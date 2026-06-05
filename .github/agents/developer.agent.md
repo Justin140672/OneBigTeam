@@ -43,6 +43,7 @@ If any of the following rejection criteria are violated by the requested impleme
 - Do not create services, repositories, handlers, validators, tests, migrations, seed data, or documentation.
 - Do not modify unrelated files.
 - Do not introduce alternative API frameworks.
+- FastEndpoints performs request validation automatically when a validator is registered for the request contract; do not duplicate manual validation blocks inside endpoint handlers.
 - For FastEndpoints request and response contracts, use positional record types with primary constructors rather than mutable classes or property-based record declarations.
 - Do not expose EF entities directly from endpoint response contracts; use explicit response DTO records.
 - Instantiate endpoint request and response DTOs with constructor arguments rather than object initializers.
