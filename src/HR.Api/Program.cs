@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using FastEndpoints;
 using HR.Modules.Companies;
 using HR.SharedKernel;
@@ -58,10 +57,7 @@ app.MapGet("/health/startup-migrations", () =>
 });
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseFastEndpoints(config =>
-{
-    config.Serializer.Options.Converters.Add(new JsonStringEnumConverter());
-});
+app.UseFastEndpoints();
 app.MapDefaultEndpoints();
 
 app.Run();

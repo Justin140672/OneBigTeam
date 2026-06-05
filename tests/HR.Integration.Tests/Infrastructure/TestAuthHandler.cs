@@ -23,7 +23,7 @@ internal sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSche
     {
         if (!Request.Headers.TryGetValue(UserHeader, out var userIdValues) || string.IsNullOrWhiteSpace(userIdValues))
         {
-            return Task.FromResult(AuthenticateResult.NoResult());
+            return Task.FromResult(AuthenticateResult.Fail("No user header present."));
         }
 
         var claims = new[]

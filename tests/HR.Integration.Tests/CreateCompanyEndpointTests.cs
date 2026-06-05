@@ -45,7 +45,7 @@ public class CreateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
 
         var response = await client.PostAsJsonAsync("/api/companies", new
         {
-            name = "Acme Corp",
+            name = "New Corp",
             addresses = new[]
             {
                 new
@@ -62,8 +62,8 @@ public class CreateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
 
         var payload = await response.Content.ReadFromJsonAsync<CreateCompanyPayload>();
         Assert.NotNull(payload);
-        Assert.Equal("Acme Corp", payload!.Name);
-        Assert.Equal("acme-corp", payload.Slug);
+        Assert.Equal("New Corp", payload!.Name);
+        Assert.Equal("new-corp", payload.Slug);
         Assert.True(payload.IsActive);
         Assert.NotEqual(Guid.Empty, payload.Id);
         Assert.Equal(2, payload.Addresses.Count);
