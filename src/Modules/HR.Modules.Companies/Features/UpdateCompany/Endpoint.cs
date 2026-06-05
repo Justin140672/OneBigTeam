@@ -1,19 +1,19 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 
-namespace HR.Modules.Companies.Features.UpdateCompanyProfile;
+namespace HR.Modules.Companies.Features.UpdateCompany;
 
 internal sealed class Endpoint(
-    UpdateCompanyProfileHandler handler) : Endpoint<UpdateCompanyProfileRequest, UpdateCompanyProfileResponse>
+    UpdateCompanyHandler handler) : Endpoint<UpdateCompanyRequest, UpdateCompanyResponse>
 {
     public override void Configure()
     {
-        Put("/api/companies/{id:guid}/profile");
+        Put("/api/companies/{id:guid}");
         Policies("authenticated");
     }
 
     public override async Task HandleAsync(
-        UpdateCompanyProfileRequest request,
+        UpdateCompanyRequest request,
         CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(request, cancellationToken);

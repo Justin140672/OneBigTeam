@@ -27,6 +27,14 @@ internal sealed class CompanyBranding
         };
     }
 
+    public void SetColors(string primaryColor, string secondaryColor, string accentColor, DateTimeOffset now)
+    {
+        PrimaryColor = primaryColor;
+        SecondaryColor = secondaryColor;
+        AccentColor = accentColor;
+        UpdatedAt = now;
+    }
+
     public void SetLogoUrl(BrandingAssetType assetType, string url, DateTimeOffset now)
     {
         switch (assetType)

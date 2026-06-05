@@ -1,15 +1,16 @@
 using HR.Modules.Companies.Domain;
 
-namespace HR.Modules.Companies.Features.UpdateCompanyProfile;
+namespace HR.Modules.Companies.Features.UpdateCompany;
 
-internal sealed record UpdateCompanyProfileResponse(
+internal sealed record UpdateCompanyResponse(
     Guid Id,
     string Name,
     string Slug,
     bool IsActive,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    IReadOnlyCollection<UpdateCompanyAddressResponse> Addresses);
+    IReadOnlyCollection<UpdateCompanyAddressResponse> Addresses,
+    UpdateCompanyBrandingResponse? Branding);
 
 internal sealed record UpdateCompanyAddressResponse(
     Guid Id,
@@ -20,3 +21,8 @@ internal sealed record UpdateCompanyAddressResponse(
     string? Region,
     string? PostalCode,
     string CountryCode);
+
+internal sealed record UpdateCompanyBrandingResponse(
+    string PrimaryColor,
+    string SecondaryColor,
+    string AccentColor);

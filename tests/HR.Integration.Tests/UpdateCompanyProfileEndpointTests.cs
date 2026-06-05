@@ -5,21 +5,21 @@ using HR.Modules.Companies.Domain;
 
 namespace HR.Integration.Tests;
 
-public class UpdateCompanyProfileEndpointTests : IClassFixture<ApiWebApplicationFactory>
+public class UpdateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
 
-    public UpdateCompanyProfileEndpointTests(ApiWebApplicationFactory factory)
+    public UpdateCompanyEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
     }
 
     [Fact]
-    public async Task Put_Company_Profile_Returns_Unauthorized_For_Anonymous_Request()
+    public async Task Put_Company_Returns_Unauthorized_For_Anonymous_Request()
     {
         using var client = _factory.CreateClient();
 
-        var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}/profile", new
+        var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}", new
         {
             name = "Acme"
         });
@@ -28,7 +28,7 @@ public class UpdateCompanyProfileEndpointTests : IClassFixture<ApiWebApplication
     }
 
     [Fact]
-    public async Task Put_Company_Profile_Updates_Name_And_Addresses()
+    public async Task Put_Company_Updates_Name_And_Addresses()
     {
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "user-5");
@@ -52,7 +52,7 @@ public class UpdateCompanyProfileEndpointTests : IClassFixture<ApiWebApplication
         var createdCompany = await createResponse.Content.ReadFromJsonAsync<CreateCompanyPayload>();
         Assert.NotNull(createdCompany);
 
-        var response = await client.PutAsJsonAsync($"/api/companies/{createdCompany!.Id}/profile", new
+        var response = await client.PutAsJsonAsync($"/api/companies/{createdCompany!.Id}", new
         {
             name = "Updated Company",
             addresses = new[]
@@ -78,21 +78,78 @@ public class UpdateCompanyProfileEndpointTests : IClassFixture<ApiWebApplication
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var payload = await response.Content.ReadFromJsonAsync<UpdateCompanyProfilePayload>();
+        var payload = await response.Content.ReadFromJsonAsync<UpdateCompanyPayload>();
         Assert.NotNull(payload);
         Assert.Equal("Updated Company", payload!.Name);
         Assert.Equal(2, payload.Addresses.Count);
-        Assert.Contains(payload.Addresses, address => address.Type == CompanyAddressType.RegisteredOffice && address.City == "London");
-        Assert.Contains(payload.Addresses, address => address.Type == CompanyAddressType.TradingAddress && address.City == "Manchester");
+        Assert.Contains(payload.Addresses, a => a.Type == CompanyAddressType.RegisteredOffice && a.City == "London");
+        Assert.Contains(payload.Addresses, a => a.Type == CompanyAddressType.TradingAddress && a.City == "Manchester");
+        Assert.Null(payload.Branding);
     }
 
     [Fact]
-    public async Task Put_Company_Profile_Returns_NotFound_For_Unknown_Id()
+    public async Task Put_Company_Updates_Branding_Colors_When_Provided()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "user-9");
+
+        var createResponse = await client.PostAsJsonAsync("/api/companies", new
+        {
+            name = $"Branding Test {Guid.NewGuid():N}",
+            addresses = new[]
+            {
+                new
+                {
+                    type = CompanyAddressType.RegisteredOffice,
+                    line1 = "10 High Street",
+                    city = "London",
+                    countryCode = "GB"
+                }
+            }
+        });
+        createResponse.EnsureSuccessStatusCode();
+
+        var createdCompany = await createResponse.Content.ReadFromJsonAsync<CreateCompanyPayload>();
+        Assert.NotNull(createdCompany);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{createdCompany!.Id}", new
+        {
+            name = createdCompany.Name,
+            addresses = new[]
+            {
+                new
+                {
+                    type = CompanyAddressType.RegisteredOffice,
+                    line1 = "10 High Street",
+                    city = "London",
+                    countryCode = "GB"
+                }
+            },
+            branding = new
+            {
+                primaryColor = "#FF5733",
+                secondaryColor = "#C70039",
+                accentColor = "#900C3F"
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<UpdateCompanyPayload>();
+        Assert.NotNull(payload);
+        Assert.NotNull(payload!.Branding);
+        Assert.Equal("#FF5733", payload.Branding!.PrimaryColor);
+        Assert.Equal("#C70039", payload.Branding.SecondaryColor);
+        Assert.Equal("#900C3F", payload.Branding.AccentColor);
+    }
+
+    [Fact]
+    public async Task Put_Company_Returns_NotFound_For_Unknown_Id()
     {
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "user-6");
 
-        var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}/profile", new
+        var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}", new
         {
             name = "Unknown",
             addresses = new[]
@@ -110,21 +167,17 @@ public class UpdateCompanyProfileEndpointTests : IClassFixture<ApiWebApplication
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    private sealed record CreateCompanyPayload(
-        Guid Id,
-        string Name,
-        string Slug,
-        bool IsActive,
-        DateTimeOffset CreatedAt);
+    private sealed record CreateCompanyPayload(Guid Id, string Name);
 
-    private sealed record UpdateCompanyProfilePayload(
+    private sealed record UpdateCompanyPayload(
         Guid Id,
         string Name,
         string Slug,
         bool IsActive,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,
-        IReadOnlyCollection<CompanyAddressPayload> Addresses);
+        IReadOnlyCollection<CompanyAddressPayload> Addresses,
+        BrandingPayload? Branding);
 
     private sealed record CompanyAddressPayload(
         Guid Id,
@@ -135,4 +188,9 @@ public class UpdateCompanyProfileEndpointTests : IClassFixture<ApiWebApplication
         string? Region,
         string? PostalCode,
         string CountryCode);
+
+    private sealed record BrandingPayload(
+        string PrimaryColor,
+        string SecondaryColor,
+        string AccentColor);
 }

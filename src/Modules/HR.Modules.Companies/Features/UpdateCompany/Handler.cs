@@ -3,44 +3,48 @@ using HR.Modules.Companies.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
-namespace HR.Modules.Companies.Features.UpdateCompanyProfile;
+namespace HR.Modules.Companies.Features.UpdateCompany;
 
-internal sealed class UpdateCompanyProfileHandler
+internal sealed class UpdateCompanyHandler
 {
     private readonly CompaniesDbContext _dbContext;
     private readonly IClock _clock;
 
-    public UpdateCompanyProfileHandler(CompaniesDbContext dbContext, IClock clock)
+    public UpdateCompanyHandler(CompaniesDbContext dbContext, IClock clock)
     {
         _dbContext = dbContext;
         _clock = clock;
     }
 
-    public async Task<Result<UpdateCompanyProfileResponse>> HandleAsync(
-        UpdateCompanyProfileRequest request,
+    public async Task<Result<UpdateCompanyResponse>> HandleAsync(
+        UpdateCompanyRequest request,
         CancellationToken cancellationToken)
     {
         var company = await _dbContext.Companies
-            .Include(currentCompany => currentCompany.Addresses)
-            .SingleOrDefaultAsync(currentCompany => currentCompany.Id == request.Id, cancellationToken);
+            .Include(c => c.Addresses)
+            .Include(c => c.Branding)
+            .SingleOrDefaultAsync(c => c.Id == request.Id, cancellationToken);
 
         if (company is null)
         {
-            return Result.Failure<UpdateCompanyProfileResponse>(
+            return Result.Failure<UpdateCompanyResponse>(
                 Error.NotFound($"Company with id '{request.Id}' was not found."));
         }
 
         var now = _clock.UtcNowOffset();
+
+        // --- Profile ---
+        company.Update(request.Name.Trim(), now);
+
+        // --- Addresses ---
         var registeredOfficeRequest = request.Addresses
             .SingleOrDefault(address => address.Type == CompanyAddressType.RegisteredOffice);
         var tradingAddressRequest = request.Addresses
             .SingleOrDefault(address => address.Type == CompanyAddressType.TradingAddress);
 
-        company.Update(request.Name.Trim(), now);
-
         if (registeredOfficeRequest is not null)
         {
-            var address = CompanyAddress.Create(
+            company.SetAddress(CompanyAddress.Create(
                 Guid.NewGuid(),
                 company.Id,
                 CompanyAddressType.RegisteredOffice,
@@ -50,12 +54,10 @@ internal sealed class UpdateCompanyProfileHandler
                 string.IsNullOrWhiteSpace(registeredOfficeRequest.Region) ? null : registeredOfficeRequest.Region.Trim(),
                 string.IsNullOrWhiteSpace(registeredOfficeRequest.PostalCode) ? null : registeredOfficeRequest.PostalCode.Trim(),
                 registeredOfficeRequest.CountryCode.Trim().ToUpperInvariant(),
-                now);
-
-            company.SetAddress(address, now);
+                now), now);
 
             var tradingSource = tradingAddressRequest ?? registeredOfficeRequest;
-            var tradingAddress = CompanyAddress.Create(
+            company.SetAddress(CompanyAddress.Create(
                 Guid.NewGuid(),
                 company.Id,
                 CompanyAddressType.TradingAddress,
@@ -65,14 +67,35 @@ internal sealed class UpdateCompanyProfileHandler
                 string.IsNullOrWhiteSpace(tradingSource.Region) ? null : tradingSource.Region.Trim(),
                 string.IsNullOrWhiteSpace(tradingSource.PostalCode) ? null : tradingSource.PostalCode.Trim(),
                 tradingSource.CountryCode.Trim().ToUpperInvariant(),
-                now);
+                now), now);
+        }
 
-            company.SetAddress(tradingAddress, now);
+        // --- Branding colors (optional) ---
+        if (request.Branding is not null)
+        {
+            if (company.Branding is null)
+            {
+                var branding = CompanyBranding.CreateDefault(company.Id, now);
+                branding.SetColors(
+                    request.Branding.PrimaryColor.Trim().ToUpperInvariant(),
+                    request.Branding.SecondaryColor.Trim().ToUpperInvariant(),
+                    request.Branding.AccentColor.Trim().ToUpperInvariant(),
+                    now);
+                _dbContext.CompanyBranding.Add(branding);
+            }
+            else
+            {
+                company.Branding.SetColors(
+                    request.Branding.PrimaryColor.Trim().ToUpperInvariant(),
+                    request.Branding.SecondaryColor.Trim().ToUpperInvariant(),
+                    request.Branding.AccentColor.Trim().ToUpperInvariant(),
+                    now);
+            }
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        var response = new UpdateCompanyProfileResponse(
+        return Result.Success(new UpdateCompanyResponse(
             company.Id,
             company.Name,
             company.Slug,
@@ -90,8 +113,10 @@ internal sealed class UpdateCompanyProfileHandler
                     address.PostalCode,
                     address.CountryCode))
                 .OrderBy(address => address.Type)
-                .ToArray());
-
-        return Result.Success(response);
+                .ToArray(),
+            company.Branding is null ? null : new UpdateCompanyBrandingResponse(
+                company.Branding.PrimaryColor,
+                company.Branding.SecondaryColor,
+                company.Branding.AccentColor)));
     }
 }
