@@ -51,6 +51,11 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
             .HasForeignKey<CompanySettings>(settings => settings.CompanyId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasOne(c => c.Branding)
+            .WithOne()
+            .HasForeignKey<CompanyBranding>(branding => branding.CompanyId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.Navigation(c => c.Addresses)
             .UsePropertyAccessMode(PropertyAccessMode.Field);
     }

@@ -22,6 +22,9 @@ public class CreateCompanyHandlerTests
         Assert.NotNull(result.Value);
         Assert.Equal("Acme Corporation", result.Value!.Name);
         Assert.Equal("acme-corporation", result.Value.Slug);
+        Assert.Equal("#0055AA", result.Value.Branding.PrimaryColor);
+        Assert.Equal("#1F2937", result.Value.Branding.SecondaryColor);
+        Assert.Equal("#0EA5E9", result.Value.Branding.AccentColor);
         Assert.Empty(result.Value.Addresses);
 
         var company = await context.Companies.SingleAsync();
@@ -44,6 +47,12 @@ public class CreateCompanyHandlerTests
         Assert.Equal(1, settings.LeaveYearStartMonth);
         Assert.Equal(25, settings.DefaultHolidayAllowance);
         Assert.Equal(6, settings.ProbationMonths);
+
+        var branding = await context.CompanyBranding.SingleAsync();
+        Assert.Equal(company.Id, branding.CompanyId);
+        Assert.Equal("#0055AA", branding.PrimaryColor);
+        Assert.Equal("#1F2937", branding.SecondaryColor);
+        Assert.Equal("#0EA5E9", branding.AccentColor);
     }
 
     [Fact]
@@ -73,6 +82,7 @@ public class CreateCompanyHandlerTests
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
         Assert.Equal(2, result.Value!.Addresses.Count);
+        Assert.Equal("#0055AA", result.Value.Branding.PrimaryColor);
         Assert.Contains(result.Value.Addresses, address => address.Type == CompanyAddressType.RegisteredOffice);
         Assert.Contains(result.Value.Addresses, address => address.Type == CompanyAddressType.TradingAddress);
 
@@ -86,6 +96,9 @@ public class CreateCompanyHandlerTests
 
         var settings = await context.CompanySettings.SingleAsync();
         Assert.Equal(result.Value.Id, settings.CompanyId);
+
+        var branding = await context.CompanyBranding.SingleAsync();
+        Assert.Equal(result.Value.Id, branding.CompanyId);
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,7 @@ internal sealed class GetCompanyHandler
     {
         var company = await _dbContext.Companies
             .Include(currentCompany => currentCompany.Addresses)
+            .Include(currentCompany => currentCompany.Branding)
             .AsNoTracking()
             .SingleOrDefaultAsync(company => company.Id == request.Id, cancellationToken);
 
@@ -27,12 +29,22 @@ internal sealed class GetCompanyHandler
             return Result.Failure<GetCompanyResponse>(Error.NotFound($"Company with id '{request.Id}' was not found."));
         }
 
+        var branding = company.Branding ?? CompanyBranding.CreateDefault(company.Id, company.CreatedAt);
+
         var response = new GetCompanyResponse(
             company.Id,
             company.Name,
             company.Slug,
             company.IsActive,
             company.CreatedAt,
+            new CompanyBrandingMetadataResponse(
+                branding.PrimaryLogoUrl,
+                branding.SmallLogoUrl,
+                branding.EmailLogoUrl,
+                branding.PrimaryColor,
+                branding.SecondaryColor,
+                branding.AccentColor,
+                branding.UpdatedAt),
             company.Addresses
                 .Select(address => new GetCompanyAddressResponse(
                     address.Id,

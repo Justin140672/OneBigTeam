@@ -59,6 +59,8 @@ public class GetCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory>
         Assert.Equal(createdCompany.Name, payload.Name);
         Assert.Equal(createdCompany.Slug, payload.Slug);
         Assert.Equal(createdCompany.IsActive, payload.IsActive);
+        Assert.NotNull(payload.Branding);
+        Assert.Equal("#0055AA", payload.Branding.PrimaryColor);
         Assert.Equal(2, payload.Addresses.Count);
         Assert.Contains(payload.Addresses, address => address.Type == CompanyAddressType.RegisteredOffice);
         Assert.Contains(payload.Addresses, address => address.Type == CompanyAddressType.TradingAddress);
@@ -81,6 +83,7 @@ public class GetCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory>
         string Slug,
         bool IsActive,
         DateTimeOffset CreatedAt,
+        CompanyBrandingPayload Branding,
         IReadOnlyCollection<CompanyAddressPayload> Addresses);
 
     private sealed record GetCompanyPayload(
@@ -89,7 +92,17 @@ public class GetCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory>
         string Slug,
         bool IsActive,
         DateTimeOffset CreatedAt,
+        CompanyBrandingPayload Branding,
         IReadOnlyCollection<CompanyAddressPayload> Addresses);
+
+    private sealed record CompanyBrandingPayload(
+        string? PrimaryLogoUrl,
+        string? SmallLogoUrl,
+        string? EmailLogoUrl,
+        string PrimaryColor,
+        string SecondaryColor,
+        string AccentColor,
+        DateTimeOffset UpdatedAt);
 
     private sealed record CompanyAddressPayload(
         Guid Id,

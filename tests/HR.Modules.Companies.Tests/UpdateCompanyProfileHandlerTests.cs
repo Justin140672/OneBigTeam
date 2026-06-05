@@ -26,6 +26,7 @@ public class UpdateCompanyProfileHandlerTests
             "GB",
             now);
         company.SetAddress(existingAddress, now);
+        company.SetBranding(CompanyBranding.CreateDefault(company.Id, now), now);
 
         context.Companies.Add(company);
         await context.SaveChangesAsync();
@@ -56,6 +57,7 @@ public class UpdateCompanyProfileHandlerTests
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
         Assert.Equal("Acme Corporation", result.Value!.Name);
+        Assert.Equal("#0055AA", result.Value.Branding.PrimaryColor);
         Assert.Equal(2, result.Value.Addresses.Count);
 
         var savedCompany = await context.Companies

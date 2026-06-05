@@ -9,7 +9,17 @@ internal sealed record UpdateCompanyProfileResponse(
     bool IsActive,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
+    CompanyBrandingMetadataResponse Branding,
     IReadOnlyCollection<UpdateCompanyAddressResponse> Addresses);
+
+internal sealed record CompanyBrandingMetadataResponse(
+    string? PrimaryLogoUrl,
+    string? SmallLogoUrl,
+    string? EmailLogoUrl,
+    string PrimaryColor,
+    string SecondaryColor,
+    string AccentColor,
+    DateTimeOffset UpdatedAt);
 
 internal sealed record UpdateCompanyAddressResponse(
     Guid Id,

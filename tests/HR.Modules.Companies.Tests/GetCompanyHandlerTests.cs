@@ -25,6 +25,7 @@ public class GetCompanyHandlerTests
             "GB",
             now);
         company.SetAddress(address, now);
+        company.SetBranding(CompanyBranding.CreateDefault(company.Id, now), now);
 
         context.Companies.Add(company);
         await context.SaveChangesAsync();
@@ -42,6 +43,9 @@ public class GetCompanyHandlerTests
         Assert.Equal("acme-corporation", result.Value.Slug);
         Assert.True(result.Value.IsActive);
         Assert.Equal(now, result.Value.CreatedAt);
+        Assert.Equal("#0055AA", result.Value.Branding.PrimaryColor);
+        Assert.Equal("#1F2937", result.Value.Branding.SecondaryColor);
+        Assert.Equal("#0EA5E9", result.Value.Branding.AccentColor);
         Assert.Single(result.Value.Addresses);
         Assert.Equal(CompanyAddressType.RegisteredOffice, result.Value.Addresses.Single().Type);
         Assert.Equal("London", result.Value.Addresses.Single().City);

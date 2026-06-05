@@ -13,6 +13,7 @@ internal sealed class Company
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     public CompanySettings? Settings { get; private set; }
+    public CompanyBranding? Branding { get; private set; }
     public IReadOnlyCollection<CompanyAddress> Addresses => _addresses;
 
     public static Company Create(Guid id, string name, string slug, DateTimeOffset now)
@@ -61,6 +62,12 @@ internal sealed class Company
     public void SetSettings(CompanySettings settings, DateTimeOffset now)
     {
         Settings = settings;
+        UpdatedAt = now;
+    }
+
+    public void SetBranding(CompanyBranding branding, DateTimeOffset now)
+    {
+        Branding = branding;
         UpdatedAt = now;
     }
 
