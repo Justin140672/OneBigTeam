@@ -1,6 +1,10 @@
 <Project Sdk="Aspire.AppHost.Sdk/13.4.2">
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="9.5.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\HR.Api\HR.Api.csproj" />
     <ProjectReference Include="..\HR.Web\HR.Web.csproj" />
   </ItemGroup>

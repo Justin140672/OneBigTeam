@@ -1,6 +1,11 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-var api = builder.AddProject<Projects.HR_Api>("api");
+var postgres = builder.AddPostgres("postgres");
+var hrDatabase = postgres.AddDatabase("hr");
+
+var api = builder.AddProject<Projects.HR_Api>("api")
+    .WithReference(hrDatabase)
+    .WaitFor(hrDatabase);
 
 builder.AddProject<Projects.HR_Web>("web")
 	.WithReference(api)

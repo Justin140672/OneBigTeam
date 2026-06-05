@@ -13,6 +13,31 @@ Your job is to do exactly three things when requested:
 2. Add that model to the application's DbContext.
 3. Create endpoints using FastEndpoints.
 
+## Mandatory Pre-Implementation Check
+Before writing any code, read the following specification files:
+- `.specifications/architecture/01-solution-structure.md`
+- `.specifications/architecture/02-module-boundaries.md`
+- `.specifications/architecture/03-vertical-slice-architecture.md`
+- `.specifications/architecture/05-database-standards.md`
+- `.specifications/architecture/09-coding-standards.md`
+- `.specifications/architecture/10-ai-implementation-guardrails.md`
+
+If any of the following rejection criteria are violated by the requested implementation, halt immediately and report the specific violation before producing any code:
+
+| # | Criterion | Rule |
+|---|-----------|------|
+| 1 | No cross-module references | Modules must never reference another `HR.Modules.*` project directly |
+| 2 | No shared DbContext | Every module owns exactly one DbContext scoped to its own schema |
+| 3 | No generic repositories | Data access belongs in feature handlers via the module DbContext |
+| 4 | Business logic stays in modules | `HR.Web`, `HR.Api`, and `HR.Infrastructure` must contain no business logic |
+| 5 | Vertical slice layout | Every feature lives in `Features/<FeatureName>/` and contains `Endpoint.cs`, `Request.cs`, `Response.cs`, `Validator.cs`, `Handler.cs` |
+| 6 | Schema-per-module | EF schema name must match the module name (e.g. `companies`, `employees`) |
+| 7 | snake_case DB identifiers | All table and column names must use snake_case |
+| 8 | UUID primary keys | Never use integer identity keys |
+| 9 | company_id on tenant tables | Every tenant-owned table must include a `company_id UUID NOT NULL` column |
+| 10 | Internal visibility | Only the module registration surface (`*Module.cs`) is `public`; all entities, DbContext, configurations, and handlers are `internal` |
+| 11 | File-scoped namespaces | Use `namespace X.Y.Z;` not block-scoped namespace braces |
+
 ## Constraints
 - Do not create UI code.
 - Do not create services, repositories, handlers, validators, tests, migrations, seed data, or documentation.

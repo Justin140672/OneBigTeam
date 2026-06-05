@@ -30,8 +30,33 @@ Coordinate implementation and validation work by delegating in sequence:
 ## Workflow
 
 ### 0. Architecture gate
-- After reading the mandatory specification files, state for each rejection criterion whether the proposed implementation is compliant or in violation.
-- If any criterion is marked in violation, halt and report the specific violation to the user before delegating anything.
+Read all of the following specification files before evaluating anything:
+- `.specifications/architecture/01-solution-structure.md`
+- `.specifications/architecture/02-module-boundaries.md`
+- `.specifications/architecture/03-vertical-slice-architecture.md`
+- `.specifications/architecture/05-database-standards.md`
+- `.specifications/architecture/06-authentication-authorization.md`
+- `.specifications/architecture/07-testing-strategy.md`
+- `.specifications/architecture/09-coding-standards.md`
+- `.specifications/architecture/10-ai-implementation-guardrails.md`
+
+For each of the following rejection criteria, state explicitly **Compliant** or **Violation — [reason]**:
+
+| # | Criterion | Rule |
+|---|-----------|------|
+| 1 | No cross-module references | Modules must never reference another `HR.Modules.*` project directly |
+| 2 | No shared DbContext | Every module owns exactly one DbContext scoped to its own schema |
+| 3 | No generic repositories | Data access belongs in feature handlers via the module DbContext |
+| 4 | Business logic stays in modules | `HR.Web`, `HR.Api`, and `HR.Infrastructure` must contain no business logic |
+| 5 | Vertical slice layout | Every feature lives in `Features/<FeatureName>/` and contains `Endpoint.cs`, `Request.cs`, `Response.cs`, `Validator.cs`, `Handler.cs` |
+| 6 | Schema-per-module | EF schema name must match the module name (e.g. `companies`, `employees`) |
+| 7 | snake_case DB identifiers | All table and column names must use snake_case |
+| 8 | UUID primary keys | Never use integer identity keys |
+| 9 | company_id on tenant tables | Every tenant-owned table must include a `company_id UUID NOT NULL` column |
+| 10 | Internal visibility | Only the module registration surface (`*Module.cs`) is `public`; all entities, DbContext, configurations, and handlers are `internal` |
+| 11 | File-scoped namespaces | Use `namespace X.Y.Z;` not block-scoped namespace braces |
+
+If any criterion is marked **Violation**, halt and report the specific violation to the user before delegating anything.
 
 ### 1. Developer handoff
 - Give the developer agent the user request and any relevant repository context.
