@@ -102,6 +102,7 @@ Provide a concise final summary that includes:
 ## Guardrails
 - Keep changes minimal and focused on the user request.
 - Do not introduce unrelated refactors.
+- Before adding new code (helpers, utilities, services, models, or components), search for existing implementations and reuse/extend them when appropriate to avoid duplicate code.
 - If build or tests fail, stop and report the failure with the relevant details.
 - If a specialist agent returns an error, refuses the task, or reports it cannot complete the handoff, stop immediately and report the agent name, the task it was given, and the failure reason to the user. Do not attempt to proceed to the next step.
 - Do not invoke the ui agent until the pre-UI build and test checks have both passed.

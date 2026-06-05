@@ -1,7 +1,7 @@
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Features.CreateCompany;
 using HR.Modules.Companies.Persistence;
-using HR.SharedKernel;
+using HR.Modules.Companies.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Tests;
@@ -29,6 +29,15 @@ public class CreateCompanyHandlerTests
         Assert.Equal("Acme Corporation", company.Name);
         Assert.Equal("acme-corporation", company.Slug);
         Assert.True(company.IsActive);
+
+        var settings = await context.CompanySettings.SingleAsync();
+        Assert.Equal(company.Id, settings.CompanyId);
+        Assert.Equal("UTC", settings.TimeZone);
+        Assert.Equal("en-GB", settings.Locale);
+        Assert.Equal("Monday-Friday", settings.WorkingWeek);
+        Assert.Equal(1, settings.LeaveYearStartMonth);
+        Assert.Equal(25, settings.DefaultHolidayAllowance);
+        Assert.Equal(6, settings.ProbationMonths);
     }
 
     [Fact]
@@ -68,6 +77,9 @@ public class CreateCompanyHandlerTests
         Assert.Equal(2, addresses.Count);
         Assert.Equal("10 High Street", addresses.Single(address => address.Type == CompanyAddressType.RegisteredOffice).Line1);
         Assert.Equal("10 High Street", addresses.Single(address => address.Type == CompanyAddressType.TradingAddress).Line1);
+
+        var settings = await context.CompanySettings.SingleAsync();
+        Assert.Equal(result.Value.Id, settings.CompanyId);
     }
 
     [Fact]
@@ -97,15 +109,5 @@ public class CreateCompanyHandlerTests
             .Options;
 
         return new CompaniesDbContext(options);
-    }
-
-    private sealed class FakeClock : IClock
-    {
-        public FakeClock(DateTime utcNow)
-        {
-            UtcNow = utcNow;
-        }
-
-        public DateTime UtcNow { get; }
     }
 }

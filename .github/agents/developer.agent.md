@@ -42,6 +42,7 @@ If any of the following rejection criteria are violated by the requested impleme
 - Do not create UI code.
 - Do not create services, repositories, handlers, validators, tests, migrations, seed data, or documentation.
 - Do not modify unrelated files.
+- Before adding new code (helpers, utilities, services, models, or components), search for existing implementations and reuse or extend them when appropriate to avoid duplicate code.
 - Do not introduce alternative API frameworks.
 - FastEndpoints performs request validation automatically when a validator is registered for the request contract; do not duplicate manual validation blocks inside endpoint handlers.
 - For FastEndpoints request and response contracts, use positional record types with primary constructors rather than mutable classes or property-based record declarations.

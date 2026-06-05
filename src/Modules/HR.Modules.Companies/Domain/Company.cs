@@ -12,6 +12,7 @@ internal sealed class Company
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+    public CompanySettings? Settings { get; private set; }
     public IReadOnlyCollection<CompanyAddress> Addresses => _addresses;
 
     public static Company Create(Guid id, string name, string slug, DateTimeOffset now)
@@ -54,6 +55,12 @@ internal sealed class Company
             address.CountryCode,
             now);
 
+        UpdatedAt = now;
+    }
+
+    public void SetSettings(CompanySettings settings, DateTimeOffset now)
+    {
+        Settings = settings;
         UpdatedAt = now;
     }
 

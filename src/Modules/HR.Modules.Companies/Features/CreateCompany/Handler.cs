@@ -80,6 +80,8 @@ internal sealed class CreateCompanyHandler
             company.SetAddress(tradingAddress, now);
         }
 
+        company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
         _dbContext.Companies.Add(company);
         await _dbContext.SaveChangesAsync(cancellationToken);
 

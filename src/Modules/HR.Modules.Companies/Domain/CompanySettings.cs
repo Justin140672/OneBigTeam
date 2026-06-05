@@ -8,7 +8,7 @@ internal sealed class CompanySettings
     public string TimeZone { get; private set; } = string.Empty;
     public string Locale { get; private set; } = string.Empty;
     public string WorkingWeek { get; private set; } = string.Empty;
-    public DateOnly LeaveYearStart { get; private set; }
+    public int LeaveYearStartMonth { get; private set; }
     public decimal DefaultHolidayAllowance { get; private set; }
     public int ProbationMonths { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -22,7 +22,7 @@ internal sealed class CompanySettings
             TimeZone = "UTC",
             Locale = "en-GB",
             WorkingWeek = "Monday-Friday",
-            LeaveYearStart = new DateOnly(2000, 1, 1),
+            LeaveYearStartMonth = 1,
             DefaultHolidayAllowance = 25,
             ProbationMonths = 6,
             CreatedAt = now,

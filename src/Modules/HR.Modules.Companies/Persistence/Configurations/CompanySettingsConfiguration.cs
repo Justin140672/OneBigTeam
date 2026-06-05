@@ -8,7 +8,10 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
 {
     public void Configure(EntityTypeBuilder<CompanySettings> builder)
     {
-        builder.ToTable("company_settings");
+        builder.ToTable("company_settings", tableBuilder =>
+            tableBuilder.HasCheckConstraint(
+                "CK_company_settings_leave_year_start_month",
+                "leave_year_start_month BETWEEN 1 AND 12"));
 
         builder.HasKey(settings => settings.CompanyId);
 
@@ -31,9 +34,8 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .HasMaxLength(30)
             .IsRequired();
 
-        builder.Property(settings => settings.LeaveYearStart)
-            .HasColumnName("leave_year_start")
-            .HasColumnType("date")
+        builder.Property(settings => settings.LeaveYearStartMonth)
+            .HasColumnName("leave_year_start_month")
             .IsRequired();
 
         builder.Property(settings => settings.DefaultHolidayAllowance)

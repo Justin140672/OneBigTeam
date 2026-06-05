@@ -1,7 +1,7 @@
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Features.UpdateCompanyProfile;
 using HR.Modules.Companies.Persistence;
-using HR.SharedKernel;
+using HR.Modules.Companies.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Tests;
@@ -95,15 +95,5 @@ public class UpdateCompanyProfileHandlerTests
             .Options;
 
         return new CompaniesDbContext(options);
-    }
-
-    private sealed class FakeClock : IClock
-    {
-        public FakeClock(DateTime utcNow)
-        {
-            UtcNow = utcNow;
-        }
-
-        public DateTime UtcNow { get; }
     }
 }
