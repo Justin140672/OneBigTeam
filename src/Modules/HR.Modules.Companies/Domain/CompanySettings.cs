@@ -29,4 +29,22 @@ internal sealed class CompanySettings
             UpdatedAt = now,
         };
     }
+
+    public void Update(
+        string timeZone,
+        string locale,
+        string workingWeek,
+        int leaveYearStartMonth,
+        decimal defaultHolidayAllowance,
+        int probationMonths,
+        DateTimeOffset now)
+    {
+        TimeZone = timeZone;
+        Locale = locale;
+        WorkingWeek = workingWeek;
+        LeaveYearStartMonth = leaveYearStartMonth;
+        DefaultHolidayAllowance = defaultHolidayAllowance;
+        ProbationMonths = probationMonths;
+        UpdatedAt = now;
+    }
 }

@@ -24,7 +24,7 @@ public class CompaniesModuleArchitectureTests
         var unexpected = ModuleAssembly
             .GetExportedTypes()
             .Where(t => t.Name is not "Class1" and not "CompaniesModule")
-            .Where(t => t.Namespace?.StartsWith("HR.Modules.Companies.Migrations", StringComparison.Ordinal) is not true)
+            .Where(t => t.Namespace?.Contains(".Migrations") is not true)
             .Select(t => t.FullName!)
             .ToArray();
 

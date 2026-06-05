@@ -30,8 +30,7 @@ internal sealed class UpdateCompanyProfileHandler
                 Error.NotFound($"Company with id '{request.Id}' was not found."));
         }
 
-        var utcNow = DateTime.SpecifyKind(_clock.UtcNow, DateTimeKind.Utc);
-        var now = new DateTimeOffset(utcNow);
+        var now = _clock.UtcNowOffset();
         var registeredOfficeRequest = request.Addresses
             .SingleOrDefault(address => address.Type == CompanyAddressType.RegisteredOffice);
         var tradingAddressRequest = request.Addresses

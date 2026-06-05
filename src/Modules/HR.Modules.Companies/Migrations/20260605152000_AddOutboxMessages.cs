@@ -1,14 +1,16 @@
-﻿using System;
+using System;
+using HR.Modules.Companies.Persistence;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace HR.Modules.Companies.Migrations
 {
-    /// <inheritdoc />
+    [DbContext(typeof(CompaniesDbContext))]
+    [Migration("20260605152000_AddOutboxMessages")]
     public partial class AddOutboxMessages : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
@@ -42,7 +44,6 @@ namespace HR.Modules.Companies.Migrations
                 columns: new[] { "status", "created_at" });
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(

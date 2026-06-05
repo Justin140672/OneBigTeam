@@ -39,8 +39,7 @@ internal sealed class CreateCompanyHandler
             return Result.Failure<CreateCompanyResponse>(Error.Conflict($"A company with slug '{slug}' already exists."));
         }
 
-        var utcNow = DateTime.SpecifyKind(_clock.UtcNow, DateTimeKind.Utc);
-        var now = new DateTimeOffset(utcNow);
+        var now = _clock.UtcNowOffset();
 
         var company = Company.Create(Guid.NewGuid(), name, slug, now);
         var registeredOfficeRequest = request.Addresses
