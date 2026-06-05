@@ -34,7 +34,13 @@ public class CreateCompanyHandlerTests
         Assert.Equal(company.Id, settings.CompanyId);
         Assert.Equal("UTC", settings.TimeZone);
         Assert.Equal("en-GB", settings.Locale);
-        Assert.Equal("Monday-Friday", settings.WorkingWeek);
+        Assert.Equal(
+            WorkingDays.Monday
+            | WorkingDays.Tuesday
+            | WorkingDays.Wednesday
+            | WorkingDays.Thursday
+            | WorkingDays.Friday,
+            settings.WorkingWeek);
         Assert.Equal(1, settings.LeaveYearStartMonth);
         Assert.Equal(25, settings.DefaultHolidayAllowance);
         Assert.Equal(6, settings.ProbationMonths);
