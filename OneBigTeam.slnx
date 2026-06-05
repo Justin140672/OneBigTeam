@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HR.Api/HR.Api.csproj" />
+    <Project Path="src/HR.AppHost/HR.AppHost.csproj" />
+    <Project Path="src/HR.ServiceDefaults/HR.ServiceDefaults.csproj" />
+    <Project Path="src/HR.Web/HR.Web.csproj" />
+  </Folder>
+  <Folder Name="/src/Infrastructure/">
+    <Project Path="src/Infrastructure/HR.Infrastructure/HR.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/">
+    <Project Path="src/Modules/HR.Modules.Companies/HR.Modules.Companies.csproj" />
+    <Project Path="src/Modules/HR.Modules.Employees/HR.Modules.Employees.csproj" />
+    <Project Path="src/Modules/HR.Modules.Identity/HR.Modules.Identity.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/">
+    <Project Path="src/Shared/HR.SharedKernel/HR.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/HR.Architecture.Tests/HR.Architecture.Tests.csproj" />
+  </Folder>
+</Solution>
