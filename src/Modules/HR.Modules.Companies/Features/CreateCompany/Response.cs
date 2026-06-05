@@ -8,17 +8,7 @@ internal sealed record CreateCompanyResponse(
     string Slug,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    CompanyBrandingMetadataResponse Branding,
     IReadOnlyCollection<CreateCompanyAddressResponse> Addresses);
-
-internal sealed record CompanyBrandingMetadataResponse(
-    string? PrimaryLogoUrl,
-    string? SmallLogoUrl,
-    string? EmailLogoUrl,
-    string PrimaryColor,
-    string SecondaryColor,
-    string AccentColor,
-    DateTimeOffset UpdatedAt);
 
 internal sealed record CreateCompanyAddressResponse(
     Guid Id,

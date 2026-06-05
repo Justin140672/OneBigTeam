@@ -54,16 +54,6 @@ public class CompaniesModuleArchitectureTests
     }
 
     [Fact]
-    public void CompanyBranding_Entity_Is_Not_Public()
-    {
-        var entityType = ModuleAssembly
-            .GetTypes()
-            .Single(t => t.Name == "CompanyBranding");
-
-        Assert.False(entityType.IsPublic, "CompanyBranding entity must be internal, not public.");
-    }
-
-    [Fact]
     public void Companies_DbContext_Uses_Companies_Schema()
     {
         using var context = BuildContext();
@@ -92,17 +82,6 @@ public class CompaniesModuleArchitectureTests
 
         Assert.Single(pk.Properties);
         Assert.Equal(typeof(Guid), pk.Properties[0].ClrType);
-    }
-
-    [Fact]
-    public void CompanyBranding_Entity_Maps_To_Correct_Table_And_Schema()
-    {
-        using var context = BuildContext();
-
-        var entityType = context.Model.FindEntityType(typeof(CompanyBranding))!;
-
-        Assert.Equal("company_branding", entityType.GetTableName());
-        Assert.Equal("companies", entityType.GetSchema());
     }
 
     [Fact]

@@ -81,12 +81,9 @@ internal sealed class CreateCompanyHandler
         }
 
         company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
-        company.SetBranding(CompanyBranding.CreateDefault(company.Id, now), now);
 
         _dbContext.Companies.Add(company);
         await _dbContext.SaveChangesAsync(cancellationToken);
-
-        var branding = company.Branding ?? CompanyBranding.CreateDefault(company.Id, now);
 
         var response = new CreateCompanyResponse(
             company.Id,
@@ -94,14 +91,6 @@ internal sealed class CreateCompanyHandler
             company.Slug,
             company.IsActive,
             company.CreatedAt,
-            new CompanyBrandingMetadataResponse(
-                branding.PrimaryLogoUrl,
-                branding.SmallLogoUrl,
-                branding.EmailLogoUrl,
-                branding.PrimaryColor,
-                branding.SecondaryColor,
-                branding.AccentColor,
-                branding.UpdatedAt),
             company.Addresses
                 .Select(address => new CreateCompanyAddressResponse(
                     address.Id,

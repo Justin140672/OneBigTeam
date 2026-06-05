@@ -31,6 +31,7 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
 
         builder.Property(settings => settings.WorkingWeek)
             .HasColumnName("working_week")
+            .HasMaxLength(30)
             .IsRequired();
 
         builder.Property(settings => settings.LeaveYearStartMonth)

@@ -7,7 +7,7 @@ internal sealed class CompanySettings
     public Guid CompanyId { get; private set; }
     public string TimeZone { get; private set; } = string.Empty;
     public string Locale { get; private set; } = string.Empty;
-    public WorkingDays WorkingWeek { get; private set; }
+    public string WorkingWeek { get; private set; } = string.Empty;
     public int LeaveYearStartMonth { get; private set; }
     public decimal DefaultHolidayAllowance { get; private set; }
     public int ProbationMonths { get; private set; }
@@ -21,34 +21,12 @@ internal sealed class CompanySettings
             CompanyId = companyId,
             TimeZone = "UTC",
             Locale = "en-GB",
-            WorkingWeek = WorkingDays.Monday
-                | WorkingDays.Tuesday
-                | WorkingDays.Wednesday
-                | WorkingDays.Thursday
-                | WorkingDays.Friday,
+            WorkingWeek = "Monday-Friday",
             LeaveYearStartMonth = 1,
             DefaultHolidayAllowance = 25,
             ProbationMonths = 6,
             CreatedAt = now,
             UpdatedAt = now,
         };
-    }
-
-    public void Update(
-        string timeZone,
-        string locale,
-        WorkingDays workingWeek,
-        int leaveYearStartMonth,
-        decimal defaultHolidayAllowance,
-        int probationMonths,
-        DateTimeOffset now)
-    {
-        TimeZone = timeZone;
-        Locale = locale;
-        WorkingWeek = workingWeek;
-        LeaveYearStartMonth = leaveYearStartMonth;
-        DefaultHolidayAllowance = defaultHolidayAllowance;
-        ProbationMonths = probationMonths;
-        UpdatedAt = now;
     }
 }

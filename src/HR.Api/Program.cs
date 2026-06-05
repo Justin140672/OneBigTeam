@@ -1,5 +1,4 @@
 using FastEndpoints;
-using HR.Api.Authentication;
 using HR.Modules.Companies;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -12,9 +11,7 @@ var connectionString = builder.Configuration.GetConnectionString("hr")
 
 builder.Services.AddCompaniesModule(connectionString);
 builder.Services.AddFastEndpoints();
-builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<IClock, SystemClock>();
-builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 builder.Services
 	.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 	.AddJwtBearer();

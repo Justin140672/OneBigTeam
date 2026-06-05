@@ -13,8 +13,6 @@ internal sealed class CompaniesDbContext : DbContext
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<CompanyAddress> CompanyAddresses => Set<CompanyAddress>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
-    public DbSet<CompanyBranding> CompanyBranding => Set<CompanyBranding>();
-    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -22,7 +22,6 @@ internal sealed class UpdateCompanyProfileHandler
     {
         var company = await _dbContext.Companies
             .Include(currentCompany => currentCompany.Addresses)
-            .Include(currentCompany => currentCompany.Branding)
             .SingleOrDefaultAsync(currentCompany => currentCompany.Id == request.Id, cancellationToken);
 
         if (company is null)
@@ -74,8 +73,6 @@ internal sealed class UpdateCompanyProfileHandler
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        var branding = company.Branding ?? CompanyBranding.CreateDefault(company.Id, company.CreatedAt);
-
         var response = new UpdateCompanyProfileResponse(
             company.Id,
             company.Name,
@@ -83,14 +80,6 @@ internal sealed class UpdateCompanyProfileHandler
             company.IsActive,
             company.CreatedAt,
             company.UpdatedAt,
-            new CompanyBrandingMetadataResponse(
-                branding.PrimaryLogoUrl,
-                branding.SmallLogoUrl,
-                branding.EmailLogoUrl,
-                branding.PrimaryColor,
-                branding.SecondaryColor,
-                branding.AccentColor,
-                branding.UpdatedAt),
             company.Addresses
                 .Select(address => new UpdateCompanyAddressResponse(
                     address.Id,

@@ -81,8 +81,6 @@ public class UpdateCompanyProfileEndpointTests : IClassFixture<ApiWebApplication
         var payload = await response.Content.ReadFromJsonAsync<UpdateCompanyProfilePayload>();
         Assert.NotNull(payload);
         Assert.Equal("Updated Company", payload!.Name);
-        Assert.NotNull(payload.Branding);
-        Assert.Equal("#0055AA", payload.Branding.PrimaryColor);
         Assert.Equal(2, payload.Addresses.Count);
         Assert.Contains(payload.Addresses, address => address.Type == CompanyAddressType.RegisteredOffice && address.City == "London");
         Assert.Contains(payload.Addresses, address => address.Type == CompanyAddressType.TradingAddress && address.City == "Manchester");
@@ -126,17 +124,7 @@ public class UpdateCompanyProfileEndpointTests : IClassFixture<ApiWebApplication
         bool IsActive,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,
-        CompanyBrandingPayload Branding,
         IReadOnlyCollection<CompanyAddressPayload> Addresses);
-
-    private sealed record CompanyBrandingPayload(
-        string? PrimaryLogoUrl,
-        string? SmallLogoUrl,
-        string? EmailLogoUrl,
-        string PrimaryColor,
-        string SecondaryColor,
-        string AccentColor,
-        DateTimeOffset UpdatedAt);
 
     private sealed record CompanyAddressPayload(
         Guid Id,

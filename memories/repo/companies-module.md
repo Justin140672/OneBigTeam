@@ -1,5 +1,3 @@
 - Companies module follows vertical slices under src/Modules/HR.Modules.Companies/Features.
 - Company profile updates are handled at PUT /api/companies/{id}/profile.
 - Integration tests rely on Docker testcontainers PostgreSQL and set ConnectionStrings__hr env var in ApiWebApplicationFactory.
-- Company creation now seeds one-to-one CompanyBranding defaults (#0055AA, #1F2937, #0EA5E9) and returns branding metadata in create/get/update-profile responses.
-- Integration tests currently fail if companies migrations are not present/applied because runtime startup uses MigrateCompaniesAsync.

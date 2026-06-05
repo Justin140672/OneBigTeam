@@ -10,35 +10,29 @@ namespace HR.Modules.Companies.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql(
-                """
-                ALTER TABLE companies.company_settings
-                ALTER COLUMN working_week TYPE integer
-                USING (
-                    CASE working_week
-                        WHEN 'Monday-Friday' THEN 31
-                        WHEN 'Sunday-Thursday' THEN 79
-                        ELSE 0
-                    END
-                );
-                """);
+            migrationBuilder.AlterColumn<int>(
+                name: "working_week",
+                schema: "companies",
+                table: "company_settings",
+                type: "integer",
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "character varying(30)",
+                oldMaxLength: 30);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql(
-                """
-                ALTER TABLE companies.company_settings
-                ALTER COLUMN working_week TYPE character varying(30)
-                USING (
-                    CASE working_week
-                        WHEN 31 THEN 'Monday-Friday'
-                        WHEN 79 THEN 'Sunday-Thursday'
-                        ELSE 'Monday-Friday'
-                    END
-                );
-                """);
+            migrationBuilder.AlterColumn<string>(
+                name: "working_week",
+                schema: "companies",
+                table: "company_settings",
+                type: "character varying(30)",
+                maxLength: 30,
+                nullable: false,
+                oldClrType: typeof(int),
+                oldType: "integer");
         }
     }
 }
