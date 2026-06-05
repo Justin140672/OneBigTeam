@@ -1,5 +1,6 @@
 using FluentValidation;
 using HR.Modules.Companies.Features.CreateCompany;
+using HR.Modules.Companies.Features.GetCompany;
 using HR.Modules.Companies.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,8 +13,7 @@ public static class CompaniesModule
         this IServiceCollection services,
         string connectionString)
     {
-        services.AddScoped<CreateCompanyHandler>();
-        services.AddScoped<IValidator<CreateCompanyRequest>, CreateCompanyValidator>();
+        AddFeatureServices(services);
 
         services.AddDbContext<CompaniesDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
@@ -27,5 +27,12 @@ public static class CompaniesModule
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
         await db.Database.MigrateAsync();
+    }
+
+    private static void AddFeatureServices(IServiceCollection services)
+    {
+        services.AddScoped<CreateCompanyHandler>();
+        services.AddScoped<GetCompanyHandler>();
+        services.AddScoped<IValidator<CreateCompanyRequest>, CreateCompanyValidator>();
     }
 }
