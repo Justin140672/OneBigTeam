@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using FastEndpoints;
 using HR.Modules.Companies;
 using HR.SharedKernel;
@@ -28,6 +29,7 @@ DateTimeOffset? companiesMigrationCheckedAt = null;
 try
 {
 	await app.Services.MigrateCompaniesAsync();
+	await app.Services.SeedCompaniesAsync();
 	companiesMigrationStatus = "succeeded";
 	companiesMigrationCheckedAt = DateTimeOffset.UtcNow;
 }
@@ -56,7 +58,10 @@ app.MapGet("/health/startup-migrations", () =>
 });
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseFastEndpoints();
+app.UseFastEndpoints(config =>
+{
+    config.Serializer.Options.Converters.Add(new JsonStringEnumConverter());
+});
 app.MapDefaultEndpoints();
 
 app.Run();

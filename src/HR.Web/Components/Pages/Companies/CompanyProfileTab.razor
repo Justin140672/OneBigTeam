@@ -1,0 +1,28 @@
+@using HR.Web.Models
+@using System.ComponentModel.DataAnnotations
+
+<div class="card">
+    <div class="card-body">
+        <div class="mb-4">
+            <label class="form-label fw-semibold">Name</label>
+            <SfTextBox @bind-Value="Model.Name" Placeholder="Company name" FloatLabelType="FloatLabelType.Auto" />
+        </div>
+        <div class="mb-4">
+            <label class="form-label fw-semibold">Slug</label>
+            <SfTextBox Value="@Company!.Slug" Enabled="false" FloatLabelType="FloatLabelType.Auto" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-semibold">Status</label>
+            <p class="mb-0">
+                <span class="badge @(Company.IsActive ? "bg-success" : "bg-secondary")">
+                    @(Company.IsActive ? "Active" : "Inactive")
+                </span>
+            </p>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public GetCompanyResponse? Company { get; set; }
+    [Parameter, EditorRequired] public CompanyProfileEditModel Model { get; set; } = default!;
+}

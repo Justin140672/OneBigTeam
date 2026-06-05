@@ -1,0 +1,65 @@
+@using HR.Web.Models
+@using System.ComponentModel.DataAnnotations
+
+<div class="card">
+    <div class="card-body">
+        <div class="row g-4">
+            <div class="col-md-6">
+                <SfTextBox @bind-Value="Model.TimeZone" Placeholder="Time Zone" FloatLabelType="FloatLabelType.Auto" />
+            </div>
+            <div class="col-md-6">
+                <SfTextBox @bind-Value="Model.Locale" Placeholder="Locale" FloatLabelType="FloatLabelType.Auto" />
+            </div>
+            <div class="col-12">
+                <label class="form-label fw-semibold">Working Week</label>
+                <div class="d-flex flex-wrap gap-3 mt-1">
+                    @foreach (var day in _allDays)
+                    {
+                        <SfCheckBox TChecked="bool" Label="@day"
+                                    Checked="@Model.WorkingWeek.Contains(day)"
+                                    CheckedChanged="@(e => ToggleDay(day, e))" />
+                    }
+                </div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Leave Year Start Month</label>
+                <SfDropDownList TValue="int" TItem="MonthItem"
+                                @bind-Value="Model.LeaveYearStartMonth"
+                                DataSource="@_months"
+                                Placeholder="Select month">
+                    <DropDownListFieldSettings Value="Number" Text="Name" />
+                </SfDropDownList>
+            </div>
+            <div class="col-md-4">
+                <SfNumericTextBox TValue="decimal" @bind-Value="Model.DefaultHolidayAllowance"
+                                  Placeholder="Default Holiday Allowance (days)"
+                                  FloatLabelType="FloatLabelType.Auto"
+                                  Min="0" Max="365" />
+            </div>
+            <div class="col-md-4">
+                <SfNumericTextBox TValue="int" @bind-Value="Model.ProbationMonths"
+                                  Placeholder="Probation Months"
+                                  FloatLabelType="FloatLabelType.Auto"
+                                  Min="0" Max="24" />
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public CompanySettingsEditModel Model { get; set; } = default!;
+
+    private static readonly string[] _allDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+    private static readonly List<MonthItem> _months = Enumerable.Range(1, 12)
+        .Select(m => new MonthItem(m, System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)))
+        .ToList();
+
+    private void ToggleDay(string day, bool isChecked)
+    {
+        if (isChecked) Model.WorkingWeek.Add(day);
+        else Model.WorkingWeek.Remove(day);
+    }
+
+    private sealed record MonthItem(int Number, string Name);
+}

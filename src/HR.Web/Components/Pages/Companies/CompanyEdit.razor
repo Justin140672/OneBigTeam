@@ -1,0 +1,139 @@
+@page "/companies/{Id:guid}/edit"
+@rendermode InteractiveServer
+@using HR.Web.Models
+@using HR.Web.Services
+@inject CompanyService CompanyService
+
+<PageTitle>Edit Company</PageTitle>
+
+<div class="container py-4">
+    @if (_loading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span>Loading…</span>
+        </div>
+    }
+    else if (_company is null)
+    {
+        <div class="alert alert-danger">Company not found.</div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <h1 class="mb-0">@_company.Name</h1>
+            <span class="badge @(_company.IsActive ? "bg-success" : "bg-secondary")">
+                @(_company.IsActive ? "Active" : "Inactive")
+            </span>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_globalError))
+        {
+            <div class="alert alert-danger">@_globalError</div>
+        }
+
+        <ul class="nav nav-tabs mb-4" role="tablist">
+            @foreach (var tab in _tabs)
+            {
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link @(tab == _activeTab ? "active" : "")" type="button" role="tab"
+                            @onclick="() => _activeTab = tab">@tab</button>
+                </li>
+            }
+        </ul>
+
+        <div class="tab-content">
+            @if (_activeTab == "Profile")
+            {
+                <CompanyProfileTab Company="_company" Model="_profile" />
+            }
+            else if (_activeTab == "Addresses")
+            {
+                <CompanyAddressesTab Addresses="_addresses" />
+            }
+            else if (_activeTab == "Settings")
+            {
+                <CompanySettingsTab Model="_settings" />
+            }
+            else if (_activeTab == "Branding")
+            {
+                <CompanyBrandingTab Model="_branding" />
+            }
+        </div>
+
+        <div class="mt-4">
+            @if (!string.IsNullOrEmpty(_successMsg))
+            {
+                <div class="alert alert-success py-2 mb-3">@_successMsg</div>
+            }
+            <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAll">
+                @(_saving ? "Saving…" : "Save")
+            </SfButton>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private GetCompanyResponse? _company;
+    private bool _loading = true;
+    private string? _globalError;
+    private string? _successMsg;
+    private bool _saving;
+    private string _activeTab = "Profile";
+    private readonly string[] _tabs = ["Profile", "Addresses", "Settings", "Branding"];
+
+    private readonly CompanyProfileEditModel _profile = new();
+    private List<CompanyAddressEditModel> _addresses = [];
+    private readonly CompanySettingsEditModel _settings = new();
+    private readonly CompanyBrandingEditModel _branding = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _company = await CompanyService.GetCompanyAsync(Id);
+        if (_company is not null)
+        {
+            _profile.Name = _company.Name;
+            _addresses = _company.Addresses.Select(a => new CompanyAddressEditModel
+            {
+                Type = a.Type,
+                Line1 = a.Line1,
+                Line2 = a.Line2,
+                City = a.City,
+                Region = a.Region,
+                PostalCode = a.PostalCode,
+                CountryCode = a.CountryCode
+            }).ToList();
+        }
+        _loading = false;
+    }
+
+    private async Task SaveAll()
+    {
+        _saving = true;
+        _globalError = null;
+        _successMsg = null;
+
+        var profileReq = new UpdateCompanyRequest(
+            Id, _profile.Name,
+            _addresses.Select(a => new UpdateCompanyAddressRequest(
+                a.Type, a.Line1, a.Line2, a.City, a.Region, a.PostalCode, a.CountryCode)).ToList(),
+            new UpdateCompanyBrandingRequest(_branding.PrimaryColor, _branding.SecondaryColor, _branding.AccentColor));
+
+        var settingsReq = new UpdateCompanySettingsRequest(
+            Id, _settings.TimeZone, _settings.Locale,
+            [.. _settings.WorkingWeek],
+            _settings.LeaveYearStartMonth, _settings.DefaultHolidayAllowance, _settings.ProbationMonths);
+
+        var companyResult = await CompanyService.UpdateCompanyAsync(Id, profileReq);
+        var settingsResult = await CompanyService.UpdateCompanySettingsAsync(Id, settingsReq);
+
+        if (companyResult is null || settingsResult is null)
+            _globalError = "One or more sections failed to save.";
+        else
+            _successMsg = "Company saved successfully.";
+
+        _saving = false;
+    }
+}

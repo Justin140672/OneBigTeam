@@ -1,4 +1,6 @@
 using HR.Web.Components;
+using HR.Web.Services;
+using Syncfusion.Blazor;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
@@ -6,6 +8,22 @@ builder.AddServiceDefaults();
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddHttpClient("hrapi", c =>
+{
+    var apiBaseUrl =
+        builder.Configuration["services:api:https:0"] ??
+        builder.Configuration["services:api:http:0"] ??
+        throw new InvalidOperationException("API base URL is missing. Expected services:api:https:0 or services:api:http:0.");
+
+    c.BaseAddress = new Uri(apiBaseUrl);
+});
+
+builder.Services.AddScoped<CompanyService>();
+
+Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(
+    builder.Configuration["Syncfusion:LicenseKey"] ?? string.Empty);
+builder.Services.AddSyncfusionBlazor();
 
 var app = builder.Build();
 

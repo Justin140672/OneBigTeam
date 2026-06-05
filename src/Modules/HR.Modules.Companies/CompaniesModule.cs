@@ -1,4 +1,5 @@
 using FluentValidation;
+using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Features.CreateCompany;
 using HR.Modules.Companies.Features.GetCompany;
 using HR.Modules.Companies.Features.UpdateCompany;
@@ -31,6 +32,33 @@ public static class CompaniesModule
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
         await db.Database.MigrateAsync();
+    }
+
+    public static async Task SeedCompaniesAsync(this IServiceProvider services)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+
+        if (await db.Companies.AnyAsync())
+            return;
+
+        var now = DateTimeOffset.UtcNow;
+        var companyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+        var company = Company.Create(companyId, "Acme Corporation", "acme-corporation", now);
+
+        company.SetAddress(
+            CompanyAddress.Create(Guid.NewGuid(), companyId, CompanyAddressType.RegisteredOffice,
+                "123 Main Street", null, "London", null, "EC1A 1BB", "GB", now),
+            now);
+
+        company.SetAddress(
+            CompanyAddress.Create(Guid.NewGuid(), companyId, CompanyAddressType.TradingAddress,
+                "456 High Street", "Floor 2", "Manchester", null, "M1 1AE", "GB", now),
+            now);
+
+        db.Companies.Add(company);
+        await db.SaveChangesAsync();
     }
 
     private static void AddFeatureServices(IServiceCollection services)
