@@ -6,8 +6,8 @@ public class ModuleDependencyBoundariesTests
 {
     public static TheoryData<Assembly> ModuleAssemblies =>
         [
-            typeof(HR.Modules.Companies.Class1).Assembly,
-            typeof(HR.Modules.Identity.Class1).Assembly,
+            typeof(HR.Modules.Companies.CompaniesModule).Assembly,
+            typeof(HR.Modules.Identity.IdentityModule).Assembly,
             typeof(HR.Modules.Employees.Class1).Assembly
         ];
 
