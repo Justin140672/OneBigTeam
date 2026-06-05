@@ -4,7 +4,8 @@ using HR.Integration.Tests.Infrastructure;
 
 namespace HR.Integration.Tests;
 
-public class GetCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection(ApiIntegrationCollection.Name)]
+public class GetCompanyEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

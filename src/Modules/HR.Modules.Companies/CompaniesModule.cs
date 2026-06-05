@@ -1,6 +1,7 @@
 using FluentValidation;
 using HR.Modules.Companies.Features.CreateCompany;
 using HR.Modules.Companies.Features.GetCompany;
+using HR.Modules.Companies.Features.UpdateCompanyProfile;
 using HR.Modules.Companies.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,6 +34,8 @@ public static class CompaniesModule
     {
         services.AddScoped<CreateCompanyHandler>();
         services.AddScoped<GetCompanyHandler>();
+        services.AddScoped<UpdateCompanyProfileHandler>();
         services.AddScoped<IValidator<CreateCompanyRequest>, CreateCompanyValidator>();
+        services.AddScoped<IValidator<UpdateCompanyProfileRequest>, UpdateCompanyProfileValidator>();
     }
 }
