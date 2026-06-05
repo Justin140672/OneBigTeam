@@ -1,11 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Companies.Domain;
 
 namespace HR.Integration.Tests;
 
-[Collection(ApiIntegrationCollection.Name)]
-public class CreateCompanyEndpointTests
+public class CreateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
 
@@ -21,7 +21,17 @@ public class CreateCompanyEndpointTests
 
         var response = await client.PostAsJsonAsync("/api/companies", new
         {
-            name = "Acme Corp"
+            name = "Acme Corp",
+            addresses = new[]
+            {
+                new
+                {
+                    type = CompanyAddressType.RegisteredOffice,
+                    line1 = "10 High Street",
+                    city = "London",
+                    countryCode = "GB"
+                }
+            }
         });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -35,7 +45,17 @@ public class CreateCompanyEndpointTests
 
         var response = await client.PostAsJsonAsync("/api/companies", new
         {
-            name = "Acme Corp"
+            name = "Acme Corp",
+            addresses = new[]
+            {
+                new
+                {
+                    type = CompanyAddressType.RegisteredOffice,
+                    line1 = "10 High Street",
+                    city = "London",
+                    countryCode = "GB"
+                }
+            }
         });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -46,6 +66,9 @@ public class CreateCompanyEndpointTests
         Assert.Equal("acme-corp", payload.Slug);
         Assert.True(payload.IsActive);
         Assert.NotEqual(Guid.Empty, payload.Id);
+        Assert.Equal(2, payload.Addresses.Count);
+        Assert.Contains(payload.Addresses, address => address.Type == CompanyAddressType.RegisteredOffice);
+        Assert.Contains(payload.Addresses, address => address.Type == CompanyAddressType.TradingAddress);
     }
 
     [Fact]
@@ -56,13 +79,33 @@ public class CreateCompanyEndpointTests
 
         var firstResponse = await client.PostAsJsonAsync("/api/companies", new
         {
-            name = "Globex"
+            name = "Globex",
+            addresses = new[]
+            {
+                new
+                {
+                    type = CompanyAddressType.RegisteredOffice,
+                    line1 = "10 High Street",
+                    city = "London",
+                    countryCode = "GB"
+                }
+            }
         });
         firstResponse.EnsureSuccessStatusCode();
 
         var secondResponse = await client.PostAsJsonAsync("/api/companies", new
         {
-            name = "Globex"
+            name = "Globex",
+            addresses = new[]
+            {
+                new
+                {
+                    type = CompanyAddressType.RegisteredOffice,
+                    line1 = "10 High Street",
+                    city = "London",
+                    countryCode = "GB"
+                }
+            }
         });
 
         Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
@@ -73,5 +116,16 @@ public class CreateCompanyEndpointTests
         string Name,
         string Slug,
         bool IsActive,
-        DateTimeOffset CreatedAt);
+        DateTimeOffset CreatedAt,
+        IReadOnlyCollection<CompanyAddressPayload> Addresses);
+
+    private sealed record CompanyAddressPayload(
+        Guid Id,
+        CompanyAddressType Type,
+        string Line1,
+        string? Line2,
+        string City,
+        string? Region,
+        string? PostalCode,
+        string CountryCode);
 }

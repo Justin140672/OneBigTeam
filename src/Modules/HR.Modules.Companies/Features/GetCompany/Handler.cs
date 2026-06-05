@@ -18,6 +18,7 @@ internal sealed class GetCompanyHandler
         CancellationToken cancellationToken)
     {
         var company = await _dbContext.Companies
+            .Include(currentCompany => currentCompany.Addresses)
             .AsNoTracking()
             .SingleOrDefaultAsync(company => company.Id == request.Id, cancellationToken);
 
@@ -31,7 +32,19 @@ internal sealed class GetCompanyHandler
             company.Name,
             company.Slug,
             company.IsActive,
-            company.CreatedAt);
+            company.CreatedAt,
+            company.Addresses
+                .Select(address => new GetCompanyAddressResponse(
+                    address.Id,
+                    address.Type,
+                    address.Line1,
+                    address.Line2,
+                    address.City,
+                    address.Region,
+                    address.PostalCode,
+                    address.CountryCode))
+                .OrderBy(address => address.Type)
+                .ToArray());
 
         return Result.Success(response);
     }

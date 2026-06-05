@@ -43,6 +43,42 @@ internal sealed class CreateCompanyHandler
         var now = new DateTimeOffset(utcNow);
 
         var company = Company.Create(Guid.NewGuid(), name, slug, now);
+        var registeredOfficeRequest = request.Addresses
+            .SingleOrDefault(address => address.Type == CompanyAddressType.RegisteredOffice);
+        var tradingAddressRequest = request.Addresses
+            .SingleOrDefault(address => address.Type == CompanyAddressType.TradingAddress);
+
+        if (registeredOfficeRequest is not null)
+        {
+            var address = CompanyAddress.Create(
+                Guid.NewGuid(),
+                company.Id,
+                CompanyAddressType.RegisteredOffice,
+                registeredOfficeRequest.Line1.Trim(),
+                string.IsNullOrWhiteSpace(registeredOfficeRequest.Line2) ? null : registeredOfficeRequest.Line2.Trim(),
+                registeredOfficeRequest.City.Trim(),
+                string.IsNullOrWhiteSpace(registeredOfficeRequest.Region) ? null : registeredOfficeRequest.Region.Trim(),
+                string.IsNullOrWhiteSpace(registeredOfficeRequest.PostalCode) ? null : registeredOfficeRequest.PostalCode.Trim(),
+                registeredOfficeRequest.CountryCode.Trim().ToUpperInvariant(),
+                now);
+
+            company.SetAddress(address, now);
+
+            var tradingSource = tradingAddressRequest ?? registeredOfficeRequest;
+            var tradingAddress = CompanyAddress.Create(
+                Guid.NewGuid(),
+                company.Id,
+                CompanyAddressType.TradingAddress,
+                tradingSource.Line1.Trim(),
+                string.IsNullOrWhiteSpace(tradingSource.Line2) ? null : tradingSource.Line2.Trim(),
+                tradingSource.City.Trim(),
+                string.IsNullOrWhiteSpace(tradingSource.Region) ? null : tradingSource.Region.Trim(),
+                string.IsNullOrWhiteSpace(tradingSource.PostalCode) ? null : tradingSource.PostalCode.Trim(),
+                tradingSource.CountryCode.Trim().ToUpperInvariant(),
+                now);
+
+            company.SetAddress(tradingAddress, now);
+        }
 
         _dbContext.Companies.Add(company);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -52,7 +88,19 @@ internal sealed class CreateCompanyHandler
             company.Name,
             company.Slug,
             company.IsActive,
-            company.CreatedAt);
+            company.CreatedAt,
+            company.Addresses
+                .Select(address => new CreateCompanyAddressResponse(
+                    address.Id,
+                    address.Type,
+                    address.Line1,
+                    address.Line2,
+                    address.City,
+                    address.Region,
+                    address.PostalCode,
+                    address.CountryCode))
+                .OrderBy(address => address.Type)
+                .ToArray());
 
         return Result.Success(response);
     }

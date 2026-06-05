@@ -22,12 +22,52 @@ public class CreateCompanyHandlerTests
         Assert.NotNull(result.Value);
         Assert.Equal("Acme Corporation", result.Value!.Name);
         Assert.Equal("acme-corporation", result.Value.Slug);
+        Assert.Empty(result.Value.Addresses);
 
         var company = await context.Companies.SingleAsync();
         Assert.Equal(result.Value.Id, company.Id);
         Assert.Equal("Acme Corporation", company.Name);
         Assert.Equal("acme-corporation", company.Slug);
         Assert.True(company.IsActive);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creates_Company_With_Addresses()
+    {
+        await using var context = BuildContext();
+        var handler = new CreateCompanyHandler(context, new FakeClock(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc)));
+
+        var result = await handler.HandleAsync(
+            new CreateCompanyRequest
+            {
+                Name = "Acme Corporation",
+                Addresses =
+                [
+                    new CreateCompanyAddressRequest
+                    {
+                        Type = CompanyAddressType.RegisteredOffice,
+                        Line1 = "10 High Street",
+                        City = "London",
+                        PostalCode = "SW1A 1AA",
+                        CountryCode = "GB"
+                    }
+                ]
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal(2, result.Value!.Addresses.Count);
+        Assert.Contains(result.Value.Addresses, address => address.Type == CompanyAddressType.RegisteredOffice);
+        Assert.Contains(result.Value.Addresses, address => address.Type == CompanyAddressType.TradingAddress);
+
+        var addresses = await context.CompanyAddresses
+            .Where(address => address.CompanyId == result.Value.Id)
+            .ToListAsync();
+
+        Assert.Equal(2, addresses.Count);
+        Assert.Equal("10 High Street", addresses.Single(address => address.Type == CompanyAddressType.RegisteredOffice).Line1);
+        Assert.Equal("10 High Street", addresses.Single(address => address.Type == CompanyAddressType.TradingAddress).Line1);
     }
 
     [Fact]

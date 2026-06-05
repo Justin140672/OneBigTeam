@@ -1,0 +1,3 @@
+- Companies module follows vertical slices under src/Modules/HR.Modules.Companies/Features.
+- Company profile updates are handled at PUT /api/companies/{id}/profile.
+- Integration tests rely on Docker testcontainers PostgreSQL and set ConnectionStrings__hr env var in ApiWebApplicationFactory.

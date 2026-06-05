@@ -1,11 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Companies.Domain;
 
 namespace HR.Integration.Tests;
 
-[Collection(ApiIntegrationCollection.Name)]
-public class GetCompanyEndpointTests
+public class GetCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
 
@@ -32,7 +32,17 @@ public class GetCompanyEndpointTests
 
         var createResponse = await client.PostAsJsonAsync("/api/companies", new
         {
-            name = $"Get Test {Guid.NewGuid():N}"
+            name = $"Get Test {Guid.NewGuid():N}",
+            addresses = new[]
+            {
+                new
+                {
+                    type = CompanyAddressType.RegisteredOffice,
+                    line1 = "10 High Street",
+                    city = "London",
+                    countryCode = "GB"
+                }
+            }
         });
         createResponse.EnsureSuccessStatusCode();
 
@@ -49,6 +59,9 @@ public class GetCompanyEndpointTests
         Assert.Equal(createdCompany.Name, payload.Name);
         Assert.Equal(createdCompany.Slug, payload.Slug);
         Assert.Equal(createdCompany.IsActive, payload.IsActive);
+        Assert.Equal(2, payload.Addresses.Count);
+        Assert.Contains(payload.Addresses, address => address.Type == CompanyAddressType.RegisteredOffice);
+        Assert.Contains(payload.Addresses, address => address.Type == CompanyAddressType.TradingAddress);
     }
 
     [Fact]
@@ -67,12 +80,24 @@ public class GetCompanyEndpointTests
         string Name,
         string Slug,
         bool IsActive,
-        DateTimeOffset CreatedAt);
+        DateTimeOffset CreatedAt,
+        IReadOnlyCollection<CompanyAddressPayload> Addresses);
 
     private sealed record GetCompanyPayload(
         Guid Id,
         string Name,
         string Slug,
         bool IsActive,
-        DateTimeOffset CreatedAt);
+        DateTimeOffset CreatedAt,
+        IReadOnlyCollection<CompanyAddressPayload> Addresses);
+
+    private sealed record CompanyAddressPayload(
+        Guid Id,
+        CompanyAddressType Type,
+        string Line1,
+        string? Line2,
+        string City,
+        string? Region,
+        string? PostalCode,
+        string CountryCode);
 }

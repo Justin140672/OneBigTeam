@@ -40,5 +40,13 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
         builder.Property(c => c.UpdatedAt)
             .HasColumnName("updated_at")
             .IsRequired();
+
+        builder.HasMany(c => c.Addresses)
+            .WithOne()
+            .HasForeignKey(address => address.CompanyId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(c => c.Addresses)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

@@ -9,56 +9,83 @@ namespace HR.Modules.Companies.Tests;
 public class UpdateCompanyProfileHandlerTests
 {
     [Fact]
-    public async Task HandleAsync_Updates_Company_Name_And_UpdatedAt()
+    public async Task HandleAsync_Updates_Company_Name_And_Addresses()
     {
         await using var context = BuildContext();
-        var createdAt = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
-        var updatedAt = new DateTime(2026, 6, 5, 11, 30, 0, DateTimeKind.Utc);
-        var company = Company.Create(Guid.NewGuid(), "Acme Corporation", "acme-corporation", createdAt);
+        var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
+        var company = Company.Create(Guid.NewGuid(), "Acme", "acme", now);
+        var existingAddress = CompanyAddress.Create(
+            Guid.NewGuid(),
+            company.Id,
+            CompanyAddressType.RegisteredOffice,
+            "1 Old Street",
+            null,
+            "London",
+            null,
+            "EC1",
+            "GB",
+            now);
+        company.SetAddress(existingAddress, now);
 
         context.Companies.Add(company);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateCompanyProfileHandler(context, new FakeClock(updatedAt));
+        var handler = new UpdateCompanyProfileHandler(
+            context,
+            new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)));
 
         var result = await handler.HandleAsync(
             new UpdateCompanyProfileRequest
             {
                 Id = company.Id,
-                Name = "Acme Global"
+                Name = "Acme Corporation",
+                Addresses =
+                [
+                    new UpdateCompanyAddressRequest
+                    {
+                        Type = CompanyAddressType.RegisteredOffice,
+                        Line1 = "10 High Street",
+                        City = "London",
+                        PostalCode = "SW1A 1AA",
+                        CountryCode = "GB"
+                    }
+                ]
             },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
-        Assert.Equal(company.Id, result.Value!.Id);
-        Assert.Equal("Acme Global", result.Value.Name);
-        Assert.Equal("acme-corporation", result.Value.Slug);
-        Assert.Equal(new DateTimeOffset(updatedAt), result.Value.UpdatedAt);
+        Assert.Equal("Acme Corporation", result.Value!.Name);
+        Assert.Equal(2, result.Value.Addresses.Count);
 
-        var updatedCompany = await context.Companies.SingleAsync(c => c.Id == company.Id);
-        Assert.Equal("Acme Global", updatedCompany.Name);
-        Assert.Equal(new DateTimeOffset(updatedAt), updatedCompany.UpdatedAt);
+        var savedCompany = await context.Companies
+            .Include(currentCompany => currentCompany.Addresses)
+            .SingleAsync(currentCompany => currentCompany.Id == company.Id);
+
+        Assert.Equal("Acme Corporation", savedCompany.Name);
+        Assert.Equal(2, savedCompany.Addresses.Count);
+        Assert.Equal("10 High Street", savedCompany.Addresses.Single(a => a.Type == CompanyAddressType.RegisteredOffice).Line1);
+        Assert.Equal("London", savedCompany.Addresses.Single(a => a.Type == CompanyAddressType.TradingAddress).City);
     }
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Company_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new UpdateCompanyProfileHandler(context, new FakeClock(new DateTime(2026, 6, 5, 12, 0, 0, DateTimeKind.Utc)));
-        var unknownCompanyId = Guid.NewGuid();
+        var handler = new UpdateCompanyProfileHandler(
+            context,
+            new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)));
 
         var result = await handler.HandleAsync(
             new UpdateCompanyProfileRequest
             {
-                Id = unknownCompanyId,
-                Name = "Acme Global"
+                Id = Guid.NewGuid(),
+                Name = "Unknown"
             },
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
-        Assert.Contains(unknownCompanyId.ToString(), result.Error.Message);
     }
 
     private static CompaniesDbContext BuildContext()

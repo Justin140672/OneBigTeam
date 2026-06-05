@@ -13,6 +13,18 @@ public class GetCompanyHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
         var company = Company.Create(Guid.NewGuid(), "Acme Corporation", "acme-corporation", now);
+        var address = CompanyAddress.Create(
+            Guid.NewGuid(),
+            company.Id,
+            CompanyAddressType.RegisteredOffice,
+            "10 High Street",
+            null,
+            "London",
+            null,
+            "SW1A 1AA",
+            "GB",
+            now);
+        company.SetAddress(address, now);
 
         context.Companies.Add(company);
         await context.SaveChangesAsync();
@@ -30,6 +42,9 @@ public class GetCompanyHandlerTests
         Assert.Equal("acme-corporation", result.Value.Slug);
         Assert.True(result.Value.IsActive);
         Assert.Equal(now, result.Value.CreatedAt);
+        Assert.Single(result.Value.Addresses);
+        Assert.Equal(CompanyAddressType.RegisteredOffice, result.Value.Addresses.Single().Type);
+        Assert.Equal("London", result.Value.Addresses.Single().City);
     }
 
     [Fact]

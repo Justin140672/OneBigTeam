@@ -11,6 +11,7 @@ internal sealed class CompaniesDbContext : DbContext
     }
 
     public DbSet<Company> Companies => Set<Company>();
+    public DbSet<CompanyAddress> CompanyAddresses => Set<CompanyAddress>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
