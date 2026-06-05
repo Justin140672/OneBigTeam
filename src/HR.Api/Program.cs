@@ -1,5 +1,6 @@
 using FastEndpoints;
 using HR.Modules.Companies;
+using HR.Modules.Identity;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
@@ -10,6 +11,7 @@ var connectionString = builder.Configuration.GetConnectionString("hr")
 	?? throw new InvalidOperationException("Connection string 'hr' was not found.");
 
 builder.Services.AddCompaniesModule(connectionString);
+builder.Services.AddIdentityModule(connectionString);
 builder.Services.AddFastEndpoints();
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services
@@ -24,6 +26,9 @@ var app = builder.Build();
 var companiesMigrationStatus = "unknown";
 string? companiesMigrationError = null;
 DateTimeOffset? companiesMigrationCheckedAt = null;
+var identityMigrationStatus = "unknown";
+string? identityMigrationError = null;
+DateTimeOffset? identityMigrationCheckedAt = null;
 
 try
 {
@@ -39,6 +44,19 @@ catch (Exception exception)
 	companiesMigrationCheckedAt = DateTimeOffset.UtcNow;
 }
 
+try
+{
+	await app.Services.MigrateIdentityAsync();
+	identityMigrationStatus = "succeeded";
+	identityMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+catch (Exception exception)
+{
+	identityMigrationStatus = "failed";
+	identityMigrationError = exception.Message;
+	identityMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+
 app.MapGet("/health/startup-migrations", () =>
 {
 	var response = new
@@ -48,10 +66,16 @@ app.MapGet("/health/startup-migrations", () =>
 			status = companiesMigrationStatus,
 			checkedAt = companiesMigrationCheckedAt,
 			error = companiesMigrationError
+		},
+		identity = new
+		{
+			status = identityMigrationStatus,
+			checkedAt = identityMigrationCheckedAt,
+			error = identityMigrationError
 		}
 	};
 
-	return companiesMigrationStatus == "failed"
+	return companiesMigrationStatus == "failed" || identityMigrationStatus == "failed"
 		? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
 		: Results.Ok(response);
 });

@@ -125,4 +125,27 @@ public class IdentityModuleArchitectureTests
         Assert.Contains(pk.Properties, p => p.Name == nameof(UserRole.UserId));
         Assert.Contains(pk.Properties, p => p.Name == nameof(UserRole.RoleId));
     }
+
+    [Fact]
+    public void UserProfile_Entity_Maps_To_Correct_Table_And_Schema()
+    {
+        using var context = BuildContext();
+
+        var entityType = context.Model.FindEntityType(typeof(UserProfile))!;
+
+        Assert.Equal("user_profiles", entityType.GetTableName());
+        Assert.Equal("identity", entityType.GetSchema());
+    }
+
+    [Fact]
+    public void UserProfile_Entity_Contains_Supabase_User_Id_Column()
+    {
+        using var context = BuildContext();
+
+        var entityType = context.Model.FindEntityType(typeof(UserProfile))!;
+        var supabaseUserIdProperty = entityType.FindProperty(nameof(UserProfile.SupabaseAuthUserId));
+
+        Assert.NotNull(supabaseUserIdProperty);
+        Assert.Equal("supabase_auth_user_id", supabaseUserIdProperty!.GetColumnName());
+    }
 }

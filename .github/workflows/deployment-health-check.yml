@@ -1,0 +1,58 @@
+name: Deployment Health Check
+
+on:
+  workflow_call:
+    inputs:
+      api_base_url:
+        required: true
+        type: string
+      max_attempts:
+        required: false
+        type: number
+        default: 10
+      delay_seconds:
+        required: false
+        type: number
+        default: 6
+    secrets:
+      api_bearer_token:
+        required: false
+
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: Base URL for API, e.g. https://api.example.com
+        required: true
+        type: string
+      max_attempts:
+        description: Max retry attempts
+        required: false
+        default: "10"
+      delay_seconds:
+        description: Delay between retries (seconds)
+        required: false
+        default: "6"
+
+jobs:
+  startup-migrations-health:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify startup migrations endpoint
+        shell: pwsh
+        env:
+          API_BASE_URL: ${{ inputs.api_base_url }}
+          API_BEARER_TOKEN: ${{ secrets.api_bearer_token }}
+          MAX_ATTEMPTS: ${{ inputs.max_attempts }}
+          DELAY_SECONDS: ${{ inputs.delay_seconds }}
+        run: |
+          $maxAttempts = [int]$env:MAX_ATTEMPTS
+          $delaySeconds = [int]$env:DELAY_SECONDS
+          ./.github/scripts/check-startup-migrations.ps1 `
+            -ApiBaseUrl "$env:API_BASE_URL" `
+            -BearerToken "$env:API_BEARER_TOKEN" `
+            -MaxAttempts $maxAttempts `
+            -DelaySeconds $delaySeconds
