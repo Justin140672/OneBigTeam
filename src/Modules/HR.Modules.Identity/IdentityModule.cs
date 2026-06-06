@@ -27,6 +27,7 @@ public static class IdentityModule
     public static IApplicationBuilder UseIdentityModule(this IApplicationBuilder app)
     {
         app.UseMiddleware<SupabaseCurrentUserResolutionMiddleware>();
+        app.UseMiddleware<RequireTenantMiddleware>();
         return app;
     }
 
