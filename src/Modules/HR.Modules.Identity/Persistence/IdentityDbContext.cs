@@ -19,6 +19,7 @@ internal sealed class IdentityDbContext : DbContext
     public DbSet<Position> Positions => Set<Position>();
     public DbSet<PositionRole> PositionRoles => Set<PositionRole>();
     public DbSet<UserPosition> UserPositions => Set<UserPosition>();
+    public DbSet<EmployeeRoleOverride> EmployeeRoleOverrides => Set<EmployeeRoleOverride>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
