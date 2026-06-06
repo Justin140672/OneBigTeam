@@ -17,6 +17,7 @@ public static class IdentityModule
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "identity")));
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
+        services.AddScoped<ICurrentTenant, HttpContextCurrentTenant>();
 
         return services;
     }
