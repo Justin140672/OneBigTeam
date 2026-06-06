@@ -1,4 +1,6 @@
 using HR.Modules.Identity.Persistence;
+using HR.SharedKernel;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,8 +15,16 @@ public static class IdentityModule
         services.AddDbContext<IdentityDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "identity")));
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 
         return services;
+    }
+
+    public static IApplicationBuilder UseIdentityModule(this IApplicationBuilder app)
+    {
+        app.UseMiddleware<SupabaseCurrentUserResolutionMiddleware>();
+        return app;
     }
 
     public static async Task MigrateIdentityAsync(this IServiceProvider services)

@@ -80,6 +80,7 @@ app.MapGet("/health/startup-migrations", () =>
 		: Results.Ok(response);
 });
 app.UseAuthentication();
+app.UseIdentityModule();
 app.UseAuthorization();
 app.UseFastEndpoints();
 app.MapDefaultEndpoints();
