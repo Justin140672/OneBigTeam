@@ -10,6 +10,7 @@ internal sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSche
 {
     public const string SchemeName = "TestAuth";
     public const string UserHeader = "X-Test-User";
+    public const string TenantHeader = "X-Test-Tenant";
 
     public TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -26,11 +27,16 @@ internal sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSche
             return Task.FromResult(AuthenticateResult.Fail("No user header present."));
         }
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, userIdValues.ToString()),
             new Claim("sub", userIdValues.ToString())
         };
+
+        if (Request.Headers.TryGetValue(TenantHeader, out var tenantIdValues) && !string.IsNullOrWhiteSpace(tenantIdValues))
+        {
+            claims.Add(new Claim("company_id", tenantIdValues.ToString()));
+        }
 
         var identity = new ClaimsIdentity(claims, SchemeName);
         var principal = new ClaimsPrincipal(identity);
