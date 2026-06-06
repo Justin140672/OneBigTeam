@@ -148,4 +148,119 @@ public class IdentityModuleArchitectureTests
         Assert.NotNull(supabaseUserIdProperty);
         Assert.Equal("supabase_auth_user_id", supabaseUserIdProperty!.GetColumnName());
     }
+
+    // ── UserPosition boundary tests ──────────────────────────────────────────
+
+    [Fact]
+    public void UserPosition_Entity_Is_Not_Public()
+    {
+        var entityType = ModuleAssembly
+            .GetTypes()
+            .Single(t => t.Name == "UserPosition");
+
+        Assert.False(entityType.IsPublic, "UserPosition must be internal — it is an implementation detail of the Identity module.");
+    }
+
+    [Fact]
+    public void Position_Entity_Is_Not_Public()
+    {
+        var entityType = ModuleAssembly
+            .GetTypes()
+            .Single(t => t.Name == "Position");
+
+        Assert.False(entityType.IsPublic, "Position must be internal — it is an implementation detail of the Identity module.");
+    }
+
+    [Fact]
+    public void PositionRole_Entity_Is_Not_Public()
+    {
+        var entityType = ModuleAssembly
+            .GetTypes()
+            .Single(t => t.Name == "PositionRole");
+
+        Assert.False(entityType.IsPublic, "PositionRole must be internal — it is an implementation detail of the Identity module.");
+    }
+
+    [Fact]
+    public void UserPosition_Entity_Maps_To_Correct_Table_And_Schema()
+    {
+        using var context = BuildContext();
+
+        var entityType = context.Model.FindEntityType(typeof(UserPosition))!;
+
+        Assert.Equal("user_positions", entityType.GetTableName());
+        Assert.Equal("identity", entityType.GetSchema());
+    }
+
+    [Fact]
+    public void UserPosition_Entity_Has_Composite_Primary_Key()
+    {
+        using var context = BuildContext();
+
+        var entityType = context.Model.FindEntityType(typeof(UserPosition))!;
+        var pk = entityType.FindPrimaryKey()!;
+
+        Assert.Equal(2, pk.Properties.Count);
+        Assert.Contains(pk.Properties, p => p.Name == nameof(UserPosition.UserId));
+        Assert.Contains(pk.Properties, p => p.Name == nameof(UserPosition.PositionId));
+    }
+
+    [Fact]
+    public void UserPosition_Entity_ExpiresAt_Is_Nullable()
+    {
+        using var context = BuildContext();
+
+        var entityType = context.Model.FindEntityType(typeof(UserPosition))!;
+        var property = entityType.FindProperty(nameof(UserPosition.ExpiresAt))!;
+
+        Assert.False(property.IsNullable is false, "ExpiresAt must be nullable to support open-ended position assignments.");
+    }
+
+    [Fact]
+    public void Position_Entity_Has_Tenant_And_NormalizedName_Unique_Index()
+    {
+        using var context = BuildContext();
+
+        var entityType = context.Model.FindEntityType(typeof(Position))!;
+
+        var uniqueIndex = entityType
+            .GetIndexes()
+            .SingleOrDefault(i =>
+                i.IsUnique &&
+                i.Properties.Count == 2 &&
+                i.Properties.Any(p => p.Name == nameof(Position.TenantId)) &&
+                i.Properties.Any(p => p.Name == nameof(Position.NormalizedName)));
+
+        Assert.NotNull(uniqueIndex);
+    }
+
+    [Fact]
+    public void No_External_Assembly_Directly_References_UserPosition_Type()
+    {
+        var externalAssemblies = new[]
+        {
+            typeof(HR.Modules.Companies.CompaniesModule).Assembly,
+            typeof(HR.Modules.Employees.Class1).Assembly,
+        };
+
+        var userPositionTypeName = "HR.Modules.Identity.Domain.UserPosition";
+
+        var violations = externalAssemblies
+            .SelectMany(asm => asm.GetTypes())
+            .SelectMany(t => t.GetMembers())
+            .OfType<System.Reflection.MethodBase>()
+            .SelectMany(m =>
+            {
+                try { return m.GetMethodBody()?.LocalVariables.Select(v => v.LocalType) ?? []; }
+                catch { return []; }
+            })
+            .Where(t => t?.FullName == userPositionTypeName)
+            .Select(t => t!.FullName!)
+            .Distinct()
+            .ToArray();
+
+        Assert.True(
+            violations.Length == 0,
+            $"External modules directly reference UserPosition, bypassing the Identity module boundary: {string.Join(", ", violations)}");
+    }
 }
