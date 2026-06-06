@@ -20,5 +20,6 @@
     <Project Path="tests/HR.Architecture.Tests/HR.Architecture.Tests.csproj" />
      <Project Path="tests/HR.Modules.Companies.Tests/HR.Modules.Companies.Tests.csproj" />
       <Project Path="tests/HR.Integration.Tests/HR.Integration.Tests.csproj" />
+    <Project Path="tests/HR.Modules.Identity.Tests/HR.Modules.Identity.Tests.csproj" />
   </Folder>
 </Solution>

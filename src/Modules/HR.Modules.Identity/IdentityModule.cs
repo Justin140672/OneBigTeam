@@ -18,6 +18,8 @@ public static class IdentityModule
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
         services.AddScoped<ICurrentTenant, HttpContextCurrentTenant>();
+        services.AddScoped<IAuthorizationService, IdentityAuthorizationService>();
+        services.AddSingleton<IClock, SystemClock>();
 
         return services;
     }
