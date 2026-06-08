@@ -3,6 +3,7 @@ using System;
 using HR.Modules.Employees.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HR.Modules.Employees.Migrations
 {
     [DbContext(typeof(EmployeesDbContext))]
-    partial class EmployeesDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260608065814_AddEmployeeDepartmentPositionProfile")]
+    partial class AddEmployeeDepartmentPositionProfile
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -37,28 +40,11 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("description");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
-                    b.Property<Guid?>("ManagerEmployeeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("manager_employee_id");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
-
-                    b.Property<Guid?>("ParentDepartmentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("parent_department_id");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -67,8 +53,6 @@ namespace HR.Modules.Employees.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
-
-                    b.HasIndex("ParentDepartmentId");
 
                     b.ToTable("departments", "employees");
                 });
@@ -91,11 +75,25 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("department_id");
 
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
+
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("first_name");
+
+                    b.Property<DateOnly?>("HiredOn")
+                        .HasColumnType("date")
+                        .HasColumnName("hired_on");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
 
                     b.Property<string>("LastName")
                         .IsRequired()
@@ -103,38 +101,13 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("last_name");
 
-                    b.Property<Guid?>("ManagerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("manager_id");
-
-                    b.Property<string>("PersonalEmail")
-                        .HasMaxLength(320)
-                        .HasColumnType("character varying(320)")
-                        .HasColumnName("personal_email");
-
                     b.Property<Guid?>("PositionProfileId")
                         .HasColumnType("uuid")
                         .HasColumnName("position_profile_id");
 
-                    b.Property<DateOnly>("StartDate")
-                        .HasColumnType("date")
-                        .HasColumnName("start_date");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("status");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
-
-                    b.Property<string>("WorkEmail")
-                        .IsRequired()
-                        .HasMaxLength(320)
-                        .HasColumnType("character varying(320)")
-                        .HasColumnName("work_email");
 
                     b.HasKey("Id");
 
@@ -142,13 +115,9 @@ namespace HR.Modules.Employees.Migrations
 
                     b.HasIndex("DepartmentId");
 
-                    b.HasIndex("ManagerId");
-
                     b.HasIndex("PositionProfileId");
 
-                    b.HasIndex("CompanyId", "Status");
-
-                    b.HasIndex("CompanyId", "WorkEmail")
+                    b.HasIndex("CompanyId", "Email")
                         .IsUnique();
 
                     b.ToTable("employees", "employees");
@@ -176,14 +145,6 @@ namespace HR.Modules.Employees.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("description");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
-                    b.Property<bool>("IsManagerial")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_managerial");
 
                     b.Property<string>("Title")
                         .IsRequired()
