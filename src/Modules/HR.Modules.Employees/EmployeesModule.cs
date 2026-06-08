@@ -4,6 +4,7 @@ using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Modules.Employees.Features.CreatePositionProfile;
 using HR.Modules.Employees.Features.GetEmployee;
 using HR.Modules.Employees.Features.ListEmployees;
+using HR.Modules.Employees.Features.UpdateEmployeeProfile;
 using HR.Modules.Employees.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,6 +41,9 @@ public static class EmployeesModule
 
         services.AddScoped<ListEmployeesHandler>();
         services.AddScoped<IValidator<ListEmployeesRequest>, ListEmployeesValidator>();
+
+        services.AddScoped<UpdateEmployeeProfileHandler>();
+        services.AddScoped<IValidator<UpdateEmployeeProfileRequest>, UpdateEmployeeProfileValidator>();
     }
 
     public static async Task MigrateEmployeesAsync(this IServiceProvider services)
