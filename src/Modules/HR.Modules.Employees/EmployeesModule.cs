@@ -1,4 +1,5 @@
 using FluentValidation;
+using HR.Modules.Employees.Features.AssignManager;
 using HR.Modules.Employees.Features.CreateDepartment;
 using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Modules.Employees.Features.CreatePositionProfile;
@@ -44,6 +45,9 @@ public static class EmployeesModule
 
         services.AddScoped<UpdateEmployeeProfileHandler>();
         services.AddScoped<IValidator<UpdateEmployeeProfileRequest>, UpdateEmployeeProfileValidator>();
+
+        services.AddScoped<AssignManagerHandler>();
+        services.AddScoped<IValidator<AssignManagerRequest>, AssignManagerValidator>();
     }
 
     public static async Task MigrateEmployeesAsync(this IServiceProvider services)
