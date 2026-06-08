@@ -1,0 +1,110 @@
+using HR.Modules.Employees.Persistence;
+using HR.SharedKernel;
+using Microsoft.EntityFrameworkCore;
+
+namespace HR.Modules.Employees.Features.ListEmployees;
+
+internal sealed class ListEmployeesHandler
+{
+    private readonly EmployeesDbContext _dbContext;
+
+    public ListEmployeesHandler(EmployeesDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<Result<ListEmployeesResponse>> HandleAsync(
+        ListEmployeesRequest request,
+        CancellationToken cancellationToken)
+    {
+        var query = _dbContext.Employees
+            .AsNoTracking()
+            .Where(e => e.CompanyId == request.CompanyId);
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim().ToLowerInvariant();
+            query = query.Where(e =>
+                e.FirstName.ToLower().Contains(search) ||
+                e.LastName.ToLower().Contains(search) ||
+                e.WorkEmail.ToLower().Contains(search));
+        }
+
+        if (request.DepartmentId is not null)
+            query = query.Where(e => e.DepartmentId == request.DepartmentId);
+
+        if (request.PositionProfileId is not null)
+            query = query.Where(e => e.PositionProfileId == request.PositionProfileId);
+
+        if (request.Status is not null)
+            query = query.Where(e => e.Status == request.Status);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var employees = await query
+            .OrderBy(e => e.LastName)
+            .ThenBy(e => e.FirstName)
+            .Skip((request.PageNumber - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToListAsync(cancellationToken);
+
+        // Resolve display names with two targeted lookups — no N+1
+        var departmentIds = employees
+            .Where(e => e.DepartmentId is not null)
+            .Select(e => e.DepartmentId!.Value)
+            .ToHashSet();
+
+        var positionProfileIds = employees
+            .Where(e => e.PositionProfileId is not null)
+            .Select(e => e.PositionProfileId!.Value)
+            .ToHashSet();
+
+        var managerIds = employees
+            .Where(e => e.ManagerId is not null)
+            .Select(e => e.ManagerId!.Value)
+            .ToHashSet();
+
+        var departmentNames = departmentIds.Count > 0
+            ? await _dbContext.Departments
+                .AsNoTracking()
+                .Where(d => departmentIds.Contains(d.Id))
+                .ToDictionaryAsync(d => d.Id, d => d.Name, cancellationToken)
+            : new Dictionary<Guid, string>();
+
+        var positionProfileTitles = positionProfileIds.Count > 0
+            ? await _dbContext.PositionProfiles
+                .AsNoTracking()
+                .Where(p => positionProfileIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => p.Title, cancellationToken)
+            : new Dictionary<Guid, string>();
+
+        var managerNames = managerIds.Count > 0
+            ? await _dbContext.Employees
+                .AsNoTracking()
+                .Where(e => managerIds.Contains(e.Id))
+                .ToDictionaryAsync(e => e.Id, e => $"{e.FirstName} {e.LastName}", cancellationToken)
+            : new Dictionary<Guid, string>();
+
+        var items = employees
+            .Select(e => new EmployeeListItem(
+                e.Id,
+                e.CompanyId,
+                e.DepartmentId,
+                e.DepartmentId is not null && departmentNames.TryGetValue(e.DepartmentId.Value, out var deptName) ? deptName : null,
+                e.PositionProfileId,
+                e.PositionProfileId is not null && positionProfileTitles.TryGetValue(e.PositionProfileId.Value, out var ppTitle) ? ppTitle : null,
+                e.ManagerId,
+                e.ManagerId is not null && managerNames.TryGetValue(e.ManagerId.Value, out var mgrName) ? mgrName : null,
+                e.FirstName,
+                e.LastName,
+                e.WorkEmail,
+                e.StartDate,
+                e.Status,
+                e.CreatedAt))
+            .ToList();
+
+        var totalPages = request.PageSize == 0 ? 0 : (int)Math.Ceiling((double)totalCount / request.PageSize);
+
+        return Result.Success(new ListEmployeesResponse(items, totalCount, request.PageNumber, request.PageSize, totalPages));
+    }
+}
