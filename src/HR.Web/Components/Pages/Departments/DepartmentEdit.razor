@@ -1,0 +1,168 @@
+@page "/companies/{CompanyId:guid}/departments/new"
+@page "/companies/{CompanyId:guid}/departments/{Id:guid}"
+@rendermode InteractiveServer
+@using HR.Web.Models
+@using HR.Web.Services
+@using Syncfusion.Blazor.DropDowns
+@inject DepartmentService DepartmentService
+@inject NavigationManager Navigation
+
+<PageTitle>@PageTitle</PageTitle>
+
+<div class="container py-4">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="/companies/@CompanyId/departments">Departments</a>
+            </li>
+            <li class="breadcrumb-item active">@PageTitle</li>
+        </ol>
+    </nav>
+
+    @if (_loading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span>Loading…</span>
+        </div>
+    }
+    else
+    {
+        <h1 class="mb-4">@PageTitle</h1>
+
+        @if (!string.IsNullOrEmpty(_globalError))
+        {
+            <div class="alert alert-danger">@_globalError</div>
+        }
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label">Name <span class="text-danger">*</span></label>
+                    <HrTextBox @bind-Value="_model.Name" Placeholder="Department name" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <HrTextBox @bind-Value="_model.Description" Placeholder="Optional description" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Parent Department</label>
+                    <SfDropDownList TValue="Guid?"
+                                    TItem="DepartmentListItemModel"
+                                    DataSource="@_otherDepts"
+                                    @bind-Value="_model.ParentDepartmentId"
+                                    Placeholder="None"
+                                    AllowFiltering="true">
+                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                    </SfDropDownList>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-2 d-flex gap-2">
+            @if (!string.IsNullOrEmpty(_successMsg))
+            {
+                <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
+            }
+            <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
+                @if (_saving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Save
+            </SfButton>
+            <SfButton OnClick="Cancel" Disabled="@_saving">Cancel</SfButton>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+
+    private bool _isNew => Id is null || Id == Guid.Empty;
+    private string PageTitle => _isNew ? "Add Department" : _model.Name.Trim().Length > 0 ? _model.Name : "Edit Department";
+
+    private bool _loading = true;
+    private bool _saving;
+    private string? _globalError;
+    private string? _successMsg;
+
+    private readonly DepartmentEditModel _model = new();
+    private List<DepartmentListItemModel> _otherDepts = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _globalError = null;
+        _successMsg = null;
+
+        // Load all active departments for the parent picker
+        var list = await DepartmentService.ListDepartmentsAsync(CompanyId);
+        var all = list?.Items ?? new List<DepartmentListItemModel>();
+
+        if (!_isNew)
+        {
+            var existing = all.FirstOrDefault(d => d.Id == Id);
+            if (existing is not null)
+            {
+                _model.Name = existing.Name;
+                _model.ParentDepartmentId = existing.ParentDepartmentId;
+                _model.ManagerEmployeeId = existing.ManagerEmployeeId;
+            }
+
+            // Exclude self from parent candidates
+            _otherDepts = all.Where(d => d.Id != Id).ToList();
+        }
+        else
+        {
+            _otherDepts = all;
+        }
+
+        _loading = false;
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        _globalError = null;
+        _successMsg = null;
+
+        if (_isNew)
+        {
+            var request = new CreateDepartmentRequest(
+                CompanyId,
+                _model.Name.Trim(),
+                string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim(),
+                _model.ParentDepartmentId);
+
+            var (created, error) = await DepartmentService.CreateDepartmentAsync(CompanyId, request);
+            _saving = false;
+
+            if (created is not null)
+                Navigation.NavigateTo($"/companies/{CompanyId}/departments/{created.Id}");
+            else
+                _globalError = error ?? "Failed to create department.";
+        }
+        else
+        {
+            var request = new UpdateDepartmentRequest(
+                CompanyId,
+                Id!.Value,
+                _model.Name.Trim(),
+                string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim(),
+                _model.ParentDepartmentId,
+                _model.ManagerEmployeeId);
+
+            var (updated, error) = await DepartmentService.UpdateDepartmentAsync(CompanyId, Id!.Value, request);
+            _saving = false;
+
+            if (updated is not null)
+                Navigation.NavigateTo($"/companies/{CompanyId}/departments");
+            else
+                _globalError = error ?? "Failed to save department.";
+        }
+    }
+
+    private void Cancel() => Navigation.NavigateTo($"/companies/{CompanyId}/departments");
+}

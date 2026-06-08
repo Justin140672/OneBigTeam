@@ -51,11 +51,13 @@ public sealed class EmployeeProfileEditModel
     public string WorkEmail { get; set; } = string.Empty;
     public string? PersonalEmail { get; set; }
     public DateOnly StartDate { get; set; }
+    public Guid? DepartmentId { get; set; }
 }
 
 public record UpdateEmployeeProfileRequest(
     Guid CompanyId,
     Guid Id,
+    Guid? DepartmentId,
     string FirstName,
     string LastName,
     string WorkEmail,
@@ -65,6 +67,7 @@ public record UpdateEmployeeProfileRequest(
 public record UpdateEmployeeProfileResponse(
     Guid Id,
     Guid CompanyId,
+    Guid? DepartmentId,
     string FirstName,
     string LastName,
     string WorkEmail,
@@ -86,6 +89,7 @@ public sealed class CreateEmployeeFormModel
 
 public record CreateEmployeeRequest(
     Guid CompanyId,
+    Guid? DepartmentId,
     string FirstName,
     string LastName,
     string WorkEmail,

@@ -4,7 +4,9 @@
 @using HR.Web.Models
 @using HR.Web.Services
 @using Syncfusion.Blazor.Calendars
+@using Syncfusion.Blazor.DropDowns
 @inject EmployeeService EmployeeService
+@inject DepartmentService DepartmentService
 @inject InviteService InviteService
 @inject NavigationManager Navigation
 
@@ -73,6 +75,17 @@
                                   @bind-Value="_model.StartDate"
                                   FloatLabelType="Syncfusion.Blazor.Inputs.FloatLabelType.Auto"
                                   Placeholder="Start date" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Department</label>
+                    <SfDropDownList TValue="Guid?"
+                                    TItem="DepartmentListItemModel"
+                                    DataSource="@_departments"
+                                    @bind-Value="_model.DepartmentId"
+                                    Placeholder="None"
+                                    AllowFiltering="true">
+                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                    </SfDropDownList>
                 </div>
             </div>
         </div>
@@ -160,12 +173,16 @@
     private string? _inviteError;
 
     private readonly EmployeeProfileEditModel _model = new();
+    private List<DepartmentListItemModel> _departments = new();
 
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
         _globalError = null;
         _successMsg = null;
+
+        var deptResult = await DepartmentService.ListDepartmentsAsync(CompanyId);
+        _departments = deptResult?.Items ?? new List<DepartmentListItemModel>();
 
         if (!_isNew)
         {
@@ -177,6 +194,7 @@
                 _model.WorkEmail = _employee.WorkEmail;
                 _model.PersonalEmail = _employee.PersonalEmail;
                 _model.StartDate = _employee.StartDate;
+                _model.DepartmentId = _employee.DepartmentId;
             }
 
             // Auto-generate invite link if redirected here after create with invite
@@ -202,6 +220,7 @@
         {
             var request = new CreateEmployeeRequest(
                 CompanyId,
+                _model.DepartmentId,
                 _model.FirstName.Trim(),
                 _model.LastName.Trim(),
                 _model.WorkEmail.Trim(),
@@ -235,6 +254,7 @@
             var request = new UpdateEmployeeProfileRequest(
                 CompanyId,
                 Id!.Value,
+                _model.DepartmentId,
                 _model.FirstName,
                 _model.LastName,
                 _model.WorkEmail,

@@ -20,6 +20,7 @@ builder.Services.AddHttpClient("hrapi", c =>
 });
 
 builder.Services.AddScoped<CompanyService>();
+builder.Services.AddScoped<DepartmentService>();
 builder.Services.AddScoped<EmployeeService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<InviteService>();

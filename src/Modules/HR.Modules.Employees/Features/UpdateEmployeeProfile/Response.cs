@@ -5,6 +5,7 @@ namespace HR.Modules.Employees.Features.UpdateEmployeeProfile;
 internal sealed record UpdateEmployeeProfileResponse(
     Guid Id,
     Guid CompanyId,
+    Guid? DepartmentId,
     string FirstName,
     string LastName,
     string WorkEmail,

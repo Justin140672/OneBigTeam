@@ -1,0 +1,158 @@
+@page "/companies/{CompanyId:guid}/departments"
+@rendermode InteractiveServer
+@using HR.Web.Models
+@using HR.Web.Services
+@using Syncfusion.Blazor.Grids
+@inject DepartmentService DepartmentService
+@inject NavigationManager Navigation
+
+<PageTitle>Departments</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="mb-0">Departments</h1>
+        <SfButton IsPrimary="true" OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/departments/new"))">
+            + Add Department
+        </SfButton>
+    </div>
+
+    <div class="mb-3">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="showInactive"
+                   @bind="_showInactive" @bind:after="LoadAsync" />
+            <label class="form-check-label" for="showInactive">Show inactive departments</label>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span>Loading departments…</span>
+        </div>
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(_actionError))
+        {
+            <div class="alert alert-danger alert-dismissible">
+                @_actionError
+                <button type="button" class="btn-close" @onclick="() => _actionError = null"></button>
+            </div>
+        }
+        <HrGrid TValue="DepartmentListItemModel"
+                DataSource="@_items"
+                AllowPaging="true"
+                AllowSorting="true"
+                AllowFiltering="false">
+            <GridPageSettings PageSize="20" />
+            <GridColumns>
+                <GridColumn Field="@nameof(DepartmentListItemModel.Name)" HeaderText="Name" Width="220">
+                    <Template>
+                        @{
+                            var row = (context as DepartmentListItemModel)!;
+                            <a href="/companies/@CompanyId/departments/@row.Id">@row.Name</a>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn HeaderText="Parent" Width="200">
+                    <Template>
+                        @{
+                            var row = (context as DepartmentListItemModel)!;
+                            @if (row.ParentDepartmentId is not null && _nameMap.TryGetValue(row.ParentDepartmentId.Value, out var parentName))
+                            {
+                                @parentName
+                            }
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(DepartmentListItemModel.IsActive)" HeaderText="Status" Width="110">
+                    <Template>
+                        @{
+                            var row = (context as DepartmentListItemModel)!;
+                            <span class="badge @(row.IsActive ? "bg-success" : "bg-secondary")">
+                                @(row.IsActive ? "Active" : "Inactive")
+                            </span>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn HeaderText="" Width="120" AllowSorting="false">
+                    <Template>
+                        @{
+                            var row = (context as DepartmentListItemModel)!;
+                            @if (row.IsActive)
+                            {
+                                <SfButton CssClass="e-small e-danger" Disabled="@(_deactivating == row.Id)"
+                                          OnClick="@(() => ConfirmDeactivate(row))">
+                                    @if (_deactivating == row.Id)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                    }
+                                    Deactivate
+                                </SfButton>
+                            }
+                        }
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </HrGrid>
+
+        <p class="text-muted mt-2 small">@_items.Count department@(_items.Count != 1 ? "s" : string.Empty)</p>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private List<DepartmentListItemModel> _items = new();
+    private Dictionary<Guid, string> _nameMap = new();
+    private bool _loading = true;
+    private bool _showInactive;
+    private string? _error;
+    private string? _actionError;
+    private Guid? _deactivating;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        var result = await DepartmentService.ListDepartmentsAsync(CompanyId, _showInactive);
+        if (result is null)
+        {
+            _error = "Failed to load departments.";
+        }
+        else
+        {
+            _items = result.Items;
+            _nameMap = result.Items.ToDictionary(d => d.Id, d => d.Name);
+        }
+
+        _loading = false;
+    }
+
+    private async Task ConfirmDeactivate(DepartmentListItemModel dept)
+    {
+        _deactivating = dept.Id;
+        _actionError = null;
+
+        var error = await DepartmentService.DeactivateDepartmentAsync(CompanyId, dept.Id);
+
+        _deactivating = null;
+
+        if (error is not null)
+            _actionError = error;
+        else
+            await LoadAsync();
+    }
+}

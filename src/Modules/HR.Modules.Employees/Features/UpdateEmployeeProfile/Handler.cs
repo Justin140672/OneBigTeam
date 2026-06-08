@@ -58,11 +58,14 @@ internal sealed class UpdateEmployeeProfileHandler
             request.StartDate,
             now);
 
+        employee.Assign(request.DepartmentId, employee.PositionProfileId, employee.ManagerId, now);
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new UpdateEmployeeProfileResponse(
             employee.Id,
             employee.CompanyId,
+            employee.DepartmentId,
             employee.FirstName,
             employee.LastName,
             employee.WorkEmail,

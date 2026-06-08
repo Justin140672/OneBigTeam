@@ -1,0 +1,95 @@
+using HR.Modules.Employees.Domain;
+using HR.Modules.Employees.Features.DeactivateDepartment;
+using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+
+namespace HR.Modules.Employees.Tests;
+
+public class DeactivateDepartmentHandlerTests
+{
+    private static readonly DateTime FixedUtcNow = new(2026, 6, 8, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTimeOffset FixedOffset = new(FixedUtcNow, TimeSpan.Zero);
+
+    [Fact]
+    public async Task HandleAsync_Deactivates_Active_Department()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var dept = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, FixedOffset);
+        context.Departments.Add(dept);
+        await context.SaveChangesAsync();
+
+        var handler = new DeactivateDepartmentHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(
+            new DeactivateDepartmentRequest { CompanyId = companyId, Id = dept.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var saved = await context.Departments.SingleAsync();
+        Assert.False(saved.IsActive);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_Department_Does_Not_Exist()
+    {
+        await using var context = BuildContext();
+        var handler = new DeactivateDepartmentHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(
+            new DeactivateDepartmentRequest { CompanyId = Guid.NewGuid(), Id = Guid.NewGuid() },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_For_Already_Inactive_Department()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var dept = Department.Create(Guid.NewGuid(), companyId, "Legacy", null, FixedOffset);
+        dept.Deactivate(FixedOffset);
+        context.Departments.Add(dept);
+        await context.SaveChangesAsync();
+
+        var handler = new DeactivateDepartmentHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(
+            new DeactivateDepartmentRequest { CompanyId = companyId, Id = dept.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_For_Wrong_Company()
+    {
+        await using var context = BuildContext();
+        var dept = Department.Create(Guid.NewGuid(), Guid.NewGuid(), "Engineering", null, FixedOffset);
+        context.Departments.Add(dept);
+        await context.SaveChangesAsync();
+
+        var handler = new DeactivateDepartmentHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(
+            new DeactivateDepartmentRequest { CompanyId = Guid.NewGuid(), Id = dept.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    private static EmployeesDbContext BuildContext()
+    {
+        var options = new DbContextOptionsBuilder<EmployeesDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+
+        return new EmployeesDbContext(options);
+    }
+}

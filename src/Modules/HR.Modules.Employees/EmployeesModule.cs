@@ -4,6 +4,7 @@ using HR.Modules.Employees.Features.AssignManager;
 using HR.Modules.Employees.Features.CreateDepartment;
 using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Modules.Employees.Features.CreatePositionProfile;
+using HR.Modules.Employees.Features.DeactivateDepartment;
 using HR.Modules.Employees.Features.GetEmployee;
 using HR.Modules.Employees.Features.ListDepartments;
 using HR.Modules.Employees.Features.ListEmployees;
@@ -37,6 +38,8 @@ public static class EmployeesModule
 
         services.AddScoped<UpdateDepartmentHandler>();
         services.AddScoped<IValidator<UpdateDepartmentRequest>, UpdateDepartmentValidator>();
+
+        services.AddScoped<DeactivateDepartmentHandler>();
 
         services.AddScoped<CreatePositionProfileHandler>();
         services.AddScoped<IValidator<CreatePositionProfileRequest>, CreatePositionProfileValidator>();
