@@ -1,0 +1,79 @@
+@page "/invite/{Token}"
+@rendermode InteractiveServer
+@using HR.Web.Services
+@inject InviteService InviteService
+@inject NavigationManager Navigation
+
+<PageTitle>Accept Invitation</PageTitle>
+
+<div class="container py-5" style="max-width: 480px;">
+    <h1 class="mb-1">Welcome to One Big Team</h1>
+    <p class="text-muted mb-4">Set a password to activate your account.</p>
+
+    @if (_success)
+    {
+        <div class="alert alert-success">
+            <strong>Account activated!</strong> You can now sign in.
+        </div>
+    }
+    else
+    {
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        <div class="mb-3">
+            <label class="form-label">Password <span class="text-danger">*</span></label>
+            <input type="password" class="form-control" @bind="_password" placeholder="Choose a password" />
+        </div>
+        <div class="mb-4">
+            <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
+            <input type="password" class="form-control" @bind="_confirm" placeholder="Repeat password" />
+        </div>
+
+        <button class="btn btn-primary w-100" @onclick="Submit" disabled="@_saving">
+            @if (_saving)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            }
+            Activate Account
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter] public string Token { get; set; } = string.Empty;
+
+    private string _password = string.Empty;
+    private string _confirm = string.Empty;
+    private bool _saving;
+    private bool _success;
+    private string? _error;
+
+    private async Task Submit()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_password) || _password.Length < 8)
+        {
+            _error = "Password must be at least 8 characters.";
+            return;
+        }
+
+        if (_password != _confirm)
+        {
+            _error = "Passwords do not match.";
+            return;
+        }
+
+        _saving = true;
+        var (success, error) = await InviteService.AcceptInviteAsync(Token, _password);
+        _saving = false;
+
+        if (success)
+            _success = true;
+        else
+            _error = error;
+    }
+}
