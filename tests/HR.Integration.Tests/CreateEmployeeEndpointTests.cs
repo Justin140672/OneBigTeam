@@ -56,7 +56,7 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         Assert.Equal(companyId, payload.CompanyId);
         Assert.Equal("Alice", payload.FirstName);
         Assert.Equal("Smith", payload.LastName);
-        Assert.Equal(EmploymentStatus.Draft, payload.Status);
+        Assert.Equal("Draft", payload.Status);
         Assert.Null(payload.DepartmentId);
         Assert.Null(payload.PositionProfileId);
         Assert.Null(payload.ManagerId);
@@ -206,6 +206,6 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         string WorkEmail,
         string? PersonalEmail,
         DateOnly StartDate,
-        EmploymentStatus Status,
+        string Status,
         DateTimeOffset CreatedAt);
 }

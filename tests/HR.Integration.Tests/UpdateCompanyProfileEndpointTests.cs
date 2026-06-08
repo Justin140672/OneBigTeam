@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
-using HR.Modules.Companies.Domain;
 
 namespace HR.Integration.Tests;
 
@@ -41,7 +40,7 @@ public class UpdateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
             {
                 new
                 {
-                    type = CompanyAddressType.RegisteredOffice,
+                    type = "RegisteredOffice",
                     line1 = "10 High Street",
                     city = "London",
                     countryCode = "GB"
@@ -60,7 +59,7 @@ public class UpdateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
             {
                 new
                 {
-                    type = CompanyAddressType.RegisteredOffice,
+                    type = "RegisteredOffice",
                     line1 = "10 High Street",
                     city = "London",
                     postalCode = (string?)"SW1A 1AA",
@@ -68,7 +67,7 @@ public class UpdateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
                 },
                 new
                 {
-                    type = CompanyAddressType.TradingAddress,
+                    type = "TradingAddress",
                     line1 = "11 Billing Street",
                     city = "Manchester",
                     postalCode = (string?)null,
@@ -83,8 +82,8 @@ public class UpdateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
         Assert.NotNull(payload);
         Assert.Equal("Updated Company", payload!.Name);
         Assert.Equal(2, payload.Addresses.Count);
-        Assert.Contains(payload.Addresses, a => a.Type == CompanyAddressType.RegisteredOffice && a.City == "London");
-        Assert.Contains(payload.Addresses, a => a.Type == CompanyAddressType.TradingAddress && a.City == "Manchester");
+        Assert.Contains(payload.Addresses, a => a.Type == "RegisteredOffice" && a.City == "London");
+        Assert.Contains(payload.Addresses, a => a.Type == "TradingAddress" && a.City == "Manchester");
         Assert.Null(payload.Branding);
     }
 
@@ -102,7 +101,7 @@ public class UpdateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
             {
                 new
                 {
-                    type = CompanyAddressType.RegisteredOffice,
+                    type = "RegisteredOffice",
                     line1 = "10 High Street",
                     city = "London",
                     countryCode = "GB"
@@ -121,7 +120,7 @@ public class UpdateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
             {
                 new
                 {
-                    type = CompanyAddressType.RegisteredOffice,
+                    type = "RegisteredOffice",
                     line1 = "10 High Street",
                     city = "London",
                     countryCode = "GB"
@@ -159,7 +158,7 @@ public class UpdateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
             {
                 new
                 {
-                    type = CompanyAddressType.RegisteredOffice,
+                    type = "RegisteredOffice",
                     line1 = "10 High Street",
                     city = "London",
                     countryCode = "GB"
@@ -184,7 +183,7 @@ public class UpdateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
 
     private sealed record CompanyAddressPayload(
         Guid Id,
-        CompanyAddressType Type,
+        string Type,
         string Line1,
         string? Line2,
         string City,

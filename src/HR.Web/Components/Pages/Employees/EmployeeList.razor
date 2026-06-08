@@ -1,0 +1,142 @@
+@page "/companies/{CompanyId:guid}/employees"
+@rendermode InteractiveServer
+@using HR.Web.Models
+@using HR.Web.Services
+@using Syncfusion.Blazor.Grids
+@inject EmployeeService EmployeeService
+@inject NavigationManager Navigation
+
+<PageTitle>Employees</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="mb-0">Employees</h1>
+        <SfButton IsPrimary="true" OnClick="AddEmployee">+ Add Employee</SfButton>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <HrTextBox Value="@_search"
+                       ValueChanged="@OnSearchChanged"
+                       Placeholder="Search by name or email" />
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span>Loading employees…</span>
+        </div>
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else
+    {
+        <HrGrid TValue="EmployeeListItemModel"
+                DataSource="@_items"
+                AllowPaging="true"
+                AllowSorting="true"
+                AllowFiltering="false">
+            <GridPageSettings PageSize="20" />
+            <GridColumns>
+                <GridColumn Field="@nameof(EmployeeListItemModel.LastName)" HeaderText="Last Name" Width="140">
+                    <Template>
+                        @{
+                            var row = (context as EmployeeListItemModel)!;
+                            <a href="/companies/@CompanyId/employees/@row.Id">@row.LastName</a>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(EmployeeListItemModel.FirstName)" HeaderText="First Name" Width="130" />
+                <GridColumn Field="@nameof(EmployeeListItemModel.WorkEmail)" HeaderText="Work Email" Width="220" />
+                <GridColumn Field="@nameof(EmployeeListItemModel.DepartmentName)" HeaderText="Department" Width="160" />
+                <GridColumn Field="@nameof(EmployeeListItemModel.PositionProfileTitle)" HeaderText="Position" Width="180" />
+                <GridColumn Field="@nameof(EmployeeListItemModel.ManagerFullName)" HeaderText="Manager" Width="150" />
+                <GridColumn Field="@nameof(EmployeeListItemModel.StartDate)" HeaderText="Start Date" Width="120" Format="d" />
+                <GridColumn Field="@nameof(EmployeeListItemModel.Status)" HeaderText="Status" Width="120">
+                    <Template>
+                        @{
+                            var row = (context as EmployeeListItemModel)!;
+                            <span class="badge @StatusBadgeClass(row.Status)">@row.Status</span>
+                        }
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </HrGrid>
+
+        <p class="text-muted mt-2 small">@_totalCount employee@(_totalCount != 1 ? "s" : string.Empty)</p>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private List<EmployeeListItemModel> _items = [];
+    private int _totalCount;
+    private bool _loading = true;
+    private string? _error;
+    private string _search = string.Empty;
+    private System.Threading.CancellationTokenSource? _searchCts;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task OnSearchChanged(string value)
+    {
+        _search = value;
+
+        // Debounce: cancel previous pending search
+        _searchCts?.Cancel();
+        _searchCts = new System.Threading.CancellationTokenSource();
+        var token = _searchCts.Token;
+
+        try
+        {
+            await Task.Delay(300, token);
+            await LoadAsync();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        var result = await EmployeeService.ListEmployeesAsync(
+            CompanyId,
+            search: string.IsNullOrWhiteSpace(_search) ? null : _search,
+            pageSize: 100);
+
+        if (result is null)
+        {
+            _error = "Failed to load employees.";
+            _items = [];
+            _totalCount = 0;
+        }
+        else
+        {
+            _items = result.Items;
+            _totalCount = result.TotalCount;
+        }
+
+        _loading = false;
+    }
+
+    private void AddEmployee() =>
+        Navigation.NavigateTo($"/companies/{CompanyId}/employees/new");
+
+    private static string StatusBadgeClass(string status) => status switch
+    {
+        "Active"     => "bg-success",
+        "OnLeave"    => "bg-warning text-dark",
+        "Suspended"  => "bg-danger",
+        "Terminated" => "bg-secondary",
+        _            => "bg-light text-dark"
+    };
+}

@@ -133,6 +133,6 @@ public class UpdateEmployeeProfileEndpointTests : IClassFixture<ApiWebApplicatio
         string WorkEmail,
         string? PersonalEmail,
         DateOnly StartDate,
-        EmploymentStatus Status,
+        string Status,
         DateTimeOffset UpdatedAt);
 }

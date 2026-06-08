@@ -1,0 +1,49 @@
+@using HR.Web.Models
+
+<div class="card">
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-4 text-muted fw-normal">Department</dt>
+            <dd class="col-sm-8">@(Employee.DepartmentId?.ToString() ?? "—")</dd>
+
+            <dt class="col-sm-4 text-muted fw-normal">Position Profile</dt>
+            <dd class="col-sm-8">@(Employee.PositionProfileId?.ToString() ?? "—")</dd>
+
+            <dt class="col-sm-4 text-muted fw-normal">Manager</dt>
+            <dd class="col-sm-8">@(Employee.ManagerId?.ToString() ?? "—")</dd>
+
+            <dt class="col-sm-4 text-muted fw-normal">Start Date</dt>
+            <dd class="col-sm-8">@Employee.StartDate.ToString("d MMM yyyy")</dd>
+
+            <dt class="col-sm-4 text-muted fw-normal">Work Email</dt>
+            <dd class="col-sm-8">@Employee.WorkEmail</dd>
+
+            <dt class="col-sm-4 text-muted fw-normal">Personal Email</dt>
+            <dd class="col-sm-8">@(Employee.PersonalEmail ?? "—")</dd>
+
+            <dt class="col-sm-4 text-muted fw-normal">Status</dt>
+            <dd class="col-sm-8">
+                <span class="badge @StatusBadgeClass(Employee.Status)">@Employee.Status</span>
+            </dd>
+
+            <dt class="col-sm-4 text-muted fw-normal">Created</dt>
+            <dd class="col-sm-8">@Employee.CreatedAt.ToString("d MMM yyyy HH:mm")</dd>
+
+            <dt class="col-sm-4 text-muted fw-normal">Last Updated</dt>
+            <dd class="col-sm-8">@Employee.UpdatedAt.ToString("d MMM yyyy HH:mm")</dd>
+        </dl>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public GetEmployeeResponse Employee { get; set; } = default!;
+
+    private static string StatusBadgeClass(string status) => status switch
+    {
+        "Active"     => "bg-success",
+        "OnLeave"    => "bg-warning text-dark",
+        "Suspended"  => "bg-danger",
+        "Terminated" => "bg-secondary",
+        _            => "bg-light text-dark"
+    };
+}

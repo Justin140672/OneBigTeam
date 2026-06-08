@@ -1,12 +1,12 @@
 @page "/companies"
 @rendermode InteractiveServer
+@inject NavigationManager Navigation
 
-<PageTitle>Companies</PageTitle>
+<PageTitle>Company</PageTitle>
 
-<div class="container py-4">
-    <h1>Companies</h1>
-    <p class="text-muted">Company list coming soon.</p>
-    <a class="btn btn-primary" href="/companies/00000000-0000-0000-0000-000000000001/edit">
-        Edit Company (demo)
-    </a>
-</div>
+@code {
+    protected override void OnInitialized()
+    {
+        Navigation.NavigateTo("/companies/00000000-0000-0000-0000-000000000001/edit", replace: true);
+    }
+}

@@ -31,6 +31,7 @@ public static class CompaniesModule
     {
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        await db.Database.ExecuteSqlRawAsync("CREATE SCHEMA IF NOT EXISTS companies");
         await db.Database.MigrateAsync();
     }
 

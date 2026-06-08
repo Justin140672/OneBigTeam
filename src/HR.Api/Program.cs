@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HR.Api.Authentication;
 using HR.Modules.Companies;
 using HR.Modules.Employees;
 using HR.Modules.Identity;
@@ -16,9 +17,21 @@ builder.Services.AddEmployeesModule(connectionString);
 builder.Services.AddIdentityModule(connectionString);
 builder.Services.AddFastEndpoints();
 builder.Services.AddSingleton<IClock, SystemClock>();
-builder.Services
-	.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-	.AddJwtBearer();
+
+if (builder.Environment.IsDevelopment())
+{
+	builder.Services
+		.AddAuthentication("DevAuth")
+		.AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, DevAuthHandler>(
+			"DevAuth", _ => { });
+}
+else
+{
+	builder.Services
+		.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+		.AddJwtBearer();
+}
+
 builder.Services
 	.AddAuthorizationBuilder()
 	.AddPolicy("authenticated", policy => policy.RequireAuthenticatedUser());
@@ -52,6 +65,7 @@ catch (Exception exception)
 try
 {
 	await app.Services.MigrateEmployeesAsync();
+	await app.Services.SeedEmployeesAsync();
 	employeesMigrationStatus = "succeeded";
 	employeesMigrationCheckedAt = DateTimeOffset.UtcNow;
 }
@@ -106,7 +120,10 @@ app.MapGet("/health/startup-migrations", () =>
 app.UseAuthentication();
 app.UseIdentityModule();
 app.UseAuthorization();
-app.UseFastEndpoints();
+app.UseFastEndpoints(c =>
+{
+	c.Serializer.Options.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+});
 app.MapDefaultEndpoints();
 
 app.Run();

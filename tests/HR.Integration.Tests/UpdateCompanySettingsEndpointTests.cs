@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
-using HR.Modules.Companies.Domain;
 
 namespace HR.Integration.Tests;
 
@@ -46,7 +45,7 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
 			{
 				new
 				{
-					type = CompanyAddressType.RegisteredOffice,
+					type = "RegisteredOffice",
 					line1 = "10 High Street",
 					city = "London",
 					countryCode = "GB"

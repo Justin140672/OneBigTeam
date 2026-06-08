@@ -1,0 +1,74 @@
+namespace HR.Web.Models;
+
+// ── LIST ──────────────────────────────────────────────────────────────────────
+
+public record ListEmployeesResponse(
+    List<EmployeeListItemModel> Items,
+    int TotalCount,
+    int PageNumber,
+    int PageSize,
+    int TotalPages);
+
+public record EmployeeListItemModel(
+    Guid Id,
+    Guid CompanyId,
+    Guid? DepartmentId,
+    string? DepartmentName,
+    Guid? PositionProfileId,
+    string? PositionProfileTitle,
+    Guid? ManagerId,
+    string? ManagerFullName,
+    string FirstName,
+    string LastName,
+    string WorkEmail,
+    DateOnly StartDate,
+    string Status,
+    DateTimeOffset CreatedAt);
+
+// ── GET ───────────────────────────────────────────────────────────────────────
+
+public record GetEmployeeResponse(
+    Guid Id,
+    Guid CompanyId,
+    Guid? DepartmentId,
+    Guid? PositionProfileId,
+    Guid? ManagerId,
+    string FirstName,
+    string LastName,
+    string WorkEmail,
+    string? PersonalEmail,
+    DateOnly StartDate,
+    string Status,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
+
+// ── EDIT MODELS ───────────────────────────────────────────────────────────────
+
+public sealed class EmployeeProfileEditModel
+{
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string WorkEmail { get; set; } = string.Empty;
+    public string? PersonalEmail { get; set; }
+    public DateOnly StartDate { get; set; }
+}
+
+public record UpdateEmployeeProfileRequest(
+    Guid CompanyId,
+    Guid Id,
+    string FirstName,
+    string LastName,
+    string WorkEmail,
+    string? PersonalEmail,
+    DateOnly StartDate);
+
+public record UpdateEmployeeProfileResponse(
+    Guid Id,
+    Guid CompanyId,
+    string FirstName,
+    string LastName,
+    string WorkEmail,
+    string? PersonalEmail,
+    DateOnly StartDate,
+    string Status,
+    DateTimeOffset UpdatedAt);

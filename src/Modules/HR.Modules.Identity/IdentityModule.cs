@@ -35,6 +35,7 @@ public static class IdentityModule
     {
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        await db.Database.ExecuteSqlRawAsync("CREATE SCHEMA IF NOT EXISTS identity");
         await db.Database.MigrateAsync();
     }
 }

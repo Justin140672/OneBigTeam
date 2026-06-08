@@ -162,5 +162,5 @@ public class ListEmployeesEndpointTests : IClassFixture<ApiWebApplicationFactory
         string FirstName,
         string LastName,
         string WorkEmail,
-        EmploymentStatus Status);
+        string Status);
 }

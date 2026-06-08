@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
-using HR.Modules.Companies.Domain;
 
 namespace HR.Integration.Tests;
 
@@ -26,7 +25,7 @@ public class CreateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
             {
                 new
                 {
-                    type = CompanyAddressType.RegisteredOffice,
+                    type = "RegisteredOffice",
                     line1 = "10 High Street",
                     city = "London",
                     countryCode = "GB"
@@ -51,7 +50,7 @@ public class CreateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
             {
                 new
                 {
-                    type = CompanyAddressType.RegisteredOffice,
+                    type = "RegisteredOffice",
                     line1 = "10 High Street",
                     city = "London",
                     countryCode = "GB"
@@ -68,8 +67,8 @@ public class CreateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
         Assert.True(payload.IsActive);
         Assert.NotEqual(Guid.Empty, payload.Id);
         Assert.Equal(2, payload.Addresses.Count);
-        Assert.Contains(payload.Addresses, address => address.Type == CompanyAddressType.RegisteredOffice);
-        Assert.Contains(payload.Addresses, address => address.Type == CompanyAddressType.TradingAddress);
+        Assert.Contains(payload.Addresses, address => address.Type == "RegisteredOffice");
+        Assert.Contains(payload.Addresses, address => address.Type == "TradingAddress");
     }
 
     [Fact]
@@ -86,7 +85,7 @@ public class CreateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
             {
                 new
                 {
-                    type = CompanyAddressType.RegisteredOffice,
+                    type = "RegisteredOffice",
                     line1 = "10 High Street",
                     city = "London",
                     countryCode = "GB"
@@ -102,7 +101,7 @@ public class CreateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
             {
                 new
                 {
-                    type = CompanyAddressType.RegisteredOffice,
+                    type = "RegisteredOffice",
                     line1 = "10 High Street",
                     city = "London",
                     countryCode = "GB"
@@ -123,7 +122,7 @@ public class CreateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
 
     private sealed record CompanyAddressPayload(
         Guid Id,
-        CompanyAddressType Type,
+        string Type,
         string Line1,
         string? Line2,
         string City,

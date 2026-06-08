@@ -55,7 +55,7 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         Assert.Equal(companyId, payload.CompanyId);
         Assert.Equal("Alice", payload.FirstName);
         Assert.Equal("Smith", payload.LastName);
-        Assert.Equal(EmploymentStatus.Draft, payload.Status);
+        Assert.Equal("Draft", payload.Status);
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         string WorkEmail,
         string? PersonalEmail,
         DateOnly StartDate,
-        EmploymentStatus Status,
+        string Status,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt);
 }
