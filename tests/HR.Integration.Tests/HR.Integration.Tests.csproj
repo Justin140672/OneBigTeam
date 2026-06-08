@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\HR.Api\HR.Api.csproj" />
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Companies\HR.Modules.Companies.csproj" />
+    <ProjectReference Include="..\..\src\Modules\HR.Modules.Employees\HR.Modules.Employees.csproj" />
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Identity\HR.Modules.Identity.csproj" />
   </ItemGroup>
 

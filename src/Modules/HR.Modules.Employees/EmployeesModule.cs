@@ -1,5 +1,6 @@
 using FluentValidation;
 using HR.Modules.Employees.Features.CreateDepartment;
+using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Modules.Employees.Features.CreatePositionProfile;
 using HR.Modules.Employees.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +30,9 @@ public static class EmployeesModule
 
         services.AddScoped<CreatePositionProfileHandler>();
         services.AddScoped<IValidator<CreatePositionProfileRequest>, CreatePositionProfileValidator>();
+
+        services.AddScoped<CreateEmployeeHandler>();
+        services.AddScoped<IValidator<CreateEmployeeRequest>, CreateEmployeeValidator>();
     }
 
     public static async Task MigrateEmployeesAsync(this IServiceProvider services)

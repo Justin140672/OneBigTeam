@@ -1,5 +1,6 @@
 using FastEndpoints;
 using HR.Modules.Companies;
+using HR.Modules.Employees;
 using HR.Modules.Identity;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -11,6 +12,7 @@ var connectionString = builder.Configuration.GetConnectionString("hr")
 	?? throw new InvalidOperationException("Connection string 'hr' was not found.");
 
 builder.Services.AddCompaniesModule(connectionString);
+builder.Services.AddEmployeesModule(connectionString);
 builder.Services.AddIdentityModule(connectionString);
 builder.Services.AddFastEndpoints();
 builder.Services.AddSingleton<IClock, SystemClock>();
@@ -26,6 +28,9 @@ var app = builder.Build();
 var companiesMigrationStatus = "unknown";
 string? companiesMigrationError = null;
 DateTimeOffset? companiesMigrationCheckedAt = null;
+var employeesMigrationStatus = "unknown";
+string? employeesMigrationError = null;
+DateTimeOffset? employeesMigrationCheckedAt = null;
 var identityMigrationStatus = "unknown";
 string? identityMigrationError = null;
 DateTimeOffset? identityMigrationCheckedAt = null;
@@ -42,6 +47,19 @@ catch (Exception exception)
 	companiesMigrationStatus = "failed";
 	companiesMigrationError = exception.Message;
 	companiesMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+
+try
+{
+	await app.Services.MigrateEmployeesAsync();
+	employeesMigrationStatus = "succeeded";
+	employeesMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+catch (Exception exception)
+{
+	employeesMigrationStatus = "failed";
+	employeesMigrationError = exception.Message;
+	employeesMigrationCheckedAt = DateTimeOffset.UtcNow;
 }
 
 try
@@ -67,6 +85,12 @@ app.MapGet("/health/startup-migrations", () =>
 			checkedAt = companiesMigrationCheckedAt,
 			error = companiesMigrationError
 		},
+		employees = new
+		{
+			status = employeesMigrationStatus,
+			checkedAt = employeesMigrationCheckedAt,
+			error = employeesMigrationError
+		},
 		identity = new
 		{
 			status = identityMigrationStatus,
@@ -75,7 +99,7 @@ app.MapGet("/health/startup-migrations", () =>
 		}
 	};
 
-	return companiesMigrationStatus == "failed" || identityMigrationStatus == "failed"
+	return companiesMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed"
 		? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
 		: Results.Ok(response);
 });
