@@ -2,8 +2,10 @@
 @rendermode InteractiveServer
 @using HR.Web.Models
 @using HR.Web.Services
+@using HR.SharedKernel
 @using Syncfusion.Blazor.Grids
 @inject EmployeeService EmployeeService
+@inject UserService UserService
 @inject NavigationManager Navigation
 
 <PageTitle>Employees</PageTitle>
@@ -11,7 +13,10 @@
 <div class="container-fluid py-4">
     <div class="d-flex align-items-center justify-content-between mb-4">
         <h1 class="mb-0">Employees</h1>
-        <SfButton IsPrimary="true" OnClick="AddEmployee">+ Add Employee</SfButton>
+        @if (_canCreateEmployee)
+        {
+            <SfButton IsPrimary="true" OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/employees/new"))">+ Add Employee</SfButton>
+        }
     </div>
 
     <div class="row g-3 mb-4">
@@ -79,10 +84,12 @@
     private bool _loading = true;
     private string? _error;
     private string _search = string.Empty;
+    private bool _canCreateEmployee;
     private System.Threading.CancellationTokenSource? _searchCts;
 
     protected override async Task OnParametersSetAsync()
     {
+        _canCreateEmployee = await UserService.HasPermissionAsync(SystemPermissions.EmployeeCreate);
         await LoadAsync();
     }
 

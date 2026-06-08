@@ -1,0 +1,200 @@
+@page "/companies/{CompanyId:guid}/employees/new"
+@page "/companies/{CompanyId:guid}/employees/{Id:guid}"
+@rendermode InteractiveServer
+@using HR.Web.Models
+@using HR.Web.Services
+@using Syncfusion.Blazor.Calendars
+@inject EmployeeService EmployeeService
+@inject NavigationManager Navigation
+
+<PageTitle>@PageTitle</PageTitle>
+
+<div class="container py-4">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="/companies/@CompanyId/employees">Employees</a>
+            </li>
+            <li class="breadcrumb-item active">@PageTitle</li>
+        </ol>
+    </nav>
+
+    @if (_loading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span>Loading…</span>
+        </div>
+    }
+    else
+    {
+        @if (!_isNew)
+        {
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <h1 class="mb-0">@(_employee?.FirstName) @(_employee?.LastName)</h1>
+                @if (_employee is not null)
+                {
+                    <span class="badge @StatusBadgeClass(_employee.Status)">@_employee.Status</span>
+                }
+            </div>
+        }
+        else
+        {
+            <h1 class="mb-4">Add Employee</h1>
+        }
+
+        @if (!string.IsNullOrEmpty(_globalError))
+        {
+            <div class="alert alert-danger">@_globalError</div>
+        }
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label">First Name <span class="text-danger">*</span></label>
+                    <HrTextBox @bind-Value="_model.FirstName" Placeholder="First name" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Last Name <span class="text-danger">*</span></label>
+                    <HrTextBox @bind-Value="_model.LastName" Placeholder="Last name" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Work Email <span class="text-danger">*</span></label>
+                    <HrTextBox @bind-Value="_model.WorkEmail" Placeholder="work@company.com" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Personal Email</label>
+                    <HrTextBox @bind-Value="_model.PersonalEmail" Placeholder="personal@example.com" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                    <SfDatePicker TValue="DateOnly"
+                                  @bind-Value="_model.StartDate"
+                                  FloatLabelType="Syncfusion.Blazor.Inputs.FloatLabelType.Auto"
+                                  Placeholder="Start date" />
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-2 d-flex gap-2">
+            @if (!string.IsNullOrEmpty(_successMsg))
+            {
+                <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
+            }
+            <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
+                @if (_saving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Save
+            </SfButton>
+            <SfButton OnClick="Cancel" Disabled="@_saving">Cancel</SfButton>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+
+    private bool _isNew => Id is null || Id == Guid.Empty;
+    private string PageTitle => _isNew ? "Add Employee" : $"{_model.FirstName} {_model.LastName}".Trim();
+
+    private GetEmployeeResponse? _employee;
+    private bool _loading = true;
+    private string? _globalError;
+    private string? _successMsg;
+    private bool _saving;
+
+    private readonly EmployeeProfileEditModel _model = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _globalError = null;
+        _successMsg = null;
+
+        if (!_isNew)
+        {
+            _employee = await EmployeeService.GetEmployeeAsync(CompanyId, Id!.Value);
+            if (_employee is not null)
+            {
+                _model.FirstName = _employee.FirstName;
+                _model.LastName = _employee.LastName;
+                _model.WorkEmail = _employee.WorkEmail;
+                _model.PersonalEmail = _employee.PersonalEmail;
+                _model.StartDate = _employee.StartDate;
+            }
+        }
+        else
+        {
+            _model.StartDate = DateOnly.FromDateTime(DateTime.Today);
+        }
+
+        _loading = false;
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        _globalError = null;
+        _successMsg = null;
+
+        if (_isNew)
+        {
+            var request = new CreateEmployeeRequest(
+                CompanyId,
+                _model.FirstName.Trim(),
+                _model.LastName.Trim(),
+                _model.WorkEmail.Trim(),
+                string.IsNullOrWhiteSpace(_model.PersonalEmail) ? null : _model.PersonalEmail.Trim(),
+                _model.StartDate);
+
+            var (created, error) = await EmployeeService.CreateEmployeeAsync(CompanyId, request);
+            _saving = false;
+
+            if (created is not null)
+            {
+                Navigation.NavigateTo($"/companies/{CompanyId}/employees");
+                return;
+            }
+
+            _globalError = error ?? "Failed to create employee.";
+        }
+        else
+        {
+            var request = new UpdateEmployeeProfileRequest(
+                CompanyId,
+                Id!.Value,
+                _model.FirstName,
+                _model.LastName,
+                _model.WorkEmail,
+                _model.PersonalEmail,
+                _model.StartDate);
+
+            var (success, conflictMessage) = await EmployeeService.UpdateEmployeeProfileAsync(CompanyId, Id!.Value, request);
+            _saving = false;
+
+            if (success)
+            {
+                Navigation.NavigateTo($"/companies/{CompanyId}/employees");
+            }
+            else
+            {
+                _globalError = conflictMessage;
+            }
+        }
+    }
+
+    private void Cancel() =>
+        Navigation.NavigateTo($"/companies/{CompanyId}/employees");
+
+    private static string StatusBadgeClass(string status) => status switch
+    {
+        "Active"     => "bg-success",
+        "OnLeave"    => "bg-warning text-dark",
+        "Suspended"  => "bg-danger",
+        "Terminated" => "bg-secondary",
+        _            => "bg-light text-dark"
+    };
+}

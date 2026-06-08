@@ -79,6 +79,8 @@ catch (Exception exception)
 try
 {
 	await app.Services.MigrateIdentityAsync();
+	if (app.Environment.IsDevelopment())
+		await app.Services.SeedDevUserAsync();
 	identityMigrationStatus = "succeeded";
 	identityMigrationCheckedAt = DateTimeOffset.UtcNow;
 }

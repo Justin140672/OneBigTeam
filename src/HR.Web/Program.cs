@@ -21,6 +21,7 @@ builder.Services.AddHttpClient("hrapi", c =>
 
 builder.Services.AddScoped<CompanyService>();
 builder.Services.AddScoped<EmployeeService>();
+builder.Services.AddScoped<UserService>();
 
 Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(
     builder.Configuration["Syncfusion:LicenseKey"] ?? string.Empty);

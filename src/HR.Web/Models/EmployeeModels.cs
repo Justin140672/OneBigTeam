@@ -72,3 +72,31 @@ public record UpdateEmployeeProfileResponse(
     DateOnly StartDate,
     string Status,
     DateTimeOffset UpdatedAt);
+
+// ── CREATE ────────────────────────────────────────────────────────────────────
+
+public sealed class CreateEmployeeFormModel
+{
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string WorkEmail { get; set; } = string.Empty;
+    public string? PersonalEmail { get; set; }
+    public DateOnly StartDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+}
+
+public record CreateEmployeeRequest(
+    Guid CompanyId,
+    string FirstName,
+    string LastName,
+    string WorkEmail,
+    string? PersonalEmail,
+    DateOnly StartDate);
+
+public record CreateEmployeeResponse(
+    Guid Id,
+    Guid CompanyId,
+    string FirstName,
+    string LastName,
+    string WorkEmail,
+    string Status,
+    DateTimeOffset CreatedAt);
