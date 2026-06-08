@@ -5,7 +5,9 @@ using HR.Modules.Employees.Features.CreateDepartment;
 using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Modules.Employees.Features.CreatePositionProfile;
 using HR.Modules.Employees.Features.GetEmployee;
+using HR.Modules.Employees.Features.ListDepartments;
 using HR.Modules.Employees.Features.ListEmployees;
+using HR.Modules.Employees.Features.UpdateDepartment;
 using HR.Modules.Employees.Features.UpdateEmployeeProfile;
 using HR.Modules.Employees.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -33,6 +35,9 @@ public static class EmployeesModule
         services.AddScoped<CreateDepartmentHandler>();
         services.AddScoped<IValidator<CreateDepartmentRequest>, CreateDepartmentValidator>();
 
+        services.AddScoped<UpdateDepartmentHandler>();
+        services.AddScoped<IValidator<UpdateDepartmentRequest>, UpdateDepartmentValidator>();
+
         services.AddScoped<CreatePositionProfileHandler>();
         services.AddScoped<IValidator<CreatePositionProfileRequest>, CreatePositionProfileValidator>();
 
@@ -40,6 +45,9 @@ public static class EmployeesModule
         services.AddScoped<IValidator<CreateEmployeeRequest>, CreateEmployeeValidator>();
 
         services.AddScoped<GetEmployeeHandler>();
+
+        services.AddScoped<ListDepartmentsHandler>();
+        services.AddScoped<IValidator<ListDepartmentsRequest>, ListDepartmentsValidator>();
 
         services.AddScoped<ListEmployeesHandler>();
         services.AddScoped<IValidator<ListEmployeesRequest>, ListEmployeesValidator>();
