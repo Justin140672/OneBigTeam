@@ -240,7 +240,7 @@ public class IdentityModuleArchitectureTests
         var externalAssemblies = new[]
         {
             typeof(HR.Modules.Companies.CompaniesModule).Assembly,
-            typeof(HR.Modules.Employees.Class1).Assembly,
+            typeof(HR.Modules.Employees.EmployeesModule).Assembly,
         };
 
         var userPositionTypeName = "HR.Modules.Identity.Domain.UserPosition";

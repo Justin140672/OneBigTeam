@@ -42,6 +42,7 @@ public class CreateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
     {
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "user-1");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, "tenant-1");
 
         var response = await client.PostAsJsonAsync("/api/companies", new
         {
@@ -76,6 +77,7 @@ public class CreateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
     {
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "user-2");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, "tenant-2");
 
         var firstResponse = await client.PostAsJsonAsync("/api/companies", new
         {
