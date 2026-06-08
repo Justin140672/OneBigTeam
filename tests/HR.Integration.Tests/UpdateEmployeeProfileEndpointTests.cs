@@ -1,7 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
-using HR.Modules.Employees.Domain;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Employees.Domain;
+using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
@@ -9,9 +10,20 @@ public class UpdateEmployeeProfileEndpointTests : IClassFixture<ApiWebApplicatio
 {
     private readonly ApiWebApplicationFactory _factory;
 
+    private static readonly Guid UpdEmpUser1 = new("cccccccc-0000-0000-0000-000000000001");
+    private static readonly Guid UpdEmpUser2 = new("cccccccc-0000-0000-0000-000000000002");
+    private static readonly Guid UpdEmpUser3 = new("cccccccc-0000-0000-0000-000000000003");
+
     public UpdateEmployeeProfileEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, UpdEmpUser1, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, UpdEmpUser2, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, UpdEmpUser3, SystemRoles.HrAdministrator);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]
@@ -31,7 +43,7 @@ public class UpdateEmployeeProfileEndpointTests : IClassFixture<ApiWebApplicatio
     {
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "upd-emp-user-1");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UpdEmpUser1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
         var created = await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com");
@@ -64,7 +76,7 @@ public class UpdateEmployeeProfileEndpointTests : IClassFixture<ApiWebApplicatio
     {
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "upd-emp-user-2");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UpdEmpUser2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
         var emp1 = await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com");
@@ -90,7 +102,7 @@ public class UpdateEmployeeProfileEndpointTests : IClassFixture<ApiWebApplicatio
     {
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "upd-emp-user-3");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UpdEmpUser3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
         var response = await client.PutAsJsonAsync(

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
@@ -8,9 +9,24 @@ public class AssignManagerEndpointTests : IClassFixture<ApiWebApplicationFactory
 {
     private readonly ApiWebApplicationFactory _factory;
 
+    private static readonly Guid MgrUser1 = new("dddddddd-0000-0000-0000-000000000001");
+    private static readonly Guid MgrUser2 = new("dddddddd-0000-0000-0000-000000000002");
+    private static readonly Guid MgrUser3 = new("dddddddd-0000-0000-0000-000000000003");
+    private static readonly Guid MgrUser4 = new("dddddddd-0000-0000-0000-000000000004");
+    private static readonly Guid MgrUser5 = new("dddddddd-0000-0000-0000-000000000005");
+
     public AssignManagerEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, MgrUser1, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, MgrUser2, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, MgrUser3, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, MgrUser4, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, MgrUser5, SystemRoles.HrAdministrator);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]
@@ -30,7 +46,7 @@ public class AssignManagerEndpointTests : IClassFixture<ApiWebApplicationFactory
     {
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "mgr-user-1");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, MgrUser1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
         var manager = await CreateEmployeeAsync(client, companyId, "Jane", "Manager", $"jane.{Guid.NewGuid():N}@example.com");
@@ -53,7 +69,7 @@ public class AssignManagerEndpointTests : IClassFixture<ApiWebApplicationFactory
     {
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "mgr-user-2");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, MgrUser2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
         var manager = await CreateEmployeeAsync(client, companyId, "Jane", "Manager", $"jane2.{Guid.NewGuid():N}@example.com");
@@ -82,7 +98,7 @@ public class AssignManagerEndpointTests : IClassFixture<ApiWebApplicationFactory
     {
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "mgr-user-3");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, MgrUser3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
         var empA = await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"alice3.{Guid.NewGuid():N}@example.com");
@@ -106,7 +122,7 @@ public class AssignManagerEndpointTests : IClassFixture<ApiWebApplicationFactory
     {
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "mgr-user-4");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, MgrUser4.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
         var empA = await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"a4.{Guid.NewGuid():N}@example.com");
@@ -132,7 +148,7 @@ public class AssignManagerEndpointTests : IClassFixture<ApiWebApplicationFactory
     {
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "mgr-user-5");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, MgrUser5.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
         var response = await client.PutAsJsonAsync(
