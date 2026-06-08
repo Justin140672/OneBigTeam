@@ -1,3 +1,5 @@
+using FluentValidation;
+using HR.Modules.Employees.Features.CreateDepartment;
 using HR.Modules.Employees.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,11 +12,19 @@ public static class EmployeesModule
         this IServiceCollection services,
         string connectionString)
     {
+        AddFeatureServices(services);
+
         services.AddDbContext<EmployeesDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "employees")));
 
         return services;
+    }
+
+    private static void AddFeatureServices(IServiceCollection services)
+    {
+        services.AddScoped<CreateDepartmentHandler>();
+        services.AddScoped<IValidator<CreateDepartmentRequest>, CreateDepartmentValidator>();
     }
 
     public static async Task MigrateEmployeesAsync(this IServiceProvider services)
