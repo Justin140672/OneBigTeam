@@ -65,13 +65,14 @@ public class UserInviteEndpointTests : IClassFixture<ApiWebApplicationFactory>
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
+        var email = $"emp.{Guid.NewGuid():N}@example.com";
 
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, InviteAdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/invite",
-            new { companyId, employeeId, email = $"emp.{Guid.NewGuid():N}@example.com" });
+            new { companyId, employeeId, email });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -79,6 +80,39 @@ public class UserInviteEndpointTests : IClassFixture<ApiWebApplicationFactory>
         Assert.NotNull(payload);
         Assert.False(string.IsNullOrWhiteSpace(payload!.Token));
         Assert.True(payload.ExpiresAt > DateTimeOffset.UtcNow);
+
+        // Verify invite email was dispatched
+        var sent = _factory.EmailSender.Sent.SingleOrDefault(e => e.ToEmail == email);
+        Assert.NotNull(sent);
+        Assert.Contains(payload.Token, sent!.HtmlBody);
+        Assert.Contains("invite", sent.HtmlBody, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Post_Invite_Sends_Email_Containing_Invite_Link_To_Employee_Email()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var email = $"unique.{Guid.NewGuid():N}@example.com";
+
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, InviteAdminUser.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/invite",
+            new { companyId, employeeId, email });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<InvitePayload>();
+
+        var sent = _factory.EmailSender.Sent.SingleOrDefault(e => e.ToEmail == email);
+        Assert.NotNull(sent);
+        Assert.Equal(email, sent!.ToEmail);
+        Assert.Equal("You have been invited to One Big Team", sent.Subject);
+        // The link built by FakeInviteLinkBuilder must appear in the body
+        Assert.Contains($"https://test.local/invite/{payload!.Token}", sent.HtmlBody);
     }
 
     [Fact]

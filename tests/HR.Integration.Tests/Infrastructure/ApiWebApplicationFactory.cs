@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -14,6 +15,8 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, I
         .WithUsername("postgres")
         .WithPassword("postgres")
         .Build();
+
+    public FakeEmailSender EmailSender { get; } = new FakeEmailSender();
 
     async Task IAsyncLifetime.InitializeAsync()
     {
@@ -43,6 +46,10 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, I
                     _ =>
                     {
                     });
+
+            // Replace real email sender and link builder with test doubles
+            services.AddSingleton<IEmailSender>(EmailSender);
+            services.AddSingleton<IInviteLinkBuilder, FakeInviteLinkBuilder>();
         });
     }
 }

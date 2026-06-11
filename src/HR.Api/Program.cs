@@ -1,5 +1,6 @@
 using FastEndpoints;
 using HR.Api.Authentication;
+using HR.Infrastructure;
 using HR.Modules.Companies;
 using HR.Modules.Employees;
 using HR.Modules.Identity;
@@ -15,6 +16,7 @@ var connectionString = builder.Configuration.GetConnectionString("hr")
 builder.Services.AddCompaniesModule(connectionString);
 builder.Services.AddEmployeesModule(connectionString);
 builder.Services.AddIdentityModule(connectionString);
+builder.Services.AddInfrastructure();
 builder.Services.AddFastEndpoints();
 builder.Services.AddSingleton<IClock, SystemClock>();
 
