@@ -10,6 +10,9 @@ internal sealed class LeaveDbContext : DbContext
     {
     }
 
+    public DbSet<LeaveType> LeaveTypes => Set<LeaveType>();
+    public DbSet<LeavePolicy> LeavePolicies => Set<LeavePolicy>();
+    public DbSet<LeaveBalance> LeaveBalances => Set<LeaveBalance>();
     public DbSet<LeaveRequest> LeaveRequests => Set<LeaveRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -7,10 +7,12 @@ internal sealed class LeaveRequest
     public Guid Id { get; private set; }
     public Guid CompanyId { get; private set; }
     public Guid EmployeeId { get; private set; }
-    public LeaveType LeaveType { get; private set; }
+    public Guid LeaveTypeId { get; private set; }
+    public Guid? LeavePolicyId { get; private set; }
     public LeaveStatus Status { get; private set; }
     public DateOnly StartDate { get; private set; }
     public DateOnly EndDate { get; private set; }
+    public decimal TotalDays { get; private set; }
     public string? Notes { get; private set; }
     public Guid? ReviewedByEmployeeId { get; private set; }
     public DateTimeOffset? ReviewedAt { get; private set; }
@@ -21,9 +23,11 @@ internal sealed class LeaveRequest
         Guid id,
         Guid companyId,
         Guid employeeId,
-        LeaveType leaveType,
+        Guid leaveTypeId,
+        Guid? leavePolicyId,
         DateOnly startDate,
         DateOnly endDate,
+        decimal totalDays,
         string? notes,
         DateTimeOffset now)
     {
@@ -32,10 +36,12 @@ internal sealed class LeaveRequest
             Id = id,
             CompanyId = companyId,
             EmployeeId = employeeId,
-            LeaveType = leaveType,
+            LeaveTypeId = leaveTypeId,
+            LeavePolicyId = leavePolicyId,
             Status = LeaveStatus.Pending,
             StartDate = startDate,
             EndDate = endDate,
+            TotalDays = totalDays,
             Notes = notes,
             CreatedAt = now,
             UpdatedAt = now
@@ -65,15 +71,17 @@ internal sealed class LeaveRequest
     }
 
     public void UpdateDetails(
-        LeaveType leaveType,
+        Guid leaveTypeId,
         DateOnly startDate,
         DateOnly endDate,
+        decimal totalDays,
         string? notes,
         DateTimeOffset now)
     {
-        LeaveType = leaveType;
+        LeaveTypeId = leaveTypeId;
         StartDate = startDate;
         EndDate = endDate;
+        TotalDays = totalDays;
         Notes = notes;
         UpdatedAt = now;
     }
