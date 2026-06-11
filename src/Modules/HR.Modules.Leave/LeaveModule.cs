@@ -1,5 +1,6 @@
 using FluentValidation;
 using HR.Modules.Leave.Domain;
+using HR.Modules.Leave.Features.AssignLeavePolicyToEmployee;
 using HR.Modules.Leave.Features.CreateLeavePolicy;
 using HR.Modules.Leave.Features.GetLeavePolicy;
 using HR.Modules.Leave.Persistence;
@@ -28,6 +29,8 @@ public static class LeaveModule
         services.AddScoped<CreateLeavePolicyHandler>();
         services.AddScoped<IValidator<CreateLeavePolicyRequest>, CreateLeavePolicyValidator>();
         services.AddScoped<GetLeavePolicyHandler>();
+        services.AddScoped<AssignLeavePolicyToEmployeeHandler>();
+        services.AddScoped<IValidator<AssignLeavePolicyToEmployeeRequest>, AssignLeavePolicyToEmployeeValidator>();
     }
 
     public static async Task MigrateLeaveAsync(this IServiceProvider services)
