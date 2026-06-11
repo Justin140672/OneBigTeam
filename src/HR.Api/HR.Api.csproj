@@ -12,6 +12,7 @@
     <ProjectReference Include="..\Modules\HR.Modules.Companies\HR.Modules.Companies.csproj" />
     <ProjectReference Include="..\Modules\HR.Modules.Identity\HR.Modules.Identity.csproj" />
     <ProjectReference Include="..\Modules\HR.Modules.Employees\HR.Modules.Employees.csproj" />
+    <ProjectReference Include="..\Modules\HR.Modules.Leave\HR.Modules.Leave.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -4,6 +4,7 @@ using HR.Infrastructure;
 using HR.Modules.Companies;
 using HR.Modules.Employees;
 using HR.Modules.Identity;
+using HR.Modules.Leave;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
@@ -16,6 +17,7 @@ var connectionString = builder.Configuration.GetConnectionString("hr")
 builder.Services.AddCompaniesModule(connectionString);
 builder.Services.AddEmployeesModule(connectionString);
 builder.Services.AddIdentityModule(connectionString);
+builder.Services.AddLeaveModule(connectionString);
 builder.Services.AddInfrastructure();
 builder.Services.AddFastEndpoints();
 builder.Services.AddSingleton<IClock, SystemClock>();
@@ -49,6 +51,9 @@ DateTimeOffset? employeesMigrationCheckedAt = null;
 var identityMigrationStatus = "unknown";
 string? identityMigrationError = null;
 DateTimeOffset? identityMigrationCheckedAt = null;
+var leaveMigrationStatus = "unknown";
+string? leaveMigrationError = null;
+DateTimeOffset? leaveMigrationCheckedAt = null;
 
 try
 {
@@ -93,6 +98,20 @@ catch (Exception exception)
 	identityMigrationCheckedAt = DateTimeOffset.UtcNow;
 }
 
+try
+{
+	await app.Services.MigrateLeaveAsync();
+	await app.Services.SeedLeaveAsync();
+	leaveMigrationStatus = "succeeded";
+	leaveMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+catch (Exception exception)
+{
+	leaveMigrationStatus = "failed";
+	leaveMigrationError = exception.Message;
+	leaveMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+
 app.MapGet("/health/startup-migrations", () =>
 {
 	var response = new
@@ -114,10 +133,16 @@ app.MapGet("/health/startup-migrations", () =>
 			status = identityMigrationStatus,
 			checkedAt = identityMigrationCheckedAt,
 			error = identityMigrationError
+		},
+		leave = new
+		{
+			status = leaveMigrationStatus,
+			checkedAt = leaveMigrationCheckedAt,
+			error = leaveMigrationError
 		}
 	};
 
-	return companiesMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed"
+	return companiesMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed"
 		? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
 		: Results.Ok(response);
 });
