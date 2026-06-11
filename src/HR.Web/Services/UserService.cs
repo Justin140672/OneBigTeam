@@ -1,6 +1,3 @@
-using HR.SharedKernel;
-using System.Net.Http.Json;
-
 namespace HR.Web.Services;
 
 public class UserService(IHttpClientFactory httpClientFactory)
@@ -17,7 +14,7 @@ public class UserService(IHttpClientFactory httpClientFactory)
         try
         {
             var response = await Http.GetFromJsonAsync<PermissionsResponse>("api/users/me/permissions");
-            _cachedPermissions = response?.PermissionIds.ToHashSet() ?? new HashSet<Guid>();
+            _cachedPermissions = response?.PermissionIds.ToHashSet() ?? [];
         }
         catch
         {

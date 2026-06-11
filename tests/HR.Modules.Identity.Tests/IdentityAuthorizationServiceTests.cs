@@ -1,6 +1,5 @@
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Tests.Infrastructure;
-using Xunit;
 
 namespace HR.Modules.Identity.Tests;
 

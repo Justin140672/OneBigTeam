@@ -1,7 +1,6 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.GetEmployee;
 using HR.Modules.Employees.Persistence;
-using HR.Modules.Employees.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Tests;

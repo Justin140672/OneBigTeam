@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
-using HR.Modules.Employees.Domain;
 using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;

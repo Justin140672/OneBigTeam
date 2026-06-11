@@ -1,8 +1,5 @@
 @page "/companies/{CompanyId:guid}/departments"
 @rendermode InteractiveServer
-@using HR.Web.Models
-@using HR.Web.Services
-@using Syncfusion.Blazor.Grids
 @inject DepartmentService DepartmentService
 @inject NavigationManager Navigation
 
@@ -108,7 +105,7 @@
 @code {
     [Parameter] public Guid CompanyId { get; set; }
 
-    private List<DepartmentListItemModel> _items = new();
+    private List<DepartmentListItemModel> _items = [];
     private Dictionary<Guid, string> _nameMap = new();
     private bool _loading = true;
     private bool _showInactive;

@@ -1,9 +1,6 @@
 @page "/companies/{CompanyId:guid}/departments/new"
 @page "/companies/{CompanyId:guid}/departments/{Id:guid}"
 @rendermode InteractiveServer
-@using HR.Web.Models
-@using HR.Web.Services
-@using Syncfusion.Blazor.DropDowns
 @inject DepartmentService DepartmentService
 @inject NavigationManager Navigation
 
@@ -80,8 +77,8 @@
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool _isNew => Id is null || Id == Guid.Empty;
-    private string PageTitle => _isNew ? "Add Department" : _model.Name.Trim().Length > 0 ? _model.Name : "Edit Department";
+    private bool IsNew => Id is null || Id == Guid.Empty;
+    private string PageTitle => IsNew ? "Add Department" : _model.Name.Trim().Length > 0 ? _model.Name : "Edit Department";
 
     private bool _loading = true;
     private bool _saving;
@@ -89,7 +86,7 @@
     private string? _successMsg;
 
     private readonly DepartmentEditModel _model = new();
-    private List<DepartmentListItemModel> _otherDepts = new();
+    private List<DepartmentListItemModel> _otherDepts = [];
 
     protected override async Task OnParametersSetAsync()
     {
@@ -99,9 +96,9 @@
 
         // Load all active departments for the parent picker
         var list = await DepartmentService.ListDepartmentsAsync(CompanyId);
-        var all = list?.Items ?? new List<DepartmentListItemModel>();
+        var all = list?.Items ?? [];
 
-        if (!_isNew)
+        if (!IsNew)
         {
             var existing = all.FirstOrDefault(d => d.Id == Id);
             if (existing is not null)
@@ -128,7 +125,7 @@
         _globalError = null;
         _successMsg = null;
 
-        if (_isNew)
+        if (IsNew)
         {
             var request = new CreateDepartmentRequest(
                 CompanyId,

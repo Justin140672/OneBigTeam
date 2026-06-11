@@ -1,10 +1,6 @@
 @page "/companies/{CompanyId:guid}/employees/new"
 @page "/companies/{CompanyId:guid}/employees/{Id:guid}"
 @rendermode InteractiveServer
-@using HR.Web.Models
-@using HR.Web.Services
-@using Syncfusion.Blazor.Calendars
-@using Syncfusion.Blazor.DropDowns
 @inject EmployeeService EmployeeService
 @inject DepartmentService DepartmentService
 @inject InviteService InviteService
@@ -31,7 +27,7 @@
     }
     else
     {
-        @if (!_isNew)
+        @if (!IsNew)
         {
             <div class="d-flex align-items-center gap-3 mb-4">
                 <h1 class="mb-0">@(_employee?.FirstName) @(_employee?.LastName)</h1>
@@ -105,7 +101,7 @@
             <SfButton OnClick="Cancel" Disabled="@_saving">Cancel</SfButton>
         </div>
 
-        @if (_isNew)
+        @if (IsNew)
         {
             <div class="mt-4 pt-3 border-top">
                 <h6 class="text-muted mb-2">Invite</h6>
@@ -156,8 +152,8 @@
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool _isNew => Id is null || Id == Guid.Empty;
-    private string PageTitle => _isNew ? "Add Employee" : $"{_model.FirstName} {_model.LastName}".Trim();
+    private bool IsNew => Id is null || Id == Guid.Empty;
+    private string PageTitle => IsNew ? "Add Employee" : $"{_model.FirstName} {_model.LastName}".Trim();
 
     private GetEmployeeResponse? _employee;
     private bool _loading = true;
@@ -173,7 +169,7 @@
     private string? _inviteError;
 
     private readonly EmployeeProfileEditModel _model = new();
-    private List<DepartmentListItemModel> _departments = new();
+    private List<DepartmentListItemModel> _departments = [];
 
     protected override async Task OnParametersSetAsync()
     {
@@ -182,9 +178,9 @@
         _successMsg = null;
 
         var deptResult = await DepartmentService.ListDepartmentsAsync(CompanyId);
-        _departments = deptResult?.Items ?? new List<DepartmentListItemModel>();
+        _departments = deptResult?.Items ?? [];
 
-        if (!_isNew)
+        if (!IsNew)
         {
             _employee = await EmployeeService.GetEmployeeAsync(CompanyId, Id!.Value);
             if (_employee is not null)
@@ -216,7 +212,7 @@
         _globalError = null;
         _successMsg = null;
 
-        if (_isNew)
+        if (IsNew)
         {
             var request = new CreateEmployeeRequest(
                 CompanyId,

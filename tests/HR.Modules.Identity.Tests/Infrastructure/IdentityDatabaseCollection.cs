@@ -1,6 +1,3 @@
-using HR.Modules.Identity.Tests.Infrastructure;
-using Xunit;
-
 namespace HR.Modules.Identity.Tests.Infrastructure;
 
 [CollectionDefinition("IdentityDatabase")]

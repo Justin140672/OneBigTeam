@@ -1,7 +1,6 @@
 using HR.Modules.Identity.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
-using Xunit;
 
 namespace HR.Modules.Identity.Tests.Infrastructure;
 

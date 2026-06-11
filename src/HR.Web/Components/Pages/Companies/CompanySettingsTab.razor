@@ -1,6 +1,3 @@
-@using HR.Web.Models
-@using System.ComponentModel.DataAnnotations
-
 <div class="card">
     <div class="card-body">
         <div class="row g-4">
@@ -13,7 +10,7 @@
             <div class="col-12">
                 <label class="form-label fw-semibold">Working Week</label>
                 <div class="d-flex flex-wrap gap-3 mt-1">
-                    @foreach (var day in _allDays)
+                    @foreach (var day in AllDays)
                     {
                         <SfCheckBox TChecked="bool" Label="@day"
                                     Checked="@Model.WorkingWeek.Contains(day)"
@@ -25,7 +22,7 @@
                 <label class="form-label fw-semibold">Leave Year Start Month</label>
                 <SfDropDownList TValue="int" TItem="MonthItem"
                                 @bind-Value="Model.LeaveYearStartMonth"
-                                DataSource="@_months"
+                                DataSource="@Months"
                                 Placeholder="Select month">
                     <DropDownListFieldSettings Value="Number" Text="Name" />
                 </SfDropDownList>
@@ -49,9 +46,9 @@
 @code {
     [Parameter, EditorRequired] public CompanySettingsEditModel Model { get; set; } = default!;
 
-    private static readonly string[] _allDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    private static readonly string[] AllDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-    private static readonly List<MonthItem> _months = Enumerable.Range(1, 12)
+    private static readonly List<MonthItem> Months = Enumerable.Range(1, 12)
         .Select(m => new MonthItem(m, System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)))
         .ToList();
 
