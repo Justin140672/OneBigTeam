@@ -37,6 +37,18 @@ internal sealed class LeaveTypeConfiguration : IEntityTypeConfiguration<LeaveTyp
             .HasColumnName("default_entitlement_days")
             .IsRequired();
 
+        builder.Property(t => t.AccrualMethod)
+            .HasColumnName("accrual_method")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(t => t.Behaviour)
+            .HasColumnName("behaviour")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
         builder.Property(t => t.IsActive)
             .HasColumnName("is_active")
             .IsRequired()

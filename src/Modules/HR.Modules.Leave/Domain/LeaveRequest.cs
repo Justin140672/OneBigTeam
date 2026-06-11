@@ -9,7 +9,7 @@ internal sealed class LeaveRequest
     public Guid EmployeeId { get; private set; }
     public Guid LeaveTypeId { get; private set; }
     public Guid? LeavePolicyId { get; private set; }
-    public LeaveStatus Status { get; private set; }
+    public LeaveRequestStatus Status { get; private set; }
     public DateOnly StartDate { get; private set; }
     public DateOnly EndDate { get; private set; }
     public decimal TotalDays { get; private set; }
@@ -38,7 +38,7 @@ internal sealed class LeaveRequest
             EmployeeId = employeeId,
             LeaveTypeId = leaveTypeId,
             LeavePolicyId = leavePolicyId,
-            Status = LeaveStatus.Pending,
+            Status = LeaveRequestStatus.Pending,
             StartDate = startDate,
             EndDate = endDate,
             TotalDays = totalDays,
@@ -50,7 +50,7 @@ internal sealed class LeaveRequest
 
     public void Approve(Guid reviewedByEmployeeId, DateTimeOffset now)
     {
-        Status = LeaveStatus.Approved;
+        Status = LeaveRequestStatus.Approved;
         ReviewedByEmployeeId = reviewedByEmployeeId;
         ReviewedAt = now;
         UpdatedAt = now;
@@ -58,7 +58,7 @@ internal sealed class LeaveRequest
 
     public void Reject(Guid reviewedByEmployeeId, DateTimeOffset now)
     {
-        Status = LeaveStatus.Rejected;
+        Status = LeaveRequestStatus.Rejected;
         ReviewedByEmployeeId = reviewedByEmployeeId;
         ReviewedAt = now;
         UpdatedAt = now;
@@ -66,7 +66,7 @@ internal sealed class LeaveRequest
 
     public void Cancel(DateTimeOffset now)
     {
-        Status = LeaveStatus.Cancelled;
+        Status = LeaveRequestStatus.Cancelled;
         UpdatedAt = now;
     }
 

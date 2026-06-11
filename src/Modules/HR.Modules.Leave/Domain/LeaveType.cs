@@ -9,6 +9,8 @@ internal sealed class LeaveType
     public string Name { get; private set; } = string.Empty;
     public string Code { get; private set; } = string.Empty;
     public int DefaultEntitlementDays { get; private set; }
+    public AccrualMethod AccrualMethod { get; private set; }
+    public LeaveTypeBehaviour Behaviour { get; private set; }
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -19,6 +21,8 @@ internal sealed class LeaveType
         string name,
         string code,
         int defaultEntitlementDays,
+        AccrualMethod accrualMethod,
+        LeaveTypeBehaviour behaviour,
         DateTimeOffset now)
     {
         return new LeaveType
@@ -28,17 +32,21 @@ internal sealed class LeaveType
             Name = name,
             Code = code.ToUpperInvariant(),
             DefaultEntitlementDays = defaultEntitlementDays,
+            AccrualMethod = accrualMethod,
+            Behaviour = behaviour,
             IsActive = true,
             CreatedAt = now,
             UpdatedAt = now
         };
     }
 
-    public void Update(string name, string code, int defaultEntitlementDays, DateTimeOffset now)
+    public void Update(string name, string code, int defaultEntitlementDays, AccrualMethod accrualMethod, LeaveTypeBehaviour behaviour, DateTimeOffset now)
     {
         Name = name;
         Code = code.ToUpperInvariant();
         DefaultEntitlementDays = defaultEntitlementDays;
+        AccrualMethod = accrualMethod;
+        Behaviour = behaviour;
         UpdatedAt = now;
     }
 

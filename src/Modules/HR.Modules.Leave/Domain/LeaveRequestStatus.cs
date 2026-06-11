@@ -1,9 +1,10 @@
 namespace HR.Modules.Leave.Domain;
 
-internal enum LeaveStatus
+internal enum LeaveRequestStatus
 {
     Pending,
     Approved,
     Rejected,
-    Cancelled
+    Cancelled,
+    Withdrawn
 }
