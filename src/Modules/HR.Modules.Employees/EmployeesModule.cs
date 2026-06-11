@@ -9,7 +9,10 @@ using HR.Modules.Employees.Features.GetEmployee;
 using HR.Modules.Employees.Features.ListDepartments;
 using HR.Modules.Employees.Features.ListEmployees;
 using HR.Modules.Employees.Features.UpdateDepartment;
+using HR.Modules.Employees.Features.GetPositionProfile;
+using HR.Modules.Employees.Features.ListPositionProfiles;
 using HR.Modules.Employees.Features.UpdateEmployeeProfile;
+using HR.Modules.Employees.Features.UpdatePositionProfile;
 using HR.Modules.Employees.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,6 +46,14 @@ public static class EmployeesModule
 
         services.AddScoped<CreatePositionProfileHandler>();
         services.AddScoped<IValidator<CreatePositionProfileRequest>, CreatePositionProfileValidator>();
+
+        services.AddScoped<GetPositionProfileHandler>();
+
+        services.AddScoped<ListPositionProfilesHandler>();
+        services.AddScoped<IValidator<ListPositionProfilesRequest>, ListPositionProfilesValidator>();
+
+        services.AddScoped<UpdatePositionProfileHandler>();
+        services.AddScoped<IValidator<UpdatePositionProfileRequest>, UpdatePositionProfileValidator>();
 
         services.AddScoped<CreateEmployeeHandler>();
         services.AddScoped<IValidator<CreateEmployeeRequest>, CreateEmployeeValidator>();
