@@ -5,10 +5,7 @@
 <div class="app-shell">
 
     <SfSidebar Width="280px"
-               DockSize="64px"
-               EnableDock="true"
                Type="SidebarType.Push"
-               Target=".main-content"
                @bind-IsOpen="SidebarOpen"
                CssClass="app-sidebar">
 
@@ -17,20 +14,23 @@
                 <button class="sidebar-toggle" @onclick="ToggleSidebar">
                     ☰
                 </button>
-
                 @if (SidebarOpen)
                 {
                     <span class="app-title">One Big Team</span>
                 }
             </div>
 
-            <SfMenu TValue="MenuItem" Orientation="Orientation.Vertical">
+            <SfMenu TValue="MenuItem"
+                    Orientation="Orientation.Vertical"
+                    CssClass="app-nav-menu"
+                    ShowItemOnClick="true">
                 <MenuItems>
-                    <MenuItem Text = "Dashboard" IconCss = "e-icons e-home" Url = "/" />
+                    <MenuItem Text="Dashboard" IconCss="e-icons e-home" Url="/" />
                     <MenuItem Text="People" IconCss="e-icons e-people">
                         <MenuItems>
-                            <MenuItem Text="Employees" Url="@MenuItems["Employees"]"/>
-                            <MenuItem Text="Departments" Url="@MenuItems["Departments"]"/>
+                            <MenuItem Text="Employees"         Url="@_menuItems["Employees"]" />
+                            <MenuItem Text="Departments"       Url="@_menuItems["Departments"]" />
+                            <MenuItem Text="Position Profiles" Url="@_menuItems["PositionProfiles"]" />
                         </MenuItems>
                     </MenuItem>
                 </MenuItems>
@@ -78,90 +78,22 @@
     private bool SidebarOpen { get; set; } = true;
     private bool IsDark { get; set; }
 
+    private string CompanyId => "00000000-0000-0000-0000-000000000001";
+
+    private readonly Dictionary<string, string> _menuItems = new();
+
+    protected override void OnInitialized()
+    {
+        _menuItems["Employees"]        = $"/companies/{CompanyId}/employees";
+        _menuItems["Departments"]      = $"/companies/{CompanyId}/departments";
+        _menuItems["PositionProfiles"] = $"/companies/{CompanyId}/position-profiles";
+    }
+
+    private void ToggleSidebar() => SidebarOpen = !SidebarOpen;
+
     private void ToggleTheme()
     {
         IsDark = !IsDark;
         JS.InvokeAsync<object>("setTheme", IsDark);
     }
-
-    private string CompanyId => "00000000-0000-0000-0000-000000000001";
-
-    public readonly Dictionary<string, string> MenuItems = new Dictionary<string, string>();
-
-    protected override void OnInitialized()
-    {
-        MenuItems.Add("Employees", $"/companies/{CompanyId}/employees");
-        MenuItems.Add("Departments", $"/companies/{CompanyId}/departments");
-    }
-
-    // private List<MenuItemModel> MenuItems { get; } =
-    // [
-    //     new() {  },
-
-    //     new()
-    //     {
-    //         Text = "People", IconCss = "e-icons e-people",
-    //         Items =
-    //         [
-    //             new() { Text = "Employees", Url = "/companies//employees" },
-    //             new() { Text = "Departments", Url = "/companies/00000000-0000-0000-0000-000000000001/departments" },
-    //             new() { Text = "Position Profiles", Url = "/position-profiles" }
-    //         ]
-    //     },
-
-
-    //     new()
-    //     {
-    //         Text = "Recruitment", IconCss = "e-icons e-user",
-    //         Items =
-    //         [
-    //             new() { Text = "Vacancies", Url = "/recruitment/vacancies" },
-    //             new() { Text = "Candidates", Url = "/recruitment/candidates" },
-    //             new() { Text = "Interviews", Url = "/recruitment/interviews" }
-    //         ]
-    //     },
-
-
-    //     new()
-    //     {
-    //         Text = "Absence", IconCss = "e-icons e-calendar",
-    //         Items =
-    //         [
-    //             new() { Text = "Leave", Url = "/leave" },
-    //             new() { Text = "Sickness", Url = "/sickness" },
-    //             new() { Text = "Reports", Url = "/absence/reports" }
-    //         ]
-    //     },
-
-
-    //     new() { Text = "Documents", IconCss = "e-icons e-file", Url = "/documents" },
-
-    //     new()
-    //     {
-    //         Text = "Settings", IconCss = "e-icons e-settings",
-    //         Items =
-    //         [
-    //             new() { Text = "Company Settings", Url = "/settings/company" },
-    //             new() { Text = "Users & Permissions", Url = "/settings/users" },
-    //             new() { Text = "Lookup Data", Url = "/settings/lookups" }
-    //         ]
-    //     }
-
-    // ];
-
-    private void ToggleSidebar()
-    {
-        SidebarOpen = !SidebarOpen;
-    }
-
-    private void OnMenuItemSelected(MenuEventArgs<MenuItemModel> args)
-    {
-        var url = args.Item.Url;
-
-        if (!string.IsNullOrWhiteSpace(url))
-        {
-            NavigationManager.NavigateTo(url);
-        }
-    }
-
 }

@@ -1,0 +1,78 @@
+using HR.Web.Models;
+
+namespace HR.Web.Services;
+
+public class PositionProfileService(IHttpClientFactory httpClientFactory)
+{
+    private HttpClient Http => httpClientFactory.CreateClient("hrapi");
+
+    public async Task<ListPositionProfilesResponse?> ListPositionProfilesAsync(Guid companyId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<ListPositionProfilesResponse>(
+                $"api/companies/{companyId}/position-profiles");
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<GetPositionProfileResponse?> GetPositionProfileAsync(Guid companyId, Guid id)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetPositionProfileResponse>(
+                $"api/companies/{companyId}/position-profiles/{id}");
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<(CreatePositionProfileResponse? Profile, string? Error)> CreatePositionProfileAsync(
+        Guid companyId, CreatePositionProfileRequest request)
+    {
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/position-profiles", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var created = await response.Content.ReadFromJsonAsync<CreatePositionProfileResponse>();
+            return (created, null);
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+            return (null, body?.Error ?? "A position profile with that title already exists.");
+        }
+
+        return (null, "Failed to create position profile.");
+    }
+
+    public async Task<(bool Success, string? Error)> UpdatePositionProfileAsync(
+        Guid companyId, Guid id, UpdatePositionProfileRequest request)
+    {
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{companyId}/position-profiles/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+            return (true, null);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+            return (false, body?.Error ?? "A conflict occurred.");
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return (false, "Position profile not found.");
+
+        return (false, "Failed to save position profile.");
+    }
+
+    private sealed record ErrorEnvelope(string? Error);
+}

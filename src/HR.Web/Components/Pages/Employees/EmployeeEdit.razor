@@ -3,20 +3,19 @@
 @rendermode InteractiveServer
 @inject EmployeeService EmployeeService
 @inject DepartmentService DepartmentService
+@inject PositionProfileService PositionProfileService
 @inject InviteService InviteService
 @inject NavigationManager Navigation
 
 <PageTitle>@PageTitle</PageTitle>
 
 <div class="container py-4">
-    <nav aria-label="breadcrumb" class="mb-3">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item">
-                <a href="/companies/@CompanyId/employees">Employees</a>
-            </li>
-            <li class="breadcrumb-item active">@PageTitle</li>
-        </ol>
-    </nav>
+    <SfBreadcrumb Class="mb-3">
+        <BreadcrumbItems>
+            <BreadcrumbItem Text="Employees" Url="@($"/companies/{CompanyId}/employees")" />
+            <BreadcrumbItem Text="@PageTitle" />
+        </BreadcrumbItems>
+    </SfBreadcrumb>
 
     @if (_loading)
     {
@@ -68,9 +67,7 @@
                 <div class="mb-3">
                     <label class="form-label">Start Date <span class="text-danger">*</span></label>
                     <SfDatePicker TValue="DateOnly"
-                                  @bind-Value="_model.StartDate"
-                                  FloatLabelType="Syncfusion.Blazor.Inputs.FloatLabelType.Auto"
-                                  Placeholder="Start date" />
+                                  @bind-Value="_model.StartDate" />
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Department</label>
@@ -83,10 +80,21 @@
                         <DropDownListFieldSettings Value="Id" Text="Name" />
                     </SfDropDownList>
                 </div>
+                <div class="mb-3">
+                    <label class="form-label">Position Profile</label>
+                    <SfDropDownList TValue="Guid?"
+                                    TItem="PositionProfileListItemModel"
+                                    DataSource="@_positionProfiles"
+                                    @bind-Value="_model.PositionProfileId"
+                                    Placeholder="None"
+                                    AllowFiltering="true">
+                        <DropDownListFieldSettings Value="Id" Text="Title" />
+                    </SfDropDownList>
+                </div>
             </div>
         </div>
 
-        <div class="mt-2 d-flex gap-2">
+        <div class="mt-3 d-flex gap-2">
             @if (!string.IsNullOrEmpty(_successMsg))
             {
                 <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
@@ -177,6 +185,7 @@
 
     private readonly EmployeeProfileEditModel _model = new();
     private List<DepartmentListItemModel> _departments = [];
+    private List<PositionProfileListItemModel> _positionProfiles = [];
 
     protected override async Task OnParametersSetAsync()
     {
@@ -186,6 +195,9 @@
 
         var deptResult = await DepartmentService.ListDepartmentsAsync(CompanyId);
         _departments = deptResult?.Items ?? [];
+
+        var profileResult = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
+        _positionProfiles = profileResult?.Items.ToList() ?? [];
 
         if (!IsNew)
         {
@@ -198,6 +210,7 @@
                 _model.PersonalEmail = _employee.PersonalEmail;
                 _model.StartDate = _employee.StartDate;
                 _model.DepartmentId = _employee.DepartmentId;
+                _model.PositionProfileId = _employee.PositionProfileId;
                 _model.HasSystemAccess = _employee.HasSystemAccess;
             }
 
@@ -225,6 +238,7 @@
             var request = new CreateEmployeeRequest(
                 CompanyId,
                 _model.DepartmentId,
+                _model.PositionProfileId,
                 _model.FirstName.Trim(),
                 _model.LastName.Trim(),
                 _model.WorkEmail.Trim(),
@@ -260,6 +274,7 @@
                 CompanyId,
                 Id!.Value,
                 _model.DepartmentId,
+                _model.PositionProfileId,
                 _model.FirstName,
                 _model.LastName,
                 _model.WorkEmail,

@@ -53,6 +53,7 @@ public sealed class EmployeeProfileEditModel
     public string? PersonalEmail { get; set; }
     public DateOnly StartDate { get; set; }
     public Guid? DepartmentId { get; set; }
+    public Guid? PositionProfileId { get; set; }
     public bool HasSystemAccess { get; set; } = true;
 }
 
@@ -60,6 +61,7 @@ public record UpdateEmployeeProfileRequest(
     Guid CompanyId,
     Guid Id,
     Guid? DepartmentId,
+    Guid? PositionProfileId,
     string FirstName,
     string LastName,
     string WorkEmail,
@@ -93,6 +95,7 @@ public sealed class CreateEmployeeFormModel
 public record CreateEmployeeRequest(
     Guid CompanyId,
     Guid? DepartmentId,
+    Guid? PositionProfileId,
     string FirstName,
     string LastName,
     string WorkEmail,

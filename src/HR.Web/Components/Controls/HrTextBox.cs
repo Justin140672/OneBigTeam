@@ -14,7 +14,7 @@ public class HrTextBox : SfTextBox
     {
         if (!parameters.TryGetValue<FloatLabelType>(nameof(FloatLabelType), out _))
         {
-            FloatLabelType = FloatLabelType.Auto;
+            FloatLabelType = FloatLabelType.Never;
         }
 
         return base.SetParametersAsync(parameters);

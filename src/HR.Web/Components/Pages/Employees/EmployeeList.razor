@@ -8,20 +8,18 @@
 <PageTitle>Employees</PageTitle>
 
 <div class="container-fluid py-4">
-    <div class="d-flex align-items-center justify-content-between mb-4">
-        <h1 class="mb-0">Employees</h1>
-        @if (_canCreateEmployee)
-        {
-            <SfButton IsPrimary="true" OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/employees/new"))">+ Add Employee</SfButton>
-        }
-    </div>
+    <h1 class="mb-3">Employees</h1>
 
-    <div class="row g-3 mb-4">
-        <div class="col-md-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="col-md-4 px-0">
             <HrTextBox Value="@_search"
                        ValueChanged="@OnSearchChanged"
                        Placeholder="Search by name or email" />
         </div>
+        @if (_canCreateEmployee)
+        {
+            <SfButton IsPrimary="true" OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/employees/new"))">+ Add Employee</SfButton>
+        }
     </div>
 
     @if (_loading)
@@ -69,7 +67,6 @@
             </GridColumns>
         </HrGrid>
 
-        <p class="text-muted mt-2 small">@_totalCount employee@(_totalCount != 1 ? "s" : string.Empty)</p>
     }
 </div>
 
@@ -77,7 +74,6 @@
     [Parameter] public Guid CompanyId { get; set; }
 
     private List<EmployeeListItemModel> _items = [];
-    private int _totalCount;
     private bool _loading = true;
     private string? _error;
     private string _search = string.Empty;
@@ -121,12 +117,10 @@
         {
             _error = "Failed to load employees.";
             _items = [];
-            _totalCount = 0;
         }
         else
         {
             _items = result.Items;
-            _totalCount = result.TotalCount;
         }
 
         _loading = false;

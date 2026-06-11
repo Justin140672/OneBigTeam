@@ -5,6 +5,7 @@ internal sealed record UpdateEmployeeProfileRequest
     public Guid CompanyId { get; init; }
     public Guid Id { get; init; }
     public Guid? DepartmentId { get; init; }
+    public Guid? PositionProfileId { get; init; }
     public string FirstName { get; init; } = string.Empty;
     public string LastName { get; init; } = string.Empty;
     public string WorkEmail { get; init; } = string.Empty;

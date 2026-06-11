@@ -1,0 +1,111 @@
+@page "/companies/{CompanyId:guid}/position-profiles"
+@rendermode InteractiveServer
+@inject PositionProfileService PositionProfileService
+@inject NavigationManager Navigation
+
+<PageTitle>Position Profiles</PageTitle>
+
+<div class="container-fluid py-4">
+    <h1 class="mb-3">Position Profiles</h1>
+
+    <div class="d-flex justify-content-end mb-3">
+        <SfButton IsPrimary="true" OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/position-profiles/new"))">+ Add Position Profile</SfButton>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span>Loading position profiles…</span>
+        </div>
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else
+    {
+        <HrGrid TValue="PositionProfileListItemModel"
+                DataSource="@_items"
+                AllowPaging="true"
+                AllowSorting="true"
+                AllowFiltering="false">
+            <GridPageSettings PageSize="20" />
+            <GridColumns>
+                <GridColumn Field="@nameof(PositionProfileListItemModel.Title)" HeaderText="Title" Width="220">
+                    <Template>
+                        @{
+                            var row = (context as PositionProfileListItemModel)!;
+                            <a href="/companies/@CompanyId/position-profiles/@row.Id">@row.Title</a>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(PositionProfileListItemModel.DepartmentName)" HeaderText="Department" Width="180" />
+                <GridColumn Field="@nameof(PositionProfileListItemModel.IsManagerial)" HeaderText="Managerial" Width="120">
+                    <Template>
+                        @{
+                            var row = (context as PositionProfileListItemModel)!;
+                            @if (row.IsManagerial)
+                            {
+                                <span class="badge bg-info text-dark">Yes</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">No</span>
+                            }
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(PositionProfileListItemModel.IsActive)" HeaderText="Status" Width="110">
+                    <Template>
+                        @{
+                            var row = (context as PositionProfileListItemModel)!;
+                            @if (row.IsActive)
+                            {
+                                <span class="badge bg-success">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Inactive</span>
+                            }
+                        }
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </HrGrid>
+
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private List<PositionProfileListItemModel> _items = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        var result = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
+
+        if (result is null)
+        {
+            _error = "Failed to load position profiles.";
+            _items = [];
+        }
+        else
+        {
+            _items = result.Items.ToList();
+        }
+
+        _loading = false;
+    }
+}

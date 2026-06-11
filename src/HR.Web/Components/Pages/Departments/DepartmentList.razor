@@ -6,19 +6,15 @@
 <PageTitle>Departments</PageTitle>
 
 <div class="container-fluid py-4">
-    <div class="d-flex align-items-center justify-content-between mb-4">
-        <h1 class="mb-0">Departments</h1>
-        <SfButton IsPrimary="true" OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/departments/new"))">
-            + Add Department
-        </SfButton>
-    </div>
+    <h1 class="mb-3">Departments</h1>
 
-    <div class="mb-3">
-        <div class="form-check form-switch">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="form-check form-switch mb-0">
             <input class="form-check-input" type="checkbox" id="showInactive"
                    @bind="_showInactive" @bind:after="LoadAsync" />
-            <label class="form-check-label" for="showInactive">Show inactive departments</label>
+            <label class="form-check-label" for="showInactive">Show inactive</label>
         </div>
+        <SfButton IsPrimary="true" OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/departments/new"))">+ Add Department</SfButton>
     </div>
 
     @if (_loading)
@@ -98,7 +94,6 @@
             </GridColumns>
         </HrGrid>
 
-        <p class="text-muted mt-2 small">@_items.Count department@(_items.Count != 1 ? "s" : string.Empty)</p>
     }
 </div>
 

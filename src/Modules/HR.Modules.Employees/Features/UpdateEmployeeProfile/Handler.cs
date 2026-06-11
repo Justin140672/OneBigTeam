@@ -58,7 +58,7 @@ internal sealed class UpdateEmployeeProfileHandler
             request.StartDate,
             now);
 
-        employee.Assign(request.DepartmentId, employee.PositionProfileId, employee.ManagerId, now);
+        employee.Assign(request.DepartmentId, request.PositionProfileId, employee.ManagerId, now);
         employee.SetSystemAccess(request.HasSystemAccess, now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
