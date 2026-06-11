@@ -1,6 +1,7 @@
 using FluentValidation;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.CreateLeavePolicy;
+using HR.Modules.Leave.Features.GetLeavePolicy;
 using HR.Modules.Leave.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +27,7 @@ public static class LeaveModule
     {
         services.AddScoped<CreateLeavePolicyHandler>();
         services.AddScoped<IValidator<CreateLeavePolicyRequest>, CreateLeavePolicyValidator>();
+        services.AddScoped<GetLeavePolicyHandler>();
     }
 
     public static async Task MigrateLeaveAsync(this IServiceProvider services)
