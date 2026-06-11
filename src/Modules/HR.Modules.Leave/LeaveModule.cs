@@ -2,6 +2,7 @@ using FluentValidation;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.AssignLeavePolicyToEmployee;
 using HR.Modules.Leave.Features.CreateLeavePolicy;
+using HR.Modules.Leave.Features.GetEmployeeLeaveBalance;
 using HR.Modules.Leave.Features.GetLeavePolicy;
 using HR.Modules.Leave.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +32,8 @@ public static class LeaveModule
         services.AddScoped<GetLeavePolicyHandler>();
         services.AddScoped<AssignLeavePolicyToEmployeeHandler>();
         services.AddScoped<IValidator<AssignLeavePolicyToEmployeeRequest>, AssignLeavePolicyToEmployeeValidator>();
+        services.AddScoped<GetEmployeeLeaveBalanceHandler>();
+        services.AddScoped<IValidator<GetEmployeeLeaveBalanceRequest>, GetEmployeeLeaveBalanceValidator>();
     }
 
     public static async Task MigrateLeaveAsync(this IServiceProvider services)
