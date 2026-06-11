@@ -12,6 +12,7 @@
     <Project Path="src/Modules/HR.Modules.Companies/HR.Modules.Companies.csproj" />
     <Project Path="src/Modules/HR.Modules.Employees/HR.Modules.Employees.csproj" />
     <Project Path="src/Modules/HR.Modules.Identity/HR.Modules.Identity.csproj" />
+    <Project Path="src/Modules/HR.Modules.Leave/HR.Modules.Leave.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">
     <Project Path="src/Shared/HR.SharedKernel/HR.SharedKernel.csproj" />
@@ -22,5 +23,6 @@
       <Project Path="tests/HR.Integration.Tests/HR.Integration.Tests.csproj" />
     <Project Path="tests/HR.Modules.Employees.Tests/HR.Modules.Employees.Tests.csproj" />
     <Project Path="tests/HR.Modules.Identity.Tests/HR.Modules.Identity.Tests.csproj" />
+    <Project Path="tests/HR.Modules.Leave.Tests/HR.Modules.Leave.Tests.csproj" />
   </Folder>
 </Solution>
