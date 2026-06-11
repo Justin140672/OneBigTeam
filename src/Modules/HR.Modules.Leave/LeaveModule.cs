@@ -1,4 +1,6 @@
+using FluentValidation;
 using HR.Modules.Leave.Domain;
+using HR.Modules.Leave.Features.CreateLeavePolicy;
 using HR.Modules.Leave.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,11 +13,19 @@ public static class LeaveModule
         this IServiceCollection services,
         string connectionString)
     {
+        AddFeatureServices(services);
+
         services.AddDbContext<LeaveDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "leave")));
 
         return services;
+    }
+
+    private static void AddFeatureServices(IServiceCollection services)
+    {
+        services.AddScoped<CreateLeavePolicyHandler>();
+        services.AddScoped<IValidator<CreateLeavePolicyRequest>, CreateLeavePolicyValidator>();
     }
 
     public static async Task MigrateLeaveAsync(this IServiceProvider services)
