@@ -14,4 +14,5 @@ internal sealed record CreateEmployeeResponse(
     string? PersonalEmail,
     DateOnly StartDate,
     EmploymentStatus Status,
+    bool HasSystemAccess,
     DateTimeOffset CreatedAt);

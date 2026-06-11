@@ -41,6 +41,7 @@ internal sealed class GetEmployeeHandler
             employee.PersonalEmail,
             employee.StartDate,
             employee.Status,
+            employee.HasSystemAccess,
             employee.CreatedAt,
             employee.UpdatedAt));
     }

@@ -17,7 +17,7 @@ public class GetEmployeeHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
@@ -57,7 +57,7 @@ public class GetEmployeeHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var employee = Employee.Create(Guid.NewGuid(), Guid.NewGuid(), "Alice", "Smith", "alice@example.com", StartDate, now);
+        var employee = Employee.Create(Guid.NewGuid(), Guid.NewGuid(), "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
@@ -70,6 +70,27 @@ public class GetEmployeeHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_HasSystemAccess_In_Response()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: false, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new GetEmployeeHandler(context);
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.HasSystemAccess);
     }
 
     private static EmployeesDbContext BuildContext()

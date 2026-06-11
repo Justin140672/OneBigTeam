@@ -12,4 +12,5 @@ internal sealed record UpdateEmployeeProfileResponse(
     string? PersonalEmail,
     DateOnly StartDate,
     EmploymentStatus Status,
+    bool HasSystemAccess,
     DateTimeOffset UpdatedAt);

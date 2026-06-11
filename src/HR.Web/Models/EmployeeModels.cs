@@ -39,6 +39,7 @@ public record GetEmployeeResponse(
     string? PersonalEmail,
     DateOnly StartDate,
     string Status,
+    bool HasSystemAccess,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
@@ -52,6 +53,7 @@ public sealed class EmployeeProfileEditModel
     public string? PersonalEmail { get; set; }
     public DateOnly StartDate { get; set; }
     public Guid? DepartmentId { get; set; }
+    public bool HasSystemAccess { get; set; } = true;
 }
 
 public record UpdateEmployeeProfileRequest(
@@ -62,7 +64,8 @@ public record UpdateEmployeeProfileRequest(
     string LastName,
     string WorkEmail,
     string? PersonalEmail,
-    DateOnly StartDate);
+    DateOnly StartDate,
+    bool HasSystemAccess);
 
 public record UpdateEmployeeProfileResponse(
     Guid Id,
@@ -94,7 +97,8 @@ public record CreateEmployeeRequest(
     string LastName,
     string WorkEmail,
     string? PersonalEmail,
-    DateOnly StartDate);
+    DateOnly StartDate,
+    bool HasSystemAccess);
 
 public record CreateEmployeeResponse(
     Guid Id,

@@ -10,4 +10,5 @@ internal sealed record UpdateEmployeeProfileRequest
     public string WorkEmail { get; init; } = string.Empty;
     public string? PersonalEmail { get; init; }
     public DateOnly StartDate { get; init; }
+    public bool HasSystemAccess { get; init; } = true;
 }

@@ -129,7 +129,7 @@ public static class EmployeesModule
         Employee Make(Guid id, string first, string last, string email, DateOnly start,
                       Guid? deptId, Guid? posId, Guid? managerId)
         {
-            var e = Employee.Create(id, companyId, first, last, email, start, now);
+            var e = Employee.Create(id, companyId, first, last, email, start, hasSystemAccess: true, now);
             e.Assign(deptId, posId, managerId, now);
             e.Activate(now);
             return e;

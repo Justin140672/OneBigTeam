@@ -61,6 +61,11 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .HasMaxLength(20)
             .IsRequired();
 
+        builder.Property(e => e.HasSystemAccess)
+            .HasColumnName("has_system_access")
+            .IsRequired()
+            .HasDefaultValue(true);
+
         builder.Property(e => e.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

@@ -101,49 +101,56 @@
             <SfButton OnClick="Cancel" Disabled="@_saving">Cancel</SfButton>
         </div>
 
-        @if (IsNew)
+        <div class="mt-4 pt-3 border-top">
+            <h6 class="text-muted mb-2">System Access</h6>
+            <SfCheckBox TChecked="bool"
+                        Label="Employee needs system access (can log in)"
+                        @bind-Checked="_model.HasSystemAccess" />
+        </div>
+
+        @if (_model.HasSystemAccess)
         {
-            <div class="mt-4 pt-3 border-top">
-                <h6 class="text-muted mb-2">Invite</h6>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="sendInvite" @bind="_sendInviteOnCreate" />
-                    <label class="form-check-label" for="sendInvite">
-                        Send invite link after creating employee
-                    </label>
+            @if (IsNew)
+            {
+                <div class="mt-4 pt-3 border-top">
+                    <h6 class="text-muted mb-2">Invite</h6>
+                    <SfCheckBox TChecked="bool"
+                                Label="Send invite link after creating employee"
+                                @bind-Checked="_sendInviteOnCreate" />
                 </div>
-            </div>
-        }
-        else
-        {
-            <div class="mt-4 pt-3 border-top">
-                <h6 class="text-muted mb-2">Invite</h6>
-                @if (!string.IsNullOrEmpty(_inviteError))
-                {
-                    <div class="alert alert-danger py-2">@_inviteError</div>
-                }
-                @if (_inviteLink is not null)
-                {
-                    <div class="alert alert-success py-2">
-                        <div class="mb-1"><strong>Invite link generated</strong> — expires @_inviteExpiresAt.ToString("MMM d, yyyy")</div>
-                        <div class="input-group">
-                            <input class="form-control form-control-sm font-monospace" readonly value="@_inviteLink" />
-                            <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="CopyLink">Copy</button>
+            }
+            else
+            {
+                <div class="mt-4 pt-3 border-top">
+                    <h6 class="text-muted mb-2">Invite</h6>
+                    @if (!string.IsNullOrEmpty(_inviteError))
+                    {
+                        <div class="alert alert-danger py-2">@_inviteError</div>
+                    }
+                    @if (_inviteLink is not null)
+                    {
+                        <div class="alert alert-success py-2">
+                            <div class="mb-1"><strong>Invite link generated</strong> — expires @_inviteExpiresAt.ToString("MMM d, yyyy")</div>
+                            <div class="input-group">
+                                <input class="form-control form-control-sm font-monospace" readonly value="@_inviteLink" />
+                                <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="CopyLink">Copy</button>
+                            </div>
+                            <small class="text-muted">Share this link with the employee to let them set their password.</small>
                         </div>
-                        <small class="text-muted">Share this link with the employee to let them set their password.</small>
-                    </div>
-                }
-                else
-                {
-                    <p class="text-muted small mb-2">Generate an invite link to send to the employee so they can set their password and access the system.</p>
-                    <SfButton OnClick="SendInvite" Disabled="@_sendingInvite">
-                        @if (_sendingInvite)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                        }
-                        Generate Invite Link
-                    </SfButton>
-                }
-            </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted small mb-2">Generate an invite link to send to the employee so they can set their password and access the system.</p>
+                        <SfButton OnClick="SendInvite" Disabled="@_sendingInvite">
+                            @if (_sendingInvite)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            Generate Invite Link
+                        </SfButton>
+                    }
+                </div>
+            }
         }
     }
 </div>
@@ -191,6 +198,7 @@
                 _model.PersonalEmail = _employee.PersonalEmail;
                 _model.StartDate = _employee.StartDate;
                 _model.DepartmentId = _employee.DepartmentId;
+                _model.HasSystemAccess = _employee.HasSystemAccess;
             }
 
             // Auto-generate invite link if redirected here after create with invite
@@ -221,7 +229,8 @@
                 _model.LastName.Trim(),
                 _model.WorkEmail.Trim(),
                 string.IsNullOrWhiteSpace(_model.PersonalEmail) ? null : _model.PersonalEmail.Trim(),
-                _model.StartDate);
+                _model.StartDate,
+                _model.HasSystemAccess);
 
             var (created, error) = await EmployeeService.CreateEmployeeAsync(CompanyId, request);
             _saving = false;
@@ -255,7 +264,8 @@
                 _model.LastName,
                 _model.WorkEmail,
                 _model.PersonalEmail,
-                _model.StartDate);
+                _model.StartDate,
+                _model.HasSystemAccess);
 
             var (success, conflictMessage) = await EmployeeService.UpdateEmployeeProfileAsync(CompanyId, Id!.Value, request);
             _saving = false;

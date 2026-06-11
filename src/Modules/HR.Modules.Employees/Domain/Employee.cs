@@ -15,6 +15,7 @@ internal sealed class Employee
     public string? PersonalEmail { get; private set; }
     public DateOnly StartDate { get; private set; }
     public EmploymentStatus Status { get; private set; }
+    public bool HasSystemAccess { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -25,6 +26,7 @@ internal sealed class Employee
         string lastName,
         string workEmail,
         DateOnly startDate,
+        bool hasSystemAccess,
         DateTimeOffset now)
     {
         return new Employee
@@ -36,6 +38,7 @@ internal sealed class Employee
             WorkEmail = workEmail,
             StartDate = startDate,
             Status = EmploymentStatus.Draft,
+            HasSystemAccess = hasSystemAccess,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -46,6 +49,12 @@ internal sealed class Employee
         DepartmentId = departmentId;
         PositionProfileId = positionProfileId;
         ManagerId = managerId;
+        UpdatedAt = now;
+    }
+
+    public void SetSystemAccess(bool hasSystemAccess, DateTimeOffset now)
+    {
+        HasSystemAccess = hasSystemAccess;
         UpdatedAt = now;
     }
 

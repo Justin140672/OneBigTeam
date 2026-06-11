@@ -18,7 +18,7 @@ public class UpdateEmployeeProfileHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
@@ -57,7 +57,7 @@ public class UpdateEmployeeProfileHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
@@ -107,7 +107,7 @@ public class UpdateEmployeeProfileHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var employee = Employee.Create(Guid.NewGuid(), Guid.NewGuid(), "Alice", "Smith", "alice@example.com", StartDate, now);
+        var employee = Employee.Create(Guid.NewGuid(), Guid.NewGuid(), "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
@@ -136,8 +136,8 @@ public class UpdateEmployeeProfileHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var emp1 = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, now);
-        var emp2 = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, now);
+        var emp1 = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
+        var emp2 = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, now);
         context.Employees.AddRange(emp1, emp2);
         await context.SaveChangesAsync();
 
@@ -166,7 +166,7 @@ public class UpdateEmployeeProfileHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
@@ -186,6 +186,69 @@ public class UpdateEmployeeProfileHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Alicia", result.Value!.FirstName);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Updates_HasSystemAccess_To_False()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(
+            new UpdateEmployeeProfileRequest
+            {
+                CompanyId = companyId,
+                Id = employee.Id,
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate,
+                HasSystemAccess = false
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.HasSystemAccess);
+
+        var saved = await context.Employees.SingleAsync();
+        Assert.False(saved.HasSystemAccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Preserves_HasSystemAccess_True_When_Not_Changed()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(
+            new UpdateEmployeeProfileRequest
+            {
+                CompanyId = companyId,
+                Id = employee.Id,
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate,
+                HasSystemAccess = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.HasSystemAccess);
     }
 
     private static EmployeesDbContext BuildContext()

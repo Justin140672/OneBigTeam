@@ -18,8 +18,8 @@ public class AssignManagerHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, now);
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, now);
+        var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
         context.Employees.AddRange(manager, employee);
         await context.SaveChangesAsync();
 
@@ -44,8 +44,8 @@ public class AssignManagerHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, now);
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, now);
+        var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
         employee.Assign(null, null, manager.Id, now);
         context.Employees.AddRange(manager, employee);
         await context.SaveChangesAsync();
@@ -81,7 +81,7 @@ public class AssignManagerHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var employee = Employee.Create(Guid.NewGuid(), Guid.NewGuid(), "Alice", "Smith", "alice@example.com", StartDate, now);
+        var employee = Employee.Create(Guid.NewGuid(), Guid.NewGuid(), "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
@@ -102,7 +102,7 @@ public class AssignManagerHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
@@ -123,9 +123,9 @@ public class AssignManagerHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, now);
+        var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, now);
         manager.Terminate(now);
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
         context.Employees.AddRange(manager, employee);
         await context.SaveChangesAsync();
 
@@ -147,8 +147,8 @@ public class AssignManagerHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var empA = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, now);
-        var empB = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, now);
+        var empA = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
+        var empB = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, now);
         // B reports to A
         empB.Assign(null, null, empA.Id, now);
         context.Employees.AddRange(empA, empB);
@@ -173,9 +173,9 @@ public class AssignManagerHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var empA = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, now);
-        var empB = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, now);
-        var empC = Employee.Create(Guid.NewGuid(), companyId, "Carol", "White", "carol@example.com", StartDate, now);
+        var empA = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
+        var empB = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, now);
+        var empC = Employee.Create(Guid.NewGuid(), companyId, "Carol", "White", "carol@example.com", StartDate, hasSystemAccess: true, now);
         // B reports to A; C reports to B
         empB.Assign(null, null, empA.Id, now);
         empC.Assign(null, null, empB.Id, now);
@@ -201,9 +201,9 @@ public class AssignManagerHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var empA = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, now);
-        var empB = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, now);
-        var empC = Employee.Create(Guid.NewGuid(), companyId, "Carol", "White", "carol@example.com", StartDate, now);
+        var empA = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
+        var empB = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, now);
+        var empC = Employee.Create(Guid.NewGuid(), companyId, "Carol", "White", "carol@example.com", StartDate, hasSystemAccess: true, now);
         empB.Assign(null, null, empA.Id, now);
         empC.Assign(null, null, empB.Id, now);
         context.Employees.AddRange(empA, empB, empC);

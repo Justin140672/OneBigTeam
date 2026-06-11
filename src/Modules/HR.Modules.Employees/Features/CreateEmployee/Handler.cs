@@ -89,6 +89,7 @@ internal sealed class CreateEmployeeHandler
             request.LastName.Trim(),
             request.WorkEmail.Trim().ToLowerInvariant(),
             request.StartDate,
+            request.HasSystemAccess,
             now);
 
         if (request.DepartmentId is not null || request.PositionProfileId is not null || request.ManagerId is not null)
@@ -111,6 +112,7 @@ internal sealed class CreateEmployeeHandler
             employee.PersonalEmail,
             employee.StartDate,
             employee.Status,
+            employee.HasSystemAccess,
             employee.CreatedAt));
     }
 }
