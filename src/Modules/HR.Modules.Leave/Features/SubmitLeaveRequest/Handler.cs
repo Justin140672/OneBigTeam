@@ -98,6 +98,16 @@ internal sealed class SubmitLeaveRequestHandler
             request.Reason,
             now);
 
+        var conflicts = await _dbContext.LeaveRequests
+            .Where(r => r.EmployeeId == request.EmployeeId
+                     && r.CompanyId == request.CompanyId
+                     && r.Status != LeaveRequestStatus.Rejected
+                     && r.Status != LeaveRequestStatus.Cancelled
+                     && r.StartDate <= request.EndDate
+                     && r.EndDate >= request.StartDate)
+            .Select(r => new LeaveConflictWarning(r.Id, r.LeaveTypeId, r.StartDate, r.EndDate, r.Status.ToString()))
+            .ToListAsync(cancellationToken);
+
         _dbContext.LeaveRequests.Add(leaveRequest);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -114,7 +124,8 @@ internal sealed class SubmitLeaveRequestHandler
             leaveRequest.EndPart,
             leaveRequest.TotalDays,
             leaveRequest.Reason,
-            leaveRequest.CreatedAt));
+            leaveRequest.CreatedAt,
+            conflicts));
     }
 
     internal static decimal CalculateTotalDays(

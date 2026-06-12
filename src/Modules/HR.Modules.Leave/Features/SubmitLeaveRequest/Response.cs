@@ -2,6 +2,13 @@ using HR.Modules.Leave.Domain;
 
 namespace HR.Modules.Leave.Features.SubmitLeaveRequest;
 
+internal sealed record LeaveConflictWarning(
+    Guid LeaveRequestId,
+    Guid LeaveTypeId,
+    DateOnly StartDate,
+    DateOnly EndDate,
+    string Status);
+
 internal sealed record SubmitLeaveRequestResponse(
     Guid Id,
     Guid CompanyId,
@@ -15,4 +22,5 @@ internal sealed record SubmitLeaveRequestResponse(
     LeaveDayPart EndPart,
     decimal TotalDays,
     string? Reason,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    IReadOnlyList<LeaveConflictWarning> Conflicts);

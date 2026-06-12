@@ -75,6 +75,7 @@ public class SubmitLeaveRequestHandlerTests
         Assert.Equal(LeaveDayPart.FullDay, result.Value.EndPart);
         Assert.Equal("Family holiday", result.Value.Reason);
         Assert.Equal(policy.Id, result.Value.LeavePolicyId);
+        Assert.Empty(result.Value.Conflicts);
 
         var saved = await context.LeaveRequests.SingleAsync();
         Assert.Equal(LeaveRequestStatus.Pending, saved.Status);
@@ -200,6 +201,136 @@ public class SubmitLeaveRequestHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_No_Conflicts_When_No_Overlapping_Requests_Exist()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.Conflicts);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_Pending_Request_Overlaps()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var (leaveType, policy, assignment, _) = await SeedStandardSetupAsync(context, companyId, employeeId, entitlementDays: 25);
+
+        // Existing pending request: Wed–Thu (overlaps with Mon–Fri new request)
+        var existing = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
+            new DateOnly(2026, 8, 5), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 6), LeaveDayPart.FullDay,
+            2m, "Existing", now);
+        context.LeaveRequests.Add(existing);
+        await context.SaveChangesAsync();
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value!.Conflicts);
+        Assert.Equal(existing.Id, result.Value.Conflicts[0].LeaveRequestId);
+        Assert.Equal("Pending", result.Value.Conflicts[0].Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_No_Conflict_For_Adjacent_Non_Overlapping_Request()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var (leaveType, policy, assignment, _) = await SeedStandardSetupAsync(context, companyId, employeeId, entitlementDays: 25);
+
+        // Existing request ends the day before new request starts
+        var existing = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
+            new DateOnly(2026, 7, 27), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 2), LeaveDayPart.FullDay,
+            5m, "Prior week", now);
+        context.LeaveRequests.Add(existing);
+        await context.SaveChangesAsync();
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.Conflicts);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Flag_Cancelled_Or_Rejected_Requests_As_Conflicts()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var (leaveType, policy, assignment, _) = await SeedStandardSetupAsync(context, companyId, employeeId, entitlementDays: 25);
+
+        var cancelled = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
+            5m, "Cancelled", now);
+        cancelled.Cancel(now);
+
+        var rejected = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
+            5m, "Rejected", now);
+        rejected.Reject(Guid.NewGuid(), now);
+
+        context.LeaveRequests.AddRange(cancelled, rejected);
+        await context.SaveChangesAsync();
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.Conflicts);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Flag_Another_Employees_Request_As_Conflict()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var otherEmployeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var (leaveType, policy, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId, entitlementDays: 25);
+
+        var otherRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, otherEmployeeId, leaveType.Id, policy.Id,
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
+            5m, "Other employee", now);
+        context.LeaveRequests.Add(otherRequest);
+        await context.SaveChangesAsync();
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.Conflicts);
     }
 }
 
