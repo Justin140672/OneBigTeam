@@ -1,5 +1,6 @@
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
+using HR.Modules.Leave.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,15 +11,18 @@ internal sealed class SubmitLeaveRequestHandler
     private readonly LeaveDbContext _dbContext;
     private readonly IClock _clock;
     private readonly IWorkingPatternProvider _workingPatternProvider;
+    private readonly IPublicHolidayService _publicHolidayService;
 
     public SubmitLeaveRequestHandler(
         LeaveDbContext dbContext,
         IClock clock,
-        IWorkingPatternProvider workingPatternProvider)
+        IWorkingPatternProvider workingPatternProvider,
+        IPublicHolidayService publicHolidayService)
     {
         _dbContext = dbContext;
         _clock = clock;
         _workingPatternProvider = workingPatternProvider;
+        _publicHolidayService = publicHolidayService;
     }
 
     public async Task<Result<SubmitLeaveRequestResponse>> HandleAsync(
@@ -49,7 +53,12 @@ internal sealed class SubmitLeaveRequestHandler
         var workingPattern = await _workingPatternProvider.GetEffectivePatternAsync(
             request.CompanyId, request.EmployeeId, cancellationToken);
 
-        var totalDays = CalculateTotalDays(request.StartDate, request.StartPart, request.EndDate, request.EndPart, workingPattern);
+        var publicHolidays = await _publicHolidayService.GetPublicHolidays(
+            request.StartDate, request.EndDate);
+
+        var publicHolidayDates = publicHolidays.Select(h => h.Date).ToList();
+
+        var totalDays = CalculateTotalDays(request.StartDate, request.StartPart, request.EndDate, request.EndPart, workingPattern, publicHolidayDates);
 
         if (totalDays == 0)
             return Result.Failure<SubmitLeaveRequestResponse>(
@@ -111,14 +120,16 @@ internal sealed class SubmitLeaveRequestHandler
     internal static decimal CalculateTotalDays(
         DateOnly startDate, LeaveDayPart startPart,
         DateOnly endDate, LeaveDayPart endPart,
-        WorkingPattern pattern)
+        WorkingPattern pattern,
+        IReadOnlyCollection<DateOnly>? publicHolidays = null)
     {
         decimal totalHours = 0;
         var current = startDate;
 
         while (current <= endDate)
         {
-            if (pattern.IsWorkingDay(current.DayOfWeek))
+            if (pattern.IsWorkingDay(current.DayOfWeek) &&
+                (publicHolidays is null || !publicHolidays.Contains(current)))
             {
                 totalHours += current == startDate && current == endDate
                     ? PartToHours(startPart, pattern.HoursPerDay)

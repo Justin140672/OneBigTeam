@@ -12,4 +12,5 @@ internal sealed record UpdateCompanySettingsRequest
 	public int LeaveYearStartMonth { get; init; }
 	public decimal DefaultHolidayAllowance { get; init; }
 	public int ProbationMonths { get; init; }
+	public bool ExcludePublicHolidaysFromLeave { get; init; } = true;
 }

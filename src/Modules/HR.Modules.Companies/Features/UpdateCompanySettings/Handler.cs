@@ -47,7 +47,8 @@ internal sealed class UpdateCompanySettingsHandler
 				company.Settings.HoursPerDay,
 				company.Settings.LeaveYearStartMonth,
 				company.Settings.DefaultHolidayAllowance,
-				company.Settings.ProbationMonths);
+				company.Settings.ProbationMonths,
+				company.Settings.ExcludePublicHolidaysFromLeave);
 
 		var settings = company.Settings ?? CompanySettings.CreateDefault(company.Id, now);
 		settings.Update(
@@ -58,6 +59,7 @@ internal sealed class UpdateCompanySettingsHandler
 			request.LeaveYearStartMonth,
 			request.DefaultHolidayAllowance,
 			request.ProbationMonths,
+			request.ExcludePublicHolidaysFromLeave,
 			now);
 
 		company.SetSettings(settings, now);
@@ -71,6 +73,7 @@ internal sealed class UpdateCompanySettingsHandler
 			settings.LeaveYearStartMonth,
 			settings.DefaultHolidayAllowance,
 			settings.ProbationMonths,
+			settings.ExcludePublicHolidaysFromLeave,
 			now));
 
 		var outboxMessage = OutboxMessage.CreatePending(
@@ -96,7 +99,8 @@ internal sealed class UpdateCompanySettingsHandler
 					settings.HoursPerDay,
 					settings.LeaveYearStartMonth,
 					settings.DefaultHolidayAllowance,
-					settings.ProbationMonths)),
+					settings.ProbationMonths,
+					settings.ExcludePublicHolidaysFromLeave)),
 			cancellationToken);
 
 		return Result.Success(new UpdateCompanySettingsResponse(
@@ -108,6 +112,7 @@ internal sealed class UpdateCompanySettingsHandler
 			settings.LeaveYearStartMonth,
 			settings.DefaultHolidayAllowance,
 			settings.ProbationMonths,
+			settings.ExcludePublicHolidaysFromLeave,
 			settings.UpdatedAt));
 	}
 }

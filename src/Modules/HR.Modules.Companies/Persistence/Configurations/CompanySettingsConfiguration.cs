@@ -51,6 +51,11 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .HasColumnName("probation_months")
             .IsRequired();
 
+        builder.Property(settings => settings.ExcludePublicHolidaysFromLeave)
+            .HasColumnName("exclude_public_holidays_from_leave")
+            .IsRequired()
+            .HasDefaultValue(true);
+
         builder.Property(settings => settings.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

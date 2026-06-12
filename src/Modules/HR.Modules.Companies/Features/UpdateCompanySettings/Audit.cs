@@ -10,7 +10,8 @@ internal sealed record CompanySettingsAuditSnapshot(
     decimal HoursPerDay,
     int LeaveYearStartMonth,
     decimal DefaultHolidayAllowance,
-    int ProbationMonths);
+    int ProbationMonths,
+    bool ExcludePublicHolidaysFromLeave);
 
 internal sealed record CompanySettingsUpdatedAuditEvent(
     Guid CompanyId,

@@ -11,4 +11,5 @@ internal sealed record UpdateCompanySettingsResponse(
 	int LeaveYearStartMonth,
 	decimal DefaultHolidayAllowance,
 	int ProbationMonths,
+	bool ExcludePublicHolidaysFromLeave,
 	DateTimeOffset UpdatedAt);

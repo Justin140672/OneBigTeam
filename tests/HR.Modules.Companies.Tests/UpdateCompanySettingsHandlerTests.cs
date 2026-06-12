@@ -100,6 +100,47 @@ public class UpdateCompanySettingsHandlerTests
 		Assert.Empty(context.OutboxMessages);
 	}
 
+	[Theory]
+	[InlineData(true)]
+	[InlineData(false)]
+	public async Task HandleAsync_Persists_ExcludePublicHolidaysFromLeave(bool excludePublicHolidays)
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 6, 12, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", "acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var handler = new UpdateCompanySettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 6, 12, 11, 0, 0, DateTimeKind.Utc)),
+			new LoggerCompanyAuditEventPublisher(Microsoft.Extensions.Logging.Abstractions.NullLogger<LoggerCompanyAuditEventPublisher>.Instance));
+
+		var result = await handler.HandleAsync(
+			new UpdateCompanySettingsRequest
+			{
+				Id = company.Id,
+				TimeZone = "UTC",
+				Locale = "en-GB",
+				WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+				              WorkingDays.Thursday | WorkingDays.Friday,
+				HoursPerDay = 7.5m,
+				LeaveYearStartMonth = 1,
+				DefaultHolidayAllowance = 25,
+				ProbationMonths = 6,
+				ExcludePublicHolidaysFromLeave = excludePublicHolidays,
+			},
+			CancellationToken.None);
+
+		Assert.True(result.IsSuccess);
+		Assert.Equal(excludePublicHolidays, result.Value!.ExcludePublicHolidaysFromLeave);
+
+		var savedSettings = await context.CompanySettings.SingleAsync();
+		Assert.Equal(excludePublicHolidays, savedSettings.ExcludePublicHolidaysFromLeave);
+	}
+
 	private static CompaniesDbContext BuildContext()
 	{
 		var options = new DbContextOptionsBuilder<CompaniesDbContext>()

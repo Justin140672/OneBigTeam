@@ -110,5 +110,6 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
 		int LeaveYearStartMonth,
 		decimal DefaultHolidayAllowance,
 		int ProbationMonths,
+		bool ExcludePublicHolidaysFromLeave,
 		DateTimeOffset UpdatedAt);
 }

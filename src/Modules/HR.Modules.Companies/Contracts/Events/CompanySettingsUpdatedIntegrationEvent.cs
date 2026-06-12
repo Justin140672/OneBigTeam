@@ -11,4 +11,5 @@ internal sealed record CompanySettingsUpdatedIntegrationEvent(
 	int LeaveYearStartMonth,
 	decimal DefaultHolidayAllowance,
 	int ProbationMonths,
+	bool ExcludePublicHolidaysFromLeave,
 	DateTimeOffset OccurredAt);

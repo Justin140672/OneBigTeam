@@ -7,6 +7,7 @@ using HR.Modules.Leave.Features.GetLeavePolicy;
 using HR.Modules.Leave.Features.SubmitLeaveRequest;
 using HR.Modules.Leave.Features.InitialiseEmployeeLeave;
 using HR.Modules.Leave.Persistence;
+using HR.Modules.Leave.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,6 +41,7 @@ public static class LeaveModule
         services.AddScoped<SubmitLeaveRequestHandler>();
         services.AddScoped<IValidator<SubmitLeaveRequestRequest>, SubmitLeaveRequestValidator>();
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
+        services.AddSingleton<IPublicHolidayService, NullPublicHolidayService>();
     }
 
     public static async Task MigrateLeaveAsync(this IServiceProvider services)
