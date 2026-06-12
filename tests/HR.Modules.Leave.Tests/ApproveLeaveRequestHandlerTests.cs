@@ -2,6 +2,7 @@ using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.ApproveLeaveRequest;
 using HR.Modules.Leave.Persistence;
 using HR.Modules.Leave.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Tests;
@@ -48,7 +49,7 @@ public class ApproveLeaveRequestHandlerTests
         await context.SaveChangesAsync();
 
         var approvalTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
-        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(approvalTime));
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(approvalTime), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, reviewerId),
             CancellationToken.None);
@@ -68,7 +69,7 @@ public class ApproveLeaveRequestHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Request_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             ApproveRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
@@ -89,7 +90,7 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, Guid.NewGuid(), leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -112,7 +113,7 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, reviewerId),
             CancellationToken.None);
@@ -134,7 +135,7 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -157,7 +158,7 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, reviewerId),
             CancellationToken.None);
@@ -189,7 +190,7 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -213,12 +214,49 @@ public class ApproveLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Approved", result.Value!.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_LeaveApprovedIntegrationEvent()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var reviewerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(), Guid.NewGuid(),
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
+            5m, "Holiday", now);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        var publisher = new CapturingIntegrationEventPublisher();
+        var approvalTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(approvalTime), publisher);
+        await handler.HandleAsync(
+            ApproveRequest(companyId, employeeId, leaveRequest.Id, reviewerId),
+            CancellationToken.None);
+
+        var evt = Assert.Single(publisher.Published);
+        var approved = Assert.IsType<LeaveApprovedIntegrationEvent>(evt);
+        Assert.Equal(companyId, approved.CompanyId);
+        Assert.Equal(employeeId, approved.EmployeeId);
+        Assert.Equal(leaveRequest.Id, approved.LeaveRequestId);
+        Assert.Equal(leaveRequest.LeaveTypeId, approved.LeaveTypeId);
+        Assert.Equal(new DateOnly(2026, 8, 3), approved.StartDate);
+        Assert.Equal(new DateOnly(2026, 8, 7), approved.EndDate);
+        Assert.Equal(5m, approved.TotalDays);
+        Assert.Equal(reviewerId, approved.ReviewedByEmployeeId);
+        Assert.Equal(new DateTimeOffset(approvalTime, TimeSpan.Zero), approved.OccurredAt);
     }
 }

@@ -12,17 +12,20 @@ internal sealed class SubmitLeaveRequestHandler
     private readonly IClock _clock;
     private readonly IWorkingPatternProvider _workingPatternProvider;
     private readonly IPublicHolidayService _publicHolidayService;
+    private readonly IIntegrationEventPublisher _publisher;
 
     public SubmitLeaveRequestHandler(
         LeaveDbContext dbContext,
         IClock clock,
         IWorkingPatternProvider workingPatternProvider,
-        IPublicHolidayService publicHolidayService)
+        IPublicHolidayService publicHolidayService,
+        IIntegrationEventPublisher publisher)
     {
         _dbContext = dbContext;
         _clock = clock;
         _workingPatternProvider = workingPatternProvider;
         _publicHolidayService = publicHolidayService;
+        _publisher = publisher;
     }
 
     public async Task<Result<SubmitLeaveRequestResponse>> HandleAsync(
@@ -110,6 +113,16 @@ internal sealed class SubmitLeaveRequestHandler
 
         _dbContext.LeaveRequests.Add(leaveRequest);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await _publisher.PublishAsync(new LeaveRequestedIntegrationEvent(
+            leaveRequest.CompanyId,
+            leaveRequest.EmployeeId,
+            leaveRequest.Id,
+            leaveRequest.LeaveTypeId,
+            leaveRequest.StartDate,
+            leaveRequest.EndDate,
+            leaveRequest.TotalDays,
+            now), cancellationToken);
 
         return Result.Success(new SubmitLeaveRequestResponse(
             leaveRequest.Id,

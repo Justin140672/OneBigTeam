@@ -64,7 +64,7 @@ public class SubmitLeaveRequestHandlerTests
 
         var (leaveType, policy, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService(), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -86,7 +86,7 @@ public class SubmitLeaveRequestHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_LeaveType_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService(), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             ValidRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
 
@@ -108,7 +108,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveTypes.Add(leaveType);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService(), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
@@ -128,7 +128,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveTypes.Add(leaveType);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService(), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             ValidRequest(companyId, Guid.NewGuid(), leaveType.Id), CancellationToken.None);
 
@@ -146,7 +146,7 @@ public class SubmitLeaveRequestHandlerTests
         // 2 days entitlement, requesting Mon–Fri (5 days)
         var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId, entitlementDays: 2);
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService(), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
@@ -173,7 +173,7 @@ public class SubmitLeaveRequestHandlerTests
         context.EmployeeLeavePolicyAssignments.Add(assignment);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService(), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
@@ -190,7 +190,7 @@ public class SubmitLeaveRequestHandlerTests
         var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
 
         // 2026-08-08 = Saturday, 2026-08-09 = Sunday
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService(), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id) with
             {
@@ -212,7 +212,7 @@ public class SubmitLeaveRequestHandlerTests
 
         var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService(), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -238,7 +238,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveRequests.Add(existing);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService(), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -266,7 +266,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveRequests.Add(existing);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService(), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -300,7 +300,7 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveRequests.AddRange(cancelled, rejected);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService(), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -326,11 +326,38 @@ public class SubmitLeaveRequestHandlerTests
         context.LeaveRequests.Add(otherRequest);
         await context.SaveChangesAsync();
 
-        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService());
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService(), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value!.Conflicts);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_LeaveRequestedIntegrationEvent()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
+
+        var publisher = new CapturingIntegrationEventPublisher();
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new NullPublicHolidayService(), publisher);
+        var request = ValidRequest(companyId, employeeId, leaveType.Id);
+        var result = await handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.Single(publisher.Published);
+        var submitted = Assert.IsType<LeaveRequestedIntegrationEvent>(evt);
+        Assert.Equal(companyId, submitted.CompanyId);
+        Assert.Equal(employeeId, submitted.EmployeeId);
+        Assert.Equal(result.Value!.Id, submitted.LeaveRequestId);
+        Assert.Equal(leaveType.Id, submitted.LeaveTypeId);
+        Assert.Equal(request.StartDate, submitted.StartDate);
+        Assert.Equal(request.EndDate, submitted.EndDate);
+        Assert.Equal(result.Value.TotalDays, submitted.TotalDays);
+        Assert.Equal(new DateTimeOffset(FixedUtcNow, TimeSpan.Zero), submitted.OccurredAt);
     }
 }
 

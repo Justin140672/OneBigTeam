@@ -2,6 +2,7 @@ using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.RejectLeaveRequest;
 using HR.Modules.Leave.Persistence;
 using HR.Modules.Leave.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Tests;
@@ -50,7 +51,7 @@ public class RejectLeaveRequestHandlerTests
         await context.SaveChangesAsync();
 
         var rejectionTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(rejectionTime));
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(rejectionTime), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, reviewerId, "Team at capacity"),
             CancellationToken.None);
@@ -79,7 +80,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -93,7 +94,7 @@ public class RejectLeaveRequestHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Request_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             RejectRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
@@ -114,7 +115,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, Guid.NewGuid(), leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -137,7 +138,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, reviewerId, "Approved in error"),
             CancellationToken.None);
@@ -172,7 +173,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid(), "Approved in error"),
             CancellationToken.None);
@@ -207,7 +208,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -233,7 +234,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, reviewerId),
             CancellationToken.None);
@@ -255,7 +256,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -277,12 +278,50 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Rejected", result.Value!.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_LeaveRejectedIntegrationEvent()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var reviewerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(), Guid.NewGuid(),
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
+            5m, "Holiday", now);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        var publisher = new CapturingIntegrationEventPublisher();
+        var rejectionTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(rejectionTime), publisher);
+        await handler.HandleAsync(
+            RejectRequest(companyId, employeeId, leaveRequest.Id, reviewerId, "No capacity"),
+            CancellationToken.None);
+
+        var evt = Assert.Single(publisher.Published);
+        var rejected = Assert.IsType<LeaveRejectedIntegrationEvent>(evt);
+        Assert.Equal(companyId, rejected.CompanyId);
+        Assert.Equal(employeeId, rejected.EmployeeId);
+        Assert.Equal(leaveRequest.Id, rejected.LeaveRequestId);
+        Assert.Equal(leaveRequest.LeaveTypeId, rejected.LeaveTypeId);
+        Assert.Equal(new DateOnly(2026, 8, 3), rejected.StartDate);
+        Assert.Equal(new DateOnly(2026, 8, 7), rejected.EndDate);
+        Assert.Equal(5m, rejected.TotalDays);
+        Assert.Equal(reviewerId, rejected.ReviewedByEmployeeId);
+        Assert.Equal("No capacity", rejected.RejectionReason);
+        Assert.Equal(new DateTimeOffset(rejectionTime, TimeSpan.Zero), rejected.OccurredAt);
     }
 }
