@@ -11,9 +11,11 @@ internal sealed class LeaveRequest
     public Guid? LeavePolicyId { get; private set; }
     public LeaveRequestStatus Status { get; private set; }
     public DateOnly StartDate { get; private set; }
+    public LeaveDayPart StartPart { get; private set; }
     public DateOnly EndDate { get; private set; }
+    public LeaveDayPart EndPart { get; private set; }
     public decimal TotalDays { get; private set; }
-    public string? Notes { get; private set; }
+    public string? Reason { get; private set; }
     public Guid? ReviewedByEmployeeId { get; private set; }
     public DateTimeOffset? ReviewedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -26,9 +28,11 @@ internal sealed class LeaveRequest
         Guid leaveTypeId,
         Guid? leavePolicyId,
         DateOnly startDate,
+        LeaveDayPart startPart,
         DateOnly endDate,
+        LeaveDayPart endPart,
         decimal totalDays,
-        string? notes,
+        string? reason,
         DateTimeOffset now)
     {
         return new LeaveRequest
@@ -40,9 +44,11 @@ internal sealed class LeaveRequest
             LeavePolicyId = leavePolicyId,
             Status = LeaveRequestStatus.Pending,
             StartDate = startDate,
+            StartPart = startPart,
             EndDate = endDate,
+            EndPart = endPart,
             TotalDays = totalDays,
-            Notes = notes,
+            Reason = reason,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -73,16 +79,20 @@ internal sealed class LeaveRequest
     public void UpdateDetails(
         Guid leaveTypeId,
         DateOnly startDate,
+        LeaveDayPart startPart,
         DateOnly endDate,
+        LeaveDayPart endPart,
         decimal totalDays,
-        string? notes,
+        string? reason,
         DateTimeOffset now)
     {
         LeaveTypeId = leaveTypeId;
         StartDate = startDate;
+        StartPart = startPart;
         EndDate = endDate;
+        EndPart = endPart;
         TotalDays = totalDays;
-        Notes = notes;
+        Reason = reason;
         UpdatedAt = now;
     }
 }

@@ -2,6 +2,7 @@ using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Features.CreateCompany;
 using HR.Modules.Companies.Persistence;
 using HR.Modules.Companies.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Tests;
@@ -34,7 +35,9 @@ public class CreateCompanyHandlerTests
         Assert.Equal(company.Id, settings.CompanyId);
         Assert.Equal("UTC", settings.TimeZone);
         Assert.Equal("en-GB", settings.Locale);
-        Assert.Equal("Monday-Friday", settings.WorkingWeek);
+        Assert.Equal(WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+                     WorkingDays.Thursday | WorkingDays.Friday, settings.WorkingDays);
+        Assert.Equal(7.5m, settings.HoursPerDay);
         Assert.Equal(1, settings.LeaveYearStartMonth);
         Assert.Equal(25, settings.DefaultHolidayAllowance);
         Assert.Equal(6, settings.ProbationMonths);

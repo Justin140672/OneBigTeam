@@ -29,9 +29,13 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .HasMaxLength(20)
             .IsRequired();
 
-        builder.Property(settings => settings.WorkingWeek)
-            .HasColumnName("working_week")
-            .HasMaxLength(30)
+        builder.Property(settings => settings.WorkingDays)
+            .HasColumnName("working_days")
+            .IsRequired();
+
+        builder.Property(settings => settings.HoursPerDay)
+            .HasColumnName("hours_per_day")
+            .HasPrecision(4, 2)
             .IsRequired();
 
         builder.Property(settings => settings.LeaveYearStartMonth)

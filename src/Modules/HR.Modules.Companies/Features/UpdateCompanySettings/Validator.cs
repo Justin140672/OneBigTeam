@@ -1,4 +1,5 @@
 using FluentValidation;
+using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Features.UpdateCompanySettings;
 
@@ -17,9 +18,13 @@ internal sealed class UpdateCompanySettingsValidator : AbstractValidator<UpdateC
 			.NotEmpty()
 			.MaximumLength(20);
 
-		RuleFor(request => request.WorkingWeek)
-			.NotEmpty()
-			.MaximumLength(30);
+		RuleFor(request => request.WorkingDays)
+			.Must(w => w != WorkingDays.None)
+			.WithMessage("At least one working day must be selected.");
+
+		RuleFor(request => request.HoursPerDay)
+			.GreaterThan(0)
+			.LessThanOrEqualTo(24);
 
 		RuleFor(request => request.LeaveYearStartMonth)
 			.InclusiveBetween(1, 12);

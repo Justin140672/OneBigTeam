@@ -4,6 +4,7 @@ using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Features.UpdateCompanySettings;
 using HR.Modules.Companies.Persistence;
 using HR.Modules.Companies.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Tests;
@@ -32,7 +33,9 @@ public class UpdateCompanySettingsHandlerTests
 				Id = company.Id,
 				TimeZone = "Europe/London",
 				Locale = "en-GB",
-				WorkingWeek = "Monday-Friday",
+				WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+				              WorkingDays.Thursday | WorkingDays.Friday,
+				HoursPerDay = 7.5m,
 				LeaveYearStartMonth = 4,
 				DefaultHolidayAllowance = 28,
 				ProbationMonths = 3,
@@ -59,7 +62,9 @@ public class UpdateCompanySettingsHandlerTests
 		Assert.Equal(company.Id, integrationEvent!.CompanyId);
 		Assert.Equal("Europe/London", integrationEvent.TimeZone);
 		Assert.Equal("en-GB", integrationEvent.Locale);
-		Assert.Equal("Monday-Friday", integrationEvent.WorkingWeek);
+		Assert.Equal(WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+		             WorkingDays.Thursday | WorkingDays.Friday, integrationEvent.WorkingDays);
+		Assert.Equal(7.5m, integrationEvent.HoursPerDay);
 		Assert.Equal(4, integrationEvent.LeaveYearStartMonth);
 		Assert.Equal(28, integrationEvent.DefaultHolidayAllowance);
 		Assert.Equal(3, integrationEvent.ProbationMonths);
@@ -81,7 +86,9 @@ public class UpdateCompanySettingsHandlerTests
 				Id = Guid.NewGuid(),
 				TimeZone = "UTC",
 				Locale = "en-GB",
-				WorkingWeek = "Monday-Friday",
+				WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+				              WorkingDays.Thursday | WorkingDays.Friday,
+				HoursPerDay = 7.5m,
 				LeaveYearStartMonth = 1,
 				DefaultHolidayAllowance = 25,
 				ProbationMonths = 6,

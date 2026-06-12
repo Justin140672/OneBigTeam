@@ -66,6 +66,13 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(e => e.WorkingDaysOverride)
+            .HasColumnName("working_days_override");
+
+        builder.Property(e => e.HoursPerDayOverride)
+            .HasColumnName("hours_per_day_override")
+            .HasPrecision(4, 2);
+
         builder.Property(e => e.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

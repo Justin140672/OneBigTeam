@@ -41,8 +41,20 @@ internal sealed class LeaveRequestConfiguration : IEntityTypeConfiguration<Leave
             .HasColumnName("start_date")
             .IsRequired();
 
+        builder.Property(r => r.StartPart)
+            .HasColumnName("start_part")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
         builder.Property(r => r.EndDate)
             .HasColumnName("end_date")
+            .IsRequired();
+
+        builder.Property(r => r.EndPart)
+            .HasColumnName("end_part")
+            .HasConversion<string>()
+            .HasMaxLength(20)
             .IsRequired();
 
         builder.Property(r => r.TotalDays)
@@ -50,8 +62,8 @@ internal sealed class LeaveRequestConfiguration : IEntityTypeConfiguration<Leave
             .HasColumnType("numeric(6,2)")
             .IsRequired();
 
-        builder.Property(r => r.Notes)
-            .HasColumnName("notes")
+        builder.Property(r => r.Reason)
+            .HasColumnName("reason")
             .HasMaxLength(1000);
 
         builder.Property(r => r.ReviewedByEmployeeId)

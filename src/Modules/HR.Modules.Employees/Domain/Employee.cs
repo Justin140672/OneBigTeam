@@ -1,3 +1,5 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Employees.Domain;
 
 internal sealed class Employee
@@ -16,6 +18,8 @@ internal sealed class Employee
     public DateOnly StartDate { get; private set; }
     public EmploymentStatus Status { get; private set; }
     public bool HasSystemAccess { get; private set; }
+    public WorkingDays? WorkingDaysOverride { get; private set; }
+    public decimal? HoursPerDayOverride { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -71,6 +75,13 @@ internal sealed class Employee
         WorkEmail = workEmail;
         PersonalEmail = personalEmail;
         StartDate = startDate;
+        UpdatedAt = now;
+    }
+
+    public void SetWorkingPattern(WorkingDays? workingDays, decimal? hoursPerDay, DateTimeOffset now)
+    {
+        WorkingDaysOverride = workingDays;
+        HoursPerDayOverride = hoursPerDay;
         UpdatedAt = now;
     }
 

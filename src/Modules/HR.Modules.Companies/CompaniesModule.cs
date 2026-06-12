@@ -6,7 +6,9 @@ using HR.Modules.Companies.Features.UpdateCompany;
 using HR.Modules.Companies.Features.UpdateCompanySettings;
 using HR.Modules.Companies.Features.UploadCompanyLogo;
 using HR.Modules.Companies.Persistence;
+using HR.Modules.Companies.Services;
 using HR.Modules.Companies.Storage;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -71,6 +73,7 @@ public static class CompaniesModule
         services.AddScoped<UploadCompanyLogoHandler>();
         services.AddScoped<IBrandingStorage, StubBrandingStorage>();
         services.AddScoped<ICompanyAuditEventPublisher, LoggerCompanyAuditEventPublisher>();
+        services.AddScoped<ICompanyWorkingPatternReader, CompanyWorkingPatternReader>();
         services.AddScoped<IValidator<CreateCompanyRequest>, CreateCompanyValidator>();
         services.AddScoped<IValidator<UpdateCompanyRequest>, UpdateCompanyValidator>();
         services.AddScoped<IValidator<UpdateCompanySettingsRequest>, UpdateCompanySettingsValidator>();

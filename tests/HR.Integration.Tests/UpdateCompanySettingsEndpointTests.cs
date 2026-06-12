@@ -22,7 +22,8 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
 		{
 			timeZone = "UTC",
 			locale = "en-GB",
-			workingWeek = "Monday-Friday",
+			workingDays = 31,
+			hoursPerDay = 7.5,
 			leaveYearStartMonth = 1,
 			defaultHolidayAllowance = 25,
 			probationMonths = 6
@@ -61,7 +62,8 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
 		{
 			timeZone = "Europe/London",
 			locale = "en-GB",
-			workingWeek = "Monday-Friday",
+			workingDays = 31,
+			hoursPerDay = 7.5,
 			leaveYearStartMonth = 4,
 			defaultHolidayAllowance = 28,
 			probationMonths = 3,
@@ -87,7 +89,8 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
 		{
 			timeZone = "UTC",
 			locale = "en-GB",
-			workingWeek = "Monday-Friday",
+			workingDays = 31,
+			hoursPerDay = 7.5,
 			leaveYearStartMonth = 1,
 			defaultHolidayAllowance = 25,
 			probationMonths = 6,
@@ -102,7 +105,8 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
 		Guid CompanyId,
 		string TimeZone,
 		string Locale,
-		string WorkingWeek,
+		string WorkingDays,
+		decimal HoursPerDay,
 		int LeaveYearStartMonth,
 		decimal DefaultHolidayAllowance,
 		int ProbationMonths,

@@ -8,12 +8,15 @@ using HR.Modules.Employees.Features.DeactivateDepartment;
 using HR.Modules.Employees.Features.GetEmployee;
 using HR.Modules.Employees.Features.ListDepartments;
 using HR.Modules.Employees.Features.ListEmployees;
+using HR.Modules.Employees.Features.SetEmployeeWorkingPattern;
 using HR.Modules.Employees.Features.UpdateDepartment;
 using HR.Modules.Employees.Features.GetPositionProfile;
 using HR.Modules.Employees.Features.ListPositionProfiles;
 using HR.Modules.Employees.Features.UpdateEmployeeProfile;
 using HR.Modules.Employees.Features.UpdatePositionProfile;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Services;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -71,6 +74,11 @@ public static class EmployeesModule
 
         services.AddScoped<AssignManagerHandler>();
         services.AddScoped<IValidator<AssignManagerRequest>, AssignManagerValidator>();
+
+        services.AddScoped<SetEmployeeWorkingPatternHandler>();
+        services.AddScoped<IValidator<SetEmployeeWorkingPatternRequest>, SetEmployeeWorkingPatternValidator>();
+
+        services.AddScoped<IWorkingPatternProvider, WorkingPatternProvider>();
     }
 
     public static async Task MigrateEmployeesAsync(this IServiceProvider services)

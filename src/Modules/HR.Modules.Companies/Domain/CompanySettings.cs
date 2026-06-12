@@ -1,3 +1,5 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Companies.Domain;
 
 internal sealed class CompanySettings
@@ -7,7 +9,8 @@ internal sealed class CompanySettings
     public Guid CompanyId { get; private set; }
     public string TimeZone { get; private set; } = string.Empty;
     public string Locale { get; private set; } = string.Empty;
-    public string WorkingWeek { get; private set; } = string.Empty;
+    public WorkingDays WorkingDays { get; private set; }
+    public decimal HoursPerDay { get; private set; }
     public int LeaveYearStartMonth { get; private set; }
     public decimal DefaultHolidayAllowance { get; private set; }
     public int ProbationMonths { get; private set; }
@@ -21,7 +24,9 @@ internal sealed class CompanySettings
             CompanyId = companyId,
             TimeZone = "UTC",
             Locale = "en-GB",
-            WorkingWeek = "Monday-Friday",
+            WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+                          WorkingDays.Thursday | WorkingDays.Friday,
+            HoursPerDay = 7.5m,
             LeaveYearStartMonth = 1,
             DefaultHolidayAllowance = 25,
             ProbationMonths = 6,
@@ -33,7 +38,8 @@ internal sealed class CompanySettings
     public void Update(
         string timeZone,
         string locale,
-        string workingWeek,
+        WorkingDays workingDays,
+        decimal hoursPerDay,
         int leaveYearStartMonth,
         decimal defaultHolidayAllowance,
         int probationMonths,
@@ -41,7 +47,8 @@ internal sealed class CompanySettings
     {
         TimeZone = timeZone;
         Locale = locale;
-        WorkingWeek = workingWeek;
+        WorkingDays = workingDays;
+        HoursPerDay = hoursPerDay;
         LeaveYearStartMonth = leaveYearStartMonth;
         DefaultHolidayAllowance = defaultHolidayAllowance;
         ProbationMonths = probationMonths;

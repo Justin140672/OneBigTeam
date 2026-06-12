@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Companies.Features.UpdateCompanySettings;
@@ -5,7 +6,8 @@ namespace HR.Modules.Companies.Features.UpdateCompanySettings;
 internal sealed record CompanySettingsAuditSnapshot(
     string TimeZone,
     string Locale,
-    string WorkingWeek,
+    WorkingDays WorkingDays,
+    decimal HoursPerDay,
     int LeaveYearStartMonth,
     decimal DefaultHolidayAllowance,
     int ProbationMonths);
