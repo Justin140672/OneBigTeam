@@ -21,6 +21,7 @@ builder.Services.AddLeaveModule(connectionString);
 builder.Services.AddInfrastructure();
 builder.Services.AddFastEndpoints();
 builder.Services.AddSingleton<IClock, SystemClock>();
+builder.Services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher>();
 
 if (builder.Environment.IsDevelopment())
 {

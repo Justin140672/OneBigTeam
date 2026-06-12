@@ -9,11 +9,13 @@ internal sealed class CreateEmployeeHandler
 {
     private readonly EmployeesDbContext _dbContext;
     private readonly IClock _clock;
+    private readonly IIntegrationEventPublisher _publisher;
 
-    public CreateEmployeeHandler(EmployeesDbContext dbContext, IClock clock)
+    public CreateEmployeeHandler(EmployeesDbContext dbContext, IClock clock, IIntegrationEventPublisher publisher)
     {
         _dbContext = dbContext;
         _clock = clock;
+        _publisher = publisher;
     }
 
     public async Task<Result<CreateEmployeeResponse>> HandleAsync(
@@ -99,6 +101,8 @@ internal sealed class CreateEmployeeHandler
 
         _dbContext.Employees.Add(employee);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await _publisher.PublishAsync(new EmployeeCreatedIntegrationEvent(employee.CompanyId, employee.Id), cancellationToken);
 
         return Result.Success(new CreateEmployeeResponse(
             employee.Id,
