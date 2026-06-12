@@ -1,5 +1,6 @@
 using FluentValidation;
 using HR.Modules.Leave.Domain;
+using HR.Modules.Leave.Features.ApproveLeaveRequest;
 using HR.Modules.Leave.Features.AssignLeavePolicyToEmployee;
 using HR.Modules.Leave.Features.CancelLeaveRequest;
 using HR.Modules.Leave.Features.CreateLeavePolicy;
@@ -43,6 +44,8 @@ public static class LeaveModule
         services.AddScoped<IValidator<SubmitLeaveRequestRequest>, SubmitLeaveRequestValidator>();
         services.AddScoped<CancelLeaveRequestHandler>();
         services.AddScoped<IValidator<CancelLeaveRequestRequest>, CancelLeaveRequestValidator>();
+        services.AddScoped<ApproveLeaveRequestHandler>();
+        services.AddScoped<IValidator<ApproveLeaveRequestRequest>, ApproveLeaveRequestValidator>();
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddSingleton<IPublicHolidayService, NullPublicHolidayService>();
     }
