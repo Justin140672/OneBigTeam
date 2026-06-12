@@ -26,7 +26,18 @@ internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, ICloc
             return Result.Failure<ApproveLeaveRequestResponse>(
                 Error.Validation($"Cannot approve a leave request with status '{leaveRequest.Status}'."));
 
-        leaveRequest.Approve(request.ReviewedByEmployeeId, clock.UtcNowOffset());
+        var now = clock.UtcNowOffset();
+
+        var balance = await dbContext.LeaveBalances
+            .SingleOrDefaultAsync(
+                b => b.EmployeeId == leaveRequest.EmployeeId
+                  && b.CompanyId == leaveRequest.CompanyId
+                  && b.LeaveTypeId == leaveRequest.LeaveTypeId
+                  && b.PolicyYear == leaveRequest.StartDate.Year,
+                cancellationToken);
+
+        leaveRequest.Approve(request.ReviewedByEmployeeId, now);
+        balance?.RecordUsage(leaveRequest.TotalDays, now);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new ApproveLeaveRequestResponse(

@@ -165,4 +165,60 @@ public class ApproveLeaveRequestHandlerTests
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
     }
+
+    [Fact]
+    public async Task HandleAsync_Deducts_Balance_On_Approval()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var leaveTypeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
+            5m, "Holiday", now);
+
+        var balance = LeaveBalance.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
+            2026, 25m, now);
+
+        context.LeaveRequests.Add(leaveRequest);
+        context.LeaveBalances.Add(balance);
+        await context.SaveChangesAsync();
+
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var result = await handler.HandleAsync(
+            ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(5m, savedBalance.UsedDays);
+        Assert.Equal(20m, savedBalance.RemainingDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Succeeds_When_No_Balance_Record_Exists()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveRequest = CreatePendingRequest(companyId, employeeId, now);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var result = await handler.HandleAsync(
+            ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Approved", result.Value!.Status);
+    }
 }
