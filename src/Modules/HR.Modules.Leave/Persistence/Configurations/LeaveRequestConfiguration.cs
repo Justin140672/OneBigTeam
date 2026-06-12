@@ -72,6 +72,10 @@ internal sealed class LeaveRequestConfiguration : IEntityTypeConfiguration<Leave
         builder.Property(r => r.ReviewedAt)
             .HasColumnName("reviewed_at");
 
+        builder.Property(r => r.RejectionReason)
+            .HasColumnName("rejection_reason")
+            .HasMaxLength(500);
+
         builder.Property(r => r.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

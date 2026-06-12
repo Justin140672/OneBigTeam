@@ -18,6 +18,7 @@ internal sealed class LeaveRequest
     public string? Reason { get; private set; }
     public Guid? ReviewedByEmployeeId { get; private set; }
     public DateTimeOffset? ReviewedAt { get; private set; }
+    public string? RejectionReason { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -62,11 +63,12 @@ internal sealed class LeaveRequest
         UpdatedAt = now;
     }
 
-    public void Reject(Guid reviewedByEmployeeId, DateTimeOffset now)
+    public void Reject(Guid reviewedByEmployeeId, DateTimeOffset now, string? rejectionReason = null)
     {
         Status = LeaveRequestStatus.Rejected;
         ReviewedByEmployeeId = reviewedByEmployeeId;
         ReviewedAt = now;
+        RejectionReason = rejectionReason;
         UpdatedAt = now;
     }
 
