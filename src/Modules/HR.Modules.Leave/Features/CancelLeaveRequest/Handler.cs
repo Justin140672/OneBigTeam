@@ -26,7 +26,22 @@ internal sealed class CancelLeaveRequestHandler(LeaveDbContext dbContext, IClock
             return Result.Failure<CancelLeaveRequestResponse>(
                 Error.Validation($"Cannot cancel a leave request with status '{leaveRequest.Status}'."));
 
-        leaveRequest.Cancel(clock.UtcNowOffset());
+        var now = clock.UtcNowOffset();
+
+        if (leaveRequest.Status == LeaveRequestStatus.Approved)
+        {
+            var balance = await dbContext.LeaveBalances
+                .SingleOrDefaultAsync(
+                    b => b.EmployeeId == leaveRequest.EmployeeId
+                      && b.CompanyId == leaveRequest.CompanyId
+                      && b.LeaveTypeId == leaveRequest.LeaveTypeId
+                      && b.PolicyYear == leaveRequest.StartDate.Year,
+                    cancellationToken);
+
+            balance?.ReverseUsage(leaveRequest.TotalDays, now);
+        }
+
+        leaveRequest.Cancel(now);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new CancelLeaveRequestResponse(

@@ -22,11 +22,26 @@ internal sealed class RejectLeaveRequestHandler(LeaveDbContext dbContext, IClock
             return Result.Failure<RejectLeaveRequestResponse>(
                 Error.NotFound($"Leave request '{request.LeaveRequestId}' was not found."));
 
-        if (leaveRequest.Status != LeaveRequestStatus.Pending)
+        if (leaveRequest.Status is not (LeaveRequestStatus.Pending or LeaveRequestStatus.Approved))
             return Result.Failure<RejectLeaveRequestResponse>(
                 Error.Validation($"Cannot reject a leave request with status '{leaveRequest.Status}'."));
 
-        leaveRequest.Reject(request.ReviewedByEmployeeId, clock.UtcNowOffset(), request.RejectionReason);
+        var now = clock.UtcNowOffset();
+
+        if (leaveRequest.Status == LeaveRequestStatus.Approved)
+        {
+            var balance = await dbContext.LeaveBalances
+                .SingleOrDefaultAsync(
+                    b => b.EmployeeId == leaveRequest.EmployeeId
+                      && b.CompanyId == leaveRequest.CompanyId
+                      && b.LeaveTypeId == leaveRequest.LeaveTypeId
+                      && b.PolicyYear == leaveRequest.StartDate.Year,
+                    cancellationToken);
+
+            balance?.ReverseUsage(leaveRequest.TotalDays, now);
+        }
+
+        leaveRequest.Reject(request.ReviewedByEmployeeId, now, request.RejectionReason);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new RejectLeaveRequestResponse(

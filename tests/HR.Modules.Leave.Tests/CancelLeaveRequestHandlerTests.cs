@@ -180,4 +180,113 @@ public class CancelLeaveRequestHandlerTests
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
     }
+
+    [Fact]
+    public async Task HandleAsync_Restores_Balance_When_Cancelling_Approved_Request()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var leaveTypeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
+            5m, "Holiday", now);
+        leaveRequest.Approve(Guid.NewGuid(), now);
+
+        var balance = LeaveBalance.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
+            2026, 25m, now);
+        balance.RecordUsage(5m, now);
+
+        context.LeaveRequests.Add(leaveRequest);
+        context.LeaveBalances.Add(balance);
+        await context.SaveChangesAsync();
+
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var result = await handler.HandleAsync(
+            new CancelLeaveRequestRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                LeaveRequestId = leaveRequest.Id
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(0m, savedBalance.UsedDays);
+        Assert.Equal(25m, savedBalance.RemainingDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Restore_Balance_When_Cancelling_Pending_Request()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var leaveTypeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
+            5m, "Holiday", now);
+
+        var balance = LeaveBalance.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
+            2026, 25m, now);
+
+        context.LeaveRequests.Add(leaveRequest);
+        context.LeaveBalances.Add(balance);
+        await context.SaveChangesAsync();
+
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var result = await handler.HandleAsync(
+            new CancelLeaveRequestRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                LeaveRequestId = leaveRequest.Id
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(0m, savedBalance.UsedDays);
+        Assert.Equal(25m, savedBalance.RemainingDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Succeeds_When_Cancelling_Approved_Request_With_No_Balance_Record()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveRequest = CreatePendingRequest(companyId, employeeId, now);
+        leaveRequest.Approve(Guid.NewGuid(), now);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var result = await handler.HandleAsync(
+            new CancelLeaveRequestRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                LeaveRequestId = leaveRequest.Id
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Cancelled", result.Value!.Status);
+    }
 }
