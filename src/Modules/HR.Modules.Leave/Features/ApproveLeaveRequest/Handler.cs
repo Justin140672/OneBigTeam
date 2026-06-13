@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.ApproveLeaveRequest;
 
-internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, IClock clock, IIntegrationEventPublisher publisher)
+internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, IClock clock, IIntegrationEventPublisher publisher, ICompanyLeaveSettingsReader leaveSettingsReader)
 {
     public async Task<Result<ApproveLeaveRequestResponse>> HandleAsync(
         ApproveLeaveRequestRequest request,
@@ -26,6 +26,8 @@ internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, ICloc
             return Result.Failure<ApproveLeaveRequestResponse>(
                 Error.Validation($"Cannot approve a leave request with status '{leaveRequest.Status}'."));
 
+        var leaveSettings = await leaveSettingsReader.GetLeaveSettingsAsync(leaveRequest.CompanyId, cancellationToken);
+        var policyYear = LeaveYearCalculator.GetPolicyYear(leaveRequest.StartDate, leaveSettings.LeaveYearStartMonth);
         var now = clock.UtcNowOffset();
 
         var balance = await dbContext.LeaveBalances
@@ -33,7 +35,7 @@ internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, ICloc
                 b => b.EmployeeId == leaveRequest.EmployeeId
                   && b.CompanyId == leaveRequest.CompanyId
                   && b.LeaveTypeId == leaveRequest.LeaveTypeId
-                  && b.PolicyYear == leaveRequest.StartDate.Year,
+                  && b.PolicyYear == policyYear,
                 cancellationToken);
 
         leaveRequest.Approve(request.ReviewedByEmployeeId, now);

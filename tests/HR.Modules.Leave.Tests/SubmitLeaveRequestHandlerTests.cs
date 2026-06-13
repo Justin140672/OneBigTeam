@@ -203,6 +203,39 @@ public class SubmitLeaveRequestHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Creates_LeaveRequest_For_Saturday_When_Saturday_Is_In_Working_Pattern()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
+
+        var monToSat = new WorkingPattern(
+            WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+            WorkingDays.Thursday | WorkingDays.Friday | WorkingDays.Saturday,
+            7.5m);
+
+        var handler = new SubmitLeaveRequestHandler(
+            context, new FakeClock(FixedUtcNow),
+            new FakeWorkingPatternProvider(monToSat),
+            new FakeCompanyLeaveSettingsReader(),
+            new NoOpIntegrationEventPublisher());
+
+        // 2026-08-08 = Saturday — a working day in this pattern
+        var result = await handler.HandleAsync(
+            ValidRequest(companyId, employeeId, leaveType.Id) with
+            {
+                StartDate = new DateOnly(2026, 8, 8),
+                EndDate = new DateOnly(2026, 8, 8)
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1.0m, result.Value!.TotalDays);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_No_Conflicts_When_No_Overlapping_Requests_Exist()
     {
         await using var context = BuildContext();
@@ -387,6 +420,117 @@ public class SubmitLeaveRequestHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Does_Not_Deduct_Balance_On_Submit()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var (leaveType, _, _, balance) = await SeedStandardSetupAsync(context, companyId, employeeId);
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new NoOpIntegrationEventPublisher());
+        var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(0m, savedBalance.UsedDays);
+        Assert.Equal(25m, savedBalance.RemainingDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_Approved_Request_Overlaps()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var (leaveType, policy, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId, entitlementDays: 25);
+
+        var approved = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
+            new DateOnly(2026, 8, 5), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 6), LeaveDayPart.FullDay,
+            2m, "Existing approved", now);
+        approved.Approve(Guid.NewGuid(), now);
+        context.LeaveRequests.Add(approved);
+        await context.SaveChangesAsync();
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new NoOpIntegrationEventPublisher());
+        var result = await handler.HandleAsync(ValidRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value!.Conflicts);
+        Assert.Equal(approved.Id, result.Value.Conflicts[0].LeaveRequestId);
+        Assert.Equal("Approved", result.Value.Conflicts[0].Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_Half_Day_Requested_With_Insufficient_Balance()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 0,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 0, allowNegativeBalance: false, now);
+        var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
+            DateOnly.FromDateTime(FixedUtcNow), now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
+            FixedUtcNow.Year, 0.4m, now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeavePolicies.Add(policy);
+        context.EmployeeLeavePolicyAssignments.Add(assignment);
+        context.LeaveBalances.Add(balance);
+        await context.SaveChangesAsync();
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new NoOpIntegrationEventPublisher());
+        var result = await handler.HandleAsync(
+            ValidRequest(companyId, employeeId, leaveType.Id) with
+            {
+                StartDate = new DateOnly(2026, 8, 3),
+                StartPart = LeaveDayPart.Morning,
+                EndDate = new DateOnly(2026, 8, 3),
+                EndPart = LeaveDayPart.Morning
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Exclude_Other_Company_Public_Holiday()
+    {
+        await using var context = BuildContext();
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyB, employeeId);
+
+        // Holiday belongs to company A, not company B
+        context.PublicHolidays.Add(
+            PublicHoliday.Create(Guid.NewGuid(), companyA, new DateOnly(2026, 8, 5), "Company A Holiday", "GB", now));
+        await context.SaveChangesAsync();
+
+        var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow),
+            new FakeWorkingPatternProvider(),
+            new FakeCompanyLeaveSettingsReader(CompanyLeaveSettings.Default with { ExcludePublicHolidaysFromLeave = true }),
+            new NoOpIntegrationEventPublisher());
+
+        var result = await handler.HandleAsync(ValidRequest(companyB, employeeId, leaveType.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(5m, result.Value!.TotalDays);
+    }
+
+    [Fact]
     public async Task HandleAsync_Publishes_LeaveRequestedIntegrationEvent()
     {
         await using var context = BuildContext();
@@ -440,5 +584,53 @@ public class SubmitLeaveRequestCalculationTests
             WorkingPattern.Default);
 
         Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void CalculateTotalDays_Counts_Saturday_When_Saturday_Is_In_Working_Pattern()
+    {
+        var monToSat = new WorkingPattern(
+            WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+            WorkingDays.Thursday | WorkingDays.Friday | WorkingDays.Saturday,
+            7.5m);
+
+        // 2026-08-08 = Saturday
+        var result = SubmitLeaveRequestHandler.CalculateTotalDays(
+            new DateOnly(2026, 8, 8), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 8), LeaveDayPart.FullDay,
+            monToSat);
+
+        Assert.Equal(1.0m, result);
+    }
+
+    [Fact]
+    public void CalculateTotalDays_Counts_Both_Weekend_Days_When_Full_Week_Pattern_Set()
+    {
+        var allWeek = new WorkingPattern(
+            WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+            WorkingDays.Thursday | WorkingDays.Friday | WorkingDays.Saturday | WorkingDays.Sunday,
+            7.5m);
+
+        // 2026-08-08 = Saturday, 2026-08-09 = Sunday
+        var result = SubmitLeaveRequestHandler.CalculateTotalDays(
+            new DateOnly(2026, 8, 8), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 9), LeaveDayPart.FullDay,
+            allWeek);
+
+        Assert.Equal(2.0m, result);
+    }
+
+    [Fact]
+    public void CalculateTotalDays_Skips_Sunday_When_Only_Saturday_Is_Working_Day()
+    {
+        var satOnly = new WorkingPattern(WorkingDays.Saturday, 7.5m);
+
+        // 2026-08-08 = Saturday, 2026-08-09 = Sunday — only Saturday counts
+        var result = SubmitLeaveRequestHandler.CalculateTotalDays(
+            new DateOnly(2026, 8, 8), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 9), LeaveDayPart.FullDay,
+            satOnly);
+
+        Assert.Equal(1.0m, result);
     }
 }

@@ -26,16 +26,26 @@ internal sealed class GetEmployeeLeaveBalanceHandler
                 _dbContext.LeaveTypes.AsNoTracking(),
                 b => b.LeaveTypeId,
                 lt => lt.Id,
-                (b, lt) => new LeaveBalanceItem(
+                (b, lt) => new
+                {
                     b.Id,
                     b.LeaveTypeId,
                     lt.Name,
                     lt.Code,
                     b.EntitlementDays,
                     b.UsedDays,
-                    b.AdjustmentDays,
-                    b.EntitlementDays + b.AdjustmentDays - b.UsedDays))
-            .OrderBy(item => item.LeaveTypeName)
+                    b.AdjustmentDays
+                })
+            .OrderBy(x => x.Name)
+            .Select(x => new LeaveBalanceItem(
+                x.Id,
+                x.LeaveTypeId,
+                x.Name,
+                x.Code,
+                x.EntitlementDays,
+                x.UsedDays,
+                x.AdjustmentDays,
+                x.EntitlementDays + x.AdjustmentDays - x.UsedDays))
             .ToListAsync(cancellationToken);
 
         return Result.Success(new GetEmployeeLeaveBalanceResponse(

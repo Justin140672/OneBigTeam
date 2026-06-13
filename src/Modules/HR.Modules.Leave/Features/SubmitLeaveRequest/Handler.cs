@@ -74,7 +74,7 @@ internal sealed class SubmitLeaveRequestHandler
 
         if (policy is not null && !policy.AllowNegativeBalance)
         {
-            var policyYear = _clock.UtcNowOffset().Year;
+            var policyYear = LeaveYearCalculator.GetPolicyYear(_clock.UtcNowOffset(), leaveSettings.LeaveYearStartMonth);
 
             var balance = await _dbContext.LeaveBalances
                 .SingleOrDefaultAsync(

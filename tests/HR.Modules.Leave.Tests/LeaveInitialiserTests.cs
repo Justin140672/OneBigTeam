@@ -32,7 +32,7 @@ public class EmployeeCreatedHandlerTests
                 DateOnly.FromDateTime(FixedUtcNow), now));
         await context.SaveChangesAsync();
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
         await handler.HandleAsync(new EmployeeCreatedIntegrationEvent(companyId, employeeId), CancellationToken.None);
 
         var balances = await context.LeaveBalances.ToListAsync();
@@ -62,7 +62,7 @@ public class EmployeeCreatedHandlerTests
                 DateOnly.FromDateTime(FixedUtcNow), now));
         await context.SaveChangesAsync();
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
         await handler.HandleAsync(new EmployeeCreatedIntegrationEvent(companyId, employeeId), CancellationToken.None);
 
         Assert.Empty(await context.LeaveBalances.ToListAsync());
@@ -81,7 +81,7 @@ public class EmployeeCreatedHandlerTests
         context.LeaveTypes.Add(activeType);
         await context.SaveChangesAsync();
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
         await handler.HandleAsync(new EmployeeCreatedIntegrationEvent(companyId, employeeId), CancellationToken.None);
 
         Assert.Empty(await context.LeaveBalances.ToListAsync());
@@ -105,7 +105,7 @@ public class EmployeeCreatedHandlerTests
                 DateOnly.FromDateTime(FixedUtcNow), now));
         await context.SaveChangesAsync();
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
         await handler.HandleAsync(new EmployeeCreatedIntegrationEvent(companyId, employeeId), CancellationToken.None);
 
         var balances = await context.LeaveBalances.ToListAsync();
@@ -134,7 +134,7 @@ public class EmployeeCreatedHandlerTests
                 DateOnly.FromDateTime(FixedUtcNow), now));
         await context.SaveChangesAsync();
 
-        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
         await handler.HandleAsync(new EmployeeCreatedIntegrationEvent(companyId, employeeId), CancellationToken.None);
 
         var balances = await context.LeaveBalances.ToListAsync();

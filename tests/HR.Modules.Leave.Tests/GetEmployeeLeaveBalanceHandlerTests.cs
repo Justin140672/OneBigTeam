@@ -128,6 +128,38 @@ public class GetEmployeeLeaveBalanceHandlerTests
         Assert.Empty(result.Value!.Balances);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Correct_Balance_When_Adjustment_And_Usage_Applied()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var policyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var typeId = Guid.NewGuid();
+        context.LeaveTypes.Add(
+            LeaveType.Create(typeId, companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now));
+
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, typeId, policyId, 2026, 25m, now);
+        balance.Adjust(2m, now);       // +2 carry-over adjustment
+        balance.RecordUsage(5m, now);  // 5 days used
+        context.LeaveBalances.Add(balance);
+        await context.SaveChangesAsync();
+
+        var handler = new GetEmployeeLeaveBalanceHandler(context);
+        var result = await handler.HandleAsync(
+            new GetEmployeeLeaveBalanceRequest { CompanyId = companyId, EmployeeId = employeeId, PolicyYear = 2026 },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Balances);
+        Assert.Equal(25m, item.EntitlementDays);
+        Assert.Equal(2m, item.AdjustmentDays);
+        Assert.Equal(5m, item.UsedDays);
+        Assert.Equal(22m, item.RemainingDays); // 25 + 2 - 5
+    }
+
     private static LeaveDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<LeaveDbContext>()

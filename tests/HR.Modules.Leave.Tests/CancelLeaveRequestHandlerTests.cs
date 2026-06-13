@@ -38,7 +38,7 @@ public class CancelLeaveRequestHandlerTests
         await context.SaveChangesAsync();
 
         var cancelTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(cancelTime));
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(cancelTime), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -69,7 +69,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -87,7 +87,7 @@ public class CancelLeaveRequestHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Request_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
 
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
@@ -113,12 +113,39 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
                 CompanyId = companyId,
                 EmployeeId = Guid.NewGuid(),
+                LeaveRequestId = leaveRequest.Id
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_Request_Belongs_To_Different_Company()
+    {
+        await using var context = BuildContext();
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveRequest = CreatePendingRequest(companyA, employeeId, now);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var result = await handler.HandleAsync(
+            new CancelLeaveRequestRequest
+            {
+                CompanyId = companyB,
+                EmployeeId = employeeId,
                 LeaveRequestId = leaveRequest.Id
             },
             CancellationToken.None);
@@ -140,7 +167,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -167,7 +194,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -206,7 +233,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -246,7 +273,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -276,7 +303,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {

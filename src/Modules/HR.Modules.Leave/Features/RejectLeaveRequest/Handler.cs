@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.RejectLeaveRequest;
 
-internal sealed class RejectLeaveRequestHandler(LeaveDbContext dbContext, IClock clock, IIntegrationEventPublisher publisher)
+internal sealed class RejectLeaveRequestHandler(LeaveDbContext dbContext, IClock clock, IIntegrationEventPublisher publisher, ICompanyLeaveSettingsReader leaveSettingsReader)
 {
     public async Task<Result<RejectLeaveRequestResponse>> HandleAsync(
         RejectLeaveRequestRequest request,
@@ -30,12 +30,15 @@ internal sealed class RejectLeaveRequestHandler(LeaveDbContext dbContext, IClock
 
         if (leaveRequest.Status == LeaveRequestStatus.Approved)
         {
+            var leaveSettings = await leaveSettingsReader.GetLeaveSettingsAsync(leaveRequest.CompanyId, cancellationToken);
+            var policyYear = LeaveYearCalculator.GetPolicyYear(leaveRequest.StartDate, leaveSettings.LeaveYearStartMonth);
+
             var balance = await dbContext.LeaveBalances
                 .SingleOrDefaultAsync(
                     b => b.EmployeeId == leaveRequest.EmployeeId
                       && b.CompanyId == leaveRequest.CompanyId
                       && b.LeaveTypeId == leaveRequest.LeaveTypeId
-                      && b.PolicyYear == leaveRequest.StartDate.Year,
+                      && b.PolicyYear == policyYear,
                     cancellationToken);
 
             balance?.ReverseUsage(leaveRequest.TotalDays, now);

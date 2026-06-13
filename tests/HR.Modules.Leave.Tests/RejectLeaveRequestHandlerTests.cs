@@ -51,7 +51,7 @@ public class RejectLeaveRequestHandlerTests
         await context.SaveChangesAsync();
 
         var rejectionTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(rejectionTime), new NoOpIntegrationEventPublisher());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(rejectionTime), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, reviewerId, "Team at capacity"),
             CancellationToken.None);
@@ -80,7 +80,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -94,7 +94,7 @@ public class RejectLeaveRequestHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Request_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
 
         var result = await handler.HandleAsync(
             RejectRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
@@ -115,7 +115,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, Guid.NewGuid(), leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -138,7 +138,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, reviewerId, "Approved in error"),
             CancellationToken.None);
@@ -173,7 +173,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid(), "Approved in error"),
             CancellationToken.None);
@@ -208,7 +208,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -218,6 +218,28 @@ public class RejectLeaveRequestHandlerTests
         var savedBalance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(0m, savedBalance.UsedDays);
         Assert.Equal(25m, savedBalance.RemainingDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_Request_Belongs_To_Different_Company()
+    {
+        await using var context = BuildContext();
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveRequest = CreatePendingRequest(companyA, employeeId, now);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
+        var result = await handler.HandleAsync(
+            RejectRequest(companyB, employeeId, leaveRequest.Id, Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
     }
 
     [Fact]
@@ -234,7 +256,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, reviewerId),
             CancellationToken.None);
@@ -256,7 +278,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -278,7 +300,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -306,7 +328,7 @@ public class RejectLeaveRequestHandlerTests
 
         var publisher = new CapturingIntegrationEventPublisher();
         var rejectionTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(rejectionTime), publisher);
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(rejectionTime), publisher, new FakeCompanyLeaveSettingsReader());
         await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, reviewerId, "No capacity"),
             CancellationToken.None);

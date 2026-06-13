@@ -9,11 +9,13 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
 {
     private readonly LeaveDbContext _dbContext;
     private readonly IClock _clock;
+    private readonly ICompanyLeaveSettingsReader _leaveSettingsReader;
 
-    public EmployeeCreatedHandler(LeaveDbContext dbContext, IClock clock)
+    public EmployeeCreatedHandler(LeaveDbContext dbContext, IClock clock, ICompanyLeaveSettingsReader leaveSettingsReader)
     {
         _dbContext = dbContext;
         _clock = clock;
+        _leaveSettingsReader = leaveSettingsReader;
     }
 
     public async Task HandleAsync(EmployeeCreatedIntegrationEvent integrationEvent, CancellationToken cancellationToken)
@@ -33,8 +35,9 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
         if (assignment is null)
             return;
 
+        var leaveSettings = await _leaveSettingsReader.GetLeaveSettingsAsync(integrationEvent.CompanyId, cancellationToken);
         var now = _clock.UtcNowOffset();
-        var policyYear = now.Year;
+        var policyYear = LeaveYearCalculator.GetPolicyYear(now, leaveSettings.LeaveYearStartMonth);
 
         var balances = activeLeaveTypes.Select(lt => LeaveBalance.Create(
             Guid.NewGuid(),
