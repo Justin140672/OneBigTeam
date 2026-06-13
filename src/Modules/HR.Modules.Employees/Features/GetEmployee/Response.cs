@@ -1,4 +1,5 @@
 using HR.Modules.Employees.Domain;
+using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Features.GetEmployee;
 
@@ -15,5 +16,7 @@ internal sealed record GetEmployeeResponse(
     DateOnly StartDate,
     EmploymentStatus Status,
     bool HasSystemAccess,
+    WorkingDays? WorkingDaysOverride,
+    decimal? HoursPerDayOverride,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

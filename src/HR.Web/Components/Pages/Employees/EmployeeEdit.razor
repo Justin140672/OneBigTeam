@@ -6,6 +6,7 @@
 @inject PositionProfileService PositionProfileService
 @inject InviteService InviteService
 @inject NavigationManager Navigation
+@using HR.SharedKernel
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -116,6 +117,39 @@
                         @bind-Checked="_model.HasSystemAccess" />
         </div>
 
+        @if (!IsNew)
+        {
+            <div class="mt-4 pt-3 border-top">
+                <h6 class="text-muted mb-2">Working Pattern Override</h6>
+                <SfCheckBox TChecked="bool"
+                            Label="Override company defaults"
+                            Checked="@_model.OverrideWorkingPattern"
+                            CheckedChanged="@((bool v) => _model.OverrideWorkingPattern = v)" />
+                @if (_model.OverrideWorkingPattern)
+                {
+                    <div class="row g-3 mt-2">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Working Days</label>
+                            <div class="d-flex flex-wrap gap-3 mt-1">
+                                @foreach (var day in _allDays)
+                                {
+                                    <SfCheckBox TChecked="bool" Label="@day"
+                                                Checked="@_model.WorkingWeek.Contains(day)"
+                                                CheckedChanged="@(e => ToggleWorkingDay(day, e))" />
+                                }
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <SfNumericTextBox TValue="decimal" @bind-Value="_model.HoursPerDay"
+                                              Placeholder="Hours Per Day"
+                                              FloatLabelType="FloatLabelType.Auto"
+                                              Min="0.5m" Max="24m" Step="0.5m" />
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
         @if (_model.HasSystemAccess)
         {
             @if (IsNew)
@@ -184,6 +218,8 @@
     private string? _inviteError;
 
     private readonly EmployeeProfileEditModel _model = new();
+    private static readonly string[] _allDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
     private List<DepartmentListItemModel> _departments = [];
     private List<PositionProfileListItemModel> _positionProfiles = [];
 
@@ -212,6 +248,20 @@
                 _model.DepartmentId = _employee.DepartmentId;
                 _model.PositionProfileId = _employee.PositionProfileId;
                 _model.HasSystemAccess = _employee.HasSystemAccess;
+
+                if (_employee.WorkingDaysOverride.HasValue || _employee.HoursPerDayOverride.HasValue)
+                {
+                    _model.OverrideWorkingPattern = true;
+                    if (_employee.WorkingDaysOverride.HasValue)
+                    {
+                        _model.WorkingWeek = _allDays
+                            .Where(d => Enum.TryParse<WorkingDays>(d, out var wd) &&
+                                        _employee.WorkingDaysOverride.Value.HasFlag(wd))
+                            .ToHashSet();
+                    }
+                    if (_employee.HoursPerDayOverride.HasValue)
+                        _model.HoursPerDay = _employee.HoursPerDayOverride.Value;
+                }
             }
 
             // Auto-generate invite link if redirected here after create with invite
@@ -270,6 +320,14 @@
         }
         else
         {
+            var workingDaysOverride = _model.OverrideWorkingPattern
+                ? _model.WorkingWeek.Aggregate(WorkingDays.None, (acc, day) =>
+                    Enum.TryParse<WorkingDays>(day, out var wd) ? acc | wd : acc)
+                : (WorkingDays?)null;
+            var hoursPerDayOverride = _model.OverrideWorkingPattern
+                ? _model.HoursPerDay
+                : (decimal?)null;
+
             var request = new UpdateEmployeeProfileRequest(
                 CompanyId,
                 Id!.Value,
@@ -280,7 +338,9 @@
                 _model.WorkEmail,
                 _model.PersonalEmail,
                 _model.StartDate,
-                _model.HasSystemAccess);
+                _model.HasSystemAccess,
+                workingDaysOverride,
+                hoursPerDayOverride);
 
             var (success, conflictMessage) = await EmployeeService.UpdateEmployeeProfileAsync(CompanyId, Id!.Value, request);
             _saving = false;
@@ -328,6 +388,12 @@
         // The link is shown in a readonly input — user can select and copy manually.
         // JS interop clipboard could be added later.
         await Task.CompletedTask;
+    }
+
+    private void ToggleWorkingDay(string day, bool isChecked)
+    {
+        if (isChecked) _model.WorkingWeek.Add(day);
+        else _model.WorkingWeek.Remove(day);
     }
 
     private static string StatusBadgeClass(string status) => status switch

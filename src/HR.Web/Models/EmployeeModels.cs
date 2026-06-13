@@ -1,3 +1,5 @@
+using HR.SharedKernel;
+
 namespace HR.Web.Models;
 
 // ── LIST ──────────────────────────────────────────────────────────────────────
@@ -40,6 +42,8 @@ public record GetEmployeeResponse(
     DateOnly StartDate,
     string Status,
     bool HasSystemAccess,
+    WorkingDays? WorkingDaysOverride,
+    decimal? HoursPerDayOverride,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
@@ -55,6 +59,9 @@ public sealed class EmployeeProfileEditModel
     public Guid? DepartmentId { get; set; }
     public Guid? PositionProfileId { get; set; }
     public bool HasSystemAccess { get; set; } = true;
+    public bool OverrideWorkingPattern { get; set; } = false;
+    public HashSet<string> WorkingWeek { get; set; } = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+    public decimal HoursPerDay { get; set; } = 7.5m;
 }
 
 public record UpdateEmployeeProfileRequest(
@@ -67,7 +74,9 @@ public record UpdateEmployeeProfileRequest(
     string WorkEmail,
     string? PersonalEmail,
     DateOnly StartDate,
-    bool HasSystemAccess);
+    bool HasSystemAccess,
+    WorkingDays? WorkingDaysOverride,
+    decimal? HoursPerDayOverride);
 
 public record UpdateEmployeeProfileResponse(
     Guid Id,
@@ -111,3 +120,4 @@ public record CreateEmployeeResponse(
     string WorkEmail,
     string Status,
     DateTimeOffset CreatedAt);
+

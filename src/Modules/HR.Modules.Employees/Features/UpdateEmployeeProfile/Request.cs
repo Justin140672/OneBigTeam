@@ -1,3 +1,5 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Employees.Features.UpdateEmployeeProfile;
 
 internal sealed record UpdateEmployeeProfileRequest
@@ -12,4 +14,6 @@ internal sealed record UpdateEmployeeProfileRequest
     public string? PersonalEmail { get; init; }
     public DateOnly StartDate { get; init; }
     public bool HasSystemAccess { get; init; } = true;
+    public WorkingDays? WorkingDaysOverride { get; init; }
+    public decimal? HoursPerDayOverride { get; init; }
 }

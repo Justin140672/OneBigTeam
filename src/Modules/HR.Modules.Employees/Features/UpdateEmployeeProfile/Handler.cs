@@ -60,6 +60,7 @@ internal sealed class UpdateEmployeeProfileHandler
 
         employee.Assign(request.DepartmentId, request.PositionProfileId, employee.ManagerId, now);
         employee.SetSystemAccess(request.HasSystemAccess, now);
+        employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

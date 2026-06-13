@@ -42,6 +42,8 @@ internal sealed class GetEmployeeHandler
             employee.StartDate,
             employee.Status,
             employee.HasSystemAccess,
+            employee.WorkingDaysOverride,
+            employee.HoursPerDayOverride,
             employee.CreatedAt,
             employee.UpdatedAt));
     }
