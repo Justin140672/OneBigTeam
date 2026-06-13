@@ -73,7 +73,7 @@ public static class CompaniesModule
         services.AddScoped<UploadCompanyLogoHandler>();
         services.AddScoped<IBrandingStorage, StubBrandingStorage>();
         services.AddScoped<ICompanyAuditEventPublisher, LoggerCompanyAuditEventPublisher>();
-        services.AddScoped<ICompanyWorkingPatternReader, CompanyWorkingPatternReader>();
+        services.AddScoped<ICompanyLeaveSettingsReader, CompanyLeaveSettingsReader>();
         services.AddScoped<IValidator<CreateCompanyRequest>, CreateCompanyValidator>();
         services.AddScoped<IValidator<UpdateCompanyRequest>, UpdateCompanyValidator>();
         services.AddScoped<IValidator<UpdateCompanySettingsRequest>, UpdateCompanySettingsValidator>();

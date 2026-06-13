@@ -6,7 +6,7 @@ namespace HR.Modules.Employees.Services;
 
 internal sealed class WorkingPatternProvider(
     EmployeesDbContext dbContext,
-    ICompanyWorkingPatternReader companyWorkingPatternReader) : IWorkingPatternProvider
+    ICompanyLeaveSettingsReader companySettingsReader) : IWorkingPatternProvider
 {
     public async Task<WorkingPattern> GetEffectivePatternAsync(
         Guid companyId,
@@ -19,9 +19,8 @@ internal sealed class WorkingPatternProvider(
         if (employee?.WorkingDaysOverride is not null && employee.HoursPerDayOverride is not null)
             return new WorkingPattern(employee.WorkingDaysOverride.Value, employee.HoursPerDayOverride.Value);
 
-        var companyPattern = await companyWorkingPatternReader
-            .GetCompanyWorkingPatternAsync(companyId, cancellationToken);
+        var settings = await companySettingsReader.GetLeaveSettingsAsync(companyId, cancellationToken);
 
-        return companyPattern ?? WorkingPattern.Default;
+        return settings.WorkingPattern;
     }
 }

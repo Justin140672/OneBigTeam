@@ -10,17 +10,20 @@ internal sealed class SubmitLeaveRequestHandler
     private readonly LeaveDbContext _dbContext;
     private readonly IClock _clock;
     private readonly IWorkingPatternProvider _workingPatternProvider;
+    private readonly ICompanyLeaveSettingsReader _leaveSettingsReader;
     private readonly IIntegrationEventPublisher _publisher;
 
     public SubmitLeaveRequestHandler(
         LeaveDbContext dbContext,
         IClock clock,
         IWorkingPatternProvider workingPatternProvider,
+        ICompanyLeaveSettingsReader leaveSettingsReader,
         IIntegrationEventPublisher publisher)
     {
         _dbContext = dbContext;
         _clock = clock;
         _workingPatternProvider = workingPatternProvider;
+        _leaveSettingsReader = leaveSettingsReader;
         _publisher = publisher;
     }
 
@@ -52,10 +55,16 @@ internal sealed class SubmitLeaveRequestHandler
         var workingPattern = await _workingPatternProvider.GetEffectivePatternAsync(
             request.CompanyId, request.EmployeeId, cancellationToken);
 
-        var publicHolidayDates = await _dbContext.PublicHolidays
-            .Where(h => h.CompanyId == request.CompanyId && h.Date >= request.StartDate && h.Date <= request.EndDate)
-            .Select(h => h.Date)
-            .ToListAsync(cancellationToken);
+        var leaveSettings = await _leaveSettingsReader.GetLeaveSettingsAsync(request.CompanyId, cancellationToken);
+
+        List<DateOnly>? publicHolidayDates = null;
+        if (leaveSettings.ExcludePublicHolidaysFromLeave)
+        {
+            publicHolidayDates = await _dbContext.PublicHolidays
+                .Where(h => h.CompanyId == request.CompanyId && h.Date >= request.StartDate && h.Date <= request.EndDate)
+                .Select(h => h.Date)
+                .ToListAsync(cancellationToken);
+        }
 
         var totalDays = CalculateTotalDays(request.StartDate, request.StartPart, request.EndDate, request.EndPart, workingPattern, publicHolidayDates);
 
