@@ -87,6 +87,66 @@ public class EmployeeCreatedHandlerTests
         Assert.Empty(await context.LeaveBalances.ToListAsync());
     }
 
+    [Fact]
+    public async Task HandleAsync_Initialises_TOIL_Balance_At_Zero_Regardless_Of_DefaultEntitlementDays()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var policyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var toilType = LeaveType.Create(Guid.NewGuid(), companyId, "Time Off In Lieu", "TOIL", 99,
+            AccrualMethod.None, LeaveTypeBehaviour.Toil, now);
+
+        context.LeaveTypes.Add(toilType);
+        context.EmployeeLeavePolicyAssignments.Add(
+            EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policyId,
+                DateOnly.FromDateTime(FixedUtcNow), now));
+        await context.SaveChangesAsync();
+
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow));
+        await handler.HandleAsync(new EmployeeCreatedIntegrationEvent(companyId, employeeId), CancellationToken.None);
+
+        var balances = await context.LeaveBalances.ToListAsync();
+        Assert.Single(balances);
+        Assert.Equal(toilType.Id, balances[0].LeaveTypeId);
+        Assert.Equal(0, balances[0].EntitlementDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creates_TOIL_Balance_Alongside_Other_Leave_Types()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var policyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var annualType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+        var toilType = LeaveType.Create(Guid.NewGuid(), companyId, "Time Off In Lieu", "TOIL", 0,
+            AccrualMethod.None, LeaveTypeBehaviour.Toil, now);
+
+        context.LeaveTypes.AddRange(annualType, toilType);
+        context.EmployeeLeavePolicyAssignments.Add(
+            EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policyId,
+                DateOnly.FromDateTime(FixedUtcNow), now));
+        await context.SaveChangesAsync();
+
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow));
+        await handler.HandleAsync(new EmployeeCreatedIntegrationEvent(companyId, employeeId), CancellationToken.None);
+
+        var balances = await context.LeaveBalances.ToListAsync();
+        Assert.Equal(2, balances.Count);
+
+        var toilBalance = balances.Single(b => b.LeaveTypeId == toilType.Id);
+        var annualBalance = balances.Single(b => b.LeaveTypeId == annualType.Id);
+
+        Assert.Equal(0, toilBalance.EntitlementDays);
+        Assert.Equal(25, annualBalance.EntitlementDays);
+    }
+
     private static LeaveDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<LeaveDbContext>()

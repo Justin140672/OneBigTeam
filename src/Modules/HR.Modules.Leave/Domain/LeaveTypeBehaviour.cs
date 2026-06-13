@@ -7,5 +7,6 @@ internal enum LeaveTypeBehaviour
     Maternity,
     Paternity,
     Parental,
-    Unpaid
+    Unpaid,
+    Toil
 }

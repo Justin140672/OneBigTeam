@@ -43,7 +43,7 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
             lt.Id,
             assignment.LeavePolicyId,
             policyYear,
-            lt.DefaultEntitlementDays,
+            lt.Behaviour == LeaveTypeBehaviour.Toil ? 0 : lt.DefaultEntitlementDays,
             now)).ToList();
 
         _dbContext.LeaveBalances.AddRange(balances);
