@@ -1,0 +1,178 @@
+@page "/companies/{CompanyId:guid}/public-holidays/new"
+@page "/companies/{CompanyId:guid}/public-holidays/{Id:guid}"
+@rendermode InteractiveServer
+@inject PublicHolidayService PublicHolidayService
+@inject NavigationManager Navigation
+
+<PageTitle>@PageTitle</PageTitle>
+
+<div class="container py-4">
+    <SfBreadcrumb Class="mb-3">
+        <BreadcrumbItems>
+            <BreadcrumbItem Text="Public Holidays" Url="@($"/companies/{CompanyId}/public-holidays")" />
+            <BreadcrumbItem Text="@PageTitle" />
+        </BreadcrumbItems>
+    </SfBreadcrumb>
+
+    @if (_loading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span>Loading…</span>
+        </div>
+    }
+    else
+    {
+        <h1 class="mb-4">@PageTitle</h1>
+
+        @if (!string.IsNullOrEmpty(_globalError))
+        {
+            <div class="alert alert-danger">@_globalError</div>
+        }
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label">Date <span class="text-danger">*</span></label>
+                    <SfDatePicker TValue="DateTime?" @bind-Value="_model.Date" Placeholder="Select date" Format="dd/MM/yyyy" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Name <span class="text-danger">*</span></label>
+                    <HrTextBox @bind-Value="_model.Name" Placeholder="e.g. Christmas Day" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Country Code <span class="text-danger">*</span></label>
+                    <HrTextBox @bind-Value="_model.CountryCode" Placeholder="e.g. GB" />
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-3 d-flex gap-2">
+            @if (!string.IsNullOrEmpty(_successMsg))
+            {
+                <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
+            }
+            <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
+                @if (_saving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Save
+            </SfButton>
+            <SfButton OnClick="Cancel" Disabled="@_saving">Cancel</SfButton>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+
+    private bool IsNew => Id is null || Id == Guid.Empty;
+    private string PageTitle => IsNew ? "Add Public Holiday" : "Edit Public Holiday";
+
+    private bool _loading = true;
+    private bool _saving;
+    private string? _globalError;
+    private string? _successMsg;
+
+    private readonly PublicHolidayEditModel _model = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _globalError = null;
+        _successMsg = null;
+
+        if (!IsNew)
+        {
+            var list = await PublicHolidayService.ListAsync(CompanyId, DateTime.UtcNow.Year);
+            var existing = list?.Items.FirstOrDefault(h => h.Id == Id);
+
+            if (existing is not null)
+            {
+                _model.Date = existing.Date.ToDateTime(TimeOnly.MinValue);
+                _model.Name = existing.Name;
+                _model.CountryCode = existing.CountryCode;
+            }
+            else
+            {
+                // Try adjacent years in case the holiday is in a different year
+                foreach (var year in new[] { DateTime.UtcNow.Year - 1, DateTime.UtcNow.Year + 1 })
+                {
+                    var result = await PublicHolidayService.ListAsync(CompanyId, year);
+                    existing = result?.Items.FirstOrDefault(h => h.Id == Id);
+                    if (existing is not null)
+                    {
+                        _model.Date = existing.Date.ToDateTime(TimeOnly.MinValue);
+                        _model.Name = existing.Name;
+                        _model.CountryCode = existing.CountryCode;
+                        break;
+                    }
+                }
+            }
+        }
+
+        _loading = false;
+    }
+
+    private async Task Save()
+    {
+        _globalError = null;
+        _successMsg = null;
+
+        if (_model.Date is null)
+        {
+            _globalError = "Please select a date.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_model.Name))
+        {
+            _globalError = "Name is required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_model.CountryCode))
+        {
+            _globalError = "Country code is required.";
+            return;
+        }
+
+        _saving = true;
+
+        var date = DateOnly.FromDateTime(_model.Date.Value);
+        var name = _model.Name.Trim();
+        var countryCode = _model.CountryCode.Trim().ToUpperInvariant();
+
+        if (IsNew)
+        {
+            var (created, error) = await PublicHolidayService.CreateAsync(
+                CompanyId,
+                new CreatePublicHolidayRequest(CompanyId, date, name, countryCode));
+
+            _saving = false;
+
+            if (created is not null)
+                Navigation.NavigateTo($"/companies/{CompanyId}/public-holidays");
+            else
+                _globalError = error ?? "Failed to create public holiday.";
+        }
+        else
+        {
+            var (updated, error) = await PublicHolidayService.UpdateAsync(
+                CompanyId,
+                Id!.Value,
+                new UpdatePublicHolidayRequest(CompanyId, Id!.Value, date, name, countryCode));
+
+            _saving = false;
+
+            if (updated is not null)
+                Navigation.NavigateTo($"/companies/{CompanyId}/public-holidays");
+            else
+                _globalError = error ?? "Failed to update public holiday.";
+        }
+    }
+
+    private void Cancel() => Navigation.NavigateTo($"/companies/{CompanyId}/public-holidays");
+}

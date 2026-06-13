@@ -29,4 +29,11 @@ internal sealed class PublicHoliday
             CreatedAt = now
         };
     }
+
+    public void Update(DateOnly date, string name, string countryCode)
+    {
+        Date = date;
+        Name = name;
+        CountryCode = countryCode;
+    }
 }

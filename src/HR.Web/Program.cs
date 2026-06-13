@@ -25,6 +25,7 @@ builder.Services.AddScoped<EmployeeService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<InviteService>();
 builder.Services.AddScoped<PositionProfileService>();
+builder.Services.AddScoped<PublicHolidayService>();
 
 Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(
     builder.Configuration["Syncfusion:LicenseKey"] ?? string.Empty);

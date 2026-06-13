@@ -1,0 +1,88 @@
+@page "/companies/{CompanyId:guid}/public-holidays"
+@rendermode InteractiveServer
+@inject PublicHolidayService PublicHolidayService
+@inject NavigationManager Navigation
+
+<PageTitle>Public Holidays</PageTitle>
+
+<div class="container-fluid py-4">
+    <h1 class="mb-3">Public Holidays</h1>
+
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="d-flex align-items-center gap-2">
+            <label class="form-label mb-0">Year</label>
+            <HrNumericTextBox TValue="int"
+                              @bind-Value="_year"
+                              Min="2000"
+                              Max="2100"
+                              Format="0"
+                              Width="100px" />
+            <SfButton OnClick="LoadAsync">Apply</SfButton>
+        </div>
+        <SfButton IsPrimary="true" OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/public-holidays/new"))">+ Add Holiday</SfButton>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span>Loading public holidays…</span>
+        </div>
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else
+    {
+        <HrGrid TValue="PublicHolidayListItemModel"
+                DataSource="@_items"
+                AllowPaging="true"
+                AllowSorting="true"
+                AllowFiltering="false">
+            <GridPageSettings PageSize="20" />
+            <GridColumns>
+                <GridColumn Field="@nameof(PublicHolidayListItemModel.Date)" HeaderText="Date" Width="140" Format="d" />
+                <GridColumn Field="@nameof(PublicHolidayListItemModel.Name)" HeaderText="Name" Width="260" />
+                <GridColumn Field="@nameof(PublicHolidayListItemModel.CountryCode)" HeaderText="Country" Width="110" />
+                <GridColumn HeaderText="" Width="100" AllowSorting="false">
+                    <Template>
+                        @{
+                            var row = (context as PublicHolidayListItemModel)!;
+                            <a href="/companies/@CompanyId/public-holidays/@row.Id">Edit</a>
+                        }
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </HrGrid>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private List<PublicHolidayListItemModel> _items = [];
+    private bool _loading = true;
+    private string? _error;
+    private int _year = DateTime.UtcNow.Year;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        var result = await PublicHolidayService.ListAsync(CompanyId, _year);
+        if (result is null)
+            _error = "Failed to load public holidays.";
+        else
+            _items = result.Items;
+
+        _loading = false;
+    }
+}

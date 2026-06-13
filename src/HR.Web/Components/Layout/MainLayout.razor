@@ -33,6 +33,11 @@
                             <MenuItem Text="Position Profiles" Url="@_menuItems["PositionProfiles"]" />
                         </MenuItems>
                     </MenuItem>
+                    <MenuItem Text="Leave" IconCss="e-icons e-calendar">
+                        <MenuItems>
+                            <MenuItem Text="Public Holidays" Url="@_menuItems["PublicHolidays"]" />
+                        </MenuItems>
+                    </MenuItem>
                 </MenuItems>
             </SfMenu>
 
@@ -87,6 +92,7 @@
         _menuItems["Employees"]        = $"/companies/{CompanyId}/employees";
         _menuItems["Departments"]      = $"/companies/{CompanyId}/departments";
         _menuItems["PositionProfiles"] = $"/companies/{CompanyId}/position-profiles";
+        _menuItems["PublicHolidays"]   = $"/companies/{CompanyId}/public-holidays";
     }
 
     private void ToggleSidebar() => SidebarOpen = !SidebarOpen;
