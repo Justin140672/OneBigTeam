@@ -16,6 +16,7 @@ internal sealed class LeaveDbContext : DbContext
     public DbSet<LeaveBalance> LeaveBalances => Set<LeaveBalance>();
     public DbSet<LeaveRequest> LeaveRequests => Set<LeaveRequest>();
     public DbSet<EmployeeLeavePolicyAssignment> EmployeeLeavePolicyAssignments => Set<EmployeeLeavePolicyAssignment>();
+    public DbSet<ToilTransaction> ToilTransactions => Set<ToilTransaction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
