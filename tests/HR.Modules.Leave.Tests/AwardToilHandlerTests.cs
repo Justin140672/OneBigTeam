@@ -1,3 +1,4 @@
+using HR.Modules.Leave;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.AwardToil;
 using HR.Modules.Leave.Persistence;
@@ -49,7 +50,7 @@ public class AwardToilHandlerTests
         context.EmployeeLeavePolicyAssignments.Add(assignment);
         await context.SaveChangesAsync();
 
-        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(BuildRequest(companyId, employeeId, days: 0.5m), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -77,7 +78,7 @@ public class AwardToilHandlerTests
         context.EmployeeLeavePolicyAssignments.Add(assignment);
         await context.SaveChangesAsync();
 
-        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(BuildRequest(companyId, employeeId, days: 1m), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -106,7 +107,7 @@ public class AwardToilHandlerTests
         context.LeaveBalances.Add(existingBalance);
         await context.SaveChangesAsync();
 
-        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(BuildRequest(companyId, employeeId, days: 1m), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -120,7 +121,7 @@ public class AwardToilHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_No_Toil_Leave_Type()
     {
         await using var context = BuildContext();
-        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             BuildRequest(Guid.NewGuid(), Guid.NewGuid()),
@@ -141,7 +142,7 @@ public class AwardToilHandlerTests
         context.LeaveTypes.Add(leaveType);
         await context.SaveChangesAsync();
 
-        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             BuildRequest(companyId, Guid.NewGuid()),
             CancellationToken.None);
@@ -168,7 +169,7 @@ public class AwardToilHandlerTests
         context.LeaveBalances.Add(existingBalance);
         await context.SaveChangesAsync();
 
-        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         await handler.HandleAsync(BuildRequest(companyId, employeeId, days: 1m), CancellationToken.None);
 
         Assert.Equal(1, await context.LeaveBalances.CountAsync());
@@ -189,7 +190,7 @@ public class AwardToilHandlerTests
         context.EmployeeLeavePolicyAssignments.Add(assignment);
         await context.SaveChangesAsync();
 
-        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             new AwardToilRequest
             {
@@ -220,12 +221,65 @@ public class AwardToilHandlerTests
         context.LeaveTypes.Add(leaveType);
         await context.SaveChangesAsync();
 
-        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             BuildRequest(companyId, Guid.NewGuid()),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_LeaveBalanceAdjusted_And_ToilAwarded_AuditEvents()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var awardedById = Guid.NewGuid();
+        var occurredOn = new DateOnly(2026, 6, 10);
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = CreateToilLeaveType(companyId, now);
+        var assignment = CreateAssignment(companyId, employeeId, now);
+        context.LeaveTypes.Add(leaveType);
+        context.EmployeeLeavePolicyAssignments.Add(assignment);
+        await context.SaveChangesAsync();
+
+        var auditPublisher = new CapturingAuditEventPublisher();
+        var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), auditPublisher);
+        var result = await handler.HandleAsync(
+            new AwardToilRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                AwardedByEmployeeId = awardedById,
+                Days = 2m,
+                OccurredOn = occurredOn,
+                Notes = "Overtime on release"
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, auditPublisher.Published.Count);
+
+        var balanceAdjusted = Assert.IsType<LeaveBalanceAdjustedAuditEvent>(auditPublisher.Published[0]);
+        Assert.Equal(companyId, balanceAdjusted.CompanyId);
+        Assert.Equal(employeeId, balanceAdjusted.EmployeeId);
+        Assert.Equal(leaveType.Id, balanceAdjusted.LeaveTypeId);
+        Assert.Equal(2m, balanceAdjusted.AdjustmentDays);
+        Assert.Equal(2m, balanceAdjusted.NewRemainingDays);
+        Assert.Equal(awardedById, balanceAdjusted.AdjustedByEmployeeId);
+        Assert.Equal(new DateTimeOffset(FixedUtcNow, TimeSpan.Zero), balanceAdjusted.OccurredAt);
+
+        var toilAwarded = Assert.IsType<ToilAwardedAuditEvent>(auditPublisher.Published[1]);
+        Assert.Equal(companyId, toilAwarded.CompanyId);
+        Assert.Equal(employeeId, toilAwarded.EmployeeId);
+        Assert.Equal(result.Value!.TransactionId, toilAwarded.TransactionId);
+        Assert.Equal(awardedById, toilAwarded.AwardedByEmployeeId);
+        Assert.Equal(2m, toilAwarded.Days);
+        Assert.Equal(occurredOn, toilAwarded.OccurredOn);
+        Assert.Equal("Overtime on release", toilAwarded.Notes);
+        Assert.Equal(new DateTimeOffset(FixedUtcNow, TimeSpan.Zero), toilAwarded.OccurredAt);
     }
 }

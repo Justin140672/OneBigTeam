@@ -1,3 +1,4 @@
+using HR.Modules.Leave;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.CancelLeaveRequest;
 using HR.Modules.Leave.Persistence;
@@ -38,7 +39,7 @@ public class CancelLeaveRequestHandlerTests
         await context.SaveChangesAsync();
 
         var cancelTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(cancelTime), new FakeCompanyLeaveSettingsReader());
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(cancelTime), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -69,7 +70,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -87,7 +88,7 @@ public class CancelLeaveRequestHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Request_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
@@ -113,7 +114,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -140,7 +141,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -167,7 +168,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -194,7 +195,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -233,7 +234,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -273,7 +274,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -303,7 +304,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -345,7 +346,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -391,7 +392,7 @@ public class CancelLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance2025);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             new CancelLeaveRequestRequest
             {
@@ -406,5 +407,42 @@ public class CancelLeaveRequestHandlerTests
         var savedBalance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(0m, savedBalance.UsedDays);
         Assert.Equal(4m, savedBalance.RemainingDays); // 2025 balance fully restored
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_LeaveCancelledAuditEvent()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveRequest = CreatePendingRequest(companyId, employeeId, now);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        var auditPublisher = new CapturingAuditEventPublisher();
+        var cancelTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(cancelTime), new FakeCompanyLeaveSettingsReader(), auditPublisher);
+        await handler.HandleAsync(
+            new CancelLeaveRequestRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                LeaveRequestId = leaveRequest.Id
+            },
+            CancellationToken.None);
+
+        var auditEvt = Assert.Single(auditPublisher.Published);
+        var auditEvent = Assert.IsType<LeaveCancelledAuditEvent>(auditEvt);
+        Assert.Equal(companyId, auditEvent.CompanyId);
+        Assert.Equal(employeeId, auditEvent.EmployeeId);
+        Assert.Equal(leaveRequest.Id, auditEvent.LeaveRequestId);
+        Assert.Equal(leaveRequest.LeaveTypeId, auditEvent.LeaveTypeId);
+        Assert.Equal(new DateOnly(2026, 8, 3), auditEvent.StartDate);
+        Assert.Equal(new DateOnly(2026, 8, 7), auditEvent.EndDate);
+        Assert.Equal(5m, auditEvent.TotalDays);
+        Assert.Equal("Pending", auditEvent.PreviousStatus);
+        Assert.Equal(new DateTimeOffset(cancelTime, TimeSpan.Zero), auditEvent.OccurredAt);
     }
 }

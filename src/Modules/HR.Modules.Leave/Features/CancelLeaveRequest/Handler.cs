@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.CancelLeaveRequest;
 
-internal sealed class CancelLeaveRequestHandler(LeaveDbContext dbContext, IClock clock, ICompanyLeaveSettingsReader leaveSettingsReader)
+internal sealed class CancelLeaveRequestHandler(LeaveDbContext dbContext, IClock clock, ICompanyLeaveSettingsReader leaveSettingsReader, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<CancelLeaveRequestResponse>> HandleAsync(
         CancelLeaveRequestRequest request,
@@ -27,6 +27,7 @@ internal sealed class CancelLeaveRequestHandler(LeaveDbContext dbContext, IClock
                 Error.Validation($"Cannot cancel a leave request with status '{leaveRequest.Status}'."));
 
         var now = clock.UtcNowOffset();
+        var previousStatus = leaveRequest.Status.ToString();
 
         if (leaveRequest.Status == LeaveRequestStatus.Approved)
         {
@@ -67,6 +68,17 @@ internal sealed class CancelLeaveRequestHandler(LeaveDbContext dbContext, IClock
 
         leaveRequest.Cancel(now);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new LeaveCancelledAuditEvent(
+            leaveRequest.CompanyId,
+            leaveRequest.EmployeeId,
+            leaveRequest.Id,
+            leaveRequest.LeaveTypeId,
+            leaveRequest.StartDate,
+            leaveRequest.EndDate,
+            leaveRequest.TotalDays,
+            previousStatus,
+            now), cancellationToken);
 
         return Result.Success(new CancelLeaveRequestResponse(
             leaveRequest.Id,

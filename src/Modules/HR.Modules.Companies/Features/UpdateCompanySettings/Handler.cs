@@ -11,12 +11,12 @@ internal sealed class UpdateCompanySettingsHandler
 {
 	private readonly CompaniesDbContext _dbContext;
 	private readonly IClock _clock;
-	private readonly ICompanyAuditEventPublisher _auditEventPublisher;
+	private readonly IAuditEventPublisher _auditEventPublisher;
 
 	public UpdateCompanySettingsHandler(
 		CompaniesDbContext dbContext,
 		IClock clock,
-		ICompanyAuditEventPublisher auditEventPublisher)
+		IAuditEventPublisher auditEventPublisher)
 	{
 		_dbContext = dbContext;
 		_clock = clock;
@@ -86,7 +86,7 @@ internal sealed class UpdateCompanySettingsHandler
 		_dbContext.OutboxMessages.Add(outboxMessage);
 		await _dbContext.SaveChangesAsync(cancellationToken);
 
-		await _auditEventPublisher.PublishCompanySettingsUpdatedAsync(
+		await _auditEventPublisher.PublishAsync(
 			new CompanySettingsUpdatedAuditEvent(
 				company.Id,
 				null,

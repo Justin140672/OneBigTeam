@@ -62,7 +62,7 @@ public static class LeaveModule
         services.AddScoped<IValidator<RejectLeaveRequestRequest>, RejectLeaveRequestValidator>();
         services.AddScoped<AwardToilHandler>();
         services.AddScoped<IValidator<AwardToilRequest>, AwardToilValidator>();
-        services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
+services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddScoped<CreatePublicHolidayHandler>();
         services.AddScoped<IValidator<CreatePublicHolidayRequest>, CreatePublicHolidayValidator>();
         services.AddScoped<ListPublicHolidaysHandler>();

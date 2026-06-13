@@ -62,7 +62,7 @@ public class LeaveYearHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new SubmitLeaveRequestHandler(context, new FakeClock(JanuaryClockUtc),
-            new FakeWorkingPatternProvider(), AprilStartSettings, new NoOpIntegrationEventPublisher());
+            new FakeWorkingPatternProvider(), AprilStartSettings, new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new SubmitLeaveRequestRequest
         {
@@ -101,7 +101,7 @@ public class LeaveYearHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new SubmitLeaveRequestHandler(context, new FakeClock(JanuaryClockUtc),
-            new FakeWorkingPatternProvider(), AprilStartSettings, new NoOpIntegrationEventPublisher());
+            new FakeWorkingPatternProvider(), AprilStartSettings, new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new SubmitLeaveRequestRequest
         {
@@ -143,7 +143,7 @@ public class LeaveYearHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new ApproveLeaveRequestHandler(context, new FakeClock(JanuaryClockUtc),
-            new NoOpIntegrationEventPublisher(), AprilStartSettings);
+            new NoOpIntegrationEventPublisher(), AprilStartSettings, new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new ApproveLeaveRequestRequest
         {
@@ -185,7 +185,7 @@ public class LeaveYearHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new CancelLeaveRequestHandler(context, new FakeClock(JanuaryClockUtc), AprilStartSettings);
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(JanuaryClockUtc), AprilStartSettings, new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new CancelLeaveRequestRequest
         {
@@ -227,7 +227,7 @@ public class LeaveYearHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new RejectLeaveRequestHandler(context, new FakeClock(JanuaryClockUtc),
-            new NoOpIntegrationEventPublisher(), AprilStartSettings);
+            new NoOpIntegrationEventPublisher(), AprilStartSettings, new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new RejectLeaveRequestRequest
         {

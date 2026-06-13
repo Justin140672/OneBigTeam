@@ -25,7 +25,7 @@ public class UpdateCompanySettingsHandlerTests
 		var handler = new UpdateCompanySettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
-			new LoggerCompanyAuditEventPublisher(Microsoft.Extensions.Logging.Abstractions.NullLogger<LoggerCompanyAuditEventPublisher>.Instance));
+			new NoOpAuditEventPublisher());
 
 		var result = await handler.HandleAsync(
 			new UpdateCompanySettingsRequest
@@ -78,7 +78,7 @@ public class UpdateCompanySettingsHandlerTests
 		var handler = new UpdateCompanySettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
-			new LoggerCompanyAuditEventPublisher(Microsoft.Extensions.Logging.Abstractions.NullLogger<LoggerCompanyAuditEventPublisher>.Instance));
+			new NoOpAuditEventPublisher());
 
 		var result = await handler.HandleAsync(
 			new UpdateCompanySettingsRequest
@@ -116,7 +116,7 @@ public class UpdateCompanySettingsHandlerTests
 		var handler = new UpdateCompanySettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 12, 11, 0, 0, DateTimeKind.Utc)),
-			new LoggerCompanyAuditEventPublisher(Microsoft.Extensions.Logging.Abstractions.NullLogger<LoggerCompanyAuditEventPublisher>.Instance));
+			new NoOpAuditEventPublisher());
 
 		var result = await handler.HandleAsync(
 			new UpdateCompanySettingsRequest
@@ -139,6 +139,55 @@ public class UpdateCompanySettingsHandlerTests
 
 		var savedSettings = await context.CompanySettings.SingleAsync();
 		Assert.Equal(excludePublicHolidays, savedSettings.ExcludePublicHolidaysFromLeave);
+	}
+
+	[Fact]
+	public async Task HandleAsync_Publishes_CompanySettingsUpdatedAuditEvent()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", "acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var auditPublisher = new CapturingAuditEventPublisher();
+		var updateTime = new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc);
+		var handler = new UpdateCompanySettingsHandler(context, new FakeClock(updateTime), auditPublisher);
+
+		await handler.HandleAsync(
+			new UpdateCompanySettingsRequest
+			{
+				Id = company.Id,
+				TimeZone = "Europe/London",
+				Locale = "en-GB",
+				WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+				              WorkingDays.Thursday | WorkingDays.Friday,
+				HoursPerDay = 7.5m,
+				LeaveYearStartMonth = 4,
+				DefaultHolidayAllowance = 28,
+				ProbationMonths = 3,
+				ExcludePublicHolidaysFromLeave = true
+			},
+			CancellationToken.None);
+
+		var auditEvt = Assert.Single(auditPublisher.Published);
+		var auditEvent = Assert.IsType<CompanySettingsUpdatedAuditEvent>(auditEvt);
+		Assert.Equal(company.Id, auditEvent.CompanyId);
+		Assert.Null(auditEvent.ActorId);
+		Assert.Equal(new DateTimeOffset(updateTime, TimeSpan.Zero), auditEvent.OccurredAt);
+
+		Assert.NotNull(auditEvent.PreviousSettings);
+		Assert.Equal("UTC", auditEvent.PreviousSettings!.TimeZone);
+		Assert.Equal(1, auditEvent.PreviousSettings.LeaveYearStartMonth);
+
+		Assert.Equal("Europe/London", auditEvent.CurrentSettings.TimeZone);
+		Assert.Equal("en-GB", auditEvent.CurrentSettings.Locale);
+		Assert.Equal(4, auditEvent.CurrentSettings.LeaveYearStartMonth);
+		Assert.Equal(28m, auditEvent.CurrentSettings.DefaultHolidayAllowance);
+		Assert.Equal(3, auditEvent.CurrentSettings.ProbationMonths);
+		Assert.True(auditEvent.CurrentSettings.ExcludePublicHolidaysFromLeave);
 	}
 
 	private static CompaniesDbContext BuildContext()

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.ApproveLeaveRequest;
 
-internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, IClock clock, IIntegrationEventPublisher publisher, ICompanyLeaveSettingsReader leaveSettingsReader)
+internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, IClock clock, IIntegrationEventPublisher publisher, ICompanyLeaveSettingsReader leaveSettingsReader, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<ApproveLeaveRequestResponse>> HandleAsync(
         ApproveLeaveRequestRequest request,
@@ -63,6 +63,17 @@ internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, ICloc
         leaveRequest.Approve(request.ReviewedByEmployeeId, now);
         balance?.RecordUsage(leaveRequest.TotalDays, now);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new LeaveApprovedAuditEvent(
+            leaveRequest.CompanyId,
+            leaveRequest.EmployeeId,
+            leaveRequest.Id,
+            leaveRequest.LeaveTypeId,
+            leaveRequest.StartDate,
+            leaveRequest.EndDate,
+            leaveRequest.TotalDays,
+            request.ReviewedByEmployeeId,
+            now), cancellationToken);
 
         await publisher.PublishAsync(new LeaveApprovedIntegrationEvent(
             leaveRequest.CompanyId,

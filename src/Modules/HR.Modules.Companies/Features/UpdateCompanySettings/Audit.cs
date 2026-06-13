@@ -1,5 +1,4 @@
 using HR.SharedKernel;
-using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Companies.Features.UpdateCompanySettings;
 
@@ -18,30 +17,16 @@ internal sealed record CompanySettingsUpdatedAuditEvent(
     string? ActorId,
     DateTimeOffset OccurredAt,
     CompanySettingsAuditSnapshot? PreviousSettings,
-    CompanySettingsAuditSnapshot CurrentSettings);
-
-internal interface ICompanyAuditEventPublisher
+    CompanySettingsAuditSnapshot CurrentSettings) : IAuditEvent
 {
-    Task PublishCompanySettingsUpdatedAsync(
-        CompanySettingsUpdatedAuditEvent auditEvent,
-        CancellationToken cancellationToken);
-}
-
-internal sealed class LoggerCompanyAuditEventPublisher(
-    ILogger<LoggerCompanyAuditEventPublisher> logger) : ICompanyAuditEventPublisher
-{
-    public Task PublishCompanySettingsUpdatedAsync(
-        CompanySettingsUpdatedAuditEvent auditEvent,
-        CancellationToken cancellationToken)
-    {
-        logger.LogInformation(
-            "AuditEvent company.settings.updated: CompanyId={CompanyId}, ActorId={ActorId}, OccurredAt={OccurredAt}, Previous={Previous}, Current={Current}",
-            auditEvent.CompanyId,
-            auditEvent.ActorId,
-            auditEvent.OccurredAt,
-            auditEvent.PreviousSettings,
-            auditEvent.CurrentSettings);
-
-        return Task.CompletedTask;
-    }
+    string IAuditEvent.EventType => "company-settings.updated";
+    string IAuditEvent.EntityType => "CompanySettings";
+    Guid IAuditEvent.EntityId => CompanyId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Company settings updated";
+    object? IAuditEvent.Before => PreviousSettings;
+    object? IAuditEvent.After => CurrentSettings;
+    object? IAuditEvent.Metadata => null;
 }

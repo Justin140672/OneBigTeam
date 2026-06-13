@@ -1,3 +1,4 @@
+using HR.Modules.Leave;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.RejectLeaveRequest;
 using HR.Modules.Leave.Persistence;
@@ -51,7 +52,7 @@ public class RejectLeaveRequestHandlerTests
         await context.SaveChangesAsync();
 
         var rejectionTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(rejectionTime), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(rejectionTime), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, reviewerId, "Team at capacity"),
             CancellationToken.None);
@@ -80,7 +81,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -94,7 +95,7 @@ public class RejectLeaveRequestHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Request_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(
             RejectRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
@@ -115,7 +116,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, Guid.NewGuid(), leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -138,7 +139,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, reviewerId, "Approved in error"),
             CancellationToken.None);
@@ -173,7 +174,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid(), "Approved in error"),
             CancellationToken.None);
@@ -208,7 +209,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -233,7 +234,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyB, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -256,7 +257,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, reviewerId),
             CancellationToken.None);
@@ -278,7 +279,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -300,7 +301,7 @@ public class RejectLeaveRequestHandlerTests
         context.LeaveRequests.Add(leaveRequest);
         await context.SaveChangesAsync();
 
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
             CancellationToken.None);
@@ -328,7 +329,7 @@ public class RejectLeaveRequestHandlerTests
 
         var publisher = new CapturingIntegrationEventPublisher();
         var rejectionTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
-        var handler = new RejectLeaveRequestHandler(context, new FakeClock(rejectionTime), publisher, new FakeCompanyLeaveSettingsReader());
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(rejectionTime), publisher, new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         await handler.HandleAsync(
             RejectRequest(companyId, employeeId, leaveRequest.Id, reviewerId, "No capacity"),
             CancellationToken.None);
@@ -345,5 +346,37 @@ public class RejectLeaveRequestHandlerTests
         Assert.Equal(reviewerId, rejected.ReviewedByEmployeeId);
         Assert.Equal("No capacity", rejected.RejectionReason);
         Assert.Equal(new DateTimeOffset(rejectionTime, TimeSpan.Zero), rejected.OccurredAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_LeaveRejectedAuditEvent()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var reviewerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveRequest = CreatePendingRequest(companyId, employeeId, now);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        var auditPublisher = new CapturingAuditEventPublisher();
+        var rejectionTime = new DateTime(2026, 6, 13, 10, 0, 0, DateTimeKind.Utc);
+        var handler = new RejectLeaveRequestHandler(context, new FakeClock(rejectionTime), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), auditPublisher);
+        await handler.HandleAsync(RejectRequest(companyId, employeeId, leaveRequest.Id, reviewerId, "No capacity"), CancellationToken.None);
+
+        var auditEvt = Assert.Single(auditPublisher.Published);
+        var auditEvent = Assert.IsType<LeaveRejectedAuditEvent>(auditEvt);
+        Assert.Equal(companyId, auditEvent.CompanyId);
+        Assert.Equal(employeeId, auditEvent.EmployeeId);
+        Assert.Equal(leaveRequest.Id, auditEvent.LeaveRequestId);
+        Assert.Equal(leaveRequest.LeaveTypeId, auditEvent.LeaveTypeId);
+        Assert.Equal(new DateOnly(2026, 8, 3), auditEvent.StartDate);
+        Assert.Equal(new DateOnly(2026, 8, 7), auditEvent.EndDate);
+        Assert.Equal(5m, auditEvent.TotalDays);
+        Assert.Equal(reviewerId, auditEvent.ReviewedByEmployeeId);
+        Assert.Equal("No capacity", auditEvent.RejectionReason);
+        Assert.Equal(new DateTimeOffset(rejectionTime, TimeSpan.Zero), auditEvent.OccurredAt);
     }
 }

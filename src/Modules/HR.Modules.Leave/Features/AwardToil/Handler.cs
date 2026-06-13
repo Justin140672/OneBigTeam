@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.AwardToil;
 
-internal sealed class AwardToilHandler(LeaveDbContext dbContext, IClock clock, ICompanyLeaveSettingsReader leaveSettingsReader)
+internal sealed class AwardToilHandler(LeaveDbContext dbContext, IClock clock, ICompanyLeaveSettingsReader leaveSettingsReader, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<AwardToilResponse>> HandleAsync(
         AwardToilRequest request,
@@ -73,6 +73,28 @@ internal sealed class AwardToilHandler(LeaveDbContext dbContext, IClock clock, I
 
         dbContext.ToilTransactions.Add(transaction);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new LeaveBalanceAdjustedAuditEvent(
+            balance.CompanyId,
+            balance.EmployeeId,
+            balance.LeaveTypeId,
+            balance.Id,
+            balance.PolicyYear,
+            request.Days,
+            balance.RemainingDays,
+            request.AwardedByEmployeeId,
+            now), cancellationToken);
+
+        await auditPublisher.PublishAsync(new ToilAwardedAuditEvent(
+            transaction.CompanyId,
+            transaction.EmployeeId,
+            transaction.Id,
+            transaction.LeaveBalanceId,
+            transaction.AwardedByEmployeeId,
+            transaction.Days,
+            transaction.OccurredOn,
+            transaction.Notes,
+            now), cancellationToken);
 
         return Result.Success(new AwardToilResponse(
             transaction.Id,

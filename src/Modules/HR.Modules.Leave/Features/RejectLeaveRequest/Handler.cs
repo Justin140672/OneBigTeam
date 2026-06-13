@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.RejectLeaveRequest;
 
-internal sealed class RejectLeaveRequestHandler(LeaveDbContext dbContext, IClock clock, IIntegrationEventPublisher publisher, ICompanyLeaveSettingsReader leaveSettingsReader)
+internal sealed class RejectLeaveRequestHandler(LeaveDbContext dbContext, IClock clock, IIntegrationEventPublisher publisher, ICompanyLeaveSettingsReader leaveSettingsReader, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<RejectLeaveRequestResponse>> HandleAsync(
         RejectLeaveRequestRequest request,
@@ -46,6 +46,18 @@ internal sealed class RejectLeaveRequestHandler(LeaveDbContext dbContext, IClock
 
         leaveRequest.Reject(request.ReviewedByEmployeeId, now, request.RejectionReason);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new LeaveRejectedAuditEvent(
+            leaveRequest.CompanyId,
+            leaveRequest.EmployeeId,
+            leaveRequest.Id,
+            leaveRequest.LeaveTypeId,
+            leaveRequest.StartDate,
+            leaveRequest.EndDate,
+            leaveRequest.TotalDays,
+            request.ReviewedByEmployeeId,
+            request.RejectionReason,
+            now), cancellationToken);
 
         await publisher.PublishAsync(new LeaveRejectedIntegrationEvent(
             leaveRequest.CompanyId,
