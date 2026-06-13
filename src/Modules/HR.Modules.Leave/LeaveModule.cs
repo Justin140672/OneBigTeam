@@ -8,6 +8,7 @@ using HR.Modules.Leave.Features.ListPublicHolidays;
 using HR.Modules.Leave.Features.UpdatePublicHoliday;
 using HR.Modules.Leave.Features.RejectLeaveRequest;
 using HR.Modules.Leave.Features.CreateLeavePolicy;
+using HR.Modules.Leave.Features.UpdateLeavePolicy;
 using HR.Modules.Leave.Features.GetEmployeeLeaveBalance;
 using HR.Modules.Leave.Features.GetLeavePolicy;
 using HR.Modules.Leave.Features.SubmitLeaveRequest;
@@ -38,6 +39,8 @@ public static class LeaveModule
     {
         services.AddScoped<CreateLeavePolicyHandler>();
         services.AddScoped<IValidator<CreateLeavePolicyRequest>, CreateLeavePolicyValidator>();
+        services.AddScoped<UpdateLeavePolicyHandler>();
+        services.AddScoped<IValidator<UpdateLeavePolicyRequest>, UpdateLeavePolicyValidator>();
         services.AddScoped<GetLeavePolicyHandler>();
         services.AddScoped<AssignLeavePolicyToEmployeeHandler>();
         services.AddScoped<IValidator<AssignLeavePolicyToEmployeeRequest>, AssignLeavePolicyToEmployeeValidator>();
