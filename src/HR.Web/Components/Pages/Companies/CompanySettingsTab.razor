@@ -18,7 +18,13 @@
                     }
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
+                <SfNumericTextBox TValue="decimal" @bind-Value="Model.HoursPerDay"
+                                  Placeholder="Hours Per Day"
+                                  FloatLabelType="FloatLabelType.Auto"
+                                  Min="0.5m" Max="24m" Step="0.5m" />
+            </div>
+            <div class="col-md-3">
                 <label class="form-label fw-semibold">Leave Year Start Month</label>
                 <SfDropDownList TValue="int" TItem="MonthItem"
                                 @bind-Value="Model.LeaveYearStartMonth"
@@ -27,17 +33,22 @@
                     <DropDownListFieldSettings Value="Number" Text="Name" />
                 </SfDropDownList>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <SfNumericTextBox TValue="decimal" @bind-Value="Model.DefaultHolidayAllowance"
                                   Placeholder="Default Holiday Allowance (days)"
                                   FloatLabelType="FloatLabelType.Auto"
                                   Min="0" Max="365" />
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <SfNumericTextBox TValue="int" @bind-Value="Model.ProbationMonths"
                                   Placeholder="Probation Months"
                                   FloatLabelType="FloatLabelType.Auto"
                                   Min="0" Max="24" />
+            </div>
+            <div class="col-12">
+                <SfCheckBox TChecked="bool" Label="Exclude public holidays from leave"
+                            Checked="@Model.ExcludePublicHolidaysFromLeave"
+                            CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromLeave = v)" />
             </div>
         </div>
     </div>

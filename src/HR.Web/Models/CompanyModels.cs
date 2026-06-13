@@ -1,3 +1,5 @@
+using HR.SharedKernel;
+
 namespace HR.Web.Models;
 
 // ── GET ──────────────────────────────────────────────────────────────────────
@@ -51,19 +53,23 @@ public record UpdateCompanySettingsRequest(
     Guid Id,
     string? TimeZone,
     string? Locale,
-    List<string> WorkingWeek,
+    WorkingDays WorkingDays,
+    decimal HoursPerDay,
     int LeaveYearStartMonth,
     decimal DefaultHolidayAllowance,
-    int ProbationMonths);
+    int ProbationMonths,
+    bool ExcludePublicHolidaysFromLeave);
 
 public record UpdateCompanySettingsResponse(
     Guid CompanyId,
     string? TimeZone,
     string? Locale,
-    List<string> WorkingWeek,
+    WorkingDays WorkingDays,
+    decimal HoursPerDay,
     int LeaveYearStartMonth,
     decimal DefaultHolidayAllowance,
     int ProbationMonths,
+    bool ExcludePublicHolidaysFromLeave,
     DateTime UpdatedAt);
 
 // ── LOGO UPLOAD ───────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 @page "/companies/{Id:guid}/edit"
 @rendermode InteractiveServer
 @inject CompanyService CompanyService
+@using HR.SharedKernel
 
 <PageTitle>Edit Company</PageTitle>
 
@@ -119,10 +120,15 @@
                 a.Type, a.Line1, a.Line2, a.City, a.Region, a.PostalCode, a.CountryCode)).ToList(),
             new UpdateCompanyBrandingRequest(_branding.PrimaryColor, _branding.SecondaryColor, _branding.AccentColor));
 
+        var workingDays = _settings.WorkingWeek
+            .Aggregate(WorkingDays.None, (acc, day) =>
+                Enum.TryParse<WorkingDays>(day, out var wd) ? acc | wd : acc);
+
         var settingsReq = new UpdateCompanySettingsRequest(
             Id, _settings.TimeZone, _settings.Locale,
-            [.. _settings.WorkingWeek],
-            _settings.LeaveYearStartMonth, _settings.DefaultHolidayAllowance, _settings.ProbationMonths);
+            workingDays, _settings.HoursPerDay,
+            _settings.LeaveYearStartMonth, _settings.DefaultHolidayAllowance,
+            _settings.ProbationMonths, _settings.ExcludePublicHolidaysFromLeave);
 
         var companyResult = await CompanyService.UpdateCompanyAsync(Id, profileReq);
         var settingsResult = await CompanyService.UpdateCompanySettingsAsync(Id, settingsReq);

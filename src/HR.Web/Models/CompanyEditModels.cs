@@ -24,12 +24,15 @@ public sealed class CompanySettingsEditModel
     public string? TimeZone { get; set; }
     public string? Locale { get; set; }
     public HashSet<string> WorkingWeek { get; set; } = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+    [Range(0.5, 24)]
+    public decimal HoursPerDay { get; set; } = 7.5m;
     [Range(1, 12)]
     public int LeaveYearStartMonth { get; set; } = 1;
     [Range(0, 365)]
     public decimal DefaultHolidayAllowance { get; set; } = 25;
     [Range(0, 24)]
     public int ProbationMonths { get; set; } = 3;
+    public bool ExcludePublicHolidaysFromLeave { get; set; } = true;
 }
 
 public sealed class CompanyBrandingEditModel
