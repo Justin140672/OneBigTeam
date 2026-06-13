@@ -1,6 +1,8 @@
+using HR.Modules.Identity.Authorization;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.SharedKernel;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,7 +21,8 @@ public static class IdentityModule
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
         services.AddScoped<ICurrentTenant, HttpContextCurrentTenant>();
-        services.AddScoped<IAuthorizationService, IdentityAuthorizationService>();
+        services.AddScoped<HR.SharedKernel.IAuthorizationService, IdentityAuthorizationService>();
+        services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, RoleAuthorizationHandler>();
         services.AddSingleton<IClock, SystemClock>();
 
         return services;
@@ -31,6 +34,50 @@ public static class IdentityModule
         app.UseMiddleware<RequireTenantMiddleware>();
         return app;
     }
+
+    public static AuthorizationBuilder AddRolePolicies(this AuthorizationBuilder builder)
+    {
+        // Individual role policies
+        builder.AddPolicy("role:employee",             RolePolicy(SystemRoles.Employee));
+        builder.AddPolicy("role:manager",              RolePolicy(SystemRoles.Manager));
+        builder.AddPolicy("role:recruiter",            RolePolicy(SystemRoles.Recruiter));
+        builder.AddPolicy("role:hr-administrator",     RolePolicy(SystemRoles.HrAdministrator));
+        builder.AddPolicy("role:finance",              RolePolicy(SystemRoles.Finance));
+        builder.AddPolicy("role:company-administrator",RolePolicy(SystemRoles.CompanyAdministrator));
+
+        // Employee domain policies — match spec section 12/13
+        builder.AddPolicy("employee:manage", RolePolicy(
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
+        // Company domain policies — match spec section 24
+        builder.AddPolicy("company:manage", RolePolicy(
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
+        // Leave domain composite policies — match spec section 14
+        builder.AddPolicy("leave:request", RolePolicy(
+            SystemRoles.Employee,
+            SystemRoles.Manager,
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
+        builder.AddPolicy("leave:approve", RolePolicy(
+            SystemRoles.Manager,
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
+        builder.AddPolicy("leave:manage", RolePolicy(
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
+        return builder;
+    }
+
+    private static Action<AuthorizationPolicyBuilder> RolePolicy(params Guid[] roleIds) =>
+        policy => policy
+            .RequireAuthenticatedUser()
+            .AddRequirements(new RoleRequirement(roleIds.ToHashSet()));
 
     public static async Task MigrateIdentityAsync(this IServiceProvider services)
     {

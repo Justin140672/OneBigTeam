@@ -1,16 +1,28 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
 public class ListDepartmentsEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
+    private static readonly Guid AdminUserId = new("11111111-0000-0000-0000-000000000001");
 
     public ListDepartmentsEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator))
+            .GetAwaiter().GetResult();
+    }
+
+    private HttpClient AdminClient(Guid companyId)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        return client;
     }
 
     [Fact]
@@ -26,10 +38,8 @@ public class ListDepartmentsEndpointTests : IClassFixture<ApiWebApplicationFacto
     [Fact]
     public async Task Get_Departments_Returns_Empty_List_When_None_Exist()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "list-dept-user-1");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AdminClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/departments");
 
@@ -43,12 +53,9 @@ public class ListDepartmentsEndpointTests : IClassFixture<ApiWebApplicationFacto
     [Fact]
     public async Task Get_Departments_Returns_Created_Departments()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "list-dept-user-2");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AdminClient(companyId);
 
-        // Create two departments
         var createEng = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
         {
             companyId,
@@ -64,7 +71,6 @@ public class ListDepartmentsEndpointTests : IClassFixture<ApiWebApplicationFacto
         });
         createPeople.EnsureSuccessStatusCode();
 
-        // List them back
         var response = await client.GetAsync($"/api/companies/{companyId}/departments");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -72,8 +78,6 @@ public class ListDepartmentsEndpointTests : IClassFixture<ApiWebApplicationFacto
         var payload = await response.Content.ReadFromJsonAsync<DepartmentsListPayload>();
         Assert.NotNull(payload);
         Assert.Equal(2, payload!.Items.Count);
-
-        // Should be sorted alphabetically
         Assert.Equal("Engineering", payload.Items[0].Name);
         Assert.Equal("People", payload.Items[1].Name);
         Assert.All(payload.Items, item => Assert.True(item.IsActive));
@@ -82,25 +86,18 @@ public class ListDepartmentsEndpointTests : IClassFixture<ApiWebApplicationFacto
     [Fact]
     public async Task Get_Departments_Scopes_To_Company()
     {
-        using var client = _factory.CreateClient();
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        // Create in company A
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "list-dept-user-3");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyA.ToString());
-        var create = await client.PostAsJsonAsync($"/api/companies/{companyA}/departments", new
+        using var clientA = AdminClient(companyA);
+        var create = await clientA.PostAsJsonAsync($"/api/companies/{companyA}/departments", new
         {
             companyId = companyA,
             name = "Engineering"
         });
         create.EnsureSuccessStatusCode();
 
-        // List from company B (different client to avoid conflicting headers)
-        using var clientB = _factory.CreateClient();
-        clientB.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "list-dept-user-4");
-        clientB.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyB.ToString());
-
+        using var clientB = AdminClient(companyB);
         var response = await clientB.GetAsync($"/api/companies/{companyB}/departments");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

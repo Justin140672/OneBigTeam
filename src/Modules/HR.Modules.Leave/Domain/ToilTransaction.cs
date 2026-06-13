@@ -8,6 +8,7 @@ internal sealed class ToilTransaction
     public Guid CompanyId { get; private set; }
     public Guid EmployeeId { get; private set; }
     public Guid LeaveBalanceId { get; private set; }
+    public Guid AwardedByEmployeeId { get; private set; }
     public decimal Days { get; private set; }
     public DateOnly OccurredOn { get; private set; }
     public string? Notes { get; private set; }
@@ -19,6 +20,7 @@ internal sealed class ToilTransaction
         Guid companyId,
         Guid employeeId,
         Guid leaveBalanceId,
+        Guid awardedByEmployeeId,
         decimal days,
         DateOnly occurredOn,
         string? notes,
@@ -30,6 +32,7 @@ internal sealed class ToilTransaction
             CompanyId = companyId,
             EmployeeId = employeeId,
             LeaveBalanceId = leaveBalanceId,
+            AwardedByEmployeeId = awardedByEmployeeId,
             Days = days,
             OccurredOn = occurredOn,
             Notes = notes,

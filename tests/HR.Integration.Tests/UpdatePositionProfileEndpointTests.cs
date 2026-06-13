@@ -1,16 +1,28 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
 public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
+    private static readonly Guid UserId = new("eeeeeeee-0000-0000-0000-000000000005");
 
     public UpdatePositionProfileEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator))
+            .GetAwaiter().GetResult();
+    }
+
+    private HttpClient AuthenticatedClient(Guid companyId)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        return client;
     }
 
     [Fact]
@@ -29,10 +41,8 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
     [Fact]
     public async Task Put_PositionProfile_Updates_Profile()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "upd-pp-user-1");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AuthenticatedClient(companyId);
 
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
@@ -66,10 +76,8 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
     [Fact]
     public async Task Put_PositionProfile_Returns_NotFound_For_Unknown_Id()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "upd-pp-user-2");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AuthenticatedClient(companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles/{Guid.NewGuid()}", new
@@ -86,10 +94,8 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
     [Fact]
     public async Task Put_PositionProfile_Returns_Conflict_For_Duplicate_Title()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "upd-pp-user-3");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AuthenticatedClient(companyId);
 
         var create1 = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
@@ -109,7 +115,6 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         var profileB = await create2.Content.ReadFromJsonAsync<PositionProfilePayload>();
         Assert.NotNull(profileB);
 
-        // Try to rename Profile B to Profile A
         var updateResponse = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles/{profileB!.Id}", new
             {
@@ -125,12 +130,9 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
     [Fact]
     public async Task Put_PositionProfile_Returns_NotFound_When_Profile_Belongs_To_Different_Company()
     {
-        using var client = _factory.CreateClient();
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
-
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "upd-pp-user-4");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyA.ToString());
+        using var client = AuthenticatedClient(companyA);
 
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyA}/position-profiles", new
         {
@@ -142,7 +144,6 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         var created = await createResponse.Content.ReadFromJsonAsync<PositionProfilePayload>();
         Assert.NotNull(created);
 
-        // Attempt update from company B's scope
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyB}/position-profiles/{created!.Id}", new
             {

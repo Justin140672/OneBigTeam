@@ -9,7 +9,7 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Delete("/api/companies/{companyId:guid}/employees/{employeeId:guid}/leave-requests/{leaveRequestId:guid}");
-        Policies("authenticated");
+        Policies("leave:request");
     }
 
     public override async Task HandleAsync(

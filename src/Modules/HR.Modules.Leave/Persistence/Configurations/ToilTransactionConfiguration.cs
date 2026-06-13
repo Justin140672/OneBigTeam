@@ -28,6 +28,10 @@ internal sealed class ToilTransactionConfiguration : IEntityTypeConfiguration<To
             .HasColumnName("leave_balance_id")
             .IsRequired();
 
+        builder.Property(t => t.AwardedByEmployeeId)
+            .HasColumnName("awarded_by_employee_id")
+            .IsRequired();
+
         builder.Property(t => t.Days)
             .HasColumnName("days")
             .HasColumnType("numeric(6,2)")

@@ -1,19 +1,19 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 
-namespace HR.Modules.Leave.Features.AssignLeavePolicyToEmployee;
+namespace HR.Modules.Leave.Features.AwardToil;
 
 internal sealed class Endpoint(
-    AssignLeavePolicyToEmployeeHandler handler) : Endpoint<AssignLeavePolicyToEmployeeRequest, AssignLeavePolicyToEmployeeResponse>
+    AwardToilHandler handler) : Endpoint<AwardToilRequest, AwardToilResponse>
 {
     public override void Configure()
     {
-        Put("/api/companies/{companyId:guid}/employees/{employeeId:guid}/leave-policy");
-        Policies("leave:manage");
+        Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/toil");
+        Policies("leave:approve");
     }
 
     public override async Task HandleAsync(
-        AssignLeavePolicyToEmployeeRequest request,
+        AwardToilRequest request,
         CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(request, cancellationToken);
@@ -32,6 +32,6 @@ internal sealed class Endpoint(
             return;
         }
 
-        await SendAsync(result.Value!, StatusCodes.Status200OK, cancellationToken);
+        await SendAsync(result.Value!, StatusCodes.Status201Created, cancellationToken);
     }
 }

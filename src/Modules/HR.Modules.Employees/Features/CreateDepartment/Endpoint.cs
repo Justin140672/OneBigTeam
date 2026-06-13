@@ -9,7 +9,7 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/departments");
-        Policies("authenticated");
+        Policies("employee:manage");
     }
 
     public override async Task HandleAsync(

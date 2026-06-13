@@ -9,7 +9,7 @@ internal sealed class Endpoint(PreviewLeaveRequestHandler handler)
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/leave-requests/preview");
-        Policies("authenticated");
+        Policies("leave:request");
     }
 
     public override async Task HandleAsync(

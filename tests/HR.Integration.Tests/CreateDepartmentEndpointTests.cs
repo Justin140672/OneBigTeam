@@ -1,16 +1,28 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
 public class CreateDepartmentEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
+    private static readonly Guid UserId = new("eeeeeeee-0000-0000-0000-000000000001");
 
     public CreateDepartmentEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator))
+            .GetAwaiter().GetResult();
+    }
+
+    private HttpClient AuthenticatedClient(Guid companyId)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        return client;
     }
 
     [Fact]
@@ -29,10 +41,8 @@ public class CreateDepartmentEndpointTests : IClassFixture<ApiWebApplicationFact
     [Fact]
     public async Task Post_Departments_Creates_Department()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "dept-user-1");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AuthenticatedClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
         {
@@ -57,10 +67,8 @@ public class CreateDepartmentEndpointTests : IClassFixture<ApiWebApplicationFact
     [Fact]
     public async Task Post_Departments_Creates_Department_With_Parent()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "dept-user-2");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AuthenticatedClient(companyId);
 
         var parentResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
         {
@@ -88,10 +96,8 @@ public class CreateDepartmentEndpointTests : IClassFixture<ApiWebApplicationFact
     [Fact]
     public async Task Post_Departments_Returns_Conflict_For_Duplicate_Name()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "dept-user-3");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AuthenticatedClient(companyId);
 
         var first = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
         {
@@ -112,10 +118,8 @@ public class CreateDepartmentEndpointTests : IClassFixture<ApiWebApplicationFact
     [Fact]
     public async Task Post_Departments_Returns_NotFound_For_Unknown_Parent()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "dept-user-4");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AuthenticatedClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
         {

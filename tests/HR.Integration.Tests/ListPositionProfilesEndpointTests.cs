@@ -1,16 +1,28 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
 public class ListPositionProfilesEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
+    private static readonly Guid AdminUserId = new("22222222-0000-0000-0000-000000000001");
 
     public ListPositionProfilesEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator))
+            .GetAwaiter().GetResult();
+    }
+
+    private HttpClient AdminClient(Guid companyId)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        return client;
     }
 
     [Fact]
@@ -26,10 +38,8 @@ public class ListPositionProfilesEndpointTests : IClassFixture<ApiWebApplication
     [Fact]
     public async Task Get_PositionProfiles_Returns_Empty_List_When_None_Exist()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "list-pp-user-1");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AdminClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/position-profiles");
 
@@ -43,10 +53,8 @@ public class ListPositionProfilesEndpointTests : IClassFixture<ApiWebApplication
     [Fact]
     public async Task Get_PositionProfiles_Returns_Created_Profiles_Alphabetically()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "list-pp-user-2");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AdminClient(companyId);
 
         var create1 = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
@@ -78,14 +86,11 @@ public class ListPositionProfilesEndpointTests : IClassFixture<ApiWebApplication
     [Fact]
     public async Task Get_PositionProfiles_Scopes_To_Company()
     {
-        using var client = _factory.CreateClient();
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "list-pp-user-3");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyA.ToString());
-
-        var create = await client.PostAsJsonAsync($"/api/companies/{companyA}/position-profiles", new
+        using var clientA = AdminClient(companyA);
+        var create = await clientA.PostAsJsonAsync($"/api/companies/{companyA}/position-profiles", new
         {
             companyId = companyA,
             title = "Analyst",
@@ -93,10 +98,7 @@ public class ListPositionProfilesEndpointTests : IClassFixture<ApiWebApplication
         });
         create.EnsureSuccessStatusCode();
 
-        using var clientB = _factory.CreateClient();
-        clientB.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "list-pp-user-4");
-        clientB.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyB.ToString());
-
+        using var clientB = AdminClient(companyB);
         var response = await clientB.GetAsync($"/api/companies/{companyB}/position-profiles");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

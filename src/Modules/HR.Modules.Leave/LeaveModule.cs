@@ -14,6 +14,7 @@ using HR.Modules.Leave.Features.GetLeavePolicy;
 using HR.Modules.Leave.Features.ListLeavePolicies;
 using HR.Modules.Leave.Features.SubmitLeaveRequest;
 using HR.Modules.Leave.Features.PreviewLeaveRequest;
+using HR.Modules.Leave.Features.AwardToil;
 using HR.Modules.Leave.Features.InitialiseEmployeeLeave;
 using HR.Modules.Leave.Persistence;
 using HR.SharedKernel;
@@ -59,6 +60,8 @@ public static class LeaveModule
         services.AddScoped<IValidator<ApproveLeaveRequestRequest>, ApproveLeaveRequestValidator>();
         services.AddScoped<RejectLeaveRequestHandler>();
         services.AddScoped<IValidator<RejectLeaveRequestRequest>, RejectLeaveRequestValidator>();
+        services.AddScoped<AwardToilHandler>();
+        services.AddScoped<IValidator<AwardToilRequest>, AwardToilValidator>();
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddScoped<CreatePublicHolidayHandler>();
         services.AddScoped<IValidator<CreatePublicHolidayRequest>, CreatePublicHolidayValidator>();

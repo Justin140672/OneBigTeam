@@ -1,33 +1,21 @@
 using FastEndpoints;
-using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Employees.Features.CreateEmployee;
 
 internal sealed class Endpoint(
-    CreateEmployeeHandler handler,
-    ICurrentUser currentUser,
-    IAuthorizationService authorizationService) : Endpoint<CreateEmployeeRequest, CreateEmployeeResponse>
+    CreateEmployeeHandler handler) : Endpoint<CreateEmployeeRequest, CreateEmployeeResponse>
 {
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/employees");
-        Policies("authenticated");
+        Policies("employee:manage");
     }
 
     public override async Task HandleAsync(
         CreateEmployeeRequest request,
         CancellationToken cancellationToken)
     {
-        var userId = currentUser.UserId;
-
-        if (userId is null ||
-            !await authorizationService.HasPermissionAsync(userId.Value, SystemPermissions.EmployeeCreate, cancellationToken))
-        {
-            await SendResultAsync(TypedResults.Forbid());
-            return;
-        }
-
         var result = await handler.HandleAsync(request, cancellationToken);
 
         if (result.IsFailure)

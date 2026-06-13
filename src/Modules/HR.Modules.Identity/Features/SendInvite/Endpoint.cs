@@ -10,8 +10,6 @@ namespace HR.Modules.Identity.Features.SendInvite;
 
 internal sealed class Endpoint(
     IdentityDbContext db,
-    ICurrentUser currentUser,
-    IAuthorizationService authorizationService,
     IClock clock,
     IEmailSender emailSender,
     IInviteLinkBuilder inviteLinkBuilder,
@@ -20,19 +18,11 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/invite");
-        Policies("authenticated");
+        Policies("employee:manage");
     }
 
     public override async Task HandleAsync(SendInviteRequest req, CancellationToken ct)
     {
-        var userId = currentUser.UserId;
-        if (userId is null ||
-            !await authorizationService.HasPermissionAsync(userId.Value, HR.SharedKernel.SystemPermissions.EmployeeCreate, ct))
-        {
-            await SendResultAsync(TypedResults.Forbid());
-            return;
-        }
-
         var now = clock.UtcNow;
 
         // Cancel any existing pending invites for this employee

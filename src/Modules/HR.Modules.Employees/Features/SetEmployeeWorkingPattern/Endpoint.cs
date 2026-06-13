@@ -9,7 +9,7 @@ internal sealed class Endpoint(SetEmployeeWorkingPatternHandler handler)
     public override void Configure()
     {
         Put("/api/companies/{companyId:guid}/employees/{employeeId:guid}/working-pattern");
-        Policies("authenticated");
+        Policies("employee:manage");
     }
 
     public override async Task HandleAsync(

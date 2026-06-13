@@ -9,7 +9,7 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Post("/api/companies/{id:guid}/branding/logos/{assetType}");
-        Policies("authenticated");
+        Policies("company:manage");
     }
 
     public override async Task HandleAsync(

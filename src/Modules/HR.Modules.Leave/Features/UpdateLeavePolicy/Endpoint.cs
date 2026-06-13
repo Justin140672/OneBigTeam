@@ -9,7 +9,7 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Put("/api/companies/{companyId:guid}/leave-policies/{policyId:guid}");
-        Policies("authenticated");
+        Policies("leave:manage");
     }
 
     public override async Task HandleAsync(

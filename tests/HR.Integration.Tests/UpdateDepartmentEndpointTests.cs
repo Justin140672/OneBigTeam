@@ -1,16 +1,28 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
 public class UpdateDepartmentEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
+    private static readonly Guid UserId = new("eeeeeeee-0000-0000-0000-000000000003");
 
     public UpdateDepartmentEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator))
+            .GetAwaiter().GetResult();
+    }
+
+    private HttpClient AuthenticatedClient(Guid companyId)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        return client;
     }
 
     [Fact]
@@ -28,10 +40,8 @@ public class UpdateDepartmentEndpointTests : IClassFixture<ApiWebApplicationFact
     [Fact]
     public async Task Put_Department_Returns_NotFound_When_Department_Does_Not_Exist()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "upd-dept-user-1");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AuthenticatedClient(companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/departments/{Guid.NewGuid()}",
@@ -43,12 +53,9 @@ public class UpdateDepartmentEndpointTests : IClassFixture<ApiWebApplicationFact
     [Fact]
     public async Task Put_Department_Updates_Name_And_Description()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "upd-dept-user-2");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AuthenticatedClient(companyId);
 
-        // Create
         var created = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
         {
             companyId,
@@ -58,7 +65,6 @@ public class UpdateDepartmentEndpointTests : IClassFixture<ApiWebApplicationFact
         var dept = await created.Content.ReadFromJsonAsync<DeptPayload>();
         Assert.NotNull(dept);
 
-        // Update
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/departments/{dept!.Id}",
             new
@@ -82,13 +88,10 @@ public class UpdateDepartmentEndpointTests : IClassFixture<ApiWebApplicationFact
     [Fact]
     public async Task Put_Department_Updates_Parent_And_Manager()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
         var managerId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "upd-dept-user-3");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AuthenticatedClient(companyId);
 
-        // Create parent
         var parentResp = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
         {
             companyId,
@@ -97,7 +100,6 @@ public class UpdateDepartmentEndpointTests : IClassFixture<ApiWebApplicationFact
         parentResp.EnsureSuccessStatusCode();
         var parent = await parentResp.Content.ReadFromJsonAsync<DeptPayload>();
 
-        // Create child
         var childResp = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
         {
             companyId,
@@ -107,7 +109,6 @@ public class UpdateDepartmentEndpointTests : IClassFixture<ApiWebApplicationFact
         var child = await childResp.Content.ReadFromJsonAsync<DeptPayload>();
         Assert.NotNull(child);
 
-        // Update child to have parent + manager
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/departments/{child!.Id}",
             new
@@ -129,10 +130,8 @@ public class UpdateDepartmentEndpointTests : IClassFixture<ApiWebApplicationFact
     [Fact]
     public async Task Put_Department_Returns_Conflict_When_Name_Already_Used()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "upd-dept-user-4");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AuthenticatedClient(companyId);
 
         await client.PostAsJsonAsync($"/api/companies/{companyId}/departments",
             new { companyId, name = "Engineering" });

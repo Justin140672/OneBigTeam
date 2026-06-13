@@ -1,16 +1,28 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
 public class GetPositionProfileEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
+    private static readonly Guid AdminUserId = new("33333333-0000-0000-0000-000000000001");
 
     public GetPositionProfileEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator))
+            .GetAwaiter().GetResult();
+    }
+
+    private HttpClient AdminClient(Guid companyId)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        return client;
     }
 
     [Fact]
@@ -26,10 +38,8 @@ public class GetPositionProfileEndpointTests : IClassFixture<ApiWebApplicationFa
     [Fact]
     public async Task Get_PositionProfile_Returns_PositionProfile_For_Authenticated_Request()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "get-pp-user-1");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AdminClient(companyId);
 
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
@@ -58,10 +68,8 @@ public class GetPositionProfileEndpointTests : IClassFixture<ApiWebApplicationFa
     [Fact]
     public async Task Get_PositionProfile_Returns_NotFound_For_Unknown_Id()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "get-pp-user-2");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AdminClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/position-profiles/{Guid.NewGuid()}");
 
@@ -71,12 +79,10 @@ public class GetPositionProfileEndpointTests : IClassFixture<ApiWebApplicationFa
     [Fact]
     public async Task Get_PositionProfile_Returns_NotFound_When_Profile_Belongs_To_Different_Company()
     {
-        using var client = _factory.CreateClient();
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "get-pp-user-3");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyA.ToString());
+        using var client = AdminClient(companyA);
 
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyA}/position-profiles", new
         {
@@ -88,7 +94,6 @@ public class GetPositionProfileEndpointTests : IClassFixture<ApiWebApplicationFa
         var created = await createResponse.Content.ReadFromJsonAsync<PositionProfilePayload>();
         Assert.NotNull(created);
 
-        // Request using company B's scope
         var response = await client.GetAsync($"/api/companies/{companyB}/position-profiles/{created!.Id}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

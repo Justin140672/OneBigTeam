@@ -1,16 +1,28 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
 public class DeactivateDepartmentEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
+    private static readonly Guid UserId = new("eeeeeeee-0000-0000-0000-000000000002");
 
     public DeactivateDepartmentEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator))
+            .GetAwaiter().GetResult();
+    }
+
+    private HttpClient AuthenticatedClient(Guid companyId)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        return client;
     }
 
     [Fact]
@@ -27,10 +39,8 @@ public class DeactivateDepartmentEndpointTests : IClassFixture<ApiWebApplication
     [Fact]
     public async Task Delete_Department_Returns_NotFound_When_Department_Does_Not_Exist()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "deact-dept-user-1");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AuthenticatedClient(companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/departments/{Guid.NewGuid()}");
@@ -41,25 +51,20 @@ public class DeactivateDepartmentEndpointTests : IClassFixture<ApiWebApplication
     [Fact]
     public async Task Delete_Department_Deactivates_Active_Department()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "deact-dept-user-2");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AuthenticatedClient(companyId);
 
-        // Create
         var created = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments",
             new { companyId, name = "Engineering" });
         created.EnsureSuccessStatusCode();
         var dept = await created.Content.ReadFromJsonAsync<DeptPayload>();
         Assert.NotNull(dept);
 
-        // Deactivate
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/departments/{dept!.Id}");
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
-        // Verify it no longer appears in the active list
         var list = await client.GetFromJsonAsync<DeptListPayload>(
             $"/api/companies/{companyId}/departments");
         Assert.NotNull(list);
@@ -69,22 +74,18 @@ public class DeactivateDepartmentEndpointTests : IClassFixture<ApiWebApplication
     [Fact]
     public async Task Delete_Department_Returns_NotFound_When_Already_Inactive()
     {
-        using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "deact-dept-user-3");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        using var client = AuthenticatedClient(companyId);
 
         var created = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments",
             new { companyId, name = "Engineering" });
         created.EnsureSuccessStatusCode();
         var dept = await created.Content.ReadFromJsonAsync<DeptPayload>();
 
-        // First deactivation
         var first = await client.DeleteAsync(
             $"/api/companies/{companyId}/departments/{dept!.Id}");
         first.EnsureSuccessStatusCode();
 
-        // Second deactivation — already inactive
         var second = await client.DeleteAsync(
             $"/api/companies/{companyId}/departments/{dept.Id}");
 

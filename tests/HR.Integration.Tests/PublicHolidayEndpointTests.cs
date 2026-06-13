@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
@@ -9,17 +10,19 @@ public class PublicHolidayEndpointTests : IClassFixture<ApiWebApplicationFactory
     private readonly ApiWebApplicationFactory _factory;
 
     private static readonly Guid CompanyId = Guid.NewGuid();
-    private static readonly string UserId = Guid.NewGuid().ToString();
+    private static readonly Guid UserId = new("eeeeeeee-0000-0000-0000-000000000008");
 
     public PublicHolidayEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator))
+            .GetAwaiter().GetResult();
     }
 
     private HttpClient AuthenticatedClient()
     {
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, CompanyId.ToString());
         return client;
     }
