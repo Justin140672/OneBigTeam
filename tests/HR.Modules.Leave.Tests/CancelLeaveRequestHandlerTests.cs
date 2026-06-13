@@ -316,4 +316,95 @@ public class CancelLeaveRequestHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal("Cancelled", result.Value!.Status);
     }
+
+    [Fact]
+    public async Task HandleAsync_Restores_Toil_Balance_When_Cancelling_Approved_Toil_Request()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "TOIL", "TOIL", 0,
+            AccrualMethod.None, LeaveTypeBehaviour.Toil, now);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 5), LeaveDayPart.FullDay,
+            3m, null, now);
+        leaveRequest.Approve(Guid.NewGuid(), now);
+
+        var balance = LeaveBalance.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2026, 0m, now);
+        balance.Adjust(5m, now);
+        balance.RecordUsage(3m, now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeaveRequests.Add(leaveRequest);
+        context.LeaveBalances.Add(balance);
+        await context.SaveChangesAsync();
+
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var result = await handler.HandleAsync(
+            new CancelLeaveRequestRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                LeaveRequestId = leaveRequest.Id
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(0m, savedBalance.UsedDays);
+        Assert.Equal(5m, savedBalance.RemainingDays); // fully restored
+    }
+
+    [Fact]
+    public async Task HandleAsync_Restores_Toil_Balance_From_Different_Policy_Year()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "TOIL", "TOIL", 0,
+            AccrualMethod.None, LeaveTypeBehaviour.Toil, now);
+
+        // TOIL earned in 2025, leave taken in 2026
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
+            new DateOnly(2026, 1, 5), LeaveDayPart.FullDay,
+            new DateOnly(2026, 1, 7), LeaveDayPart.FullDay,
+            3m, null, now);
+        leaveRequest.Approve(Guid.NewGuid(), now);
+
+        var balance2025 = LeaveBalance.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2025, 0m, now);
+        balance2025.Adjust(4m, now);
+        balance2025.RecordUsage(3m, now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeaveRequests.Add(leaveRequest);
+        context.LeaveBalances.Add(balance2025);
+        await context.SaveChangesAsync();
+
+        var handler = new CancelLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        var result = await handler.HandleAsync(
+            new CancelLeaveRequestRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                LeaveRequestId = leaveRequest.Id
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(0m, savedBalance.UsedDays);
+        Assert.Equal(4m, savedBalance.RemainingDays); // 2025 balance fully restored
+    }
 }

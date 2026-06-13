@@ -30,16 +30,37 @@ internal sealed class CancelLeaveRequestHandler(LeaveDbContext dbContext, IClock
 
         if (leaveRequest.Status == LeaveRequestStatus.Approved)
         {
-            var leaveSettings = await leaveSettingsReader.GetLeaveSettingsAsync(leaveRequest.CompanyId, cancellationToken);
-            var policyYear = LeaveYearCalculator.GetPolicyYear(leaveRequest.StartDate, leaveSettings.LeaveYearStartMonth);
+            var leaveType = await dbContext.LeaveTypes
+                .SingleOrDefaultAsync(lt => lt.Id == leaveRequest.LeaveTypeId, cancellationToken);
 
-            var balance = await dbContext.LeaveBalances
-                .SingleOrDefaultAsync(
-                    b => b.EmployeeId == leaveRequest.EmployeeId
-                      && b.CompanyId == leaveRequest.CompanyId
-                      && b.LeaveTypeId == leaveRequest.LeaveTypeId
-                      && b.PolicyYear == policyYear,
-                    cancellationToken);
+            LeaveBalance? balance;
+            if (leaveType?.Behaviour == LeaveTypeBehaviour.Toil)
+            {
+                // Mirror the approval FIFO logic: reverse from the oldest balance that
+                // still has used days recorded against it.
+                var toilBalances = await dbContext.LeaveBalances
+                    .Where(b => b.EmployeeId == leaveRequest.EmployeeId
+                             && b.CompanyId == leaveRequest.CompanyId
+                             && b.LeaveTypeId == leaveRequest.LeaveTypeId)
+                    .OrderBy(b => b.PolicyYear)
+                    .ToListAsync(cancellationToken);
+
+                balance = toilBalances.FirstOrDefault(b => b.UsedDays > 0)
+                          ?? toilBalances.FirstOrDefault();
+            }
+            else
+            {
+                var leaveSettings = await leaveSettingsReader.GetLeaveSettingsAsync(leaveRequest.CompanyId, cancellationToken);
+                var policyYear = LeaveYearCalculator.GetPolicyYear(leaveRequest.StartDate, leaveSettings.LeaveYearStartMonth);
+
+                balance = await dbContext.LeaveBalances
+                    .SingleOrDefaultAsync(
+                        b => b.EmployeeId == leaveRequest.EmployeeId
+                          && b.CompanyId == leaveRequest.CompanyId
+                          && b.LeaveTypeId == leaveRequest.LeaveTypeId
+                          && b.PolicyYear == policyYear,
+                        cancellationToken);
+            }
 
             balance?.ReverseUsage(leaveRequest.TotalDays, now);
         }

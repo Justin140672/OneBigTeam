@@ -246,6 +246,126 @@ public class ApproveLeaveRequestHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Deducts_Toil_Balance_On_Approval()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "TOIL", "TOIL", 0,
+            AccrualMethod.None, LeaveTypeBehaviour.Toil, now);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
+            new DateOnly(2026, 8, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 8, 5), LeaveDayPart.FullDay,
+            3m, null, now);
+
+        var balance = LeaveBalance.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2026, 0m, now);
+        balance.Adjust(5m, now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeaveRequests.Add(leaveRequest);
+        context.LeaveBalances.Add(balance);
+        await context.SaveChangesAsync();
+
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
+        var result = await handler.HandleAsync(
+            ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(3m, savedBalance.UsedDays);
+        Assert.Equal(2m, savedBalance.RemainingDays); // 0 entitlement + 5 adjustment - 3 used
+    }
+
+    [Fact]
+    public async Task HandleAsync_Deducts_Toil_Balance_From_Different_Policy_Year()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "TOIL", "TOIL", 0,
+            AccrualMethod.None, LeaveTypeBehaviour.Toil, now);
+
+        // TOIL earned in 2025, leave taken in 2026 — different policy years
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
+            new DateOnly(2026, 1, 5), LeaveDayPart.FullDay,
+            new DateOnly(2026, 1, 7), LeaveDayPart.FullDay,
+            3m, null, now);
+
+        var balance2025 = LeaveBalance.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2025, 0m, now);
+        balance2025.Adjust(4m, now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeaveRequests.Add(leaveRequest);
+        context.LeaveBalances.Add(balance2025);
+        await context.SaveChangesAsync();
+
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
+        var result = await handler.HandleAsync(
+            ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var savedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(3m, savedBalance.UsedDays);
+        Assert.Equal(1m, savedBalance.RemainingDays); // deducted from 2025 balance despite 2026 leave dates
+    }
+
+    [Fact]
+    public async Task HandleAsync_Deducts_Toil_From_Oldest_Balance_First()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "TOIL", "TOIL", 0,
+            AccrualMethod.None, LeaveTypeBehaviour.Toil, now);
+
+        var leaveRequest = LeaveRequest.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
+            new DateOnly(2026, 6, 3), LeaveDayPart.FullDay,
+            new DateOnly(2026, 6, 3), LeaveDayPart.FullDay,
+            1m, null, now);
+
+        var balance2025 = LeaveBalance.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2025, 0m, now);
+        balance2025.Adjust(2m, now);
+
+        var balance2026 = LeaveBalance.Create(
+            Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(), 2026, 0m, now);
+        balance2026.Adjust(3m, now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeaveRequests.Add(leaveRequest);
+        context.LeaveBalances.AddRange(balance2025, balance2026);
+        await context.SaveChangesAsync();
+
+        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader());
+        var result = await handler.HandleAsync(
+            ApproveRequest(companyId, employeeId, leaveRequest.Id, Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var saved2025 = await context.LeaveBalances.SingleAsync(b => b.PolicyYear == 2025);
+        var saved2026 = await context.LeaveBalances.SingleAsync(b => b.PolicyYear == 2026);
+        Assert.Equal(1m, saved2025.UsedDays);  // deducted from the older balance
+        Assert.Equal(0m, saved2026.UsedDays);  // 2026 balance untouched
+    }
+
+    [Fact]
     public async Task HandleAsync_Publishes_LeaveApprovedIntegrationEvent()
     {
         await using var context = BuildContext();

@@ -26,17 +26,39 @@ internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, ICloc
             return Result.Failure<ApproveLeaveRequestResponse>(
                 Error.Validation($"Cannot approve a leave request with status '{leaveRequest.Status}'."));
 
-        var leaveSettings = await leaveSettingsReader.GetLeaveSettingsAsync(leaveRequest.CompanyId, cancellationToken);
-        var policyYear = LeaveYearCalculator.GetPolicyYear(leaveRequest.StartDate, leaveSettings.LeaveYearStartMonth);
         var now = clock.UtcNowOffset();
 
-        var balance = await dbContext.LeaveBalances
-            .SingleOrDefaultAsync(
-                b => b.EmployeeId == leaveRequest.EmployeeId
-                  && b.CompanyId == leaveRequest.CompanyId
-                  && b.LeaveTypeId == leaveRequest.LeaveTypeId
-                  && b.PolicyYear == policyYear,
-                cancellationToken);
+        var leaveType = await dbContext.LeaveTypes
+            .SingleOrDefaultAsync(lt => lt.Id == leaveRequest.LeaveTypeId, cancellationToken);
+
+        LeaveBalance? balance;
+        if (leaveType?.Behaviour == LeaveTypeBehaviour.Toil)
+        {
+            // TOIL is not year-bound: earned in one year, taken in another. Search all years
+            // and prefer the oldest balance that still has days remaining (FIFO consumption).
+            var toilBalances = await dbContext.LeaveBalances
+                .Where(b => b.EmployeeId == leaveRequest.EmployeeId
+                         && b.CompanyId == leaveRequest.CompanyId
+                         && b.LeaveTypeId == leaveRequest.LeaveTypeId)
+                .OrderBy(b => b.PolicyYear)
+                .ToListAsync(cancellationToken);
+
+            balance = toilBalances.FirstOrDefault(b => b.RemainingDays > 0)
+                      ?? toilBalances.FirstOrDefault();
+        }
+        else
+        {
+            var leaveSettings = await leaveSettingsReader.GetLeaveSettingsAsync(leaveRequest.CompanyId, cancellationToken);
+            var policyYear = LeaveYearCalculator.GetPolicyYear(leaveRequest.StartDate, leaveSettings.LeaveYearStartMonth);
+
+            balance = await dbContext.LeaveBalances
+                .SingleOrDefaultAsync(
+                    b => b.EmployeeId == leaveRequest.EmployeeId
+                      && b.CompanyId == leaveRequest.CompanyId
+                      && b.LeaveTypeId == leaveRequest.LeaveTypeId
+                      && b.PolicyYear == policyYear,
+                    cancellationToken);
+        }
 
         leaveRequest.Approve(request.ReviewedByEmployeeId, now);
         balance?.RecordUsage(leaveRequest.TotalDays, now);
