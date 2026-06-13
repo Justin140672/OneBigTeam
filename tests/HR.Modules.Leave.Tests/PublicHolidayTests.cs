@@ -1,5 +1,4 @@
 using HR.Modules.Leave.Domain;
-using HR.Modules.Leave.Services;
 
 namespace HR.Modules.Leave.Tests;
 
@@ -22,21 +21,5 @@ public class PublicHolidayTests
         Assert.Equal("Christmas Day", holiday.Name);
         Assert.Equal("GB", holiday.CountryCode);
         Assert.Equal(Now, holiday.CreatedAt);
-    }
-
-    [Fact]
-    public async Task NullPublicHolidayService_IsPublicHoliday_Returns_False()
-    {
-        var service = new NullPublicHolidayService();
-        var result = await service.IsPublicHoliday(new DateOnly(2026, 12, 25));
-        Assert.False(result);
-    }
-
-    [Fact]
-    public async Task NullPublicHolidayService_GetPublicHolidays_Returns_Empty()
-    {
-        var service = new NullPublicHolidayService();
-        var result = await service.GetPublicHolidays(new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31));
-        Assert.Empty(result);
     }
 }

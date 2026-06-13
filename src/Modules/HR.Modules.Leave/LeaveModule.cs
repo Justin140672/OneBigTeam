@@ -3,6 +3,8 @@ using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.ApproveLeaveRequest;
 using HR.Modules.Leave.Features.AssignLeavePolicyToEmployee;
 using HR.Modules.Leave.Features.CancelLeaveRequest;
+using HR.Modules.Leave.Features.CreatePublicHoliday;
+using HR.Modules.Leave.Features.ListPublicHolidays;
 using HR.Modules.Leave.Features.RejectLeaveRequest;
 using HR.Modules.Leave.Features.CreateLeavePolicy;
 using HR.Modules.Leave.Features.GetEmployeeLeaveBalance;
@@ -10,7 +12,6 @@ using HR.Modules.Leave.Features.GetLeavePolicy;
 using HR.Modules.Leave.Features.SubmitLeaveRequest;
 using HR.Modules.Leave.Features.InitialiseEmployeeLeave;
 using HR.Modules.Leave.Persistence;
-using HR.Modules.Leave.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,7 +51,9 @@ public static class LeaveModule
         services.AddScoped<RejectLeaveRequestHandler>();
         services.AddScoped<IValidator<RejectLeaveRequestRequest>, RejectLeaveRequestValidator>();
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
-        services.AddSingleton<IPublicHolidayService, NullPublicHolidayService>();
+        services.AddScoped<CreatePublicHolidayHandler>();
+        services.AddScoped<IValidator<CreatePublicHolidayRequest>, CreatePublicHolidayValidator>();
+        services.AddScoped<ListPublicHolidaysHandler>();
     }
 
     public static async Task MigrateLeaveAsync(this IServiceProvider services)

@@ -31,14 +31,14 @@ Coordinate implementation and validation work by delegating in sequence:
 
 ### 0. Architecture gate
 Read all of the following specification files before evaluating anything:
-- `.specifications/architecture/01-solution-structure.md`
-- `.specifications/architecture/02-module-boundaries.md`
-- `.specifications/architecture/03-vertical-slice-architecture.md`
-- `.specifications/architecture/05-database-standards.md`
-- `.specifications/architecture/06-authentication-authorization.md`
-- `.specifications/architecture/07-testing-strategy.md`
-- `.specifications/architecture/09-coding-standards.md`
-- `.specifications/architecture/10-ai-implementation-guardrails.md`
+- `specifications/architecture/01-solution-structure.md`
+- `specifications/architecture/02-module-boundaries.md`
+- `specifications/architecture/03-vertical-slice-architecture.md`
+- `specifications/architecture/05-database-standards.md`
+- `specifications/architecture/06-authentication-authorization.md`
+- `specifications/architecture/07-testing-strategy.md`
+- `specifications/architecture/09-coding-standards.md`
+- `specifications/architecture/10-ai-implementation-guardrails.md`
 
 For each of the following rejection criteria, state explicitly **Compliant** or **Violation — [reason]**:
 
@@ -114,16 +114,16 @@ Provide a concise final summary that includes:
 
 Before designing, reviewing, or implementing any feature, read and apply:
 
-- `/.specifications/architecture/01-solution-structure.md`
-- `/.specifications/architecture/02-module-boundaries.md`
-- `/.specifications/architecture/03-vertical-slice-architecture.md`
-- `/.specifications/architecture/04-event-architecture.md`
-- `/.specifications/architecture/05-database-standards.md`
-- `/.specifications/architecture/06-authentication-authorization.md`
-- `/.specifications/architecture/07-testing-strategy.md`
-- `/.specifications/architecture/08-deployment-architecture.md`
-- `/.specifications/architecture/09-coding-standards.md`
-- `/.specifications/architecture/10-ai-implementation-guardrails.md`
+- `/specifications/architecture/01-solution-structure.md`
+- `/specifications/architecture/02-module-boundaries.md`
+- `/specifications/architecture/03-vertical-slice-architecture.md`
+- `/specifications/architecture/04-event-architecture.md`
+- `/specifications/architecture/05-database-standards.md`
+- `/specifications/architecture/06-authentication-authorization.md`
+- `/specifications/architecture/07-testing-strategy.md`
+- `/specifications/architecture/08-deployment-architecture.md`
+- `/specifications/architecture/09-coding-standards.md`
+- `/specifications/architecture/10-ai-implementation-guardrails.md`
 - `/implementation-guide.md`
 
 If any mandatory specification file cannot be read, halt and report to the user which file is missing and that the task cannot proceed until it is present.

@@ -1,6 +1,5 @@
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
-using HR.Modules.Leave.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,20 +10,17 @@ internal sealed class SubmitLeaveRequestHandler
     private readonly LeaveDbContext _dbContext;
     private readonly IClock _clock;
     private readonly IWorkingPatternProvider _workingPatternProvider;
-    private readonly IPublicHolidayService _publicHolidayService;
     private readonly IIntegrationEventPublisher _publisher;
 
     public SubmitLeaveRequestHandler(
         LeaveDbContext dbContext,
         IClock clock,
         IWorkingPatternProvider workingPatternProvider,
-        IPublicHolidayService publicHolidayService,
         IIntegrationEventPublisher publisher)
     {
         _dbContext = dbContext;
         _clock = clock;
         _workingPatternProvider = workingPatternProvider;
-        _publicHolidayService = publicHolidayService;
         _publisher = publisher;
     }
 
@@ -56,10 +52,10 @@ internal sealed class SubmitLeaveRequestHandler
         var workingPattern = await _workingPatternProvider.GetEffectivePatternAsync(
             request.CompanyId, request.EmployeeId, cancellationToken);
 
-        var publicHolidays = await _publicHolidayService.GetPublicHolidays(
-            request.StartDate, request.EndDate);
-
-        var publicHolidayDates = publicHolidays.Select(h => h.Date).ToList();
+        var publicHolidayDates = await _dbContext.PublicHolidays
+            .Where(h => h.CompanyId == request.CompanyId && h.Date >= request.StartDate && h.Date <= request.EndDate)
+            .Select(h => h.Date)
+            .ToListAsync(cancellationToken);
 
         var totalDays = CalculateTotalDays(request.StartDate, request.StartPart, request.EndDate, request.EndPart, workingPattern, publicHolidayDates);
 
