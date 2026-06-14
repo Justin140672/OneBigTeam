@@ -1,35 +1,33 @@
 @page "/companies/{CompanyId:guid}/position-profiles"
 @rendermode InteractiveServer
+@inherits SearchPageBase<PositionProfileListItemModel>
 @inject PositionProfileService PositionProfileService
-@inject NavigationManager Navigation
 
 <PageTitle>Position Profiles</PageTitle>
 
 <div class="container-fluid py-4">
     <h1 class="mb-3">Position Profiles</h1>
 
-    <div class="d-flex justify-content-end mb-3">
-        <SfButton IsPrimary="true" OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/position-profiles/new"))">+ Add Position Profile</SfButton>
-    </div>
-
-    @if (_loading)
+    @if (IsLoading)
     {
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm" role="status"></div>
             <span>Loading position profiles…</span>
         </div>
     }
-    else if (_error is not null)
+    else if (Error is not null)
     {
-        <div class="alert alert-danger">@_error</div>
+        <div class="alert alert-danger">@Error</div>
     }
     else
     {
-        <HrGrid TValue="PositionProfileListItemModel"
-                DataSource="@_items"
-                AllowPaging="true"
-                AllowSorting="true"
+        <HrGrid @ref="Grid"
+                TValue="PositionProfileListItemModel"
+                DataSource="@Items"
+                Toolbar="@GridToolbar"
                 AllowFiltering="false">
+            <GridEvents TValue="PositionProfileListItemModel" OnToolbarClick="OnToolbarClick"
+                        RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
             <GridPageSettings PageSize="20" />
             <GridColumns>
                 <GridColumn Field="@nameof(PositionProfileListItemModel.Title)" HeaderText="Title" Width="220">
@@ -60,52 +58,31 @@
                     <Template>
                         @{
                             var row = (context as PositionProfileListItemModel)!;
-                            @if (row.IsActive)
-                            {
-                                <span class="badge bg-success">Active</span>
-                            }
-                            else
-                            {
-                                <span class="badge bg-secondary">Inactive</span>
-                            }
+                            <span class="badge @(row.IsActive ? "bg-success" : "bg-secondary")">
+                                @(row.IsActive ? "Active" : "Inactive")
+                            </span>
                         }
                     </Template>
                 </GridColumn>
             </GridColumns>
         </HrGrid>
-
     }
 </div>
 
 @code {
-    [Parameter] public Guid CompanyId { get; set; }
-
-    private List<PositionProfileListItemModel> _items = [];
-    private bool _loading = true;
-    private string? _error;
-
-    protected override async Task OnParametersSetAsync()
+    protected override async Task<IReadOnlyList<PositionProfileListItemModel>?> FetchItemsAsync(string? search)
     {
-        await LoadAsync();
-    }
-
-    private async Task LoadAsync()
-    {
-        _loading = true;
-        _error = null;
-
         var result = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
-
-        if (result is null)
-        {
-            _error = "Failed to load position profiles.";
-            _items = [];
-        }
-        else
-        {
-            _items = result.Items.ToList();
-        }
-
-        _loading = false;
+        return result?.Items.ToList();
     }
+
+    protected override string LoadErrorMessage => "Failed to load position profiles.";
+
+    protected override string? GetAddUrl() => $"/companies/{CompanyId}/position-profiles/new";
+
+    protected override string? GetEditUrl(PositionProfileListItemModel item) =>
+        $"/companies/{CompanyId}/position-profiles/{item.Id}";
+
+    protected override string? GetViewUrl(PositionProfileListItemModel item) =>
+        $"/companies/{CompanyId}/position-profiles/{item.Id}/view";
 }

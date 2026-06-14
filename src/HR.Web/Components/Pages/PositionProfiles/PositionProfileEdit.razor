@@ -1,5 +1,6 @@
 @page "/companies/{CompanyId:guid}/position-profiles/new"
 @page "/companies/{CompanyId:guid}/position-profiles/{Id:guid}"
+@page "/companies/{CompanyId:guid}/position-profiles/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject PositionProfileService PositionProfileService
 @inject DepartmentService DepartmentService
@@ -37,7 +38,7 @@
                     <div class="card-header">
                         <h5 class="mb-0">Position Profile Details</h5>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body @(_isViewMode ? "view-mode" : "")">
                         <div class="mb-3">
                             <label class="form-label">Title <span class="text-danger">*</span></label>
                             <HrTextBox @bind-Value="_model.Title" Placeholder="e.g. Senior Software Engineer" />
@@ -66,14 +67,17 @@
                 </div>
 
                 <div class="d-flex gap-2 align-items-center mt-3">
-                    <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
-                        @if (_saving)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                        }
-                        Save
-                    </SfButton>
-                    <SfButton OnClick="Cancel" Disabled="@_saving">Cancel</SfButton>
+                    @if (!_isViewMode)
+                    {
+                        <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
+                            @if (_saving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            Save
+                        </SfButton>
+                    }
+                    <SfButton OnClick="Cancel" Disabled="@_saving">@(_isViewMode ? "Close" : "Cancel")</SfButton>
                 </div>
             </div>
         </div>
@@ -84,8 +88,11 @@
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
+    private bool _isViewMode;
     private bool IsNew => Id is null || Id == Guid.Empty;
-    private string PageTitle => IsNew ? "Add Position Profile" : _model.Title.Trim().Length > 0 ? _model.Title.Trim() : "Edit Position Profile";
+    private string PageTitle => IsNew ? "Add Position Profile"
+        : _model.Title.Trim().Length > 0 ? _model.Title.Trim()
+        : _isViewMode ? "View Position Profile" : "Edit Position Profile";
 
     private bool _loading = true;
     private string? _globalError;
@@ -96,6 +103,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        _isViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
         _loading = true;
         _globalError = null;
 

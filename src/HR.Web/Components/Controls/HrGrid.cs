@@ -21,6 +21,15 @@ public class HrGrid<TValue> : SfGrid<TValue>
         if (!parameters.TryGetValue<bool>(nameof(AllowFiltering), out _))
             AllowFiltering = true;
 
+        if (!parameters.TryGetValue<bool>(nameof(AllowExcelExport), out _))
+            AllowExcelExport = true;
+
+        if (!parameters.TryGetValue<bool>(nameof(AllowPdfExport), out _))
+            AllowPdfExport = true;
+
+        if (!parameters.TryGetValue<bool>(nameof(ShowColumnChooser), out _))
+            ShowColumnChooser = true;
+
         return base.SetParametersAsync(parameters);
     }
 }

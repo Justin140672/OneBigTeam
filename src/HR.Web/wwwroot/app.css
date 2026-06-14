@@ -16,6 +16,15 @@ html, body {
     background: transparent;
 }
 
+/* ── View-mode form overlay ──────────────────────────────── */
+/* Applied to card-body (or a content wrapper) to make a form read-only.
+   Keeps tab headers and buttons outside the container fully interactive. */
+.view-mode {
+    pointer-events: none;
+    opacity: 0.75;
+    user-select: text;
+}
+
 /* Give labels breathing room above Syncfusion controls that have no bottom margin */
 .form-label {
     margin-top: 0.5rem;

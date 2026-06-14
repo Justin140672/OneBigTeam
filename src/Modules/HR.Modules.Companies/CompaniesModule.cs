@@ -1,4 +1,5 @@
 using FluentValidation;
+
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Features.CreateCompany;
 using HR.Modules.Companies.Features.GetCompany;
@@ -9,6 +10,7 @@ using HR.Modules.Companies.Persistence;
 using HR.Modules.Companies.Services;
 using HR.Modules.Companies.Storage;
 using HR.SharedKernel;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -72,7 +74,7 @@ public static class CompaniesModule
         services.AddScoped<UpdateCompanySettingsHandler>();
         services.AddScoped<UploadCompanyLogoHandler>();
         services.AddScoped<IBrandingStorage, StubBrandingStorage>();
-services.AddScoped<ICompanyLeaveSettingsReader, CompanyLeaveSettingsReader>();
+        services.AddScoped<ICompanyLeaveSettingsReader, CompanyLeaveSettingsReader>();
         services.AddScoped<IValidator<CreateCompanyRequest>, CreateCompanyValidator>();
         services.AddScoped<IValidator<UpdateCompanyRequest>, UpdateCompanyValidator>();
         services.AddScoped<IValidator<UpdateCompanySettingsRequest>, UpdateCompanySettingsValidator>();

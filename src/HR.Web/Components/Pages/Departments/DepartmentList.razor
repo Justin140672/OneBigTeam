@@ -1,47 +1,47 @@
 @page "/companies/{CompanyId:guid}/departments"
 @rendermode InteractiveServer
+@inherits SearchPageBase<DepartmentListItemModel>
 @inject DepartmentService DepartmentService
-@inject NavigationManager Navigation
 
 <PageTitle>Departments</PageTitle>
 
 <div class="container-fluid py-4">
     <h1 class="mb-3">Departments</h1>
 
-    <div class="d-flex align-items-center justify-content-between mb-3">
-        <div class="form-check form-switch mb-0">
-            <input class="form-check-input" type="checkbox" id="showInactive"
-                   @bind="_showInactive" @bind:after="LoadAsync" />
-            <label class="form-check-label" for="showInactive">Show inactive</label>
-        </div>
-        <SfButton IsPrimary="true" OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/departments/new"))">+ Add Department</SfButton>
+    <div class="form-check form-switch mb-3">
+        <input class="form-check-input" type="checkbox" id="showInactive"
+               @bind="_showInactive" @bind:after="LoadAsync" />
+        <label class="form-check-label" for="showInactive">Show inactive</label>
     </div>
 
-    @if (_loading)
+    @if (IsLoading)
     {
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm" role="status"></div>
             <span>Loading departments…</span>
         </div>
     }
-    else if (_error is not null)
+    else if (Error is not null)
     {
-        <div class="alert alert-danger">@_error</div>
+        <div class="alert alert-danger">@Error</div>
     }
     else
     {
-        @if (!string.IsNullOrEmpty(_actionError))
+        @if (ActionError is not null)
         {
             <div class="alert alert-danger alert-dismissible">
-                @_actionError
-                <button type="button" class="btn-close" @onclick="() => _actionError = null"></button>
+                @ActionError
+                <button type="button" class="btn-close" @onclick="ClearActionError"></button>
             </div>
         }
-        <HrGrid TValue="DepartmentListItemModel"
-                DataSource="@_items"
-                AllowPaging="true"
-                AllowSorting="true"
+
+        <HrGrid @ref="Grid"
+                TValue="DepartmentListItemModel"
+                DataSource="@Items"
+                Toolbar="@GridToolbar"
                 AllowFiltering="false">
+            <GridEvents TValue="DepartmentListItemModel" OnToolbarClick="OnToolbarClick"
+                        RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
             <GridPageSettings PageSize="20" />
             <GridColumns>
                 <GridColumn Field="@nameof(DepartmentListItemModel.Name)" HeaderText="Name" Width="220">
@@ -93,57 +93,42 @@
                 </GridColumn>
             </GridColumns>
         </HrGrid>
-
     }
 </div>
 
 @code {
-    [Parameter] public Guid CompanyId { get; set; }
-
-    private List<DepartmentListItemModel> _items = [];
     private Dictionary<Guid, string> _nameMap = new();
-    private bool _loading = true;
     private bool _showInactive;
-    private string? _error;
-    private string? _actionError;
     private Guid? _deactivating;
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task<IReadOnlyList<DepartmentListItemModel>?> FetchItemsAsync(string? search)
     {
-        await LoadAsync();
-    }
-
-    private async Task LoadAsync()
-    {
-        _loading = true;
-        _error = null;
-        StateHasChanged();
-
         var result = await DepartmentService.ListDepartmentsAsync(CompanyId, _showInactive);
-        if (result is null)
-        {
-            _error = "Failed to load departments.";
-        }
-        else
-        {
-            _items = result.Items;
+        if (result is not null)
             _nameMap = result.Items.ToDictionary(d => d.Id, d => d.Name);
-        }
-
-        _loading = false;
+        return result?.Items;
     }
+
+    protected override string LoadErrorMessage => "Failed to load departments.";
+
+    protected override string? GetAddUrl() => $"/companies/{CompanyId}/departments/new";
+
+    protected override string? GetEditUrl(DepartmentListItemModel item) =>
+        $"/companies/{CompanyId}/departments/{item.Id}";
+
+    protected override string? GetViewUrl(DepartmentListItemModel item) =>
+        $"/companies/{CompanyId}/departments/{item.Id}/view";
 
     private async Task ConfirmDeactivate(DepartmentListItemModel dept)
     {
         _deactivating = dept.Id;
-        _actionError = null;
+        ClearActionError();
 
         var error = await DepartmentService.DeactivateDepartmentAsync(CompanyId, dept.Id);
-
         _deactivating = null;
 
         if (error is not null)
-            _actionError = error;
+            SetActionError(error);
         else
             await LoadAsync();
     }

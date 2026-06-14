@@ -1,5 +1,6 @@
 @page "/companies/{CompanyId:guid}/public-holidays/new"
 @page "/companies/{CompanyId:guid}/public-holidays/{Id:guid}"
+@page "/companies/{CompanyId:guid}/public-holidays/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject PublicHolidayService PublicHolidayService
 @inject NavigationManager Navigation
@@ -36,7 +37,7 @@
                     <div class="card-header">
                         <h5 class="mb-0">Public Holiday Details</h5>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body @(_isViewMode ? "view-mode" : "")">
                         <div class="mb-3">
                             <label class="form-label">Date <span class="text-danger">*</span></label>
                             <SfDatePicker TValue="DateTime?" @bind-Value="_model.Date" Placeholder="Select date" Format="dd/MM/yyyy" />
@@ -53,18 +54,21 @@
                 </div>
 
                 <div class="d-flex gap-2 mt-3">
-                    @if (!string.IsNullOrEmpty(_successMsg))
+                    @if (!_isViewMode)
                     {
-                        <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
-                    }
-                    <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
-                        @if (_saving)
+                        @if (!string.IsNullOrEmpty(_successMsg))
                         {
-                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
                         }
-                        Save
-                    </SfButton>
-                    <SfButton OnClick="Cancel" Disabled="@_saving">Cancel</SfButton>
+                        <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
+                            @if (_saving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            Save
+                        </SfButton>
+                    }
+                    <SfButton OnClick="Cancel" Disabled="@_saving">@(_isViewMode ? "Close" : "Cancel")</SfButton>
                 </div>
             </div>
         </div>
@@ -75,8 +79,10 @@
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
+    private bool _isViewMode;
     private bool IsNew => Id is null || Id == Guid.Empty;
-    private string PageTitle => IsNew ? "Add Public Holiday" : "Edit Public Holiday";
+    private string PageTitle => IsNew ? "Add Public Holiday"
+        : _isViewMode ? "View Public Holiday" : "Edit Public Holiday";
 
     private bool _loading = true;
     private bool _saving;
@@ -87,6 +93,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        _isViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
         _loading = true;
         _globalError = null;
         _successMsg = null;

@@ -1,6 +1,8 @@
 @page "/companies/{Id:guid}/edit"
+@page "/companies/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject CompanyService CompanyService
+@inject NavigationManager Navigation
 @using HR.SharedKernel
 
 <PageTitle>Edit Company</PageTitle>
@@ -36,38 +38,41 @@
                 <TabItem>
                     <ChildContent><TabHeader Text="Profile" /></ChildContent>
                     <ContentTemplate>
-                        <div class="mt-4"><CompanyProfileTab Company="_company" Model="_profile" /></div>
+                        <div class="mt-4 @(_isViewMode ? "view-mode" : "")"><CompanyProfileTab Company="_company" Model="_profile" /></div>
                     </ContentTemplate>
                 </TabItem>
                 <TabItem>
                     <ChildContent><TabHeader Text="Addresses" /></ChildContent>
                     <ContentTemplate>
-                        <div class="mt-4"><CompanyAddressesTab Addresses="_addresses" /></div>
+                        <div class="mt-4 @(_isViewMode ? "view-mode" : "")"><CompanyAddressesTab Addresses="_addresses" /></div>
                     </ContentTemplate>
                 </TabItem>
                 <TabItem>
                     <ChildContent><TabHeader Text="Settings" /></ChildContent>
                     <ContentTemplate>
-                        <div class="mt-4"><CompanySettingsTab Model="_settings" /></div>
+                        <div class="mt-4 @(_isViewMode ? "view-mode" : "")"><CompanySettingsTab Model="_settings" /></div>
                     </ContentTemplate>
                 </TabItem>
                 <TabItem>
                     <ChildContent><TabHeader Text="Branding" /></ChildContent>
                     <ContentTemplate>
-                        <div class="mt-4"><CompanyBrandingTab Model="_branding" /></div>
+                        <div class="mt-4 @(_isViewMode ? "view-mode" : "")"><CompanyBrandingTab Model="_branding" /></div>
                     </ContentTemplate>
                 </TabItem>
             </TabItems>
         </SfTab>
 
-        <div class="mt-4">
-            @if (!string.IsNullOrEmpty(_successMsg))
+        <div class="mt-4 d-flex gap-2 align-items-center">
+            @if (!_isViewMode)
             {
-                <div class="alert alert-success py-2 mb-3">@_successMsg</div>
+                @if (!string.IsNullOrEmpty(_successMsg))
+                {
+                    <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
+                }
+                <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAll">
+                    @(_saving ? "Saving…" : "Save")
+                </SfButton>
             }
-            <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAll">
-                @(_saving ? "Saving…" : "Save")
-            </SfButton>
         </div>
     }
 </div>
@@ -75,6 +80,7 @@
 @code {
     [Parameter] public Guid Id { get; set; }
 
+    private bool _isViewMode;
     private GetCompanyResponse? _company;
     private bool _loading = true;
     private string? _globalError;
@@ -87,6 +93,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _isViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
         _company = await CompanyService.GetCompanyAsync(Id);
         if (_company is not null)
         {

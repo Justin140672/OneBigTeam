@@ -1,45 +1,41 @@
 @page "/companies/{CompanyId:guid}/employees"
 @rendermode InteractiveServer
+@inherits SearchPageBase<EmployeeListItemModel>
 @using HR.SharedKernel
 @inject EmployeeService EmployeeService
 @inject UserService UserService
-@inject NavigationManager Navigation
 
 <PageTitle>Employees</PageTitle>
 
 <div class="container-fluid py-4">
     <h1 class="mb-3">Employees</h1>
 
-    <div class="d-flex align-items-center justify-content-between mb-3">
-        <div class="col-md-4 px-0">
-            <HrTextBox Value="@_search"
-                       ValueChanged="@OnSearchChanged"
-                       Placeholder="Search by name or email" />
-        </div>
-        @if (_canCreateEmployee)
-        {
-            <SfButton IsPrimary="true" OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/employees/new"))">+ Add Employee</SfButton>
-        }
+    <div class="mb-3 col-md-4 px-0">
+        <HrTextBox Value="@SearchTerm"
+                   ValueChanged="@OnSearchChanged"
+                   Placeholder="Search by name or email" />
     </div>
 
-    @if (_loading)
+    @if (IsLoading)
     {
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm" role="status"></div>
             <span>Loading employees…</span>
         </div>
     }
-    else if (_error is not null)
+    else if (Error is not null)
     {
-        <div class="alert alert-danger">@_error</div>
+        <div class="alert alert-danger">@Error</div>
     }
     else
     {
-        <HrGrid TValue="EmployeeListItemModel"
-                DataSource="@_items"
-                AllowPaging="true"
-                AllowSorting="true"
+        <HrGrid @ref="Grid"
+                TValue="EmployeeListItemModel"
+                DataSource="@Items"
+                Toolbar="@GridToolbar"
                 AllowFiltering="false">
+            <GridEvents TValue="EmployeeListItemModel" OnToolbarClick="OnToolbarClick"
+                        RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
             <GridPageSettings PageSize="20" />
             <GridColumns>
                 <GridColumn Field="@nameof(EmployeeListItemModel.LastName)" HeaderText="Last Name" Width="140">
@@ -66,68 +62,33 @@
                 </GridColumn>
             </GridColumns>
         </HrGrid>
-
     }
 </div>
 
 @code {
-    [Parameter] public Guid CompanyId { get; set; }
-
-    private List<EmployeeListItemModel> _items = [];
-    private bool _loading = true;
-    private string? _error;
-    private string _search = string.Empty;
     private bool _canCreateEmployee;
-    private System.Threading.CancellationTokenSource? _searchCts;
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task OnBeforeLoadAsync()
     {
         _canCreateEmployee = await UserService.HasPermissionAsync(SystemPermissions.EmployeeCreate);
-        await LoadAsync();
     }
 
-    private async Task OnSearchChanged(string value)
+    protected override async Task<IReadOnlyList<EmployeeListItemModel>?> FetchItemsAsync(string? search)
     {
-        _search = value;
-
-        // Debounce: cancel previous pending search
-        _searchCts?.Cancel();
-        _searchCts = new System.Threading.CancellationTokenSource();
-        var token = _searchCts.Token;
-
-        try
-        {
-            await Task.Delay(300, token);
-            await LoadAsync();
-        }
-        catch (TaskCanceledException) { }
+        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: search, pageSize: 100);
+        return result?.Items;
     }
 
-    private async Task LoadAsync()
-    {
-        _loading = true;
-        _error = null;
+    protected override string LoadErrorMessage => "Failed to load employees.";
 
-        var result = await EmployeeService.ListEmployeesAsync(
-            CompanyId,
-            search: string.IsNullOrWhiteSpace(_search) ? null : _search,
-            pageSize: 100);
+    protected override string? GetAddUrl() =>
+        _canCreateEmployee ? $"/companies/{CompanyId}/employees/new" : null;
 
-        if (result is null)
-        {
-            _error = "Failed to load employees.";
-            _items = [];
-        }
-        else
-        {
-            _items = result.Items;
-        }
+    protected override string? GetEditUrl(EmployeeListItemModel item) =>
+        $"/companies/{CompanyId}/employees/{item.Id}";
 
-        _loading = false;
-    }
-
-    private void AddEmployee() =>
-        Navigation.NavigateTo($"/companies/{CompanyId}/employees/new");
+    protected override string? GetViewUrl(EmployeeListItemModel item) =>
+        $"/companies/{CompanyId}/employees/{item.Id}/view";
 
     private static string StatusBadgeClass(string status) => status switch
     {
