@@ -1,0 +1,119 @@
+@page "/companies/{CompanyId:guid}/employees/{EmployeeId:guid}/profile"
+@rendermode InteractiveServer
+@inject LeaveService LeaveService
+@inject EmployeeService EmployeeService
+
+<PageTitle>My Profile</PageTitle>
+
+<div class="container py-4">
+    <h1 class="mb-4">My Profile</h1>
+
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        @foreach (var tab in _tabs)
+        {
+            <li class="nav-item" role="presentation">
+                <button class="nav-link @(tab == _activeTab ? "active" : "")"
+                        type="button" role="tab"
+                        @onclick="() => _activeTab = tab">@tab</button>
+            </li>
+        }
+    </ul>
+
+    <div class="tab-content">
+        @if (_activeTab == "Overview")
+        {
+            <p class="text-muted">Overview coming soon.</p>
+        }
+        else if (_activeTab == "Leave")
+        {
+            @if (_loading)
+            {
+                <div class="d-flex align-items-center gap-2">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                    <span>Loading…</span>
+                </div>
+            }
+            else
+            {
+                <div class="row g-3 mb-4">
+                    @if (_annualLeave is not null)
+                    {
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header fw-semibold">Annual Leave</div>
+                                <div class="card-body">
+                                    <dl class="mb-0">
+                                        <dt class="text-muted small">Remaining</dt>
+                                        <dd class="fs-4 fw-semibold mb-2">@FormatHours(_annualLeave.RemainingDays)</dd>
+                                        <dt class="text-muted small">Booked</dt>
+                                        <dd class="mb-2">@FormatHours(_annualLeave.UsedDays)</dd>
+                                        <dt class="text-muted small">Pending</dt>
+                                        <dd class="mb-0">—</dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    @if (_toil is not null)
+                    {
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header fw-semibold">TOIL</div>
+                                <div class="card-body">
+                                    <dl class="mb-0">
+                                        <dt class="text-muted small">Available</dt>
+                                        <dd class="fs-4 fw-semibold mb-0">@FormatHours(_toil.RemainingDays)</dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <SfButton IsPrimary="true">Request Leave</SfButton>
+            }
+        }
+        else if (_activeTab == "Documents")
+        {
+            <p class="text-muted">Documents coming soon.</p>
+        }
+        else if (_activeTab == "Tasks")
+        {
+            <p class="text-muted">Tasks coming soon.</p>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid EmployeeId { get; set; }
+
+    private static readonly string[] _tabs = ["Overview", "Leave", "Documents", "Tasks"];
+    private string _activeTab = "Leave";
+    private bool _loading = true;
+    private decimal _hoursPerDay = 7.5m;
+
+    private LeaveBalanceItemModel? _annualLeave;
+    private LeaveBalanceItemModel? _toil;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+
+        var employee = await EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
+        if (employee?.HoursPerDayOverride is not null)
+            _hoursPerDay = employee.HoursPerDayOverride.Value;
+
+        var balance = await LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
+        if (balance is not null)
+        {
+            _annualLeave = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "ANNUAL");
+            _toil = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "TOIL");
+        }
+
+        _loading = false;
+    }
+
+    private string FormatHours(decimal days) => $"{days * _hoursPerDay:0.#}h";
+}

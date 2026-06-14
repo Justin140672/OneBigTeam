@@ -31,42 +31,49 @@
         }
 
         <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label">Name <span class="text-danger">*</span></label>
-                    <HrTextBox @bind-Value="_model.Name" Placeholder="Department name" />
+            <div class="col-lg-7">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Department Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Name <span class="text-danger">*</span></label>
+                            <HrTextBox @bind-Value="_model.Name" Placeholder="Department name" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <HrTextBox @bind-Value="_model.Description" Placeholder="Optional description" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Parent Department</label>
+                            <SfDropDownList TValue="Guid?"
+                                            TItem="DepartmentListItemModel"
+                                            DataSource="@_otherDepts"
+                                            @bind-Value="_model.ParentDepartmentId"
+                                            Placeholder="None"
+                                            AllowFiltering="true">
+                                <DropDownListFieldSettings Value="Id" Text="Name" />
+                            </SfDropDownList>
+                        </div>
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Description</label>
-                    <HrTextBox @bind-Value="_model.Description" Placeholder="Optional description" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Parent Department</label>
-                    <SfDropDownList TValue="Guid?"
-                                    TItem="DepartmentListItemModel"
-                                    DataSource="@_otherDepts"
-                                    @bind-Value="_model.ParentDepartmentId"
-                                    Placeholder="None"
-                                    AllowFiltering="true">
-                        <DropDownListFieldSettings Value="Id" Text="Name" />
-                    </SfDropDownList>
+
+                <div class="d-flex gap-2 mt-3">
+                    @if (!string.IsNullOrEmpty(_successMsg))
+                    {
+                        <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
+                    }
+                    <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
+                        @if (_saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Save
+                    </SfButton>
+                    <SfButton OnClick="Cancel" Disabled="@_saving">Cancel</SfButton>
                 </div>
             </div>
-        </div>
-
-        <div class="mt-3 d-flex gap-2">
-            @if (!string.IsNullOrEmpty(_successMsg))
-            {
-                <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
-            }
-            <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
-                @if (_saving)
-                {
-                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                }
-                Save
-            </SfButton>
-            <SfButton OnClick="Cancel" Disabled="@_saving">Cancel</SfButton>
         </div>
     }
 </div>

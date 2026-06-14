@@ -25,22 +25,9 @@
             <span>Loading…</span>
         </div>
     }
-    else
+    else if (IsNew)
     {
-        @if (!IsNew)
-        {
-            <div class="d-flex align-items-center gap-3 mb-4">
-                <h1 class="mb-0">@(_employee?.FirstName) @(_employee?.LastName)</h1>
-                @if (_employee is not null)
-                {
-                    <span class="badge @StatusBadgeClass(_employee.Status)">@_employee.Status</span>
-                }
-            </div>
-        }
-        else
-        {
-            <h1 class="mb-4">Add Employee</h1>
-        }
+        <h1 class="mb-4">Add Employee</h1>
 
         @if (!string.IsNullOrEmpty(_globalError))
         {
@@ -48,152 +35,312 @@
         }
 
         <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label">First Name <span class="text-danger">*</span></label>
-                    <HrTextBox @bind-Value="_model.FirstName" Placeholder="First name" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Last Name <span class="text-danger">*</span></label>
-                    <HrTextBox @bind-Value="_model.LastName" Placeholder="Last name" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Work Email <span class="text-danger">*</span></label>
-                    <HrTextBox @bind-Value="_model.WorkEmail" Placeholder="work@company.com" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Personal Email</label>
-                    <HrTextBox @bind-Value="_model.PersonalEmail" Placeholder="personal@example.com" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Start Date <span class="text-danger">*</span></label>
-                    <SfDatePicker TValue="DateOnly"
-                                  @bind-Value="_model.StartDate" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Department</label>
-                    <SfDropDownList TValue="Guid?"
-                                    TItem="DepartmentListItemModel"
-                                    DataSource="@_departments"
-                                    @bind-Value="_model.DepartmentId"
-                                    Placeholder="None"
-                                    AllowFiltering="true">
-                        <DropDownListFieldSettings Value="Id" Text="Name" />
-                    </SfDropDownList>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Position Profile</label>
-                    <SfDropDownList TValue="Guid?"
-                                    TItem="PositionProfileListItemModel"
-                                    DataSource="@_positionProfiles"
-                                    @bind-Value="_model.PositionProfileId"
-                                    Placeholder="None"
-                                    AllowFiltering="true">
-                        <DropDownListFieldSettings Value="Id" Text="Title" />
-                    </SfDropDownList>
-                </div>
-            </div>
-        </div>
-
-        <div class="mt-3 d-flex gap-2">
-            @if (!string.IsNullOrEmpty(_successMsg))
-            {
-                <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
-            }
-            <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
-                @if (_saving)
-                {
-                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                }
-                Save
-            </SfButton>
-            <SfButton OnClick="Cancel" Disabled="@_saving">Cancel</SfButton>
-        </div>
-
-        <div class="mt-4 pt-3 border-top">
-            <h6 class="text-muted mb-2">System Access</h6>
-            <SfCheckBox TChecked="bool"
-                        Label="Employee needs system access (can log in)"
-                        @bind-Checked="_model.HasSystemAccess" />
-        </div>
-
-        @if (!IsNew)
-        {
-            <div class="mt-4 pt-3 border-top">
-                <h6 class="text-muted mb-2">Working Pattern Override</h6>
-                <SfCheckBox TChecked="bool"
-                            Label="Override company defaults"
-                            Checked="@_model.OverrideWorkingPattern"
-                            CheckedChanged="@((bool v) => _model.OverrideWorkingPattern = v)" />
-                @if (_model.OverrideWorkingPattern)
-                {
-                    <div class="row g-3 mt-2">
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Working Days</label>
-                            <div class="d-flex flex-wrap gap-3 mt-1">
-                                @foreach (var day in _allDays)
-                                {
-                                    <SfCheckBox TChecked="bool" Label="@day"
-                                                Checked="@_model.WorkingWeek.Contains(day)"
-                                                CheckedChanged="@(e => ToggleWorkingDay(day, e))" />
-                                }
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Personal Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">First Name <span class="text-danger">*</span></label>
+                                <HrTextBox @bind-Value="_model.FirstName" Placeholder="First name" />
                             </div>
-                        </div>
-                        <div class="col-md-4">
-                            <SfNumericTextBox TValue="decimal" @bind-Value="_model.HoursPerDay"
-                                              Placeholder="Hours Per Day"
-                                              FloatLabelType="FloatLabelType.Auto"
-                                              Min="0.5m" Max="24m" Step="0.5m" />
+                            <div class="col-md-6">
+                                <label class="form-label">Last Name <span class="text-danger">*</span></label>
+                                <HrTextBox @bind-Value="_model.LastName" Placeholder="Last name" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Work Email <span class="text-danger">*</span></label>
+                                <HrTextBox @bind-Value="_model.WorkEmail" Placeholder="work@company.com" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Personal Email</label>
+                                <HrTextBox @bind-Value="_model.PersonalEmail" Placeholder="personal@example.com" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                                <SfDatePicker TValue="DateOnly" @bind-Value="_model.StartDate" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Department</label>
+                                <SfDropDownList TValue="Guid?"
+                                                TItem="DepartmentListItemModel"
+                                                DataSource="@_departments"
+                                                @bind-Value="_model.DepartmentId"
+                                                Placeholder="None"
+                                                AllowFiltering="true">
+                                    <DropDownListFieldSettings Value="Id" Text="Name" />
+                                </SfDropDownList>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Position Profile</label>
+                                <SfDropDownList TValue="Guid?"
+                                                TItem="PositionProfileListItemModel"
+                                                DataSource="@_positionProfiles"
+                                                @bind-Value="_model.PositionProfileId"
+                                                Placeholder="None"
+                                                AllowFiltering="true">
+                                    <DropDownListFieldSettings Value="Id" Text="Title" />
+                                </SfDropDownList>
+                            </div>
                         </div>
                     </div>
-                }
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">System Access</h5>
+                    </div>
+                    <div class="card-body">
+                        <SfCheckBox TChecked="bool"
+                                    Label="Employee needs system access (can log in)"
+                                    @bind-Checked="_model.HasSystemAccess" />
+                        @if (_model.HasSystemAccess)
+                        {
+                            <hr class="my-3" />
+                            <SfCheckBox TChecked="bool"
+                                        Label="Send invite link after creating employee"
+                                        @bind-Checked="_sendInviteOnCreate" />
+                        }
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 align-items-center mt-3">
+                    @if (!string.IsNullOrEmpty(_successMsg))
+                    {
+                        <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
+                    }
+                    <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
+                        @if (_saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Save
+                    </SfButton>
+                    <SfButton OnClick="Cancel" Disabled="@_saving">Cancel</SfButton>
+                </div>
             </div>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-3 mb-3">
+            <h1 class="mb-0">@(_employee?.FirstName) @(_employee?.LastName)</h1>
+            @if (_employee is not null)
+            {
+                <span class="badge rounded-pill px-3 py-2 fs-6 fw-normal @StatusBadgeClass(_employee.Status)">@_employee.Status</span>
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(_globalError))
+        {
+            <div class="alert alert-danger mb-3">@_globalError</div>
         }
 
-        @if (_model.HasSystemAccess)
-        {
-            @if (IsNew)
-            {
-                <div class="mt-4 pt-3 border-top">
-                    <h6 class="text-muted mb-2">Invite</h6>
-                    <SfCheckBox TChecked="bool"
-                                Label="Send invite link after creating employee"
-                                @bind-Checked="_sendInviteOnCreate" />
-                </div>
-            }
-            else
-            {
-                <div class="mt-4 pt-3 border-top">
-                    <h6 class="text-muted mb-2">Invite</h6>
-                    @if (!string.IsNullOrEmpty(_inviteError))
-                    {
-                        <div class="alert alert-danger py-2">@_inviteError</div>
-                    }
-                    @if (_inviteLink is not null)
-                    {
-                        <div class="alert alert-success py-2">
-                            <div class="mb-1"><strong>Invite link generated</strong> — expires @_inviteExpiresAt.ToString("MMM d, yyyy")</div>
-                            <div class="input-group">
-                                <input class="form-control form-control-sm font-monospace" readonly value="@_inviteLink" />
-                                <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="CopyLink">Copy</button>
+        <SfTab>
+            <TabItems>
+
+                <TabItem>
+                    <ChildContent><TabHeader Text="Details" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4 row">
+                            <div class="col-lg-8">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">Personal Information</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">First Name <span class="text-danger">*</span></label>
+                                                <HrTextBox @bind-Value="_model.FirstName" Placeholder="First name" />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Last Name <span class="text-danger">*</span></label>
+                                                <HrTextBox @bind-Value="_model.LastName" Placeholder="Last name" />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Work Email <span class="text-danger">*</span></label>
+                                                <HrTextBox @bind-Value="_model.WorkEmail" Placeholder="work@company.com" />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Personal Email</label>
+                                                <HrTextBox @bind-Value="_model.PersonalEmail" Placeholder="personal@example.com" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                                                <SfDatePicker TValue="DateOnly" @bind-Value="_model.StartDate" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Department</label>
+                                                <SfDropDownList TValue="Guid?"
+                                                                TItem="DepartmentListItemModel"
+                                                                DataSource="@_departments"
+                                                                @bind-Value="_model.DepartmentId"
+                                                                Placeholder="None"
+                                                                AllowFiltering="true">
+                                                    <DropDownListFieldSettings Value="Id" Text="Name" />
+                                                </SfDropDownList>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Position Profile</label>
+                                                <SfDropDownList TValue="Guid?"
+                                                                TItem="PositionProfileListItemModel"
+                                                                DataSource="@_positionProfiles"
+                                                                @bind-Value="_model.PositionProfileId"
+                                                                Placeholder="None"
+                                                                AllowFiltering="true">
+                                                    <DropDownListFieldSettings Value="Id" Text="Title" />
+                                                </SfDropDownList>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">System Access</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <SfCheckBox TChecked="bool"
+                                                    Label="Employee needs system access (can log in)"
+                                                    @bind-Checked="_model.HasSystemAccess" />
+                                        @if (_model.HasSystemAccess)
+                                        {
+                                            <hr class="my-3" />
+                                            @if (!string.IsNullOrEmpty(_inviteError))
+                                            {
+                                                <div class="alert alert-danger py-2">@_inviteError</div>
+                                            }
+                                            @if (_inviteLink is not null)
+                                            {
+                                                <div class="alert alert-success py-2">
+                                                    <div class="mb-1"><strong>Invite link generated</strong> — expires @_inviteExpiresAt.ToString("MMM d, yyyy")</div>
+                                                    <div class="input-group">
+                                                        <input class="form-control form-control-sm font-monospace" readonly value="@_inviteLink" />
+                                                        <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="CopyLink">Copy</button>
+                                                    </div>
+                                                    <small class="text-muted">Share this link with the employee to let them set their password.</small>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <p class="text-muted small mb-2">Generate an invite link to send to the employee so they can set their password and access the system.</p>
+                                                <SfButton OnClick="SendInvite" Disabled="@_sendingInvite">
+                                                    @if (_sendingInvite)
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                                    }
+                                                    Generate Invite Link
+                                                </SfButton>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">Working Pattern</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <SfCheckBox TChecked="bool"
+                                                    Label="Override company defaults"
+                                                    Checked="@_model.OverrideWorkingPattern"
+                                                    CheckedChanged="@((bool v) => _model.OverrideWorkingPattern = v)" />
+                                        @if (_model.OverrideWorkingPattern)
+                                        {
+                                            <div class="row g-3 mt-2">
+                                                <div class="col-12">
+                                                    <label class="form-label fw-semibold">Working Days</label>
+                                                    <div class="d-flex flex-wrap gap-3 mt-1">
+                                                        @foreach (var day in _allDays)
+                                                        {
+                                                            <SfCheckBox TChecked="bool" Label="@day"
+                                                                        Checked="@_model.WorkingWeek.Contains(day)"
+                                                                        CheckedChanged="@(e => ToggleWorkingDay(day, e))" />
+                                                        }
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <SfNumericTextBox TValue="decimal" @bind-Value="_model.HoursPerDay"
+                                                                      Placeholder="Hours Per Day"
+                                                                      FloatLabelType="FloatLabelType.Auto"
+                                                                      Min="0.5m" Max="24m" Step="0.5m" />
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2 align-items-center mt-3">
+                                    @if (!string.IsNullOrEmpty(_successMsg))
+                                    {
+                                        <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
+                                    }
+                                    <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
+                                        @if (_saving)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        }
+                                        Save
+                                    </SfButton>
+                                    <SfButton OnClick="Cancel" Disabled="@_saving">Cancel</SfButton>
+                                </div>
                             </div>
-                            <small class="text-muted">Share this link with the employee to let them set their password.</small>
                         </div>
-                    }
-                    else
-                    {
-                        <p class="text-muted small mb-2">Generate an invite link to send to the employee so they can set their password and access the system.</p>
-                        <SfButton OnClick="SendInvite" Disabled="@_sendingInvite">
-                            @if (_sendingInvite)
-                            {
-                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                            }
-                            Generate Invite Link
-                        </SfButton>
-                    }
-                </div>
-            }
-        }
+                    </ContentTemplate>
+                </TabItem>
+
+                <TabItem>
+                    <ChildContent><TabHeader Text="Employment" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <p class="text-muted">Employment details coming soon.</p>
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
+                <TabItem>
+                    <ChildContent><TabHeader Text="Leave" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <EmployeeLeaveTab CompanyId="CompanyId"
+                                              EmployeeId="Id!.Value"
+                                              HoursPerDay="@(_model.OverrideWorkingPattern ? _model.HoursPerDay : 7.5m)" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
+                <TabItem>
+                    <ChildContent><TabHeader Text="Documents" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <p class="text-muted">Documents coming soon.</p>
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
+                <TabItem>
+                    <ChildContent><TabHeader Text="Compensation" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <p class="text-muted">Compensation coming soon.</p>
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
+                <TabItem>
+                    <ChildContent><TabHeader Text="Audit" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <p class="text-muted">Audit history coming soon.</p>
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
+            </TabItems>
+        </SfTab>
     }
 </div>
 
@@ -210,7 +357,6 @@
     private string? _successMsg;
     private bool _saving;
 
-    // Invite state
     private bool _sendInviteOnCreate;
     private bool _sendingInvite;
     private string? _inviteLink;
@@ -264,7 +410,6 @@
                 }
             }
 
-            // Auto-generate invite link if redirected here after create with invite
             var uri = new Uri(Navigation.Uri);
             if (uri.Query.Contains("invited=true") && _employee is not null)
                 await SendInvite();
@@ -307,7 +452,6 @@
                     var (token, expiresAt, _) = await InviteService.SendInviteAsync(CompanyId, created.Id, email);
                     if (token is not null)
                     {
-                        // Navigate to the edit page so the user can see and copy the invite link
                         Navigation.NavigateTo($"/companies/{CompanyId}/employees/{created.Id}?invited=true");
                         return;
                     }
@@ -346,13 +490,9 @@
             _saving = false;
 
             if (success)
-            {
                 Navigation.NavigateTo($"/companies/{CompanyId}/employees");
-            }
             else
-            {
                 _globalError = conflictMessage;
-            }
         }
     }
 
@@ -385,8 +525,6 @@
 
     private async Task CopyLink()
     {
-        // The link is shown in a readonly input — user can select and copy manually.
-        // JS interop clipboard could be added later.
         await Task.CompletedTask;
     }
 

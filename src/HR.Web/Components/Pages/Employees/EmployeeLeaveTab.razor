@@ -1,0 +1,99 @@
+@inject LeaveService LeaveService
+
+@if (_loading)
+{
+    <div class="d-flex align-items-center gap-2">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span>Loading…</span>
+    </div>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header fw-semibold">Current Balance</div>
+                <div class="card-body">
+                    @if (_nonToilBalances.Count > 0)
+                    {
+                        <div class="row g-3">
+                            @foreach (var item in _nonToilBalances)
+                            {
+                                <div class="col-md-4">
+                                    <div class="d-flex flex-column">
+                                        <span class="text-muted small">@item.LeaveTypeName</span>
+                                        <span class="fs-4 fw-semibold">@FormatHours(item.RemainingDays)</span>
+                                        <span class="text-muted small">of @FormatHours(item.EntitlementDays) entitlement</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted small mb-0">No balance data available.</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header fw-semibold">Pending Requests</div>
+                <div class="card-body">
+                    <p class="text-muted small mb-0">No pending requests.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header fw-semibold">Approved Requests</div>
+                <div class="card-body">
+                    <p class="text-muted small mb-0">No approved requests.</p>
+                </div>
+            </div>
+        </div>
+
+        @if (_toilBalance is not null)
+        {
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header fw-semibold">TOIL Balance</div>
+                    <div class="card-body">
+                        <span class="fs-4 fw-semibold">@FormatHours(_toilBalance.RemainingDays)</span>
+                        <span class="text-muted small ms-2">available</span>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="col-12">
+            <SfButton>Adjust Balance</SfButton>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter] public decimal HoursPerDay { get; set; } = 7.5m;
+
+    private bool _loading = true;
+    private List<LeaveBalanceItemModel> _nonToilBalances = [];
+    private LeaveBalanceItemModel? _toilBalance;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        var balance = await LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
+        if (balance is not null)
+        {
+            _toilBalance = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "TOIL");
+            _nonToilBalances = balance.Balances.Where(b => b.LeaveTypeCode != "TOIL").ToList();
+        }
+        _loading = false;
+    }
+
+    private string FormatHours(decimal days) => $"{days * HoursPerDay:0.#}h";
+}

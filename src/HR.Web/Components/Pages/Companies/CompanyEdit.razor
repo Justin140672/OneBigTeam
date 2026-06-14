@@ -31,34 +31,34 @@
             <div class="alert alert-danger">@_globalError</div>
         }
 
-        <ul class="nav nav-tabs mb-4" role="tablist">
-            @foreach (var tab in _tabs)
-            {
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link @(tab == _activeTab ? "active" : "")" type="button" role="tab"
-                            @onclick="() => _activeTab = tab">@tab</button>
-                </li>
-            }
-        </ul>
-
-        <div class="tab-content">
-            @if (_activeTab == "Profile")
-            {
-                <CompanyProfileTab Company="_company" Model="_profile" />
-            }
-            else if (_activeTab == "Addresses")
-            {
-                <CompanyAddressesTab Addresses="_addresses" />
-            }
-            else if (_activeTab == "Settings")
-            {
-                <CompanySettingsTab Model="_settings" />
-            }
-            else if (_activeTab == "Branding")
-            {
-                <CompanyBrandingTab Model="_branding" />
-            }
-        </div>
+        <SfTab>
+            <TabItems>
+                <TabItem>
+                    <ChildContent><TabHeader Text="Profile" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4"><CompanyProfileTab Company="_company" Model="_profile" /></div>
+                    </ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent><TabHeader Text="Addresses" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4"><CompanyAddressesTab Addresses="_addresses" /></div>
+                    </ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent><TabHeader Text="Settings" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4"><CompanySettingsTab Model="_settings" /></div>
+                    </ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent><TabHeader Text="Branding" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4"><CompanyBrandingTab Model="_branding" /></div>
+                    </ContentTemplate>
+                </TabItem>
+            </TabItems>
+        </SfTab>
 
         <div class="mt-4">
             @if (!string.IsNullOrEmpty(_successMsg))
@@ -80,9 +80,6 @@
     private string? _globalError;
     private string? _successMsg;
     private bool _saving;
-    private string _activeTab = "Profile";
-    private readonly string[] _tabs = ["Profile", "Addresses", "Settings", "Branding"];
-
     private readonly CompanyProfileEditModel _profile = new();
     private List<CompanyAddressEditModel> _addresses = [];
     private readonly CompanySettingsEditModel _settings = new();

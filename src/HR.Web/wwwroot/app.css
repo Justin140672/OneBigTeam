@@ -2,9 +2,24 @@ html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
+/* ── SfMenu sidebar overrides ────────────────────────────── */
+.app-nav-menu.e-menu-wrapper {
+    display: block;
+    width: 100%;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.app-nav-menu .e-menu.e-vertical {
+    width: 100%;
+    background: transparent;
+}
+
 /* Give labels breathing room above Syncfusion controls that have no bottom margin */
 .form-label {
-    margin-top: 0.25rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.4rem;
 }
 
 /* Normalize Syncfusion form controls to match Bootstrap form fields */
