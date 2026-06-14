@@ -22,8 +22,12 @@ else
                                 <div class="col-md-4">
                                     <div class="d-flex flex-column">
                                         <span class="text-muted small">@item.LeaveTypeName</span>
-                                        <span class="fs-4 fw-semibold">@FormatHours(item.RemainingDays)</span>
-                                        <span class="text-muted small">of @FormatHours(item.EntitlementDays) entitlement</span>
+                                        <span class="fs-4 fw-semibold">@FormatDays(item.RemainingDays)</span>
+                                        <span class="text-muted small">of @FormatDays(item.EntitlementDays) entitlement</span>
+                                        @if (item.PendingDays > 0)
+                                        {
+                                            <span class="text-muted small">@FormatDays(item.PendingDays) pending</span>
+                                        }
                                     </div>
                                 </div>
                             }
@@ -41,7 +45,38 @@ else
             <div class="card">
                 <div class="card-header fw-semibold">Pending Requests</div>
                 <div class="card-body">
-                    <p class="text-muted small mb-0">No pending requests.</p>
+                    @if (_pendingRequests.Count > 0)
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Start</th>
+                                        <th>End</th>
+                                        <th>Days</th>
+                                        <th>Reason</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var r in _pendingRequests)
+                                    {
+                                        <tr>
+                                            <td>@r.LeaveTypeName</td>
+                                            <td>@FormatDate(r.StartDate, r.StartPart)</td>
+                                            <td>@FormatDate(r.EndDate, r.EndPart)</td>
+                                            <td>@FormatDays(r.TotalDays)</td>
+                                            <td class="text-muted">@(r.Reason ?? "—")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted small mb-0">No pending requests.</p>
+                    }
                 </div>
             </div>
         </div>
@@ -50,7 +85,38 @@ else
             <div class="card">
                 <div class="card-header fw-semibold">Approved Requests</div>
                 <div class="card-body">
-                    <p class="text-muted small mb-0">No approved requests.</p>
+                    @if (_approvedRequests.Count > 0)
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Start</th>
+                                        <th>End</th>
+                                        <th>Days</th>
+                                        <th>Reason</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var r in _approvedRequests)
+                                    {
+                                        <tr>
+                                            <td>@r.LeaveTypeName</td>
+                                            <td>@FormatDate(r.StartDate, r.StartPart)</td>
+                                            <td>@FormatDate(r.EndDate, r.EndPart)</td>
+                                            <td>@FormatDays(r.TotalDays)</td>
+                                            <td class="text-muted">@(r.Reason ?? "—")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted small mb-0">No approved requests.</p>
+                    }
                 </div>
             </div>
         </div>
@@ -61,7 +127,7 @@ else
                 <div class="card">
                     <div class="card-header fw-semibold">TOIL Balance</div>
                     <div class="card-body">
-                        <span class="fs-4 fw-semibold">@FormatHours(_toilBalance.RemainingDays)</span>
+                        <span class="fs-4 fw-semibold">@FormatDays(_toilBalance.RemainingDays)</span>
                         <span class="text-muted small ms-2">available</span>
                     </div>
                 </div>
@@ -77,23 +143,42 @@ else
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
-    [Parameter] public decimal HoursPerDay { get; set; } = 7.5m;
 
     private bool _loading = true;
     private List<LeaveBalanceItemModel> _nonToilBalances = [];
     private LeaveBalanceItemModel? _toilBalance;
+    private List<LeaveRequestListItem> _pendingRequests = [];
+    private List<LeaveRequestListItem> _approvedRequests = [];
 
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
-        var balance = await LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
+
+        var balanceTask = LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
+        var requestsTask = LeaveService.ListLeaveRequestsAsync(CompanyId, EmployeeId);
+
+        await Task.WhenAll(balanceTask, requestsTask);
+
+        var balance = await balanceTask;
         if (balance is not null)
         {
             _toilBalance = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "TOIL");
             _nonToilBalances = balance.Balances.Where(b => b.LeaveTypeCode != "TOIL").ToList();
         }
+
+        var requests = await requestsTask;
+        if (requests is not null)
+        {
+            _pendingRequests = requests.Items.Where(r => r.Status == "Pending").ToList();
+            _approvedRequests = requests.Items.Where(r => r.Status == "Approved").ToList();
+        }
+
         _loading = false;
     }
 
-    private string FormatHours(decimal days) => $"{days * HoursPerDay:0.#}h";
+    private static string FormatDays(decimal days) =>
+        $"{days:0.##} {(days == 1m ? "day" : "days")}";
+
+    private static string FormatDate(DateOnly date, string part) =>
+        part == "FullDay" ? date.ToString("dd MMM yyyy") : $"{date:dd MMM yyyy} ({part})";
 }

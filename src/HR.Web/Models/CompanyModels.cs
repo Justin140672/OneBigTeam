@@ -49,6 +49,18 @@ public record UpdateCompanyResponse(Guid Id, string Name, string Slug, bool IsAc
 
 // ── SETTINGS ──────────────────────────────────────────────────────────────────
 
+public record GetCompanySettingsResponse(
+    Guid CompanyId,
+    string TimeZone,
+    string Locale,
+    int WorkingDays,
+    decimal HoursPerDay,
+    int LeaveYearStartMonth,
+    decimal DefaultHolidayAllowance,
+    int ProbationMonths,
+    bool ExcludePublicHolidaysFromLeave,
+    DateTime UpdatedAt);
+
 public record UpdateCompanySettingsRequest(
     Guid Id,
     string? TimeZone,

@@ -3,6 +3,7 @@ using FluentValidation;
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Features.CreateCompany;
 using HR.Modules.Companies.Features.GetCompany;
+using HR.Modules.Companies.Features.GetCompanySettings;
 using HR.Modules.Companies.Features.UpdateCompany;
 using HR.Modules.Companies.Features.UpdateCompanySettings;
 using HR.Modules.Companies.Features.UploadCompanyLogo;
@@ -70,6 +71,7 @@ public static class CompaniesModule
     {
         services.AddScoped<CreateCompanyHandler>();
         services.AddScoped<GetCompanyHandler>();
+        services.AddScoped<GetCompanySettingsHandler>();
         services.AddScoped<UpdateCompanyHandler>();
         services.AddScoped<UpdateCompanySettingsHandler>();
         services.AddScoped<UploadCompanyLogoHandler>();

@@ -13,4 +13,5 @@ internal sealed record LeaveBalanceItem(
     decimal EntitlementDays,
     decimal UsedDays,
     decimal AdjustmentDays,
-    decimal RemainingDays);
+    decimal RemainingDays,
+    decimal PendingDays);

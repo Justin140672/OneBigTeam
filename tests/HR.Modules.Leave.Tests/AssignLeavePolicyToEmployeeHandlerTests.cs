@@ -23,7 +23,7 @@ public class AssignLeavePolicyToEmployeeHandlerTests
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 
-        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
 
         var result = await handler.HandleAsync(
             new AssignLeavePolicyToEmployeeRequest
@@ -64,7 +64,7 @@ public class AssignLeavePolicyToEmployeeHandlerTests
         context.EmployeeLeavePolicyAssignments.Add(existingAssignment);
         await context.SaveChangesAsync();
 
-        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
 
         var result = await handler.HandleAsync(
             new AssignLeavePolicyToEmployeeRequest
@@ -90,7 +90,7 @@ public class AssignLeavePolicyToEmployeeHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Policy_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
 
         var result = await handler.HandleAsync(
             new AssignLeavePolicyToEmployeeRequest
@@ -116,7 +116,7 @@ public class AssignLeavePolicyToEmployeeHandlerTests
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 
-        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new AssignLeavePolicyToEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
 
         var result = await handler.HandleAsync(
             new AssignLeavePolicyToEmployeeRequest

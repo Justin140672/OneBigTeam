@@ -10,6 +10,7 @@
     <PackageReference Include="Syncfusion.Blazor.DropDowns" Version="33.2.10" />
     <PackageReference Include="Syncfusion.Blazor.Grid" Version="33.2.10" />
     <PackageReference Include="Syncfusion.Blazor.Inputs" Version="33.2.10" />
+    <PackageReference Include="Syncfusion.Blazor.Popups" Version="33.2.10" />
     <PackageReference Include="Syncfusion.Blazor.Themes" Version="33.2.10" />
   </ItemGroup>
 

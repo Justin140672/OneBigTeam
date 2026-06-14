@@ -21,18 +21,47 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
 
     private bool _hasSelection;
 
-    // Recomputed on every render so Disabled reflects current selection state.
-    protected IEnumerable<object> GridToolbar => new List<object>
+    private record ToolbarAction(string Id, string Text, string Icon, Func<TItem, Task> OnClick, string? Tooltip = null);
+    private readonly List<ToolbarAction> _customActions = new();
+
+    protected void AddToolbarAction(string id, string text, string icon, Func<TItem, Task> onClick, string? tooltip = null)
+        => _customActions.Add(new(id, text, icon, onClick, tooltip));
+
+    // Override to register custom toolbar actions via AddToolbarAction.
+    protected virtual void ConfigureToolbar() { }
+
+    protected override void OnInitialized()
     {
-        new ItemModel { Id = "hr-add",  Text = "Add",  PrefixIcon = "e-icons e-add",  TooltipText = "Add" },
-        new ItemModel { Id = "hr-edit", Text = "Edit", PrefixIcon = "e-icons e-edit", TooltipText = "Edit selected",  Disabled = !_hasSelection },
-        new ItemModel { Id = "hr-view", Text = "View", PrefixIcon = "e-icons e-eye",  TooltipText = "View selected",  Disabled = !_hasSelection },
-        "Print",
-        "ExcelExport",
-        "CsvExport",
-        "PdfExport",
-        "ColumnChooser",
-    };
+        ConfigureToolbar();
+        base.OnInitialized();
+    }
+
+    // Recomputed on every render so Disabled reflects current selection state.
+    protected IEnumerable<object> GridToolbar
+    {
+        get
+        {
+            var items = new List<object>
+            {
+                new ItemModel { Id = "hr-add",  Text = "Add",  PrefixIcon = "e-icons e-add",  TooltipText = "Add" },
+                new ItemModel { Id = "hr-edit", Text = "Edit", PrefixIcon = "e-icons e-edit", TooltipText = "Edit selected", Disabled = !_hasSelection },
+                new ItemModel { Id = "hr-view", Text = "View", PrefixIcon = "e-icons e-eye",  TooltipText = "View selected", Disabled = !_hasSelection },
+            };
+
+            foreach (var action in _customActions)
+                items.Add(new ItemModel
+                {
+                    Id          = action.Id,
+                    Text        = action.Text,
+                    PrefixIcon  = action.Icon,
+                    TooltipText = action.Tooltip ?? action.Text,
+                    Disabled    = !_hasSelection,
+                });
+
+            items.AddRange(new object[] { "Print", "ExcelExport", "CsvExport", "PdfExport", "ColumnChooser" });
+            return items;
+        }
+    }
 
     protected virtual string? GetAddUrl() => null;
     protected virtual string? GetEditUrl(TItem item) => null;
@@ -68,7 +97,7 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
                 if (url is not null) Navigation.NavigateTo(url);
                 break;
 
-            // Built-in toolbar item IDs have a grid-ID prefix: "{gridId}_excelexport" etc.
+            // Built-in toolbar item IDs carry a grid-ID prefix: "{gridId}_excelexport" etc.
             case var id when id.EndsWith("_excelexport", StringComparison.OrdinalIgnoreCase):
                 if (Grid is not null) await Grid.ExportToExcelAsync(new ExcelExportProperties());
                 break;
@@ -81,7 +110,17 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
                 if (Grid is not null) await Grid.ExportToPdfAsync(new PdfExportProperties());
                 break;
 
-            // Print and ColumnChooser are handled client-side by Syncfusion
+            // Print and ColumnChooser are handled client-side by Syncfusion.
+            // Fall through to check registered custom actions.
+            default:
+                var customAction = _customActions.FirstOrDefault(a => a.Id == args.Item.Id);
+                if (customAction is not null && _hasSelection && Grid is not null)
+                {
+                    var selected = await Grid.GetSelectedRecordsAsync();
+                    if (selected.Count > 0)
+                        await customAction.OnClick(selected[0]);
+                }
+                break;
         }
     }
 

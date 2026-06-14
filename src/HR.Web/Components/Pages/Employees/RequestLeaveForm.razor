@@ -1,0 +1,305 @@
+@inject LeaveService LeaveService
+
+<SfDialog @bind-Visible="_visible" IsModal="true" Width="640px" ShowCloseIcon="true">
+    <DialogEvents Closed="OnDialogClosed" />
+    <DialogTemplates>
+        <Header>Request Leave</Header>
+        <Content>
+            @if (_submitError is not null)
+            {
+                <div class="alert alert-danger alert-dismissible mb-3">
+                    @_submitError
+                    <button type="button" class="btn-close" @onclick="@(() => _submitError = null)"></button>
+                </div>
+            }
+
+            @if (Balances.Count == 0)
+            {
+                <p class="text-muted mb-0">No leave types are available.</p>
+            }
+            else
+            {
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Leave Type <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="Guid" TItem="LeaveBalanceItemModel"
+                                        DataSource="@Balances"
+                                        Value="_leaveTypeId"
+                                        ValueChanged="OnLeaveTypeChanged"
+                                        Placeholder="Select leave type">
+                            <DropDownListFieldSettings Value="LeaveTypeId" Text="LeaveTypeName" />
+                        </SfDropDownList>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-1">
+                    <div class="col-6">
+                        <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                        <SfDatePicker TValue="DateTime"
+                                      Value="_startDateTime"
+                                      ValueChanged="OnStartDateChanged"
+                                      Format="dd/MM/yyyy" />
+                        <div class="mt-2">
+                            <label class="form-label small text-muted">Start</label>
+                            <SfDropDownList TValue="LeaveDayPart" TItem="DayPartChoice"
+                                            DataSource="@DayPartOptions"
+                                            Value="_startPart"
+                                            ValueChanged="OnStartPartChanged">
+                                <DropDownListFieldSettings Value="Part" Text="Label" />
+                            </SfDropDownList>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">End Date <span class="text-danger">*</span></label>
+                        <SfDatePicker TValue="DateTime"
+                                      Value="_endDateTime"
+                                      ValueChanged="OnEndDateChanged"
+                                      Format="dd/MM/yyyy" />
+                        <div class="mt-2">
+                            <label class="form-label small text-muted">End</label>
+                            <SfDropDownList TValue="LeaveDayPart" TItem="DayPartChoice"
+                                            DataSource="@DayPartOptions"
+                                            Value="_endPart"
+                                            ValueChanged="OnEndPartChanged">
+                                <DropDownListFieldSettings Value="Part" Text="Label" />
+                            </SfDropDownList>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-1">
+                    <div class="col-12">
+                        <label class="form-label">Reason <span class="text-muted small">(optional)</span></label>
+                        <HrTextBox @bind-Value="_reason" Placeholder="Reason for leave request" />
+                    </div>
+                </div>
+
+                @if (_leaveTypeId != Guid.Empty)
+                {
+                    var dateInvalid = EndDate < StartDate;
+                    var totalDays = dateInvalid ? 0m : CalculateDays();
+                    var selectedBalance = Balances.FirstOrDefault(b => b.LeaveTypeId == _leaveTypeId);
+                    var remainingAfter = !dateInvalid && selectedBalance is not null
+                        ? selectedBalance.RemainingDays - totalDays
+                        : (decimal?)null;
+                    var wouldExceed = remainingAfter.HasValue && remainingAfter.Value < 0;
+                    var excludedHolidays = !dateInvalid && ExcludePublicHolidays
+                        ? GetExcludedHolidays()
+                        : (IReadOnlyList<DateOnly>)[];
+
+                    <div class="mt-3 p-3 rounded border bg-light">
+                        @if (dateInvalid)
+                        {
+                            <span class="text-danger small">End date must be on or after start date.</span>
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-column gap-1">
+                                <span class="fw-semibold">@FormatDays(totalDays) requested</span>
+
+                                @if (excludedHolidays.Count > 0)
+                                {
+                                    <small class="text-muted">
+                                        @excludedHolidays.Count public holiday(s) excluded
+                                    </small>
+                                }
+
+                                @if (remainingAfter.HasValue)
+                                {
+                                    <small class="@(wouldExceed ? "text-danger fw-semibold" : "text-muted")">
+                                        Balance after: @FormatDays(remainingAfter.Value)
+                                        @if (wouldExceed)
+                                        {
+                                            <span> &mdash; would exceed your allowance</span>
+                                        }
+                                    </small>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton IsPrimary="true" Disabled="@(!CanSubmit)" OnClick="Submit">
+                @if (_submitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Submit Request
+            </SfButton>
+            <SfButton OnClick="Cancel">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<LeaveBalanceItemModel> Balances { get; set; } = [];
+    [Parameter] public WorkingDays EffectiveWorkingDays { get; set; } =
+        WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+        WorkingDays.Thursday | WorkingDays.Friday;
+    [Parameter] public decimal EffectiveHoursPerDay { get; set; } = 7.5m;
+    [Parameter] public bool ExcludePublicHolidays { get; set; } = true;
+    [Parameter] public IReadOnlyList<DateOnly> PublicHolidays { get; set; } = [];
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnSubmitted { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+
+    private record DayPartChoice(LeaveDayPart Part, string Label);
+
+    private static readonly DayPartChoice[] DayPartOptions =
+    [
+        new(LeaveDayPart.FullDay, "Full day"),
+        new(LeaveDayPart.Morning, "Morning"),
+        new(LeaveDayPart.Afternoon, "Afternoon"),
+    ];
+
+    private bool _visible;
+
+    private Guid _leaveTypeId;
+    private DateTime _startDateTime = DateTime.Today;
+    private LeaveDayPart _startPart = LeaveDayPart.FullDay;
+    private DateTime _endDateTime = DateTime.Today;
+    private LeaveDayPart _endPart = LeaveDayPart.FullDay;
+    private string? _reason;
+
+    private bool _submitting;
+    private string? _submitError;
+
+    private DateOnly StartDate => DateOnly.FromDateTime(_startDateTime);
+    private DateOnly EndDate => DateOnly.FromDateTime(_endDateTime);
+
+    private bool CanSubmit =>
+        _leaveTypeId != Guid.Empty && EndDate >= StartDate && !_submitting;
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && !_visible)
+        {
+            Reset();
+            _visible = true;
+        }
+        else if (!IsOpen && _visible)
+        {
+            _visible = false;
+        }
+    }
+
+    private void Reset()
+    {
+        _leaveTypeId = Guid.Empty;
+        _startDateTime = DateTime.Today;
+        _startPart = LeaveDayPart.FullDay;
+        _endDateTime = DateTime.Today;
+        _endPart = LeaveDayPart.FullDay;
+        _reason = null;
+        _submitError = null;
+    }
+
+    private async Task OnDialogClosed() => await OnCancelled.InvokeAsync();
+
+    private async Task Cancel()
+    {
+        _visible = false;
+        await OnCancelled.InvokeAsync();
+    }
+
+    private void OnLeaveTypeChanged(Guid v) => _leaveTypeId = v;
+
+    private void OnStartDateChanged(DateTime v)
+    {
+        _startDateTime = v;
+        if (_endDateTime < _startDateTime)
+            _endDateTime = _startDateTime;
+    }
+
+    private void OnEndDateChanged(DateTime v) => _endDateTime = v;
+    private void OnStartPartChanged(LeaveDayPart v) => _startPart = v;
+    private void OnEndPartChanged(LeaveDayPart v) => _endPart = v;
+
+    private decimal CalculateDays()
+    {
+        var start = StartDate;
+        var end = EndDate;
+        if (end < start || EffectiveHoursPerDay <= 0) return 0;
+
+        decimal totalHours = 0;
+        var current = start;
+
+        while (current <= end)
+        {
+            if (IsWorkingDay(current.DayOfWeek) &&
+                (!ExcludePublicHolidays || !PublicHolidays.Contains(current)))
+            {
+                totalHours += current == start && current == end
+                    ? PartToHours(_startPart)
+                    : current == start
+                        ? PartToHours(_startPart)
+                        : current == end
+                            ? PartToHours(_endPart)
+                            : EffectiveHoursPerDay;
+            }
+
+            current = current.AddDays(1);
+        }
+
+        return totalHours / EffectiveHoursPerDay;
+    }
+
+    private IReadOnlyList<DateOnly> GetExcludedHolidays()
+    {
+        var start = StartDate;
+        var end = EndDate;
+        return PublicHolidays
+            .Where(h => h >= start && h <= end && IsWorkingDay(h.DayOfWeek))
+            .ToList();
+    }
+
+    private bool IsWorkingDay(DayOfWeek day) => day switch
+    {
+        DayOfWeek.Monday    => EffectiveWorkingDays.HasFlag(WorkingDays.Monday),
+        DayOfWeek.Tuesday   => EffectiveWorkingDays.HasFlag(WorkingDays.Tuesday),
+        DayOfWeek.Wednesday => EffectiveWorkingDays.HasFlag(WorkingDays.Wednesday),
+        DayOfWeek.Thursday  => EffectiveWorkingDays.HasFlag(WorkingDays.Thursday),
+        DayOfWeek.Friday    => EffectiveWorkingDays.HasFlag(WorkingDays.Friday),
+        DayOfWeek.Saturday  => EffectiveWorkingDays.HasFlag(WorkingDays.Saturday),
+        DayOfWeek.Sunday    => EffectiveWorkingDays.HasFlag(WorkingDays.Sunday),
+        _                   => false
+    };
+
+    private decimal PartToHours(LeaveDayPart part) =>
+        part == LeaveDayPart.FullDay ? EffectiveHoursPerDay : EffectiveHoursPerDay / 2;
+
+    private async Task Submit()
+    {
+        if (!CanSubmit) return;
+
+        _submitting = true;
+        _submitError = null;
+
+        var (response, error) = await LeaveService.SubmitLeaveRequestAsync(
+            CompanyId, EmployeeId,
+            new SubmitLeaveRequestModel(
+                _leaveTypeId,
+                StartDate, _startPart,
+                EndDate, _endPart,
+                string.IsNullOrWhiteSpace(_reason) ? null : _reason));
+
+        _submitting = false;
+
+        if (response is not null)
+        {
+            _visible = false;
+            await OnSubmitted.InvokeAsync();
+        }
+        else
+        {
+            _submitError = error ?? "Failed to submit leave request.";
+        }
+    }
+
+    private static string FormatDays(decimal days) =>
+        $"{days:0.##} {(days == 1m ? "day" : "days")}";
+}

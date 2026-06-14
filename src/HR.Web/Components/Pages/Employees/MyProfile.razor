@@ -1,7 +1,9 @@
 @page "/companies/{CompanyId:guid}/employees/{EmployeeId:guid}/profile"
 @rendermode InteractiveServer
 @inject LeaveService LeaveService
+@inject CompanyService CompanyService
 @inject EmployeeService EmployeeService
+@inject PublicHolidayService PublicHolidayService
 
 <PageTitle>My Profile</PageTitle>
 
@@ -44,11 +46,11 @@
                                 <div class="card-body">
                                     <dl class="mb-0">
                                         <dt class="text-muted small">Remaining</dt>
-                                        <dd class="fs-4 fw-semibold mb-2">@FormatHours(_annualLeave.RemainingDays)</dd>
+                                        <dd class="fs-4 fw-semibold mb-2">@FormatDays(_annualLeave.RemainingDays)</dd>
                                         <dt class="text-muted small">Booked</dt>
-                                        <dd class="mb-2">@FormatHours(_annualLeave.UsedDays)</dd>
+                                        <dd class="mb-2">@FormatDays(_annualLeave.UsedDays)</dd>
                                         <dt class="text-muted small">Pending</dt>
-                                        <dd class="mb-0">—</dd>
+                                        <dd class="mb-0">@(_annualLeave.PendingDays > 0 ? FormatDays(_annualLeave.PendingDays) : "—")</dd>
                                     </dl>
                                 </div>
                             </div>
@@ -63,7 +65,7 @@
                                 <div class="card-body">
                                     <dl class="mb-0">
                                         <dt class="text-muted small">Available</dt>
-                                        <dd class="fs-4 fw-semibold mb-0">@FormatHours(_toil.RemainingDays)</dd>
+                                        <dd class="fs-4 fw-semibold mb-0">@FormatDays(_toil.RemainingDays)</dd>
                                     </dl>
                                 </div>
                             </div>
@@ -71,7 +73,18 @@
                     }
                 </div>
 
-                <SfButton IsPrimary="true">Request Leave</SfButton>
+                <SfButton IsPrimary="true" OnClick="@(() => _showRequestForm = true)">Request Leave</SfButton>
+
+                <RequestLeaveForm CompanyId="CompanyId"
+                                  EmployeeId="EmployeeId"
+                                  Balances="_allBalances"
+                                  EffectiveWorkingDays="_effectiveWorkingDays"
+                                  EffectiveHoursPerDay="_effectiveHoursPerDay"
+                                  ExcludePublicHolidays="_excludePublicHolidays"
+                                  PublicHolidays="_publicHolidays"
+                                  IsOpen="_showRequestForm"
+                                  OnSubmitted="OnLeaveSubmitted"
+                                  OnCancelled="@(() => _showRequestForm = false)" />
             }
         }
         else if (_activeTab == "Documents")
@@ -92,28 +105,71 @@
     private static readonly string[] _tabs = ["Overview", "Leave", "Documents", "Tasks"];
     private string _activeTab = "Leave";
     private bool _loading = true;
-    private decimal _hoursPerDay = 7.5m;
+    private bool _showRequestForm;
 
+    private IReadOnlyList<LeaveBalanceItemModel> _allBalances = [];
     private LeaveBalanceItemModel? _annualLeave;
     private LeaveBalanceItemModel? _toil;
+
+    private WorkingDays _effectiveWorkingDays = WorkingDays.Monday | WorkingDays.Tuesday |
+        WorkingDays.Wednesday | WorkingDays.Thursday | WorkingDays.Friday;
+    private decimal _effectiveHoursPerDay = 7.5m;
+    private bool _excludePublicHolidays = true;
+    private IReadOnlyList<DateOnly> _publicHolidays = [];
 
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
+        _showRequestForm = false;
 
-        var employee = await EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
-        if (employee?.HoursPerDayOverride is not null)
-            _hoursPerDay = employee.HoursPerDayOverride.Value;
+        var balanceTask = LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
+        var settingsTask = CompanyService.GetCompanySettingsAsync(CompanyId);
+        var employeeTask = EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
+        var holidaysTask = PublicHolidayService.ListAsync(CompanyId, DateTime.UtcNow.Year);
 
-        var balance = await LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
+        await Task.WhenAll(balanceTask, settingsTask, employeeTask, holidaysTask);
+
+        var balance = await balanceTask;
+        var settings = await settingsTask;
+        var employee = await employeeTask;
+        var holidays = await holidaysTask;
+
         if (balance is not null)
         {
+            _allBalances = balance.Balances;
             _annualLeave = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "ANNUAL");
             _toil = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "TOIL");
         }
 
+        if (settings is not null)
+        {
+            _effectiveWorkingDays = employee?.WorkingDaysOverride ?? (WorkingDays)settings.WorkingDays;
+            _effectiveHoursPerDay = employee?.HoursPerDayOverride ?? settings.HoursPerDay;
+            _excludePublicHolidays = settings.ExcludePublicHolidaysFromLeave;
+        }
+
+        _publicHolidays = holidays?.Items.Select(h => h.Date).ToList() ?? [];
+
         _loading = false;
     }
 
-    private string FormatHours(decimal days) => $"{days * _hoursPerDay:0.#}h";
+    private async Task LoadBalanceAsync()
+    {
+        var balance = await LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
+        if (balance is not null)
+        {
+            _allBalances = balance.Balances;
+            _annualLeave = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "ANNUAL");
+            _toil = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "TOIL");
+        }
+    }
+
+    private async Task OnLeaveSubmitted()
+    {
+        _showRequestForm = false;
+        await LoadBalanceAsync();
+    }
+
+    private static string FormatDays(decimal days) =>
+        $"{days:0.##} {(days == 1m ? "day" : "days")}";
 }

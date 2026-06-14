@@ -36,7 +36,7 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
             return await Http.GetFromJsonAsync<GetEmployeeResponse>(
                 $"api/companies/{companyId}/employees/{id}");
         }
-        catch (HttpRequestException)
+        catch
         {
             return null;
         }

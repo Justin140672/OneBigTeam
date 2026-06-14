@@ -1,3 +1,4 @@
+using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,15 @@ internal sealed class GetEmployeeLeaveBalanceHandler
         GetEmployeeLeaveBalanceRequest request,
         CancellationToken cancellationToken)
     {
+        var pendingByType = await _dbContext.LeaveRequests
+            .AsNoTracking()
+            .Where(r => r.CompanyId == request.CompanyId
+                     && r.EmployeeId == request.EmployeeId
+                     && r.Status == LeaveRequestStatus.Pending)
+            .GroupBy(r => r.LeaveTypeId)
+            .Select(g => new { LeaveTypeId = g.Key, PendingDays = g.Sum(r => r.TotalDays) })
+            .ToDictionaryAsync(x => x.LeaveTypeId, x => x.PendingDays, cancellationToken);
+
         var balances = await _dbContext.LeaveBalances
             .AsNoTracking()
             .Where(b => b.CompanyId == request.CompanyId
@@ -37,7 +47,9 @@ internal sealed class GetEmployeeLeaveBalanceHandler
                     b.AdjustmentDays
                 })
             .OrderBy(x => x.Name)
-            .Select(x => new LeaveBalanceItem(
+            .ToListAsync(cancellationToken);
+
+        var items = balances.Select(x => new LeaveBalanceItem(
                 x.Id,
                 x.LeaveTypeId,
                 x.Name,
@@ -45,12 +57,13 @@ internal sealed class GetEmployeeLeaveBalanceHandler
                 x.EntitlementDays,
                 x.UsedDays,
                 x.AdjustmentDays,
-                x.EntitlementDays + x.AdjustmentDays - x.UsedDays))
-            .ToListAsync(cancellationToken);
+                x.EntitlementDays + x.AdjustmentDays - x.UsedDays,
+                pendingByType.GetValueOrDefault(x.LeaveTypeId)))
+            .ToList();
 
         return Result.Success(new GetEmployeeLeaveBalanceResponse(
             request.EmployeeId,
             request.PolicyYear,
-            balances));
+            items));
     }
 }

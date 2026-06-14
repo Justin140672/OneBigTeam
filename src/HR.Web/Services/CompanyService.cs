@@ -6,6 +6,18 @@ public class CompanyService(IHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
+    public async Task<GetCompanySettingsResponse?> GetCompanySettingsAsync(Guid id)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetCompanySettingsResponse>($"api/companies/{id}/settings");
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
     public async Task<GetCompanyResponse?> GetCompanyAsync(Guid id)
     {
         try

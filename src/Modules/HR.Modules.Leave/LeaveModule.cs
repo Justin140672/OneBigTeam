@@ -12,6 +12,7 @@ using HR.Modules.Leave.Features.UpdateLeavePolicy;
 using HR.Modules.Leave.Features.GetEmployeeLeaveBalance;
 using HR.Modules.Leave.Features.GetLeavePolicy;
 using HR.Modules.Leave.Features.ListLeavePolicies;
+using HR.Modules.Leave.Features.ListLeaveRequests;
 using HR.Modules.Leave.Features.SubmitLeaveRequest;
 using HR.Modules.Leave.Features.PreviewLeaveRequest;
 using HR.Modules.Leave.Features.AwardToil;
@@ -50,6 +51,7 @@ public static class LeaveModule
         services.AddScoped<IValidator<AssignLeavePolicyToEmployeeRequest>, AssignLeavePolicyToEmployeeValidator>();
         services.AddScoped<GetEmployeeLeaveBalanceHandler>();
         services.AddScoped<IValidator<GetEmployeeLeaveBalanceRequest>, GetEmployeeLeaveBalanceValidator>();
+        services.AddScoped<ListLeaveRequestsHandler>();
         services.AddScoped<SubmitLeaveRequestHandler>();
         services.AddScoped<IValidator<SubmitLeaveRequestRequest>, SubmitLeaveRequestValidator>();
         services.AddScoped<PreviewLeaveRequestHandler>();
@@ -121,6 +123,64 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
                 PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000206"), companyId, new DateOnly(2026,  8, 31), "Summer Bank Holiday",         "GB", now),
                 PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000207"), companyId, new DateOnly(2026, 12, 25), "Christmas Day",               "GB", now),
                 PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000208"), companyId, new DateOnly(2026, 12, 28), "Boxing Day (substitute)",     "GB", now));
+
+            await db.SaveChangesAsync();
+        }
+
+        if (!await db.LeavePolicies.AnyAsync())
+        {
+            var policyId = Guid.Parse("C0000000-0000-0000-0000-000000000001");
+
+            var policy = LeavePolicy.Create(
+                policyId,
+                companyId,
+                "Standard",
+                "Default leave policy for all employees",
+                carryOverDays: 5,
+                allowNegativeBalance: false,
+                now);
+
+            db.LeavePolicies.Add(policy);
+            await db.SaveChangesAsync();
+
+            // Assign all seeded employees to the standard policy and initialise their balances.
+            var leaveTypes = await db.LeaveTypes
+                .Where(lt => lt.CompanyId == companyId && lt.IsActive)
+                .ToListAsync();
+
+            var policyYear = LeaveYearCalculator.GetPolicyYear(DateTimeOffset.UtcNow, startMonth: 1);
+            var effectiveFrom = new DateOnly(policyYear, 1, 1);
+
+            var employeeIds = new[]
+            {
+                Guid.Parse("30000000-0000-0000-0000-000000000001"),
+                Guid.Parse("30000000-0000-0000-0000-000000000002"),
+                Guid.Parse("30000000-0000-0000-0000-000000000003"),
+                Guid.Parse("30000000-0000-0000-0000-000000000004"),
+                Guid.Parse("30000000-0000-0000-0000-000000000005"),
+                Guid.Parse("30000000-0000-0000-0000-000000000006"),
+                Guid.Parse("30000000-0000-0000-0000-000000000007"),
+                Guid.Parse("30000000-0000-0000-0000-000000000008"),
+                Guid.Parse("30000000-0000-0000-0000-000000000009"),
+                Guid.Parse("30000000-0000-0000-0000-000000000010"),
+            };
+
+            foreach (var employeeId in employeeIds)
+            {
+                db.EmployeeLeavePolicyAssignments.Add(
+                    EmployeeLeavePolicyAssignment.Create(
+                        Guid.NewGuid(), companyId, employeeId, policyId, effectiveFrom, now));
+
+                db.LeaveBalances.AddRange(leaveTypes.Select(lt => LeaveBalance.Create(
+                    Guid.NewGuid(),
+                    companyId,
+                    employeeId,
+                    lt.Id,
+                    policyId,
+                    policyYear,
+                    lt.Behaviour == LeaveTypeBehaviour.Toil ? 0 : lt.DefaultEntitlementDays,
+                    now)));
+            }
 
             await db.SaveChangesAsync();
         }

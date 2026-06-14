@@ -4,6 +4,7 @@ using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
@@ -205,10 +206,19 @@ public class LeaveLifecycleIntegrationTests : IClassFixture<ApiWebApplicationFac
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
-        db.LeaveBalances.Add(LeaveBalance.Create(
-            Guid.NewGuid(), companyId, employeeId, leaveTypeId, policyId,
-            DateTimeOffset.UtcNow.Year, entitlementDays, DateTimeOffset.UtcNow));
-        await db.SaveChangesAsync();
+        var policyYear = DateTimeOffset.UtcNow.Year;
+        var exists = await db.LeaveBalances.AnyAsync(b =>
+            b.CompanyId == companyId &&
+            b.EmployeeId == employeeId &&
+            b.LeaveTypeId == leaveTypeId &&
+            b.PolicyYear == policyYear);
+        if (!exists)
+        {
+            db.LeaveBalances.Add(LeaveBalance.Create(
+                Guid.NewGuid(), companyId, employeeId, leaveTypeId, policyId,
+                policyYear, entitlementDays, DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        }
     }
 
     private async Task<Guid> SubmitLeaveRequestAsync(
