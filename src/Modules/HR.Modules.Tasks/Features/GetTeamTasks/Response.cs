@@ -13,6 +13,7 @@ internal sealed record TeamTaskItem(
     DateOnly? DueDate,
     Guid? AssignedEmployeeId,
     Guid? AssignedUserId,
+    string? AssignedEmployeeName,
     Guid CreatedBy,
     Guid? CompletedBy,
     DateTimeOffset? CompletedAt,

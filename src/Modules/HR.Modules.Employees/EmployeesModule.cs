@@ -18,6 +18,7 @@ using HR.Modules.Employees.Features.UpdatePositionProfile;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
 using HR.SharedKernel;
+using HR.SharedKernel.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -82,6 +83,7 @@ public static class EmployeesModule
 
         services.AddScoped<IWorkingPatternProvider, WorkingPatternProvider>();
         services.AddScoped<IDirectReportsReader, DirectReportsReader>();
+        services.AddScoped<IEmployeeNameReader, EmployeeNameReader>();
     }
 
     public static async Task MigrateEmployeesAsync(this IServiceProvider services)

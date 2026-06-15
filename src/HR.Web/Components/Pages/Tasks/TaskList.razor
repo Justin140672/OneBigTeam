@@ -21,10 +21,22 @@
                 </div>
             </Template>
         </GridColumn>
-        <GridColumn Field="@nameof(TaskListItem.Status)" HeaderText="Status" Width="120" />
+        <GridColumn HeaderText="Status" Width="140">
+            <Template>
+                @{
+                    var item = (TaskListItem)context;
+                }
+                <span class="task-status-badge task-status-badge--@item.Status.ToLowerInvariant()">
+                    @StatusLabel(item.Status)
+                </span>
+            </Template>
+        </GridColumn>
         <GridColumn Field="@nameof(TaskListItem.Priority)" HeaderText="Priority" Width="120" />
         <GridColumn Field="@nameof(TaskListItem.DueDate)" HeaderText="Due Date" Width="140" Format="d" />
-        <GridColumn Field="@nameof(TaskListItem.AssignedTo)" HeaderText="Assigned To" Width="200" />
+        @if (ShowAssignedTo)
+        {
+            <GridColumn Field="@nameof(TaskListItem.AssignedTo)" HeaderText="Assigned To" Width="180" />
+        }
         @if (CompanyId != Guid.Empty)
         {
             <GridColumn HeaderText="" Width="110" AllowFiltering="false" AllowSorting="false" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Center">
@@ -86,12 +98,24 @@
     public Guid CompanyId { get; set; }
 
     [Parameter]
+    public bool ShowAssignedTo { get; set; } = true;
+
+    [Parameter]
     public EventCallback OnTaskCompleted { get; set; }
 
     private bool _confirmVisible;
     private bool _completing;
     private string? _completeError;
     private TaskListItem? _pendingTask;
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "Open"       => "Not Started",
+        "InProgress" => "In Progress",
+        "Completed"  => "Completed",
+        "Cancelled"  => "Cancelled",
+        _            => status
+    };
 
     private void BeginComplete(TaskListItem task)
     {

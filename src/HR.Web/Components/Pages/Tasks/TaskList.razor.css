@@ -15,3 +15,33 @@
     line-height: 1.4;
     white-space: normal;
 }
+
+.task-status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.task-status-badge--open {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.task-status-badge--inprogress {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.task-status-badge--completed {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.task-status-badge--cancelled {
+    background: #fee2e2;
+    color: #b91c1c;
+}

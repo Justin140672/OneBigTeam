@@ -13,13 +13,13 @@ public sealed record TaskListItem(
     DateOnly? DueDate,
     Guid? AssignedEmployeeId,
     Guid? AssignedUserId,
+    string? AssignedEmployeeName,
     Guid CreatedBy,
     Guid? CompletedBy,
     DateTimeOffset? CompletedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt)
 {
-    public string AssignedTo => (AssignedEmployeeId is null && AssignedUserId is null)
-        ? "Unassigned"
-        : AssignedEmployeeId?.ToString() ?? AssignedUserId!.Value.ToString();
+    public string AssignedTo => AssignedEmployeeName
+        ?? (AssignedEmployeeId.HasValue || AssignedUserId.HasValue ? "Unknown" : "Unassigned");
 }

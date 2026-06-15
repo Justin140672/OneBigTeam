@@ -1,5 +1,6 @@
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.GetEmployeeTasks;
+using HR.Modules.Tasks.Tests.Infrastructure;
 using HR.SharedKernel;
 using HR.Modules.Tasks.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -45,7 +46,7 @@ public class GetEmployeeTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var result = await new GetEmployeeTasksHandler(context).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = companyId, EmployeeId = employeeId },
             CancellationToken.None);
 
@@ -58,7 +59,7 @@ public class GetEmployeeTasksHandlerTests
     {
         await using var context = BuildContext();
 
-        var result = await new GetEmployeeTasksHandler(context).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = Guid.NewGuid(), EmployeeId = Guid.NewGuid() },
             CancellationToken.None);
 
@@ -79,7 +80,7 @@ public class GetEmployeeTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var result = await new GetEmployeeTasksHandler(context).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = companyA, EmployeeId = employeeId },
             CancellationToken.None);
 
@@ -101,7 +102,7 @@ public class GetEmployeeTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var result = await new GetEmployeeTasksHandler(context).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = companyId, EmployeeId = employeeId, Status = "Completed" },
             CancellationToken.None);
 
@@ -122,7 +123,7 @@ public class GetEmployeeTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var result = await new GetEmployeeTasksHandler(context).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = companyId, EmployeeId = employeeId, Status = "cancelled" },
             CancellationToken.None);
 
@@ -143,7 +144,7 @@ public class GetEmployeeTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var result = await new GetEmployeeTasksHandler(context).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = companyId, EmployeeId = employeeId, Status = "bogus" },
             CancellationToken.None);
 
@@ -164,7 +165,7 @@ public class GetEmployeeTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var result = await new GetEmployeeTasksHandler(context).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = companyId, EmployeeId = employeeId },
             CancellationToken.None);
 
@@ -191,7 +192,7 @@ public class GetEmployeeTasksHandlerTests
         context.TaskItems.Add(task);
         await context.SaveChangesAsync();
 
-        var result = await new GetEmployeeTasksHandler(context).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = companyId, EmployeeId = employeeId },
             CancellationToken.None);
 

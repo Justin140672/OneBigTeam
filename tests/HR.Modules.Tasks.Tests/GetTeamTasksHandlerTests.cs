@@ -49,7 +49,7 @@ public class GetTeamTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader(report1, report2));
+        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader(report1, report2), new FakeEmployeeNameReader());
 
         var result = await handler.HandleAsync(
             new GetTeamTasksRequest { CompanyId = companyId, ManagerId = managerId },
@@ -69,7 +69,7 @@ public class GetTeamTasksHandlerTests
         context.TaskItems.Add(MakeTask(companyId, Guid.NewGuid(), "Some task"));
         await context.SaveChangesAsync();
 
-        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader());
+        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader(), new FakeEmployeeNameReader());
 
         var result = await handler.HandleAsync(
             new GetTeamTasksRequest { CompanyId = companyId, ManagerId = Guid.NewGuid() },
@@ -92,7 +92,7 @@ public class GetTeamTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader(reportId));
+        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader(reportId), new FakeEmployeeNameReader());
 
         var result = await handler.HandleAsync(
             new GetTeamTasksRequest { CompanyId = companyA, ManagerId = Guid.NewGuid() },
@@ -116,7 +116,7 @@ public class GetTeamTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader(reportId));
+        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader(reportId), new FakeEmployeeNameReader());
 
         var result = await handler.HandleAsync(
             new GetTeamTasksRequest { CompanyId = companyId, ManagerId = Guid.NewGuid(), Status = "InProgress" },
@@ -139,7 +139,7 @@ public class GetTeamTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader(reportId));
+        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader(reportId), new FakeEmployeeNameReader());
 
         var result = await handler.HandleAsync(
             new GetTeamTasksRequest { CompanyId = companyId, ManagerId = Guid.NewGuid(), Status = "completed" },
@@ -162,7 +162,7 @@ public class GetTeamTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader(reportId));
+        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader(reportId), new FakeEmployeeNameReader());
 
         var result = await handler.HandleAsync(
             new GetTeamTasksRequest { CompanyId = companyId, ManagerId = Guid.NewGuid(), Status = "bogus" },
@@ -185,7 +185,7 @@ public class GetTeamTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader(reportId));
+        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader(reportId), new FakeEmployeeNameReader());
 
         var result = await handler.HandleAsync(
             new GetTeamTasksRequest { CompanyId = companyId, ManagerId = Guid.NewGuid() },
@@ -214,7 +214,7 @@ public class GetTeamTasksHandlerTests
         context.TaskItems.Add(task);
         await context.SaveChangesAsync();
 
-        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader(reportId));
+        var handler = new GetTeamTasksHandler(context, new FakeDirectReportsReader(reportId), new FakeEmployeeNameReader());
 
         var result = await handler.HandleAsync(
             new GetTeamTasksRequest { CompanyId = companyId, ManagerId = Guid.NewGuid() },

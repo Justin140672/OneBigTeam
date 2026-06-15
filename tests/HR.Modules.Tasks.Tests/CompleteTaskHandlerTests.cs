@@ -1,5 +1,6 @@
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.CompleteTask;
+using HR.Modules.Tasks.Services;
 using HR.SharedKernel;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Tests.Infrastructure;
@@ -12,8 +13,11 @@ public class CompleteTaskHandlerTests
     private static readonly DateTime FixedNow = new(2026, 6, 15, 12, 0, 0, DateTimeKind.Utc);
     private static readonly FakeClock Clock = new(FixedNow);
 
+    private static readonly TaskCompletionDispatcher NoOpDispatcher =
+        new(Enumerable.Empty<HR.SharedKernel.Contracts.ITaskCompletionAction>());
+
     private static CompleteTaskHandler BuildHandler(TasksDbContext context, FakeAuditPublisher? audit = null) =>
-        new(context, Clock, audit ?? new FakeAuditPublisher());
+        new(context, Clock, audit ?? new FakeAuditPublisher(), NoOpDispatcher);
 
     private static TaskItem MakeTask(Guid companyId, TaskItemStatus status = TaskItemStatus.Open)
     {
