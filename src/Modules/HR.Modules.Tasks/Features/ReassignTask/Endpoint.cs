@@ -13,7 +13,11 @@ internal sealed class Endpoint(ReassignTaskHandler handler) : Endpoint<ReassignT
 
     public override async Task HandleAsync(ReassignTaskRequest request, CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        Guid.TryParse(User.FindFirst("sub")?.Value, out var actorUserId);
+
+        var result = await handler.HandleAsync(
+            request with { ActorUserId = actorUserId == Guid.Empty ? null : actorUserId },
+            cancellationToken);
 
         if (result.IsFailure)
         {

@@ -4,7 +4,7 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Tasks.Services;
 
-internal sealed class TaskCreator(TasksDbContext dbContext, IClock clock) : ITaskCreator
+internal sealed class TaskCreator(TasksDbContext dbContext, IClock clock, IAuditEventPublisher auditPublisher) : ITaskCreator
 {
     public async Task<Guid> CreateAsync(
         Guid companyId,
@@ -27,6 +27,17 @@ internal sealed class TaskCreator(TasksDbContext dbContext, IClock clock) : ITas
 
         dbContext.TaskItems.Add(task);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new TaskCreatedAuditEvent(
+            task.CompanyId,
+            task.Id,
+            task.CreatedBy,
+            task.Title,
+            task.Priority.ToString(),
+            task.Source.ToString(),
+            task.AssignedEmployeeId,
+            task.AssignedUserId,
+            task.CreatedAt), cancellationToken);
 
         return task.Id;
     }

@@ -12,6 +12,9 @@ public class ReassignTaskHandlerTests
     private static readonly DateTime FixedNow = new(2026, 6, 15, 9, 0, 0, DateTimeKind.Utc);
     private static readonly FakeClock Clock = new(FixedNow);
 
+    private static ReassignTaskHandler BuildHandler(TasksDbContext context, FakeAuditPublisher? audit = null) =>
+        new(context, Clock, audit ?? new FakeAuditPublisher());
+
     private static TaskItem MakeTask(Guid companyId, Guid? assignedEmployeeId = null, Guid? assignedUserId = null)
     {
         return TaskItem.Create(
@@ -25,7 +28,7 @@ public class ReassignTaskHandlerTests
     {
         await using var context = BuildContext();
 
-        var result = await new ReassignTaskHandler(context, Clock).HandleAsync(
+        var result = await BuildHandler(context).HandleAsync(
             new ReassignTaskRequest { CompanyId = Guid.NewGuid(), Id = Guid.NewGuid() },
             CancellationToken.None);
 
@@ -41,7 +44,7 @@ public class ReassignTaskHandlerTests
         context.TaskItems.Add(task);
         await context.SaveChangesAsync();
 
-        var result = await new ReassignTaskHandler(context, Clock).HandleAsync(
+        var result = await BuildHandler(context).HandleAsync(
             new ReassignTaskRequest { CompanyId = Guid.NewGuid(), Id = task.Id },
             CancellationToken.None);
 
@@ -53,15 +56,15 @@ public class ReassignTaskHandlerTests
     public async Task HandleAsync_Updates_AssignedEmployeeId_And_AssignedUserId()
     {
         await using var context = BuildContext();
-        var companyId    = Guid.NewGuid();
-        var newEmployee  = Guid.NewGuid();
-        var newUser      = Guid.NewGuid();
+        var companyId   = Guid.NewGuid();
+        var newEmployee = Guid.NewGuid();
+        var newUser     = Guid.NewGuid();
 
         var task = MakeTask(companyId);
         context.TaskItems.Add(task);
         await context.SaveChangesAsync();
 
-        var result = await new ReassignTaskHandler(context, Clock).HandleAsync(
+        var result = await BuildHandler(context).HandleAsync(
             new ReassignTaskRequest
             {
                 CompanyId = companyId,
@@ -86,7 +89,7 @@ public class ReassignTaskHandlerTests
         context.TaskItems.Add(task);
         await context.SaveChangesAsync();
 
-        var result = await new ReassignTaskHandler(context, Clock).HandleAsync(
+        var result = await BuildHandler(context).HandleAsync(
             new ReassignTaskRequest { CompanyId = companyId, Id = task.Id },
             CancellationToken.None);
 
@@ -105,7 +108,7 @@ public class ReassignTaskHandlerTests
         context.TaskItems.Add(task);
         await context.SaveChangesAsync();
 
-        var result = await new ReassignTaskHandler(context, Clock).HandleAsync(
+        var result = await BuildHandler(context).HandleAsync(
             new ReassignTaskRequest { CompanyId = companyId, Id = task.Id, AssignedEmployeeId = Guid.NewGuid() },
             CancellationToken.None);
 
@@ -124,7 +127,7 @@ public class ReassignTaskHandlerTests
         context.TaskItems.Add(task);
         await context.SaveChangesAsync();
 
-        await new ReassignTaskHandler(context, Clock).HandleAsync(
+        await BuildHandler(context).HandleAsync(
             new ReassignTaskRequest { CompanyId = companyId, Id = task.Id, AssignedEmployeeId = newEmployee },
             CancellationToken.None);
 
@@ -138,8 +141,8 @@ public class ReassignTaskHandlerTests
     public async Task HandleAsync_Returns_Full_Task_Snapshot()
     {
         await using var context = BuildContext();
-        var companyId  = Guid.NewGuid();
-        var createdBy  = Guid.NewGuid();
+        var companyId   = Guid.NewGuid();
+        var createdBy   = Guid.NewGuid();
         var newEmployee = Guid.NewGuid();
 
         var task = TaskItem.Create(
@@ -150,7 +153,7 @@ public class ReassignTaskHandlerTests
         context.TaskItems.Add(task);
         await context.SaveChangesAsync();
 
-        var result = await new ReassignTaskHandler(context, Clock).HandleAsync(
+        var result = await BuildHandler(context).HandleAsync(
             new ReassignTaskRequest { CompanyId = companyId, Id = task.Id, AssignedEmployeeId = newEmployee },
             CancellationToken.None);
 
@@ -169,6 +172,49 @@ public class ReassignTaskHandlerTests
         Assert.Equal(createdBy, r.CreatedBy);
         Assert.Null(r.CompletedBy);
         Assert.Null(r.CompletedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_TaskReassigned_Audit_Event()
+    {
+        await using var context = BuildContext();
+        var companyId       = Guid.NewGuid();
+        var actorUserId     = Guid.NewGuid();
+        var previousEmployee = Guid.NewGuid();
+        var newEmployee     = Guid.NewGuid();
+        var audit           = new FakeAuditPublisher();
+
+        var task = MakeTask(companyId, assignedEmployeeId: previousEmployee);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        await BuildHandler(context, audit).HandleAsync(
+            new ReassignTaskRequest
+            {
+                CompanyId = companyId,
+                Id = task.Id,
+                AssignedEmployeeId = newEmployee,
+                ActorUserId = actorUserId
+            },
+            CancellationToken.None);
+
+        var evt = Assert.Single(audit.Published);
+        Assert.Equal("task.updated", evt.EventType);
+        Assert.Equal(task.Id, evt.EntityId);
+        Assert.Equal(actorUserId, evt.ActorUserId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_Audit_Event_When_Task_Not_Found()
+    {
+        await using var context = BuildContext();
+        var audit = new FakeAuditPublisher();
+
+        await BuildHandler(context, audit).HandleAsync(
+            new ReassignTaskRequest { CompanyId = Guid.NewGuid(), Id = Guid.NewGuid() },
+            CancellationToken.None);
+
+        Assert.Empty(audit.Published);
     }
 
     private static TasksDbContext BuildContext()

@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Tasks.Features.ReassignTask;
 
-internal sealed class ReassignTaskHandler(TasksDbContext dbContext, IClock clock)
+internal sealed class ReassignTaskHandler(TasksDbContext dbContext, IClock clock, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<ReassignTaskResponse>> HandleAsync(
         ReassignTaskRequest request,
@@ -19,9 +19,22 @@ internal sealed class ReassignTaskHandler(TasksDbContext dbContext, IClock clock
             return Result.Failure<ReassignTaskResponse>(
                 Error.NotFound($"Task with id '{request.Id}' was not found."));
 
+        var previousEmployeeId = task.AssignedEmployeeId;
+        var previousUserId     = task.AssignedUserId;
+
         task.Reassign(request.AssignedEmployeeId, request.AssignedUserId, clock.UtcNowOffset());
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new TaskReassignedAuditEvent(
+            task.CompanyId,
+            task.Id,
+            request.ActorUserId,
+            previousEmployeeId,
+            previousUserId,
+            task.AssignedEmployeeId,
+            task.AssignedUserId,
+            task.UpdatedAt), cancellationToken);
 
         return Result.Success(new ReassignTaskResponse(
             task.Id,

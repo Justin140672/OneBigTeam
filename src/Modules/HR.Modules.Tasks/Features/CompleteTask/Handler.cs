@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Tasks.Features.CompleteTask;
 
-internal sealed class CompleteTaskHandler(TasksDbContext dbContext, IClock clock)
+internal sealed class CompleteTaskHandler(TasksDbContext dbContext, IClock clock, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<CompleteTaskResponse>> HandleAsync(
         CompleteTaskRequest request,
@@ -24,9 +24,18 @@ internal sealed class CompleteTaskHandler(TasksDbContext dbContext, IClock clock
             return Result.Failure<CompleteTaskResponse>(
                 Error.Conflict("Cannot complete a cancelled task."));
 
+        var previousStatus = task.Status.ToString();
+
         task.Complete(request.CompletedBy, clock.UtcNowOffset());
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new TaskCompletedAuditEvent(
+            task.CompanyId,
+            task.Id,
+            task.CompletedBy!.Value,
+            previousStatus,
+            task.CompletedAt!.Value), cancellationToken);
 
         return Result.Success(new CompleteTaskResponse(
             task.Id,
