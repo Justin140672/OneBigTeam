@@ -29,6 +29,7 @@ builder.Services.AddScoped<PublicHolidayService>();
 builder.Services.AddScoped<LeaveService>();
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<DevAuthService>();
 builder.Services.AddScoped<AppSession>();
 
 Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(

@@ -1,0 +1,69 @@
+.login-card {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    padding: 40px 40px 36px;
+    width: 100%;
+    max-width: 520px;
+}
+
+.login-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+}
+
+.login-logo {
+    font-size: 1.6rem;
+    color: #6366f1;
+}
+
+.login-app-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.login-heading {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 24px;
+}
+
+.login-error {
+    background: #fee2e2;
+    color: #991b1b;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.875rem;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.login-field {
+    margin-bottom: 18px;
+}
+
+.login-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 6px;
+}
+
+.login-validation {
+    display: block;
+    font-size: 0.8rem;
+    color: #dc2626;
+    margin-top: 4px;
+}
+
+.login-btn {
+    width: 100%;
+    margin-top: 8px;
+}

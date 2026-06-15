@@ -55,6 +55,16 @@ else
                 </MenuItems>
             </SfMenu>
 
+        <div class="sidebar-footer">
+            <a href="/login" class="sidebar-login-link">
+                <i class="fa-solid fa-right-to-bracket"></i>
+                @if (SidebarOpen)
+                {
+                    <span>Switch account</span>
+                }
+            </a>
+        </div>
+
         </ChildContent>
 
     </SfSidebar>
