@@ -4,6 +4,18 @@
 @inject AppSession Session
 @inject NotificationService NotificationService
 
+@if (!Session.IsLoaded)
+{
+    <div class="app-loading">
+        <div class="app-loading-spinner">
+            <div class="spinner-border text-primary" role="status"></div>
+            <span class="app-loading-label">Loading…</span>
+        </div>
+    </div>
+}
+else
+{
+
 <div class="app-shell">
 
     <SfSidebar Width="280px"
@@ -144,6 +156,8 @@
     </main>
 
 </div>
+
+}
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
