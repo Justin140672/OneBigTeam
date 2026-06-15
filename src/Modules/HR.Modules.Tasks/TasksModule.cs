@@ -1,3 +1,5 @@
+using FluentValidation;
+using HR.Modules.Tasks.Features.CreateTask;
 using HR.Modules.Tasks.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,11 +12,19 @@ public static class TasksModule
         this IServiceCollection services,
         string connectionString)
     {
+        AddFeatureServices(services);
+
         services.AddDbContext<TasksDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "tasks")));
 
         return services;
+    }
+
+    private static void AddFeatureServices(IServiceCollection services)
+    {
+        services.AddScoped<CreateTaskHandler>();
+        services.AddScoped<IValidator<CreateTaskRequest>, CreateTaskValidator>();
     }
 
     public static async Task MigrateTasksAsync(this IServiceProvider services)
