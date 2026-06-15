@@ -2,6 +2,7 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject AppSession Session
+@inject NotificationService NotificationService
 
 <div class="app-shell">
 
@@ -13,7 +14,7 @@
         <ChildContent>
             <div class="sidebar-header">
                 <button class="sidebar-toggle" @onclick="ToggleSidebar">
-                    ☰
+                    <i class="fa-solid fa-bars"></i>
                 </button>
                 @if (SidebarOpen)
                 {
@@ -26,15 +27,15 @@
                     CssClass="app-nav-menu"
                     ShowItemOnClick="true">
                 <MenuItems>
-                    <MenuItem Text="Dashboard" IconCss="e-icons e-home" Url="/" />
-                    <MenuItem Text="People" IconCss="e-icons e-people">
+                    <MenuItem Text="Dashboard" IconCss="fa-solid fa-house" Url="/" />
+                    <MenuItem Text="People" IconCss="fa-solid fa-users">
                         <MenuItems>
                             <MenuItem Text="Employees"         Url="@_menuItems["Employees"]" />
                             <MenuItem Text="Departments"       Url="@_menuItems["Departments"]" />
                             <MenuItem Text="Position Profiles" Url="@_menuItems["PositionProfiles"]" />
                         </MenuItems>
                     </MenuItem>
-                    <MenuItem Text="Leave" IconCss="e-icons e-calendar">
+                    <MenuItem Text="Leave" IconCss="fa-solid fa-calendar-days">
                         <MenuItems>
                             <MenuItem Text="Public Holidays" Url="@_menuItems["PublicHolidays"]" />
                         </MenuItems>
@@ -49,10 +50,56 @@
     <main class="main-content">
         <div class="top-bar">
             <button class="mobile-menu-button" @onclick="ToggleSidebar">
-                ☰
+                <i class="fa-solid fa-bars"></i>
             </button>
             <span class="page-title">Dashboard</span>
             <div class="top-bar-actions">
+                @if (Session.IsLoaded && Session.EmployeeId.HasValue)
+                {
+                    <div class="notif-bell @(_notifOpen ? "notif-open" : "")">
+                        <button class="notif-btn" @onclick="ToggleNotifications" title="Notifications">
+                            <i class="fa-solid fa-bell"></i>
+                            @if (_unreadCount > 0)
+                            {
+                                <span class="notif-badge">@(_unreadCount > 99 ? "99+" : _unreadCount.ToString())</span>
+                            }
+                        </button>
+                        @if (_notifOpen)
+                        {
+                            <div class="notif-dropdown">
+                                <div class="notif-header">
+                                    <span class="notif-header-title">Notifications</span>
+                                    @if (_unreadCount > 0)
+                                    {
+                                        <button class="notif-mark-all" @onclick="MarkAllRead">Mark all read</button>
+                                    }
+                                </div>
+                                <div class="notif-list">
+                                    @if (_notifications.Count == 0)
+                                    {
+                                        <div class="notif-empty">No notifications</div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var n in _notifications)
+                                        {
+                                            var notif = n;
+                                            <div class="notif-item @(notif.IsRead ? "" : "notif-unread")"
+                                                 @onclick="() => OnNotificationClick(notif)">
+                                                <div class="notif-item-title">@notif.Title</div>
+                                                @if (notif.Body is not null)
+                                                {
+                                                    <div class="notif-item-body">@notif.Body</div>
+                                                }
+                                                <div class="notif-item-time">@FormatTime(notif.CreatedAt)</div>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
                 @if (Session.IsLoaded && Session.EmployeeId.HasValue)
                 {
                     <a href="/companies/@Session.CompanyId/employees/@Session.EmployeeId/profile" class="top-bar-user">
@@ -76,11 +123,11 @@
                 <button class="theme-toggle" @onclick="ToggleTheme" title="@(IsDark ? "Switch to light mode" : "Switch to dark mode")">
                     @if (IsDark)
                     {
-                        <span class="e-icons e-brightness"></span>
+                        <i class="fa-solid fa-sun"></i>
                     }
                     else
                     {
-                        <span class="e-icons e-contrast"></span>
+                        <i class="fa-solid fa-moon"></i>
                     }
                 </button>
             </div>
@@ -103,6 +150,10 @@
     private bool SidebarOpen { get; set; } = true;
     private bool IsDark { get; set; }
 
+    private int _unreadCount;
+    private List<NotificationDto> _notifications = [];
+    private bool _notifOpen;
+
     private readonly Dictionary<string, string> _menuItems = new()
     {
         ["Employees"]        = "/",
@@ -120,6 +171,57 @@
         _menuItems["Departments"]      = $"/companies/{companyId}/departments";
         _menuItems["PositionProfiles"] = $"/companies/{companyId}/position-profiles";
         _menuItems["PublicHolidays"]   = $"/companies/{companyId}/public-holidays";
+
+        await LoadNotificationsAsync();
+    }
+
+    private async Task LoadNotificationsAsync()
+    {
+        if (!Session.EmployeeId.HasValue) return;
+        var result = await NotificationService.GetAsync(Session.CompanyId, Session.EmployeeId.Value);
+        if (result is null) return;
+        _unreadCount = result.UnreadCount;
+        _notifications = result.Items;
+    }
+
+    private async Task ToggleNotifications()
+    {
+        _notifOpen = !_notifOpen;
+        if (_notifOpen)
+            await LoadNotificationsAsync();
+    }
+
+    private async Task OnNotificationClick(NotificationDto notification)
+    {
+        _notifOpen = false;
+        if (!notification.IsRead)
+        {
+            await NotificationService.MarkReadAsync(Session.CompanyId, notification.Id);
+            _unreadCount = Math.Max(0, _unreadCount - 1);
+            var idx = _notifications.IndexOf(notification);
+            if (idx >= 0)
+                _notifications[idx] = notification with { IsRead = true };
+        }
+        NavigationManager.NavigateTo(
+            $"/companies/{Session.CompanyId}/tasks/{notification.SourceEntityId}");
+    }
+
+    private async Task MarkAllRead()
+    {
+        if (!Session.EmployeeId.HasValue) return;
+        await NotificationService.MarkAllReadAsync(Session.CompanyId, Session.EmployeeId.Value);
+        _unreadCount = 0;
+        _notifications = _notifications.Select(n => n with { IsRead = true }).ToList();
+    }
+
+    private static string FormatTime(DateTimeOffset dt)
+    {
+        var diff = DateTimeOffset.UtcNow - dt;
+        if (diff.TotalMinutes < 1) return "Just now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays < 7) return $"{(int)diff.TotalDays}d ago";
+        return dt.ToString("d MMM");
     }
 
     private void ToggleSidebar() => SidebarOpen = !SidebarOpen;

@@ -11,6 +11,7 @@ internal sealed class TasksDbContext : DbContext
     }
 
     public DbSet<TaskItem> TaskItems => Set<TaskItem>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

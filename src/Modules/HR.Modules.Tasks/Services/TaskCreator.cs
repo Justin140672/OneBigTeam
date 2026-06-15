@@ -27,6 +27,18 @@ internal sealed class TaskCreator(TasksDbContext dbContext, IClock clock, IAudit
             clock.UtcNowOffset(), sourceEntityId);
 
         dbContext.TaskItems.Add(task);
+
+        if (assignedEmployeeId.HasValue)
+        {
+            var notification = Notification.Create(
+                Guid.NewGuid(), companyId, assignedEmployeeId.Value,
+                $"New task assigned: {task.Title}",
+                task.Description,
+                task.Id,
+                clock.UtcNowOffset());
+            dbContext.Notifications.Add(notification);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await auditPublisher.PublishAsync(new TaskCreatedAuditEvent(

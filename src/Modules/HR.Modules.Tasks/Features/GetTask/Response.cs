@@ -11,6 +11,7 @@ internal sealed record GetTaskResponse(
     DateOnly? DueDate,
     Guid? AssignedEmployeeId,
     Guid? AssignedUserId,
+    Guid? SourceEntityId,
     Guid CreatedBy,
     Guid? CompletedBy,
     DateTimeOffset? CompletedAt,

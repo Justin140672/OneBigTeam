@@ -6,6 +6,9 @@ using HR.Modules.Tasks.Features.GetMyTasks;
 using HR.Modules.Tasks.Features.GetTeamTasks;
 using HR.Modules.Tasks.Features.GetTask;
 using HR.Modules.Tasks.Features.LeaveRequested;
+using HR.Modules.Tasks.Features.ListNotifications;
+using HR.Modules.Tasks.Features.MarkAllNotificationsRead;
+using HR.Modules.Tasks.Features.MarkNotificationRead;
 using HR.Modules.Tasks.Features.ReassignTask;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Services;
@@ -45,6 +48,9 @@ public static class TasksModule
         services.AddScoped<GetEmployeeTasksHandler>();
         services.AddScoped<ReassignTaskHandler>();
         services.AddScoped<CompleteTaskHandler>();
+        services.AddScoped<ListNotificationsHandler>();
+        services.AddScoped<MarkNotificationReadHandler>();
+        services.AddScoped<MarkAllNotificationsReadHandler>();
     }
 
     public static async Task MigrateTasksAsync(this IServiceProvider services)
@@ -74,14 +80,20 @@ public static class TasksModule
         var empHrMgrId    = Guid.Parse("30000000-0000-0000-0000-000000000005"); // Laura Bennett
         var empAe2Id      = Guid.Parse("30000000-0000-0000-0000-000000000010"); // Carlos Rivera
 
+        // Fixed IDs for tasks assigned to Sarah so notifications can reference them
+        var taskQ2ReviewId      = Guid.Parse("a0000000-0000-0000-0000-000000000001");
+        var taskBoardAgendaId   = Guid.Parse("a0000000-0000-0000-0000-000000000002");
+        var taskInterviewId     = Guid.Parse("a0000000-0000-0000-0000-000000000003");
+
         TaskItem Make(
+            Guid id,
             string title, string? description,
             TaskPriority priority, TaskSource source,
             DateOnly? dueDate, Guid? assignedEmployeeId,
             TaskItemStatus status = TaskItemStatus.Open)
         {
             var t = TaskItem.Create(
-                Guid.NewGuid(), companyId, devUserId,
+                id, companyId, devUserId,
                 title, description, priority, source,
                 dueDate, assignedEmployeeId, devUserId, now);
             if (status == TaskItemStatus.InProgress) t.Start(now);
@@ -89,45 +101,69 @@ public static class TasksModule
         }
 
         db.TaskItems.AddRange(
-            Make("Review Q2 performance reports",
+            Make(taskQ2ReviewId,
+                "Review Q2 performance reports",
                 "Gather scores from all department heads and summarise findings.",
                 TaskPriority.High, TaskSource.Manual,
                 new DateOnly(2026, 6, 30), empCtoId),
 
-            Make("Schedule probation review — Tom Williams",
+            Make(Guid.NewGuid(),
+                "Schedule probation review — Tom Williams",
                 "Tom's 3-month probation ends 20 May. Book a review meeting with his line manager.",
                 TaskPriority.Medium, TaskSource.Probation,
                 new DateOnly(2026, 6, 20), empDev1Id, TaskItemStatus.InProgress),
 
-            Make("Update annual leave policy documentation",
+            Make(Guid.NewGuid(),
+                "Update annual leave policy documentation",
                 null,
                 TaskPriority.Low, TaskSource.Leave,
                 new DateOnly(2026, 7, 15), empHrMgrId),
 
-            Make("Complete compliance training sign-off",
+            Make(Guid.NewGuid(),
+                "Complete compliance training sign-off",
                 "Confirm all Engineering staff have completed the data protection module.",
                 TaskPriority.Critical, TaskSource.Compliance,
                 new DateOnly(2026, 6, 17), empSenDev1Id),
 
-            Make("Send onboarding pack — Carlos Rivera",
+            Make(Guid.NewGuid(),
+                "Send onboarding pack — Carlos Rivera",
                 null,
                 TaskPriority.Medium, TaskSource.Onboarding,
                 new DateOnly(2026, 6, 18), empAe2Id),
 
-            Make("Collect signed contract amendments",
+            Make(Guid.NewGuid(),
+                "Collect signed contract amendments",
                 "Three employees accepted revised terms. Collect signed copies and file.",
                 TaskPriority.High, TaskSource.Document,
                 null, null),
 
-            Make("Prepare board meeting agenda",
+            Make(taskBoardAgendaId,
+                "Prepare board meeting agenda",
                 "Draft the Q3 board meeting agenda including financial review and product roadmap.",
                 TaskPriority.High, TaskSource.Manual,
                 new DateOnly(2026, 6, 25), empCtoId),
 
-            Make("Engineering lead interview debrief",
+            Make(taskInterviewId,
+                "Engineering lead interview debrief",
                 "Consolidate panel feedback and make hiring recommendation to the board.",
                 TaskPriority.Medium, TaskSource.Manual,
                 new DateOnly(2026, 6, 22), empCtoId, TaskItemStatus.InProgress));
+
+        db.Notifications.AddRange(
+            Notification.Create(Guid.NewGuid(), companyId, empCtoId,
+                "New task assigned: Review Q2 performance reports",
+                "Gather scores from all department heads and summarise findings.",
+                taskQ2ReviewId, now.AddHours(-2)),
+
+            Notification.Create(Guid.NewGuid(), companyId, empCtoId,
+                "New task assigned: Prepare board meeting agenda",
+                "Draft the Q3 board meeting agenda including financial review and product roadmap.",
+                taskBoardAgendaId, now.AddHours(-1)),
+
+            Notification.Create(Guid.NewGuid(), companyId, empCtoId,
+                "New task assigned: Engineering lead interview debrief",
+                "Consolidate panel feedback and make hiring recommendation to the board.",
+                taskInterviewId, now.AddDays(-1)));
 
         await db.SaveChangesAsync();
     }

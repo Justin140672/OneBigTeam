@@ -31,6 +31,7 @@ internal sealed class GetTaskHandler(TasksDbContext dbContext)
             task.DueDate,
             task.AssignedEmployeeId,
             task.AssignedUserId,
+            task.SourceEntityId,
             task.CreatedBy,
             task.CompletedBy,
             task.CompletedAt,

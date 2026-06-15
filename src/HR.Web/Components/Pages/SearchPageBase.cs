@@ -43,9 +43,9 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
         {
             var items = new List<object>
             {
-                new ItemModel { Id = "hr-add",  Text = "Add",  PrefixIcon = "e-icons e-add",  TooltipText = "Add" },
-                new ItemModel { Id = "hr-edit", Text = "Edit", PrefixIcon = "e-icons e-edit", TooltipText = "Edit selected", Disabled = !_hasSelection },
-                new ItemModel { Id = "hr-view", Text = "View", PrefixIcon = "e-icons e-eye",  TooltipText = "View selected", Disabled = !_hasSelection },
+                new ItemModel { Id = "hr-add",  Text = "Add",  PrefixIcon = "fa-solid fa-plus", TooltipText = "Add" },
+                new ItemModel { Id = "hr-edit", Text = "Edit", PrefixIcon = "fa-solid fa-pen",  TooltipText = "Edit selected", Disabled = !_hasSelection },
+                new ItemModel { Id = "hr-view", Text = "View", PrefixIcon = "fa-solid fa-eye",  TooltipText = "View selected", Disabled = !_hasSelection },
             };
 
             foreach (var action in _customActions)

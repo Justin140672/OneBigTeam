@@ -1,0 +1,198 @@
+@page "/companies/{CompanyId:guid}/tasks/{TaskId:guid}"
+@rendermode InteractiveServer
+@inject TaskService TaskService
+@inject NavigationManager Navigation
+@inject AppSession Session
+
+<PageTitle>@(_task?.Title ?? "Task")</PageTitle>
+
+<div class="container-fluid py-4">
+    @if (_loading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span>Loading task…</span>
+        </div>
+    }
+    else if (_task is null)
+    {
+        <div class="alert alert-danger">Task not found.</div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="GoBack">
+                <i class="fa-solid fa-arrow-left me-1"></i>Back
+            </button>
+            <h1 class="mb-0 flex-grow-1 fs-3">@_task.Title</h1>
+            <span class="task-status-badge task-status-badge--@_task.Status.ToLowerInvariant()">
+                @StatusLabel(_task.Status)
+            </span>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        @if (_task.Description is not null)
+                        {
+                            <p class="mb-3">@_task.Description</p>
+                            <hr class="my-3" />
+                        }
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4 text-muted fw-normal">Source</dt>
+                            <dd class="col-sm-8">@_task.Source</dd>
+
+                            <dt class="col-sm-4 text-muted fw-normal">Priority</dt>
+                            <dd class="col-sm-8">@_task.Priority</dd>
+
+                            <dt class="col-sm-4 text-muted fw-normal">Due Date</dt>
+                            <dd class="col-sm-8">@(_task.DueDate?.ToString("d MMM yyyy") ?? "—")</dd>
+
+                            <dt class="col-sm-4 text-muted fw-normal">Created</dt>
+                            <dd class="col-sm-8">@_task.CreatedAt.ToString("d MMM yyyy")</dd>
+
+                            @if (_task.CompletedAt.HasValue)
+                            {
+                                <dt class="col-sm-4 text-muted fw-normal">Completed</dt>
+                                <dd class="col-sm-8">@_task.CompletedAt.Value.ToString("d MMM yyyy")</dd>
+                            }
+                        </dl>
+                    </div>
+                </div>
+
+                @if (_task.Status is "Open" or "InProgress")
+                {
+                    @if (_task.Source == "Leave")
+                    {
+                        <div class="card">
+                            <div class="card-header fw-medium">Review Leave Request</div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        Reason <span class="text-muted">(required for rejection)</span>
+                                    </label>
+                                    <textarea class="form-control"
+                                              rows="3"
+                                              @bind="_reason"
+                                              placeholder="Enter a reason for your decision…" />
+                                </div>
+                                @if (_actionError is not null)
+                                {
+                                    <div class="alert alert-danger mb-3">@_actionError</div>
+                                }
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-success"
+                                            @onclick='() => SubmitLeaveReviewAsync("Approve")'
+                                            disabled="@_submitting">
+                                        @if (_submitting && _pendingDecision == "Approve")
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        }
+                                        Approve
+                                    </button>
+                                    <button class="btn btn-outline-danger"
+                                            @onclick='() => SubmitLeaveReviewAsync("Reject")'
+                                            disabled="@_submitting">
+                                        @if (_submitting && _pendingDecision == "Reject")
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        }
+                                        Reject
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        @if (_actionError is not null)
+                        {
+                            <div class="alert alert-danger mb-3">@_actionError</div>
+                        }
+                        <button class="btn btn-success" @onclick="CompleteAsync" disabled="@_submitting">
+                            @if (_submitting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            <i class="fa-solid fa-check me-1"></i>Mark as Complete
+                        </button>
+                    }
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid TaskId { get; set; }
+
+    private TaskDetailModel? _task;
+    private bool _loading = true;
+
+    private string? _reason;
+    private string? _actionError;
+    private bool _submitting;
+    private string? _pendingDecision;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _task = await TaskService.GetTaskAsync(CompanyId, TaskId);
+        _loading = false;
+    }
+
+    private async Task SubmitLeaveReviewAsync(string decision)
+    {
+        if (_task is null) return;
+
+        _pendingDecision = decision;
+        _submitting = true;
+        _actionError = null;
+
+        var success = await TaskService.CompleteTaskAsync(CompanyId, _task.Id, decision, _reason);
+
+        _submitting = false;
+        _pendingDecision = null;
+
+        if (success)
+            _task = await TaskService.GetTaskAsync(CompanyId, TaskId);
+        else
+            _actionError = "Failed to submit the decision. Please try again.";
+    }
+
+    private async Task CompleteAsync()
+    {
+        if (_task is null) return;
+
+        _submitting = true;
+        _actionError = null;
+
+        var success = await TaskService.CompleteTaskAsync(CompanyId, _task.Id);
+
+        _submitting = false;
+
+        if (success)
+            _task = await TaskService.GetTaskAsync(CompanyId, TaskId);
+        else
+            _actionError = "Failed to complete the task. Please try again.";
+    }
+
+    private void GoBack()
+    {
+        if (Session.EmployeeId.HasValue)
+            Navigation.NavigateTo($"/companies/{CompanyId}/employees/{Session.EmployeeId}/profile");
+        else
+            Navigation.NavigateTo($"/companies/{CompanyId}/employees");
+    }
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "Open"       => "Not Started",
+        "InProgress" => "In Progress",
+        "Completed"  => "Completed",
+        "Cancelled"  => "Cancelled",
+        _            => status
+    };
+}

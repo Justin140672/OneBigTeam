@@ -1,11 +1,15 @@
-@using HR.Web.Models
-@inject TaskService TaskService
+@inject NavigationManager Navigation
 
 <HrGrid TValue="TaskListItem"
         DataSource="@Tasks"
         AllowFiltering="false"
         AllowPaging="false"
-        AllowSorting="false">
+        AllowSorting="false"
+        Toolbar="@_toolbar">
+    <GridEvents TValue="TaskListItem"
+                OnToolbarClick="OnToolbarClickAsync"
+                RowSelected="OnRowSelected"
+                RowDeselected="OnRowDeselected" />
     <GridColumns>
         <GridColumn HeaderText="Task">
             <Template>
@@ -37,74 +41,8 @@
         {
             <GridColumn Field="@nameof(TaskListItem.AssignedTo)" HeaderText="Assigned To" Width="180" />
         }
-        @if (CompanyId != Guid.Empty)
-        {
-            <GridColumn HeaderText="" Width="110" AllowFiltering="false" AllowSorting="false" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Center">
-                <Template>
-                    @{
-                        var item = (TaskListItem)context;
-                    }
-                    @if (item.Status is "Open" or "InProgress")
-                    {
-                        @if (item.Source == "Leave")
-                        {
-                            <button class="btn btn-sm btn-outline-primary"
-                                    @onclick="() => BeginLeaveReview(item)"
-                                    @onclick:stopPropagation="true">
-                                Review
-                            </button>
-                        }
-                        else
-                        {
-                            <button class="btn btn-sm btn-outline-success"
-                                    @onclick="() => BeginComplete(item)"
-                                    @onclick:stopPropagation="true">
-                                Complete
-                            </button>
-                        }
-                    }
-                </Template>
-            </GridColumn>
-        }
     </GridColumns>
 </HrGrid>
-
-@if (CompanyId != Guid.Empty)
-{
-    <LeaveReviewDialog @bind-Visible="_leaveReviewVisible"
-                       Task="_leaveReviewTask"
-                       CompanyId="CompanyId"
-                       OnReviewed="OnTaskCompleted" />
-
-    <SfDialog @bind-Visible="_confirmVisible" IsModal="true" Width="420px" ShowCloseIcon="true">
-        <DialogEvents Closed="CancelComplete" />
-        <DialogTemplates>
-            <Header>@_pendingTask?.Title</Header>
-            <Content>
-                @if (_pendingTask?.Description is not null)
-                {
-                    <p class="mb-3">@_pendingTask.Description</p>
-                    <hr class="my-3" />
-                }
-                <p class="mb-0 text-muted">Mark this task as complete?</p>
-                @if (_completeError is not null)
-                {
-                    <div class="alert alert-danger mt-3 mb-0">@_completeError</div>
-                }
-            </Content>
-            <FooterTemplate>
-                <SfButton IsPrimary="true" Disabled="@_completing" OnClick="ConfirmCompleteAsync">
-                    @if (_completing)
-                    {
-                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                    }
-                    Complete
-                </SfButton>
-                <SfButton Disabled="@_completing" OnClick="CancelComplete">Cancel</SfButton>
-            </FooterTemplate>
-        </DialogTemplates>
-    </SfDialog>
-}
 
 @code {
     [Parameter, EditorRequired]
@@ -116,16 +54,33 @@
     [Parameter]
     public bool ShowAssignedTo { get; set; } = true;
 
-    [Parameter]
-    public EventCallback OnTaskCompleted { get; set; }
+    private TaskListItem? _selected;
 
-    private bool _confirmVisible;
-    private bool _completing;
-    private string? _completeError;
-    private TaskListItem? _pendingTask;
+    private IEnumerable<object> _toolbar => CompanyId != Guid.Empty
+        ? new List<object>
+          {
+              new ItemModel { Id = "hr-view", Text = "View", PrefixIcon = "fa-solid fa-eye", TooltipText = "View task", Disabled = _selected is null }
+          }
+        : [];
 
-    private bool _leaveReviewVisible;
-    private TaskListItem? _leaveReviewTask;
+    private void OnRowSelected(RowSelectEventArgs<TaskListItem> args)
+    {
+        _selected = args.Data;
+        StateHasChanged();
+    }
+
+    private void OnRowDeselected(RowDeselectEventArgs<TaskListItem> args)
+    {
+        _selected = null;
+        StateHasChanged();
+    }
+
+    private Task OnToolbarClickAsync(ClickEventArgs args)
+    {
+        if (args.Item.Id == "hr-view" && _selected is not null)
+            Navigation.NavigateTo($"/companies/{CompanyId}/tasks/{_selected.Id}");
+        return Task.CompletedTask;
+    }
 
     private static string StatusLabel(string status) => status switch
     {
@@ -135,47 +90,4 @@
         "Cancelled"  => "Cancelled",
         _            => status
     };
-
-    private void BeginLeaveReview(TaskListItem task)
-    {
-        _leaveReviewTask = task;
-        _leaveReviewVisible = true;
-    }
-
-    private void BeginComplete(TaskListItem task)
-    {
-        _pendingTask = task;
-        _completeError = null;
-        _confirmVisible = true;
-    }
-
-    private void CancelComplete()
-    {
-        _confirmVisible = false;
-        _pendingTask = null;
-        _completeError = null;
-    }
-
-    private async Task ConfirmCompleteAsync()
-    {
-        if (_pendingTask is null) return;
-
-        _completing = true;
-        _completeError = null;
-
-        var success = await TaskService.CompleteTaskAsync(CompanyId, _pendingTask.Id);
-
-        _completing = false;
-
-        if (success)
-        {
-            _confirmVisible = false;
-            _pendingTask = null;
-            await OnTaskCompleted.InvokeAsync();
-        }
-        else
-        {
-            _completeError = "Failed to complete the task. Please try again.";
-        }
-    }
 }
