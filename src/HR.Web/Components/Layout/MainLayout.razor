@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
+@inject AppSession Session
 
 <div class="app-shell">
 
@@ -52,6 +53,26 @@
             </button>
             <span class="page-title">Dashboard</span>
             <div class="top-bar-actions">
+                @if (Session.IsLoaded && Session.EmployeeId.HasValue)
+                {
+                    <a href="@_menuItems["MyProfile"]" class="top-bar-user">
+                        @if (Session.ProfileImageUrl is not null)
+                        {
+                            <img src="@Session.ProfileImageUrl" alt="@Session.DisplayName" class="top-bar-avatar" />
+                        }
+                        else
+                        {
+                            <span class="top-bar-avatar top-bar-avatar--initials">@Session.Initials</span>
+                        }
+                        <span class="top-bar-user-info">
+                            @Session.DisplayName
+                            @if (Session.JobTitle is not null)
+                            {
+                                <span class="top-bar-job-title">@Session.JobTitle</span>
+                            }
+                        </span>
+                    </a>
+                }
                 <button class="theme-toggle" @onclick="ToggleTheme" title="@(IsDark ? "Switch to light mode" : "Switch to dark mode")">
                     @if (IsDark)
                     {
@@ -82,16 +103,27 @@
     private bool SidebarOpen { get; set; } = true;
     private bool IsDark { get; set; }
 
-    private string CompanyId => "00000000-0000-0000-0000-000000000001";
-
-    private readonly Dictionary<string, string> _menuItems = new();
-
-    protected override void OnInitialized()
+    private readonly Dictionary<string, string> _menuItems = new()
     {
-        _menuItems["Employees"]        = $"/companies/{CompanyId}/employees";
-        _menuItems["Departments"]      = $"/companies/{CompanyId}/departments";
-        _menuItems["PositionProfiles"] = $"/companies/{CompanyId}/position-profiles";
-        _menuItems["PublicHolidays"]   = $"/companies/{CompanyId}/public-holidays";
+        ["Employees"]        = "/",
+        ["Departments"]      = "/",
+        ["PositionProfiles"] = "/",
+        ["PublicHolidays"]   = "/",
+        ["MyProfile"]        = "/",
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.InitialiseAsync();
+
+        var companyId = Session.CompanyId;
+        _menuItems["Employees"]        = $"/companies/{companyId}/employees";
+        _menuItems["Departments"]      = $"/companies/{companyId}/departments";
+        _menuItems["PositionProfiles"] = $"/companies/{companyId}/position-profiles";
+        _menuItems["PublicHolidays"]   = $"/companies/{companyId}/public-holidays";
+        _menuItems["MyProfile"]        = Session.EmployeeId.HasValue
+            ? $"/companies/{companyId}/employees/{Session.EmployeeId}/profile"
+            : "/";
     }
 
     private void ToggleSidebar() => SidebarOpen = !SidebarOpen;

@@ -10,7 +10,16 @@ public record GetCompanyResponse(
     string Slug,
     bool IsActive,
     DateTime CreatedAt,
-    List<GetCompanyAddressResponse> Addresses);
+    List<GetCompanyAddressResponse> Addresses,
+    GetCompanyBrandingResponse? Branding);
+
+public record GetCompanyBrandingResponse(
+    string PrimaryColor,
+    string SecondaryColor,
+    string AccentColor,
+    string? PrimaryLogoUrl,
+    string? SmallLogoUrl,
+    string? EmailLogoUrl);
 
 public record GetCompanyAddressResponse(
     Guid Id,

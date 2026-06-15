@@ -57,10 +57,10 @@ public static class TasksModule
 
         var now = DateTimeOffset.UtcNow;
         var companyId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        var devUserId  = Guid.Parse("00000000-0000-0000-0000-000000000099");
+        var devUserId  = Guid.Parse("30000000-0000-0000-0000-000000000001"); // Sarah Chen — matches DevAuthHandler
 
         // Seeded employee IDs from EmployeesModule
-        var empCtoId      = Guid.Parse("30000000-0000-0000-0000-000000000001"); // Sarah Chen
+        var empCtoId      = devUserId; // Sarah Chen
         var empSenDev1Id  = Guid.Parse("30000000-0000-0000-0000-000000000002"); // James Okafor
         var empDev1Id     = Guid.Parse("30000000-0000-0000-0000-000000000004"); // Tom Williams
         var empHrMgrId    = Guid.Parse("30000000-0000-0000-0000-000000000005"); // Laura Bennett

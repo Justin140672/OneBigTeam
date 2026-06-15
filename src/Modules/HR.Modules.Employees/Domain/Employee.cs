@@ -20,6 +20,7 @@ internal sealed class Employee
     public bool HasSystemAccess { get; private set; }
     public WorkingDays? WorkingDaysOverride { get; private set; }
     public decimal? HoursPerDayOverride { get; private set; }
+    public string? ProfileImageUrl { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -85,6 +86,12 @@ internal sealed class Employee
         UpdatedAt = now;
     }
 
+    public void SetProfileImage(string? url, DateTimeOffset now)
+    {
+        ProfileImageUrl = url;
+        UpdatedAt = now;
+    }
+
     public void Activate(DateTimeOffset now)
     {
         Status = EmploymentStatus.Active;
@@ -108,4 +115,5 @@ internal sealed class Employee
         Status = EmploymentStatus.Terminated;
         UpdatedAt = now;
     }
+
 }

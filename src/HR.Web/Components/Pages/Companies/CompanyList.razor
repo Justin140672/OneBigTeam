@@ -1,12 +1,14 @@
 @page "/companies"
 @rendermode InteractiveServer
 @inject NavigationManager Navigation
+@inject AppSession Session
 
 <PageTitle>Company</PageTitle>
 
 @code {
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        Navigation.NavigateTo("/companies/00000000-0000-0000-0000-000000000001/edit", replace: true);
+        await Session.InitialiseAsync();
+        Navigation.NavigateTo($"/companies/{Session.CompanyId}/edit", replace: true);
     }
 }

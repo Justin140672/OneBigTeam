@@ -73,6 +73,10 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .HasColumnName("hours_per_day_override")
             .HasPrecision(4, 2);
 
+        builder.Property(e => e.ProfileImageUrl)
+            .HasColumnName("profile_image_url")
+            .HasMaxLength(2048);
+
         builder.Property(e => e.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

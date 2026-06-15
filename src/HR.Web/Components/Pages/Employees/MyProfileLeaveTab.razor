@@ -1,7 +1,6 @@
 @inject LeaveService LeaveService
-@inject CompanyService CompanyService
-@inject EmployeeService EmployeeService
 @inject PublicHolidayService PublicHolidayService
+@inject AppSession Session
 
 @if (_loading)
 {
@@ -144,26 +143,18 @@ else
         _loading = true;
         _showRequestForm = false;
 
+        _effectiveWorkingDays  = Session.WorkingDaysOverride ?? (WorkingDays)Session.WorkingDays;
+        _effectiveHoursPerDay  = Session.HoursPerDayOverride ?? Session.HoursPerDay;
+        _excludePublicHolidays = Session.ExcludePublicHolidaysFromLeave;
+
         var balanceTask  = LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
         var requestsTask = LeaveService.ListLeaveRequestsAsync(CompanyId, EmployeeId);
-        var settingsTask = CompanyService.GetCompanySettingsAsync(CompanyId);
-        var employeeTask = EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
         var holidaysTask = PublicHolidayService.ListAsync(CompanyId, DateTime.UtcNow.Year);
 
-        await Task.WhenAll(balanceTask, requestsTask, settingsTask, employeeTask, holidaysTask);
+        await Task.WhenAll(balanceTask, requestsTask, holidaysTask);
 
         ApplyBalance(await balanceTask);
-        _requests = (await requestsTask)?.Items.ToList() ?? [];
-
-        var settings = await settingsTask;
-        var employee  = await employeeTask;
-        if (settings is not null)
-        {
-            _effectiveWorkingDays = employee?.WorkingDaysOverride ?? (WorkingDays)settings.WorkingDays;
-            _effectiveHoursPerDay = employee?.HoursPerDayOverride ?? settings.HoursPerDay;
-            _excludePublicHolidays = settings.ExcludePublicHolidaysFromLeave;
-        }
-
+        _requests       = (await requestsTask)?.Items.ToList() ?? [];
         _publicHolidays = (await holidaysTask)?.Items.Select(h => h.Date).ToList() ?? [];
 
         _loading = false;

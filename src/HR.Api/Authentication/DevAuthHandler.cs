@@ -14,7 +14,7 @@ internal sealed class DevAuthHandler : AuthenticationHandler<AuthenticationSchem
 {
     // Matches the seeded company from SeedCompaniesAsync
     private static readonly string DevCompanyId = "00000000-0000-0000-0000-000000000001";
-    private static readonly string DevUserId = "00000000-0000-0000-0000-000000000099";
+    private static readonly string DevUserId = "30000000-0000-0000-0000-000000000001"; // Sarah Chen
 
     public DevAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,

@@ -56,6 +56,55 @@
     gap: 8px;
 }
 
+.top-bar-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: inherit;
+    border-radius: 8px;
+    padding: 4px 8px;
+    transition: background 0.15s;
+}
+
+.top-bar-user:hover {
+    background: #f3f4f6;
+}
+
+.top-bar-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.top-bar-avatar--initials {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #6366f1;
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    user-select: none;
+}
+
+.top-bar-user-info {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.top-bar-job-title {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: #6b7280;
+}
+
 .theme-toggle {
     border: none;
     background: transparent;

@@ -8,7 +8,16 @@ internal sealed record GetCompanyResponse(
     string Slug,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    IReadOnlyCollection<GetCompanyAddressResponse> Addresses);
+    IReadOnlyCollection<GetCompanyAddressResponse> Addresses,
+    GetCompanyBrandingResponse Branding);
+
+internal sealed record GetCompanyBrandingResponse(
+    string PrimaryColor,
+    string SecondaryColor,
+    string AccentColor,
+    string? PrimaryLogoUrl,
+    string? SmallLogoUrl,
+    string? EmailLogoUrl);
 
 internal sealed record GetCompanyAddressResponse(
     Guid Id,

@@ -19,6 +19,7 @@ internal sealed class GetCompanyHandler
     {
         var company = await _dbContext.Companies
             .Include(currentCompany => currentCompany.Addresses)
+            .Include(currentCompany => currentCompany.Branding)
             .AsNoTracking()
             .SingleOrDefaultAsync(company => company.Id == request.Id, cancellationToken);
 
@@ -27,6 +28,7 @@ internal sealed class GetCompanyHandler
             return Result.Failure<GetCompanyResponse>(Error.NotFound($"Company with id '{request.Id}' was not found."));
         }
 
+        var branding = company.Branding;
         var response = new GetCompanyResponse(
             company.Id,
             company.Name,
@@ -44,7 +46,14 @@ internal sealed class GetCompanyHandler
                     address.PostalCode,
                     address.CountryCode))
                 .OrderBy(address => address.Type)
-                .ToArray());
+                .ToArray(),
+            new GetCompanyBrandingResponse(
+                branding?.PrimaryColor ?? "#000000",
+                branding?.SecondaryColor ?? "#6B7280",
+                branding?.AccentColor ?? "#3B82F6",
+                branding?.PrimaryLogoUrl,
+                branding?.SmallLogoUrl,
+                branding?.EmailLogoUrl));
 
         return Result.Success(response);
     }
