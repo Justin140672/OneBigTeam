@@ -1,10 +1,11 @@
 @page "/companies/{CompanyId:guid}/employees/{EmployeeId:guid}/profile"
 @rendermode InteractiveServer
+@inject AppSession Session
 
 <PageTitle>My Profile</PageTitle>
 
 <div class="container py-4">
-    <h1 class="mb-4">My Profile</h1>
+    <h1 class="mb-4">@Session.DisplayName</h1>
 
     <SfTab>
         <TabItems>

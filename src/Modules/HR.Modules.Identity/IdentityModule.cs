@@ -88,33 +88,42 @@ public static class IdentityModule
     }
 
     /// <summary>
-    /// Seeds a development user with the HrAdministrator role so the DevAuthHandler
-    /// has a valid, permission-bearing identity. Safe to call on every startup (idempotent).
+    /// Seeds development personas with identity records and appropriate roles so
+    /// the DevAuthHandler has valid, permission-bearing identities for each persona.
+    /// Safe to call on every startup (idempotent).
     /// </summary>
     public static async Task SeedDevUserAsync(this IServiceProvider services)
     {
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        var now = DateTimeOffset.UtcNow;
 
-        var devUserId = new Guid("00000000-0000-0000-0000-000000000099");
-
-        var exists = await db.Users.AnyAsync(u => u.Id == devUserId);
-        if (!exists)
+        var personas = new[]
         {
-            db.Users.Add(ApplicationUser.Create(
-                devUserId,
-                email: "admin@dev.local",
-                passwordHash: "dev-only-not-used",
-                firstName: "Dev",
-                lastName: "Admin",
-                now: DateTimeOffset.UtcNow));
-        }
+            (Id: new Guid("30000000-0000-0000-0000-000000000001"), First: "Sarah",  Last: "Chen",    Email: "sarah.chen@acme.example",    Roles: new[] { SystemRoles.HrAdministrator }),
+            (Id: new Guid("30000000-0000-0000-0000-000000000002"), First: "James",  Last: "Okafor",  Email: "james.okafor@acme.example",  Roles: new[] { SystemRoles.Employee, SystemRoles.Manager }),
+            (Id: new Guid("30000000-0000-0000-0000-000000000004"), First: "Tom",    Last: "Williams",Email: "tom.williams@acme.example",   Roles: new[] { SystemRoles.Employee }),
+            (Id: new Guid("30000000-0000-0000-0000-000000000005"), First: "Laura",  Last: "Bennett", Email: "laura.bennett@acme.example",  Roles: new[] { SystemRoles.HrAdministrator }),
+        };
 
-        var roleExists = await db.UserRoles.AnyAsync(
-            ur => ur.UserId == devUserId && ur.RoleId == SystemRoles.HrAdministrator);
-        if (!roleExists)
+        foreach (var persona in personas)
         {
-            db.UserRoles.Add(UserRole.Create(devUserId, SystemRoles.HrAdministrator, DateTimeOffset.UtcNow));
+            var exists = await db.Users.AnyAsync(u => u.Id == persona.Id);
+            if (!exists)
+            {
+                db.Users.Add(ApplicationUser.Create(
+                    persona.Id, persona.Email,
+                    passwordHash: "dev-only-not-used",
+                    firstName: persona.First, lastName: persona.Last, now));
+            }
+
+            foreach (var roleId in persona.Roles)
+            {
+                var roleExists = await db.UserRoles.AnyAsync(
+                    ur => ur.UserId == persona.Id && ur.RoleId == roleId);
+                if (!roleExists)
+                    db.UserRoles.Add(UserRole.Create(persona.Id, roleId, now));
+            }
         }
 
         await db.SaveChangesAsync();
