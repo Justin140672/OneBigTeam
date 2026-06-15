@@ -84,14 +84,12 @@
                                         @foreach (var n in _notifications)
                                         {
                                             var notif = n;
-                                            var isDueSoon = notif.Type == "TaskDueSoon";
-                                            <div class="notif-item @(notif.IsRead ? "" : "notif-unread") @(isDueSoon ? "notif-due-soon" : "")"
+                                            var (typeIcon, typeLabel, typeCss) = NotifTypeInfo(notif.Type);
+                                            <div class="notif-item @(notif.IsRead ? "" : "notif-unread") notif-type--@notif.Type.ToLowerInvariant()"
                                                  @onclick="() => OnNotificationClick(notif)">
                                                 <div class="notif-item-header">
-                                                    <i class="@(isDueSoon ? "fa-solid fa-clock" : "fa-solid fa-bell") notif-type-icon"></i>
-                                                    <span class="notif-type-label @(isDueSoon ? "notif-type-label--due-soon" : "notif-type-label--assigned")">
-                                                        @(isDueSoon ? "Due Soon" : "Assigned")
-                                                    </span>
+                                                    <i class="@typeIcon notif-type-icon"></i>
+                                                    <span class="notif-type-label @typeCss">@typeLabel</span>
                                                     <span class="notif-item-time ms-auto">@FormatTime(notif.CreatedAt)</span>
                                                 </div>
                                                 <div class="notif-item-title">@notif.Title</div>
@@ -220,6 +218,13 @@
         _unreadCount = 0;
         _notifications = _notifications.Select(n => n with { IsRead = true }).ToList();
     }
+
+    private static (string Icon, string Label, string Css) NotifTypeInfo(string type) => type switch
+    {
+        "TaskDueSoon" => ("fa-solid fa-clock",              "Due Soon", "notif-type-label--due-soon"),
+        "TaskOverdue" => ("fa-solid fa-triangle-exclamation", "Overdue",  "notif-type-label--overdue"),
+        _             => ("fa-solid fa-bell",               "Assigned", "notif-type-label--assigned"),
+    };
 
     private static string FormatTime(DateTimeOffset dt)
     {

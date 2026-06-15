@@ -304,9 +304,14 @@
     color: #92400e;
 }
 
-.notif-due-soon .notif-type-icon {
-    color: #d97706;
+.notif-type-label--overdue {
+    background: #fee2e2;
+    color: #991b1b;
 }
+
+.notif-type--taskduesoon .notif-type-icon { color: #d97706; }
+.notif-type--taskoverdue .notif-type-icon { color: #dc2626; }
+.notif-type--taskoverdue                  { border-left-color: #dc2626; }
 
 .notif-item-time {
     font-size: 0.75rem;

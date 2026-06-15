@@ -4,4 +4,5 @@ internal enum NotificationType
 {
     TaskAssigned = 1,
     TaskDueSoon  = 2,
+    TaskOverdue  = 3,
 }

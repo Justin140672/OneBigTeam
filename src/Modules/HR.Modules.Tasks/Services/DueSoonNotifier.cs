@@ -20,7 +20,7 @@ internal sealed class DueSoonNotifier(IServiceScopeFactory scopeFactory) : Backg
         {
             try
             {
-                await CheckDueSoonAsync(stoppingToken);
+                await CheckTaskAlertsAsync(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -35,50 +35,73 @@ internal sealed class DueSoonNotifier(IServiceScopeFactory scopeFactory) : Backg
         }
     }
 
-    private async Task CheckDueSoonAsync(CancellationToken ct)
+    private async Task CheckTaskAlertsAsync(CancellationToken ct)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
-        var clock    = scope.ServiceProvider.GetRequiredService<IClock>();
+        var clock     = scope.ServiceProvider.GetRequiredService<IClock>();
 
-        var now      = clock.UtcNowOffset();
-        var today    = DateOnly.FromDateTime(now.UtcDateTime);
-        var cutoff   = today.AddDays(DueSoonDays);
+        var now    = clock.UtcNowOffset();
+        var today  = DateOnly.FromDateTime(now.UtcDateTime);
+        var cutoff = today.AddDays(DueSoonDays);
 
         var candidates = await dbContext.TaskItems
             .AsNoTracking()
             .Where(t => t.DueDate.HasValue
-                     && t.DueDate.Value <= cutoff
                      && t.AssignedEmployeeId.HasValue
                      && (t.Status == TaskItemStatus.Open || t.Status == TaskItemStatus.InProgress))
             .ToListAsync(ct);
 
         foreach (var task in candidates)
         {
-            var alreadyNotified = await dbContext.Notifications
-                .AnyAsync(n => n.SourceEntityId == task.Id
-                            && n.EmployeeId     == task.AssignedEmployeeId!.Value
-                            && n.Type           == NotificationType.TaskDueSoon, ct);
+            var isOverdue = task.DueDate!.Value < today;
+            var isDueSoon = !isOverdue && task.DueDate.Value <= cutoff;
 
-            if (alreadyNotified) continue;
-
-            var dueToday = task.DueDate!.Value == today;
-            var notification = Notification.Create(
-                Guid.NewGuid(),
-                task.CompanyId,
-                task.AssignedEmployeeId!.Value,
-                $"Due {(dueToday ? "today" : "soon")}: {task.Title}",
-                dueToday
-                    ? "This task is due today."
-                    : $"This task is due on {task.DueDate.Value:d MMM yyyy}.",
-                task.Id,
-                now,
-                NotificationType.TaskDueSoon);
-
-            dbContext.Notifications.Add(notification);
+            if (isOverdue)
+            {
+                await MaybeCreateAsync(
+                    dbContext, task, now,
+                    NotificationType.TaskOverdue,
+                    $"Overdue: {task.Title}",
+                    $"This task was due on {task.DueDate.Value:d MMM yyyy} and has not been completed.",
+                    ct);
+            }
+            else if (isDueSoon)
+            {
+                var dueToday = task.DueDate.Value == today;
+                await MaybeCreateAsync(
+                    dbContext, task, now,
+                    NotificationType.TaskDueSoon,
+                    $"Due {(dueToday ? "today" : "soon")}: {task.Title}",
+                    dueToday
+                        ? "This task is due today."
+                        : $"This task is due on {task.DueDate.Value:d MMM yyyy}.",
+                    ct);
+            }
         }
 
         if (dbContext.ChangeTracker.HasChanges())
             await dbContext.SaveChangesAsync(ct);
+    }
+
+    private static async Task MaybeCreateAsync(
+        TasksDbContext dbContext,
+        TaskItem task,
+        DateTimeOffset now,
+        NotificationType type,
+        string title,
+        string body,
+        CancellationToken ct)
+    {
+        var exists = await dbContext.Notifications
+            .AnyAsync(n => n.SourceEntityId == task.Id
+                        && n.EmployeeId     == task.AssignedEmployeeId!.Value
+                        && n.Type           == type, ct);
+
+        if (exists) return;
+
+        dbContext.Notifications.Add(Notification.Create(
+            Guid.NewGuid(), task.CompanyId, task.AssignedEmployeeId!.Value,
+            title, body, task.Id, now, type));
     }
 }

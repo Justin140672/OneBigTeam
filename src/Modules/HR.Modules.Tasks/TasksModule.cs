@@ -86,6 +86,7 @@ public static class TasksModule
         var taskQ2ReviewId      = Guid.Parse("a0000000-0000-0000-0000-000000000001");
         var taskBoardAgendaId   = Guid.Parse("a0000000-0000-0000-0000-000000000002");
         var taskInterviewId     = Guid.Parse("a0000000-0000-0000-0000-000000000003");
+        var taskSurveyId        = Guid.Parse("a0000000-0000-0000-0000-000000000004");
 
         TaskItem Make(
             Guid id,
@@ -149,7 +150,13 @@ public static class TasksModule
                 "Engineering lead interview debrief",
                 "Consolidate panel feedback and make hiring recommendation to the board.",
                 TaskPriority.Medium, TaskSource.Manual,
-                new DateOnly(2026, 6, 22), empCtoId, TaskItemStatus.InProgress));
+                new DateOnly(2026, 6, 22), empCtoId, TaskItemStatus.InProgress),
+
+            Make(taskSurveyId,
+                "Analyse employee satisfaction survey results",
+                "Review responses from the May survey and prepare a summary report for leadership.",
+                TaskPriority.High, TaskSource.Manual,
+                new DateOnly(2026, 6, 10), empCtoId));
 
         db.Notifications.AddRange(
             Notification.Create(Guid.NewGuid(), companyId, empCtoId,
@@ -174,7 +181,13 @@ public static class TasksModule
                 "Due soon: Engineering lead interview debrief",
                 "This task is due on 22 Jun 2026.",
                 taskInterviewId, now.AddMinutes(-30),
-                NotificationType.TaskDueSoon));
+                NotificationType.TaskDueSoon),
+
+            Notification.Create(Guid.NewGuid(), companyId, empCtoId,
+                "Overdue: Analyse employee satisfaction survey results",
+                "This task was due on 10 Jun 2026 and has not been completed.",
+                taskSurveyId, now.AddMinutes(-15),
+                NotificationType.TaskOverdue));
 
         await db.SaveChangesAsync();
     }
