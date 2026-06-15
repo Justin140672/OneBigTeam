@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HR.Modules.Tasks.Persistence.Migrations
 {
     [DbContext(typeof(TasksDbContext))]
-    [Migration("20260615074842_InitialCreate")]
+    [Migration("20260615075318_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -32,9 +32,13 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid?>("AssignedToEmployeeId")
+                    b.Property<Guid?>("AssignedEmployeeId")
                         .HasColumnType("uuid")
-                        .HasColumnName("assigned_to_employee_id");
+                        .HasColumnName("assigned_employee_id");
+
+                    b.Property<Guid?>("AssignedUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_user_id");
 
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
@@ -44,13 +48,17 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
 
+                    b.Property<Guid?>("CompletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("completed_by");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<Guid>("CreatedByEmployeeId")
+                    b.Property<Guid>("CreatedBy")
                         .HasColumnType("uuid")
-                        .HasColumnName("created_by_employee_id");
+                        .HasColumnName("created_by");
 
                     b.Property<string>("Description")
                         .HasMaxLength(2000)
@@ -85,7 +93,9 @@ namespace HR.Modules.Tasks.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AssignedToEmployeeId");
+                    b.HasIndex("AssignedEmployeeId");
+
+                    b.HasIndex("AssignedUserId");
 
                     b.HasIndex("CompanyId");
 

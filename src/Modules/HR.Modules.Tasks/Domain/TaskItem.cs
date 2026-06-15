@@ -8,11 +8,13 @@ internal sealed class TaskItem
     public Guid CompanyId { get; private set; }
     public string Title { get; private set; } = string.Empty;
     public string? Description { get; private set; }
-    public Guid? AssignedToEmployeeId { get; private set; }
-    public Guid CreatedByEmployeeId { get; private set; }
     public TaskItemStatus Status { get; private set; }
     public TaskPriority Priority { get; private set; }
     public DateOnly? DueDate { get; private set; }
+    public Guid? AssignedEmployeeId { get; private set; }
+    public Guid? AssignedUserId { get; private set; }
+    public Guid CreatedBy { get; private set; }
+    public Guid? CompletedBy { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -20,24 +22,26 @@ internal sealed class TaskItem
     public static TaskItem Create(
         Guid id,
         Guid companyId,
-        Guid createdByEmployeeId,
+        Guid createdBy,
         string title,
         string? description,
         TaskPriority priority,
         DateOnly? dueDate,
-        Guid? assignedToEmployeeId,
+        Guid? assignedEmployeeId,
+        Guid? assignedUserId,
         DateTimeOffset now)
     {
         return new TaskItem
         {
             Id = id,
             CompanyId = companyId,
-            CreatedByEmployeeId = createdByEmployeeId,
+            CreatedBy = createdBy,
             Title = title,
             Description = description,
             Priority = priority,
             DueDate = dueDate,
-            AssignedToEmployeeId = assignedToEmployeeId,
+            AssignedEmployeeId = assignedEmployeeId,
+            AssignedUserId = assignedUserId,
             Status = TaskItemStatus.Open,
             CreatedAt = now,
             UpdatedAt = now
@@ -53,7 +57,7 @@ internal sealed class TaskItem
         UpdatedAt = now;
     }
 
-    public void Complete(DateTimeOffset now)
+    public void Complete(Guid completedBy, DateTimeOffset now)
     {
         if (Status == TaskItemStatus.Completed)
             return;
@@ -62,6 +66,7 @@ internal sealed class TaskItem
             throw new InvalidOperationException("Cannot complete a cancelled task.");
 
         Status = TaskItemStatus.Completed;
+        CompletedBy = completedBy;
         CompletedAt = now;
         UpdatedAt = now;
     }
@@ -78,9 +83,10 @@ internal sealed class TaskItem
         UpdatedAt = now;
     }
 
-    public void Reassign(Guid? employeeId, DateTimeOffset now)
+    public void Reassign(Guid? assignedEmployeeId, Guid? assignedUserId, DateTimeOffset now)
     {
-        AssignedToEmployeeId = employeeId;
+        AssignedEmployeeId = assignedEmployeeId;
+        AssignedUserId = assignedUserId;
         UpdatedAt = now;
     }
 

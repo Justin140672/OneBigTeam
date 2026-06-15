@@ -29,13 +29,6 @@ internal sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
             .HasColumnName("description")
             .HasMaxLength(2000);
 
-        builder.Property(t => t.AssignedToEmployeeId)
-            .HasColumnName("assigned_to_employee_id");
-
-        builder.Property(t => t.CreatedByEmployeeId)
-            .HasColumnName("created_by_employee_id")
-            .IsRequired();
-
         builder.Property(t => t.Status)
             .HasColumnName("status")
             .HasConversion<string>()
@@ -51,6 +44,19 @@ internal sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
         builder.Property(t => t.DueDate)
             .HasColumnName("due_date");
 
+        builder.Property(t => t.AssignedEmployeeId)
+            .HasColumnName("assigned_employee_id");
+
+        builder.Property(t => t.AssignedUserId)
+            .HasColumnName("assigned_user_id");
+
+        builder.Property(t => t.CreatedBy)
+            .HasColumnName("created_by")
+            .IsRequired();
+
+        builder.Property(t => t.CompletedBy)
+            .HasColumnName("completed_by");
+
         builder.Property(t => t.CompletedAt)
             .HasColumnName("completed_at");
 
@@ -63,7 +69,8 @@ internal sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
             .IsRequired();
 
         builder.HasIndex(t => t.CompanyId);
-        builder.HasIndex(t => t.AssignedToEmployeeId);
+        builder.HasIndex(t => t.AssignedEmployeeId);
+        builder.HasIndex(t => t.AssignedUserId);
         builder.HasIndex(t => new { t.CompanyId, t.Status });
     }
 }

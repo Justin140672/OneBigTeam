@@ -23,11 +23,13 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                     company_id = table.Column<Guid>(type: "uuid", nullable: false),
                     title = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     description = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
-                    assigned_to_employee_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    created_by_employee_id = table.Column<Guid>(type: "uuid", nullable: false),
                     status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     priority = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     due_date = table.Column<DateOnly>(type: "date", nullable: true),
+                    assigned_employee_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    assigned_user_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    created_by = table.Column<Guid>(type: "uuid", nullable: false),
+                    completed_by = table.Column<Guid>(type: "uuid", nullable: true),
                     completed_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
@@ -38,10 +40,16 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_task_items_assigned_to_employee_id",
+                name: "IX_task_items_assigned_employee_id",
                 schema: "tasks",
                 table: "task_items",
-                column: "assigned_to_employee_id");
+                column: "assigned_employee_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_task_items_assigned_user_id",
+                schema: "tasks",
+                table: "task_items",
+                column: "assigned_user_id");
 
             migrationBuilder.CreateIndex(
                 name: "IX_task_items_company_id",
