@@ -1,0 +1,29 @@
+@inject TaskService TaskService
+@using HR.Web.Components.Pages.Tasks
+
+@if (_loading)
+{
+    <div class="d-flex align-items-center gap-2">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span>Loading tasks…</span>
+    </div>
+}
+else
+{
+    <TaskList Tasks="@_tasks" />
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+
+    private IReadOnlyList<TaskListItem> _tasks = [];
+    private bool _loading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        var result = await TaskService.GetMyTasksAsync(CompanyId);
+        _tasks = result?.Items ?? [];
+        _loading = false;
+    }
+}

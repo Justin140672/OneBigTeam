@@ -2,9 +2,9 @@
 
 <HrGrid TValue="TaskListItem"
         DataSource="@Tasks"
-        AllowFiltering="true"
-        AllowSorting="true">
-    <GridPageSettings PageSize="20" />
+        AllowFiltering="false"
+        AllowPaging="false"
+        AllowSorting="false">
     <GridColumns>
         <GridColumn Field="@nameof(TaskListItem.Title)" HeaderText="Title" />
         <GridColumn Field="@nameof(TaskListItem.Status)" HeaderText="Status" Width="120" />

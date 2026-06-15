@@ -1,255 +1,42 @@
 @page "/companies/{CompanyId:guid}/employees/{EmployeeId:guid}/profile"
 @rendermode InteractiveServer
-@inject LeaveService LeaveService
-@inject CompanyService CompanyService
-@inject EmployeeService EmployeeService
-@inject PublicHolidayService PublicHolidayService
 
 <PageTitle>My Profile</PageTitle>
 
 <div class="container py-4">
     <h1 class="mb-4">My Profile</h1>
 
-    <ul class="nav nav-tabs mb-4" role="tablist">
-        @foreach (var tab in _tabs)
-        {
-            <li class="nav-item" role="presentation">
-                <button class="nav-link @(tab == _activeTab ? "active" : "")"
-                        type="button" role="tab"
-                        @onclick="() => _activeTab = tab">@tab</button>
-            </li>
-        }
-    </ul>
-
-    <div class="tab-content">
-        @if (_activeTab == "Overview")
-        {
-            <p class="text-muted">Overview coming soon.</p>
-        }
-        else if (_activeTab == "Leave")
-        {
-            @if (_loading)
-            {
-                <div class="d-flex align-items-center gap-2">
-                    <div class="spinner-border spinner-border-sm" role="status"></div>
-                    <span>Loading…</span>
-                </div>
-            }
-            else
-            {
-                <div class="row g-3 mb-4">
-                    @if (_annualLeave is not null)
-                    {
-                        <div class="col-md-4">
-                            <div class="card h-100">
-                                <div class="card-header fw-semibold">Annual Leave</div>
-                                <div class="card-body">
-                                    <dl class="mb-0">
-                                        <dt class="text-muted small">Remaining</dt>
-                                        <dd class="fs-4 fw-semibold mb-2">@FormatDays(_annualLeave.RemainingDays)</dd>
-                                        <dt class="text-muted small">Booked</dt>
-                                        <dd class="mb-2">@FormatDays(_annualLeave.UsedDays)</dd>
-                                        <dt class="text-muted small">Pending</dt>
-                                        <dd class="mb-0">@(_annualLeave.PendingDays > 0 ? FormatDays(_annualLeave.PendingDays) : "—")</dd>
-                                    </dl>
-                                </div>
-                            </div>
-                        </div>
-                    }
-
-                    @if (_toil is not null)
-                    {
-                        <div class="col-md-4">
-                            <div class="card h-100">
-                                <div class="card-header fw-semibold">TOIL</div>
-                                <div class="card-body">
-                                    <dl class="mb-0">
-                                        <dt class="text-muted small">Available</dt>
-                                        <dd class="fs-4 fw-semibold mb-0">@FormatDays(_toil.RemainingDays)</dd>
-                                    </dl>
-                                </div>
-                            </div>
-                        </div>
-                    }
-                </div>
-
-                <div class="mb-4">
-                    <SfButton IsPrimary="true" OnClick="@(() => _showRequestForm = true)">Request Leave</SfButton>
-                </div>
-
-                @if (_requests.Count > 0)
-                {
-                    <div class="card">
-                        <div class="card-header fw-semibold">My Requests</div>
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Type</th>
-                                        <th>Start</th>
-                                        <th>End</th>
-                                        <th>Days</th>
-                                        <th>Status</th>
-                                        <th>Reason</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var r in _requests)
-                                    {
-                                        <tr>
-                                            <td>@r.LeaveTypeName</td>
-                                            <td class="text-nowrap">@FormatDate(r.StartDate, r.StartPart)</td>
-                                            <td class="text-nowrap">@FormatDate(r.EndDate, r.EndPart)</td>
-                                            <td>@FormatDays(r.TotalDays)</td>
-                                            <td><span class="badge @StatusBadge(r.Status)">@r.Status</span></td>
-                                            <td class="text-muted">@(r.Reason ?? "—")</td>
-                                            <td>
-                                                @if (r.Status == "Pending")
-                                                {
-                                                    <button class="btn btn-sm btn-outline-danger"
-                                                            disabled="@(_cancelling == r.Id)"
-                                                            @onclick="() => CancelRequestAsync(r.Id)">
-                                                        @if (_cancelling == r.Id)
-                                                        {
-                                                            <span class="spinner-border spinner-border-sm"></span>
-                                                        }
-                                                        else
-                                                        {
-                                                            <span>Cancel</span>
-                                                        }
-                                                    </button>
-                                                }
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                }
-                else
-                {
-                    <p class="text-muted">No leave requests yet.</p>
-                }
-
-                <RequestLeaveForm CompanyId="CompanyId"
-                                  EmployeeId="EmployeeId"
-                                  Balances="_allBalances"
-                                  EffectiveWorkingDays="_effectiveWorkingDays"
-                                  EffectiveHoursPerDay="_effectiveHoursPerDay"
-                                  ExcludePublicHolidays="_excludePublicHolidays"
-                                  PublicHolidays="_publicHolidays"
-                                  IsOpen="_showRequestForm"
-                                  OnSubmitted="OnLeaveSubmitted"
-                                  OnCancelled="@(() => _showRequestForm = false)" />
-            }
-        }
-        else if (_activeTab == "Documents")
-        {
-            <p class="text-muted">Documents coming soon.</p>
-        }
-        else if (_activeTab == "Tasks")
-        {
-            <p class="text-muted">Tasks coming soon.</p>
-        }
-    </div>
+    <SfTab>
+        <TabItems>
+            <TabItem>
+                <ChildContent><TabHeader Text="Overview" /></ChildContent>
+                <ContentTemplate>
+                    <div class="mt-4"><MyProfileOverviewTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
+                </ContentTemplate>
+            </TabItem>
+            <TabItem>
+                <ChildContent><TabHeader Text="Leave" /></ChildContent>
+                <ContentTemplate>
+                    <div class="mt-4"><MyProfileLeaveTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
+                </ContentTemplate>
+            </TabItem>
+            <TabItem>
+                <ChildContent><TabHeader Text="Documents" /></ChildContent>
+                <ContentTemplate>
+                    <div class="mt-4"><MyProfileDocumentsTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
+                </ContentTemplate>
+            </TabItem>
+            <TabItem>
+                <ChildContent><TabHeader Text="Tasks" /></ChildContent>
+                <ContentTemplate>
+                    <div class="mt-4"><MyProfileTasksTab CompanyId="CompanyId" /></div>
+                </ContentTemplate>
+            </TabItem>
+        </TabItems>
+    </SfTab>
 </div>
 
 @code {
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid EmployeeId { get; set; }
-
-    private static readonly string[] _tabs = ["Overview", "Leave", "Documents", "Tasks"];
-    private string _activeTab = "Leave";
-    private bool _loading = true;
-    private bool _showRequestForm;
-    private Guid? _cancelling;
-
-    private IReadOnlyList<LeaveBalanceItemModel> _allBalances = [];
-    private LeaveBalanceItemModel? _annualLeave;
-    private LeaveBalanceItemModel? _toil;
-    private List<LeaveRequestListItem> _requests = [];
-
-    private WorkingDays _effectiveWorkingDays = WorkingDays.Monday | WorkingDays.Tuesday |
-        WorkingDays.Wednesday | WorkingDays.Thursday | WorkingDays.Friday;
-    private decimal _effectiveHoursPerDay = 7.5m;
-    private bool _excludePublicHolidays = true;
-    private IReadOnlyList<DateOnly> _publicHolidays = [];
-
-    protected override async Task OnParametersSetAsync()
-    {
-        _loading = true;
-        _showRequestForm = false;
-
-        var balanceTask = LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
-        var requestsTask = LeaveService.ListLeaveRequestsAsync(CompanyId, EmployeeId);
-        var settingsTask = CompanyService.GetCompanySettingsAsync(CompanyId);
-        var employeeTask = EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
-        var holidaysTask = PublicHolidayService.ListAsync(CompanyId, DateTime.UtcNow.Year);
-
-        await Task.WhenAll(balanceTask, requestsTask, settingsTask, employeeTask, holidaysTask);
-
-        ApplyBalance(await balanceTask);
-        _requests = (await requestsTask)?.Items.ToList() ?? [];
-
-        var settings = await settingsTask;
-        var employee = await employeeTask;
-        if (settings is not null)
-        {
-            _effectiveWorkingDays = employee?.WorkingDaysOverride ?? (WorkingDays)settings.WorkingDays;
-            _effectiveHoursPerDay = employee?.HoursPerDayOverride ?? settings.HoursPerDay;
-            _excludePublicHolidays = settings.ExcludePublicHolidaysFromLeave;
-        }
-
-        _publicHolidays = (await holidaysTask)?.Items.Select(h => h.Date).ToList() ?? [];
-
-        _loading = false;
-    }
-
-    private async Task RefreshLeaveAsync()
-    {
-        var balanceTask = LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
-        var requestsTask = LeaveService.ListLeaveRequestsAsync(CompanyId, EmployeeId);
-        await Task.WhenAll(balanceTask, requestsTask);
-        ApplyBalance(await balanceTask);
-        _requests = (await requestsTask)?.Items.ToList() ?? [];
-    }
-
-    private void ApplyBalance(LeaveBalanceResponse? balance)
-    {
-        if (balance is null) return;
-        _allBalances = balance.Balances;
-        _annualLeave = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "ANNUAL");
-        _toil = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "TOIL");
-    }
-
-    private async Task OnLeaveSubmitted()
-    {
-        _showRequestForm = false;
-        await RefreshLeaveAsync();
-    }
-
-    private async Task CancelRequestAsync(Guid leaveRequestId)
-    {
-        _cancelling = leaveRequestId;
-        await LeaveService.CancelLeaveRequestAsync(CompanyId, EmployeeId, leaveRequestId);
-        _cancelling = null;
-        await RefreshLeaveAsync();
-    }
-
-    private static string StatusBadge(string status) => status switch
-    {
-        "Pending"   => "bg-warning text-dark",
-        "Approved"  => "bg-success",
-        "Rejected"  => "bg-danger",
-        "Cancelled" => "bg-secondary",
-        _           => "bg-light text-dark"
-    };
-
-    private static string FormatDays(decimal days) =>
-        $"{days:0.##} {(days == 1m ? "day" : "days")}";
-
-    private static string FormatDate(DateOnly date, string part) =>
-        part == "FullDay" ? date.ToString("dd MMM yyyy") : $"{date:dd MMM yyyy} ({part})";
 }

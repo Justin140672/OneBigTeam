@@ -140,6 +140,7 @@ catch (Exception exception)
 try
 {
 	await app.Services.MigrateTasksAsync();
+	await app.Services.SeedTasksAsync();
 	tasksMigrationStatus = "succeeded";
 	tasksMigrationCheckedAt = DateTimeOffset.UtcNow;
 }
