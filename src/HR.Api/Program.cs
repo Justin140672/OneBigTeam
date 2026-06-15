@@ -1,6 +1,7 @@
 using FastEndpoints;
 using HR.Api.Authentication;
 using HR.Infrastructure;
+using HR.Infrastructure.Logging;
 using HR.Modules.Companies;
 using HR.Modules.Employees;
 using HR.Modules.Identity;
@@ -10,6 +11,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
+builder.Host.UseSerilogWithDefaults();
 
 var connectionString = builder.Configuration.GetConnectionString("hr")
 	?? throw new InvalidOperationException("Connection string 'hr' was not found.");
@@ -170,6 +172,7 @@ app.MapGet("/health/startup-migrations", () =>
 		? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
 		: Results.Ok(response);
 });
+app.UseLoggingMiddleware();
 app.UseAuthentication();
 app.UseIdentityModule();
 app.UseAuthorization();
