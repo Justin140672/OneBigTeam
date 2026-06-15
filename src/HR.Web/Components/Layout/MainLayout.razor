@@ -55,7 +55,7 @@
             <div class="top-bar-actions">
                 @if (Session.IsLoaded && Session.EmployeeId.HasValue)
                 {
-                    <a href="@_menuItems["MyProfile"]" class="top-bar-user">
+                    <div class="top-bar-user">
                         @if (Session.ProfileImageUrl is not null)
                         {
                             <img src="@Session.ProfileImageUrl" alt="@Session.DisplayName" class="top-bar-avatar" />
@@ -71,7 +71,7 @@
                                 <span class="top-bar-job-title">@Session.JobTitle</span>
                             }
                         </span>
-                    </a>
+                    </div>
                 }
                 <button class="theme-toggle" @onclick="ToggleTheme" title="@(IsDark ? "Switch to light mode" : "Switch to dark mode")">
                     @if (IsDark)
@@ -109,7 +109,6 @@
         ["Departments"]      = "/",
         ["PositionProfiles"] = "/",
         ["PublicHolidays"]   = "/",
-        ["MyProfile"]        = "/",
     };
 
     protected override async Task OnInitializedAsync()
@@ -121,9 +120,6 @@
         _menuItems["Departments"]      = $"/companies/{companyId}/departments";
         _menuItems["PositionProfiles"] = $"/companies/{companyId}/position-profiles";
         _menuItems["PublicHolidays"]   = $"/companies/{companyId}/public-holidays";
-        _menuItems["MyProfile"]        = Session.EmployeeId.HasValue
-            ? $"/companies/{companyId}/employees/{Session.EmployeeId}/profile"
-            : "/";
     }
 
     private void ToggleSidebar() => SidebarOpen = !SidebarOpen;

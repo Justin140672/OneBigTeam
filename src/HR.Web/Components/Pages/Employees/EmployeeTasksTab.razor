@@ -1,0 +1,37 @@
+@inject TaskService TaskService
+@using HR.Web.Components.Pages.Tasks
+
+@if (_loading)
+{
+    <div class="d-flex align-items-center gap-2">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span>Loading tasks…</span>
+    </div>
+}
+else if (_tasks.Count == 0)
+{
+    <p class="text-muted">No tasks assigned to this employee.</p>
+}
+else
+{
+    <TaskList Tasks="@_tasks" CompanyId="@CompanyId" ShowAssignedTo="false" OnTaskCompleted="LoadTasksAsync" />
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private IReadOnlyList<TaskListItem> _tasks = [];
+    private bool _loading = true;
+
+    protected override async Task OnParametersSetAsync() => await LoadTasksAsync();
+
+    private async Task LoadTasksAsync()
+    {
+        _loading = _tasks.Count == 0;
+        var result = await TaskService.GetEmployeeTasksAsync(CompanyId, EmployeeId);
+        _tasks = result?.Items ?? [];
+        _loading = false;
+        StateHasChanged();
+    }
+}

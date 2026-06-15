@@ -68,21 +68,6 @@
 @code {
     private bool _canCreateEmployee;
 
-    // TODO: remove test button
-    protected override void ConfigureToolbar()
-    {
-        AddToolbarAction(
-            id:      "hr-myprofile-test",
-            text:    "My Profile",
-            icon:    "e-icons e-people",
-            onClick: item =>
-            {
-                Navigation.NavigateTo($"/companies/{CompanyId}/employees/{item.Id}/profile");
-                return Task.CompletedTask;
-            },
-            tooltip: "View profile page (test)");
-    }
-
     protected override async Task OnBeforeLoadAsync()
     {
         _canCreateEmployee = await UserService.HasPermissionAsync(SystemPermissions.EmployeeCreate);

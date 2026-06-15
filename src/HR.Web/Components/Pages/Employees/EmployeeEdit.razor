@@ -316,6 +316,15 @@
                 </TabItem>
 
                 <TabItem>
+                    <ChildContent><TabHeader Text="Tasks" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <EmployeeTasksTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
+                <TabItem>
                     <ChildContent><TabHeader Text="Documents" /></ChildContent>
                     <ContentTemplate>
                         <div class="mt-4">

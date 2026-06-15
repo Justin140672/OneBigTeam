@@ -5,6 +5,7 @@ using HR.Modules.Tasks.Features.GetEmployeeTasks;
 using HR.Modules.Tasks.Features.GetMyTasks;
 using HR.Modules.Tasks.Features.GetTeamTasks;
 using HR.Modules.Tasks.Features.GetTask;
+using HR.Modules.Tasks.Features.LeaveRequested;
 using HR.Modules.Tasks.Features.ReassignTask;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Services;
@@ -35,6 +36,7 @@ public static class TasksModule
         services.AddScoped<ITaskCreator, TaskCreator>();
         services.AddScoped<TaskCompletionDispatcher>();
         services.AddScoped<ITaskCompletionAction, ProbationTaskCompletionAction>();
+        services.AddScoped<IIntegrationEventHandler<LeaveRequestedIntegrationEvent>, LeaveRequestedHandler>();
 
         services.AddScoped<GetTaskHandler>();
         services.AddScoped<GetMyTasksHandler>();
@@ -114,7 +116,17 @@ public static class TasksModule
             Make("Collect signed contract amendments",
                 "Three employees accepted revised terms. Collect signed copies and file.",
                 TaskPriority.High, TaskSource.Document,
-                null, null));
+                null, null),
+
+            Make("Prepare board meeting agenda",
+                "Draft the Q3 board meeting agenda including financial review and product roadmap.",
+                TaskPriority.High, TaskSource.Manual,
+                new DateOnly(2026, 6, 25), empCtoId),
+
+            Make("Engineering lead interview debrief",
+                "Consolidate panel feedback and make hiring recommendation to the board.",
+                TaskPriority.Medium, TaskSource.Manual,
+                new DateOnly(2026, 6, 22), empCtoId, TaskItemStatus.InProgress));
 
         await db.SaveChangesAsync();
     }
