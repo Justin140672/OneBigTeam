@@ -56,6 +56,9 @@ internal sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
         builder.Property(t => t.AssignedUserId)
             .HasColumnName("assigned_user_id");
 
+        builder.Property(t => t.SourceEntityId)
+            .HasColumnName("source_entity_id");
+
         builder.Property(t => t.CreatedBy)
             .HasColumnName("created_by")
             .IsRequired();

@@ -12,5 +12,6 @@ public interface ITaskCreator
         DateOnly? dueDate,
         Guid? assignedEmployeeId,
         Guid? assignedUserId,
+        Guid? sourceEntityId,
         CancellationToken cancellationToken);
 }

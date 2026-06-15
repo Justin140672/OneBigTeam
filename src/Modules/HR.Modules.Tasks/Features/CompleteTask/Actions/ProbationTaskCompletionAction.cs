@@ -28,6 +28,7 @@ internal sealed class ProbationTaskCompletionAction(ITaskCreator taskCreator, IC
             dueDate,
             assignedEmployeeId: null,
             assignedUserId: null,
+            sourceEntityId: null,
             cancellationToken);
     }
 

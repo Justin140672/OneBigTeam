@@ -30,6 +30,7 @@ internal sealed class LeaveRequestedHandler(
             dueDate,
             assignedEmployeeId: managerId,
             assignedUserId: null,
+            sourceEntityId: e.LeaveRequestId,
             cancellationToken);
     }
 }

@@ -16,6 +16,7 @@ internal sealed class TaskCreator(TasksDbContext dbContext, IClock clock, IAudit
         DateOnly? dueDate,
         Guid? assignedEmployeeId,
         Guid? assignedUserId,
+        Guid? sourceEntityId,
         CancellationToken cancellationToken)
     {
         var task = TaskItem.Create(
@@ -23,7 +24,7 @@ internal sealed class TaskCreator(TasksDbContext dbContext, IClock clock, IAudit
             title.Trim(),
             string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
             priority, source, dueDate, assignedEmployeeId, assignedUserId,
-            clock.UtcNowOffset());
+            clock.UtcNowOffset(), sourceEntityId);
 
         dbContext.TaskItems.Add(task);
         await dbContext.SaveChangesAsync(cancellationToken);

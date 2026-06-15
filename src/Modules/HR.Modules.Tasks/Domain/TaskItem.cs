@@ -16,6 +16,7 @@ internal sealed class TaskItem
     public TaskSource Source { get; private set; }
     public Guid? AssignedEmployeeId { get; private set; }
     public Guid? AssignedUserId { get; private set; }
+    public Guid? SourceEntityId { get; private set; }
     public Guid CreatedBy { get; private set; }
     public Guid? CompletedBy { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
@@ -33,7 +34,8 @@ internal sealed class TaskItem
         DateOnly? dueDate,
         Guid? assignedEmployeeId,
         Guid? assignedUserId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? sourceEntityId = null)
     {
         return new TaskItem
         {
@@ -47,6 +49,7 @@ internal sealed class TaskItem
             DueDate = dueDate,
             AssignedEmployeeId = assignedEmployeeId,
             AssignedUserId = assignedUserId,
+            SourceEntityId = sourceEntityId,
             Status = TaskItemStatus.Open,
             CreatedAt = now,
             UpdatedAt = now

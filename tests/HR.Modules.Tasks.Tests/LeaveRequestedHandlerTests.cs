@@ -192,4 +192,24 @@ public class LeaveRequestedHandlerTests
 
         Assert.Equal(EmployeeId, creator.Created[0].CreatedBy);
     }
+
+    [Fact]
+    public async Task HandleAsync_SourceEntityId_Is_LeaveRequestId()
+    {
+        var creator        = new FakeTaskCreator();
+        var handler        = BuildHandler(creator);
+        var leaveRequestId = Guid.NewGuid();
+        var evt = new LeaveRequestedIntegrationEvent(
+            CompanyId, EmployeeId,
+            LeaveRequestId: leaveRequestId,
+            LeaveTypeId:    Guid.NewGuid(),
+            StartDate:      new DateOnly(2099, 8, 1),
+            EndDate:        new DateOnly(2099, 8, 5),
+            TotalDays:      3m,
+            OccurredAt:     DateTimeOffset.UtcNow);
+
+        await handler.HandleAsync(evt, CancellationToken.None);
+
+        Assert.Equal(leaveRequestId, creator.Created[0].SourceEntityId);
+    }
 }
