@@ -1,6 +1,7 @@
 using FluentValidation;
 using HR.Modules.Tasks.Features.CreateTask;
 using HR.Modules.Tasks.Features.GetMyTasks;
+using HR.Modules.Tasks.Features.GetTeamTasks;
 using HR.Modules.Tasks.Features.GetTask;
 using HR.Modules.Tasks.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +30,7 @@ public static class TasksModule
         services.AddScoped<IValidator<CreateTaskRequest>, CreateTaskValidator>();
         services.AddScoped<GetTaskHandler>();
         services.AddScoped<GetMyTasksHandler>();
+        services.AddScoped<GetTeamTasksHandler>();
     }
 
     public static async Task MigrateTasksAsync(this IServiceProvider services)

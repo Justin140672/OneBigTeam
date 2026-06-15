@@ -79,6 +79,7 @@ public static class EmployeesModule
         services.AddScoped<IValidator<SetEmployeeWorkingPatternRequest>, SetEmployeeWorkingPatternValidator>();
 
         services.AddScoped<IWorkingPatternProvider, WorkingPatternProvider>();
+        services.AddScoped<IDirectReportsReader, DirectReportsReader>();
     }
 
     public static async Task MigrateEmployeesAsync(this IServiceProvider services)

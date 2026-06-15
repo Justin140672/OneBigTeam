@@ -1,0 +1,10 @@
+namespace HR.Modules.Tasks.Features.GetTeamTasks;
+
+internal sealed record GetTeamTasksRequest
+{
+    public Guid CompanyId { get; init; }
+    public Guid ManagerId { get; init; }
+
+    // Optional filter — matches TaskItemStatus enum value names (case-insensitive).
+    public string? Status { get; init; }
+}
