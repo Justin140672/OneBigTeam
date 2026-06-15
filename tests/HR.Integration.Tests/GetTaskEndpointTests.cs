@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.SharedKernel;
 
 namespace HR.Integration.Tests;
 
@@ -38,18 +39,10 @@ public class GetTaskEndpointTests(ApiWebApplicationFactory factory) : IClassFixt
     [Fact]
     public async Task Get_Task_Returns_NotFound_When_Task_Belongs_To_Different_Company()
     {
+        var taskId = await TaskSeeder.SeedAsync(factory, SeededCompanyId, "Private task", priority: TaskPriority.Low);
+
         using var client = AuthenticatedClient();
-
-        // Create a task under the seeded company
-        var createResponse = await client.PostAsJsonAsync(
-            $"/api/companies/{SeededCompanyId}/tasks",
-            new { companyId = SeededCompanyId, title = "Private task", priority = "Low", source = "Manual" });
-        createResponse.EnsureSuccessStatusCode();
-        var created = await createResponse.Content.ReadFromJsonAsync<TaskPayload>();
-
-        // Attempt to fetch it under a different company ID
-        var response = await client.GetAsync(
-            $"/api/companies/{Guid.NewGuid()}/tasks/{created!.Id}");
+        var response = await client.GetAsync($"/api/companies/{Guid.NewGuid()}/tasks/{taskId}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -59,32 +52,24 @@ public class GetTaskEndpointTests(ApiWebApplicationFactory factory) : IClassFixt
     [Fact]
     public async Task Get_Task_Returns_200_With_Full_Payload()
     {
-        using var client = AuthenticatedClient();
         var assignedEmployee = Guid.NewGuid();
+        var taskId = await TaskSeeder.SeedAsync(
+            factory, SeededCompanyId,
+            title: "Schedule probation review",
+            description: "Book 1-to-1 with line manager",
+            priority: TaskPriority.High,
+            source: TaskSource.Probation,
+            dueDate: new DateOnly(2026, 9, 1),
+            assignedEmployeeId: assignedEmployee,
+            createdBy: UserId);
 
-        var createResponse = await client.PostAsJsonAsync(
-            $"/api/companies/{SeededCompanyId}/tasks",
-            new
-            {
-                companyId = SeededCompanyId,
-                title = "Schedule probation review",
-                description = "Book 1-to-1 with line manager",
-                priority = "High",
-                source = "Probation",
-                dueDate = "2026-09-01",
-                assignedEmployeeId = assignedEmployee
-            });
-        createResponse.EnsureSuccessStatusCode();
-        var created = await createResponse.Content.ReadFromJsonAsync<TaskPayload>();
-
-        var response = await client.GetAsync(
-            $"/api/companies/{SeededCompanyId}/tasks/{created!.Id}");
+        using var client = AuthenticatedClient();
+        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/{taskId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
         var payload = await response.Content.ReadFromJsonAsync<TaskPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(created.Id, payload!.Id);
+        Assert.Equal(taskId, payload!.Id);
         Assert.Equal(SeededCompanyId, payload.CompanyId);
         Assert.Equal("Schedule probation review", payload.Title);
         Assert.Equal("Book 1-to-1 with line manager", payload.Description);
@@ -96,22 +81,6 @@ public class GetTaskEndpointTests(ApiWebApplicationFactory factory) : IClassFixt
         Assert.Equal(UserId, payload.CreatedBy);
         Assert.Null(payload.CompletedBy);
         Assert.Null(payload.CompletedAt);
-    }
-
-    [Fact]
-    public async Task Get_Task_Returns_Location_Header_From_Create_Which_Resolves_To_200()
-    {
-        using var client = AuthenticatedClient();
-
-        var createResponse = await client.PostAsJsonAsync(
-            $"/api/companies/{SeededCompanyId}/tasks",
-            new { companyId = SeededCompanyId, title = "Follow-up task", priority = "Medium", source = "Workflow" });
-        createResponse.EnsureSuccessStatusCode();
-
-        var location = createResponse.Headers.Location!.ToString();
-        var getResponse = await client.GetAsync(location);
-
-        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

@@ -3,8 +3,6 @@ using System.Net.Http.Json;
 using System.Text;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Tasks.Domain;
-using HR.Modules.Tasks.Persistence;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
@@ -65,7 +63,7 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory) : IClas
         var userId = Guid.NewGuid();
         using var client = AuthenticatedClient(userId);
 
-        var taskId = await CreateTaskAsync(client, "Task to complete");
+        var taskId = await CreateTaskAsync("Task to complete");
 
         var response = await client.PostAsync(
             $"/api/companies/{SeededCompanyId}/tasks/{taskId}/complete",
@@ -84,7 +82,7 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory) : IClas
         var userId = Guid.NewGuid();
         using var client = AuthenticatedClient(userId);
 
-        var taskId = await CreateTaskAsync(client, "Task to complete twice");
+        var taskId = await CreateTaskAsync("Task to complete twice");
 
         await client.PostAsync($"/api/companies/{SeededCompanyId}/tasks/{taskId}/complete", EmptyJson());
         var response = await client.PostAsync($"/api/companies/{SeededCompanyId}/tasks/{taskId}/complete", EmptyJson());
@@ -104,33 +102,11 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory) : IClas
         return client;
     }
 
-    private async Task<Guid> CreateTaskAsync(HttpClient client, string title)
-    {
-        var response = await client.PostAsJsonAsync(
-            $"/api/companies/{SeededCompanyId}/tasks",
-            new { companyId = SeededCompanyId, title, priority = "Medium", source = "Manual" });
-        response.EnsureSuccessStatusCode();
-        var payload = await response.Content.ReadFromJsonAsync<TaskPayload>();
-        return payload!.Id;
-    }
+    private Task<Guid> CreateTaskAsync(string title) =>
+        TaskSeeder.SeedAsync(factory, SeededCompanyId, title);
 
-    private async Task<Guid> SeedCancelledTaskAsync()
-    {
-        using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
-
-        var task = TaskItem.Create(
-            Guid.NewGuid(), SeededCompanyId, Guid.NewGuid(),
-            "Cancelled task", null, TaskPriority.Low, TaskSource.Manual,
-            null, null, null, DateTimeOffset.UtcNow);
-
-        task.Cancel(DateTimeOffset.UtcNow);
-
-        db.TaskItems.Add(task);
-        await db.SaveChangesAsync();
-
-        return task.Id;
-    }
+    private Task<Guid> SeedCancelledTaskAsync() =>
+        TaskSeeder.SeedAsync(factory, SeededCompanyId, "Cancelled task", status: TaskItemStatus.Cancelled);
 
     private static StringContent EmptyJson() =>
         new("{}", Encoding.UTF8, "application/json");

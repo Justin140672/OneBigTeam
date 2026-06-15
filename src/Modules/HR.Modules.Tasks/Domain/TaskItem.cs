@@ -1,3 +1,5 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Tasks.Domain;
 
 internal sealed class TaskItem

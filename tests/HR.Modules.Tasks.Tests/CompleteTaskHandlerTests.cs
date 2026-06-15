@@ -1,5 +1,6 @@
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.CompleteTask;
+using HR.SharedKernel;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;

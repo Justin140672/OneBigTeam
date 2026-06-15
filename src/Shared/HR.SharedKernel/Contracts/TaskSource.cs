@@ -1,6 +1,6 @@
-namespace HR.Modules.Tasks.Domain;
+namespace HR.SharedKernel;
 
-internal enum TaskSource
+public enum TaskSource
 {
     Manual = 1,
     Leave = 2,

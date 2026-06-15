@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
+using HR.SharedKernel;
 
 namespace HR.Integration.Tests;
 
@@ -62,8 +63,8 @@ public class GetTeamTasksEndpointTests : IClassFixture<ApiWebApplicationFactory>
         await AssignManagerAsync(client, report1.Id, manager.Id);
         await AssignManagerAsync(client, report2.Id, manager.Id);
 
-        await CreateTaskAsync(client, "Bob's task",   report1.Id);
-        await CreateTaskAsync(client, "Carol's task", report2.Id);
+        await CreateTaskAsync("Bob's task",   report1.Id);
+        await CreateTaskAsync("Carol's task", report2.Id);
 
         var response = await client.GetAsync(
             $"/api/companies/{SeededCompanyId}/employees/{manager.Id}/team-tasks");
@@ -86,8 +87,8 @@ public class GetTeamTasksEndpointTests : IClassFixture<ApiWebApplicationFactory>
 
         await AssignManagerAsync(client, report.Id, manager.Id);
 
-        await CreateTaskAsync(client, "Team task",    report.Id);
-        await CreateTaskAsync(client, "Outside task", outsider.Id);
+        await CreateTaskAsync("Team task",    report.Id);
+        await CreateTaskAsync("Outside task", outsider.Id);
 
         var response = await client.GetAsync(
             $"/api/companies/{SeededCompanyId}/employees/{manager.Id}/team-tasks");
@@ -107,8 +108,8 @@ public class GetTeamTasksEndpointTests : IClassFixture<ApiWebApplicationFactory>
 
         await AssignManagerAsync(client, report.Id, manager.Id);
 
-        await CreateTaskAsync(client, "Open task A", report.Id, priority: "Low");
-        await CreateTaskAsync(client, "Open task B", report.Id, priority: "High");
+        await CreateTaskAsync("Open task A", report.Id, priority: TaskPriority.Low);
+        await CreateTaskAsync("Open task B", report.Id, priority: TaskPriority.High);
 
         var response = await client.GetAsync(
             $"/api/companies/{SeededCompanyId}/employees/{manager.Id}/team-tasks?status=Open");
@@ -153,25 +154,11 @@ public class GetTeamTasksEndpointTests : IClassFixture<ApiWebApplicationFactory>
         response.EnsureSuccessStatusCode();
     }
 
-    private async Task CreateTaskAsync(
-        HttpClient client,
+    private Task CreateTaskAsync(
         string title,
         Guid assignedEmployeeId,
-        string priority = "Medium",
-        string source = "Manual")
-    {
-        var response = await client.PostAsJsonAsync(
-            $"/api/companies/{SeededCompanyId}/tasks",
-            new
-            {
-                companyId = SeededCompanyId,
-                title,
-                priority,
-                source,
-                assignedEmployeeId
-            });
-        response.EnsureSuccessStatusCode();
-    }
+        TaskPriority priority = TaskPriority.Medium) =>
+        TaskSeeder.SeedAsync(_factory, SeededCompanyId, title, priority: priority, assignedEmployeeId: assignedEmployeeId);
 
     private sealed record EmployeePayload(Guid Id);
 

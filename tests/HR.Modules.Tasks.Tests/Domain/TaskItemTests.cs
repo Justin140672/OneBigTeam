@@ -1,4 +1,5 @@
 using HR.Modules.Tasks.Domain;
+using HR.SharedKernel;
 
 namespace HR.Modules.Tasks.Tests.Domain;
 

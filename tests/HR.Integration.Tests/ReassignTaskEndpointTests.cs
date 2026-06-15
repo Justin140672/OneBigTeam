@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
+using HR.Modules.Tasks.Domain;
 
 namespace HR.Integration.Tests;
 
@@ -71,7 +72,7 @@ public class ReassignTaskEndpointTests : IClassFixture<ApiWebApplicationFactory>
         using var client = AuthenticatedClient();
 
         var employee = await CreateEmployeeAsync(client, "Dave", "Miller");
-        var taskId   = await CreateTaskAsync(client, "Task to reassign");
+        var taskId   = await CreateTaskAsync("Task to reassign");
 
         var newEmployee = await CreateEmployeeAsync(client, "Eve", "Wilson");
 
@@ -90,7 +91,7 @@ public class ReassignTaskEndpointTests : IClassFixture<ApiWebApplicationFactory>
         using var client = AuthenticatedClient();
 
         var employee = await CreateEmployeeAsync(client, "Frank", "Brown");
-        var taskId   = await CreateTaskAsync(client, "Task to unassign", assignedEmployeeId: employee.Id);
+        var taskId   = await CreateTaskAsync("Task to unassign", assignedEmployeeId: employee.Id);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/tasks/{taskId}/assignee",
@@ -128,27 +129,8 @@ public class ReassignTaskEndpointTests : IClassFixture<ApiWebApplicationFactory>
         return (await response.Content.ReadFromJsonAsync<EmployeePayload>())!;
     }
 
-    private async Task<Guid> CreateTaskAsync(
-        HttpClient client,
-        string title,
-        Guid? assignedEmployeeId = null,
-        string priority = "Medium",
-        string source = "Manual")
-    {
-        var response = await client.PostAsJsonAsync(
-            $"/api/companies/{SeededCompanyId}/tasks",
-            new
-            {
-                companyId = SeededCompanyId,
-                title,
-                priority,
-                source,
-                assignedEmployeeId
-            });
-        response.EnsureSuccessStatusCode();
-        var payload = await response.Content.ReadFromJsonAsync<TaskPayload>();
-        return payload!.Id;
-    }
+    private Task<Guid> CreateTaskAsync(string title, Guid? assignedEmployeeId = null) =>
+        TaskSeeder.SeedAsync(_factory, SeededCompanyId, title, assignedEmployeeId: assignedEmployeeId);
 
     private sealed record EmployeePayload(Guid Id);
 

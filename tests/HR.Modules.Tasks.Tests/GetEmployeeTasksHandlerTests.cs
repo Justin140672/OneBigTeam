@@ -1,5 +1,6 @@
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.GetEmployeeTasks;
+using HR.SharedKernel;
 using HR.Modules.Tasks.Persistence;
 using Microsoft.EntityFrameworkCore;
 

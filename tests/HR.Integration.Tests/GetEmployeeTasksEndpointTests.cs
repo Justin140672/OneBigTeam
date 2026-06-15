@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
+using HR.SharedKernel;
 
 namespace HR.Integration.Tests;
 
@@ -72,9 +73,9 @@ public class GetEmployeeTasksEndpointTests : IClassFixture<ApiWebApplicationFact
         var employee = await CreateEmployeeAsync(client, "Alice", "Smith");
         var other    = await CreateEmployeeAsync(client, "Bob",   "Jones");
 
-        await CreateTaskAsync(client, "Alice task A", employee.Id);
-        await CreateTaskAsync(client, "Alice task B", employee.Id);
-        await CreateTaskAsync(client, "Bob task",     other.Id);
+        await CreateTaskAsync("Alice task A", employee.Id);
+        await CreateTaskAsync("Alice task B", employee.Id);
+        await CreateTaskAsync("Bob task",     other.Id);
 
         var response = await client.GetAsync(
             $"/api/companies/{SeededCompanyId}/employees/{employee.Id}/tasks");
@@ -92,8 +93,8 @@ public class GetEmployeeTasksEndpointTests : IClassFixture<ApiWebApplicationFact
 
         var employee = await CreateEmployeeAsync(client, "Carol", "Davis");
 
-        await CreateTaskAsync(client, "Open task A", employee.Id, priority: "Low");
-        await CreateTaskAsync(client, "Open task B", employee.Id, priority: "High");
+        await CreateTaskAsync("Open task A", employee.Id, priority: TaskPriority.Low);
+        await CreateTaskAsync("Open task B", employee.Id, priority: TaskPriority.High);
 
         var response = await client.GetAsync(
             $"/api/companies/{SeededCompanyId}/employees/{employee.Id}/tasks?status=Open");
@@ -130,25 +131,11 @@ public class GetEmployeeTasksEndpointTests : IClassFixture<ApiWebApplicationFact
         return (await response.Content.ReadFromJsonAsync<EmployeePayload>())!;
     }
 
-    private async Task CreateTaskAsync(
-        HttpClient client,
+    private Task CreateTaskAsync(
         string title,
         Guid assignedEmployeeId,
-        string priority = "Medium",
-        string source = "Manual")
-    {
-        var response = await client.PostAsJsonAsync(
-            $"/api/companies/{SeededCompanyId}/tasks",
-            new
-            {
-                companyId = SeededCompanyId,
-                title,
-                priority,
-                source,
-                assignedEmployeeId
-            });
-        response.EnsureSuccessStatusCode();
-    }
+        TaskPriority priority = TaskPriority.Medium) =>
+        TaskSeeder.SeedAsync(_factory, SeededCompanyId, title, priority: priority, assignedEmployeeId: assignedEmployeeId);
 
     private sealed record EmployeePayload(Guid Id);
 
