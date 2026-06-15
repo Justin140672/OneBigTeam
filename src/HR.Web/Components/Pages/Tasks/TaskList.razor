@@ -1,0 +1,20 @@
+@using HR.Web.Models
+
+<HrGrid TValue="TaskListItem"
+        DataSource="@Tasks"
+        AllowFiltering="true"
+        AllowSorting="true">
+    <GridPageSettings PageSize="20" />
+    <GridColumns>
+        <GridColumn Field="@nameof(TaskListItem.Title)" HeaderText="Title" />
+        <GridColumn Field="@nameof(TaskListItem.Status)" HeaderText="Status" Width="120" />
+        <GridColumn Field="@nameof(TaskListItem.Priority)" HeaderText="Priority" Width="120" />
+        <GridColumn Field="@nameof(TaskListItem.DueDate)" HeaderText="Due Date" Width="140" Format="d" />
+        <GridColumn Field="@nameof(TaskListItem.AssignedTo)" HeaderText="Assigned To" Width="200" />
+    </GridColumns>
+</HrGrid>
+
+@code {
+    [Parameter, EditorRequired] 
+    public IReadOnlyList<TaskListItem> Tasks { get; set; } = [];
+}
