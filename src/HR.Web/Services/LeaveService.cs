@@ -15,6 +15,25 @@ public sealed class LeaveService(IHttpClientFactory httpClientFactory)
         Converters = { new JsonStringEnumConverter() }
     };
 
+    public async Task<bool> CancelLeaveRequestAsync(
+        Guid companyId,
+        Guid employeeId,
+        Guid leaveRequestId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync(
+                $"api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}",
+                cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public async Task<LeaveRequestListResponse?> ListLeaveRequestsAsync(
         Guid companyId,
         Guid employeeId,

@@ -184,5 +184,84 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
 
             await db.SaveChangesAsync();
         }
+
+        if (!await db.LeaveRequests.AnyAsync())
+        {
+            var annualLeaveTypeId = Guid.Parse("A0000000-0000-0000-0000-000000000001");
+            var sickLeaveTypeId   = Guid.Parse("A0000000-0000-0000-0000-000000000002");
+            var policyId          = Guid.Parse("C0000000-0000-0000-0000-000000000001");
+            var policyYear        = LeaveYearCalculator.GetPolicyYear(DateTimeOffset.UtcNow, startMonth: 1);
+
+            var empSarahId  = Guid.Parse("30000000-0000-0000-0000-000000000001"); // Sarah Chen, CTO
+            var empJamesId  = Guid.Parse("30000000-0000-0000-0000-000000000002"); // James Okafor, Senior Dev
+            var empLauraId  = Guid.Parse("30000000-0000-0000-0000-000000000005"); // Laura Bennett, HR Manager
+            var empEmmaId   = Guid.Parse("30000000-0000-0000-0000-000000000009"); // Emma Jones, Account Exec
+            var adminId     = Guid.Parse("30000000-0000-0000-0000-000000000005"); // Laura (HR) reviewed
+
+            LeaveRequest Req(Guid id, Guid empId, Guid leaveType, DateOnly start, DateOnly end, decimal days, string? reason = null)
+                => LeaveRequest.Create(id, companyId, empId, leaveType, policyId,
+                    start, LeaveDayPart.FullDay, end, LeaveDayPart.FullDay, days, reason, now);
+
+            // Sarah Chen — approved 5 days in Jan, pending 4 days in Jul
+            var sarahApproved = Req(Guid.Parse("D0000000-0000-0000-0000-000000000001"),
+                empSarahId, annualLeaveTypeId, new DateOnly(2026, 1, 5), new DateOnly(2026, 1, 9), 5m, "New Year break");
+            sarahApproved.Approve(adminId, now);
+
+            var sarahPending = Req(Guid.Parse("D0000000-0000-0000-0000-000000000002"),
+                empSarahId, annualLeaveTypeId, new DateOnly(2026, 7, 14), new DateOnly(2026, 7, 17), 4m, "Summer holiday");
+
+            // James Okafor — approved 2 days in Feb, rejected 1 day in Apr
+            var jamesApproved = Req(Guid.Parse("D0000000-0000-0000-0000-000000000003"),
+                empJamesId, annualLeaveTypeId, new DateOnly(2026, 2, 16), new DateOnly(2026, 2, 17), 2m);
+            jamesApproved.Approve(adminId, now);
+
+            var jamesRejected = Req(Guid.Parse("D0000000-0000-0000-0000-000000000004"),
+                empJamesId, annualLeaveTypeId, new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 1), 1m);
+            jamesRejected.Reject(adminId, now, "Sprint release week — cover needed");
+
+            var jamesSick = Req(Guid.Parse("D0000000-0000-0000-0000-000000000005"),
+                empJamesId, sickLeaveTypeId, new DateOnly(2026, 5, 11), new DateOnly(2026, 5, 12), 2m);
+            jamesSick.Approve(adminId, now);
+
+            // Laura Bennett — approved 2 days in Mar, pending 5 days in Aug
+            var lauraApproved = Req(Guid.Parse("D0000000-0000-0000-0000-000000000006"),
+                empLauraId, annualLeaveTypeId, new DateOnly(2026, 3, 9), new DateOnly(2026, 3, 10), 2m);
+            lauraApproved.Approve(adminId, now);
+
+            var lauraPending = Req(Guid.Parse("D0000000-0000-0000-0000-000000000007"),
+                empLauraId, annualLeaveTypeId, new DateOnly(2026, 8, 3), new DateOnly(2026, 8, 7), 5m, "Summer holiday");
+
+            // Emma Jones — pending 2 days at end of Jun (upcoming)
+            var emmaPending = Req(Guid.Parse("D0000000-0000-0000-0000-000000000008"),
+                empEmmaId, annualLeaveTypeId, new DateOnly(2026, 6, 29), new DateOnly(2026, 6, 30), 2m);
+
+            db.LeaveRequests.AddRange(
+                sarahApproved, sarahPending,
+                jamesApproved, jamesRejected, jamesSick,
+                lauraApproved, lauraPending,
+                emmaPending);
+
+            // Reflect approved requests in each employee's balance
+            var approvedItems = new[]
+            {
+                (empSarahId,  annualLeaveTypeId, 5m),
+                (empJamesId,  annualLeaveTypeId, 2m),
+                (empJamesId,  sickLeaveTypeId,   2m),
+                (empLauraId,  annualLeaveTypeId, 2m),
+            };
+
+            var balances = await db.LeaveBalances
+                .Where(b => b.CompanyId == companyId && b.PolicyYear == policyYear &&
+                    (b.EmployeeId == empSarahId || b.EmployeeId == empJamesId || b.EmployeeId == empLauraId))
+                .ToListAsync();
+
+            foreach (var (empId, typeId, days) in approvedItems)
+            {
+                var bal = balances.FirstOrDefault(b => b.EmployeeId == empId && b.LeaveTypeId == typeId);
+                bal?.RecordUsage(days, now);
+            }
+
+            await db.SaveChangesAsync();
+        }
     }
 }

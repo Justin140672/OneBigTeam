@@ -73,7 +73,65 @@
                     }
                 </div>
 
-                <SfButton IsPrimary="true" OnClick="@(() => _showRequestForm = true)">Request Leave</SfButton>
+                <div class="mb-4">
+                    <SfButton IsPrimary="true" OnClick="@(() => _showRequestForm = true)">Request Leave</SfButton>
+                </div>
+
+                @if (_requests.Count > 0)
+                {
+                    <div class="card">
+                        <div class="card-header fw-semibold">My Requests</div>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Start</th>
+                                        <th>End</th>
+                                        <th>Days</th>
+                                        <th>Status</th>
+                                        <th>Reason</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var r in _requests)
+                                    {
+                                        <tr>
+                                            <td>@r.LeaveTypeName</td>
+                                            <td class="text-nowrap">@FormatDate(r.StartDate, r.StartPart)</td>
+                                            <td class="text-nowrap">@FormatDate(r.EndDate, r.EndPart)</td>
+                                            <td>@FormatDays(r.TotalDays)</td>
+                                            <td><span class="badge @StatusBadge(r.Status)">@r.Status</span></td>
+                                            <td class="text-muted">@(r.Reason ?? "—")</td>
+                                            <td>
+                                                @if (r.Status == "Pending")
+                                                {
+                                                    <button class="btn btn-sm btn-outline-danger"
+                                                            disabled="@(_cancelling == r.Id)"
+                                                            @onclick="() => CancelRequestAsync(r.Id)">
+                                                        @if (_cancelling == r.Id)
+                                                        {
+                                                            <span class="spinner-border spinner-border-sm"></span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span>Cancel</span>
+                                                        }
+                                                    </button>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted">No leave requests yet.</p>
+                }
 
                 <RequestLeaveForm CompanyId="CompanyId"
                                   EmployeeId="EmployeeId"
@@ -106,10 +164,12 @@
     private string _activeTab = "Leave";
     private bool _loading = true;
     private bool _showRequestForm;
+    private Guid? _cancelling;
 
     private IReadOnlyList<LeaveBalanceItemModel> _allBalances = [];
     private LeaveBalanceItemModel? _annualLeave;
     private LeaveBalanceItemModel? _toil;
+    private List<LeaveRequestListItem> _requests = [];
 
     private WorkingDays _effectiveWorkingDays = WorkingDays.Monday | WorkingDays.Tuesday |
         WorkingDays.Wednesday | WorkingDays.Thursday | WorkingDays.Friday;
@@ -123,24 +183,18 @@
         _showRequestForm = false;
 
         var balanceTask = LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
+        var requestsTask = LeaveService.ListLeaveRequestsAsync(CompanyId, EmployeeId);
         var settingsTask = CompanyService.GetCompanySettingsAsync(CompanyId);
         var employeeTask = EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
         var holidaysTask = PublicHolidayService.ListAsync(CompanyId, DateTime.UtcNow.Year);
 
-        await Task.WhenAll(balanceTask, settingsTask, employeeTask, holidaysTask);
+        await Task.WhenAll(balanceTask, requestsTask, settingsTask, employeeTask, holidaysTask);
 
-        var balance = await balanceTask;
+        ApplyBalance(await balanceTask);
+        _requests = (await requestsTask)?.Items.ToList() ?? [];
+
         var settings = await settingsTask;
         var employee = await employeeTask;
-        var holidays = await holidaysTask;
-
-        if (balance is not null)
-        {
-            _allBalances = balance.Balances;
-            _annualLeave = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "ANNUAL");
-            _toil = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "TOIL");
-        }
-
         if (settings is not null)
         {
             _effectiveWorkingDays = employee?.WorkingDaysOverride ?? (WorkingDays)settings.WorkingDays;
@@ -148,28 +202,54 @@
             _excludePublicHolidays = settings.ExcludePublicHolidaysFromLeave;
         }
 
-        _publicHolidays = holidays?.Items.Select(h => h.Date).ToList() ?? [];
+        _publicHolidays = (await holidaysTask)?.Items.Select(h => h.Date).ToList() ?? [];
 
         _loading = false;
     }
 
-    private async Task LoadBalanceAsync()
+    private async Task RefreshLeaveAsync()
     {
-        var balance = await LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
-        if (balance is not null)
-        {
-            _allBalances = balance.Balances;
-            _annualLeave = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "ANNUAL");
-            _toil = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "TOIL");
-        }
+        var balanceTask = LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
+        var requestsTask = LeaveService.ListLeaveRequestsAsync(CompanyId, EmployeeId);
+        await Task.WhenAll(balanceTask, requestsTask);
+        ApplyBalance(await balanceTask);
+        _requests = (await requestsTask)?.Items.ToList() ?? [];
+    }
+
+    private void ApplyBalance(LeaveBalanceResponse? balance)
+    {
+        if (balance is null) return;
+        _allBalances = balance.Balances;
+        _annualLeave = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "ANNUAL");
+        _toil = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "TOIL");
     }
 
     private async Task OnLeaveSubmitted()
     {
         _showRequestForm = false;
-        await LoadBalanceAsync();
+        await RefreshLeaveAsync();
     }
+
+    private async Task CancelRequestAsync(Guid leaveRequestId)
+    {
+        _cancelling = leaveRequestId;
+        await LeaveService.CancelLeaveRequestAsync(CompanyId, EmployeeId, leaveRequestId);
+        _cancelling = null;
+        await RefreshLeaveAsync();
+    }
+
+    private static string StatusBadge(string status) => status switch
+    {
+        "Pending"   => "bg-warning text-dark",
+        "Approved"  => "bg-success",
+        "Rejected"  => "bg-danger",
+        "Cancelled" => "bg-secondary",
+        _           => "bg-light text-dark"
+    };
 
     private static string FormatDays(decimal days) =>
         $"{days:0.##} {(days == 1m ? "day" : "days")}";
+
+    private static string FormatDate(DateOnly date, string part) =>
+        part == "FullDay" ? date.ToString("dd MMM yyyy") : $"{date:dd MMM yyyy} ({part})";
 }
