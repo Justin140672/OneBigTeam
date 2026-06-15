@@ -72,6 +72,12 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("priority");
 
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("source");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)

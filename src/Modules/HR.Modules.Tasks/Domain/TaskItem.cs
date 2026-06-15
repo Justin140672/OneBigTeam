@@ -11,6 +11,7 @@ internal sealed class TaskItem
     public TaskItemStatus Status { get; private set; }
     public TaskPriority Priority { get; private set; }
     public DateOnly? DueDate { get; private set; }
+    public TaskSource Source { get; private set; }
     public Guid? AssignedEmployeeId { get; private set; }
     public Guid? AssignedUserId { get; private set; }
     public Guid CreatedBy { get; private set; }
@@ -26,6 +27,7 @@ internal sealed class TaskItem
         string title,
         string? description,
         TaskPriority priority,
+        TaskSource source,
         DateOnly? dueDate,
         Guid? assignedEmployeeId,
         Guid? assignedUserId,
@@ -39,6 +41,7 @@ internal sealed class TaskItem
             Title = title,
             Description = description,
             Priority = priority,
+            Source = source,
             DueDate = dueDate,
             AssignedEmployeeId = assignedEmployeeId,
             AssignedUserId = assignedUserId,

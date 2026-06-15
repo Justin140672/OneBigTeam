@@ -26,6 +26,7 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                     status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     priority = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     due_date = table.Column<DateOnly>(type: "date", nullable: true),
+                    source = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
                     assigned_employee_id = table.Column<Guid>(type: "uuid", nullable: true),
                     assigned_user_id = table.Column<Guid>(type: "uuid", nullable: true),
                     created_by = table.Column<Guid>(type: "uuid", nullable: false),

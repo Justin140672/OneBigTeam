@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HR.Modules.Tasks.Persistence.Migrations
 {
     [DbContext(typeof(TasksDbContext))]
-    [Migration("20260615075318_InitialCreate")]
+    [Migration("20260615075826_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -74,6 +74,12 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("priority");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("source");
 
                     b.Property<string>("Status")
                         .IsRequired()
