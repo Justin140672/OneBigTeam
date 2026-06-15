@@ -12,30 +12,34 @@ namespace HR.Api.Authentication;
 /// </summary>
 internal sealed class DevAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
-    // Matches the seeded company from SeedCompaniesAsync
-    private static readonly string DevCompanyId = "00000000-0000-0000-0000-000000000001";
-    private static readonly string DevUserId = "30000000-0000-0000-0000-000000000001"; // Sarah Chen
+    private const string DevCompanyId = "00000000-0000-0000-0000-000000000001";
+
+    private readonly DevPersonaStore _personaStore;
 
     public DevAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
-        UrlEncoder encoder)
+        UrlEncoder encoder,
+        DevPersonaStore personaStore)
         : base(options, logger, encoder)
     {
+        _personaStore = personaStore;
     }
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        var persona = _personaStore.Current;
+
         var claims = new[]
         {
-            new Claim("sub", DevUserId),
-            new Claim("email", "admin@dev.local"),
+            new Claim("sub",        persona.UserId),
+            new Claim("email",      persona.Email),
             new Claim("company_id", DevCompanyId),
         };
 
-        var identity = new ClaimsIdentity(claims, Scheme.Name);
+        var identity  = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);
-        var ticket = new AuthenticationTicket(principal, Scheme.Name);
+        var ticket    = new AuthenticationTicket(principal, Scheme.Name);
 
         return Task.FromResult(AuthenticateResult.Success(ticket));
     }

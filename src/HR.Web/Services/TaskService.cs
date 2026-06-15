@@ -33,13 +33,16 @@ public sealed class TaskService(IHttpClientFactory httpClientFactory)
         }
     }
 
-    public async Task<bool> CompleteTaskAsync(Guid companyId, Guid taskId, CancellationToken cancellationToken = default)
+    public async Task<bool> CompleteTaskAsync(
+        Guid companyId, Guid taskId,
+        string? outcomeDecision = null, string? outcomeReason = null,
+        CancellationToken cancellationToken = default)
     {
         try
         {
-            var response = await Http.PostAsync(
+            var response = await Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/tasks/{taskId}/complete",
-                content: null,
+                new { OutcomeDecision = outcomeDecision, OutcomeReason = outcomeReason },
                 cancellationToken);
             return response.IsSuccessStatusCode;
         }

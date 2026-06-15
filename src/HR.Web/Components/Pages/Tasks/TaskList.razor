@@ -46,11 +46,22 @@
                     }
                     @if (item.Status is "Open" or "InProgress")
                     {
-                        <button class="btn btn-sm btn-outline-success"
-                                @onclick="() => BeginComplete(item)"
-                                @onclick:stopPropagation="true">
-                            Complete
-                        </button>
+                        @if (item.Source == "Leave")
+                        {
+                            <button class="btn btn-sm btn-outline-primary"
+                                    @onclick="() => BeginLeaveReview(item)"
+                                    @onclick:stopPropagation="true">
+                                Review
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm btn-outline-success"
+                                    @onclick="() => BeginComplete(item)"
+                                    @onclick:stopPropagation="true">
+                                Complete
+                            </button>
+                        }
                     }
                 </Template>
             </GridColumn>
@@ -60,6 +71,11 @@
 
 @if (CompanyId != Guid.Empty)
 {
+    <LeaveReviewDialog @bind-Visible="_leaveReviewVisible"
+                       Task="_leaveReviewTask"
+                       CompanyId="CompanyId"
+                       OnReviewed="OnTaskCompleted" />
+
     <SfDialog @bind-Visible="_confirmVisible" IsModal="true" Width="420px" ShowCloseIcon="true">
         <DialogEvents Closed="CancelComplete" />
         <DialogTemplates>
@@ -108,6 +124,9 @@
     private string? _completeError;
     private TaskListItem? _pendingTask;
 
+    private bool _leaveReviewVisible;
+    private TaskListItem? _leaveReviewTask;
+
     private static string StatusLabel(string status) => status switch
     {
         "Open"       => "Not Started",
@@ -116,6 +135,12 @@
         "Cancelled"  => "Cancelled",
         _            => status
     };
+
+    private void BeginLeaveReview(TaskListItem task)
+    {
+        _leaveReviewTask = task;
+        _leaveReviewVisible = true;
+    }
 
     private void BeginComplete(TaskListItem task)
     {

@@ -1,0 +1,102 @@
+@using HR.Web.Models
+@inject TaskService TaskService
+
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="480px" ShowCloseIcon="true">
+    <DialogEvents Closed="Cancel" />
+    <DialogTemplates>
+        <Header>@Task?.Title</Header>
+        <Content>
+            @if (Task?.Description is not null)
+            {
+                <p class="mb-3">@Task.Description</p>
+                <hr class="my-3" />
+            }
+            <div class="mb-3">
+                <label class="form-label fw-medium">
+                    Reason <span class="text-muted fw-normal">(required for rejection)</span>
+                </label>
+                <textarea class="form-control"
+                          rows="3"
+                          @bind="_reason"
+                          placeholder="Enter a reason for your decision…" />
+            </div>
+            @if (_error is not null)
+            {
+                <div class="alert alert-danger mt-2 mb-0">@_error</div>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton CssClass="e-success"
+                      IsPrimary="true"
+                      Disabled="@_submitting"
+                      OnClick="@(() => SubmitAsync("Approve"))">
+                @if (_submitting && _pendingDecision == "Approve")
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Approve
+            </SfButton>
+            <SfButton CssClass="e-danger e-outline"
+                      Disabled="@_submitting"
+                      OnClick="@(() => SubmitAsync("Reject"))">
+                @if (_submitting && _pendingDecision == "Reject")
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Reject
+            </SfButton>
+            <SfButton Disabled="@_submitting" OnClick="Cancel">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter] public TaskListItem? Task { get; set; }
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter] public EventCallback OnReviewed { get; set; }
+
+    private string? _reason;
+    private string? _error;
+    private bool _submitting;
+    private string? _pendingDecision;
+
+    private async Task SubmitAsync(string decision)
+    {
+        if (Task is null) return;
+
+        _pendingDecision = decision;
+        _submitting = true;
+        _error = null;
+
+        var success = await TaskService.CompleteTaskAsync(
+            CompanyId, Task.Id, decision, _reason);
+
+        _submitting = false;
+
+        if (success)
+        {
+            await VisibleChanged.InvokeAsync(false);
+            Reset();
+            await OnReviewed.InvokeAsync();
+        }
+        else
+        {
+            _error = "Failed to submit the decision. Please try again.";
+        }
+    }
+
+    private async Task Cancel()
+    {
+        await VisibleChanged.InvokeAsync(false);
+        Reset();
+    }
+
+    private void Reset()
+    {
+        _reason = null;
+        _error = null;
+        _pendingDecision = null;
+    }
+}

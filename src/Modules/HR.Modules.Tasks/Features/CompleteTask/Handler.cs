@@ -51,7 +51,10 @@ internal sealed class CompleteTaskHandler(
             task.Source,
             task.AssignedEmployeeId,
             task.CompletedBy!.Value,
-            task.CompletedAt!.Value), cancellationToken);
+            task.CompletedAt!.Value,
+            task.SourceEntityId,
+            request.OutcomeDecision,
+            request.OutcomeReason), cancellationToken);
 
         return Result.Success(new CompleteTaskResponse(
             task.Id,

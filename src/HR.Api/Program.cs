@@ -29,6 +29,7 @@ builder.Services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher
 
 if (builder.Environment.IsDevelopment())
 {
+	builder.Services.AddSingleton<DevPersonaStore>();
 	builder.Services
 		.AddAuthentication("DevAuth")
 		.AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, DevAuthHandler>(
@@ -197,6 +198,16 @@ app.MapGet("/health/startup-migrations", () =>
 		? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
 		: Results.Ok(response);
 });
+if (app.Environment.IsDevelopment())
+{
+	app.MapGet("/api/dev/personas", (DevPersonaStore store) => DevPersonaStore.Personas).AllowAnonymous();
+	app.MapPost("/api/dev/persona/{userId}", (string userId, DevPersonaStore store) =>
+	{
+		store.Switch(userId);
+		return Results.NoContent();
+	}).AllowAnonymous();
+}
+
 app.UseLoggingMiddleware();
 app.UseAuthentication();
 app.UseIdentityModule();

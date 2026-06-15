@@ -2,6 +2,8 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject AppSession Session
+@inject DevService DevService
+@inject IWebHostEnvironment Env
 
 <div class="app-shell">
 
@@ -53,6 +55,20 @@
             </button>
             <span class="page-title">Dashboard</span>
             <div class="top-bar-actions">
+                @if (Env.IsDevelopment() && _personas.Count > 0)
+                {
+                    <div class="dev-persona-switcher" title="Dev persona switcher">
+                        <span class="dev-persona-label">DEV</span>
+                        <select class="dev-persona-select" @onchange="OnPersonaChanged">
+                            @foreach (var persona in _personas)
+                            {
+                                <option value="@persona.UserId" selected="@(persona.UserId == _currentPersonaUserId)">
+                                    @persona.Name — @persona.JobTitle
+                                </option>
+                            }
+                        </select>
+                    </div>
+                }
                 @if (Session.IsLoaded && Session.EmployeeId.HasValue)
                 {
                     <div class="top-bar-user">
@@ -103,6 +119,9 @@
     private bool SidebarOpen { get; set; } = true;
     private bool IsDark { get; set; }
 
+    private IReadOnlyList<DevPersonaDto> _personas = [];
+    private string _currentPersonaUserId = string.Empty;
+
     private readonly Dictionary<string, string> _menuItems = new()
     {
         ["Employees"]        = "/",
@@ -120,6 +139,20 @@
         _menuItems["Departments"]      = $"/companies/{companyId}/departments";
         _menuItems["PositionProfiles"] = $"/companies/{companyId}/position-profiles";
         _menuItems["PublicHolidays"]   = $"/companies/{companyId}/public-holidays";
+
+        if (Env.IsDevelopment())
+        {
+            _personas = await DevService.GetPersonasAsync();
+            _currentPersonaUserId = Session.EmployeeId?.ToString() ?? string.Empty;
+        }
+    }
+
+    private async Task OnPersonaChanged(Microsoft.AspNetCore.Components.ChangeEventArgs e)
+    {
+        var userId = e.Value?.ToString();
+        if (string.IsNullOrEmpty(userId)) return;
+        await DevService.SwitchPersonaAsync(userId);
+        NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
     }
 
     private void ToggleSidebar() => SidebarOpen = !SidebarOpen;

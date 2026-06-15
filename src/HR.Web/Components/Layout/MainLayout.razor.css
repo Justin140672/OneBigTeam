@@ -139,6 +139,34 @@
     padding: 24px;
 }
 
+.dev-persona-switcher {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    border-radius: 6px;
+}
+
+.dev-persona-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #92400e;
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+}
+
+.dev-persona-select {
+    font-size: 0.8rem;
+    color: #78350f;
+    background: transparent;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    max-width: 220px;
+}
+
 /* SfMenu — transparent background inside sidebar */
 ::deep .app-nav-menu.e-menu-wrapper,
 ::deep .app-nav-menu.e-menu-container {

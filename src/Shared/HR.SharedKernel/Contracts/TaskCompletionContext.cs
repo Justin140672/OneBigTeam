@@ -11,4 +11,7 @@ public sealed record TaskCompletionContext(
     TaskSource Source,
     Guid? AssignedEmployeeId,
     Guid CompletedBy,
-    DateTimeOffset CompletedAt);
+    DateTimeOffset CompletedAt,
+    Guid? SourceEntityId = null,
+    string? OutcomeDecision = null,
+    string? OutcomeReason = null);

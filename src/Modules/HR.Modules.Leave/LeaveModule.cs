@@ -18,7 +18,9 @@ using HR.Modules.Leave.Features.PreviewLeaveRequest;
 using HR.Modules.Leave.Features.AwardToil;
 using HR.Modules.Leave.Features.InitialiseEmployeeLeave;
 using HR.Modules.Leave.Persistence;
+using HR.Modules.Leave.Services;
 using HR.SharedKernel;
+using HR.SharedKernel.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -65,6 +67,7 @@ public static class LeaveModule
         services.AddScoped<AwardToilHandler>();
         services.AddScoped<IValidator<AwardToilRequest>, AwardToilValidator>();
 services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
+        services.AddScoped<ILeaveApprovalService, LeaveApprovalService>();
         services.AddScoped<CreatePublicHolidayHandler>();
         services.AddScoped<IValidator<CreatePublicHolidayRequest>, CreatePublicHolidayValidator>();
         services.AddScoped<ListPublicHolidaysHandler>();
