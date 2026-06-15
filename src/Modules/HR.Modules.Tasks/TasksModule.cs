@@ -4,6 +4,7 @@ using HR.Modules.Tasks.Features.GetEmployeeTasks;
 using HR.Modules.Tasks.Features.GetMyTasks;
 using HR.Modules.Tasks.Features.GetTeamTasks;
 using HR.Modules.Tasks.Features.GetTask;
+using HR.Modules.Tasks.Features.ReassignTask;
 using HR.Modules.Tasks.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,6 +34,7 @@ public static class TasksModule
         services.AddScoped<GetMyTasksHandler>();
         services.AddScoped<GetTeamTasksHandler>();
         services.AddScoped<GetEmployeeTasksHandler>();
+        services.AddScoped<ReassignTaskHandler>();
     }
 
     public static async Task MigrateTasksAsync(this IServiceProvider services)
