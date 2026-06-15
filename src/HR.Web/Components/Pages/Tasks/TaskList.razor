@@ -7,7 +7,20 @@
         AllowPaging="false"
         AllowSorting="false">
     <GridColumns>
-        <GridColumn Field="@nameof(TaskListItem.Title)" HeaderText="Title" />
+        <GridColumn HeaderText="Task">
+            <Template>
+                @{
+                    var item = (TaskListItem)context;
+                }
+                <div class="task-cell">
+                    <span class="task-title">@item.Title</span>
+                    @if (item.Description is not null)
+                    {
+                        <span class="task-description">@item.Description</span>
+                    }
+                </div>
+            </Template>
+        </GridColumn>
         <GridColumn Field="@nameof(TaskListItem.Status)" HeaderText="Status" Width="120" />
         <GridColumn Field="@nameof(TaskListItem.Priority)" HeaderText="Priority" Width="120" />
         <GridColumn Field="@nameof(TaskListItem.DueDate)" HeaderText="Due Date" Width="140" Format="d" />
@@ -38,15 +51,14 @@
     <SfDialog @bind-Visible="_confirmVisible" IsModal="true" Width="420px" ShowCloseIcon="true">
         <DialogEvents Closed="CancelComplete" />
         <DialogTemplates>
-            <Header>Complete Task</Header>
+            <Header>@_pendingTask?.Title</Header>
             <Content>
-                <p class="mb-0">
-                    Mark <strong>@_pendingTask?.Title</strong> as complete?
-                </p>
                 @if (_pendingTask?.Description is not null)
                 {
-                    <p class="text-muted small mt-2 mb-0">@_pendingTask.Description</p>
+                    <p class="mb-3">@_pendingTask.Description</p>
+                    <hr class="my-3" />
                 }
+                <p class="mb-0 text-muted">Mark this task as complete?</p>
                 @if (_completeError is not null)
                 {
                     <div class="alert alert-danger mt-3 mb-0">@_completeError</div>
