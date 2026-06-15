@@ -35,7 +35,8 @@ internal sealed class TaskCreator(TasksDbContext dbContext, IClock clock, IAudit
                 $"New task assigned: {task.Title}",
                 task.Description,
                 task.Id,
-                clock.UtcNowOffset());
+                clock.UtcNowOffset(),
+                NotificationType.TaskAssigned);
             dbContext.Notifications.Add(notification);
         }
 

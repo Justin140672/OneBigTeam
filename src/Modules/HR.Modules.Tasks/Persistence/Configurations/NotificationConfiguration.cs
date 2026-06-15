@@ -41,10 +41,18 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
             .HasColumnName("source_entity_id")
             .IsRequired();
 
+        builder.Property(n => n.Type)
+            .HasColumnName("type")
+            .IsRequired()
+            .HasDefaultValue(NotificationType.TaskAssigned);
+
         builder.Property(n => n.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
 
         builder.HasIndex(n => new { n.CompanyId, n.EmployeeId, n.IsRead });
+
+        // Prevents duplicate notifications of the same type for the same task+employee.
+        builder.HasIndex(n => new { n.EmployeeId, n.SourceEntityId, n.Type }).IsUnique();
     }
 }

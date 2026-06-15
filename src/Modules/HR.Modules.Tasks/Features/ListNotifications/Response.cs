@@ -6,6 +6,7 @@ internal sealed record NotificationItem(
     string? Body,
     bool IsRead,
     Guid SourceEntityId,
+    string Type,
     DateTimeOffset CreatedAt);
 
 internal sealed record ListNotificationsResponse(

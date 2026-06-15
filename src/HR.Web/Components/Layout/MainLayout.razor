@@ -84,14 +84,21 @@
                                         @foreach (var n in _notifications)
                                         {
                                             var notif = n;
-                                            <div class="notif-item @(notif.IsRead ? "" : "notif-unread")"
+                                            var isDueSoon = notif.Type == "TaskDueSoon";
+                                            <div class="notif-item @(notif.IsRead ? "" : "notif-unread") @(isDueSoon ? "notif-due-soon" : "")"
                                                  @onclick="() => OnNotificationClick(notif)">
+                                                <div class="notif-item-header">
+                                                    <i class="@(isDueSoon ? "fa-solid fa-clock" : "fa-solid fa-bell") notif-type-icon"></i>
+                                                    <span class="notif-type-label @(isDueSoon ? "notif-type-label--due-soon" : "notif-type-label--assigned")">
+                                                        @(isDueSoon ? "Due Soon" : "Assigned")
+                                                    </span>
+                                                    <span class="notif-item-time ms-auto">@FormatTime(notif.CreatedAt)</span>
+                                                </div>
                                                 <div class="notif-item-title">@notif.Title</div>
                                                 @if (notif.Body is not null)
                                                 {
                                                     <div class="notif-item-body">@notif.Body</div>
                                                 }
-                                                <div class="notif-item-time">@FormatTime(notif.CreatedAt)</div>
                                             </div>
                                         }
                                     }

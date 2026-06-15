@@ -14,7 +14,7 @@ internal sealed class ListNotificationsHandler(TasksDbContext dbContext)
             .Where(n => n.CompanyId == request.CompanyId && n.EmployeeId == request.EmployeeId)
             .OrderByDescending(n => n.CreatedAt)
             .Take(50)
-            .Select(n => new NotificationItem(n.Id, n.Title, n.Body, n.IsRead, n.SourceEntityId, n.CreatedAt))
+            .Select(n => new NotificationItem(n.Id, n.Title, n.Body, n.IsRead, n.SourceEntityId, n.Type.ToString(), n.CreatedAt))
             .ToListAsync(cancellationToken);
 
         var unreadCount = items.Count(n => !n.IsRead);

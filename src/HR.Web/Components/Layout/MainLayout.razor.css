@@ -273,6 +273,41 @@
     -webkit-box-orient: vertical;
 }
 
+.notif-item-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.notif-type-icon {
+    font-size: 0.75rem;
+    flex-shrink: 0;
+}
+
+.notif-type-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.notif-type-label--assigned {
+    background: #ede9fe;
+    color: #6d28d9;
+}
+
+.notif-type-label--due-soon {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.notif-due-soon .notif-type-icon {
+    color: #d97706;
+}
+
 .notif-item-time {
     font-size: 0.75rem;
     color: #9ca3af;
