@@ -1,4 +1,5 @@
 @using HR.Web.Models
+@inject TaskService TaskService
 
 <HrGrid TValue="TaskListItem"
         DataSource="@Tasks"
@@ -11,10 +12,109 @@
         <GridColumn Field="@nameof(TaskListItem.Priority)" HeaderText="Priority" Width="120" />
         <GridColumn Field="@nameof(TaskListItem.DueDate)" HeaderText="Due Date" Width="140" Format="d" />
         <GridColumn Field="@nameof(TaskListItem.AssignedTo)" HeaderText="Assigned To" Width="200" />
+        @if (CompanyId != Guid.Empty)
+        {
+            <GridColumn HeaderText="" Width="110" AllowFiltering="false" AllowSorting="false" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Center">
+                <Template>
+                    @{
+                        var item = (TaskListItem)context;
+                    }
+                    @if (item.Status is "Open" or "InProgress")
+                    {
+                        <button class="btn btn-sm btn-outline-success"
+                                @onclick="() => BeginComplete(item)"
+                                @onclick:stopPropagation="true">
+                            Complete
+                        </button>
+                    }
+                </Template>
+            </GridColumn>
+        }
     </GridColumns>
 </HrGrid>
 
+@if (CompanyId != Guid.Empty)
+{
+    <SfDialog @bind-Visible="_confirmVisible" IsModal="true" Width="420px" ShowCloseIcon="true">
+        <DialogEvents Closed="CancelComplete" />
+        <DialogTemplates>
+            <Header>Complete Task</Header>
+            <Content>
+                <p class="mb-0">
+                    Mark <strong>@_pendingTask?.Title</strong> as complete?
+                </p>
+                @if (_pendingTask?.Description is not null)
+                {
+                    <p class="text-muted small mt-2 mb-0">@_pendingTask.Description</p>
+                }
+                @if (_completeError is not null)
+                {
+                    <div class="alert alert-danger mt-3 mb-0">@_completeError</div>
+                }
+            </Content>
+            <FooterTemplate>
+                <SfButton IsPrimary="true" Disabled="@_completing" OnClick="ConfirmCompleteAsync">
+                    @if (_completing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Complete
+                </SfButton>
+                <SfButton Disabled="@_completing" OnClick="CancelComplete">Cancel</SfButton>
+            </FooterTemplate>
+        </DialogTemplates>
+    </SfDialog>
+}
+
 @code {
-    [Parameter, EditorRequired] 
+    [Parameter, EditorRequired]
     public IReadOnlyList<TaskListItem> Tasks { get; set; } = [];
+
+    [Parameter]
+    public Guid CompanyId { get; set; }
+
+    [Parameter]
+    public EventCallback OnTaskCompleted { get; set; }
+
+    private bool _confirmVisible;
+    private bool _completing;
+    private string? _completeError;
+    private TaskListItem? _pendingTask;
+
+    private void BeginComplete(TaskListItem task)
+    {
+        _pendingTask = task;
+        _completeError = null;
+        _confirmVisible = true;
+    }
+
+    private void CancelComplete()
+    {
+        _confirmVisible = false;
+        _pendingTask = null;
+        _completeError = null;
+    }
+
+    private async Task ConfirmCompleteAsync()
+    {
+        if (_pendingTask is null) return;
+
+        _completing = true;
+        _completeError = null;
+
+        var success = await TaskService.CompleteTaskAsync(CompanyId, _pendingTask.Id);
+
+        _completing = false;
+
+        if (success)
+        {
+            _confirmVisible = false;
+            _pendingTask = null;
+            await OnTaskCompleted.InvokeAsync();
+        }
+        else
+        {
+            _completeError = "Failed to complete the task. Please try again.";
+        }
+    }
 }

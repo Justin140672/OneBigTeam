@@ -10,7 +10,7 @@
 }
 else
 {
-    <TaskList Tasks="@_tasks" />
+    <TaskList Tasks="@_tasks" CompanyId="@CompanyId" OnTaskCompleted="LoadTasksAsync" />
 }
 
 @code {
@@ -19,11 +19,14 @@ else
     private IReadOnlyList<TaskListItem> _tasks = [];
     private bool _loading = true;
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task OnParametersSetAsync() => await LoadTasksAsync();
+
+    private async Task LoadTasksAsync()
     {
-        _loading = true;
+        _loading = _tasks.Count == 0;
         var result = await TaskService.GetMyTasksAsync(CompanyId);
         _tasks = result?.Items ?? [];
         _loading = false;
+        StateHasChanged();
     }
 }

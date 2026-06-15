@@ -6,6 +6,7 @@ public sealed record TaskListItem(
     Guid Id,
     Guid CompanyId,
     string Title,
+    string? Description,
     string Status,
     string Priority,
     string Source,
