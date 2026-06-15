@@ -22,6 +22,8 @@ public class LeaveLifecycleIntegrationTests : IClassFixture<ApiWebApplicationFac
             .GetAwaiter().GetResult();
     }
 
+    // ─── Happy-path lifecycle ──────────────────────────────────────────────────
+
     [Fact]
     public async Task Submit_Then_Approve_Deducts_Leave_Balance()
     {
@@ -113,6 +115,8 @@ public class LeaveLifecycleIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal(25m, balance.RemainingDays);
     }
 
+    // ─── Auth guards ───────────────────────────────────────────────────────────
+
     [Fact]
     public async Task Approve_Returns_Unauthorized_For_Anonymous_Request()
     {
@@ -153,6 +157,386 @@ public class LeaveLifecycleIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    // ─── Day count accuracy ────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Submit_Returns_Correct_TotalDays_In_Response()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        // Mon–Fri = 5 working days
+        var (_, totalDays, status) = await SubmitLeaveRequestWithPartsAsync(
+            client, companyId, employeeId, leaveTypeId,
+            "2026-09-07", "FullDay", "2026-09-11", "FullDay");
+
+        Assert.Equal("Pending", status);
+        Assert.Equal(5m, totalDays);
+    }
+
+    [Fact]
+    public async Task Submit_Single_Day_Morning_Returns_Half_Day()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        var (_, totalDays, _) = await SubmitLeaveRequestWithPartsAsync(
+            client, companyId, employeeId, leaveTypeId,
+            "2026-09-14", "Morning", "2026-09-14", "Morning"); // single Monday morning
+
+        Assert.Equal(0.5m, totalDays);
+    }
+
+    [Fact]
+    public async Task Submit_Multi_Day_Range_With_Half_Day_Boundaries_Returns_Correct_Days()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        // Mon morning (0.5) + Tue full (1) + Wed afternoon (0.5) = 2 days
+        var (_, totalDays, _) = await SubmitLeaveRequestWithPartsAsync(
+            client, companyId, employeeId, leaveTypeId,
+            "2026-09-21", "Morning", "2026-09-23", "Afternoon");
+
+        Assert.Equal(2m, totalDays);
+    }
+
+    [Fact]
+    public async Task Submit_Weekend_Only_Range_Returns_BadRequest()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        // 2026-09-05 = Saturday, 2026-09-06 = Sunday — no working days
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests",
+            new
+            {
+                companyId, employeeId, leaveTypeId,
+                startDate = "2026-09-05", startPart = "FullDay",
+                endDate = "2026-09-06", endPart = "FullDay",
+                reason = "Weekend test"
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    // ─── PendingDays balance tracking ─────────────────────────────────────────
+
+    [Fact]
+    public async Task Submit_Increases_PendingDays_On_Balance()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-09-28", "2026-10-02"); // Mon–Fri = 5 days
+
+        var balance = await GetBalanceAsync(client, companyId, employeeId, leaveTypeId);
+        Assert.Equal(0m, balance.UsedDays);
+        Assert.Equal(5m, balance.PendingDays);
+        Assert.Equal(25m, balance.RemainingDays); // RemainingDays is unaffected by pending
+    }
+
+    [Fact]
+    public async Task Approve_Clears_PendingDays_And_Increments_UsedDays()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-10-05", "2026-10-09"); // Mon–Fri = 5 days
+
+        await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}/approve",
+            new { companyId, employeeId, leaveRequestId, reviewedByEmployeeId = UserId });
+
+        var balance = await GetBalanceAsync(client, companyId, employeeId, leaveTypeId);
+        Assert.Equal(5m, balance.UsedDays);
+        Assert.Equal(0m, balance.PendingDays);
+        Assert.Equal(20m, balance.RemainingDays);
+    }
+
+    [Fact]
+    public async Task Reject_When_Pending_Clears_PendingDays()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-10-12", "2026-10-16"); // Mon–Fri = 5 days
+
+        await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}/reject",
+            new { companyId, employeeId, leaveRequestId, reviewedByEmployeeId = UserId, rejectionReason = "Test" });
+
+        var balance = await GetBalanceAsync(client, companyId, employeeId, leaveTypeId);
+        Assert.Equal(0m, balance.UsedDays);
+        Assert.Equal(0m, balance.PendingDays);
+    }
+
+    [Fact]
+    public async Task Cancel_When_Pending_Clears_PendingDays_Without_Affecting_UsedDays()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-10-19", "2026-10-23"); // Mon–Fri = 5 days
+
+        await client.DeleteAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}");
+
+        var balance = await GetBalanceAsync(client, companyId, employeeId, leaveTypeId);
+        Assert.Equal(0m, balance.UsedDays);
+        Assert.Equal(0m, balance.PendingDays);
+        Assert.Equal(25m, balance.RemainingDays);
+    }
+
+    // ─── State machine enforcement ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task Approve_Already_Approved_Request_Returns_BadRequest()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-10-26", "2026-10-30");
+
+        await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}/approve",
+            new { companyId, employeeId, leaveRequestId, reviewedByEmployeeId = UserId });
+
+        var secondApprove = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}/approve",
+            new { companyId, employeeId, leaveRequestId, reviewedByEmployeeId = UserId });
+
+        Assert.Equal(HttpStatusCode.BadRequest, secondApprove.StatusCode);
+    }
+
+    [Fact]
+    public async Task Cancel_Already_Cancelled_Request_Returns_BadRequest()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-11-02", "2026-11-06");
+
+        await client.DeleteAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}");
+
+        var secondCancel = await client.DeleteAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, secondCancel.StatusCode);
+    }
+
+    [Fact]
+    public async Task Cancel_Rejected_Request_Returns_BadRequest()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-11-09", "2026-11-13");
+
+        await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}/reject",
+            new { companyId, employeeId, leaveRequestId, reviewedByEmployeeId = UserId, rejectionReason = "Test" });
+
+        var cancelAfterReject = await client.DeleteAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, cancelAfterReject.StatusCode);
+    }
+
+    [Fact]
+    public async Task Reject_Already_Rejected_Request_Returns_BadRequest()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-11-16", "2026-11-20");
+
+        await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}/reject",
+            new { companyId, employeeId, leaveRequestId, reviewedByEmployeeId = UserId, rejectionReason = "First" });
+
+        var secondReject = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}/reject",
+            new { companyId, employeeId, leaveRequestId, reviewedByEmployeeId = UserId, rejectionReason = "Second" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, secondReject.StatusCode);
+    }
+
+    [Fact]
+    public async Task Reject_Cancelled_Request_Returns_BadRequest()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-11-23", "2026-11-27");
+
+        await client.DeleteAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}");
+
+        var rejectAfterCancel = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}/reject",
+            new { companyId, employeeId, leaveRequestId, reviewedByEmployeeId = UserId, rejectionReason = "Test" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, rejectAfterCancel.StatusCode);
+    }
+
+    // ─── Insufficient balance ──────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Submit_Returns_BadRequest_When_Balance_Insufficient()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+        // Policy assigns a 25-day balance automatically; request 26 days to exceed it.
+        // 2026-09-07 (Mon) to 2026-10-12 (Mon) = 26 working days
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests",
+            new
+            {
+                companyId, employeeId, leaveTypeId,
+                startDate = "2026-09-07", startPart = "FullDay",
+                endDate = "2026-10-12", endPart = "FullDay",
+                reason = "Test"
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    // ─── Multiple requests cumulate correctly ──────────────────────────────────
+
+    [Fact]
+    public async Task Two_Approved_Requests_Cumulate_Balance_Deduction()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        // First request: Mon–Wed = 3 days
+        var req1 = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-11-30", "2026-12-02");
+        await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{req1}/approve",
+            new { companyId, employeeId, leaveRequestId = req1, reviewedByEmployeeId = UserId });
+
+        // Second request: Mon–Tue = 2 days
+        var req2 = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-12-07", "2026-12-08");
+        await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{req2}/approve",
+            new { companyId, employeeId, leaveRequestId = req2, reviewedByEmployeeId = UserId });
+
+        var balance = await GetBalanceAsync(client, companyId, employeeId, leaveTypeId);
+        Assert.Equal(5m, balance.UsedDays);      // 3 + 2
+        Assert.Equal(20m, balance.RemainingDays); // 25 − 5
+    }
+
+    // ─── List endpoint ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task List_Returns_All_Requests_For_Employee_With_Correct_Fields()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        var id1 = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-12-14", "2026-12-14"); // 1 day
+
+        var id2 = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-12-15", "2026-12-16"); // 2 days
+
+        var listResponse = await ListLeaveRequestsAsync(client, companyId, employeeId);
+
+        Assert.Equal(2, listResponse.Items.Count);
+
+        // Items returned newest-first (ordered by StartDate descending)
+        Assert.Equal(id2, listResponse.Items[0].Id);
+        Assert.Equal(id1, listResponse.Items[1].Id);
+
+        Assert.All(listResponse.Items, item =>
+        {
+            Assert.Equal("Pending", item.Status);
+            Assert.Equal(leaveTypeId, item.LeaveTypeId);
+            Assert.Equal("Annual Leave", item.LeaveTypeName);
+            Assert.Equal("FullDay", item.StartPart);
+            Assert.Equal("FullDay", item.EndPart);
+        });
+
+        Assert.Equal(2m, listResponse.Items[0].TotalDays);
+        Assert.Equal(1m, listResponse.Items[1].TotalDays);
+    }
+
+    [Fact]
+    public async Task List_Returns_Empty_For_Employee_With_No_Requests()
+    {
+        var (client, companyId, _, employeeId, _) = await SetupAsync();
+
+        var listResponse = await ListLeaveRequestsAsync(client, companyId, employeeId);
+
+        Assert.Empty(listResponse.Items);
+    }
+
+    [Fact]
+    public async Task List_Does_Not_Return_Requests_From_Other_Employees()
+    {
+        var (client, companyId, leaveTypeId, employeeIdA, _) = await SetupAsync();
+
+        await SubmitLeaveRequestAsync(client, companyId, employeeIdA, leaveTypeId,
+            "2026-12-21", "2026-12-21");
+
+        // Create a second employee in the same company
+        var empBResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            new
+            {
+                companyId,
+                firstName = "Other",
+                lastName = "Employee",
+                workEmail = $"other.{Guid.NewGuid():N}@example.com",
+                startDate = "2026-01-01"
+            });
+        empBResp.EnsureSuccessStatusCode();
+        var empB = await empBResp.Content.ReadFromJsonAsync<EmployeePayload>();
+
+        var listResponse = await ListLeaveRequestsAsync(client, companyId, empB!.Id);
+
+        Assert.Empty(listResponse.Items);
+    }
+
+    // ─── Preview endpoint ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Preview_Returns_Correct_TotalDays()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        var preview = await PreviewLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-09-07", "FullDay", "2026-09-11", "FullDay"); // Mon–Fri = 5 days
+
+        Assert.Equal(5m, preview.TotalDays);
+    }
+
+    [Fact]
+    public async Task Preview_Shows_WouldExceedBalance_When_Insufficient()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+        // Policy auto-creates a 25-day balance; preview 26 days to exceed it.
+        // 2026-09-07 (Mon) to 2026-10-12 (Mon) = 26 working days
+        var preview = await PreviewLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-09-07", "FullDay", "2026-10-12", "FullDay");
+
+        Assert.True(preview.WouldExceedBalance);
+        Assert.Equal(25m, preview.RemainingBalance);
+    }
+
+    [Fact]
+    public async Task Preview_Returns_RemainingBalance_When_Sufficient()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        var preview = await PreviewLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-09-14", "FullDay", "2026-09-18", "FullDay"); // 5 days from 25 available
+
+        Assert.Equal(5m, preview.TotalDays);
+        Assert.False(preview.WouldExceedBalance);
+        Assert.Equal(25m, preview.RemainingBalance);
+    }
+
+    // ─── Helpers ───────────────────────────────────────────────────────────────
 
     private async Task<(HttpClient Client, Guid CompanyId, Guid LeaveTypeId, Guid EmployeeId, Guid PolicyId)> SetupAsync()
     {
@@ -225,6 +609,16 @@ public class LeaveLifecycleIntegrationTests : IClassFixture<ApiWebApplicationFac
         HttpClient client, Guid companyId, Guid employeeId, Guid leaveTypeId,
         string startDate, string endDate)
     {
+        var (id, _, _) = await SubmitLeaveRequestWithPartsAsync(
+            client, companyId, employeeId, leaveTypeId,
+            startDate, "FullDay", endDate, "FullDay");
+        return id;
+    }
+
+    private async Task<(Guid Id, decimal TotalDays, string Status)> SubmitLeaveRequestWithPartsAsync(
+        HttpClient client, Guid companyId, Guid employeeId, Guid leaveTypeId,
+        string startDate, string startPart, string endDate, string endPart)
+    {
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-requests",
             new
@@ -233,14 +627,14 @@ public class LeaveLifecycleIntegrationTests : IClassFixture<ApiWebApplicationFac
                 employeeId,
                 leaveTypeId,
                 startDate,
-                startPart = "FullDay",
+                startPart,
                 endDate,
-                endPart = "FullDay",
+                endPart,
                 reason = "Integration test"
             });
         response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<LeaveRequestPayload>();
-        return payload!.Id;
+        return (payload!.Id, payload.TotalDays, payload.Status);
     }
 
     private async Task<BalanceItem> GetBalanceAsync(HttpClient client, Guid companyId, Guid employeeId, Guid leaveTypeId)
@@ -253,10 +647,34 @@ public class LeaveLifecycleIntegrationTests : IClassFixture<ApiWebApplicationFac
         return payload!.Balances.Single(b => b.LeaveTypeId == leaveTypeId);
     }
 
+    private async Task<ListResponse> ListLeaveRequestsAsync(HttpClient client, Guid companyId, Guid employeeId)
+    {
+        var response = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests");
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<ListResponse>())!;
+    }
+
+    private async Task<PreviewResponse> PreviewLeaveRequestAsync(
+        HttpClient client, Guid companyId, Guid employeeId, Guid leaveTypeId,
+        string startDate, string startPart, string endDate, string endPart)
+    {
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/preview",
+            new { companyId, employeeId, leaveTypeId, startDate, startPart, endDate, endPart });
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<PreviewResponse>())!;
+    }
+
+    // ─── Response records ──────────────────────────────────────────────────────
+
     private sealed record CompanyPayload(Guid Id);
     private sealed record PolicyPayload(Guid Id);
     private sealed record EmployeePayload(Guid Id);
     private sealed record LeaveRequestPayload(Guid Id, string Status, decimal TotalDays);
     private sealed record BalanceResponse(Guid EmployeeId, int PolicyYear, List<BalanceItem> Balances);
-    private sealed record BalanceItem(Guid LeaveTypeId, decimal EntitlementDays, decimal UsedDays, decimal AdjustmentDays, decimal RemainingDays);
+    private sealed record BalanceItem(Guid LeaveTypeId, decimal EntitlementDays, decimal UsedDays, decimal AdjustmentDays, decimal RemainingDays, decimal PendingDays);
+    private sealed record ListResponse(List<ListItem> Items);
+    private sealed record ListItem(Guid Id, Guid LeaveTypeId, string LeaveTypeName, string Status, DateOnly StartDate, string StartPart, DateOnly EndDate, string EndPart, decimal TotalDays, string? Reason);
+    private sealed record PreviewResponse(decimal TotalDays, decimal? RemainingBalance, bool WouldExceedBalance);
 }
