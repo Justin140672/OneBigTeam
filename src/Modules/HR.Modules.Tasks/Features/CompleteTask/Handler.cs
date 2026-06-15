@@ -1,11 +1,17 @@
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Persistence;
+using HR.Modules.Tasks.Services;
 using HR.SharedKernel;
+using HR.SharedKernel.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Tasks.Features.CompleteTask;
 
-internal sealed class CompleteTaskHandler(TasksDbContext dbContext, IClock clock, IAuditEventPublisher auditPublisher)
+internal sealed class CompleteTaskHandler(
+    TasksDbContext dbContext,
+    IClock clock,
+    IAuditEventPublisher auditPublisher,
+    TaskCompletionDispatcher dispatcher)
 {
     public async Task<Result<CompleteTaskResponse>> HandleAsync(
         CompleteTaskRequest request,
@@ -35,6 +41,16 @@ internal sealed class CompleteTaskHandler(TasksDbContext dbContext, IClock clock
             task.Id,
             task.CompletedBy!.Value,
             previousStatus,
+            task.CompletedAt!.Value), cancellationToken);
+
+        await dispatcher.DispatchAsync(new TaskCompletionContext(
+            task.CompanyId,
+            task.Id,
+            task.Title,
+            task.Description,
+            task.Source,
+            task.AssignedEmployeeId,
+            task.CompletedBy!.Value,
             task.CompletedAt!.Value), cancellationToken);
 
         return Result.Success(new CompleteTaskResponse(

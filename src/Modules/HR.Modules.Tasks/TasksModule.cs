@@ -1,5 +1,6 @@
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.CompleteTask;
+using HR.Modules.Tasks.Features.CompleteTask.Actions;
 using HR.Modules.Tasks.Features.GetEmployeeTasks;
 using HR.Modules.Tasks.Features.GetMyTasks;
 using HR.Modules.Tasks.Features.GetTeamTasks;
@@ -8,6 +9,7 @@ using HR.Modules.Tasks.Features.ReassignTask;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Services;
 using HR.SharedKernel;
+using HR.SharedKernel.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -31,6 +33,9 @@ public static class TasksModule
     private static void AddFeatureServices(IServiceCollection services)
     {
         services.AddScoped<ITaskCreator, TaskCreator>();
+        services.AddScoped<TaskCompletionDispatcher>();
+        services.AddScoped<ITaskCompletionAction, ProbationTaskCompletionAction>();
+
         services.AddScoped<GetTaskHandler>();
         services.AddScoped<GetMyTasksHandler>();
         services.AddScoped<GetTeamTasksHandler>();
