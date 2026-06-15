@@ -1,4 +1,5 @@
 using FluentValidation;
+using HR.Modules.Tasks.Features.CompleteTask;
 using HR.Modules.Tasks.Features.CreateTask;
 using HR.Modules.Tasks.Features.GetEmployeeTasks;
 using HR.Modules.Tasks.Features.GetMyTasks;
@@ -35,6 +36,7 @@ public static class TasksModule
         services.AddScoped<GetTeamTasksHandler>();
         services.AddScoped<GetEmployeeTasksHandler>();
         services.AddScoped<ReassignTaskHandler>();
+        services.AddScoped<CompleteTaskHandler>();
     }
 
     public static async Task MigrateTasksAsync(this IServiceProvider services)

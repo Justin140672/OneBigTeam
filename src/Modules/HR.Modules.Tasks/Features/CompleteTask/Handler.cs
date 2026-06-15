@@ -1,0 +1,48 @@
+using HR.Modules.Tasks.Domain;
+using HR.Modules.Tasks.Persistence;
+using HR.SharedKernel;
+using Microsoft.EntityFrameworkCore;
+
+namespace HR.Modules.Tasks.Features.CompleteTask;
+
+internal sealed class CompleteTaskHandler(TasksDbContext dbContext, IClock clock)
+{
+    public async Task<Result<CompleteTaskResponse>> HandleAsync(
+        CompleteTaskRequest request,
+        CancellationToken cancellationToken)
+    {
+        var task = await dbContext.TaskItems
+            .SingleOrDefaultAsync(
+                t => t.Id == request.Id && t.CompanyId == request.CompanyId,
+                cancellationToken);
+
+        if (task is null)
+            return Result.Failure<CompleteTaskResponse>(
+                Error.NotFound($"Task with id '{request.Id}' was not found."));
+
+        if (task.Status == TaskItemStatus.Cancelled)
+            return Result.Failure<CompleteTaskResponse>(
+                Error.Conflict("Cannot complete a cancelled task."));
+
+        task.Complete(request.CompletedBy, clock.UtcNowOffset());
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(new CompleteTaskResponse(
+            task.Id,
+            task.CompanyId,
+            task.Title,
+            task.Description,
+            task.Status.ToString(),
+            task.Priority.ToString(),
+            task.Source.ToString(),
+            task.DueDate,
+            task.AssignedEmployeeId,
+            task.AssignedUserId,
+            task.CreatedBy,
+            task.CompletedBy,
+            task.CompletedAt,
+            task.CreatedAt,
+            task.UpdatedAt));
+    }
+}
