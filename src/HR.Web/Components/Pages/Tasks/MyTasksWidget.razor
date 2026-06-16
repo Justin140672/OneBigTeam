@@ -70,7 +70,7 @@ else
                     var t = task;
                     var (dueLabel, dueCss) = DueBadge(t.DueDate);
                     <div class="task-widget-item" @onclick="() => NavigateToTask(t)">
-                        <span class="priority-pip priority-pip--@t.Priority.ToLowerInvariant()" title="@t.Priority priority"></span>
+                        <span class="priority-pip priority-pip--@DuePip(t.DueDate)" title="@t.Priority priority"></span>
                         <div class="task-widget-content">
                             <span class="task-widget-title">@t.Title</span>
                             <span class="task-widget-meta">@StatusLabel(t.Status)</span>
@@ -135,6 +135,13 @@ else
         if (due.Value == _today.AddDays(1)) return ("Tomorrow", "soon");
         return (due.Value.ToString("d MMM"),                    "normal");
     }
+
+    private string DuePip(DateOnly? due) =>
+        due is null                           ? "low" :
+        due.Value < _today                    ? "critical" :
+        due.Value == _today                   ? "high" :
+        due.Value == _today.AddDays(1)        ? "medium" :
+        "low";
 
     private static string StatusLabel(string s) => s == "InProgress" ? "In progress" : "Not started";
 

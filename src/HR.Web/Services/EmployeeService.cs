@@ -95,6 +95,45 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         catch { return (null, "An unexpected error occurred."); }
     }
 
+    public async Task<GetMyContactDetailsResponse?> GetMyContactDetailsAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetMyContactDetailsResponse>(
+                $"api/companies/{companyId}/employees/me/contact-details", cancellationToken);
+        }
+        catch { return null; }
+    }
+
+    public async Task<(bool Success, string? Error)> UpdateMyContactDetailsAsync(
+        Guid companyId,
+        UpdateMyContactDetailsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.PutAsJsonAsync(
+                $"api/companies/{companyId}/employees/me/contact-details", request, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return (true, null);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity)
+            {
+                var body = await response.Content.ReadFromJsonAsync<ValidationErrorEnvelope>(cancellationToken);
+                var first = body?.Errors?.Values.SelectMany(v => v).FirstOrDefault();
+                return (false, first ?? "Validation failed.");
+            }
+
+            return (false, "Failed to save contact details.");
+        }
+        catch { return (false, "An unexpected error occurred."); }
+    }
+
+    private sealed record ValidationErrorEnvelope(Dictionary<string, string[]>? Errors);
+
     public async Task<ListNationalitiesResponse?> ListNationalitiesAsync(
         CancellationToken cancellationToken = default)
     {

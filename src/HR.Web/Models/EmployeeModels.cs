@@ -48,6 +48,14 @@ public record GetEmployeeResponse(
     string? Nationality,
     string? Gender,
     string? GenderOther,
+    string? PhoneNumber,
+    string? HomePhone,
+    string? AddressLine1,
+    string? AddressLine2,
+    string? City,
+    string? County,
+    string? PostCode,
+    string? Country,
     string Status,
     bool HasSystemAccess,
     WorkingDays? WorkingDaysOverride,
@@ -84,6 +92,14 @@ public sealed class EmployeeProfileEditModel
     public string Nationality { get; set; } = string.Empty;
     public string Gender { get; set; } = string.Empty;
     public string GenderOther { get; set; } = string.Empty;
+    public string PhoneNumber { get; set; } = string.Empty;
+    public string HomePhone { get; set; } = string.Empty;
+    public string AddressLine1 { get; set; } = string.Empty;
+    public string AddressLine2 { get; set; } = string.Empty;
+    public string City { get; set; } = string.Empty;
+    public string County { get; set; } = string.Empty;
+    public string PostCode { get; set; } = string.Empty;
+    public string Country { get; set; } = string.Empty;
     public Guid? DepartmentId { get; set; }
     public Guid? PositionProfileId { get; set; }
     public bool HasSystemAccess { get; set; } = true;
@@ -107,6 +123,14 @@ public record UpdateEmployeeProfileRequest(
     string? Nationality,
     string? Gender,
     string? GenderOther,
+    string? PhoneNumber,
+    string? HomePhone,
+    string? AddressLine1,
+    string? AddressLine2,
+    string? City,
+    string? County,
+    string? PostCode,
+    string? Country,
     bool HasSystemAccess,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride);
@@ -148,6 +172,14 @@ public record CreateEmployeeRequest(
     string Nationality,
     string Gender,
     string? GenderOther,
+    string? PhoneNumber,
+    string? HomePhone,
+    string? AddressLine1,
+    string? AddressLine2,
+    string? City,
+    string? County,
+    string? PostCode,
+    string? Country,
     bool HasSystemAccess);
 
 public record CreateEmployeeResponse(
@@ -158,6 +190,32 @@ public record CreateEmployeeResponse(
     string WorkEmail,
     string Status,
     DateTimeOffset CreatedAt);
+
+// ── CONTACT DETAILS ───────────────────────────────────────────────────────────
+
+public sealed record GetMyContactDetailsResponse(
+    string WorkEmail,
+    string? PersonalEmail,
+    string? PhoneNumber,
+    string? HomePhone,
+    string? AddressLine1,
+    string? AddressLine2,
+    string? City,
+    string? County,
+    string? PostCode,
+    string? Country);
+
+public sealed record UpdateMyContactDetailsRequest(
+    Guid CompanyId,
+    string? PersonalEmail,
+    string? PhoneNumber,
+    string? HomePhone,
+    string AddressLine1,
+    string? AddressLine2,
+    string City,
+    string? County,
+    string PostCode,
+    string Country);
 
 // ── NATIONALITIES ─────────────────────────────────────────────────────────────
 

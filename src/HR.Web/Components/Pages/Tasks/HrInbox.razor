@@ -41,7 +41,7 @@
                 var t = item;
                 var (dueCss, dueLabel) = DueBadge(t.DueDate);
                 <div class="inbox-card @(_claiming == t.Id ? "inbox-card--claiming" : "")">
-                    <span class="priority-pip priority-pip--@t.Priority.ToLowerInvariant()" title="@t.Priority priority"></span>
+                    <span class="priority-pip priority-pip--@DuePip(t.DueDate)" title="@t.Priority priority"></span>
                     <div class="inbox-card-body">
                         <div class="inbox-card-top">
                             <span class="inbox-card-title">@t.Title</span>
@@ -128,6 +128,13 @@
         if (due.Value == _today.AddDays(1)) return ("soon",    "Tomorrow");
         return ("normal", due.Value.ToString("d MMM"));
     }
+
+    private string DuePip(DateOnly? due) =>
+        due is null                           ? "low" :
+        due.Value < _today                    ? "critical" :
+        due.Value == _today                   ? "high" :
+        due.Value == _today.AddDays(1)        ? "medium" :
+        "low";
 
     private void ViewTask(UnassignedTaskItem task) =>
         Navigation.NavigateTo($"/companies/{CompanyId}/tasks/{task.Id}");

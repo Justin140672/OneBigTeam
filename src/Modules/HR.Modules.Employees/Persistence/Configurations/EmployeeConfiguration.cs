@@ -96,6 +96,38 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .HasColumnName("gender_other")
             .HasMaxLength(200);
 
+        builder.Property(e => e.PhoneNumber)
+            .HasColumnName("phone_number")
+            .HasMaxLength(30);
+
+        builder.Property(e => e.HomePhone)
+            .HasColumnName("home_phone")
+            .HasMaxLength(30);
+
+        builder.Property(e => e.AddressLine1)
+            .HasColumnName("address_line1")
+            .HasMaxLength(200);
+
+        builder.Property(e => e.AddressLine2)
+            .HasColumnName("address_line2")
+            .HasMaxLength(200);
+
+        builder.Property(e => e.City)
+            .HasColumnName("city")
+            .HasMaxLength(100);
+
+        builder.Property(e => e.County)
+            .HasColumnName("county")
+            .HasMaxLength(100);
+
+        builder.Property(e => e.PostCode)
+            .HasColumnName("post_code")
+            .HasMaxLength(20);
+
+        builder.Property(e => e.Country)
+            .HasColumnName("country")
+            .HasMaxLength(100);
+
         builder.Property(e => e.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

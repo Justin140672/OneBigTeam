@@ -111,6 +111,18 @@ internal sealed class CreateEmployeeHandler
             string.IsNullOrWhiteSpace(request.GenderOther) ? null : request.GenderOther.Trim(),
             now);
 
+        employee.UpdateContactDetails(
+            string.IsNullOrWhiteSpace(request.PersonalEmail) ? null : request.PersonalEmail.Trim(),
+            request.PhoneNumber,
+            request.HomePhone,
+            request.AddressLine1,
+            request.AddressLine2,
+            request.City,
+            request.County,
+            request.PostCode,
+            request.Country,
+            now);
+
         if (request.DepartmentId is not null || request.PositionProfileId is not null || request.ManagerId is not null)
         {
             employee.Assign(request.DepartmentId, request.PositionProfileId, request.ManagerId, now);

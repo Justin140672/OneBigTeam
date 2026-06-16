@@ -1,0 +1,236 @@
+@inject EmployeeService EmployeeService
+@inject AppSession Session
+
+@if (!Session.EmployeeId.HasValue || Session.EmployeeId.Value != EmployeeId)
+{
+    <div class="alert alert-danger">
+        <i class="fa-solid fa-lock me-2"></i>You can only view your own contact details.
+    </div>
+}
+else if (_loading)
+{
+    <div class="d-flex align-items-center gap-2 py-3">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span class="text-muted">Loading…</span>
+    </div>
+}
+else
+{
+    @if (_saved)
+    {
+        <div class="cd-success-banner mb-3">
+            <i class="fa-solid fa-circle-check cd-success-icon"></i>
+            <div>
+                <div class="cd-success-title">Contact details saved</div>
+                <div class="cd-success-body">Your contact details have been updated.</div>
+            </div>
+            <button class="cd-success-dismiss" @onclick="@(() => _saved = false)">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    }
+
+    @if (_error is not null)
+    {
+        <div class="alert alert-danger alert-dismissible mb-3">
+            @_error
+            <button type="button" class="btn-close" @onclick="@(() => _error = null)"></button>
+        </div>
+    }
+
+    <div class="cd-card">
+        <div class="cd-card-header">
+            <i class="fa-solid fa-address-book cd-card-icon"></i>
+            <span class="cd-card-title">Contact Details</span>
+        </div>
+
+        <div class="cd-form-body">
+            <!-- Email -->
+            <div class="cd-section-label">Email</div>
+
+            <div class="cd-field-group">
+                <label class="cd-label">Work Email</label>
+                <input class="form-control cd-readonly" type="email" value="@_workEmail" readonly />
+                <div class="cd-hint">Your work email is managed by HR and cannot be changed here.</div>
+            </div>
+
+            <div class="cd-field-group">
+                <label class="cd-label">Personal Email</label>
+                <input class="form-control" type="email" @bind="_personalEmail" placeholder="e.g. name@personal.com" maxlength="320" />
+            </div>
+
+            <!-- Phone -->
+            <div class="cd-section-label mt-3">Phone Numbers</div>
+
+            <div class="cd-field-row">
+                <div class="cd-field-group">
+                    <label class="cd-label">Mobile / Work Phone</label>
+                    <input class="form-control" type="tel" @bind="_phoneNumber" placeholder="e.g. 07700 900000" maxlength="30" />
+                </div>
+                <div class="cd-field-group">
+                    <label class="cd-label">Home Phone</label>
+                    <input class="form-control" type="tel" @bind="_homePhone" placeholder="e.g. 01234 567890" maxlength="30" />
+                </div>
+            </div>
+
+            <!-- Address -->
+            <div class="cd-section-label mt-3">Home Address</div>
+
+            <div class="cd-field-group">
+                <label class="cd-label">Address Line 1 <span class="cd-required">*</span></label>
+                <input class="form-control @(HasError("addressLine1") ? "is-invalid" : "")"
+                       @bind="_addressLine1" placeholder="Street address" maxlength="200" />
+                @if (HasError("addressLine1"))
+                {
+                    <div class="invalid-feedback">@_validationErrors["addressLine1"]</div>
+                }
+            </div>
+
+            <div class="cd-field-group">
+                <label class="cd-label">Address Line 2</label>
+                <input class="form-control" @bind="_addressLine2" placeholder="Apartment, suite, etc." maxlength="200" />
+            </div>
+
+            <div class="cd-field-row">
+                <div class="cd-field-group">
+                    <label class="cd-label">City <span class="cd-required">*</span></label>
+                    <input class="form-control @(HasError("city") ? "is-invalid" : "")"
+                           @bind="_city" placeholder="e.g. London" maxlength="100" />
+                    @if (HasError("city"))
+                    {
+                        <div class="invalid-feedback">@_validationErrors["city"]</div>
+                    }
+                </div>
+                <div class="cd-field-group">
+                    <label class="cd-label">County / State</label>
+                    <input class="form-control" @bind="_county" placeholder="e.g. Greater London" maxlength="100" />
+                </div>
+            </div>
+
+            <div class="cd-field-row">
+                <div class="cd-field-group">
+                    <label class="cd-label">Post Code <span class="cd-required">*</span></label>
+                    <input class="form-control @(HasError("postCode") ? "is-invalid" : "")"
+                           @bind="_postCode" placeholder="e.g. SW1A 1AA" maxlength="20" />
+                    @if (HasError("postCode"))
+                    {
+                        <div class="invalid-feedback">@_validationErrors["postCode"]</div>
+                    }
+                </div>
+                <div class="cd-field-group">
+                    <label class="cd-label">Country <span class="cd-required">*</span></label>
+                    <input class="form-control @(HasError("country") ? "is-invalid" : "")"
+                           @bind="_country" placeholder="e.g. United Kingdom" maxlength="100" />
+                    @if (HasError("country"))
+                    {
+                        <div class="invalid-feedback">@_validationErrors["country"]</div>
+                    }
+                </div>
+            </div>
+
+            <div class="cd-form-footer">
+                <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAsync">
+                    @if (_saving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Save Changes
+                </SfButton>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private bool _loading = true;
+    private bool _saving;
+    private bool _saved;
+    private string? _error;
+    private Dictionary<string, string> _validationErrors = new();
+
+    private string _workEmail = string.Empty;
+    private string? _personalEmail;
+    private string? _phoneNumber;
+    private string? _homePhone;
+    private string _addressLine1 = string.Empty;
+    private string? _addressLine2;
+    private string _city = string.Empty;
+    private string? _county;
+    private string _postCode = string.Empty;
+    private string _country = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Session.EmployeeId.HasValue || Session.EmployeeId.Value != EmployeeId)
+        {
+            _loading = false;
+            return;
+        }
+
+        _loading = true;
+        var details = await EmployeeService.GetMyContactDetailsAsync(CompanyId);
+        if (details is not null)
+        {
+            _workEmail     = details.WorkEmail;
+            _personalEmail = details.PersonalEmail;
+            _phoneNumber   = details.PhoneNumber;
+            _homePhone     = details.HomePhone;
+            _addressLine1  = details.AddressLine1 ?? string.Empty;
+            _addressLine2  = details.AddressLine2;
+            _city          = details.City ?? string.Empty;
+            _county        = details.County;
+            _postCode      = details.PostCode ?? string.Empty;
+            _country       = details.Country ?? string.Empty;
+        }
+        _loading = false;
+    }
+
+    private bool HasError(string field) => _validationErrors.ContainsKey(field);
+
+    private async Task SaveAsync()
+    {
+        _validationErrors.Clear();
+        _error = null;
+        _saved = false;
+
+        if (string.IsNullOrWhiteSpace(_addressLine1))
+            _validationErrors["addressLine1"] = "Address line 1 is required.";
+        if (string.IsNullOrWhiteSpace(_city))
+            _validationErrors["city"] = "City is required.";
+        if (string.IsNullOrWhiteSpace(_postCode))
+            _validationErrors["postCode"] = "Post code is required.";
+        if (string.IsNullOrWhiteSpace(_country))
+            _validationErrors["country"] = "Country is required.";
+
+        if (_validationErrors.Count > 0) return;
+
+        _saving = true;
+
+        var request = new UpdateMyContactDetailsRequest(
+            CompanyId,
+            string.IsNullOrWhiteSpace(_personalEmail) ? null : _personalEmail.Trim(),
+            string.IsNullOrWhiteSpace(_phoneNumber)   ? null : _phoneNumber.Trim(),
+            string.IsNullOrWhiteSpace(_homePhone)     ? null : _homePhone.Trim(),
+            _addressLine1.Trim(),
+            string.IsNullOrWhiteSpace(_addressLine2)  ? null : _addressLine2.Trim(),
+            _city.Trim(),
+            string.IsNullOrWhiteSpace(_county)        ? null : _county.Trim(),
+            _postCode.Trim(),
+            _country.Trim());
+
+        var (success, errorMsg) = await EmployeeService.UpdateMyContactDetailsAsync(CompanyId, request);
+
+        _saving = false;
+
+        if (!success)
+        {
+            _error = errorMsg ?? "Failed to save contact details.";
+            return;
+        }
+
+        _saved = true;
+    }
+}

@@ -26,6 +26,14 @@ internal sealed class Employee
     public string? Nationality { get; private set; }
     public string? Gender { get; private set; }
     public string? GenderOther { get; private set; }
+    public string? PhoneNumber { get; private set; }
+    public string? HomePhone { get; private set; }
+    public string? AddressLine1 { get; private set; }
+    public string? AddressLine2 { get; private set; }
+    public string? City { get; private set; }
+    public string? County { get; private set; }
+    public string? PostCode { get; private set; }
+    public string? Country { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -129,12 +137,37 @@ internal sealed class Employee
         string? genderOther,
         DateTimeOffset now)
     {
-        PreferredName = string.IsNullOrWhiteSpace(preferredName) ? null : preferredName.Trim();
+        PreferredName = Norm(preferredName);
         DateOfBirth   = dateOfBirth;
-        Nationality   = string.IsNullOrWhiteSpace(nationality)   ? null : nationality.Trim();
-        Gender        = string.IsNullOrWhiteSpace(gender)        ? null : gender.Trim();
-        GenderOther   = string.IsNullOrWhiteSpace(genderOther)   ? null : genderOther.Trim();
+        Nationality   = Norm(nationality);
+        Gender        = Norm(gender);
+        GenderOther   = Norm(genderOther);
         UpdatedAt     = now;
     }
 
+    public void UpdateContactDetails(
+        string? personalEmail,
+        string? phoneNumber,
+        string? homePhone,
+        string? addressLine1,
+        string? addressLine2,
+        string? city,
+        string? county,
+        string? postCode,
+        string? country,
+        DateTimeOffset now)
+    {
+        PersonalEmail = Norm(personalEmail);
+        PhoneNumber   = Norm(phoneNumber);
+        HomePhone     = Norm(homePhone);
+        AddressLine1  = Norm(addressLine1);
+        AddressLine2  = Norm(addressLine2);
+        City          = Norm(city);
+        County        = Norm(county);
+        PostCode      = Norm(postCode);
+        Country       = Norm(country);
+        UpdatedAt     = now;
+    }
+
+    private static string? Norm(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 }

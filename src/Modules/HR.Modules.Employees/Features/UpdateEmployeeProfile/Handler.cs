@@ -66,6 +66,18 @@ internal sealed class UpdateEmployeeProfileHandler
             request.GenderOther,
             now);
 
+        employee.UpdateContactDetails(
+            string.IsNullOrWhiteSpace(request.PersonalEmail) ? null : request.PersonalEmail.Trim(),
+            request.PhoneNumber,
+            request.HomePhone,
+            request.AddressLine1,
+            request.AddressLine2,
+            request.City,
+            request.County,
+            request.PostCode,
+            request.Country,
+            now);
+
         employee.Assign(request.DepartmentId, request.PositionProfileId, employee.ManagerId, now);
         employee.SetSystemAccess(request.HasSystemAccess, now);
         employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);

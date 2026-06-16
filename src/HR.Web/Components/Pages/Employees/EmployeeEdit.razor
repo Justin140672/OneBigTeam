@@ -125,6 +125,48 @@
 
                 <div class="card mb-4">
                     <div class="card-header">
+                        <h5 class="mb-0">Contact Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Mobile / Work Phone</label>
+                                <HrTextBox @bind-Value="_model.PhoneNumber" Placeholder="e.g. 07700 900000" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Home Phone</label>
+                                <HrTextBox @bind-Value="_model.HomePhone" Placeholder="e.g. 01234 567890" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Address Line 1</label>
+                                <HrTextBox @bind-Value="_model.AddressLine1" Placeholder="Street address" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Address Line 2</label>
+                                <HrTextBox @bind-Value="_model.AddressLine2" Placeholder="Apartment, suite, etc." />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">City</label>
+                                <HrTextBox @bind-Value="_model.City" Placeholder="e.g. London" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">County / State</label>
+                                <HrTextBox @bind-Value="_model.County" Placeholder="e.g. Greater London" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Post Code</label>
+                                <HrTextBox @bind-Value="_model.PostCode" Placeholder="e.g. SW1A 1AA" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Country</label>
+                                <HrTextBox @bind-Value="_model.Country" Placeholder="e.g. United Kingdom" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
                         <h5 class="mb-0">System Access</h5>
                     </div>
                     <div class="card-body">
@@ -262,6 +304,48 @@
                                                                 AllowFiltering="true">
                                                     <DropDownListFieldSettings Value="Id" Text="Title" />
                                                 </SfDropDownList>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">Contact Details</h5>
+                                    </div>
+                                    <div class="card-body @(_isViewMode ? "view-mode" : "")">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Mobile / Work Phone</label>
+                                                <HrTextBox @bind-Value="_model.PhoneNumber" Placeholder="e.g. 07700 900000" />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Home Phone</label>
+                                                <HrTextBox @bind-Value="_model.HomePhone" Placeholder="e.g. 01234 567890" />
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label">Address Line 1</label>
+                                                <HrTextBox @bind-Value="_model.AddressLine1" Placeholder="Street address" />
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label">Address Line 2</label>
+                                                <HrTextBox @bind-Value="_model.AddressLine2" Placeholder="Apartment, suite, etc." />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">City</label>
+                                                <HrTextBox @bind-Value="_model.City" Placeholder="e.g. London" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">County / State</label>
+                                                <HrTextBox @bind-Value="_model.County" Placeholder="e.g. Greater London" />
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label">Post Code</label>
+                                                <HrTextBox @bind-Value="_model.PostCode" Placeholder="e.g. SW1A 1AA" />
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label">Country</label>
+                                                <HrTextBox @bind-Value="_model.Country" Placeholder="e.g. United Kingdom" />
                                             </div>
                                         </div>
                                     </div>
@@ -482,7 +566,15 @@
                 _model.DateOfBirth = _employee.DateOfBirth;
                 _model.Nationality = _employee.Nationality ?? string.Empty;
                 _model.Gender = _employee.Gender ?? string.Empty;
-                _model.GenderOther = _employee.GenderOther ?? string.Empty;
+                _model.GenderOther    = _employee.GenderOther    ?? string.Empty;
+                _model.PhoneNumber    = _employee.PhoneNumber    ?? string.Empty;
+                _model.HomePhone      = _employee.HomePhone      ?? string.Empty;
+                _model.AddressLine1   = _employee.AddressLine1   ?? string.Empty;
+                _model.AddressLine2   = _employee.AddressLine2   ?? string.Empty;
+                _model.City           = _employee.City           ?? string.Empty;
+                _model.County         = _employee.County         ?? string.Empty;
+                _model.PostCode       = _employee.PostCode       ?? string.Empty;
+                _model.Country        = _employee.Country        ?? string.Empty;
                 _model.DepartmentId = _employee.DepartmentId;
                 _model.PositionProfileId = _employee.PositionProfileId;
                 _model.HasSystemAccess = _employee.HasSystemAccess;
@@ -528,14 +620,22 @@
                 _model.PositionProfileId,
                 _model.FirstName.Trim(),
                 _model.LastName.Trim(),
-                string.IsNullOrWhiteSpace(_model.PreferredName) ? null : _model.PreferredName.Trim(),
+                string.IsNullOrWhiteSpace(_model.PreferredName)  ? null : _model.PreferredName.Trim(),
                 _model.WorkEmail.Trim(),
-                string.IsNullOrWhiteSpace(_model.PersonalEmail) ? null : _model.PersonalEmail.Trim(),
+                string.IsNullOrWhiteSpace(_model.PersonalEmail)  ? null : _model.PersonalEmail.Trim(),
                 _model.StartDate,
                 _model.DateOfBirth ?? default,
                 _model.Nationality.Trim(),
                 _model.Gender.Trim(),
-                string.IsNullOrWhiteSpace(_model.GenderOther) ? null : _model.GenderOther.Trim(),
+                string.IsNullOrWhiteSpace(_model.GenderOther)    ? null : _model.GenderOther.Trim(),
+                string.IsNullOrWhiteSpace(_model.PhoneNumber)    ? null : _model.PhoneNumber.Trim(),
+                string.IsNullOrWhiteSpace(_model.HomePhone)      ? null : _model.HomePhone.Trim(),
+                string.IsNullOrWhiteSpace(_model.AddressLine1)   ? null : _model.AddressLine1.Trim(),
+                string.IsNullOrWhiteSpace(_model.AddressLine2)   ? null : _model.AddressLine2.Trim(),
+                string.IsNullOrWhiteSpace(_model.City)           ? null : _model.City.Trim(),
+                string.IsNullOrWhiteSpace(_model.County)         ? null : _model.County.Trim(),
+                string.IsNullOrWhiteSpace(_model.PostCode)       ? null : _model.PostCode.Trim(),
+                string.IsNullOrWhiteSpace(_model.Country)        ? null : _model.Country.Trim(),
                 _model.HasSystemAccess);
 
             var (created, error) = await EmployeeService.CreateEmployeeAsync(CompanyId, request);
@@ -576,14 +676,22 @@
                 _model.PositionProfileId,
                 _model.FirstName,
                 _model.LastName,
-                string.IsNullOrWhiteSpace(_model.PreferredName) ? null : _model.PreferredName.Trim(),
+                string.IsNullOrWhiteSpace(_model.PreferredName)  ? null : _model.PreferredName.Trim(),
                 _model.WorkEmail,
                 _model.PersonalEmail,
                 _model.StartDate,
                 _model.DateOfBirth,
-                string.IsNullOrWhiteSpace(_model.Nationality) ? null : _model.Nationality.Trim(),
-                string.IsNullOrWhiteSpace(_model.Gender) ? null : _model.Gender.Trim(),
-                string.IsNullOrWhiteSpace(_model.GenderOther) ? null : _model.GenderOther.Trim(),
+                string.IsNullOrWhiteSpace(_model.Nationality)    ? null : _model.Nationality.Trim(),
+                string.IsNullOrWhiteSpace(_model.Gender)         ? null : _model.Gender.Trim(),
+                string.IsNullOrWhiteSpace(_model.GenderOther)    ? null : _model.GenderOther.Trim(),
+                string.IsNullOrWhiteSpace(_model.PhoneNumber)    ? null : _model.PhoneNumber.Trim(),
+                string.IsNullOrWhiteSpace(_model.HomePhone)      ? null : _model.HomePhone.Trim(),
+                string.IsNullOrWhiteSpace(_model.AddressLine1)   ? null : _model.AddressLine1.Trim(),
+                string.IsNullOrWhiteSpace(_model.AddressLine2)   ? null : _model.AddressLine2.Trim(),
+                string.IsNullOrWhiteSpace(_model.City)           ? null : _model.City.Trim(),
+                string.IsNullOrWhiteSpace(_model.County)         ? null : _model.County.Trim(),
+                string.IsNullOrWhiteSpace(_model.PostCode)       ? null : _model.PostCode.Trim(),
+                string.IsNullOrWhiteSpace(_model.Country)        ? null : _model.Country.Trim(),
                 _model.HasSystemAccess,
                 workingDaysOverride,
                 hoursPerDayOverride);

@@ -1,0 +1,138 @@
+/* ── Card ─────────────────────────────────────────────── */
+
+.cd-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.cd-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 20px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.cd-card-icon {
+    color: #6366f1;
+    font-size: 0.95rem;
+}
+
+.cd-card-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+/* ── Form body ───────────────────────────────────────── */
+
+.cd-form-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* ── Section headings ────────────────────────────────── */
+
+.cd-section-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #9ca3af;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+/* ── Fields ──────────────────────────────────────────── */
+
+.cd-field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cd-field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.cd-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.cd-required {
+    color: #ef4444;
+}
+
+.cd-hint {
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+
+.cd-readonly {
+    background: #f9fafb;
+    color: #6b7280;
+}
+
+/* ── Footer ──────────────────────────────────────────── */
+
+.cd-form-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 8px;
+    border-top: 1px solid #f3f4f6;
+    margin-top: 4px;
+}
+
+/* ── Success banner ──────────────────────────────────── */
+
+.cd-success-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+
+.cd-success-icon {
+    color: #16a34a;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.cd-success-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #15803d;
+    margin-bottom: 2px;
+}
+
+.cd-success-body {
+    font-size: 0.8rem;
+    color: #166534;
+}
+
+.cd-success-dismiss {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #16a34a;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    opacity: 0.6;
+}
+
+.cd-success-dismiss:hover { opacity: 1; }

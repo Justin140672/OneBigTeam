@@ -1,7 +1,9 @@
 using FluentValidation;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.AssignManager;
+using HR.Modules.Employees.Features.GetMyContactDetails;
 using HR.Modules.Employees.Features.ListNationalities;
+using HR.Modules.Employees.Features.UpdateMyContactDetails;
 using HR.Modules.Employees.Features.CreateDepartment;
 using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Modules.Employees.Features.CreatePositionProfile;
@@ -88,6 +90,10 @@ public static class EmployeesModule
         services.AddScoped<IValidator<SetEmployeeWorkingPatternRequest>, SetEmployeeWorkingPatternValidator>();
 
         services.AddScoped<ListNationalitiesHandler>();
+
+        services.AddScoped<GetMyContactDetailsHandler>();
+        services.AddScoped<UpdateMyContactDetailsHandler>();
+        services.AddScoped<IValidator<UpdateMyContactDetailsRequest>, UpdateMyContactDetailsValidator>();
 
         services.AddScoped<IWorkingPatternProvider, WorkingPatternProvider>();
         services.AddScoped<IDirectReportsReader, DirectReportsReader>();
@@ -183,26 +189,30 @@ public static class EmployeesModule
 
             Employee MakeAcme(Guid id, string first, string last, string email, DateOnly start,
                               Guid? deptId, Guid? posId, Guid? managerId,
-                              DateOnly dob, string nationality, string gender, string? preferredName = null)
+                              DateOnly dob, string nationality, string gender,
+                              string? personalEmail, string? phone,
+                              string addr1, string? addr2, string city, string? county, string postCode,
+                              string? preferredName = null)
             {
                 var e = Employee.Create(id, acmeId, first, last, email, start, hasSystemAccess: true, now);
                 e.Assign(deptId, posId, managerId, now);
                 e.UpdatePersonalDetails(preferredName ?? first, dob, nationality, gender, null, now);
+                e.UpdateContactDetails(personalEmail, phone, null, addr1, addr2, city, county, postCode, "United Kingdom", now);
                 e.Activate(now);
                 return e;
             }
 
             db.Employees.AddRange(
-                MakeAcme(empCtoId,      "Sarah",  "Chen",     "sarah.chen@acme.example",     new DateOnly(2020, 1, 6),  deptEngId,     posCtoId,        null,         new DateOnly(1982, 3, 15),  "Taiwanese", "Female"),
-                MakeAcme(empSenDev1Id,  "James",  "Okafor",   "james.okafor@acme.example",   new DateOnly(2021, 3, 15), deptEngId,     posSenDevId,     empCtoId,     new DateOnly(1988, 7, 22),  "Nigerian",  "Male"),
-                MakeAcme(empSenDev2Id,  "Priya",  "Sharma",   "priya.sharma@acme.example",   new DateOnly(2021, 9, 1),  deptEngId,     posSenDevId,     empCtoId,     new DateOnly(1990, 11, 5),  "Indian",    "Female"),
-                MakeAcme(empDev1Id,     "Tom",    "Williams", "tom.williams@acme.example",   new DateOnly(2023, 2, 20), deptEngId,     posDevId,        empSenDev1Id, new DateOnly(1996, 4, 12),  "British",   "Male"),
-                MakeAcme(empHrMgrId,    "Laura",  "Bennett",  "laura.bennett@acme.example",  new DateOnly(2019, 6, 3),  deptHrId,      posHrMgrId,      null,         new DateOnly(1979, 9, 28),  "British",   "Female"),
-                MakeAcme(empHrAdvId,    "Marcus", "Diallo",   "marcus.diallo@acme.example",  new DateOnly(2022, 11, 7), deptHrId,      posHrAdvisorId,  empHrMgrId,   new DateOnly(1991, 2, 14),  "French",    "Male"),
-                MakeAcme(empFinMgrId,   "Sophie", "Laurent",  "sophie.laurent@acme.example", new DateOnly(2020, 4, 14), deptFinanceId, posFinanceMgrId, null,         new DateOnly(1985, 6, 30),  "French",    "Female"),
-                MakeAcme(empSalesMgrId, "David",  "Park",     "david.park@acme.example",     new DateOnly(2018, 8, 22), deptSalesId,   posSalesMgrId,   null,         new DateOnly(1975, 12, 8),  "Korean",    "Male"),
-                MakeAcme(empAe1Id,      "Emma",   "Jones",    "emma.jones@acme.example",     new DateOnly(2023, 5, 2),  deptSalesId,   posAeId,         empSalesMgrId, new DateOnly(1998, 8, 17), "British",   "Female"),
-                MakeAcme(empAe2Id,      "Carlos", "Rivera",   "carlos.rivera@acme.example",  new DateOnly(2024, 1, 8),  deptSalesId,   posAeId,         empSalesMgrId, new DateOnly(2000, 1, 25), "Spanish",   "Male"));
+                MakeAcme(empCtoId,      "Sarah",  "Chen",     "sarah.chen@acme.example",     new DateOnly(2020, 1, 6),  deptEngId,     posCtoId,        null,         new DateOnly(1982, 3, 15),  "Taiwanese", "Female", "sarah.chen@gmail.com",       "07700 900001", "14 Rivington Street",  null,       "London",      "Greater London",  "EC2A 3DU"),
+                MakeAcme(empSenDev1Id,  "James",  "Okafor",   "james.okafor@acme.example",   new DateOnly(2021, 3, 15), deptEngId,     posSenDevId,     empCtoId,     new DateOnly(1988, 7, 22),  "Nigerian",  "Male",   "james.okafor@outlook.com",   "07700 900002", "27 Coldharbour Lane",  "Flat 4",   "London",      "Greater London",  "SE5 9NR"),
+                MakeAcme(empSenDev2Id,  "Priya",  "Sharma",   "priya.sharma@acme.example",   new DateOnly(2021, 9, 1),  deptEngId,     posSenDevId,     empCtoId,     new DateOnly(1990, 11, 5),  "Indian",    "Female", "priya.sharma@gmail.com",     "07700 900003", "8 Brick Lane",         "Apt 2B",   "London",      "Greater London",  "E1 6RF"),
+                MakeAcme(empDev1Id,     "Tom",    "Williams", "tom.williams@acme.example",   new DateOnly(2023, 2, 20), deptEngId,     posDevId,        empSenDev1Id, new DateOnly(1996, 4, 12),  "British",   "Male",   "tom.williams@hotmail.com",   "07700 900004", "52 Didsbury Road",     null,       "Manchester",  "Greater Manchester", "M20 5LH"),
+                MakeAcme(empHrMgrId,    "Laura",  "Bennett",  "laura.bennett@acme.example",  new DateOnly(2019, 6, 3),  deptHrId,      posHrMgrId,      null,         new DateOnly(1979, 9, 28),  "British",   "Female", "laura.bennett@gmail.com",    "07700 900005", "3 Thornton Avenue",    null,       "London",      "Greater London",  "SW2 4HX"),
+                MakeAcme(empHrAdvId,    "Marcus", "Diallo",   "marcus.diallo@acme.example",  new DateOnly(2022, 11, 7), deptHrId,      posHrAdvisorId,  empHrMgrId,   new DateOnly(1991, 2, 14),  "French",    "Male",   "marcus.diallo@gmail.com",    "07700 900006", "19 Seven Sisters Road","Floor 2",  "London",      "Greater London",  "N4 2BY"),
+                MakeAcme(empFinMgrId,   "Sophie", "Laurent",  "sophie.laurent@acme.example", new DateOnly(2020, 4, 14), deptFinanceId, posFinanceMgrId, null,         new DateOnly(1985, 6, 30),  "French",    "Female", "sophie.laurent@gmail.com",   "07700 900007", "61 Gloucester Road",   null,       "London",      "Greater London",  "SW7 4PE"),
+                MakeAcme(empSalesMgrId, "David",  "Park",     "david.park@acme.example",     new DateOnly(2018, 8, 22), deptSalesId,   posSalesMgrId,   null,         new DateOnly(1975, 12, 8),  "Korean",    "Male",   "david.park@outlook.com",     "07700 900008", "44 Harborne Park Road",null,       "Birmingham",  "West Midlands",   "B17 0DH"),
+                MakeAcme(empAe1Id,      "Emma",   "Jones",    "emma.jones@acme.example",     new DateOnly(2023, 5, 2),  deptSalesId,   posAeId,         empSalesMgrId, new DateOnly(1998, 8, 17), "British",   "Female", "emma.jones@gmail.com",       "07700 900009", "11 Cowley Road",       "Flat 1",   "Oxford",      "Oxfordshire",     "OX4 1HZ"),
+                MakeAcme(empAe2Id,      "Carlos", "Rivera",   "carlos.rivera@acme.example",  new DateOnly(2024, 1, 8),  deptSalesId,   posAeId,         empSalesMgrId, new DateOnly(2000, 1, 25), "Spanish",   "Male",   "carlos.rivera@gmail.com",    "07700 900010", "5 Western Road",       null,       "Brighton",    "East Sussex",     "BN1 2DA"));
 
             await db.SaveChangesAsync();
         }
@@ -225,18 +235,21 @@ public static class EmployeesModule
                 PositionProfile.Create(betaPosDevId,    betaCorpId, betaDeptEngId, "Software Developer",  null, isManagerial: false, now));
 
             Employee MakeBeta(Guid id, string first, string last, string email, DateOnly start,
-                              Guid? posId, Guid? managerId, DateOnly dob, string nationality, string gender)
+                              Guid? posId, Guid? managerId, DateOnly dob, string nationality, string gender,
+                              string? personalEmail, string? phone,
+                              string addr1, string? addr2, string city, string? county, string postCode)
             {
                 var e = Employee.Create(id, betaCorpId, first, last, email, start, hasSystemAccess: true, now);
                 e.Assign(betaDeptEngId, posId, managerId, now);
                 e.UpdatePersonalDetails(first, dob, nationality, gender, null, now);
+                e.UpdateContactDetails(personalEmail, phone, null, addr1, addr2, city, county, postCode, "United Kingdom", now);
                 e.Activate(now);
                 return e;
             }
 
             db.Employees.AddRange(
-                MakeBeta(betaEmpMgrId, "Alice", "Morgan", "alice.morgan@betacorp.example", new DateOnly(2022, 3, 1), betaPosEngMgrId, null,         new DateOnly(1987, 5, 20), "British", "Female"),
-                MakeBeta(betaEmpDevId, "Bob",   "Taylor", "bob.taylor@betacorp.example",   new DateOnly(2023, 9, 4), betaPosDevId,    betaEmpMgrId, new DateOnly(1993, 10, 11), "British", "Male"));
+                MakeBeta(betaEmpMgrId, "Alice", "Morgan", "alice.morgan@betacorp.example", new DateOnly(2022, 3, 1), betaPosEngMgrId, null,         new DateOnly(1987, 5, 20),  "British", "Female", "alice.morgan@gmail.com", "07700 900021", "33 Headingley Lane", null,     "Leeds", "West Yorkshire", "LS6 1BL"),
+                MakeBeta(betaEmpDevId, "Bob",   "Taylor", "bob.taylor@betacorp.example",   new DateOnly(2023, 9, 4), betaPosDevId,    betaEmpMgrId, new DateOnly(1993, 10, 11), "British", "Male",   "bob.taylor@hotmail.com", "07700 900022", "7 Kirkstall Road",   "Flat 2", "Leeds", "West Yorkshire", "LS3 1LH"));
 
             await db.SaveChangesAsync();
         }
