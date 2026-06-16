@@ -91,7 +91,7 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         var now = DateTimeOffset.UtcNow;
         var companyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-        if (!await db.LeaveTypes.AnyAsync())
+        if (!await db.LeaveTypes.AnyAsync(lt => lt.CompanyId == companyId))
         {
             db.LeaveTypes.AddRange(
                 LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000001"), companyId, "Annual Leave",        "ANNUAL",        25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now),
@@ -130,7 +130,7 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
             await db.SaveChangesAsync();
         }
 
-        if (!await db.LeavePolicies.AnyAsync())
+        if (!await db.LeavePolicies.AnyAsync(lp => lp.CompanyId == companyId))
         {
             var policyId = Guid.Parse("C0000000-0000-0000-0000-000000000001");
 
@@ -183,6 +183,58 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
                     policyYear,
                     lt.Behaviour == LeaveTypeBehaviour.Toil ? 0 : lt.DefaultEntitlementDays,
                     now)));
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        // ── Beta Corp leave types & policy ───────────────────────────────────
+        var betaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+
+        if (!await db.LeaveTypes.AnyAsync(lt => lt.CompanyId == betaCorpId))
+        {
+            db.LeaveTypes.AddRange(
+                LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000011"), betaCorpId, "Annual Leave",  "ANNUAL", 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now),
+                LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000012"), betaCorpId, "Sick Leave",    "SICK",   10, AccrualMethod.None,    LeaveTypeBehaviour.Sickness,  now),
+                LeaveType.Create(Guid.Parse("A0000000-0000-0000-0000-000000000013"), betaCorpId, "Unpaid Leave",  "UNPAID",  0, AccrualMethod.None,    LeaveTypeBehaviour.Unpaid,    now));
+
+            await db.SaveChangesAsync();
+        }
+
+        if (!await db.LeavePolicies.AnyAsync(lp => lp.CompanyId == betaCorpId))
+        {
+            var betaPolicyId = Guid.Parse("C0000000-0000-0000-0000-000000000002");
+
+            var betaPolicy = LeavePolicy.Create(
+                betaPolicyId, betaCorpId,
+                "Standard", "Default leave policy",
+                carryOverDays: 5, allowNegativeBalance: false, now);
+
+            db.LeavePolicies.Add(betaPolicy);
+            await db.SaveChangesAsync();
+
+            var betaLeaveTypes = await db.LeaveTypes
+                .Where(lt => lt.CompanyId == betaCorpId && lt.IsActive)
+                .ToListAsync();
+
+            var betaPolicyYear    = LeaveYearCalculator.GetPolicyYear(DateTimeOffset.UtcNow, startMonth: 1);
+            var betaEffectiveFrom = new DateOnly(betaPolicyYear, 1, 1);
+
+            var betaEmployeeIds = new[]
+            {
+                Guid.Parse("30000000-0000-0000-0000-000000000011"), // Alice Morgan
+                Guid.Parse("30000000-0000-0000-0000-000000000012"), // Bob Taylor
+            };
+
+            foreach (var empId in betaEmployeeIds)
+            {
+                db.EmployeeLeavePolicyAssignments.Add(
+                    EmployeeLeavePolicyAssignment.Create(
+                        Guid.NewGuid(), betaCorpId, empId, betaPolicyId, betaEffectiveFrom, now));
+
+                db.LeaveBalances.AddRange(betaLeaveTypes.Select(lt => LeaveBalance.Create(
+                    Guid.NewGuid(), betaCorpId, empId, lt.Id, betaPolicyId, betaPolicyYear,
+                    lt.Behaviour == LeaveTypeBehaviour.Toil ? 0 : lt.DefaultEntitlementDays, now)));
             }
 
             await db.SaveChangesAsync();

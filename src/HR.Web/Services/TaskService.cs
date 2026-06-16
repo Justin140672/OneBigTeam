@@ -46,6 +46,19 @@ public sealed class TaskService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<TaskListResponse?> GetTeamTasksAsync(Guid companyId, Guid managerId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<TaskListResponse>(
+                $"api/companies/{companyId}/employees/{managerId}/team-tasks", cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public async Task<bool> CompleteTaskAsync(
         Guid companyId, Guid taskId,
         string? outcomeDecision = null, string? outcomeReason = null,

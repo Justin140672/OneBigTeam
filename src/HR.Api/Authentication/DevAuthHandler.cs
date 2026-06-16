@@ -12,8 +12,6 @@ namespace HR.Api.Authentication;
 /// </summary>
 internal sealed class DevAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
-    private const string DevCompanyId = "00000000-0000-0000-0000-000000000001";
-
     private readonly DevPersonaStore _personaStore;
 
     public DevAuthHandler(
@@ -34,7 +32,7 @@ internal sealed class DevAuthHandler : AuthenticationHandler<AuthenticationSchem
         {
             new Claim("sub",        persona.UserId),
             new Claim("email",      persona.Email),
-            new Claim("company_id", DevCompanyId),
+            new Claim("company_id", persona.CompanyId),
         };
 
         var identity  = new ClaimsIdentity(claims, Scheme.Name);

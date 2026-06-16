@@ -45,25 +45,34 @@ public static class CompaniesModule
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
 
-        if (await db.Companies.AnyAsync())
-            return;
-
         var now = DateTimeOffset.UtcNow;
-        var companyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-        var company = Company.Create(companyId, "Acme Corporation", "acme-corporation", now);
+        var acmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        if (!await db.Companies.AnyAsync(c => c.Id == acmeId))
+        {
+            var acme = Company.Create(acmeId, "Acme Corporation", "acme-corporation", now);
+            acme.SetAddress(
+                CompanyAddress.Create(Guid.NewGuid(), acmeId, CompanyAddressType.RegisteredOffice,
+                    "123 Main Street", null, "London", null, "EC1A 1BB", "GB", now),
+                now);
+            acme.SetAddress(
+                CompanyAddress.Create(Guid.NewGuid(), acmeId, CompanyAddressType.TradingAddress,
+                    "456 High Street", "Floor 2", "Manchester", null, "M1 1AE", "GB", now),
+                now);
+            db.Companies.Add(acme);
+        }
 
-        company.SetAddress(
-            CompanyAddress.Create(Guid.NewGuid(), companyId, CompanyAddressType.RegisteredOffice,
-                "123 Main Street", null, "London", null, "EC1A 1BB", "GB", now),
-            now);
+        var betaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        if (!await db.Companies.AnyAsync(c => c.Id == betaCorpId))
+        {
+            var betaCorp = Company.Create(betaCorpId, "Beta Corp", "beta-corp", now);
+            betaCorp.SetAddress(
+                CompanyAddress.Create(Guid.NewGuid(), betaCorpId, CompanyAddressType.RegisteredOffice,
+                    "10 Innovation Drive", null, "Bristol", null, "BS1 1AA", "GB", now),
+                now);
+            db.Companies.Add(betaCorp);
+        }
 
-        company.SetAddress(
-            CompanyAddress.Create(Guid.NewGuid(), companyId, CompanyAddressType.TradingAddress,
-                "456 High Street", "Floor 2", "Manchester", null, "M1 1AE", "GB", now),
-            now);
-
-        db.Companies.Add(company);
         await db.SaveChangesAsync();
     }
 

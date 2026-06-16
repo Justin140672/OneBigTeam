@@ -100,78 +100,108 @@ public static class EmployeesModule
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
 
-        if (await db.Employees.AnyAsync())
-            return;
-
         var now = DateTimeOffset.UtcNow;
-        var companyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-        // ── Departments ──────────────────────────────────────────────────────
-        var deptEngId      = Guid.Parse("10000000-0000-0000-0000-000000000001");
-        var deptHrId       = Guid.Parse("10000000-0000-0000-0000-000000000002");
-        var deptFinanceId  = Guid.Parse("10000000-0000-0000-0000-000000000003");
-        var deptSalesId    = Guid.Parse("10000000-0000-0000-0000-000000000004");
-
-        var deptEng     = Department.Create(deptEngId,     companyId, "Engineering", "Product and platform engineering", now);
-        var deptHr      = Department.Create(deptHrId,      companyId, "People & HR",  "HR and people operations", now);
-        var deptFinance = Department.Create(deptFinanceId, companyId, "Finance",       "Finance and accounting", now);
-        var deptSales   = Department.Create(deptSalesId,   companyId, "Sales",         "Sales and account management", now);
-
-        db.Departments.AddRange(deptEng, deptHr, deptFinance, deptSales);
-
-        // ── Position Profiles ────────────────────────────────────────────────
-        var posCtoId         = Guid.Parse("20000000-0000-0000-0000-000000000001");
-        var posSenDevId      = Guid.Parse("20000000-0000-0000-0000-000000000002");
-        var posDevId         = Guid.Parse("20000000-0000-0000-0000-000000000003");
-        var posHrMgrId       = Guid.Parse("20000000-0000-0000-0000-000000000004");
-        var posHrAdvisorId   = Guid.Parse("20000000-0000-0000-0000-000000000005");
-        var posFinanceMgrId  = Guid.Parse("20000000-0000-0000-0000-000000000006");
-        var posSalesMgrId    = Guid.Parse("20000000-0000-0000-0000-000000000007");
-        var posAeId          = Guid.Parse("20000000-0000-0000-0000-000000000008");
-
-        db.PositionProfiles.AddRange(
-            PositionProfile.Create(posCtoId,        companyId, deptEngId,     "Chief Technology Officer", null,                  isManagerial: true,  now),
-            PositionProfile.Create(posSenDevId,     companyId, deptEngId,     "Senior Software Engineer", null,                  isManagerial: false, now),
-            PositionProfile.Create(posDevId,        companyId, deptEngId,     "Software Engineer",        null,                  isManagerial: false, now),
-            PositionProfile.Create(posHrMgrId,      companyId, deptHrId,      "HR Manager",               null,                  isManagerial: true,  now),
-            PositionProfile.Create(posHrAdvisorId,  companyId, deptHrId,      "HR Advisor",               null,                  isManagerial: false, now),
-            PositionProfile.Create(posFinanceMgrId, companyId, deptFinanceId, "Finance Manager",          null,                  isManagerial: true,  now),
-            PositionProfile.Create(posSalesMgrId,   companyId, deptSalesId,   "Sales Manager",            null,                  isManagerial: true,  now),
-            PositionProfile.Create(posAeId,         companyId, deptSalesId,   "Account Executive",        null,                  isManagerial: false, now));
-
-        // ── Employees ────────────────────────────────────────────────────────
-        var empCtoId      = Guid.Parse("30000000-0000-0000-0000-000000000001");
-        var empSenDev1Id  = Guid.Parse("30000000-0000-0000-0000-000000000002");
-        var empSenDev2Id  = Guid.Parse("30000000-0000-0000-0000-000000000003");
-        var empDev1Id     = Guid.Parse("30000000-0000-0000-0000-000000000004");
-        var empHrMgrId    = Guid.Parse("30000000-0000-0000-0000-000000000005");
-        var empHrAdvId    = Guid.Parse("30000000-0000-0000-0000-000000000006");
-        var empFinMgrId   = Guid.Parse("30000000-0000-0000-0000-000000000007");
-        var empSalesMgrId = Guid.Parse("30000000-0000-0000-0000-000000000008");
-        var empAe1Id      = Guid.Parse("30000000-0000-0000-0000-000000000009");
-        var empAe2Id      = Guid.Parse("30000000-0000-0000-0000-000000000010");
-
-        Employee Make(Guid id, string first, string last, string email, DateOnly start,
-                      Guid? deptId, Guid? posId, Guid? managerId)
+        // ── Acme Corporation ─────────────────────────────────────────────────
+        var acmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        if (!await db.Employees.AnyAsync(e => e.CompanyId == acmeId))
         {
-            var e = Employee.Create(id, companyId, first, last, email, start, hasSystemAccess: true, now);
-            e.Assign(deptId, posId, managerId, now);
-            e.Activate(now);
-            return e;
+            var deptEngId      = Guid.Parse("10000000-0000-0000-0000-000000000001");
+            var deptHrId       = Guid.Parse("10000000-0000-0000-0000-000000000002");
+            var deptFinanceId  = Guid.Parse("10000000-0000-0000-0000-000000000003");
+            var deptSalesId    = Guid.Parse("10000000-0000-0000-0000-000000000004");
+
+            db.Departments.AddRange(
+                Department.Create(deptEngId,     acmeId, "Engineering", "Product and platform engineering", now),
+                Department.Create(deptHrId,      acmeId, "People & HR",  "HR and people operations",       now),
+                Department.Create(deptFinanceId, acmeId, "Finance",       "Finance and accounting",         now),
+                Department.Create(deptSalesId,   acmeId, "Sales",         "Sales and account management",   now));
+
+            var posCtoId        = Guid.Parse("20000000-0000-0000-0000-000000000001");
+            var posSenDevId     = Guid.Parse("20000000-0000-0000-0000-000000000002");
+            var posDevId        = Guid.Parse("20000000-0000-0000-0000-000000000003");
+            var posHrMgrId      = Guid.Parse("20000000-0000-0000-0000-000000000004");
+            var posHrAdvisorId  = Guid.Parse("20000000-0000-0000-0000-000000000005");
+            var posFinanceMgrId = Guid.Parse("20000000-0000-0000-0000-000000000006");
+            var posSalesMgrId   = Guid.Parse("20000000-0000-0000-0000-000000000007");
+            var posAeId         = Guid.Parse("20000000-0000-0000-0000-000000000008");
+
+            db.PositionProfiles.AddRange(
+                PositionProfile.Create(posCtoId,        acmeId, deptEngId,     "Chief Technology Officer", null, isManagerial: true,  now),
+                PositionProfile.Create(posSenDevId,     acmeId, deptEngId,     "Senior Software Engineer", null, isManagerial: false, now),
+                PositionProfile.Create(posDevId,        acmeId, deptEngId,     "Software Engineer",        null, isManagerial: false, now),
+                PositionProfile.Create(posHrMgrId,      acmeId, deptHrId,      "HR Manager",               null, isManagerial: true,  now),
+                PositionProfile.Create(posHrAdvisorId,  acmeId, deptHrId,      "HR Advisor",               null, isManagerial: false, now),
+                PositionProfile.Create(posFinanceMgrId, acmeId, deptFinanceId, "Finance Manager",          null, isManagerial: true,  now),
+                PositionProfile.Create(posSalesMgrId,   acmeId, deptSalesId,   "Sales Manager",            null, isManagerial: true,  now),
+                PositionProfile.Create(posAeId,         acmeId, deptSalesId,   "Account Executive",        null, isManagerial: false, now));
+
+            var empCtoId      = Guid.Parse("30000000-0000-0000-0000-000000000001");
+            var empSenDev1Id  = Guid.Parse("30000000-0000-0000-0000-000000000002");
+            var empSenDev2Id  = Guid.Parse("30000000-0000-0000-0000-000000000003");
+            var empDev1Id     = Guid.Parse("30000000-0000-0000-0000-000000000004");
+            var empHrMgrId    = Guid.Parse("30000000-0000-0000-0000-000000000005");
+            var empHrAdvId    = Guid.Parse("30000000-0000-0000-0000-000000000006");
+            var empFinMgrId   = Guid.Parse("30000000-0000-0000-0000-000000000007");
+            var empSalesMgrId = Guid.Parse("30000000-0000-0000-0000-000000000008");
+            var empAe1Id      = Guid.Parse("30000000-0000-0000-0000-000000000009");
+            var empAe2Id      = Guid.Parse("30000000-0000-0000-0000-000000000010");
+
+            Employee MakeAcme(Guid id, string first, string last, string email, DateOnly start,
+                              Guid? deptId, Guid? posId, Guid? managerId)
+            {
+                var e = Employee.Create(id, acmeId, first, last, email, start, hasSystemAccess: true, now);
+                e.Assign(deptId, posId, managerId, now);
+                e.Activate(now);
+                return e;
+            }
+
+            db.Employees.AddRange(
+                MakeAcme(empCtoId,      "Sarah",  "Chen",     "sarah.chen@acme.example",     new DateOnly(2020, 1, 6),  deptEngId,     posCtoId,        null),
+                MakeAcme(empSenDev1Id,  "James",  "Okafor",   "james.okafor@acme.example",   new DateOnly(2021, 3, 15), deptEngId,     posSenDevId,     empCtoId),
+                MakeAcme(empSenDev2Id,  "Priya",  "Sharma",   "priya.sharma@acme.example",   new DateOnly(2021, 9, 1),  deptEngId,     posSenDevId,     empCtoId),
+                MakeAcme(empDev1Id,     "Tom",    "Williams", "tom.williams@acme.example",   new DateOnly(2023, 2, 20), deptEngId,     posDevId,        empSenDev1Id),
+                MakeAcme(empHrMgrId,    "Laura",  "Bennett",  "laura.bennett@acme.example",  new DateOnly(2019, 6, 3),  deptHrId,      posHrMgrId,      null),
+                MakeAcme(empHrAdvId,    "Marcus", "Diallo",   "marcus.diallo@acme.example",  new DateOnly(2022, 11, 7), deptHrId,      posHrAdvisorId,  empHrMgrId),
+                MakeAcme(empFinMgrId,   "Sophie", "Laurent",  "sophie.laurent@acme.example", new DateOnly(2020, 4, 14), deptFinanceId, posFinanceMgrId, null),
+                MakeAcme(empSalesMgrId, "David",  "Park",     "david.park@acme.example",     new DateOnly(2018, 8, 22), deptSalesId,   posSalesMgrId,   null),
+                MakeAcme(empAe1Id,      "Emma",   "Jones",    "emma.jones@acme.example",     new DateOnly(2023, 5, 2),  deptSalesId,   posAeId,         empSalesMgrId),
+                MakeAcme(empAe2Id,      "Carlos", "Rivera",   "carlos.rivera@acme.example",  new DateOnly(2024, 1, 8),  deptSalesId,   posAeId,         empSalesMgrId));
+
+            await db.SaveChangesAsync();
         }
 
-        db.Employees.AddRange(
-            Make(empCtoId,      "Sarah",  "Chen",     "sarah.chen@acme.example",     new DateOnly(2020, 1, 6),  deptEngId,     posCtoId,        null),
-            Make(empSenDev1Id,  "James",  "Okafor",   "james.okafor@acme.example",   new DateOnly(2021, 3, 15), deptEngId,     posSenDevId,     empCtoId),
-            Make(empSenDev2Id,  "Priya",  "Sharma",   "priya.sharma@acme.example",   new DateOnly(2021, 9, 1),  deptEngId,     posSenDevId,     empCtoId),
-            Make(empDev1Id,     "Tom",    "Williams", "tom.williams@acme.example",   new DateOnly(2023, 2, 20), deptEngId,     posDevId,        empSenDev1Id),
-            Make(empHrMgrId,    "Laura",  "Bennett",  "laura.bennett@acme.example",  new DateOnly(2019, 6, 3),  deptHrId,      posHrMgrId,      null),
-            Make(empHrAdvId,    "Marcus", "Diallo",   "marcus.diallo@acme.example",  new DateOnly(2022, 11, 7), deptHrId,      posHrAdvisorId,  empHrMgrId),
-            Make(empFinMgrId,   "Sophie", "Laurent",  "sophie.laurent@acme.example", new DateOnly(2020, 4, 14), deptFinanceId, posFinanceMgrId, null),
-            Make(empSalesMgrId, "David",  "Park",     "david.park@acme.example",     new DateOnly(2018, 8, 22), deptSalesId,   posSalesMgrId,   null),
-            Make(empAe1Id,      "Emma",   "Jones",    "emma.jones@acme.example",     new DateOnly(2023, 5, 2),  deptSalesId,   posAeId,         empSalesMgrId),
-            Make(empAe2Id,      "Carlos", "Rivera",   "carlos.rivera@acme.example",  new DateOnly(2024, 1, 8),  deptSalesId,   posAeId,         empSalesMgrId));
+        // ── Beta Corp ─────────────────────────────────────────────────────────
+        var betaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        if (!await db.Employees.AnyAsync(e => e.CompanyId == betaCorpId))
+        {
+            var betaDeptEngId  = Guid.Parse("10000000-0000-0000-0000-000000000011");
+            var betaPosEngMgrId = Guid.Parse("20000000-0000-0000-0000-000000000011");
+            var betaPosDevId    = Guid.Parse("20000000-0000-0000-0000-000000000012");
+            var betaEmpMgrId    = Guid.Parse("30000000-0000-0000-0000-000000000011");
+            var betaEmpDevId    = Guid.Parse("30000000-0000-0000-0000-000000000012");
 
-        await db.SaveChangesAsync();
+            db.Departments.Add(
+                Department.Create(betaDeptEngId, betaCorpId, "Engineering", "Software engineering", now));
+
+            db.PositionProfiles.AddRange(
+                PositionProfile.Create(betaPosEngMgrId, betaCorpId, betaDeptEngId, "Engineering Manager", null, isManagerial: true,  now),
+                PositionProfile.Create(betaPosDevId,    betaCorpId, betaDeptEngId, "Software Developer",  null, isManagerial: false, now));
+
+            Employee MakeBeta(Guid id, string first, string last, string email, DateOnly start,
+                              Guid? posId, Guid? managerId)
+            {
+                var e = Employee.Create(id, betaCorpId, first, last, email, start, hasSystemAccess: true, now);
+                e.Assign(betaDeptEngId, posId, managerId, now);
+                e.Activate(now);
+                return e;
+            }
+
+            db.Employees.AddRange(
+                MakeBeta(betaEmpMgrId, "Alice", "Morgan", "alice.morgan@betacorp.example", new DateOnly(2022, 3, 1), betaPosEngMgrId, null),
+                MakeBeta(betaEmpDevId, "Bob",   "Taylor", "bob.taylor@betacorp.example",   new DateOnly(2023, 9, 4), betaPosDevId,    betaEmpMgrId));
+
+            await db.SaveChangesAsync();
+        }
     }
 }
