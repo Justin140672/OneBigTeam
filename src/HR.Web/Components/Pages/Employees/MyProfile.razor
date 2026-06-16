@@ -7,12 +7,18 @@
 <div class="container py-4">
     <h1 class="mb-4">@Session.DisplayName</h1>
 
-    <SfTab>
+    <SfTab @bind-SelectedItem="_activeTabIndex">
         <TabItems>
             <TabItem>
                 <ChildContent><TabHeader Text="Overview" /></ChildContent>
                 <ContentTemplate>
-                    <div class="mt-4"><MyProfileOverviewTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
+                    <div class="mt-4">
+                        <MyProfileOverviewTab CompanyId="CompanyId"
+                                             EmployeeId="EmployeeId"
+                                             OnNavigateToLeave="() => _activeTabIndex = 1"
+                                             OnNavigateToDocuments="() => _activeTabIndex = 2"
+                                             OnNavigateToTasks="() => _activeTabIndex = 3" />
+                    </div>
                 </ContentTemplate>
             </TabItem>
             <TabItem>
@@ -40,4 +46,6 @@
 @code {
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid EmployeeId { get; set; }
+
+    private int _activeTabIndex;
 }

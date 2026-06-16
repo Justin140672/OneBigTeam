@@ -2,13 +2,13 @@
     <div class="card-body">
         <dl class="row mb-0">
             <dt class="col-sm-4 text-muted fw-normal">Department</dt>
-            <dd class="col-sm-8">@(Employee.DepartmentId?.ToString() ?? "—")</dd>
+            <dd class="col-sm-8">@(Employee.DepartmentName ?? "—")</dd>
 
             <dt class="col-sm-4 text-muted fw-normal">Position Profile</dt>
-            <dd class="col-sm-8">@(Employee.PositionProfileId?.ToString() ?? "—")</dd>
+            <dd class="col-sm-8">@(Employee.PositionTitle ?? "—")</dd>
 
             <dt class="col-sm-4 text-muted fw-normal">Manager</dt>
-            <dd class="col-sm-8">@(Employee.ManagerId?.ToString() ?? "—")</dd>
+            <dd class="col-sm-8">@(Employee.ManagerFullName ?? "—")</dd>
 
             <dt class="col-sm-4 text-muted fw-normal">Start Date</dt>
             <dd class="col-sm-8">@Employee.StartDate.ToString("d MMM yyyy")</dd>

@@ -1,6 +1,274 @@
+@inject EmployeeService EmployeeService
+@inject LeaveService LeaveService
+@inject TaskService TaskService
+@inject AppSession Session
+
+@if (!Session.EmployeeId.HasValue || Session.EmployeeId.Value != EmployeeId)
+{
+    <div class="alert alert-danger">
+        <i class="fa-solid fa-lock me-2"></i>You can only view your own profile.
+    </div>
+}
+else if (_loading)
+{
+    <div class="overview-skeleton">
+        @for (var i = 0; i < 3; i++)
+        {
+            <div class="skeleton-card mb-3">
+                <div class="skeleton-line skeleton-title"></div>
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line skeleton-short"></div>
+            </div>
+        }
+    </div>
+}
+else if (_employee is null)
+{
+    <div class="alert alert-warning">Unable to load profile details.</div>
+}
+else
+{
+    <div class="overview-grid">
+
+        <!-- Personal Information -->
+        <div class="overview-card">
+            <div class="overview-card-header">
+                <i class="fa-solid fa-user overview-card-icon"></i>
+                <span class="overview-card-title">Personal Information</span>
+            </div>
+            <dl class="overview-dl">
+                <dt>Name</dt>
+                <dd>@_employee.FirstName @_employee.LastName</dd>
+
+                <dt>Job Title</dt>
+                <dd>@(_employee.PositionTitle ?? Session.JobTitle ?? "—")</dd>
+
+                <dt>Department</dt>
+                <dd>@(_employee.DepartmentName ?? "—")</dd>
+
+                <dt>Manager</dt>
+                <dd>@(_employee.ManagerFullName ?? "—")</dd>
+
+                <dt>Start Date</dt>
+                <dd>@_employee.StartDate.ToString("d MMMM yyyy")</dd>
+            </dl>
+        </div>
+
+        <!-- Contact Information -->
+        <div class="overview-card">
+            <div class="overview-card-header">
+                <i class="fa-solid fa-envelope overview-card-icon"></i>
+                <span class="overview-card-title">Contact Information</span>
+            </div>
+            <dl class="overview-dl">
+                <dt>Work Email</dt>
+                <dd>
+                    <a href="mailto:@_employee.WorkEmail" class="overview-link">@_employee.WorkEmail</a>
+                </dd>
+
+                <dt>Personal Email</dt>
+                <dd>
+                    @if (_employee.PersonalEmail is not null)
+                    {
+                        <a href="mailto:@_employee.PersonalEmail" class="overview-link">@_employee.PersonalEmail</a>
+                    }
+                    else
+                    {
+                        <span class="text-muted">—</span>
+                    }
+                </dd>
+            </dl>
+        </div>
+
+        <!-- Employment Summary -->
+        <div class="overview-card">
+            <div class="overview-card-header">
+                <i class="fa-solid fa-briefcase overview-card-icon"></i>
+                <span class="overview-card-title">Employment</span>
+            </div>
+            <dl class="overview-dl">
+                <dt>Status</dt>
+                <dd>
+                    <span class="status-badge status-badge--@_employee.Status.ToLowerInvariant()">
+                        @StatusLabel(_employee.Status)
+                    </span>
+                </dd>
+
+                <dt>Length of Service</dt>
+                <dd>@LengthOfService(_employee.StartDate)</dd>
+            </dl>
+        </div>
+
+    </div>
+
+    <!-- Quick Statistics -->
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-icon stat-icon--tasks">
+                <i class="fa-solid fa-list-check"></i>
+            </div>
+            <div class="stat-body">
+                <span class="stat-value">@_openTaskCount</span>
+                <span class="stat-label">Open Tasks</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon stat-icon--leave">
+                <i class="fa-solid fa-umbrella-beach"></i>
+            </div>
+            <div class="stat-body">
+                <span class="stat-value">@FormatDays(_annualLeaveRemaining)</span>
+                <span class="stat-label">Leave Remaining</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon stat-icon--pending @(_pendingLeaveCount > 0 ? "stat-icon--pending-active" : "")">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+            <div class="stat-body">
+                <span class="stat-value">@_pendingLeaveCount</span>
+                <span class="stat-label">Pending Requests</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upcoming Leave -->
+    <div class="overview-card mt-3">
+        <div class="overview-card-header">
+            <i class="fa-solid fa-calendar-days overview-card-icon"></i>
+            <span class="overview-card-title">Upcoming Leave</span>
+        </div>
+        @if (_upcomingLeave.Count == 0)
+        {
+            <p class="text-muted mb-0 px-1 py-2">No upcoming leave approved.</p>
+        }
+        else
+        {
+            <ul class="upcoming-leave-list">
+                @foreach (var req in _upcomingLeave)
+                {
+                    <li class="upcoming-leave-item">
+                        <span class="upcoming-leave-type">@req.LeaveTypeName</span>
+                        <span class="upcoming-leave-dates">
+                            @FormatDateRange(req.StartDate, req.StartPart, req.EndDate, req.EndPart)
+                        </span>
+                        <span class="upcoming-leave-days">@FormatDays(req.TotalDays)</span>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+
+    <!-- Actions -->
+    <div class="overview-actions mt-4">
+        <button class="action-btn" @onclick="@(() => OnNavigateToLeave.InvokeAsync())">
+            <i class="fa-solid fa-calendar-plus"></i>
+            Request Leave
+        </button>
+        <button class="action-btn" @onclick="@(() => OnNavigateToDocuments.InvokeAsync())">
+            <i class="fa-solid fa-file-lines"></i>
+            View Documents
+        </button>
+        <button class="action-btn" @onclick="@(() => OnNavigateToTasks.InvokeAsync())">
+            <i class="fa-solid fa-list-check"></i>
+            View Tasks
+        </button>
+    </div>
+}
+
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
-}
 
-<p class="text-muted">Overview coming soon.</p>
+    [Parameter] public EventCallback OnNavigateToLeave { get; set; }
+    [Parameter] public EventCallback OnNavigateToDocuments { get; set; }
+    [Parameter] public EventCallback OnNavigateToTasks { get; set; }
+
+    private bool _loading = true;
+    private GetEmployeeResponse? _employee;
+    private int _openTaskCount;
+    private decimal? _annualLeaveRemaining;
+    private int _pendingLeaveCount;
+    private List<LeaveRequestListItem> _upcomingLeave = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Session.EmployeeId.HasValue || Session.EmployeeId.Value != EmployeeId)
+        {
+            _loading = false;
+            return;
+        }
+
+        _loading = true;
+
+        var employeeTask = EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
+        var balanceTask  = LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
+        var requestsTask = LeaveService.ListLeaveRequestsAsync(CompanyId, EmployeeId);
+        var tasksTask    = TaskService.GetMyTasksAsync(CompanyId);
+
+        await Task.WhenAll(employeeTask, balanceTask, requestsTask, tasksTask);
+
+        _employee = await employeeTask;
+
+        var balance = await balanceTask;
+        if (balance is not null)
+        {
+            var annual = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "ANNUAL");
+            _annualLeaveRemaining = annual?.RemainingDays;
+        }
+
+        var requests = await requestsTask;
+        if (requests is not null)
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            _pendingLeaveCount = requests.Items.Count(r => r.Status == "Pending");
+            _upcomingLeave = requests.Items
+                .Where(r => r.Status == "Approved" && r.StartDate >= today)
+                .OrderBy(r => r.StartDate)
+                .ToList();
+        }
+
+        var tasks = await tasksTask;
+        if (tasks is not null)
+            _openTaskCount = tasks.Items.Count(t => t.Status is "Open" or "InProgress");
+
+        _loading = false;
+    }
+
+    private static string LengthOfService(DateOnly startDate)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var years = today.Year - startDate.Year;
+        var months = today.Month - startDate.Month;
+        if (months < 0) { years--; months += 12; }
+        if (today.Day < startDate.Day && months > 0) months--;
+
+        return (years, months) switch
+        {
+            (> 0, > 0) => $"{years} yr {months} mo",
+            (> 0, _)   => $"{years} yr",
+            (_, > 0)   => $"{months} mo",
+            _          => "< 1 month"
+        };
+    }
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "OnLeave"    => "On Leave",
+        "Terminated" => "Terminated",
+        _            => status
+    };
+
+    private static string FormatDays(decimal? days) =>
+        days is null ? "—" : $"{days:0.##} {(days == 1m ? "day" : "days")}";
+
+    private static string FormatDateRange(DateOnly start, string startPart, DateOnly end, string endPart)
+    {
+        var startStr = startPart == "FullDay" ? start.ToString("d MMM") : $"{start:d MMM} ({startPart})";
+        var endStr   = endPart   == "FullDay" ? end.ToString("d MMM yyyy") : $"{end:d MMM yyyy} ({endPart})";
+        return start == end ? endStr : $"{startStr} – {endStr}";
+    }
+}

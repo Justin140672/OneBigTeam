@@ -111,12 +111,88 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Get_Employee_Includes_Department_Position_And_Manager_Names()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser1.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        // Create department
+        var deptResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
+        {
+            companyId,
+            name = "Engineering"
+        });
+        deptResponse.EnsureSuccessStatusCode();
+        var dept = await deptResponse.Content.ReadFromJsonAsync<DeptPayload>();
+
+        // Create position profile
+        var posResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
+        {
+            companyId,
+            departmentId = dept!.Id,
+            title = "Senior Developer",
+            isManagerial = false
+        });
+        posResponse.EnsureSuccessStatusCode();
+        var pos = await posResponse.Content.ReadFromJsonAsync<PosPayload>();
+
+        // Create manager employee
+        var mgrResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
+        {
+            companyId,
+            firstName = "Jane",
+            lastName = "Manager",
+            workEmail = $"jane.mgr.{Guid.NewGuid():N}@example.com",
+            startDate = "2025-01-01"
+        });
+        mgrResponse.EnsureSuccessStatusCode();
+        var mgr = await mgrResponse.Content.ReadFromJsonAsync<EmployeePayload>();
+
+        // Create employee
+        var empResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
+        {
+            companyId,
+            firstName = "Alice",
+            lastName = "Smith",
+            workEmail = $"alice.{Guid.NewGuid():N}@example.com",
+            startDate = "2026-01-01",
+            departmentId = dept!.Id,
+            positionProfileId = pos!.Id
+        });
+        empResponse.EnsureSuccessStatusCode();
+        var created = await empResponse.Content.ReadFromJsonAsync<EmployeePayload>();
+
+        // Assign manager
+        await client.PutAsJsonAsync($"/api/companies/{companyId}/employees/{created!.Id}/manager", new
+        {
+            companyId,
+            employeeId = created.Id,
+            managerId = mgr!.Id
+        });
+
+        // Fetch and assert
+        var response = await client.GetAsync($"/api/companies/{companyId}/employees/{created.Id}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<EmployeePayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("Engineering", payload!.DepartmentName);
+        Assert.Equal("Senior Developer", payload.PositionTitle);
+        Assert.Equal("Jane Manager", payload.ManagerFullName);
+    }
+
     private sealed record EmployeePayload(
         Guid Id,
         Guid CompanyId,
         Guid? DepartmentId,
+        string? DepartmentName,
         Guid? PositionProfileId,
+        string? PositionTitle,
         Guid? ManagerId,
+        string? ManagerFullName,
         string FirstName,
         string LastName,
         string WorkEmail,
@@ -125,4 +201,7 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         string Status,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt);
+
+    private sealed record DeptPayload(Guid Id, string Name);
+    private sealed record PosPayload(Guid Id, string Title);
 }

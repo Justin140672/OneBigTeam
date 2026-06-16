@@ -93,6 +93,59 @@ public class GetEmployeeHandlerTests
         Assert.False(result.Value!.HasSystemAccess);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Null_Display_Names_When_No_Related_Entities()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new GetEmployeeHandler(context);
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.DepartmentName);
+        Assert.Null(result.Value.PositionTitle);
+        Assert.Null(result.Value.ManagerFullName);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_DepartmentName_PositionTitle_And_ManagerFullName()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
+        var position   = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, "Senior Developer", null, false, now);
+        var manager    = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, now);
+        context.Departments.Add(department);
+        context.PositionProfiles.Add(position);
+        context.Employees.Add(manager);
+        await context.SaveChangesAsync();
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
+        employee.Assign(department.Id, position.Id, manager.Id, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new GetEmployeeHandler(context);
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Engineering", result.Value!.DepartmentName);
+        Assert.Equal("Senior Developer", result.Value.PositionTitle);
+        Assert.Equal("Jane Manager", result.Value.ManagerFullName);
+    }
+
     private static EmployeesDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<EmployeesDbContext>()
