@@ -40,9 +40,14 @@ public record GetEmployeeResponse(
     string? ManagerFullName,
     string FirstName,
     string LastName,
+    string? PreferredName,
     string WorkEmail,
     string? PersonalEmail,
     DateOnly StartDate,
+    DateOnly? DateOfBirth,
+    string? Nationality,
+    string? Gender,
+    string? GenderOther,
     string Status,
     bool HasSystemAccess,
     WorkingDays? WorkingDaysOverride,
@@ -50,15 +55,35 @@ public record GetEmployeeResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
+// ── PERSONAL DETAILS ──────────────────────────────────────────────────────────
+
+public sealed record GetMyPersonalDetailsResponse(
+    Guid EmployeeId,
+    string FirstName,
+    string LastName,
+    string? PreferredName,
+    DateOnly? DateOfBirth,
+    string? Nationality,
+    string? Gender);
+
+public sealed record RequestPersonalDetailsChangeRequest(string Notes);
+
+public sealed record RequestPersonalDetailsChangeResponse(Guid TaskId);
+
 // ── EDIT MODELS ───────────────────────────────────────────────────────────────
 
 public sealed class EmployeeProfileEditModel
 {
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
+    public string PreferredName { get; set; } = string.Empty;
     public string WorkEmail { get; set; } = string.Empty;
     public string? PersonalEmail { get; set; }
     public DateOnly StartDate { get; set; }
+    public DateOnly? DateOfBirth { get; set; }
+    public string Nationality { get; set; } = string.Empty;
+    public string Gender { get; set; } = string.Empty;
+    public string GenderOther { get; set; } = string.Empty;
     public Guid? DepartmentId { get; set; }
     public Guid? PositionProfileId { get; set; }
     public bool HasSystemAccess { get; set; } = true;
@@ -74,9 +99,14 @@ public record UpdateEmployeeProfileRequest(
     Guid? PositionProfileId,
     string FirstName,
     string LastName,
+    string? PreferredName,
     string WorkEmail,
     string? PersonalEmail,
     DateOnly StartDate,
+    DateOnly? DateOfBirth,
+    string? Nationality,
+    string? Gender,
+    string? GenderOther,
     bool HasSystemAccess,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride);
@@ -110,9 +140,14 @@ public record CreateEmployeeRequest(
     Guid? PositionProfileId,
     string FirstName,
     string LastName,
+    string? PreferredName,
     string WorkEmail,
     string? PersonalEmail,
     DateOnly StartDate,
+    DateOnly DateOfBirth,
+    string Nationality,
+    string Gender,
+    string? GenderOther,
     bool HasSystemAccess);
 
 public record CreateEmployeeResponse(
@@ -123,4 +158,10 @@ public record CreateEmployeeResponse(
     string WorkEmail,
     string Status,
     DateTimeOffset CreatedAt);
+
+// ── NATIONALITIES ─────────────────────────────────────────────────────────────
+
+public record ListNationalitiesResponse(IReadOnlyList<NationalityListItem> Items);
+
+public record NationalityListItem(int Id, string Name);
 

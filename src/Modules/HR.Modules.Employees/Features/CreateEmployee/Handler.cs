@@ -22,10 +22,12 @@ internal sealed class CreateEmployeeHandler
         CreateEmployeeRequest request,
         CancellationToken cancellationToken)
     {
+        var normalizedEmail = request.WorkEmail.Trim().ToLowerInvariant();
+
         var emailExists = await _dbContext.Employees
             .AnyAsync(
                 e => e.CompanyId == request.CompanyId &&
-                     e.WorkEmail == request.WorkEmail.Trim().ToLowerInvariant(),
+                     e.WorkEmail == normalizedEmail,
                 cancellationToken);
 
         if (emailExists)
@@ -84,14 +86,29 @@ internal sealed class CreateEmployeeHandler
 
         var now = _clock.UtcNowOffset();
 
+        var firstName = request.FirstName.Trim();
+        var lastName  = request.LastName.Trim();
+
         var employee = Employee.Create(
             Guid.NewGuid(),
             request.CompanyId,
-            request.FirstName.Trim(),
-            request.LastName.Trim(),
-            request.WorkEmail.Trim().ToLowerInvariant(),
+            firstName,
+            lastName,
+            normalizedEmail,
             request.StartDate,
             request.HasSystemAccess,
+            now);
+
+        var preferredName = string.IsNullOrWhiteSpace(request.PreferredName)
+            ? firstName
+            : request.PreferredName.Trim();
+
+        employee.UpdatePersonalDetails(
+            preferredName,
+            request.DateOfBirth,
+            request.Nationality.Trim(),
+            request.Gender.Trim(),
+            string.IsNullOrWhiteSpace(request.GenderOther) ? null : request.GenderOther.Trim(),
             now);
 
         if (request.DepartmentId is not null || request.PositionProfileId is not null || request.ManagerId is not null)

@@ -61,7 +61,10 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
             firstName = "Alice",
             lastName = "Smith",
             workEmail = $"alice.smith.{Guid.NewGuid():N}@example.com",
-            startDate = "2026-07-01"
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-05-20",
+            nationality = "British",
+            gender = "Female"
         });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -110,7 +113,10 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
             firstName = "Jane",
             lastName = "Manager",
             workEmail = $"jane.manager.{Guid.NewGuid():N}@example.com",
-            startDate = "2026-01-01"
+            startDate = "2026-01-01",
+            dateOfBirth = "1985-03-10",
+            nationality = "British",
+            gender = "Female"
         });
         managerResponse.EnsureSuccessStatusCode();
         var manager = await managerResponse.Content.ReadFromJsonAsync<EmployeePayload>();
@@ -124,7 +130,10 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
             firstName = "Alice",
             lastName = "Smith",
             workEmail = $"alice.smith.{Guid.NewGuid():N}@example.com",
-            startDate = "2026-07-01"
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-05-20",
+            nationality = "British",
+            gender = "Female"
         });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -151,7 +160,10 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
             firstName = "Alice",
             lastName = "Smith",
             workEmail = email,
-            startDate = "2026-07-01"
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-05-20",
+            nationality = "British",
+            gender = "Female"
         });
         first.EnsureSuccessStatusCode();
 
@@ -161,7 +173,10 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
             firstName = "Alice",
             lastName = "Smith",
             workEmail = email,
-            startDate = "2026-07-01"
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-05-20",
+            nationality = "British",
+            gender = "Female"
         });
 
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
@@ -182,7 +197,10 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
             firstName = "Alice",
             lastName = "Smith",
             workEmail = $"alice.{Guid.NewGuid():N}@example.com",
-            startDate = "2026-07-01"
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-05-20",
+            nationality = "British",
+            gender = "Female"
         });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -203,7 +221,10 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
             firstName = "Alice",
             lastName = "Smith",
             workEmail = $"alice.{Guid.NewGuid():N}@example.com",
-            startDate = "2026-07-01"
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-05-20",
+            nationality = "British",
+            gender = "Female"
         });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

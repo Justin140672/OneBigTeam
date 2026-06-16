@@ -1,0 +1,162 @@
+/* ── Details card ────────────────────────────────────── */
+
+.pd-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    overflow: hidden;
+}
+
+.pd-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 20px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.pd-card-icon {
+    color: #6366f1;
+    font-size: 0.95rem;
+}
+
+.pd-card-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+/* ── Definition list ─────────────────────────────────── */
+
+.pd-dl {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 0;
+    margin: 0;
+    padding: 8px 0;
+}
+
+.pd-dl dt,
+.pd-dl dd {
+    padding: 10px 20px;
+    margin: 0;
+    border-bottom: 1px solid #f9fafb;
+    display: flex;
+    align-items: center;
+}
+
+.pd-dl dt:last-of-type,
+.pd-dl dd:last-of-type {
+    border-bottom: none;
+}
+
+.pd-dl dt {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.pd-dl dd {
+    font-size: 0.875rem;
+    color: #111827;
+}
+
+.pd-empty {
+    color: #d1d5db;
+    font-style: italic;
+}
+
+/* ── Request change button ───────────────────────────── */
+
+.pd-change-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: 1px solid #e5e7eb;
+    border-radius: 7px;
+    padding: 5px 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #6366f1;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+}
+
+.pd-change-btn:hover {
+    background: #f5f3ff;
+    border-color: #6366f1;
+}
+
+/* ── Success banner ──────────────────────────────────── */
+
+.pd-success-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+}
+
+.pd-success-icon {
+    color: #16a34a;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.pd-success-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #15803d;
+    margin-bottom: 2px;
+}
+
+.pd-success-body {
+    font-size: 0.8rem;
+    color: #166534;
+}
+
+.pd-success-dismiss {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #16a34a;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    opacity: 0.6;
+}
+
+.pd-success-dismiss:hover { opacity: 1; }
+
+/* ── Dialog content ──────────────────────────────────── */
+
+.pd-dialog-hint {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-bottom: 14px;
+}
+
+.pd-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 6px;
+}
+
+.pd-char-count {
+    font-size: 0.72rem;
+    color: #9ca3af;
+    text-align: right;
+    margin-top: 4px;
+}

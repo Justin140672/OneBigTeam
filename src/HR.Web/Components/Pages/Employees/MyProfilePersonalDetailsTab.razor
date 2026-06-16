@@ -1,0 +1,229 @@
+@inject EmployeeService EmployeeService
+@inject AppSession Session
+
+@if (!Session.EmployeeId.HasValue || Session.EmployeeId.Value != EmployeeId)
+{
+    <div class="alert alert-danger">
+        <i class="fa-solid fa-lock me-2"></i>You can only view your own personal details.
+    </div>
+}
+else if (_loading)
+{
+    <div class="d-flex align-items-center gap-2 py-3">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span class="text-muted">Loading…</span>
+    </div>
+}
+else if (_details is null)
+{
+    <div class="alert alert-warning">Unable to load personal details.</div>
+}
+else
+{
+    @if (_submitted)
+    {
+        <div class="pd-success-banner mb-3">
+            <i class="fa-solid fa-circle-check pd-success-icon"></i>
+            <div>
+                <div class="pd-success-title">Change request submitted</div>
+                <div class="pd-success-body">
+                    Your request has been sent to HR and will be reviewed shortly.
+                    You can track progress in your <strong>Tasks</strong> tab.
+                </div>
+            </div>
+            <button class="pd-success-dismiss" @onclick="@(() => _submitted = false)">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    }
+
+    <div class="pd-card">
+        <div class="pd-card-header">
+            <i class="fa-solid fa-id-card pd-card-icon"></i>
+            <span class="pd-card-title">Personal Details</span>
+            <button class="pd-change-btn ms-auto" @onclick="OpenDialog">
+                <i class="fa-solid fa-pen-to-square"></i>
+                Request Change
+            </button>
+        </div>
+        <dl class="pd-dl">
+            <dt>First Name</dt>
+            <dd>@_details.FirstName</dd>
+
+            <dt>Last Name</dt>
+            <dd>@_details.LastName</dd>
+
+            <dt>Preferred Name</dt>
+            <dd>
+                @if (_details.PreferredName is not null)
+                {
+                    @_details.PreferredName
+                }
+                else
+                {
+                    <span class="pd-empty">Not provided</span>
+                }
+            </dd>
+
+            <dt>Date of Birth</dt>
+            <dd>
+                @if (_details.DateOfBirth is DateOnly dob)
+                {
+                    @dob.ToString("d MMMM yyyy")
+                }
+                else
+                {
+                    <span class="pd-empty">Not provided</span>
+                }
+            </dd>
+
+            <dt>Nationality</dt>
+            <dd>
+                @if (_details.Nationality is not null)
+                {
+                    @_details.Nationality
+                }
+                else
+                {
+                    <span class="pd-empty">Not provided</span>
+                }
+            </dd>
+
+            <dt>Gender</dt>
+            <dd>
+                @if (_details.Gender is not null)
+                {
+                    @_details.Gender
+                }
+                else
+                {
+                    <span class="pd-empty">Not provided</span>
+                }
+            </dd>
+        </dl>
+    </div>
+
+    <SfDialog @bind-Visible="_dialogVisible" IsModal="true" Width="560px" ShowCloseIcon="true">
+        <DialogEvents Closed="OnDialogClosed" />
+        <DialogTemplates>
+            <Header>Request Change to Personal Details</Header>
+            <Content>
+                <p class="pd-dialog-hint">
+                    Describe the changes you'd like HR to make to your personal details.
+                    Include your preferred values for any fields that need updating.
+                </p>
+                @if (_submitError is not null)
+                {
+                    <div class="alert alert-danger alert-dismissible mb-3">
+                        @_submitError
+                        <button type="button" class="btn-close" @onclick="@(() => _submitError = null)"></button>
+                    </div>
+                }
+                <div>
+                    <label for="pd-notes" class="pd-label">Your request</label>
+                    <textarea id="pd-notes"
+                              class="form-control @(_notesError is not null ? "is-invalid" : "")"
+                              rows="5"
+                              maxlength="2000"
+                              placeholder="e.g. Please update my preferred name to &quot;Alex&quot; and my nationality to British."
+                              @bind="_notes"
+                              @bind:event="oninput"></textarea>
+                    @if (_notesError is not null)
+                    {
+                        <div class="invalid-feedback">@_notesError</div>
+                    }
+                    <div class="pd-char-count">@_notes.Length / 2000</div>
+                </div>
+            </Content>
+            <FooterTemplate>
+                <SfButton IsPrimary="true" Disabled="@_submitting" OnClick="SubmitRequestAsync">
+                    @if (_submitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Submit Request
+                </SfButton>
+                <SfButton Disabled="@_submitting" OnClick="CloseDialog">Cancel</SfButton>
+            </FooterTemplate>
+        </DialogTemplates>
+    </SfDialog>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private bool _loading = true;
+    private GetMyPersonalDetailsResponse? _details;
+    private bool _dialogVisible;
+    private bool _submitting;
+    private bool _submitted;
+    private string _notes = string.Empty;
+    private string? _notesError;
+    private string? _submitError;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Session.EmployeeId.HasValue || Session.EmployeeId.Value != EmployeeId)
+        {
+            _loading = false;
+            return;
+        }
+
+        _loading = true;
+        _details = await EmployeeService.GetMyPersonalDetailsAsync(CompanyId);
+        _loading = false;
+    }
+
+    private void OpenDialog()
+    {
+        _notes        = string.Empty;
+        _notesError   = null;
+        _submitError  = null;
+        _submitted    = false;
+        _dialogVisible = true;
+    }
+
+    private void CloseDialog() => _dialogVisible = false;
+
+    private void OnDialogClosed()
+    {
+        _notesError  = null;
+        _submitError = null;
+    }
+
+    private async Task SubmitRequestAsync()
+    {
+        _notesError  = null;
+        _submitError = null;
+
+        if (string.IsNullOrWhiteSpace(_notes))
+        {
+            _notesError = "Please describe the change you'd like to make.";
+            return;
+        }
+
+        if (_notes.Length > 2000)
+        {
+            _notesError = "Notes must be 2000 characters or fewer.";
+            return;
+        }
+
+        _submitting = true;
+
+        var (_, error) = await EmployeeService.RequestPersonalDetailsChangeAsync(
+            CompanyId, EmployeeId, _notes);
+
+        _submitting = false;
+
+        if (error is not null)
+        {
+            _submitError = error;
+            return;
+        }
+
+        _dialogVisible = false;
+        _submitted     = true;
+        _notes         = string.Empty;
+    }
+}

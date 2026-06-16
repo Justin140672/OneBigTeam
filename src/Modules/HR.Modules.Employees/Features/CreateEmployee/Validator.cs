@@ -17,6 +17,10 @@ internal sealed class CreateEmployeeValidator : AbstractValidator<CreateEmployee
             .NotEmpty()
             .MaximumLength(100);
 
+        RuleFor(r => r.PreferredName)
+            .MaximumLength(100)
+            .When(r => !string.IsNullOrWhiteSpace(r.PreferredName));
+
         RuleFor(r => r.WorkEmail)
             .NotEmpty()
             .MaximumLength(320)
@@ -29,5 +33,16 @@ internal sealed class CreateEmployeeValidator : AbstractValidator<CreateEmployee
 
         RuleFor(r => r.StartDate)
             .NotEmpty();
+
+        RuleFor(r => r.DateOfBirth)
+            .NotEmpty().WithMessage("Date of birth is required.");
+
+        RuleFor(r => r.Nationality)
+            .NotEmpty().WithMessage("Nationality is required.")
+            .MaximumLength(100);
+
+        RuleFor(r => r.Gender)
+            .NotEmpty().WithMessage("Gender is required.")
+            .MaximumLength(50);
     }
 }

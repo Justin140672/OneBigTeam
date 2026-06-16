@@ -1,0 +1,169 @@
+/* ── Page header ─────────────────────────────────────── */
+
+.inbox-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.inbox-count-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: #6366f1;
+    color: #fff;
+    border-radius: 12px;
+    padding: 2px 10px;
+    min-width: 24px;
+    text-align: center;
+}
+
+/* ── Empty state ─────────────────────────────────────── */
+
+.inbox-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 24px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    text-align: center;
+    color: #374151;
+}
+
+.inbox-empty-icon {
+    color: #d1d5db;
+}
+
+/* ── Task cards ──────────────────────────────────────── */
+
+.inbox-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.inbox-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: box-shadow 0.15s;
+}
+
+.inbox-card:hover {
+    box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+}
+
+.inbox-card--claiming {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* ── Priority pip ────────────────────────────────────── */
+
+.priority-pip {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 6px;
+}
+
+.priority-pip--critical { background: #dc2626; }
+.priority-pip--high     { background: #f97316; }
+.priority-pip--medium   { background: #eab308; }
+.priority-pip--low      { background: #d1d5db; }
+
+/* ── Card body ───────────────────────────────────────── */
+
+.inbox-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.inbox-card-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+
+.inbox-card-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.inbox-card-desc {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin: 0 0 6px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.inbox-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.inbox-card-age {
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+
+/* ── Source badge ────────────────────────────────────── */
+
+.inbox-source-badge {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.inbox-source-badge--leave      { background: #dbeafe; color: #1d4ed8; }
+.inbox-source-badge--manual     { background: #f3f4f6; color: #6b7280; }
+.inbox-source-badge--onboarding { background: #d1fae5; color: #065f46; }
+.inbox-source-badge--offboarding{ background: #fee2e2; color: #991b1b; }
+.inbox-source-badge--document   { background: #fef3c7; color: #92400e; }
+.inbox-source-badge--compliance { background: #ede9fe; color: #5b21b6; }
+.inbox-source-badge--probation  { background: #ffedd5; color: #9a3412; }
+.inbox-source-badge--sickness   { background: #fce7f3; color: #9d174d; }
+
+/* ── Actions ─────────────────────────────────────────── */
+
+.inbox-card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* ── Due badge (reused from widget) ─────────────────── */
+
+.due-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.due-badge--overdue { background: #fee2e2; color: #dc2626; }
+.due-badge--today   { background: #ffedd5; color: #ea580c; }
+.due-badge--soon    { background: #fef3c7; color: #ca8a04; }
+.due-badge--normal  { background: #f3f4f6; color: #6b7280; }

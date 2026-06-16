@@ -153,7 +153,10 @@ public class ListEmployeesEndpointTests : IClassFixture<ApiWebApplicationFactory
             firstName,
             lastName,
             workEmail,
-            startDate = "2026-07-01"
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-01-01",
+            nationality = "British",
+            gender = "Male"
         });
         response.EnsureSuccessStatusCode();
     }

@@ -60,6 +60,52 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         return (false, "Failed to save profile.");
     }
 
+    public async Task<GetMyPersonalDetailsResponse?> GetMyPersonalDetailsAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetMyPersonalDetailsResponse>(
+                $"api/companies/{companyId}/employees/me/personal-details", cancellationToken);
+        }
+        catch { return null; }
+    }
+
+    public async Task<(Guid? TaskId, string? Error)> RequestPersonalDetailsChangeAsync(
+        Guid companyId,
+        Guid employeeId,
+        string notes,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                $"api/companies/{companyId}/employees/{employeeId}/personal-details-change-requests",
+                new RequestPersonalDetailsChangeRequest(notes),
+                cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+                return (null, "Unable to submit your request. Please try again.");
+
+            var result = await response.Content
+                .ReadFromJsonAsync<RequestPersonalDetailsChangeResponse>(cancellationToken);
+            return (result?.TaskId, null);
+        }
+        catch { return (null, "An unexpected error occurred."); }
+    }
+
+    public async Task<ListNationalitiesResponse?> ListNationalitiesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<ListNationalitiesResponse>(
+                "api/nationalities", cancellationToken);
+        }
+        catch { return null; }
+    }
+
     public async Task<(CreateEmployeeResponse? Employee, string? Error)> CreateEmployeeAsync(
         Guid companyId, CreateEmployeeRequest request)
     {

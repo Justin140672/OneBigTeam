@@ -58,6 +58,14 @@ internal sealed class UpdateEmployeeProfileHandler
             request.StartDate,
             now);
 
+        employee.UpdatePersonalDetails(
+            request.PreferredName,
+            request.DateOfBirth,
+            request.Nationality,
+            request.Gender,
+            request.GenderOther,
+            now);
+
         employee.Assign(request.DepartmentId, request.PositionProfileId, employee.ManagerId, now);
         employee.SetSystemAccess(request.HasSystemAccess, now);
         employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);

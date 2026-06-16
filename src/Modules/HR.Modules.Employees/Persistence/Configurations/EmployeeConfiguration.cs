@@ -77,6 +77,25 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .HasColumnName("profile_image_url")
             .HasMaxLength(2048);
 
+        builder.Property(e => e.PreferredName)
+            .HasColumnName("preferred_name")
+            .HasMaxLength(100);
+
+        builder.Property(e => e.DateOfBirth)
+            .HasColumnName("date_of_birth");
+
+        builder.Property(e => e.Nationality)
+            .HasColumnName("nationality")
+            .HasMaxLength(100);
+
+        builder.Property(e => e.Gender)
+            .HasColumnName("gender")
+            .HasMaxLength(50);
+
+        builder.Property(e => e.GenderOther)
+            .HasColumnName("gender_other")
+            .HasMaxLength(200);
+
         builder.Property(e => e.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

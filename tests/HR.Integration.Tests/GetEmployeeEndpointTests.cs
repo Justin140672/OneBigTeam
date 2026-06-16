@@ -49,7 +49,10 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
             firstName = "Alice",
             lastName = "Smith",
             workEmail = $"alice.{Guid.NewGuid():N}@example.com",
-            startDate = "2026-07-01"
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-05-20",
+            nationality = "British",
+            gender = "Female"
         });
         createResponse.EnsureSuccessStatusCode();
 
@@ -99,7 +102,10 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
             firstName = "Bob",
             lastName = "Jones",
             workEmail = $"bob.{Guid.NewGuid():N}@example.com",
-            startDate = "2026-07-01"
+            startDate = "2026-07-01",
+            dateOfBirth = "1988-11-03",
+            nationality = "British",
+            gender = "Male"
         });
         createResponse.EnsureSuccessStatusCode();
         var created = await createResponse.Content.ReadFromJsonAsync<EmployeePayload>();
@@ -146,7 +152,10 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
             firstName = "Jane",
             lastName = "Manager",
             workEmail = $"jane.mgr.{Guid.NewGuid():N}@example.com",
-            startDate = "2025-01-01"
+            startDate = "2025-01-01",
+            dateOfBirth = "1980-06-15",
+            nationality = "British",
+            gender = "Female"
         });
         mgrResponse.EnsureSuccessStatusCode();
         var mgr = await mgrResponse.Content.ReadFromJsonAsync<EmployeePayload>();
@@ -160,7 +169,10 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
             workEmail = $"alice.{Guid.NewGuid():N}@example.com",
             startDate = "2026-01-01",
             departmentId = dept!.Id,
-            positionProfileId = pos!.Id
+            positionProfileId = pos!.Id,
+            dateOfBirth = "1990-05-20",
+            nationality = "British",
+            gender = "Female"
         });
         empResponse.EnsureSuccessStatusCode();
         var created = await empResponse.Content.ReadFromJsonAsync<EmployeePayload>();

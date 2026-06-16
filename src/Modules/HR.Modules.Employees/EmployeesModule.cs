@@ -1,12 +1,15 @@
 using FluentValidation;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.AssignManager;
+using HR.Modules.Employees.Features.ListNationalities;
 using HR.Modules.Employees.Features.CreateDepartment;
 using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Modules.Employees.Features.CreatePositionProfile;
 using HR.Modules.Employees.Features.DeactivateDepartment;
 using HR.Modules.Employees.Features.GetEmployee;
 using HR.Modules.Employees.Features.GetMyEmployee;
+using HR.Modules.Employees.Features.GetMyPersonalDetails;
+using HR.Modules.Employees.Features.RequestPersonalDetailsChange;
 using HR.Modules.Employees.Features.ListDepartments;
 using HR.Modules.Employees.Features.ListEmployees;
 using HR.Modules.Employees.Features.SetEmployeeWorkingPattern;
@@ -65,6 +68,9 @@ public static class EmployeesModule
 
         services.AddScoped<GetEmployeeHandler>();
         services.AddScoped<GetMyEmployeeHandler>();
+        services.AddScoped<GetMyPersonalDetailsHandler>();
+        services.AddScoped<RequestPersonalDetailsChangeHandler>();
+        services.AddScoped<IValidator<RequestPersonalDetailsChangeRequest>, RequestPersonalDetailsChangeValidator>();
 
         services.AddScoped<ListDepartmentsHandler>();
         services.AddScoped<IValidator<ListDepartmentsRequest>, ListDepartmentsValidator>();
@@ -80,6 +86,8 @@ public static class EmployeesModule
 
         services.AddScoped<SetEmployeeWorkingPatternHandler>();
         services.AddScoped<IValidator<SetEmployeeWorkingPatternRequest>, SetEmployeeWorkingPatternValidator>();
+
+        services.AddScoped<ListNationalitiesHandler>();
 
         services.AddScoped<IWorkingPatternProvider, WorkingPatternProvider>();
         services.AddScoped<IDirectReportsReader, DirectReportsReader>();
@@ -101,6 +109,32 @@ public static class EmployeesModule
         var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
 
         var now = DateTimeOffset.UtcNow;
+
+        // ── Nationalities (global reference data) ─────────────────────────────
+        if (!await db.Nationalities.AnyAsync())
+        {
+            string[] names =
+            [
+                "Afghan", "Albanian", "Algerian", "American", "Argentine", "Armenian",
+                "Australian", "Austrian", "Azerbaijani", "Bangladeshi", "Belgian",
+                "Bolivian", "Brazilian", "British", "Bulgarian", "Cambodian", "Canadian",
+                "Chilean", "Chinese", "Colombian", "Croatian", "Czech", "Danish", "Dutch",
+                "Egyptian", "Ethiopian", "Filipino", "Finnish", "French", "Georgian",
+                "German", "Ghanaian", "Greek", "Hungarian", "Indian", "Indonesian",
+                "Iranian", "Iraqi", "Irish", "Israeli", "Italian", "Jamaican", "Japanese",
+                "Jordanian", "Kenyan", "Korean", "Lebanese", "Malaysian", "Mexican",
+                "Moroccan", "Nepalese", "New Zealander", "Nigerian", "Norwegian",
+                "Pakistani", "Peruvian", "Polish", "Portuguese", "Romanian", "Russian",
+                "Saudi Arabian", "Serbian", "Singaporean", "Somali", "South African",
+                "Spanish", "Sri Lankan", "Swedish", "Swiss", "Syrian", "Taiwanese",
+                "Thai", "Turkish", "Ugandan", "Ukrainian", "Vietnamese", "Zimbabwean"
+            ];
+
+            for (var i = 0; i < names.Length; i++)
+                db.Nationalities.Add(Nationality.Create(i + 1, names[i]));
+
+            await db.SaveChangesAsync();
+        }
 
         // ── Acme Corporation ─────────────────────────────────────────────────
         var acmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -148,25 +182,27 @@ public static class EmployeesModule
             var empAe2Id      = Guid.Parse("30000000-0000-0000-0000-000000000010");
 
             Employee MakeAcme(Guid id, string first, string last, string email, DateOnly start,
-                              Guid? deptId, Guid? posId, Guid? managerId)
+                              Guid? deptId, Guid? posId, Guid? managerId,
+                              DateOnly dob, string nationality, string gender, string? preferredName = null)
             {
                 var e = Employee.Create(id, acmeId, first, last, email, start, hasSystemAccess: true, now);
                 e.Assign(deptId, posId, managerId, now);
+                e.UpdatePersonalDetails(preferredName ?? first, dob, nationality, gender, null, now);
                 e.Activate(now);
                 return e;
             }
 
             db.Employees.AddRange(
-                MakeAcme(empCtoId,      "Sarah",  "Chen",     "sarah.chen@acme.example",     new DateOnly(2020, 1, 6),  deptEngId,     posCtoId,        null),
-                MakeAcme(empSenDev1Id,  "James",  "Okafor",   "james.okafor@acme.example",   new DateOnly(2021, 3, 15), deptEngId,     posSenDevId,     empCtoId),
-                MakeAcme(empSenDev2Id,  "Priya",  "Sharma",   "priya.sharma@acme.example",   new DateOnly(2021, 9, 1),  deptEngId,     posSenDevId,     empCtoId),
-                MakeAcme(empDev1Id,     "Tom",    "Williams", "tom.williams@acme.example",   new DateOnly(2023, 2, 20), deptEngId,     posDevId,        empSenDev1Id),
-                MakeAcme(empHrMgrId,    "Laura",  "Bennett",  "laura.bennett@acme.example",  new DateOnly(2019, 6, 3),  deptHrId,      posHrMgrId,      null),
-                MakeAcme(empHrAdvId,    "Marcus", "Diallo",   "marcus.diallo@acme.example",  new DateOnly(2022, 11, 7), deptHrId,      posHrAdvisorId,  empHrMgrId),
-                MakeAcme(empFinMgrId,   "Sophie", "Laurent",  "sophie.laurent@acme.example", new DateOnly(2020, 4, 14), deptFinanceId, posFinanceMgrId, null),
-                MakeAcme(empSalesMgrId, "David",  "Park",     "david.park@acme.example",     new DateOnly(2018, 8, 22), deptSalesId,   posSalesMgrId,   null),
-                MakeAcme(empAe1Id,      "Emma",   "Jones",    "emma.jones@acme.example",     new DateOnly(2023, 5, 2),  deptSalesId,   posAeId,         empSalesMgrId),
-                MakeAcme(empAe2Id,      "Carlos", "Rivera",   "carlos.rivera@acme.example",  new DateOnly(2024, 1, 8),  deptSalesId,   posAeId,         empSalesMgrId));
+                MakeAcme(empCtoId,      "Sarah",  "Chen",     "sarah.chen@acme.example",     new DateOnly(2020, 1, 6),  deptEngId,     posCtoId,        null,         new DateOnly(1982, 3, 15),  "Taiwanese", "Female"),
+                MakeAcme(empSenDev1Id,  "James",  "Okafor",   "james.okafor@acme.example",   new DateOnly(2021, 3, 15), deptEngId,     posSenDevId,     empCtoId,     new DateOnly(1988, 7, 22),  "Nigerian",  "Male"),
+                MakeAcme(empSenDev2Id,  "Priya",  "Sharma",   "priya.sharma@acme.example",   new DateOnly(2021, 9, 1),  deptEngId,     posSenDevId,     empCtoId,     new DateOnly(1990, 11, 5),  "Indian",    "Female"),
+                MakeAcme(empDev1Id,     "Tom",    "Williams", "tom.williams@acme.example",   new DateOnly(2023, 2, 20), deptEngId,     posDevId,        empSenDev1Id, new DateOnly(1996, 4, 12),  "British",   "Male"),
+                MakeAcme(empHrMgrId,    "Laura",  "Bennett",  "laura.bennett@acme.example",  new DateOnly(2019, 6, 3),  deptHrId,      posHrMgrId,      null,         new DateOnly(1979, 9, 28),  "British",   "Female"),
+                MakeAcme(empHrAdvId,    "Marcus", "Diallo",   "marcus.diallo@acme.example",  new DateOnly(2022, 11, 7), deptHrId,      posHrAdvisorId,  empHrMgrId,   new DateOnly(1991, 2, 14),  "French",    "Male"),
+                MakeAcme(empFinMgrId,   "Sophie", "Laurent",  "sophie.laurent@acme.example", new DateOnly(2020, 4, 14), deptFinanceId, posFinanceMgrId, null,         new DateOnly(1985, 6, 30),  "French",    "Female"),
+                MakeAcme(empSalesMgrId, "David",  "Park",     "david.park@acme.example",     new DateOnly(2018, 8, 22), deptSalesId,   posSalesMgrId,   null,         new DateOnly(1975, 12, 8),  "Korean",    "Male"),
+                MakeAcme(empAe1Id,      "Emma",   "Jones",    "emma.jones@acme.example",     new DateOnly(2023, 5, 2),  deptSalesId,   posAeId,         empSalesMgrId, new DateOnly(1998, 8, 17), "British",   "Female"),
+                MakeAcme(empAe2Id,      "Carlos", "Rivera",   "carlos.rivera@acme.example",  new DateOnly(2024, 1, 8),  deptSalesId,   posAeId,         empSalesMgrId, new DateOnly(2000, 1, 25), "Spanish",   "Male"));
 
             await db.SaveChangesAsync();
         }
@@ -189,17 +225,18 @@ public static class EmployeesModule
                 PositionProfile.Create(betaPosDevId,    betaCorpId, betaDeptEngId, "Software Developer",  null, isManagerial: false, now));
 
             Employee MakeBeta(Guid id, string first, string last, string email, DateOnly start,
-                              Guid? posId, Guid? managerId)
+                              Guid? posId, Guid? managerId, DateOnly dob, string nationality, string gender)
             {
                 var e = Employee.Create(id, betaCorpId, first, last, email, start, hasSystemAccess: true, now);
                 e.Assign(betaDeptEngId, posId, managerId, now);
+                e.UpdatePersonalDetails(first, dob, nationality, gender, null, now);
                 e.Activate(now);
                 return e;
             }
 
             db.Employees.AddRange(
-                MakeBeta(betaEmpMgrId, "Alice", "Morgan", "alice.morgan@betacorp.example", new DateOnly(2022, 3, 1), betaPosEngMgrId, null),
-                MakeBeta(betaEmpDevId, "Bob",   "Taylor", "bob.taylor@betacorp.example",   new DateOnly(2023, 9, 4), betaPosDevId,    betaEmpMgrId));
+                MakeBeta(betaEmpMgrId, "Alice", "Morgan", "alice.morgan@betacorp.example", new DateOnly(2022, 3, 1), betaPosEngMgrId, null,         new DateOnly(1987, 5, 20), "British", "Female"),
+                MakeBeta(betaEmpDevId, "Bob",   "Taylor", "bob.taylor@betacorp.example",   new DateOnly(2023, 9, 4), betaPosDevId,    betaEmpMgrId, new DateOnly(1993, 10, 11), "British", "Male"));
 
             await db.SaveChangesAsync();
         }

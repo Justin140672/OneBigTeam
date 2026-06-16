@@ -5,6 +5,7 @@ using HR.Modules.Tasks.Features.GetEmployeeTasks;
 using HR.Modules.Tasks.Features.GetMyTasks;
 using HR.Modules.Tasks.Features.GetTeamTasks;
 using HR.Modules.Tasks.Features.GetTask;
+using HR.Modules.Tasks.Features.GetUnassignedTasks;
 using HR.Modules.Tasks.Features.LeaveRequested;
 using HR.Modules.Tasks.Features.ListNotifications;
 using HR.Modules.Tasks.Features.MarkAllNotificationsRead;
@@ -43,6 +44,7 @@ public static class TasksModule
         services.AddScoped<IIntegrationEventHandler<LeaveRequestedIntegrationEvent>, LeaveRequestedHandler>();
 
         services.AddScoped<GetTaskHandler>();
+        services.AddScoped<GetUnassignedTasksHandler>();
         services.AddScoped<GetMyTasksHandler>();
         services.AddScoped<GetTeamTasksHandler>();
         services.AddScoped<GetEmployeeTasksHandler>();

@@ -15,10 +15,16 @@
                     <div class="mt-4">
                         <MyProfileOverviewTab CompanyId="CompanyId"
                                              EmployeeId="EmployeeId"
-                                             OnNavigateToLeave="() => _activeTabIndex = 1"
-                                             OnNavigateToDocuments="() => _activeTabIndex = 2"
-                                             OnNavigateToTasks="() => _activeTabIndex = 3" />
+                                             OnNavigateToLeave="() => _activeTabIndex = 2"
+                                             OnNavigateToDocuments="() => _activeTabIndex = 3"
+                                             OnNavigateToTasks="() => _activeTabIndex = 4" />
                     </div>
+                </ContentTemplate>
+            </TabItem>
+            <TabItem>
+                <ChildContent><TabHeader Text="Personal Details" /></ChildContent>
+                <ContentTemplate>
+                    <div class="mt-4"><MyProfilePersonalDetailsTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
                 </ContentTemplate>
             </TabItem>
             <TabItem>

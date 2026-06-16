@@ -21,6 +21,11 @@ internal sealed class Employee
     public WorkingDays? WorkingDaysOverride { get; private set; }
     public decimal? HoursPerDayOverride { get; private set; }
     public string? ProfileImageUrl { get; private set; }
+    public string? PreferredName { get; private set; }
+    public DateOnly? DateOfBirth { get; private set; }
+    public string? Nationality { get; private set; }
+    public string? Gender { get; private set; }
+    public string? GenderOther { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -114,6 +119,22 @@ internal sealed class Employee
     {
         Status = EmploymentStatus.Terminated;
         UpdatedAt = now;
+    }
+
+    public void UpdatePersonalDetails(
+        string? preferredName,
+        DateOnly? dateOfBirth,
+        string? nationality,
+        string? gender,
+        string? genderOther,
+        DateTimeOffset now)
+    {
+        PreferredName = string.IsNullOrWhiteSpace(preferredName) ? null : preferredName.Trim();
+        DateOfBirth   = dateOfBirth;
+        Nationality   = string.IsNullOrWhiteSpace(nationality)   ? null : nationality.Trim();
+        Gender        = string.IsNullOrWhiteSpace(gender)        ? null : gender.Trim();
+        GenderOther   = string.IsNullOrWhiteSpace(genderOther)   ? null : genderOther.Trim();
+        UpdatedAt     = now;
     }
 
 }

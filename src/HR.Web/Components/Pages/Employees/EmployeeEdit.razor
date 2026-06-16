@@ -52,6 +52,40 @@
                                 <HrTextBox @bind-Value="_model.LastName" Placeholder="Last name" />
                             </div>
                             <div class="col-md-6">
+                                <label class="form-label">Preferred Name</label>
+                                <HrTextBox @bind-Value="_model.PreferredName" Placeholder="Defaults to first name" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
+                                <SfDatePicker TValue="DateOnly?" @bind-Value="_model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Nationality <span class="text-danger">*</span></label>
+                                <SfDropDownList TValue="string"
+                                                TItem="NationalityListItem"
+                                                DataSource="@_nationalities"
+                                                @bind-Value="_model.Nationality"
+                                                Placeholder="Select nationality"
+                                                AllowFiltering="true">
+                                    <DropDownListFieldSettings Value="Name" Text="Name" />
+                                </SfDropDownList>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Gender <span class="text-danger">*</span></label>
+                                <SfDropDownList TValue="string"
+                                                TItem="string"
+                                                DataSource="@_genderOptions"
+                                                @bind-Value="_model.Gender"
+                                                Placeholder="Select gender">
+                                </SfDropDownList>
+                                @if (_model.Gender == "Other")
+                                {
+                                    <div class="mt-2">
+                                        <HrTextBox @bind-Value="_model.GenderOther" Placeholder="Please specify" />
+                                    </div>
+                                }
+                            </div>
+                            <div class="col-md-6">
                                 <label class="form-label">Work Email <span class="text-danger">*</span></label>
                                 <HrTextBox @bind-Value="_model.WorkEmail" Placeholder="work@company.com" />
                             </div>
@@ -160,6 +194,40 @@
                                             <div class="col-md-6">
                                                 <label class="form-label">Last Name <span class="text-danger">*</span></label>
                                                 <HrTextBox @bind-Value="_model.LastName" Placeholder="Last name" />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Preferred Name</label>
+                                                <HrTextBox @bind-Value="_model.PreferredName" Placeholder="Defaults to first name" />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Date of Birth</label>
+                                                <SfDatePicker TValue="DateOnly?" @bind-Value="_model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Nationality</label>
+                                                <SfDropDownList TValue="string"
+                                                                TItem="NationalityListItem"
+                                                                DataSource="@_nationalities"
+                                                                @bind-Value="_model.Nationality"
+                                                                Placeholder="Select nationality"
+                                                                AllowFiltering="true">
+                                                    <DropDownListFieldSettings Value="Name" Text="Name" />
+                                                </SfDropDownList>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Gender</label>
+                                                <SfDropDownList TValue="string"
+                                                                TItem="string"
+                                                                DataSource="@_genderOptions"
+                                                                @bind-Value="_model.Gender"
+                                                                Placeholder="Select gender">
+                                                </SfDropDownList>
+                                                @if (_model.Gender == "Other")
+                                                {
+                                                    <div class="mt-2">
+                                                        <HrTextBox @bind-Value="_model.GenderOther" Placeholder="Please specify" />
+                                                    </div>
+                                                }
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label">Work Email <span class="text-danger">*</span></label>
@@ -378,9 +446,11 @@
 
     private readonly EmployeeProfileEditModel _model = new();
     private static readonly string[] _allDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    private static readonly string[] _genderOptions = ["Male", "Female", "Non-binary", "Prefer not to say", "Other"];
 
     private List<DepartmentListItemModel> _departments = [];
     private List<PositionProfileListItemModel> _positionProfiles = [];
+    private List<NationalityListItem> _nationalities = [];
 
     protected override async Task OnParametersSetAsync()
     {
@@ -395,6 +465,9 @@
         var profileResult = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
         _positionProfiles = profileResult?.Items.ToList() ?? [];
 
+        var natResult = await EmployeeService.ListNationalitiesAsync();
+        _nationalities = natResult?.Items.ToList() ?? [];
+
         if (!IsNew)
         {
             _employee = await EmployeeService.GetEmployeeAsync(CompanyId, Id!.Value);
@@ -402,9 +475,14 @@
             {
                 _model.FirstName = _employee.FirstName;
                 _model.LastName = _employee.LastName;
+                _model.PreferredName = _employee.PreferredName ?? string.Empty;
                 _model.WorkEmail = _employee.WorkEmail;
                 _model.PersonalEmail = _employee.PersonalEmail;
                 _model.StartDate = _employee.StartDate;
+                _model.DateOfBirth = _employee.DateOfBirth;
+                _model.Nationality = _employee.Nationality ?? string.Empty;
+                _model.Gender = _employee.Gender ?? string.Empty;
+                _model.GenderOther = _employee.GenderOther ?? string.Empty;
                 _model.DepartmentId = _employee.DepartmentId;
                 _model.PositionProfileId = _employee.PositionProfileId;
                 _model.HasSystemAccess = _employee.HasSystemAccess;
@@ -450,9 +528,14 @@
                 _model.PositionProfileId,
                 _model.FirstName.Trim(),
                 _model.LastName.Trim(),
+                string.IsNullOrWhiteSpace(_model.PreferredName) ? null : _model.PreferredName.Trim(),
                 _model.WorkEmail.Trim(),
                 string.IsNullOrWhiteSpace(_model.PersonalEmail) ? null : _model.PersonalEmail.Trim(),
                 _model.StartDate,
+                _model.DateOfBirth ?? default,
+                _model.Nationality.Trim(),
+                _model.Gender.Trim(),
+                string.IsNullOrWhiteSpace(_model.GenderOther) ? null : _model.GenderOther.Trim(),
                 _model.HasSystemAccess);
 
             var (created, error) = await EmployeeService.CreateEmployeeAsync(CompanyId, request);
@@ -493,9 +576,14 @@
                 _model.PositionProfileId,
                 _model.FirstName,
                 _model.LastName,
+                string.IsNullOrWhiteSpace(_model.PreferredName) ? null : _model.PreferredName.Trim(),
                 _model.WorkEmail,
                 _model.PersonalEmail,
                 _model.StartDate,
+                _model.DateOfBirth,
+                string.IsNullOrWhiteSpace(_model.Nationality) ? null : _model.Nationality.Trim(),
+                string.IsNullOrWhiteSpace(_model.Gender) ? null : _model.Gender.Trim(),
+                string.IsNullOrWhiteSpace(_model.GenderOther) ? null : _model.GenderOther.Trim(),
                 _model.HasSystemAccess,
                 workingDaysOverride,
                 hoursPerDayOverride);

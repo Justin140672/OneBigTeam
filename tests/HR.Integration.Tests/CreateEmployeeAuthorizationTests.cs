@@ -101,7 +101,10 @@ public class CreateEmployeeAuthorizationTests : IClassFixture<ApiWebApplicationF
             firstName = "Diana",
             lastName = "Evans",
             workEmail = $"diana.{Guid.NewGuid():N}@example.com",
-            startDate = "2026-07-01"
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-05-20",
+            nationality = "British",
+            gender = "Female"
         });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -125,7 +128,10 @@ public class CreateEmployeeAuthorizationTests : IClassFixture<ApiWebApplicationF
             firstName = "Frank",
             lastName = "Garcia",
             workEmail = $"frank.{Guid.NewGuid():N}@example.com",
-            startDate = "2026-07-01"
+            startDate = "2026-07-01",
+            dateOfBirth = "1985-08-15",
+            nationality = "British",
+            gender = "Male"
         });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);

@@ -3,6 +3,7 @@ using System;
 using HR.Modules.Employees.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HR.Modules.Employees.Migrations
 {
     [DbContext(typeof(EmployeesDbContext))]
-    partial class EmployeesDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260616085303_AddPersonalDetailsToEmployee")]
+    partial class AddPersonalDetailsToEmployee
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -106,11 +109,6 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("gender");
 
-                    b.Property<string>("GenderOther")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("gender_other");
-
                     b.Property<bool>("HasSystemAccess")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -196,26 +194,6 @@ namespace HR.Modules.Employees.Migrations
                         .IsUnique();
 
                     b.ToTable("employees", "employees");
-                });
-
-            modelBuilder.Entity("HR.Modules.Employees.Domain.Nationality", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("name");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("nationalities", "employees");
                 });
 
             modelBuilder.Entity("HR.Modules.Employees.Domain.PositionProfile", b =>

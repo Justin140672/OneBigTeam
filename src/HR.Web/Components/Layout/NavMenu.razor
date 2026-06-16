@@ -7,12 +7,12 @@
 </SfDropDownList>
 
 @code {
-    private string themeName;
+    private string themeName = string.Empty;
 
     public class ThemeDetails
     {
-        public string ID { get; set; }
-        public string Text { get; set; }
+        public string ID { get; set; } = string.Empty;
+        public string Text { get; set; } = string.Empty;
     }
 
     private List<ThemeDetails> Themes = new List<ThemeDetails>() {
@@ -43,7 +43,7 @@
     {
         var uri = UrlHelper.ToAbsoluteUri(UrlHelper.Uri);
         QueryHelpers.ParseQuery(uri.Query).TryGetValue("theme", out var theme);
-        return theme.Count > 0 ? theme.First() : "bootstrap4";
+        return theme.Count > 0 ? (theme.First() ?? "bootstrap4") : "bootstrap4";
     }
 
     private string GetUri(string themeName)

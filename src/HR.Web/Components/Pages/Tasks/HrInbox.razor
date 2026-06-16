@@ -1,0 +1,144 @@
+@page "/companies/{CompanyId:guid}/hr/inbox"
+@rendermode InteractiveServer
+@inject TaskService TaskService
+@inject NavigationManager Navigation
+@inject AppSession Session
+
+<PageTitle>HR Inbox</PageTitle>
+
+<div class="container py-4">
+    <div class="inbox-header mb-4">
+        <div>
+            <h1 class="mb-0">HR Inbox</h1>
+            <p class="text-muted small mb-0">Unassigned tasks waiting to be picked up</p>
+        </div>
+        @if (!_loading && _items.Count > 0)
+        {
+            <span class="inbox-count-badge">@_items.Count</span>
+        }
+    </div>
+
+    @if (_loading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span class="text-muted">Loading…</span>
+        </div>
+    }
+    else if (_items.Count == 0)
+    {
+        <div class="inbox-empty">
+            <i class="fa-solid fa-inbox fa-2x mb-3 inbox-empty-icon"></i>
+            <p class="mb-0 fw-semibold">Inbox clear</p>
+            <p class="text-muted small mb-0">No unassigned tasks right now.</p>
+        </div>
+    }
+    else
+    {
+        <div class="inbox-list">
+            @foreach (var item in _items)
+            {
+                var t = item;
+                var (dueCss, dueLabel) = DueBadge(t.DueDate);
+                <div class="inbox-card @(_claiming == t.Id ? "inbox-card--claiming" : "")">
+                    <span class="priority-pip priority-pip--@t.Priority.ToLowerInvariant()" title="@t.Priority priority"></span>
+                    <div class="inbox-card-body">
+                        <div class="inbox-card-top">
+                            <span class="inbox-card-title">@t.Title</span>
+                            <span class="inbox-source-badge inbox-source-badge--@t.Source.ToLowerInvariant()">@t.Source</span>
+                        </div>
+                        @if (t.Description is not null)
+                        {
+                            <p class="inbox-card-desc">@t.Description</p>
+                        }
+                        <div class="inbox-card-meta">
+                            <span class="inbox-card-age">Added @FormatAge(t.CreatedAt)</span>
+                            @if (dueLabel is not null)
+                            {
+                                <span class="due-badge due-badge--@dueCss">@dueLabel</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="inbox-card-actions">
+                        <button class="btn btn-sm btn-outline-secondary"
+                                @onclick="() => ViewTask(t)">
+                            View
+                        </button>
+                        <button class="btn btn-sm btn-primary"
+                                disabled="@(_claiming is not null)"
+                                @onclick="() => ClaimAsync(t)">
+                            @if (_claiming == t.Id)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            Claim
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (_claimError is not null)
+    {
+        <div class="alert alert-danger mt-3">@_claimError</div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private bool _loading = true;
+    private List<UnassignedTaskItem> _items = [];
+    private Guid? _claiming;
+    private string? _claimError;
+    private DateOnly _today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var result = await TaskService.GetUnassignedTasksAsync(CompanyId);
+        _items = result?.Items.ToList() ?? [];
+        _loading = false;
+    }
+
+    private async Task ClaimAsync(UnassignedTaskItem item)
+    {
+        if (!Session.EmployeeId.HasValue) return;
+
+        _claiming    = item.Id;
+        _claimError  = null;
+
+        var ok = await TaskService.SelfAssignTaskAsync(
+            CompanyId, item.Id, Session.EmployeeId.Value, Session.UserId);
+
+        _claiming = null;
+
+        if (ok)
+            _items.Remove(item);
+        else
+            _claimError = "Failed to claim the task. Please try again.";
+    }
+
+    private (string Css, string? Label) DueBadge(DateOnly? due)
+    {
+        if (due is null) return ("", null);
+        if (due.Value < _today)             return ("overdue", "Overdue");
+        if (due.Value == _today)            return ("today",   "Today");
+        if (due.Value == _today.AddDays(1)) return ("soon",    "Tomorrow");
+        return ("normal", due.Value.ToString("d MMM"));
+    }
+
+    private void ViewTask(UnassignedTaskItem task) =>
+        Navigation.NavigateTo($"/companies/{CompanyId}/tasks/{task.Id}");
+
+    private static string FormatAge(DateTimeOffset created)
+    {
+        var diff = DateTimeOffset.UtcNow - created;
+        if (diff.TotalMinutes < 1)  return "just now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours < 24)   return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays < 7)     return $"{(int)diff.TotalDays}d ago";
+        return created.ToString("d MMM yyyy");
+    }
+}

@@ -114,6 +114,69 @@ public class CreateEmployeeValidatorTests
     }
 
     [Fact]
+    public void Validate_Fails_When_DateOfBirth_Is_Empty()
+    {
+        var validator = new CreateEmployeeValidator();
+
+        var result = validator.Validate(new CreateEmployeeRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            FirstName = "Alice",
+            LastName = "Smith",
+            WorkEmail = "alice@example.com",
+            StartDate = new DateOnly(2026, 7, 1),
+            DateOfBirth = default,
+            Nationality = "British",
+            Gender = "Female"
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateEmployeeRequest.DateOfBirth));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Nationality_Is_Empty()
+    {
+        var validator = new CreateEmployeeValidator();
+
+        var result = validator.Validate(new CreateEmployeeRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            FirstName = "Alice",
+            LastName = "Smith",
+            WorkEmail = "alice@example.com",
+            StartDate = new DateOnly(2026, 7, 1),
+            DateOfBirth = new DateOnly(1990, 5, 20),
+            Nationality = string.Empty,
+            Gender = "Female"
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateEmployeeRequest.Nationality));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Gender_Is_Empty()
+    {
+        var validator = new CreateEmployeeValidator();
+
+        var result = validator.Validate(new CreateEmployeeRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            FirstName = "Alice",
+            LastName = "Smith",
+            WorkEmail = "alice@example.com",
+            StartDate = new DateOnly(2026, 7, 1),
+            DateOfBirth = new DateOnly(1990, 5, 20),
+            Nationality = "British",
+            Gender = string.Empty
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateEmployeeRequest.Gender));
+    }
+
+    [Fact]
     public void Validate_Passes_For_Valid_Minimal_Request()
     {
         var validator = new CreateEmployeeValidator();
@@ -124,7 +187,10 @@ public class CreateEmployeeValidatorTests
             FirstName = "Alice",
             LastName = "Smith",
             WorkEmail = "alice@example.com",
-            StartDate = new DateOnly(2026, 7, 1)
+            StartDate = new DateOnly(2026, 7, 1),
+            DateOfBirth = new DateOnly(1990, 5, 20),
+            Nationality = "British",
+            Gender = "Female"
         });
 
         Assert.True(result.IsValid);
@@ -143,9 +209,13 @@ public class CreateEmployeeValidatorTests
             ManagerId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = "Smith",
+            PreferredName = "Al",
             WorkEmail = "alice@example.com",
             PersonalEmail = "alice.personal@gmail.com",
-            StartDate = new DateOnly(2026, 7, 1)
+            StartDate = new DateOnly(2026, 7, 1),
+            DateOfBirth = new DateOnly(1990, 5, 20),
+            Nationality = "British",
+            Gender = "Female"
         });
 
         Assert.True(result.IsValid);

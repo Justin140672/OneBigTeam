@@ -59,6 +59,29 @@ public sealed class TaskService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<UnassignedTaskListResponse?> GetUnassignedTasksAsync(Guid companyId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<UnassignedTaskListResponse>(
+                $"api/companies/{companyId}/tasks/unassigned", cancellationToken);
+        }
+        catch { return null; }
+    }
+
+    public async Task<bool> SelfAssignTaskAsync(Guid companyId, Guid taskId, Guid employeeId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.PutAsJsonAsync(
+                $"api/companies/{companyId}/tasks/{taskId}/assignee",
+                new { AssignedEmployeeId = employeeId, AssignedUserId = userId },
+                cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
     public async Task<bool> CompleteTaskAsync(
         Guid companyId, Guid taskId,
         string? outcomeDecision = null, string? outcomeReason = null,

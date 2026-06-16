@@ -358,6 +358,60 @@ public class CreateEmployeeHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Sets_PreferredName_To_FirstName_When_Not_Provided()
+    {
+        await using var context = BuildContext();
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+
+        var result = await handler.HandleAsync(
+            new CreateEmployeeRequest
+            {
+                CompanyId = Guid.NewGuid(),
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female"
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var saved = await context.Employees.SingleAsync();
+        Assert.Equal("Alice", saved.PreferredName);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Uses_Provided_PreferredName_When_Supplied()
+    {
+        await using var context = BuildContext();
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+
+        var result = await handler.HandleAsync(
+            new CreateEmployeeRequest
+            {
+                CompanyId = Guid.NewGuid(),
+                FirstName = "Alice",
+                LastName = "Smith",
+                PreferredName = "Al",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female"
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var saved = await context.Employees.SingleAsync();
+        Assert.Equal("Al", saved.PreferredName);
+        Assert.Equal(new DateOnly(1990, 5, 20), saved.DateOfBirth);
+        Assert.Equal("British", saved.Nationality);
+        Assert.Equal("Female", saved.Gender);
+    }
+
+    [Fact]
     public async Task HandleAsync_Publishes_EmployeeCreatedIntegrationEvent_On_Success()
     {
         await using var context = BuildContext();

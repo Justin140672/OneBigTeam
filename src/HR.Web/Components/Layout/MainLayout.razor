@@ -52,6 +52,11 @@ else
                             <MenuItem Text="Public Holidays" Url="@_menuItems["PublicHolidays"]" />
                         </MenuItems>
                     </MenuItem>
+                    <MenuItem Text="HR" IconCss="fa-solid fa-inbox">
+                        <MenuItems>
+                            <MenuItem Text="HR Inbox" Url="@_menuItems["HrInbox"]" />
+                        </MenuItems>
+                    </MenuItem>
                 </MenuItems>
             </SfMenu>
 
@@ -189,6 +194,7 @@ else
         ["Departments"]      = "/",
         ["PositionProfiles"] = "/",
         ["PublicHolidays"]   = "/",
+        ["HrInbox"]          = "/",
     };
 
     protected override async Task OnInitializedAsync()
@@ -200,6 +206,7 @@ else
         _menuItems["Departments"]      = $"/companies/{companyId}/departments";
         _menuItems["PositionProfiles"] = $"/companies/{companyId}/position-profiles";
         _menuItems["PublicHolidays"]   = $"/companies/{companyId}/public-holidays";
+        _menuItems["HrInbox"]          = $"/companies/{companyId}/hr/inbox";
 
         await LoadNotificationsAsync();
     }

@@ -13,6 +13,7 @@ internal sealed class EmployeesDbContext : DbContext
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<PositionProfile> PositionProfiles => Set<PositionProfile>();
+    public DbSet<Nationality> Nationalities => Set<Nationality>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
