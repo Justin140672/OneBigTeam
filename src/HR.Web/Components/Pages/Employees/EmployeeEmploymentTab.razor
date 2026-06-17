@@ -31,7 +31,7 @@ else
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label">Employee Number</label>
+                            <label class="form-label">Employee Number <span class="text-danger">*</span></label>
                             <HrTextBox @bind-Value="_model.EmployeeNumber" Placeholder="e.g. EMP-001" />
                         </div>
                         <div class="col-md-6">
@@ -45,13 +45,12 @@ else
                             </SfDropDownList>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Employment Type</label>
+                            <label class="form-label">Employment Type <span class="text-danger">*</span></label>
                             <SfDropDownList TValue="string?"
                                             TItem="Option"
                                             DataSource="@_employmentTypeOptions"
                                             @bind-Value="_model.EmploymentType"
-                                            Placeholder="Select type"
-                                            ShowClearButton="true">
+                                            Placeholder="Select type">
                                 <DropDownListFieldSettings Value="Value" Text="Label" />
                             </SfDropDownList>
                         </div>

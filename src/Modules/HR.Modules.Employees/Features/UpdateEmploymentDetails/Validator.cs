@@ -17,8 +17,11 @@ internal sealed class UpdateEmploymentDetailsValidator : AbstractValidator<Updat
             .WithMessage("Cannot set employment status to Draft.");
 
         RuleFor(r => r.EmployeeNumber)
-            .MaximumLength(50)
-            .When(r => !string.IsNullOrWhiteSpace(r.EmployeeNumber));
+            .NotEmpty().WithMessage("Employee number is required.")
+            .MaximumLength(50);
+
+        RuleFor(r => r.EmploymentType)
+            .NotNull().WithMessage("Employment type is required.");
 
         RuleFor(r => r.Notes)
             .MaximumLength(4000)

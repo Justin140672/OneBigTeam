@@ -31,16 +31,13 @@ else
 {
     <div class="overview-grid">
 
-        <!-- Personal Information -->
+        <!-- Employment Summary -->
         <div class="overview-card">
             <div class="overview-card-header">
-                <i class="fa-solid fa-user overview-card-icon"></i>
-                <span class="overview-card-title">Personal Information</span>
+                <i class="fa-solid fa-briefcase overview-card-icon"></i>
+                <span class="overview-card-title">Employment</span>
             </div>
             <dl class="overview-dl">
-                <dt>Name</dt>
-                <dd>@_employee.FirstName @_employee.LastName</dd>
-
                 <dt>Job Title</dt>
                 <dd>@(_employee.PositionTitle ?? Session.JobTitle ?? "—")</dd>
 
@@ -52,6 +49,12 @@ else
 
                 <dt>Start Date</dt>
                 <dd>@_employee.StartDate.ToString("d MMMM yyyy")</dd>
+
+                <dt>Length of Service</dt>
+                <dd>@LengthOfService(_employee.StartDate)</dd>
+
+                <dt>Employment Type</dt>
+                <dd>@EmploymentTypeLabel(_employee.EmploymentType)</dd>
             </dl>
         </div>
 
@@ -78,25 +81,6 @@ else
                         <span class="text-muted">—</span>
                     }
                 </dd>
-            </dl>
-        </div>
-
-        <!-- Employment Summary -->
-        <div class="overview-card">
-            <div class="overview-card-header">
-                <i class="fa-solid fa-briefcase overview-card-icon"></i>
-                <span class="overview-card-title">Employment</span>
-            </div>
-            <dl class="overview-dl">
-                <dt>Status</dt>
-                <dd>
-                    <span class="status-badge status-badge--@_employee.Status.ToLowerInvariant()">
-                        @StatusLabel(_employee.Status)
-                    </span>
-                </dd>
-
-                <dt>Length of Service</dt>
-                <dd>@LengthOfService(_employee.StartDate)</dd>
             </dl>
         </div>
 
@@ -255,11 +239,14 @@ else
         };
     }
 
-    private static string StatusLabel(string status) => status switch
+    private static string EmploymentTypeLabel(string? type) => type switch
     {
-        "OnLeave"    => "On Leave",
-        "Terminated" => "Terminated",
-        _            => status
+        "Permanent"  => "Permanent",
+        "FixedTerm"  => "Fixed Term",
+        "Contractor" => "Contractor",
+        "Casual"     => "Casual",
+        "Apprentice" => "Apprentice",
+        _            => "—"
     };
 
     private static string FormatDays(decimal? days) =>
