@@ -24,6 +24,7 @@ using HR.Modules.Employees.Features.UpdateDepartment;
 using HR.Modules.Employees.Features.GetPositionProfile;
 using HR.Modules.Employees.Features.ListPositionProfiles;
 using HR.Modules.Employees.Features.UpdateEmployeeProfile;
+using HR.Modules.Employees.Features.UpdateEmploymentDetails;
 using HR.Modules.Employees.Features.UpdatePositionProfile;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
@@ -87,6 +88,9 @@ public static class EmployeesModule
 
         services.AddScoped<UpdateEmployeeProfileHandler>();
         services.AddScoped<IValidator<UpdateEmployeeProfileRequest>, UpdateEmployeeProfileValidator>();
+
+        services.AddScoped<UpdateEmploymentDetailsHandler>();
+        services.AddScoped<IValidator<UpdateEmploymentDetailsRequest>, UpdateEmploymentDetailsValidator>();
 
         services.AddScoped<AssignManagerHandler>();
         services.AddScoped<IValidator<AssignManagerRequest>, AssignManagerValidator>();

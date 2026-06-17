@@ -49,6 +49,12 @@ internal sealed class GetEmployeeHandler
                 e.HasSystemAccess,
                 e.WorkingDaysOverride,
                 e.HoursPerDayOverride,
+                e.EmployeeNumber,
+                e.EmploymentType,
+                e.ContinuousServiceDate,
+                e.ProbationEndDate,
+                e.LeavingDate,
+                e.Notes,
                 e.CreatedAt,
                 e.UpdatedAt,
                 DepartmentName = _dbContext.Departments
@@ -103,6 +109,12 @@ internal sealed class GetEmployeeHandler
             result.HasSystemAccess,
             result.WorkingDaysOverride,
             result.HoursPerDayOverride,
+            result.EmployeeNumber,
+            result.EmploymentType,
+            result.ContinuousServiceDate,
+            result.ProbationEndDate,
+            result.LeavingDate,
+            result.Notes,
             result.CreatedAt,
             result.UpdatedAt));
     }

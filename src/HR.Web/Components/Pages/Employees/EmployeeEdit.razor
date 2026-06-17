@@ -206,7 +206,7 @@
             <h1 class="mb-0">@(_employee?.FirstName) @(_employee?.LastName)</h1>
             @if (_employee is not null)
             {
-                <span class="badge rounded-pill px-3 py-2 fs-6 fw-normal @StatusBadgeClass(_employee.Status)">@_employee.Status</span>
+                <span class="badge rounded-pill px-3 py-2 fs-6 fw-normal @StatusBadgeClass(_employee.Status)">@StatusDisplayName(_employee.Status)</span>
             }
         </div>
 
@@ -452,7 +452,7 @@
                     <ChildContent><TabHeader Text="Employment" /></ChildContent>
                     <ContentTemplate>
                         <div class="mt-4">
-                            <p class="text-muted">Employment details coming soon.</p>
+                            <EmployeeEmploymentTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
                         </div>
                     </ContentTemplate>
                 </TabItem>
@@ -760,5 +760,14 @@
         "Suspended"  => "bg-danger",
         "Terminated" => "bg-secondary",
         _            => "bg-light text-dark"
+    };
+
+    private static string StatusDisplayName(string status) => status switch
+    {
+        "Active"     => "Active",
+        "OnLeave"    => "On Leave",
+        "Suspended"  => "Suspended",
+        "Terminated" => "Leaver",
+        _            => status
     };
 }

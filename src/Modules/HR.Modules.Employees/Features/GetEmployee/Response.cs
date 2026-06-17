@@ -34,5 +34,11 @@ internal sealed record GetEmployeeResponse(
     bool HasSystemAccess,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,
+    string? EmployeeNumber,
+    EmploymentType? EmploymentType,
+    DateOnly? ContinuousServiceDate,
+    DateOnly? ProbationEndDate,
+    DateOnly? LeavingDate,
+    string? Notes,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

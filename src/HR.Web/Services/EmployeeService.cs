@@ -242,6 +242,27 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         catch { return null; }
     }
 
+    public async Task<(bool Success, string? Error)> UpdateEmploymentDetailsAsync(
+        Guid companyId, Guid id, UpdateEmploymentDetailsRequest request)
+    {
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{companyId}/employees/{id}/employment", request);
+
+        if (response.IsSuccessStatusCode)
+            return (true, null);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+            return (false, body?.Error ?? "A conflict occurred.");
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return (false, "Employee not found.");
+
+        return (false, "Failed to save employment details.");
+    }
+
     public async Task<(CreateEmployeeResponse? Employee, string? Error)> CreateEmployeeAsync(
         Guid companyId, CreateEmployeeRequest request)
     {

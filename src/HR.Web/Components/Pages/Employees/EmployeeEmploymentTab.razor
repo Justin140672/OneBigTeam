@@ -1,0 +1,376 @@
+@inject EmployeeService EmployeeService
+@inject DepartmentService DepartmentService
+@inject PositionProfileService PositionProfileService
+@using HR.SharedKernel
+
+@if (_loading)
+{
+    <div class="d-flex align-items-center gap-2 py-3">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span class="text-muted">Loading…</span>
+    </div>
+}
+else
+{
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger mb-3">@_error</div>
+    }
+    @if (!string.IsNullOrEmpty(_successMsg))
+    {
+        <div class="alert alert-success mb-3">@_successMsg</div>
+    }
+
+    <div class="row">
+        <div class="col-lg-8">
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Employment Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Employee Number</label>
+                            <HrTextBox @bind-Value="_model.EmployeeNumber" Placeholder="e.g. EMP-001" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Employment Status</label>
+                            <SfDropDownList TValue="string"
+                                            TItem="Option"
+                                            DataSource="@_statusOptions"
+                                            @bind-Value="_model.Status"
+                                            Placeholder="Select status">
+                                <DropDownListFieldSettings Value="Value" Text="Label" />
+                            </SfDropDownList>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Employment Type</label>
+                            <SfDropDownList TValue="string?"
+                                            TItem="Option"
+                                            DataSource="@_employmentTypeOptions"
+                                            @bind-Value="_model.EmploymentType"
+                                            Placeholder="Select type"
+                                            ShowClearButton="true">
+                                <DropDownListFieldSettings Value="Value" Text="Label" />
+                            </SfDropDownList>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Dates</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                            <SfDatePicker TValue="DateOnly" @bind-Value="_model.StartDate" Format="dd/MM/yyyy" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Continuous Service Date</label>
+                            <SfDatePicker TValue="DateOnly?" @bind-Value="_model.ContinuousServiceDate" Format="dd/MM/yyyy" ShowClearButton="true" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Probation End Date</label>
+                            <SfDatePicker TValue="DateOnly?" @bind-Value="_model.ProbationEndDate" Format="dd/MM/yyyy" ShowClearButton="true" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Leaving Date</label>
+                            <SfDatePicker TValue="DateOnly?" @bind-Value="_model.LeavingDate" Format="dd/MM/yyyy" ShowClearButton="true" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Organisation</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Department</label>
+                            <SfDropDownList TValue="Guid?"
+                                            TItem="DepartmentListItemModel"
+                                            DataSource="@_departments"
+                                            @bind-Value="_model.DepartmentId"
+                                            Placeholder="None"
+                                            AllowFiltering="true"
+                                            ShowClearButton="true">
+                                <DropDownListFieldSettings Value="Id" Text="Name" />
+                            </SfDropDownList>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Position Profile</label>
+                            <SfDropDownList TValue="Guid?"
+                                            TItem="PositionProfileListItemModel"
+                                            DataSource="@_positionProfiles"
+                                            @bind-Value="_model.PositionProfileId"
+                                            Placeholder="None"
+                                            AllowFiltering="true"
+                                            ShowClearButton="true">
+                                <DropDownListFieldSettings Value="Id" Text="Title" />
+                            </SfDropDownList>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Manager</label>
+                            <SfDropDownList TValue="Guid?"
+                                            TItem="ManagerOption"
+                                            DataSource="@_managerOptions"
+                                            @bind-Value="_model.ManagerId"
+                                            Placeholder="None"
+                                            AllowFiltering="true"
+                                            ShowClearButton="true">
+                                <DropDownListFieldSettings Value="Id" Text="Name" />
+                            </SfDropDownList>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Working Pattern</h5>
+                </div>
+                <div class="card-body">
+                    <SfCheckBox TChecked="bool"
+                                Label="Use company working pattern"
+                                Checked="@_model.UseCompanyWorkingPattern"
+                                CheckedChanged="@((bool v) => _model.UseCompanyWorkingPattern = v)" />
+                    @if (!_model.UseCompanyWorkingPattern)
+                    {
+                        <div class="row g-3 mt-2">
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Working Days</label>
+                                <div class="d-flex flex-wrap gap-3 mt-1">
+                                    @foreach (var day in _allDays)
+                                    {
+                                        <SfCheckBox TChecked="bool" Label="@day"
+                                                    Checked="@_model.WorkingWeek.Contains(day)"
+                                                    CheckedChanged="@(e => ToggleWorkingDay(day, e))" />
+                                    }
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <SfNumericTextBox TValue="decimal" @bind-Value="_model.HoursPerDay"
+                                                  Placeholder="Hours Per Day"
+                                                  FloatLabelType="FloatLabelType.Auto"
+                                                  Min="0.5m" Max="24m" Step="0.5m" />
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Notes</h5>
+                </div>
+                <div class="card-body">
+                    <label class="form-label">HR Notes</label>
+                    <textarea class="form-control"
+                              rows="4"
+                              placeholder="Optional internal notes visible to HR only"
+                              @bind="_model.Notes"
+                              maxlength="4000"></textarea>
+                    @if (!string.IsNullOrEmpty(_model.Notes))
+                    {
+                        <div class="text-muted small mt-1">@_model.Notes.Length / 4000</div>
+                    }
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 align-items-center mt-3">
+                <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAsync">
+                    @if (_saving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Save Changes
+                </SfButton>
+            </div>
+
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private bool _loading = true;
+    private bool _saving;
+    private string? _error;
+    private string? _successMsg;
+
+    private readonly EmploymentEditModel _model = new();
+    private List<DepartmentListItemModel> _departments = [];
+    private List<PositionProfileListItemModel> _positionProfiles = [];
+    private List<ManagerOption> _managerOptions = [];
+
+    private static readonly string[] _allDays =
+        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+    private static readonly Option[] _statusOptions =
+    [
+        new("Active",     "Active"),
+        new("OnLeave",    "On Leave"),
+        new("Suspended",  "Suspended"),
+        new("Terminated", "Leaver"),
+    ];
+
+    private static readonly Option[] _employmentTypeOptions =
+    [
+        new("Permanent",  "Permanent"),
+        new("FixedTerm",  "Fixed Term"),
+        new("Contractor", "Contractor"),
+        new("Casual",     "Casual"),
+        new("Apprentice", "Apprentice"),
+    ];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _error = null;
+        _successMsg = null;
+
+        var tasks = new[]
+        {
+            Task.Run(async () =>
+            {
+                var r = await DepartmentService.ListDepartmentsAsync(CompanyId);
+                _departments = r?.Items ?? [];
+            }),
+            Task.Run(async () =>
+            {
+                var r = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
+                _positionProfiles = r?.Items.ToList() ?? [];
+            }),
+            Task.Run(async () =>
+            {
+                var r = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
+                _managerOptions = (r?.Items ?? [])
+                    .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "Terminated")
+                    .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+                    .OrderBy(e => e.Name)
+                    .ToList();
+            }),
+        };
+
+        await Task.WhenAll(tasks);
+
+        var employee = await EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
+        if (employee is not null)
+            PopulateModel(employee);
+
+        _loading = false;
+    }
+
+    private void PopulateModel(GetEmployeeResponse e)
+    {
+        _model.EmployeeNumber        = e.EmployeeNumber ?? string.Empty;
+        _model.EmploymentType        = e.EmploymentType;
+        _model.Status                = e.Status is "Draft" or "Active" or "OnLeave" or "Suspended" or "Terminated"
+                                           ? e.Status
+                                           : "Active";
+        _model.DepartmentId          = e.DepartmentId;
+        _model.PositionProfileId     = e.PositionProfileId;
+        _model.ManagerId             = e.ManagerId;
+        _model.StartDate             = e.StartDate;
+        _model.ContinuousServiceDate = e.ContinuousServiceDate;
+        _model.ProbationEndDate      = e.ProbationEndDate;
+        _model.LeavingDate           = e.LeavingDate;
+        _model.Notes                 = e.Notes ?? string.Empty;
+
+        if (e.WorkingDaysOverride.HasValue || e.HoursPerDayOverride.HasValue)
+        {
+            _model.UseCompanyWorkingPattern = false;
+            if (e.WorkingDaysOverride.HasValue)
+            {
+                _model.WorkingWeek = _allDays
+                    .Where(d => Enum.TryParse<WorkingDays>(d, out var wd) &&
+                                e.WorkingDaysOverride.Value.HasFlag(wd))
+                    .ToHashSet();
+            }
+            if (e.HoursPerDayOverride.HasValue)
+                _model.HoursPerDay = e.HoursPerDayOverride.Value;
+        }
+        else
+        {
+            _model.UseCompanyWorkingPattern = true;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _error = null;
+        _successMsg = null;
+
+        WorkingDays? workingDaysOverride = null;
+        decimal? hoursPerDayOverride = null;
+
+        if (!_model.UseCompanyWorkingPattern)
+        {
+            workingDaysOverride = _model.WorkingWeek
+                .Aggregate(WorkingDays.None, (acc, day) =>
+                    Enum.TryParse<WorkingDays>(day, out var wd) ? acc | wd : acc);
+            hoursPerDayOverride = _model.HoursPerDay;
+        }
+
+        var request = new UpdateEmploymentDetailsRequest(
+            CompanyId,
+            EmployeeId,
+            string.IsNullOrWhiteSpace(_model.EmployeeNumber) ? null : _model.EmployeeNumber.Trim(),
+            _model.EmploymentType,
+            _model.Status,
+            _model.DepartmentId,
+            _model.PositionProfileId,
+            _model.ManagerId,
+            _model.StartDate,
+            _model.ContinuousServiceDate,
+            _model.ProbationEndDate,
+            _model.LeavingDate,
+            workingDaysOverride,
+            hoursPerDayOverride,
+            string.IsNullOrWhiteSpace(_model.Notes) ? null : _model.Notes.Trim());
+
+        var (success, error) = await EmployeeService.UpdateEmploymentDetailsAsync(CompanyId, EmployeeId, request);
+        _saving = false;
+
+        if (success)
+            _successMsg = "Employment details saved.";
+        else
+            _error = error ?? "Failed to save employment details.";
+    }
+
+    private void ToggleWorkingDay(string day, bool isChecked)
+    {
+        if (isChecked) _model.WorkingWeek.Add(day);
+        else _model.WorkingWeek.Remove(day);
+    }
+
+    private sealed class EmploymentEditModel
+    {
+        public string EmployeeNumber { get; set; } = string.Empty;
+        public string? EmploymentType { get; set; }
+        public string Status { get; set; } = "Active";
+        public Guid? DepartmentId { get; set; }
+        public Guid? PositionProfileId { get; set; }
+        public Guid? ManagerId { get; set; }
+        public DateOnly StartDate { get; set; }
+        public DateOnly? ContinuousServiceDate { get; set; }
+        public DateOnly? ProbationEndDate { get; set; }
+        public DateOnly? LeavingDate { get; set; }
+        public bool UseCompanyWorkingPattern { get; set; } = true;
+        public HashSet<string> WorkingWeek { get; set; } = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+        public decimal HoursPerDay { get; set; } = 7.5m;
+        public string Notes { get; set; } = string.Empty;
+    }
+
+    private sealed record Option(string Value, string Label);
+    private sealed record ManagerOption(Guid Id, string Name);
+}

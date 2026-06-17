@@ -272,6 +272,33 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("working_days_override");
 
+                    b.Property<string>("EmployeeNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("employee_number");
+
+                    b.Property<string>("EmploymentType")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("employment_type");
+
+                    b.Property<DateOnly?>("ContinuousServiceDate")
+                        .HasColumnType("date")
+                        .HasColumnName("continuous_service_date");
+
+                    b.Property<DateOnly?>("ProbationEndDate")
+                        .HasColumnType("date")
+                        .HasColumnName("probation_end_date");
+
+                    b.Property<DateOnly?>("LeavingDate")
+                        .HasColumnType("date")
+                        .HasColumnName("leaving_date");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("notes");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");

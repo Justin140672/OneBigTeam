@@ -34,6 +34,12 @@ internal sealed class Employee
     public string? County { get; private set; }
     public string? PostCode { get; private set; }
     public string? Country { get; private set; }
+    public string? EmployeeNumber { get; private set; }
+    public EmploymentType? EmploymentType { get; private set; }
+    public DateOnly? ContinuousServiceDate { get; private set; }
+    public DateOnly? ProbationEndDate { get; private set; }
+    public DateOnly? LeavingDate { get; private set; }
+    public string? Notes { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -167,6 +173,26 @@ internal sealed class Employee
         PostCode      = Norm(postCode);
         Country       = Norm(country);
         UpdatedAt     = now;
+    }
+
+    public void UpdateEmploymentDetails(
+        string? employeeNumber,
+        EmploymentType? employmentType,
+        DateOnly startDate,
+        DateOnly? continuousServiceDate,
+        DateOnly? probationEndDate,
+        DateOnly? leavingDate,
+        string? notes,
+        DateTimeOffset now)
+    {
+        EmployeeNumber        = Norm(employeeNumber);
+        EmploymentType        = employmentType;
+        StartDate             = startDate;
+        ContinuousServiceDate = continuousServiceDate;
+        ProbationEndDate      = probationEndDate;
+        LeavingDate           = leavingDate;
+        Notes                 = Norm(notes);
+        UpdatedAt             = now;
     }
 
     private static string? Norm(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();

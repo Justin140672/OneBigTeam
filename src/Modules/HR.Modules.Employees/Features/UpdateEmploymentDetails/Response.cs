@@ -1,0 +1,22 @@
+using HR.Modules.Employees.Domain;
+using HR.SharedKernel;
+
+namespace HR.Modules.Employees.Features.UpdateEmploymentDetails;
+
+internal sealed record UpdateEmploymentDetailsResponse(
+    Guid Id,
+    Guid CompanyId,
+    string? EmployeeNumber,
+    EmploymentType? EmploymentType,
+    EmploymentStatus Status,
+    Guid? DepartmentId,
+    Guid? PositionProfileId,
+    Guid? ManagerId,
+    DateOnly StartDate,
+    DateOnly? ContinuousServiceDate,
+    DateOnly? ProbationEndDate,
+    DateOnly? LeavingDate,
+    WorkingDays? WorkingDaysOverride,
+    decimal? HoursPerDayOverride,
+    string? Notes,
+    DateTimeOffset UpdatedAt);

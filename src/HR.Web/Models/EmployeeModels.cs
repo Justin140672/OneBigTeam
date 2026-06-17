@@ -60,6 +60,12 @@ public record GetEmployeeResponse(
     bool HasSystemAccess,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,
+    string? EmployeeNumber,
+    string? EmploymentType,
+    DateOnly? ContinuousServiceDate,
+    DateOnly? ProbationEndDate,
+    DateOnly? LeavingDate,
+    string? Notes,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
@@ -242,6 +248,25 @@ public sealed record UpdateEmergencyContactRequest(
     string Relationship,
     string PhoneNumber,
     string? Email);
+
+// ── EMPLOYMENT DETAILS ────────────────────────────────────────────────────────
+
+public record UpdateEmploymentDetailsRequest(
+    Guid CompanyId,
+    Guid Id,
+    string? EmployeeNumber,
+    string? EmploymentType,
+    string Status,
+    Guid? DepartmentId,
+    Guid? PositionProfileId,
+    Guid? ManagerId,
+    DateOnly StartDate,
+    DateOnly? ContinuousServiceDate,
+    DateOnly? ProbationEndDate,
+    DateOnly? LeavingDate,
+    WorkingDays? WorkingDaysOverride,
+    decimal? HoursPerDayOverride,
+    string? Notes);
 
 // ── NATIONALITIES ─────────────────────────────────────────────────────────────
 

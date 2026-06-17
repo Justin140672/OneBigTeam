@@ -128,6 +128,28 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .HasColumnName("country")
             .HasMaxLength(100);
 
+        builder.Property(e => e.EmployeeNumber)
+            .HasColumnName("employee_number")
+            .HasMaxLength(50);
+
+        builder.Property(e => e.EmploymentType)
+            .HasColumnName("employment_type")
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        builder.Property(e => e.ContinuousServiceDate)
+            .HasColumnName("continuous_service_date");
+
+        builder.Property(e => e.ProbationEndDate)
+            .HasColumnName("probation_end_date");
+
+        builder.Property(e => e.LeavingDate)
+            .HasColumnName("leaving_date");
+
+        builder.Property(e => e.Notes)
+            .HasColumnName("notes")
+            .HasMaxLength(4000);
+
         builder.Property(e => e.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
