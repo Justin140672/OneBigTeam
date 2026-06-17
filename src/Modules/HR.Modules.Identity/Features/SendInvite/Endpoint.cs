@@ -1,8 +1,9 @@
 using FastEndpoints;
+
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.SharedKernel;
-using Microsoft.AspNetCore.Http;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 

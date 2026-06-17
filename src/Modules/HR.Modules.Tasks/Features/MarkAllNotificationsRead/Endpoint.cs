@@ -1,5 +1,4 @@
 using FastEndpoints;
-using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Tasks.Features.MarkAllNotificationsRead;
 

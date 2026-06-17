@@ -1,5 +1,4 @@
 using FluentValidation;
-using HR.Modules.Leave.Domain;
 
 namespace HR.Modules.Leave.Features.SubmitLeaveRequest;
 

@@ -23,7 +23,7 @@ builder.Services.AddIdentityModule(connectionString);
 builder.Services.AddLeaveModule(connectionString);
 builder.Services.AddTasksModule(connectionString);
 builder.Services.AddInfrastructure(connectionString);
-builder.Services.AddFastEndpoints();
+builder.Services.AddFastEndpoints(o => o.IncludeAbstractValidators = true);
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher>();
 
@@ -215,6 +215,7 @@ app.UseAuthorization();
 app.UseFastEndpoints(c =>
 {
 	c.Serializer.Options.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+	c.Errors.StatusCode = 422;
 });
 app.MapDefaultEndpoints();
 

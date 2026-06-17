@@ -1,4 +1,3 @@
-using System.Net.Http.Json;
 using HR.SharedKernel;
 using HR.Web.Models;
 

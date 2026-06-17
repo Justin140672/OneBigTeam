@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
-using HR.Modules.Tasks.Domain;
 
 namespace HR.Integration.Tests;
 
@@ -123,7 +123,10 @@ public class ReassignTaskEndpointTests : IClassFixture<ApiWebApplicationFactory>
                 firstName,
                 lastName,
                 workEmail = $"{firstName.ToLower()}.{lastName.ToLower()}.{Guid.NewGuid():N}@example.com",
-                startDate = "2026-01-01"
+                startDate = "2026-01-01",
+                dateOfBirth = "1990-01-01",
+                nationality = "British",
+                gender = "Male"
             });
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EmployeePayload>())!;

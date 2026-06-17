@@ -2,6 +2,7 @@ namespace HR.Modules.Employees.Features.CreateEmployee;
 
 internal sealed record CreateEmployeeRequest
 {
+    public Guid? Id { get; init; }
     public Guid CompanyId { get; init; }
     public Guid? DepartmentId { get; init; }
     public Guid? PositionProfileId { get; init; }

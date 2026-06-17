@@ -1,0 +1,94 @@
+using HR.Modules.Employees.Features.UpdatePositionProfile;
+
+namespace HR.Modules.Employees.Tests;
+
+public class UpdatePositionProfileValidatorTests
+{
+    private static UpdatePositionProfileRequest ValidRequest() => new()
+    {
+        CompanyId = Guid.NewGuid(),
+        Id = Guid.NewGuid(),
+        Title = "Senior Developer"
+    };
+
+    [Fact]
+    public void Validate_Fails_When_CompanyId_Is_Empty()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { CompanyId = Guid.Empty });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdatePositionProfileRequest.CompanyId));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Id_Is_Empty()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { Id = Guid.Empty });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdatePositionProfileRequest.Id));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Title_Is_Empty()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { Title = string.Empty });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdatePositionProfileRequest.Title));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Title_Exceeds_200_Characters()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { Title = new string('T', 201) });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdatePositionProfileRequest.Title));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Description_Exceeds_2000_Characters()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { Description = new string('D', 2001) });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdatePositionProfileRequest.Description));
+    }
+
+    [Fact]
+    public void Validate_Passes_When_Description_Is_Null()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { Description = null });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_Description_Is_At_Max_Length()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { Description = new string('D', 2000) });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_For_Valid_Minimal_Request()
+    {
+        var v = new UpdatePositionProfileValidator();
+        Assert.True(v.Validate(ValidRequest()).IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_For_Full_Valid_Request()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with
+        {
+            DepartmentId = Guid.NewGuid(),
+            Description = "Builds and maintains the core platform.",
+            IsManagerial = true
+        });
+        Assert.True(result.IsValid);
+    }
+}

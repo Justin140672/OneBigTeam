@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
@@ -15,16 +16,24 @@ public class UpdateMyContactDetailsEndpointTests : IClassFixture<ApiWebApplicati
     public UpdateMyContactDetailsEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, ContactUser1, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ContactUser2, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ContactUser3, SystemRoles.HrAdministrator);
+        }).GetAwaiter().GetResult();
     }
 
-    private async Task<(HttpClient Client, Guid CompanyId, Guid EmployeeId)> CreateEmployeeAsync(Guid userId)
+    private async Task<(HttpClient Client, Guid CompanyId, Guid EmployeeId)> CreateEmployeeAsync(Guid adminUserId)
     {
-        var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
-        var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
+        using var adminClient = _factory.CreateClient();
+        adminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, adminUserId.ToString());
+        adminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var createResponse = await adminClient.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {
             companyId,
             firstName = "Test",
@@ -38,7 +47,12 @@ public class UpdateMyContactDetailsEndpointTests : IClassFixture<ApiWebApplicati
         createResponse.EnsureSuccessStatusCode();
 
         var created = await createResponse.Content.ReadFromJsonAsync<EmployeeIdPayload>();
-        return (client, companyId, created!.Id);
+
+        var employeeClient = _factory.CreateClient();
+        employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, created!.Id.ToString());
+        employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        return (employeeClient, companyId, created.Id);
     }
 
     [Fact]

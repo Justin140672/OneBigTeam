@@ -132,7 +132,7 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
 
         var empResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
-            new { companyId, firstName = "Test", lastName = "User", workEmail = $"ph.test.{Guid.NewGuid():N}@example.com", startDate = "2026-01-01" });
+            new { companyId, firstName = "Test", lastName = "User", workEmail = $"ph.test.{Guid.NewGuid():N}@example.com", startDate = "2026-01-01", dateOfBirth = "1990-01-01", nationality = "British", gender = "Male" });
         empResp.EnsureSuccessStatusCode();
         var employee = await empResp.Content.ReadFromJsonAsync<EmployeePayload>();
 

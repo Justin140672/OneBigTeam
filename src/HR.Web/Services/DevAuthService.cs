@@ -1,5 +1,3 @@
-using System.Net.Http.Json;
-
 namespace HR.Web.Services;
 
 public sealed record DevPersonaDto(string UserId, string Name, string JobTitle, string Email);

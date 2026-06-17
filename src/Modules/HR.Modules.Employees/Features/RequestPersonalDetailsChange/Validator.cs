@@ -1,9 +1,8 @@
-using FastEndpoints;
 using FluentValidation;
 
 namespace HR.Modules.Employees.Features.RequestPersonalDetailsChange;
 
-internal sealed class RequestPersonalDetailsChangeValidator : Validator<RequestPersonalDetailsChangeRequest>
+internal sealed class RequestPersonalDetailsChangeValidator : AbstractValidator<RequestPersonalDetailsChangeRequest>
 {
     public RequestPersonalDetailsChangeValidator()
     {

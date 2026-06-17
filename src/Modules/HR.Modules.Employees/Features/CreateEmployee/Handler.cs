@@ -90,7 +90,7 @@ internal sealed class CreateEmployeeHandler
         var lastName  = request.LastName.Trim();
 
         var employee = Employee.Create(
-            Guid.NewGuid(),
+            request.Id ?? Guid.NewGuid(),
             request.CompanyId,
             firstName,
             lastName,

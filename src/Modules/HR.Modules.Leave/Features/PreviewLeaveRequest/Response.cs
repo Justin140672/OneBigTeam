@@ -1,5 +1,3 @@
-using HR.Modules.Leave.Domain;
-
 namespace HR.Modules.Leave.Features.PreviewLeaveRequest;
 
 internal sealed record ExcludedPublicHolidayItem(DateOnly Date, string Name);

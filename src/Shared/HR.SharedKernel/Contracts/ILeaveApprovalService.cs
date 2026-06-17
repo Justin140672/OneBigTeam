@@ -1,5 +1,3 @@
-using HR.SharedKernel;
-
 namespace HR.SharedKernel.Contracts;
 
 public interface ILeaveApprovalService

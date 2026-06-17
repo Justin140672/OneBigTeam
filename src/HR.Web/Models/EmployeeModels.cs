@@ -217,6 +217,32 @@ public sealed record UpdateMyContactDetailsRequest(
     string PostCode,
     string Country);
 
+// ── EMERGENCY CONTACTS ────────────────────────────────────────────────────────
+
+public sealed record EmergencyContactItem(
+    Guid Id,
+    string Name,
+    string Relationship,
+    string PhoneNumber,
+    string? Email);
+
+public sealed record GetEmergencyContactsResponse(List<EmergencyContactItem> Contacts);
+
+public sealed record AddEmergencyContactRequest(
+    Guid CompanyId,
+    string Name,
+    string Relationship,
+    string PhoneNumber,
+    string? Email);
+
+public sealed record UpdateEmergencyContactRequest(
+    Guid CompanyId,
+    Guid ContactId,
+    string Name,
+    string Relationship,
+    string PhoneNumber,
+    string? Email);
+
 // ── NATIONALITIES ─────────────────────────────────────────────────────────────
 
 public record ListNationalitiesResponse(IReadOnlyList<NationalityListItem> Items);

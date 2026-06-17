@@ -1,9 +1,14 @@
 using FluentValidation;
 using HR.Modules.Employees.Domain;
+using HR.Modules.Employees.Features.AddMyEmergencyContact;
 using HR.Modules.Employees.Features.AssignManager;
 using HR.Modules.Employees.Features.GetMyContactDetails;
+using HR.Modules.Employees.Features.GetMyEmergencyContacts;
+using HR.Modules.Employees.Features.GetEmployeeEmergencyContacts;
 using HR.Modules.Employees.Features.ListNationalities;
+using HR.Modules.Employees.Features.RemoveMyEmergencyContact;
 using HR.Modules.Employees.Features.UpdateMyContactDetails;
+using HR.Modules.Employees.Features.UpdateMyEmergencyContact;
 using HR.Modules.Employees.Features.CreateDepartment;
 using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Modules.Employees.Features.CreatePositionProfile;
@@ -94,6 +99,14 @@ public static class EmployeesModule
         services.AddScoped<GetMyContactDetailsHandler>();
         services.AddScoped<UpdateMyContactDetailsHandler>();
         services.AddScoped<IValidator<UpdateMyContactDetailsRequest>, UpdateMyContactDetailsValidator>();
+
+        services.AddScoped<GetMyEmergencyContactsHandler>();
+        services.AddScoped<AddMyEmergencyContactHandler>();
+        services.AddScoped<IValidator<AddMyEmergencyContactRequest>, AddMyEmergencyContactValidator>();
+        services.AddScoped<UpdateMyEmergencyContactHandler>();
+        services.AddScoped<IValidator<UpdateMyEmergencyContactRequest>, UpdateMyEmergencyContactValidator>();
+        services.AddScoped<RemoveMyEmergencyContactHandler>();
+        services.AddScoped<GetEmployeeEmergencyContactsHandler>();
 
         services.AddScoped<IWorkingPatternProvider, WorkingPatternProvider>();
         services.AddScoped<IDirectReportsReader, DirectReportsReader>();

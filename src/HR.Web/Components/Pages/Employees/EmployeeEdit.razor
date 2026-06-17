@@ -458,6 +458,15 @@
                 </TabItem>
 
                 <TabItem>
+                    <ChildContent><TabHeader Text="Emergency Contacts" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <EmployeeEmergencyContactsTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
+                <TabItem>
                     <ChildContent><TabHeader Text="Leave" /></ChildContent>
                     <ContentTemplate>
                         <div class="mt-4">

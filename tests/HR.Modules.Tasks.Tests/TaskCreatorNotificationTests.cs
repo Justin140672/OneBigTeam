@@ -1,8 +1,8 @@
-using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Services;
 using HR.Modules.Tasks.Tests.Infrastructure;
 using HR.SharedKernel;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Tasks.Tests;

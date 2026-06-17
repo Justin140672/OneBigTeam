@@ -14,6 +14,7 @@ internal sealed class EmployeesDbContext : DbContext
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<PositionProfile> PositionProfiles => Set<PositionProfile>();
     public DbSet<Nationality> Nationalities => Set<Nationality>();
+    public DbSet<EmergencyContact> EmergencyContacts => Set<EmergencyContact>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -15,9 +15,9 @@
                     <div class="mt-4">
                         <MyProfileOverviewTab CompanyId="CompanyId"
                                              EmployeeId="EmployeeId"
-                                             OnNavigateToLeave="() => _activeTabIndex = 3"
-                                             OnNavigateToDocuments="() => _activeTabIndex = 4"
-                                             OnNavigateToTasks="() => _activeTabIndex = 5" />
+                                             OnNavigateToLeave="() => _activeTabIndex = 4"
+                                             OnNavigateToDocuments="() => _activeTabIndex = 5"
+                                             OnNavigateToTasks="() => _activeTabIndex = 6" />
                     </div>
                 </ContentTemplate>
             </TabItem>
@@ -31,6 +31,12 @@
                 <ChildContent><TabHeader Text="Contact Details" /></ChildContent>
                 <ContentTemplate>
                     <div class="mt-4"><MyProfileContactDetailsTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
+                </ContentTemplate>
+            </TabItem>
+            <TabItem>
+                <ChildContent><TabHeader Text="Emergency Contacts" /></ChildContent>
+                <ContentTemplate>
+                    <div class="mt-4"><MyProfileEmergencyContactsTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
                 </ContentTemplate>
             </TabItem>
             <TabItem>

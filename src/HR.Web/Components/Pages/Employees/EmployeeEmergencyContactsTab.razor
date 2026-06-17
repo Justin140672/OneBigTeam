@@ -1,0 +1,62 @@
+@inject EmployeeService EmployeeService
+
+@if (_loading)
+{
+    <div class="d-flex align-items-center gap-2 py-3">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span class="text-muted">Loading…</span>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header d-flex align-items-center gap-2">
+            <i class="fa-solid fa-person-circle-exclamation text-muted"></i>
+            <h5 class="mb-0">Emergency Contacts</h5>
+            <span class="badge bg-secondary ms-auto">Read only</span>
+        </div>
+        <div class="card-body">
+            @if (_contacts.Count == 0)
+            {
+                <p class="text-muted mb-0">No emergency contacts on file. The employee can add these from their profile.</p>
+            }
+            else
+            {
+                <div class="d-flex flex-column gap-3">
+                    @foreach (var contact in _contacts)
+                    {
+                        <div class="d-flex align-items-start justify-content-between p-3 border rounded bg-light">
+                            <div>
+                                <div class="fw-semibold">@contact.Name</div>
+                                <div class="d-flex flex-wrap gap-3 mt-1 text-muted small">
+                                    <span class="badge text-bg-info fw-normal">@contact.Relationship</span>
+                                    <span><i class="fa-solid fa-phone me-1"></i>@contact.PhoneNumber</span>
+                                    @if (contact.Email is not null)
+                                    {
+                                        <span><i class="fa-solid fa-envelope me-1"></i>@contact.Email</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private bool _loading = true;
+    private List<EmergencyContactItem> _contacts = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        var result = await EmployeeService.GetEmployeeEmergencyContactsAsync(CompanyId, EmployeeId);
+        _contacts = result?.Contacts ?? [];
+        _loading = false;
+    }
+}

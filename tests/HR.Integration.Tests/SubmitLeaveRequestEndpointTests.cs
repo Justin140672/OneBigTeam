@@ -103,7 +103,10 @@ public class SubmitLeaveRequestEndpointTests : IClassFixture<ApiWebApplicationFa
                 firstName = "Leave",
                 lastName = "Tester",
                 workEmail = $"leave.tester.{Guid.NewGuid():N}@example.com",
-                startDate = "2026-01-01"
+                startDate = "2026-01-01",
+                dateOfBirth = "1990-01-01",
+                nationality = "British",
+                gender = "Male"
             });
         employeeResponse.EnsureSuccessStatusCode();
         var employee = await employeeResponse.Content.ReadFromJsonAsync<EmployeePayload>();

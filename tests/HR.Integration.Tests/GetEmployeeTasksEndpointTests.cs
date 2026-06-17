@@ -127,7 +127,10 @@ public class GetEmployeeTasksEndpointTests : IClassFixture<ApiWebApplicationFact
                 firstName,
                 lastName,
                 workEmail = $"{firstName.ToLower()}.{lastName.ToLower()}.{Guid.NewGuid():N}@example.com",
-                startDate = "2026-01-01"
+                startDate = "2026-01-01",
+                dateOfBirth = "1990-01-01",
+                nationality = "British",
+                gender = "Male"
             });
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EmployeePayload>())!;

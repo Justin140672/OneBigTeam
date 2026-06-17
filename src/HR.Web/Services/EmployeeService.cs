@@ -132,6 +132,103 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         catch { return (false, "An unexpected error occurred."); }
     }
 
+    public async Task<GetEmergencyContactsResponse?> GetMyEmergencyContactsAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetEmergencyContactsResponse>(
+                $"api/companies/{companyId}/employees/me/emergency-contacts", cancellationToken);
+        }
+        catch { return null; }
+    }
+
+    public async Task<(EmergencyContactItem? Contact, string? Error)> AddMyEmergencyContactAsync(
+        Guid companyId,
+        AddEmergencyContactRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                $"api/companies/{companyId}/employees/me/emergency-contacts", request, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var created = await response.Content.ReadFromJsonAsync<EmergencyContactItem>(cancellationToken);
+                return (created, null);
+            }
+
+            if (response.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity)
+            {
+                var body = await response.Content.ReadFromJsonAsync<ValidationErrorEnvelope>(cancellationToken);
+                var first = body?.Errors?.Values.SelectMany(v => v).FirstOrDefault();
+                return (null, first ?? "Validation failed.");
+            }
+
+            return (null, "Failed to add emergency contact.");
+        }
+        catch { return (null, "An unexpected error occurred."); }
+    }
+
+    public async Task<(bool Success, string? Error)> UpdateMyEmergencyContactAsync(
+        Guid companyId,
+        UpdateEmergencyContactRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.PutAsJsonAsync(
+                $"api/companies/{companyId}/employees/me/emergency-contacts/{request.ContactId}",
+                request, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return (true, null);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity)
+            {
+                var body = await response.Content.ReadFromJsonAsync<ValidationErrorEnvelope>(cancellationToken);
+                var first = body?.Errors?.Values.SelectMany(v => v).FirstOrDefault();
+                return (false, first ?? "Validation failed.");
+            }
+
+            return (false, "Failed to update emergency contact.");
+        }
+        catch { return (false, "An unexpected error occurred."); }
+    }
+
+    public async Task<(bool Success, string? Error)> RemoveMyEmergencyContactAsync(
+        Guid companyId,
+        Guid contactId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync(
+                $"api/companies/{companyId}/employees/me/emergency-contacts/{contactId}",
+                cancellationToken);
+
+            return response.IsSuccessStatusCode
+                ? (true, null)
+                : (false, "Failed to remove emergency contact.");
+        }
+        catch { return (false, "An unexpected error occurred."); }
+    }
+
+    public async Task<GetEmergencyContactsResponse?> GetEmployeeEmergencyContactsAsync(
+        Guid companyId,
+        Guid employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetEmergencyContactsResponse>(
+                $"api/companies/{companyId}/employees/{employeeId}/emergency-contacts", cancellationToken);
+        }
+        catch { return null; }
+    }
+
     private sealed record ValidationErrorEnvelope(Dictionary<string, string[]>? Errors);
 
     public async Task<ListNationalitiesResponse?> ListNationalitiesAsync(

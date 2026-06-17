@@ -487,7 +487,10 @@ public class LeaveLifecycleIntegrationTests : IClassFixture<ApiWebApplicationFac
                 firstName = "Other",
                 lastName = "Employee",
                 workEmail = $"other.{Guid.NewGuid():N}@example.com",
-                startDate = "2026-01-01"
+                startDate = "2026-01-01",
+                dateOfBirth = "1990-01-01",
+                nationality = "British",
+                gender = "Male"
             });
         empBResp.EnsureSuccessStatusCode();
         var empB = await empBResp.Content.ReadFromJsonAsync<EmployeePayload>();
@@ -574,7 +577,7 @@ public class LeaveLifecycleIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         var empResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
-            new { companyId, firstName = "Leave", lastName = "Lifecycle", workEmail = $"lifecycle.{Guid.NewGuid():N}@example.com", startDate = "2026-01-01" });
+            new { companyId, firstName = "Leave", lastName = "Lifecycle", workEmail = $"lifecycle.{Guid.NewGuid():N}@example.com", startDate = "2026-01-01", dateOfBirth = "1990-01-01", nationality = "British", gender = "Male" });
         empResp.EnsureSuccessStatusCode();
         var employee = await empResp.Content.ReadFromJsonAsync<EmployeePayload>();
 

@@ -126,7 +126,7 @@ public class AwardToilEndpointTests : IClassFixture<ApiWebApplicationFactory>
 
         var empResp = await setupClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
-            new { companyId, firstName = "TOIL", lastName = "Tester", workEmail = $"toil.{Guid.NewGuid():N}@example.com", startDate = "2026-01-01" });
+            new { companyId, firstName = "TOIL", lastName = "Tester", workEmail = $"toil.{Guid.NewGuid():N}@example.com", startDate = "2026-01-01", dateOfBirth = "1990-01-01", nationality = "British", gender = "Male" });
         empResp.EnsureSuccessStatusCode();
         var employee = await empResp.Content.ReadFromJsonAsync<EmployeePayload>();
 

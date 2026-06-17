@@ -1,5 +1,5 @@
-using System;
 using HR.Modules.Companies.Persistence;
+
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
