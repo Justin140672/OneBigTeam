@@ -36,6 +36,14 @@ internal sealed class EmployeeDocument
         UpdatedAt  = now,
     };
 
+    public DocumentExpiryStatus GetExpiryStatus(DateOnly today) => ExpiryDate switch
+    {
+        null                                      => DocumentExpiryStatus.Valid,
+        var d when d < today                      => DocumentExpiryStatus.Expired,
+        var d when d <= today.AddDays(30)         => DocumentExpiryStatus.ExpiringSoon,
+        _                                         => DocumentExpiryStatus.Valid,
+    };
+
     public void Acknowledge(DateTimeOffset now)
     {
         AcknowledgedAt = now;
