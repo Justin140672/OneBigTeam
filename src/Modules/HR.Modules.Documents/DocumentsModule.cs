@@ -2,6 +2,7 @@ using FluentValidation;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.CreateDocumentType;
 using HR.Modules.Documents.Features.DeactivateDocumentType;
+using HR.Modules.Documents.Services;
 using HR.Modules.Documents.Features.ListDocumentTypes;
 using HR.Modules.Documents.Features.UpdateDocumentType;
 using HR.Modules.Documents.Persistence;
@@ -37,6 +38,8 @@ public static class DocumentsModule
         services.AddScoped<IValidator<ListDocumentTypesRequest>, ListDocumentTypesValidator>();
 
         services.AddScoped<DeactivateDocumentTypeHandler>();
+
+        services.AddScoped<IDocumentStorageService, LocalDocumentStorageService>();
     }
 
     public static async Task MigrateDocumentsAsync(this IServiceProvider services)
