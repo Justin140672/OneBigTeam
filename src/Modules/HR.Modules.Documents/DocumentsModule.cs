@@ -5,6 +5,7 @@ using HR.Modules.Documents.Features.DeactivateDocumentType;
 using HR.Modules.Documents.Features.DeleteEmployeeDocument;
 using HR.Modules.Documents.Features.DownloadEmployeeDocument;
 using HR.Modules.Documents.Features.GetEmployeeDocument;
+using HR.Modules.Documents.Features.GetExpiringDocuments;
 using HR.Modules.Documents.Features.ListEmployeeDocuments;
 using HR.Modules.Documents.Features.UploadEmployeeDocument;
 using HR.Modules.Documents.Services;
@@ -77,6 +78,9 @@ public static class DocumentsModule
 
         services.AddScoped<DeleteEmployeeDocumentHandler>();
         services.AddScoped<DownloadEmployeeDocumentHandler>();
+
+        services.AddScoped<GetExpiringDocumentsHandler>();
+        services.AddScoped<IValidator<GetExpiringDocumentsRequest>, GetExpiringDocumentsValidator>();
     }
 
     public static async Task MigrateDocumentsAsync(this IServiceProvider services)

@@ -31,6 +31,6 @@ internal sealed class Endpoint(DownloadEmployeeDocumentHandler handler)
             return;
         }
 
-        await SendRedirectAsync(result.Value!.ToString(), isPermanent: false);
+        await SendRedirectAsync(result.Value!.ToString(), isPermanent: false, allowRemoteRedirects: true);
     }
 }
