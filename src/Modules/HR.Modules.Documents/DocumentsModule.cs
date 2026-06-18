@@ -31,6 +31,9 @@ public static class DocumentsModule
 
     private static void AddStorageService(IServiceCollection services, IConfiguration configuration)
     {
+        services.Configure<FileUploadOptions>(configuration.GetSection("Documents:FileUpload"));
+        services.AddScoped<IFileUploadValidator, FileUploadValidator>();
+
         var supabaseSection = configuration.GetSection("Documents:Supabase");
 
         if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
