@@ -2,6 +2,49 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Documents;
 
+internal sealed record DocumentExpiringSoonAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeDocumentId,
+    Guid EmployeeId,
+    string Title,
+    string DocumentTypeName,
+    DateOnly ExpiryDate,
+    int DaysUntilExpiry,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "document.expiring_soon";
+    string  IAuditEvent.EntityType      => "EmployeeDocument";
+    Guid    IAuditEvent.EntityId        => EmployeeDocumentId;
+    Guid?   IAuditEvent.ActorUserId     => null;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Document '{Title}' expires in {DaysUntilExpiry} day(s)";
+    object? IAuditEvent.Before          => null;
+    object? IAuditEvent.After           => null;
+    object? IAuditEvent.Metadata        => new { DocumentTypeName, EmployeeId, ExpiryDate, DaysUntilExpiry };
+}
+
+internal sealed record DocumentExpiredAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeDocumentId,
+    Guid EmployeeId,
+    string Title,
+    string DocumentTypeName,
+    DateOnly ExpiryDate,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "document.expired";
+    string  IAuditEvent.EntityType      => "EmployeeDocument";
+    Guid    IAuditEvent.EntityId        => EmployeeDocumentId;
+    Guid?   IAuditEvent.ActorUserId     => null;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Document '{Title}' has expired";
+    object? IAuditEvent.Before          => null;
+    object? IAuditEvent.After           => null;
+    object? IAuditEvent.Metadata        => new { DocumentTypeName, EmployeeId, ExpiryDate };
+}
+
 internal sealed record DocumentDeletedAuditEvent(
     Guid CompanyId,
     Guid EmployeeDocumentId,

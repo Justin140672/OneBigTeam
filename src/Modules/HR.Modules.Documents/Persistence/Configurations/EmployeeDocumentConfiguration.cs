@@ -41,6 +41,12 @@ internal sealed class EmployeeDocumentConfiguration : IEntityTypeConfiguration<E
         builder.Property(ed => ed.AcknowledgedAt)
             .HasColumnName("acknowledged_at");
 
+        builder.Property(ed => ed.ExpiringSoonNotifiedAt)
+            .HasColumnName("expiring_soon_notified_at");
+
+        builder.Property(ed => ed.ExpiredNotifiedAt)
+            .HasColumnName("expired_notified_at");
+
         builder.Property(ed => ed.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

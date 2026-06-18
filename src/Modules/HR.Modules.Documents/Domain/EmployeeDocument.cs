@@ -12,6 +12,8 @@ internal sealed class EmployeeDocument
     public DateOnly? IssueDate { get; private set; }
     public DateOnly? ExpiryDate { get; private set; }
     public DateTimeOffset? AcknowledgedAt { get; private set; }
+    public DateTimeOffset? ExpiringSoonNotifiedAt { get; private set; }
+    public DateTimeOffset? ExpiredNotifiedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -48,5 +50,17 @@ internal sealed class EmployeeDocument
     {
         AcknowledgedAt = now;
         UpdatedAt      = now;
+    }
+
+    public void MarkExpiringSoonNotified(DateTimeOffset now)
+    {
+        ExpiringSoonNotifiedAt = now;
+        UpdatedAt              = now;
+    }
+
+    public void MarkExpiredNotified(DateTimeOffset now)
+    {
+        ExpiredNotifiedAt = now;
+        UpdatedAt         = now;
     }
 }

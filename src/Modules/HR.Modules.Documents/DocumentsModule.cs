@@ -6,6 +6,7 @@ using HR.Modules.Documents.Features.DeleteEmployeeDocument;
 using HR.Modules.Documents.Features.DownloadEmployeeDocument;
 using HR.Modules.Documents.Features.GetEmployeeDocument;
 using HR.Modules.Documents.Features.GetExpiringDocuments;
+using HR.Modules.Documents.Features.ProcessDocumentExpiryNotifications;
 using HR.Modules.Documents.Features.ListEmployeeDocuments;
 using HR.Modules.Documents.Features.UploadEmployeeDocument;
 using HR.Modules.Documents.Services;
@@ -81,6 +82,8 @@ public static class DocumentsModule
 
         services.AddScoped<GetExpiringDocumentsHandler>();
         services.AddScoped<IValidator<GetExpiringDocumentsRequest>, GetExpiringDocumentsValidator>();
+
+        services.AddScoped<ProcessDocumentExpiryNotificationsHandler>();
     }
 
     public static async Task MigrateDocumentsAsync(this IServiceProvider services)
