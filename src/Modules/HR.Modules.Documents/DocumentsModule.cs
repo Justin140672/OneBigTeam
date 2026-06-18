@@ -33,6 +33,7 @@ public static class DocumentsModule
     {
         services.Configure<FileUploadOptions>(configuration.GetSection("Documents:FileUpload"));
         services.AddScoped<IFileUploadValidator, FileUploadValidator>();
+        services.AddScoped<IVirusScanService, NoOpVirusScanService>();
 
         var supabaseSection = configuration.GetSection("Documents:Supabase");
 
