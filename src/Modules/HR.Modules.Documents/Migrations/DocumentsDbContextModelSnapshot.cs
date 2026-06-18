@@ -23,6 +23,49 @@ namespace HR.Modules.Documents.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("HR.Modules.Documents.Domain.DocumentType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("CompanyId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("document_types", "documents");
+                });
+
             modelBuilder.Entity("HR.Modules.Documents.Domain.Document", b =>
                 {
                     b.Property<Guid>("Id")
@@ -48,11 +91,9 @@ namespace HR.Modules.Documents.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("description");
 
-                    b.Property<string>("DocumentType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("document_type");
+                    b.Property<Guid>("DocumentTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_type_id");
 
                     b.Property<Guid?>("EmployeeId")
                         .HasColumnType("uuid")
@@ -102,11 +143,22 @@ namespace HR.Modules.Documents.Migrations
 
                     b.HasIndex("CompanyId");
 
+                    b.HasIndex("DocumentTypeId");
+
                     b.HasIndex("EmployeeId");
 
                     b.HasIndex("CompanyId", "EmployeeId", "Status");
 
                     b.ToTable("documents", "documents");
+                });
+
+            modelBuilder.Entity("HR.Modules.Documents.Domain.Document", b =>
+                {
+                    b.HasOne("HR.Modules.Documents.Domain.DocumentType", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

@@ -11,6 +11,7 @@ internal sealed class DocumentsDbContext : DbContext
     }
 
     public DbSet<Document> Documents => Set<Document>();
+    public DbSet<DocumentType> DocumentTypes => Set<DocumentType>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

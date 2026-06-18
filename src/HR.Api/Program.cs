@@ -132,6 +132,7 @@ catch (Exception exception)
 try
 {
 	await app.Services.MigrateDocumentsAsync();
+	await app.Services.SeedDocumentsAsync();
 	documentsMigrationStatus = "succeeded";
 	documentsMigrationCheckedAt = DateTimeOffset.UtcNow;
 }

@@ -32,10 +32,8 @@ internal sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .HasColumnName("description")
             .HasMaxLength(2000);
 
-        builder.Property(d => d.DocumentType)
-            .HasColumnName("document_type")
-            .HasConversion<string>()
-            .HasMaxLength(50)
+        builder.Property(d => d.DocumentTypeId)
+            .HasColumnName("document_type_id")
             .IsRequired();
 
         builder.Property(d => d.FileName)
@@ -78,8 +76,14 @@ internal sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .HasColumnName("updated_at")
             .IsRequired();
 
+        builder.HasOne<DocumentType>()
+            .WithMany()
+            .HasForeignKey(d => d.DocumentTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(d => d.CompanyId);
         builder.HasIndex(d => d.EmployeeId);
+        builder.HasIndex(d => d.DocumentTypeId);
         builder.HasIndex(d => new { d.CompanyId, d.EmployeeId, d.Status });
     }
 }
