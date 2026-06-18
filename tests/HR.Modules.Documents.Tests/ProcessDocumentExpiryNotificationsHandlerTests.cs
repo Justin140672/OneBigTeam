@@ -2,13 +2,13 @@ using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.ProcessDocumentExpiryNotifications;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Tests;
 
 public class ProcessDocumentExpiryNotificationsHandlerTests
 {
-    // Fixed "today" for all tests
     private static readonly DateTime FixedUtcNow = new(2026, 6, 18, 9, 0, 0, DateTimeKind.Utc);
     private static readonly DateOnly Today        = DateOnly.FromDateTime(FixedUtcNow);
 
@@ -19,20 +19,26 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
 
     private static ProcessDocumentExpiryNotificationsHandler BuildHandler(
         DocumentsDbContext db,
-        FakeAuditPublisher? audit = null) =>
-        new(db, new FakeClock(FixedUtcNow), audit ?? new FakeAuditPublisher());
+        FakeAuditPublisher? audit        = null,
+        FakeTaskCreator?    taskCreator  = null) =>
+        new(db,
+            new FakeClock(FixedUtcNow),
+            audit       ?? new FakeAuditPublisher(),
+            taskCreator ?? new FakeTaskCreator());
 
     private static async Task<EmployeeDocument> SeedDocumentAsync(
         DocumentsDbContext db,
         Guid companyId,
         Guid employeeId,
-        DateOnly? expiryDate)
+        DateOnly? expiryDate,
+        string title = "Employment Contract",
+        string typeName = "Contract")
     {
-        var docType = DocumentType.Create(Guid.NewGuid(), companyId, "Contract", null, DateTimeOffset.UtcNow);
+        var docType = DocumentType.Create(Guid.NewGuid(), companyId, typeName, null, DateTimeOffset.UtcNow);
         db.DocumentTypes.Add(docType);
 
         var doc = Document.Create(
-            Guid.NewGuid(), companyId, employeeId, "Employment Contract", null,
+            Guid.NewGuid(), companyId, employeeId, title, null,
             docType.Id, "contract.pdf", 1024, "application/pdf",
             $"{companyId}/{employeeId}/contract.pdf",
             null, Guid.NewGuid(), DateTimeOffset.UtcNow);
@@ -84,7 +90,7 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
     // ── ExpiringSoon ────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task HandleAsync_Returns_ExpiringSoon_Count_And_Publishes_Event()
+    public async Task HandleAsync_Returns_ExpiringSoon_Count_And_Publishes_Audit_Event()
     {
         await using var db = BuildContext();
         var companyId      = Guid.NewGuid();
@@ -100,11 +106,37 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         Assert.Equal(0, result.ExpiredCount);
 
         var evt = Assert.Single(audit.Published);
-        Assert.Equal("document.expiring_soon", evt.EventType);
-        Assert.Equal("EmployeeDocument",       evt.EntityType);
-        Assert.Equal(companyId,                evt.CompanyId);
+        Assert.Equal("document.expiring_soon",  evt.EventType);
+        Assert.Equal("EmployeeDocument",         evt.EntityType);
+        Assert.Equal(companyId,                  evt.CompanyId);
         Assert.Null(evt.ActorUserId);
-        Assert.Contains("Employment Contract", evt.Summary);
+        Assert.Contains("Employment Contract",   evt.Summary);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creates_High_Priority_Task_For_ExpiringSoon()
+    {
+        await using var db  = BuildContext();
+        var companyId       = Guid.NewGuid();
+        var employeeId      = Guid.NewGuid();
+        var tasks           = new FakeTaskCreator();
+        var empDoc          = await SeedDocumentAsync(db, companyId, employeeId, expiryDate: Today.AddDays(10));
+        var handler         = BuildHandler(db, taskCreator: tasks);
+
+        await handler.HandleAsync(
+            new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        var task = Assert.Single(tasks.Created);
+        Assert.Equal(TaskPriority.High,           task.Priority);
+        Assert.Equal(TaskSource.Document,         task.Source);
+        Assert.Equal(companyId,                   task.CompanyId);
+        Assert.Equal(employeeId,                  task.AssignedEmployeeId);
+        Assert.Equal(empDoc.Id,                   task.SourceEntityId);
+        Assert.Equal(Today.AddDays(10),           task.DueDate);
+        Assert.Contains("Employment Contract",    task.Title);
+        Assert.Contains("expiring soon",          task.Title);
+        Assert.Contains("10",                     task.Description);
     }
 
     [Fact]
@@ -127,11 +159,11 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
     [Fact]
     public async Task HandleAsync_ExpiringSoon_Event_Has_Correct_DaysUntilExpiry()
     {
-        await using var db   = BuildContext();
-        var companyId        = Guid.NewGuid();
-        var audit            = new FakeAuditPublisher();
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var audit          = new FakeAuditPublisher();
         await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(10));
-        var handler          = BuildHandler(db, audit);
+        var handler        = BuildHandler(db, audit);
 
         await handler.HandleAsync(
             new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
@@ -144,10 +176,10 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
     [Fact]
     public async Task HandleAsync_Sets_ExpiringSoonNotifiedAt_After_Processing()
     {
-        await using var db   = BuildContext();
-        var companyId        = Guid.NewGuid();
-        var empDoc           = await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(10));
-        var handler          = BuildHandler(db);
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var empDoc         = await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(10));
+        var handler        = BuildHandler(db);
 
         await handler.HandleAsync(
             new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
@@ -160,26 +192,36 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
     [Fact]
     public async Task HandleAsync_Does_Not_Repeat_ExpiringSoon_Notification()
     {
-        await using var db   = BuildContext();
-        var companyId        = Guid.NewGuid();
-        var audit            = new FakeAuditPublisher();
-        await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(10));
-        var handler          = BuildHandler(db, audit);
+        var dbName    = Guid.NewGuid().ToString("N");
+        var companyId = Guid.NewGuid();
+        var audit     = new FakeAuditPublisher();
+        var tasks     = new FakeTaskCreator();
 
-        await handler.HandleAsync(
-            new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
-            CancellationToken.None);
-        await handler.HandleAsync(
-            new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
-            CancellationToken.None);
+        await using (var db1 = new DocumentsDbContext(new DbContextOptionsBuilder<DocumentsDbContext>()
+            .UseInMemoryDatabase(dbName).Options))
+        {
+            await SeedDocumentAsync(db1, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(10));
+            await BuildHandler(db1, audit, tasks).HandleAsync(
+                new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
+                CancellationToken.None);
+        }
+
+        await using (var db2 = new DocumentsDbContext(new DbContextOptionsBuilder<DocumentsDbContext>()
+            .UseInMemoryDatabase(dbName).Options))
+        {
+            await BuildHandler(db2, audit, tasks).HandleAsync(
+                new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
+                CancellationToken.None);
+        }
 
         Assert.Single(audit.Published);
+        Assert.Single(tasks.Created);
     }
 
     // ── Expired ─────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task HandleAsync_Returns_Expired_Count_And_Publishes_Event()
+    public async Task HandleAsync_Returns_Expired_Count_And_Publishes_Audit_Event()
     {
         await using var db = BuildContext();
         var companyId      = Guid.NewGuid();
@@ -195,20 +237,45 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         Assert.Equal(1, result.ExpiredCount);
 
         var evt = Assert.Single(audit.Published);
-        Assert.Equal("document.expired",       evt.EventType);
-        Assert.Equal("EmployeeDocument",       evt.EntityType);
-        Assert.Equal(companyId,                evt.CompanyId);
+        Assert.Equal("document.expired",         evt.EventType);
+        Assert.Equal("EmployeeDocument",         evt.EntityType);
+        Assert.Equal(companyId,                  evt.CompanyId);
         Assert.Null(evt.ActorUserId);
-        Assert.Contains("Employment Contract", evt.Summary);
+        Assert.Contains("Employment Contract",   evt.Summary);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creates_Critical_Priority_Task_For_Expired()
+    {
+        await using var db  = BuildContext();
+        var companyId       = Guid.NewGuid();
+        var employeeId      = Guid.NewGuid();
+        var tasks           = new FakeTaskCreator();
+        var empDoc          = await SeedDocumentAsync(db, companyId, employeeId, expiryDate: Today.AddDays(-5));
+        var handler         = BuildHandler(db, taskCreator: tasks);
+
+        await handler.HandleAsync(
+            new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        var task = Assert.Single(tasks.Created);
+        Assert.Equal(TaskPriority.Critical,       task.Priority);
+        Assert.Equal(TaskSource.Document,         task.Source);
+        Assert.Equal(companyId,                   task.CompanyId);
+        Assert.Equal(employeeId,                  task.AssignedEmployeeId);
+        Assert.Equal(empDoc.Id,                   task.SourceEntityId);
+        Assert.Equal(Today.AddDays(7),            task.DueDate);
+        Assert.Contains("Employment Contract",    task.Title);
+        Assert.Contains("expired",                task.Title);
     }
 
     [Fact]
     public async Task HandleAsync_Sets_ExpiredNotifiedAt_After_Processing()
     {
-        await using var db   = BuildContext();
-        var companyId        = Guid.NewGuid();
-        var empDoc           = await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(-5));
-        var handler          = BuildHandler(db);
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var empDoc         = await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(-5));
+        var handler        = BuildHandler(db);
 
         await handler.HandleAsync(
             new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
@@ -221,20 +288,30 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
     [Fact]
     public async Task HandleAsync_Does_Not_Repeat_Expired_Notification()
     {
-        await using var db   = BuildContext();
-        var companyId        = Guid.NewGuid();
-        var audit            = new FakeAuditPublisher();
-        await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(-5));
-        var handler          = BuildHandler(db, audit);
+        var dbName    = Guid.NewGuid().ToString("N");
+        var companyId = Guid.NewGuid();
+        var audit     = new FakeAuditPublisher();
+        var tasks     = new FakeTaskCreator();
 
-        await handler.HandleAsync(
-            new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
-            CancellationToken.None);
-        await handler.HandleAsync(
-            new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
-            CancellationToken.None);
+        await using (var db1 = new DocumentsDbContext(new DbContextOptionsBuilder<DocumentsDbContext>()
+            .UseInMemoryDatabase(dbName).Options))
+        {
+            await SeedDocumentAsync(db1, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(-5));
+            await BuildHandler(db1, audit, tasks).HandleAsync(
+                new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
+                CancellationToken.None);
+        }
+
+        await using (var db2 = new DocumentsDbContext(new DbContextOptionsBuilder<DocumentsDbContext>()
+            .UseInMemoryDatabase(dbName).Options))
+        {
+            await BuildHandler(db2, audit, tasks).HandleAsync(
+                new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
+                CancellationToken.None);
+        }
 
         Assert.Single(audit.Published);
+        Assert.Single(tasks.Created);
     }
 
     // ── Multi-document and isolation ────────────────────────────────────────────
@@ -245,10 +322,11 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         await using var db = BuildContext();
         var companyId      = Guid.NewGuid();
         var audit          = new FakeAuditPublisher();
+        var tasks          = new FakeTaskCreator();
         await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(10));
         await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(20));
         await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(-3));
-        var handler        = BuildHandler(db, audit);
+        var handler        = BuildHandler(db, audit, tasks);
 
         var result = await handler.HandleAsync(
             new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
@@ -257,17 +335,21 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         Assert.Equal(2, result.ExpiringSoonCount);
         Assert.Equal(1, result.ExpiredCount);
         Assert.Equal(3, audit.Published.Count);
+        Assert.Equal(3, tasks.Created.Count);
+        Assert.Equal(2, tasks.Created.Count(t => t.Priority == TaskPriority.High));
+        Assert.Equal(1, tasks.Created.Count(t => t.Priority == TaskPriority.Critical));
     }
 
     [Fact]
     public async Task HandleAsync_Does_Not_Process_Documents_From_Other_Company()
     {
-        await using var db    = BuildContext();
-        var companyA          = Guid.NewGuid();
-        var companyB          = Guid.NewGuid();
-        var audit             = new FakeAuditPublisher();
+        await using var db = BuildContext();
+        var companyA       = Guid.NewGuid();
+        var companyB       = Guid.NewGuid();
+        var audit          = new FakeAuditPublisher();
+        var tasks          = new FakeTaskCreator();
         await SeedDocumentAsync(db, companyB, Guid.NewGuid(), expiryDate: Today.AddDays(5));
-        var handler           = BuildHandler(db, audit);
+        var handler        = BuildHandler(db, audit, tasks);
 
         var result = await handler.HandleAsync(
             new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyA },
@@ -276,5 +358,22 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         Assert.Equal(0, result.ExpiringSoonCount);
         Assert.Equal(0, result.ExpiredCount);
         Assert.Empty(audit.Published);
+        Assert.Empty(tasks.Created);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Task_SourceEntityId_Matches_EmployeeDocumentId()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var tasks          = new FakeTaskCreator();
+        var empDoc         = await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(10));
+        var handler        = BuildHandler(db, taskCreator: tasks);
+
+        await handler.HandleAsync(
+            new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.Equal(empDoc.Id, tasks.Created[0].SourceEntityId);
     }
 }

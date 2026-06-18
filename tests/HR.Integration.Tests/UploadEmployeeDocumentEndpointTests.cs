@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
+using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace HR.Integration.Tests;
 
@@ -111,6 +112,30 @@ public class UploadEmployeeDocumentEndpointTests : IClassFixture<ApiWebApplicati
         var payload = await listResponse.Content.ReadFromJsonAsync<DocsPayload>();
         Assert.Single(payload!.Items);
         Assert.Equal("Listed Doc", payload.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task Uploaded_Document_Can_Be_Downloaded()
+    {
+        var employeeId   = Guid.NewGuid();
+        using var client = ManagerClient();
+
+        var uploadResponse = await client.PostAsync(
+            $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents",
+            BuildPdfUpload(AcmeContractTypeId, "Download Test"));
+        uploadResponse.EnsureSuccessStatusCode();
+        var uploaded = await uploadResponse.Content.ReadFromJsonAsync<UploadPayload>();
+
+        using var noRedirect = _factory.CreateClient(
+            new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        noRedirect.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UploadAdmin.ToString());
+        noRedirect.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
+
+        var downloadResponse = await noRedirect.GetAsync(
+            $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents/{uploaded!.EmployeeDocumentId}/download");
+
+        Assert.Equal(HttpStatusCode.Redirect, downloadResponse.StatusCode);
+        Assert.NotNull(downloadResponse.Headers.Location);
     }
 
     private HttpClient ManagerClient()

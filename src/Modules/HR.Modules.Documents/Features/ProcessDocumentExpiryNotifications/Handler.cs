@@ -7,9 +7,11 @@ namespace HR.Modules.Documents.Features.ProcessDocumentExpiryNotifications;
 internal sealed class ProcessDocumentExpiryNotificationsHandler(
     DocumentsDbContext db,
     IClock clock,
-    IAuditEventPublisher auditPublisher)
+    IAuditEventPublisher auditPublisher,
+    ITaskCreator taskCreator)
 {
     private const int ExpirySoonThresholdDays = 30;
+    private static readonly Guid SystemActor  = Guid.Empty;
 
     public async Task<ProcessDocumentExpiryNotificationsResponse> HandleAsync(
         ProcessDocumentExpiryNotificationsRequest request,
@@ -57,6 +59,7 @@ internal sealed class ProcessDocumentExpiryNotificationsHandler(
             if (c.ExpiryDate >= today)
             {
                 var daysUntil = c.ExpiryDate!.Value.DayNumber - today.DayNumber;
+
                 await auditPublisher.PublishAsync(new DocumentExpiringSoonAuditEvent(
                     request.CompanyId,
                     c.EmployeeDocumentId,
@@ -66,6 +69,20 @@ internal sealed class ProcessDocumentExpiryNotificationsHandler(
                     c.ExpiryDate.Value,
                     daysUntil,
                     now), cancellationToken);
+
+                await taskCreator.CreateAsync(
+                    companyId:          request.CompanyId,
+                    createdBy:          SystemActor,
+                    title:              $"Document expiring soon: {c.Title}",
+                    description:        $"'{c.Title}' ({c.DocumentTypeName}) expires in {daysUntil} day(s) on {c.ExpiryDate.Value:d}. Please arrange renewal.",
+                    priority:           TaskPriority.High,
+                    source:             TaskSource.Document,
+                    dueDate:            c.ExpiryDate.Value,
+                    assignedEmployeeId: c.EmployeeId,
+                    assignedUserId:     null,
+                    sourceEntityId:     c.EmployeeDocumentId,
+                    cancellationToken:  cancellationToken);
+
                 entity.MarkExpiringSoonNotified(now);
                 expiringSoonCount++;
             }
@@ -79,6 +96,20 @@ internal sealed class ProcessDocumentExpiryNotificationsHandler(
                     c.DocumentTypeName,
                     c.ExpiryDate!.Value,
                     now), cancellationToken);
+
+                await taskCreator.CreateAsync(
+                    companyId:          request.CompanyId,
+                    createdBy:          SystemActor,
+                    title:              $"Document expired: {c.Title}",
+                    description:        $"'{c.Title}' ({c.DocumentTypeName}) expired on {c.ExpiryDate.Value:d}. Please collect an updated copy.",
+                    priority:           TaskPriority.Critical,
+                    source:             TaskSource.Document,
+                    dueDate:            today.AddDays(7),
+                    assignedEmployeeId: c.EmployeeId,
+                    assignedUserId:     null,
+                    sourceEntityId:     c.EmployeeDocumentId,
+                    cancellationToken:  cancellationToken);
+
                 entity.MarkExpiredNotified(now);
                 expiredCount++;
             }
