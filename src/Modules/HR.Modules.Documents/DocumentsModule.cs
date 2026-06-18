@@ -36,62 +36,55 @@ public static class DocumentsModule
         var acmeId    = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var acmeHrMgr = Guid.Parse("30000000-0000-0000-0000-000000000005"); // Laura Bennett
 
+        var acmeContract       = Guid.Parse("50000000-0000-0000-0000-000000000001");
+        var acmePassport       = Guid.Parse("50000000-0000-0000-0000-000000000002");
+        var acmeDrivingLicence = Guid.Parse("50000000-0000-0000-0000-000000000003");
+        var acmeRightToWork    = Guid.Parse("50000000-0000-0000-0000-000000000004");
+        var acmeCertificate    = Guid.Parse("50000000-0000-0000-0000-000000000005");
+        var acmeOther          = Guid.Parse("50000000-0000-0000-0000-000000000006");
+
         if (!await db.DocumentTypes.AnyAsync(dt => dt.CompanyId == acmeId))
         {
             db.DocumentTypes.AddRange(
-                DocumentType.Create(Guid.Parse("50000000-0000-0000-0000-000000000001"), acmeId, "Contract",           "Employment and service contracts",       now),
-                DocumentType.Create(Guid.Parse("50000000-0000-0000-0000-000000000002"), acmeId, "Offer Letter",       "Job offer letters",                      now),
-                DocumentType.Create(Guid.Parse("50000000-0000-0000-0000-000000000003"), acmeId, "Policy",             "Company policies and procedures",        now),
-                DocumentType.Create(Guid.Parse("50000000-0000-0000-0000-000000000004"), acmeId, "Certificate",        "Training and professional certificates", now),
-                DocumentType.Create(Guid.Parse("50000000-0000-0000-0000-000000000005"), acmeId, "Pay Slip",           "Monthly pay slips",                      now),
-                DocumentType.Create(Guid.Parse("50000000-0000-0000-0000-000000000006"), acmeId, "Identity Document",  "Passport, driving licence, etc.",        now),
-                DocumentType.Create(Guid.Parse("50000000-0000-0000-0000-000000000007"), acmeId, "Performance Review", "Annual and mid-year reviews",            now),
-                DocumentType.Create(Guid.Parse("50000000-0000-0000-0000-000000000008"), acmeId, "Training Record",    "Completed training records",             now));
+                DocumentType.Create(acmeContract,       acmeId, "Contract",        null, now),
+                DocumentType.Create(acmePassport,       acmeId, "Passport",         null, now),
+                DocumentType.Create(acmeDrivingLicence, acmeId, "Driving Licence",  null, now),
+                DocumentType.Create(acmeRightToWork,    acmeId, "Right To Work",    null, now),
+                DocumentType.Create(acmeCertificate,    acmeId, "Certificate",      null, now),
+                DocumentType.Create(acmeOther,          acmeId, "Other",            null, now));
 
             await db.SaveChangesAsync();
         }
 
         if (!await db.Documents.AnyAsync(d => d.CompanyId == acmeId))
         {
-            var acmeContractTypeId    = Guid.Parse("50000000-0000-0000-0000-000000000001");
-            var acmeOfferLetterTypeId = Guid.Parse("50000000-0000-0000-0000-000000000002");
-            var acmePolicyTypeId      = Guid.Parse("50000000-0000-0000-0000-000000000003");
-
             db.Documents.AddRange(
-                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000001"), acmeId, null, "Employment Contract – Sarah Chen",   null, acmeContractTypeId,    "employment-contract-sarah-chen.pdf",    184320, "application/pdf", "seed/acme/contracts/employment-contract-sarah-chen.pdf",    null,                       acmeHrMgr, now),
-                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000002"), acmeId, null, "Employment Contract – James Okafor", null, acmeContractTypeId,    "employment-contract-james-okafor.pdf",  184320, "application/pdf", "seed/acme/contracts/employment-contract-james-okafor.pdf",  null,                       acmeHrMgr, now),
-                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000003"), acmeId, null, "Employment Contract – Priya Sharma", null, acmeContractTypeId,    "employment-contract-priya-sharma.pdf",  184320, "application/pdf", "seed/acme/contracts/employment-contract-priya-sharma.pdf",  null,                       acmeHrMgr, now),
-                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000004"), acmeId, null, "Employment Contract – Tom Williams", null, acmeContractTypeId,    "employment-contract-tom-williams.pdf",  184320, "application/pdf", "seed/acme/contracts/employment-contract-tom-williams.pdf",  null,                       acmeHrMgr, now),
-                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000005"), acmeId, null, "Offer Letter – Tom Williams",        null, acmeOfferLetterTypeId, "offer-letter-tom-williams.pdf",         102400, "application/pdf", "seed/acme/offer-letters/offer-letter-tom-williams.pdf",     null,                       acmeHrMgr, now),
-                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000006"), acmeId, null, "Employee Handbook 2026",             null, acmePolicyTypeId,      "employee-handbook-2026.pdf",           2097152, "application/pdf", "seed/acme/policies/employee-handbook-2026.pdf",             new DateOnly(2027, 1, 1),   acmeHrMgr, now),
-                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000007"), acmeId, null, "Remote Working Policy",             null, acmePolicyTypeId,      "remote-working-policy.pdf",             307200, "application/pdf", "seed/acme/policies/remote-working-policy.pdf",              new DateOnly(2027, 6, 30),  acmeHrMgr, now));
+                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000001"), acmeId, null, "Employment Contract – Sarah Chen",   null, acmeContract,  "employment-contract-sarah-chen.pdf",   184320,  "application/pdf", "seed/acme/contracts/employment-contract-sarah-chen.pdf",   null,                      acmeHrMgr, now),
+                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000002"), acmeId, null, "Employment Contract – James Okafor", null, acmeContract,  "employment-contract-james-okafor.pdf", 184320,  "application/pdf", "seed/acme/contracts/employment-contract-james-okafor.pdf", null,                      acmeHrMgr, now),
+                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000003"), acmeId, null, "Employment Contract – Priya Sharma", null, acmeContract,  "employment-contract-priya-sharma.pdf", 184320,  "application/pdf", "seed/acme/contracts/employment-contract-priya-sharma.pdf", null,                      acmeHrMgr, now),
+                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000004"), acmeId, null, "Employment Contract – Tom Williams", null, acmeContract,  "employment-contract-tom-williams.pdf", 184320,  "application/pdf", "seed/acme/contracts/employment-contract-tom-williams.pdf", null,                      acmeHrMgr, now),
+                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000005"), acmeId, null, "Offer Letter – Tom Williams",        null, acmeContract,  "offer-letter-tom-williams.pdf",        102400,  "application/pdf", "seed/acme/contracts/offer-letter-tom-williams.pdf",        null,                      acmeHrMgr, now),
+                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000006"), acmeId, null, "Employee Handbook 2026",             null, acmeOther,     "employee-handbook-2026.pdf",          2097152,  "application/pdf", "seed/acme/other/employee-handbook-2026.pdf",               new DateOnly(2027, 1, 1),  acmeHrMgr, now),
+                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000007"), acmeId, null, "Remote Working Policy",             null, acmeOther,     "remote-working-policy.pdf",            307200,  "application/pdf", "seed/acme/other/remote-working-policy.pdf",                new DateOnly(2027, 6, 30), acmeHrMgr, now));
 
             await db.SaveChangesAsync();
         }
 
         if (!await db.EmployeeDocuments.AnyAsync(ed => ed.CompanyId == acmeId))
         {
-            var empSarahId  = Guid.Parse("30000000-0000-0000-0000-000000000001");
-            var empJamesId  = Guid.Parse("30000000-0000-0000-0000-000000000002");
-            var empPriyaId  = Guid.Parse("30000000-0000-0000-0000-000000000003");
-            var empTomId    = Guid.Parse("30000000-0000-0000-0000-000000000004");
+            var empSarahId = Guid.Parse("30000000-0000-0000-0000-000000000001");
+            var empJamesId = Guid.Parse("30000000-0000-0000-0000-000000000002");
+            var empPriyaId = Guid.Parse("30000000-0000-0000-0000-000000000003");
+            var empTomId   = Guid.Parse("30000000-0000-0000-0000-000000000004");
 
-            var docSarahContract  = Guid.Parse("60000000-0000-0000-0000-000000000001");
-            var docJamesContract  = Guid.Parse("60000000-0000-0000-0000-000000000002");
-            var docPriyaContract  = Guid.Parse("60000000-0000-0000-0000-000000000003");
-            var docTomContract    = Guid.Parse("60000000-0000-0000-0000-000000000004");
-            var docTomOfferLetter = Guid.Parse("60000000-0000-0000-0000-000000000005");
-            var docHandbook       = Guid.Parse("60000000-0000-0000-0000-000000000006");
-            var docRemotePolicy   = Guid.Parse("60000000-0000-0000-0000-000000000007");
-
-            var sarahContract  = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000001"), acmeId, empSarahId, docSarahContract,  acmeHrMgr, now);
-            var sarahHandbook  = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000002"), acmeId, empSarahId, docHandbook,        acmeHrMgr, now);
-            var jamesContract  = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000003"), acmeId, empJamesId, docJamesContract,  acmeHrMgr, now);
-            var jamesPolicy    = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000004"), acmeId, empJamesId, docRemotePolicy,    acmeHrMgr, now);
-            var priyaContract  = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000005"), acmeId, empPriyaId, docPriyaContract,  acmeHrMgr, now);
-            var priyaHandbook  = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000006"), acmeId, empPriyaId, docHandbook,        acmeHrMgr, now);
-            var tomContract    = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000007"), acmeId, empTomId,   docTomContract,    acmeHrMgr, now);
-            var tomOfferLetter = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000008"), acmeId, empTomId,   docTomOfferLetter, acmeHrMgr, now);
+            var sarahContract  = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000001"), acmeId, empSarahId, Guid.Parse("60000000-0000-0000-0000-000000000001"), acmeHrMgr, now);
+            var sarahHandbook  = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000002"), acmeId, empSarahId, Guid.Parse("60000000-0000-0000-0000-000000000006"), acmeHrMgr, now);
+            var jamesContract  = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000003"), acmeId, empJamesId, Guid.Parse("60000000-0000-0000-0000-000000000002"), acmeHrMgr, now);
+            var jamesPolicy    = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000004"), acmeId, empJamesId, Guid.Parse("60000000-0000-0000-0000-000000000007"), acmeHrMgr, now);
+            var priyaContract  = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000005"), acmeId, empPriyaId, Guid.Parse("60000000-0000-0000-0000-000000000003"), acmeHrMgr, now);
+            var priyaHandbook  = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000006"), acmeId, empPriyaId, Guid.Parse("60000000-0000-0000-0000-000000000006"), acmeHrMgr, now);
+            var tomContract    = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000007"), acmeId, empTomId,   Guid.Parse("60000000-0000-0000-0000-000000000004"), acmeHrMgr, now);
+            var tomOfferLetter = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000008"), acmeId, empTomId,   Guid.Parse("60000000-0000-0000-0000-000000000005"), acmeHrMgr, now);
 
             sarahContract.Acknowledge(now);
             sarahHandbook.Acknowledge(now);
@@ -110,28 +103,35 @@ public static class DocumentsModule
         }
 
         // ── Beta Corp ─────────────────────────────────────────────────────────
-        var betaCorpId  = Guid.Parse("00000000-0000-0000-0000-000000000002");
-        var betaEngMgr  = Guid.Parse("30000000-0000-0000-0000-000000000011"); // Alice Morgan
+        var betaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        var betaEngMgr = Guid.Parse("30000000-0000-0000-0000-000000000011"); // Alice Morgan
+
+        var betaContract       = Guid.Parse("50000000-0000-0000-0000-000000000011");
+        var betaPassport       = Guid.Parse("50000000-0000-0000-0000-000000000012");
+        var betaDrivingLicence = Guid.Parse("50000000-0000-0000-0000-000000000013");
+        var betaRightToWork    = Guid.Parse("50000000-0000-0000-0000-000000000014");
+        var betaCertificate    = Guid.Parse("50000000-0000-0000-0000-000000000015");
+        var betaOther          = Guid.Parse("50000000-0000-0000-0000-000000000016");
 
         if (!await db.DocumentTypes.AnyAsync(dt => dt.CompanyId == betaCorpId))
         {
             db.DocumentTypes.AddRange(
-                DocumentType.Create(Guid.Parse("50000000-0000-0000-0000-000000000011"), betaCorpId, "Contract",     "Employment and service contracts", now),
-                DocumentType.Create(Guid.Parse("50000000-0000-0000-0000-000000000012"), betaCorpId, "Offer Letter", "Job offer letters",                now),
-                DocumentType.Create(Guid.Parse("50000000-0000-0000-0000-000000000013"), betaCorpId, "Policy",       "Company policies and procedures",  now));
+                DocumentType.Create(betaContract,       betaCorpId, "Contract",       null, now),
+                DocumentType.Create(betaPassport,       betaCorpId, "Passport",        null, now),
+                DocumentType.Create(betaDrivingLicence, betaCorpId, "Driving Licence", null, now),
+                DocumentType.Create(betaRightToWork,    betaCorpId, "Right To Work",   null, now),
+                DocumentType.Create(betaCertificate,    betaCorpId, "Certificate",     null, now),
+                DocumentType.Create(betaOther,          betaCorpId, "Other",           null, now));
 
             await db.SaveChangesAsync();
         }
 
         if (!await db.Documents.AnyAsync(d => d.CompanyId == betaCorpId))
         {
-            var betaContractTypeId = Guid.Parse("50000000-0000-0000-0000-000000000011");
-            var betaPolicyTypeId   = Guid.Parse("50000000-0000-0000-0000-000000000013");
-
             db.Documents.AddRange(
-                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000011"), betaCorpId, null, "Employment Contract – Alice Morgan", null, betaContractTypeId, "employment-contract-alice-morgan.pdf",  184320, "application/pdf", "seed/beta/contracts/employment-contract-alice-morgan.pdf", null,                      betaEngMgr, now),
-                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000012"), betaCorpId, null, "Employment Contract – Bob Taylor",   null, betaContractTypeId, "employment-contract-bob-taylor.pdf",    184320, "application/pdf", "seed/beta/contracts/employment-contract-bob-taylor.pdf",   null,                      betaEngMgr, now),
-                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000013"), betaCorpId, null, "Employee Handbook 2026",             null, betaPolicyTypeId,   "employee-handbook-2026.pdf",           2097152, "application/pdf", "seed/beta/policies/employee-handbook-2026.pdf",            new DateOnly(2027, 1, 1),  betaEngMgr, now));
+                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000011"), betaCorpId, null, "Employment Contract – Alice Morgan", null, betaContract, "employment-contract-alice-morgan.pdf",  184320,  "application/pdf", "seed/beta/contracts/employment-contract-alice-morgan.pdf", null,                     betaEngMgr, now),
+                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000012"), betaCorpId, null, "Employment Contract – Bob Taylor",   null, betaContract, "employment-contract-bob-taylor.pdf",    184320,  "application/pdf", "seed/beta/contracts/employment-contract-bob-taylor.pdf",   null,                     betaEngMgr, now),
+                Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000013"), betaCorpId, null, "Employee Handbook 2026",             null, betaOther,    "employee-handbook-2026.pdf",           2097152,  "application/pdf", "seed/beta/other/employee-handbook-2026.pdf",               new DateOnly(2027, 1, 1), betaEngMgr, now));
 
             await db.SaveChangesAsync();
         }
@@ -141,13 +141,9 @@ public static class DocumentsModule
             var empAliceId = Guid.Parse("30000000-0000-0000-0000-000000000011");
             var empBobId   = Guid.Parse("30000000-0000-0000-0000-000000000012");
 
-            var docAliceContract = Guid.Parse("60000000-0000-0000-0000-000000000011");
-            var docBobContract   = Guid.Parse("60000000-0000-0000-0000-000000000012");
-            var docBetaHandbook  = Guid.Parse("60000000-0000-0000-0000-000000000013");
-
-            var aliceContract = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000011"), betaCorpId, empAliceId, docAliceContract, betaEngMgr, now);
-            var bobContract   = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000012"), betaCorpId, empBobId,   docBobContract,   betaEngMgr, now);
-            var bobHandbook   = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000013"), betaCorpId, empBobId,   docBetaHandbook,  betaEngMgr, now);
+            var aliceContract = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000011"), betaCorpId, empAliceId, Guid.Parse("60000000-0000-0000-0000-000000000011"), betaEngMgr, now);
+            var bobContract   = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000012"), betaCorpId, empBobId,   Guid.Parse("60000000-0000-0000-0000-000000000012"), betaEngMgr, now);
+            var bobHandbook   = EmployeeDocument.Create(Guid.Parse("70000000-0000-0000-0000-000000000013"), betaCorpId, empBobId,   Guid.Parse("60000000-0000-0000-0000-000000000013"), betaEngMgr, now);
 
             aliceContract.Acknowledge(now);
             bobContract.Acknowledge(now);
