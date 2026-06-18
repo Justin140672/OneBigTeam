@@ -127,18 +127,15 @@
         if (_selectedFile is null)              { _error = "Please select a file."; return; }
 
         _uploading = true;
-        var ok = await DocumentService.UploadEmployeeDocumentAsync(
+        _error = await DocumentService.UploadEmployeeDocumentAsync(
             CompanyId, EmployeeId,
             _title, _description, _documentTypeId,
             _issueDate, _expiryDate,
             _selectedFile);
         _uploading = false;
 
-        if (!ok)
-        {
-            _error = "Upload failed. Check the file type and size (max 20 MB) and try again.";
+        if (_error is not null)
             return;
-        }
 
         _visible = false;
         await OnUploaded.InvokeAsync();

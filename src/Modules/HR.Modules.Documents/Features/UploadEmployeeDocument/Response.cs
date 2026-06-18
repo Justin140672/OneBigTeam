@@ -10,5 +10,6 @@ internal sealed record UploadEmployeeDocumentResponse(
     long FileSize,
     string ContentType,
     Guid DocumentTypeId,
+    DateOnly? IssueDate,
     DateOnly? ExpiryDate,
     DateTimeOffset CreatedAt);

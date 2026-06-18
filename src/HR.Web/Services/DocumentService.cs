@@ -1,3 +1,5 @@
+using System.Net.Http.Json;
+using System.Text.Json;
 using HR.Web.Models;
 using Microsoft.AspNetCore.Components.Forms;
 
@@ -31,7 +33,8 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         catch { return null; }
     }
 
-    public async Task<bool> UploadEmployeeDocumentAsync(
+    // Returns null on success, or an error message string on failure.
+    public async Task<string?> UploadEmployeeDocumentAsync(
         Guid companyId,
         Guid employeeId,
         string title,
@@ -60,9 +63,25 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
             var response = await Http.PostAsync(
                 $"api/companies/{companyId}/employees/{employeeId}/documents",
                 content, cancellationToken);
-            return response.IsSuccessStatusCode;
+
+            if (response.IsSuccessStatusCode)
+                return null;
+
+            // Try to surface the structured error message from the API.
+            try
+            {
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+                if (body.TryGetProperty("error", out var errorProp))
+                    return errorProp.GetString();
+            }
+            catch { }
+
+            return $"Upload failed ({(int)response.StatusCode}).";
         }
-        catch { return false; }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
     }
 
     public async Task<bool> DeleteEmployeeDocumentAsync(

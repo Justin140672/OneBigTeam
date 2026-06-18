@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Persistence;
 
-internal sealed class DocumentsDbContext : DbContext
+internal class DocumentsDbContext : DbContext
 {
     public DocumentsDbContext(DbContextOptions<DocumentsDbContext> options)
         : base(options)

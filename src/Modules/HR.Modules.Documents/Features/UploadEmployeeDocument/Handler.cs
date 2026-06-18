@@ -11,8 +11,10 @@ internal sealed class UploadEmployeeDocumentHandler(
     IDocumentStorageService storage,
     IFileUploadValidator fileValidator,
     IVirusScanService virusScanner,
-    IClock clock)
+    IClock clock,
+    IAuditEventPublisher auditPublisher)
 {
+    // Backward-compatible overload used by existing tests — treats the caller as a manager.
     public Task<Result<UploadEmployeeDocumentResponse>> HandleAsync(
         UploadEmployeeDocumentRequest request,
         Guid uploadedBy,
@@ -40,6 +42,13 @@ internal sealed class UploadEmployeeDocumentHandler(
 
         fileStream.Seek(0, SeekOrigin.Begin);
 
+        // Verify file content matches the declared content type (prevents extension/MIME spoofing).
+        var contentResult = fileValidator.ValidateContent(fileStream, file.ContentType);
+        if (contentResult.IsFailure)
+            return Result.Failure<UploadEmployeeDocumentResponse>(contentResult.Error);
+
+        fileStream.Seek(0, SeekOrigin.Begin);
+
         var documentType = await db.DocumentTypes
             .FirstOrDefaultAsync(
                 dt => dt.Id == request.DocumentTypeId &&
@@ -64,6 +73,9 @@ internal sealed class UploadEmployeeDocumentHandler(
 
         var now = clock.UtcNowOffset();
 
+        // ExpiryDate is intentionally NOT passed to Document — the canonical expiry for HR tracking
+        // lives on EmployeeDocument. Document.ExpiryDate is reserved for document-level metadata
+        // set through other workflows (e.g. document template management).
         var document = Document.Create(
             Guid.NewGuid(),
             request.CompanyId,
@@ -75,7 +87,7 @@ internal sealed class UploadEmployeeDocumentHandler(
             file.Length,
             file.ContentType,
             storageKey,
-            request.ExpiryDate,
+            expiryDate: null,
             uploadedBy,
             now);
 
@@ -91,7 +103,31 @@ internal sealed class UploadEmployeeDocumentHandler(
 
         db.Documents.Add(document);
         db.EmployeeDocuments.Add(employeeDocument);
-        await db.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // Best-effort: remove the already-uploaded file so it doesn't become an orphan.
+            try { await storage.DeleteAsync(storageKey, cancellationToken); } catch { }
+            throw;
+        }
+
+        await auditPublisher.PublishAsync(new DocumentUploadedAuditEvent(
+            document.CompanyId,
+            employeeDocument.Id,
+            request.EmployeeId,
+            document.Title,
+            documentType.Name,
+            document.FileName,
+            document.FileSize,
+            employeeDocument.IssueDate,
+            employeeDocument.ExpiryDate,
+            uploadedBy,
+            isManagerUpload,
+            now), cancellationToken);
 
         return Result.Success(new UploadEmployeeDocumentResponse(
             document.Id,
@@ -103,7 +139,8 @@ internal sealed class UploadEmployeeDocumentHandler(
             document.FileSize,
             document.ContentType,
             document.DocumentTypeId,
-            document.ExpiryDate,
+            employeeDocument.IssueDate,
+            employeeDocument.ExpiryDate,
             document.CreatedAt));
     }
 }

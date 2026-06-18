@@ -25,8 +25,23 @@ internal sealed class Endpoint(UploadEmployeeDocumentHandler handler, IAuthoriza
             return;
         }
 
-        var authResult = await authorizationService.AuthorizeAsync(User, "employee:manage");
+        // Verify the caller belongs to the company in the route (applies to all callers).
+        var companyClaim = User.FindFirstValue("company_id");
+        if (!Guid.TryParse(companyClaim, out var callerCompanyId) || callerCompanyId != request.CompanyId)
+        {
+            await SendResultAsync(TypedResults.Forbid());
+            return;
+        }
+
+        var authResult    = await authorizationService.AuthorizeAsync(User, "employee:manage");
         var isManagerUpload = authResult.Succeeded;
+
+        // Non-managers may only upload to their own employee record.
+        if (!isManagerUpload && uploadedBy != request.EmployeeId)
+        {
+            await SendResultAsync(TypedResults.Forbid());
+            return;
+        }
 
         var result = await handler.HandleAsync(request, uploadedBy, isManagerUpload, cancellationToken);
 
