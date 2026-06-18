@@ -1,0 +1,200 @@
+using HR.Modules.Documents.Domain;
+using HR.Modules.Documents.Features.GetEmployeeDocument;
+using HR.Modules.Documents.Persistence;
+using HR.Modules.Documents.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+
+namespace HR.Modules.Documents.Tests;
+
+public class GetEmployeeDocumentHandlerTests
+{
+    private static readonly DateTime FixedUtcNow = new(2026, 6, 18, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTimeOffset Now = new(FixedUtcNow, TimeSpan.Zero);
+
+    private static DocumentsDbContext BuildContext() =>
+        new(new DbContextOptionsBuilder<DocumentsDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options);
+
+    private static GetEmployeeDocumentHandler BuildHandler(
+        DocumentsDbContext db,
+        FakeDocumentStorageService? storage = null) =>
+        new(db, storage ?? new FakeDocumentStorageService());
+
+    private static async Task<(DocumentType docType, Document doc, EmployeeDocument empDoc)> SeedAll(
+        DocumentsDbContext db,
+        Guid companyId,
+        Guid employeeId,
+        Guid uploadedBy,
+        bool acknowledged = false)
+    {
+        var docType = DocumentType.Create(Guid.NewGuid(), companyId, "Contract", null, Now);
+        db.DocumentTypes.Add(docType);
+
+        var doc = Document.Create(
+            Guid.NewGuid(), companyId, employeeId,
+            "Employment Contract", "Signed copy",
+            docType.Id, "contract.pdf", 4096, "application/pdf",
+            $"{companyId}/{employeeId}/abc/contract.pdf",
+            new DateOnly(2027, 12, 31), uploadedBy, Now);
+        db.Documents.Add(doc);
+
+        var empDoc = EmployeeDocument.Create(
+            Guid.NewGuid(), companyId, employeeId, doc.Id, uploadedBy, Now);
+        if (acknowledged)
+            empDoc.Acknowledge(Now);
+        db.EmployeeDocuments.Add(empDoc);
+
+        await db.SaveChangesAsync();
+        return (docType, doc, empDoc);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_EmployeeDocument_With_DownloadUrl()
+    {
+        await using var db = BuildContext();
+        var storage        = new FakeDocumentStorageService();
+        var companyId      = Guid.NewGuid();
+        var employeeId     = Guid.NewGuid();
+        var uploadedBy     = Guid.NewGuid();
+        var (docType, doc, empDoc) = await SeedAll(db, companyId, employeeId, uploadedBy);
+        var handler = BuildHandler(db, storage);
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeDocumentRequest
+            {
+                CompanyId          = companyId,
+                EmployeeId         = employeeId,
+                EmployeeDocumentId = empDoc.Id,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var r = result.Value!;
+        Assert.Equal(empDoc.Id,              r.EmployeeDocumentId);
+        Assert.Equal(doc.Id,                 r.DocumentId);
+        Assert.Equal(companyId,              r.CompanyId);
+        Assert.Equal(employeeId,             r.EmployeeId);
+        Assert.Equal("Employment Contract",  r.Title);
+        Assert.Equal("Signed copy",          r.Description);
+        Assert.Equal("contract.pdf",         r.FileName);
+        Assert.Equal(4096L,                  r.FileSize);
+        Assert.Equal("application/pdf",      r.ContentType);
+        Assert.Equal(docType.Id,             r.DocumentTypeId);
+        Assert.Equal("Contract",             r.DocumentTypeName);
+        Assert.Equal(DocumentStatus.Active,  r.Status);
+        Assert.Equal(new DateOnly(2027, 12, 31), r.ExpiryDate);
+        Assert.Equal(uploadedBy,             r.UploadedBy);
+        Assert.Equal(uploadedBy,             r.AddedBy);
+        Assert.Null(r.AcknowledgedAt);
+        Assert.NotNull(r.DownloadUrl);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_AcknowledgedAt_When_Document_Is_Acknowledged()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var employeeId     = Guid.NewGuid();
+        var (_, _, empDoc) = await SeedAll(db, companyId, employeeId, Guid.NewGuid(), acknowledged: true);
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeDocumentRequest
+            {
+                CompanyId          = companyId,
+                EmployeeId         = employeeId,
+                EmployeeDocumentId = empDoc.Id,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value!.AcknowledgedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_EmployeeDocumentId_Does_Not_Exist()
+    {
+        await using var db = BuildContext();
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeDocumentRequest
+            {
+                CompanyId          = Guid.NewGuid(),
+                EmployeeId         = Guid.NewGuid(),
+                EmployeeDocumentId = Guid.NewGuid(),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_CompanyId_Does_Not_Match()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var employeeId     = Guid.NewGuid();
+        var (_, _, empDoc) = await SeedAll(db, companyId, employeeId, Guid.NewGuid());
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeDocumentRequest
+            {
+                CompanyId          = Guid.NewGuid(),
+                EmployeeId         = employeeId,
+                EmployeeDocumentId = empDoc.Id,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_EmployeeId_Does_Not_Match()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var employeeId     = Guid.NewGuid();
+        var (_, _, empDoc) = await SeedAll(db, companyId, employeeId, Guid.NewGuid());
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeDocumentRequest
+            {
+                CompanyId          = companyId,
+                EmployeeId         = Guid.NewGuid(),
+                EmployeeDocumentId = empDoc.Id,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_DownloadUrl_Is_Derived_From_StorageKey()
+    {
+        await using var db = BuildContext();
+        var storage        = new FakeDocumentStorageService();
+        var companyId      = Guid.NewGuid();
+        var employeeId     = Guid.NewGuid();
+        var (_, doc, empDoc) = await SeedAll(db, companyId, employeeId, Guid.NewGuid());
+        var handler = BuildHandler(db, storage);
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeDocumentRequest
+            {
+                CompanyId          = companyId,
+                EmployeeId         = employeeId,
+                EmployeeDocumentId = empDoc.Id,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains(doc.StorageKey, result.Value!.DownloadUrl.ToString());
+    }
+}
