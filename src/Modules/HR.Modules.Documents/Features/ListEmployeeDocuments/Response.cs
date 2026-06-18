@@ -10,6 +10,7 @@ internal sealed record EmployeeDocumentListItem(
     string Title,
     string DocumentTypeName,
     DocumentStatus Status,
+    DateOnly? IssueDate,
     DateOnly? ExpiryDate,
     bool IsAcknowledged,
     DateTimeOffset CreatedAt);

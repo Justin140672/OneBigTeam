@@ -15,9 +15,11 @@ internal sealed record GetEmployeeDocumentResponse(
     Guid DocumentTypeId,
     string DocumentTypeName,
     DocumentStatus Status,
-    DateOnly? ExpiryDate,
+    DateOnly? DocumentExpiryDate,
     Guid UploadedBy,
     Guid AddedBy,
+    DateOnly? IssueDate,
+    DateOnly? ExpiryDate,
     DateTimeOffset? AcknowledgedAt,
     DateTimeOffset CreatedAt,
     Uri DownloadUrl);

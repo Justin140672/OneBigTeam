@@ -74,7 +74,9 @@ internal sealed class UploadEmployeeDocumentHandler(
             request.EmployeeId,
             document.Id,
             uploadedBy,
-            now);
+            now,
+            issueDate:  request.IssueDate,
+            expiryDate: request.ExpiryDate);
 
         db.Documents.Add(document);
         db.EmployeeDocuments.Add(employeeDocument);

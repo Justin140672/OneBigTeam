@@ -28,7 +28,8 @@ internal sealed class ListEmployeeDocumentsHandler(DocumentsDbContext db)
                 x.d.Title,
                 x.dt.Name,
                 x.d.Status,
-                x.d.ExpiryDate,
+                x.ed.IssueDate,
+                x.ed.ExpiryDate,
                 x.ed.AcknowledgedAt != null,
                 x.ed.CreatedAt))
             .ToListAsync(cancellationToken);

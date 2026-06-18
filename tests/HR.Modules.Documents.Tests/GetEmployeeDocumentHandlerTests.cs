@@ -83,9 +83,11 @@ public class GetEmployeeDocumentHandlerTests
         Assert.Equal(docType.Id,             r.DocumentTypeId);
         Assert.Equal("Contract",             r.DocumentTypeName);
         Assert.Equal(DocumentStatus.Active,  r.Status);
-        Assert.Equal(new DateOnly(2027, 12, 31), r.ExpiryDate);
+        Assert.Equal(new DateOnly(2027, 12, 31), r.DocumentExpiryDate);
         Assert.Equal(uploadedBy,             r.UploadedBy);
         Assert.Equal(uploadedBy,             r.AddedBy);
+        Assert.Null(r.IssueDate);
+        Assert.Null(r.ExpiryDate);
         Assert.Null(r.AcknowledgedAt);
         Assert.NotNull(r.DownloadUrl);
     }

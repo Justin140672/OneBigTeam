@@ -9,6 +9,8 @@ internal sealed class EmployeeDocument
     public Guid EmployeeId { get; private set; }
     public Guid DocumentId { get; private set; }
     public Guid AddedBy { get; private set; }
+    public DateOnly? IssueDate { get; private set; }
+    public DateOnly? ExpiryDate { get; private set; }
     public DateTimeOffset? AcknowledgedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -19,13 +21,17 @@ internal sealed class EmployeeDocument
         Guid employeeId,
         Guid documentId,
         Guid addedBy,
-        DateTimeOffset now) => new()
+        DateTimeOffset now,
+        DateOnly? issueDate  = null,
+        DateOnly? expiryDate = null) => new()
     {
         Id         = id,
         CompanyId  = companyId,
         EmployeeId = employeeId,
         DocumentId = documentId,
         AddedBy    = addedBy,
+        IssueDate  = issueDate,
+        ExpiryDate = expiryDate,
         CreatedAt  = now,
         UpdatedAt  = now,
     };

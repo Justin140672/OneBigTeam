@@ -32,6 +32,12 @@ internal sealed class EmployeeDocumentConfiguration : IEntityTypeConfiguration<E
             .HasColumnName("added_by")
             .IsRequired();
 
+        builder.Property(ed => ed.IssueDate)
+            .HasColumnName("issue_date");
+
+        builder.Property(ed => ed.ExpiryDate)
+            .HasColumnName("expiry_date");
+
         builder.Property(ed => ed.AcknowledgedAt)
             .HasColumnName("acknowledged_at");
 

@@ -9,6 +9,7 @@ internal sealed class UploadEmployeeDocumentRequest
     public string Title { get; init; } = string.Empty;
     public string? Description { get; init; }
     public Guid DocumentTypeId { get; init; }
+    public DateOnly? IssueDate { get; init; }
     public DateOnly? ExpiryDate { get; init; }
     public IFormFile File { get; init; } = null!;
 }

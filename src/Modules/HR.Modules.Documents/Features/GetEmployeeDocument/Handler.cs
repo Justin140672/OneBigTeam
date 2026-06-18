@@ -42,9 +42,11 @@ internal sealed class GetEmployeeDocumentHandler(
             DocumentTypeId:     row.d.DocumentTypeId,
             DocumentTypeName:   row.dt.Name,
             Status:             row.d.Status,
-            ExpiryDate:         row.d.ExpiryDate,
+            DocumentExpiryDate: row.d.ExpiryDate,
             UploadedBy:         row.d.UploadedBy,
             AddedBy:            row.ed.AddedBy,
+            IssueDate:          row.ed.IssueDate,
+            ExpiryDate:         row.ed.ExpiryDate,
             AcknowledgedAt:     row.ed.AcknowledgedAt,
             CreatedAt:          row.ed.CreatedAt,
             DownloadUrl:        downloadUrl));
