@@ -3,6 +3,7 @@ using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.CreateDocumentType;
 using HR.Modules.Documents.Features.DeactivateDocumentType;
 using HR.Modules.Documents.Features.GetEmployeeDocument;
+using HR.Modules.Documents.Features.ListEmployeeDocuments;
 using HR.Modules.Documents.Features.UploadEmployeeDocument;
 using HR.Modules.Documents.Services;
 using HR.Modules.Documents.Features.ListDocumentTypes;
@@ -68,6 +69,9 @@ public static class DocumentsModule
 
         services.AddScoped<GetEmployeeDocumentHandler>();
         services.AddScoped<IValidator<GetEmployeeDocumentRequest>, GetEmployeeDocumentValidator>();
+
+        services.AddScoped<ListEmployeeDocumentsHandler>();
+        services.AddScoped<IValidator<ListEmployeeDocumentsRequest>, ListEmployeeDocumentsValidator>();
     }
 
     public static async Task MigrateDocumentsAsync(this IServiceProvider services)
