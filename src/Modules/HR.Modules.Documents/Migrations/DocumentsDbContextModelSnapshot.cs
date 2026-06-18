@@ -152,11 +152,64 @@ namespace HR.Modules.Documents.Migrations
                     b.ToTable("documents", "documents");
                 });
 
+            modelBuilder.Entity("HR.Modules.Documents.Domain.EmployeeDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AcknowledgedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acknowledged_at");
+
+                    b.Property<Guid>("AddedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("added_by");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "EmployeeId");
+
+                    b.HasIndex("EmployeeId", "DocumentId")
+                        .IsUnique();
+
+                    b.ToTable("employee_documents", "documents");
+                });
+
             modelBuilder.Entity("HR.Modules.Documents.Domain.Document", b =>
                 {
                     b.HasOne("HR.Modules.Documents.Domain.DocumentType", null)
                         .WithMany()
                         .HasForeignKey("DocumentTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HR.Modules.Documents.Domain.EmployeeDocument", b =>
+                {
+                    b.HasOne("HR.Modules.Documents.Domain.Document", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
