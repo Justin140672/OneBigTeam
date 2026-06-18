@@ -19,7 +19,7 @@ var connectionString = builder.Configuration.GetConnectionString("hr")
 	?? throw new InvalidOperationException("Connection string 'hr' was not found.");
 
 builder.Services.AddCompaniesModule(connectionString);
-builder.Services.AddDocumentsModule(connectionString);
+builder.Services.AddDocumentsModule(connectionString, builder.Configuration);
 builder.Services.AddEmployeesModule(connectionString);
 builder.Services.AddIdentityModule(connectionString);
 builder.Services.AddLeaveModule(connectionString);

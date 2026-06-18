@@ -7,6 +7,7 @@ using HR.Modules.Documents.Features.ListDocumentTypes;
 using HR.Modules.Documents.Features.UpdateDocumentType;
 using HR.Modules.Documents.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Modules.Documents;
@@ -15,15 +16,32 @@ public static class DocumentsModule
 {
     public static IServiceCollection AddDocumentsModule(
         this IServiceCollection services,
-        string connectionString)
+        string connectionString,
+        IConfiguration configuration)
     {
         AddFeatureServices(services);
+        AddStorageService(services, configuration);
 
         services.AddDbContext<DocumentsDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "documents")));
 
         return services;
+    }
+
+    private static void AddStorageService(IServiceCollection services, IConfiguration configuration)
+    {
+        var supabaseSection = configuration.GetSection("Documents:Supabase");
+
+        if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
+        {
+            services.Configure<SupabaseStorageOptions>(supabaseSection);
+            services.AddHttpClient<IDocumentStorageService, SupabaseDocumentStorageService>();
+        }
+        else
+        {
+            services.AddScoped<IDocumentStorageService, LocalDocumentStorageService>();
+        }
     }
 
     private static void AddFeatureServices(IServiceCollection services)
@@ -38,8 +56,6 @@ public static class DocumentsModule
         services.AddScoped<IValidator<ListDocumentTypesRequest>, ListDocumentTypesValidator>();
 
         services.AddScoped<DeactivateDocumentTypeHandler>();
-
-        services.AddScoped<IDocumentStorageService, LocalDocumentStorageService>();
     }
 
     public static async Task MigrateDocumentsAsync(this IServiceProvider services)
