@@ -1,6 +1,12 @@
 @inject DocumentService DocumentService
 @inject IJSRuntime JS
 
+<UploadDocumentDialog CompanyId="CompanyId"
+                      EmployeeId="EmployeeId"
+                      IsOpen="_uploadOpen"
+                      OnUploaded="OnDocumentUploaded"
+                      OnCancelled="@(() => _uploadOpen = false)" />
+
 @if (_loading)
 {
     <div class="d-flex align-items-center gap-2 py-3">
@@ -10,173 +16,91 @@
 }
 else
 {
-    <div class="d-flex flex-column gap-4">
-
-        @if (_showUploadForm)
-        {
-            <div class="card">
-                <div class="card-header fw-semibold">Upload Document</div>
-                <div class="card-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Title <span class="text-danger">*</span></label>
-                            <HrTextBox @bind-Value="_form.Title" Placeholder="Document title" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Document Type <span class="text-danger">*</span></label>
-                            <SfDropDownList TValue="Guid"
-                                            TItem="DocumentTypeItem"
-                                            DataSource="@_documentTypes"
-                                            @bind-Value="_form.DocumentTypeId"
-                                            Placeholder="Select type…"
-                                            AllowFiltering="true">
-                                <DropDownListFieldSettings Value="Id" Text="Name" />
-                            </SfDropDownList>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Description</label>
-                            <HrTextBox @bind-Value="_form.Description"
-                                       Placeholder="Optional description"
-                                       Multiline="true" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Issue Date</label>
-                            <SfDatePicker TValue="DateOnly?"
-                                          @bind-Value="_form.IssueDate"
-                                          Format="dd/MM/yyyy"
-                                          Placeholder="dd/mm/yyyy"
-                                          ShowClearButton="true" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Expiry Date</label>
-                            <SfDatePicker TValue="DateOnly?"
-                                          @bind-Value="_form.ExpiryDate"
-                                          Format="dd/MM/yyyy"
-                                          Placeholder="dd/mm/yyyy"
-                                          ShowClearButton="true" />
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">File <span class="text-danger">*</span></label>
-                            <InputFile class="form-control" OnChange="OnFileSelected"
-                                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
-                        </div>
-                    </div>
-
-                    @if (!string.IsNullOrEmpty(_uploadError))
-                    {
-                        <div class="alert alert-danger mt-3 mb-0">@_uploadError</div>
-                    }
-
-                    <div class="d-flex gap-2 mt-3">
-                        <SfButton IsPrimary="true" OnClick="UploadAsync" Disabled="_uploading">
-                            @if (_uploading)
-                            {
-                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                            }
-                            Upload
-                        </SfButton>
-                        <SfButton OnClick="CancelUpload">Cancel</SfButton>
-                    </div>
-                </div>
-            </div>
-        }
-
-        <div class="card">
-            <div class="card-header d-flex align-items-center">
-                <i class="fa-solid fa-file-lines text-muted me-2"></i>
-                <h5 class="mb-0">Documents</h5>
-                @if (!_showUploadForm)
-                {
-                    <div class="ms-auto">
-                        <SfButton CssClass="e-primary e-small" OnClick="ShowUploadForm">
-                            <i class="fa-solid fa-upload me-1"></i> Upload
-                        </SfButton>
-                    </div>
-                }
-            </div>
-            <div class="card-body">
-                <HrGrid TValue="EmployeeDocumentListItem"
-                        DataSource="@_documents"
-                        AllowPaging="false">
-                    <GridColumns>
-                        <GridColumn Field="@nameof(EmployeeDocumentListItem.Title)"
-                                    HeaderText="Title" />
-                        <GridColumn Field="@nameof(EmployeeDocumentListItem.DocumentTypeName)"
-                                    HeaderText="Type" Width="160" />
-                        <GridColumn Field="@nameof(EmployeeDocumentListItem.IssueDate)"
-                                    HeaderText="Issue Date" Width="130" Format="d">
-                            <Template>
-                                @{ var r = (context as EmployeeDocumentListItem)!; }
-                                <span class="text-muted small">
-                                    @(r.IssueDate?.ToString("dd MMM yyyy") ?? "—")
-                                </span>
-                            </Template>
-                        </GridColumn>
-                        <GridColumn Field="@nameof(EmployeeDocumentListItem.ExpiryDate)"
-                                    HeaderText="Expiry Date" Width="130">
-                            <Template>
-                                @{ var r = (context as EmployeeDocumentListItem)!; }
-                                <span class="text-muted small">
-                                    @(r.ExpiryDate?.ToString("dd MMM yyyy") ?? "—")
-                                </span>
-                            </Template>
-                        </GridColumn>
-                        <GridColumn HeaderText="Status" Width="140" AllowSorting="false" AllowFiltering="false">
-                            <Template>
-                                @{ var r = (context as EmployeeDocumentListItem)!;
-                                   var (css, label) = GetStatusBadge(r); }
-                                <span class="badge @css">@label</span>
-                            </Template>
-                        </GridColumn>
-                        <GridColumn HeaderText="" Width="140" AllowSorting="false" AllowFiltering="false"
-                                    TextAlign="TextAlign.Right">
-                            <Template>
-                                @{ var r = (context as EmployeeDocumentListItem)!; }
-                                @if (_deleteTargetId == r.EmployeeDocumentId)
-                                {
-                                    <span class="me-2 text-muted small">Delete?</span>
-                                    <SfButton CssClass="e-danger e-small me-1"
-                                              OnClick="() => ConfirmDeleteAsync(r.EmployeeDocumentId)">
-                                        Yes
-                                    </SfButton>
-                                    <SfButton CssClass="e-small" OnClick="CancelDelete">No</SfButton>
-                                }
-                                else
-                                {
-                                    <SfButton CssClass="e-outline e-small me-1"
-                                              OnClick="() => DownloadAsync(r.EmployeeDocumentId)"
-                                              title="Download">
-                                        <i class="fa-solid fa-download"></i>
-                                    </SfButton>
-                                    <SfButton CssClass="e-danger e-outline e-small"
-                                              OnClick="() => StartDelete(r.EmployeeDocumentId)"
-                                              title="Delete">
-                                        <i class="fa-solid fa-trash"></i>
-                                    </SfButton>
-                                }
-                            </Template>
-                        </GridColumn>
-                    </GridColumns>
-                </HrGrid>
+    <div class="card">
+        <div class="card-header d-flex align-items-center">
+            <i class="fa-solid fa-file-lines text-muted me-2"></i>
+            <h5 class="mb-0">Documents</h5>
+            <div class="ms-auto">
+                <SfButton CssClass="e-primary e-small" OnClick="@(() => _uploadOpen = true)">
+                    <i class="fa-solid fa-upload me-1"></i> Upload
+                </SfButton>
             </div>
         </div>
-
+        <div class="card-body">
+            <HrGrid TValue="EmployeeDocumentListItem"
+                    DataSource="@_documents"
+                    AllowPaging="false">
+                <GridColumns>
+                    <GridColumn Field="@nameof(EmployeeDocumentListItem.Title)"
+                                HeaderText="Title" />
+                    <GridColumn Field="@nameof(EmployeeDocumentListItem.DocumentTypeName)"
+                                HeaderText="Type" Width="160" />
+                    <GridColumn Field="@nameof(EmployeeDocumentListItem.IssueDate)"
+                                HeaderText="Issue Date" Width="130">
+                        <Template>
+                            @{ var r = (context as EmployeeDocumentListItem)!; }
+                            <span class="text-muted small">
+                                @(r.IssueDate?.ToString("dd MMM yyyy") ?? "—")
+                            </span>
+                        </Template>
+                    </GridColumn>
+                    <GridColumn Field="@nameof(EmployeeDocumentListItem.ExpiryDate)"
+                                HeaderText="Expiry Date" Width="130">
+                        <Template>
+                            @{ var r = (context as EmployeeDocumentListItem)!; }
+                            <span class="text-muted small">
+                                @(r.ExpiryDate?.ToString("dd MMM yyyy") ?? "—")
+                            </span>
+                        </Template>
+                    </GridColumn>
+                    <GridColumn HeaderText="Status" Width="140" AllowSorting="false" AllowFiltering="false">
+                        <Template>
+                            @{ var r = (context as EmployeeDocumentListItem)!;
+                               var (css, label) = GetStatusBadge(r); }
+                            <span class="badge @css">@label</span>
+                        </Template>
+                    </GridColumn>
+                    <GridColumn HeaderText="" Width="140" AllowSorting="false" AllowFiltering="false"
+                                TextAlign="TextAlign.Right">
+                        <Template>
+                            @{ var r = (context as EmployeeDocumentListItem)!; }
+                            @if (_deleteTargetId == r.EmployeeDocumentId)
+                            {
+                                <span class="me-2 text-muted small">Delete?</span>
+                                <SfButton CssClass="e-danger e-small me-1"
+                                          OnClick="() => ConfirmDeleteAsync(r.EmployeeDocumentId)">
+                                    Yes
+                                </SfButton>
+                                <SfButton CssClass="e-small" OnClick="CancelDelete">No</SfButton>
+                            }
+                            else
+                            {
+                                <SfButton CssClass="e-outline e-small me-1"
+                                          OnClick="() => DownloadAsync(r.EmployeeDocumentId)"
+                                          title="Download">
+                                    <i class="fa-solid fa-download"></i>
+                                </SfButton>
+                                <SfButton CssClass="e-danger e-outline e-small"
+                                          OnClick="() => StartDelete(r.EmployeeDocumentId)"
+                                          title="Delete">
+                                    <i class="fa-solid fa-trash"></i>
+                                </SfButton>
+                            }
+                        </Template>
+                    </GridColumn>
+                </GridColumns>
+            </HrGrid>
+        </div>
     </div>
 }
 
 @code {
-    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
 
     private bool _loading = true;
-    private List<EmployeeDocumentListItem> _documents     = [];
-    private List<DocumentTypeItem>         _documentTypes = [];
-
-    private bool    _showUploadForm;
-    private bool    _uploading;
-    private string? _uploadError;
-    private UploadForm    _form         = new();
-    private IBrowserFile? _selectedFile;
+    private bool _uploadOpen;
+    private List<EmployeeDocumentListItem> _documents = [];
 
     private Guid? _deleteTargetId;
 
@@ -184,55 +108,15 @@ else
 
     private async Task LoadAsync()
     {
-        _loading = _documents.Count == 0;
-        var docsTask  = DocumentService.ListEmployeeDocumentsAsync(CompanyId, EmployeeId);
-        var typesTask = DocumentService.ListDocumentTypesAsync(CompanyId);
-        await Task.WhenAll(docsTask, typesTask);
-        _documents     = (await docsTask)?.Items.ToList()  ?? [];
-        _documentTypes = (await typesTask)?.Items.ToList() ?? [];
-        _loading = false;
+        _loading   = _documents.Count == 0;
+        _documents = (await DocumentService.ListEmployeeDocumentsAsync(CompanyId, EmployeeId))?.Items.ToList() ?? [];
+        _loading   = false;
         StateHasChanged();
     }
 
-    private void ShowUploadForm()
+    private async Task OnDocumentUploaded()
     {
-        _form         = new();
-        _selectedFile = null;
-        _uploadError  = null;
-        _showUploadForm = true;
-    }
-
-    private void CancelUpload()
-    {
-        _showUploadForm = false;
-        _uploadError    = null;
-    }
-
-    private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
-
-    private async Task UploadAsync()
-    {
-        _uploadError = null;
-
-        if (string.IsNullOrWhiteSpace(_form.Title))    { _uploadError = "Title is required."; return; }
-        if (_form.DocumentTypeId == Guid.Empty)         { _uploadError = "Document type is required."; return; }
-        if (_selectedFile is null)                      { _uploadError = "Please select a file."; return; }
-
-        _uploading = true;
-        var ok = await DocumentService.UploadEmployeeDocumentAsync(
-            CompanyId, EmployeeId,
-            _form.Title, _form.Description, _form.DocumentTypeId,
-            _form.IssueDate, _form.ExpiryDate,
-            _selectedFile);
-        _uploading = false;
-
-        if (!ok)
-        {
-            _uploadError = "Upload failed. Check the file type and size (max 20 MB) and try again.";
-            return;
-        }
-
-        _showUploadForm = false;
+        _uploadOpen = false;
         await LoadAsync();
     }
 
@@ -243,8 +127,8 @@ else
             await JS.InvokeVoidAsync("window.open", url, "_blank");
     }
 
-    private void StartDelete(Guid id)   => _deleteTargetId = id;
-    private void CancelDelete()         => _deleteTargetId = null;
+    private void StartDelete(Guid id) => _deleteTargetId = id;
+    private void CancelDelete()       => _deleteTargetId = null;
 
     private async Task ConfirmDeleteAsync(Guid id)
     {
@@ -269,14 +153,5 @@ else
             "Expired"  => ("text-bg-danger",    "Expired"),
             _          => ("text-bg-success",    "Active"),
         };
-    }
-
-    private sealed class UploadForm
-    {
-        public string    Title          { get; set; } = string.Empty;
-        public string?   Description    { get; set; }
-        public Guid      DocumentTypeId { get; set; }
-        public DateOnly? IssueDate      { get; set; }
-        public DateOnly? ExpiryDate     { get; set; }
     }
 }

@@ -1,0 +1,153 @@
+@inject DocumentService DocumentService
+
+<SfDialog @bind-Visible="_visible" IsModal="true" Width="640px" ShowCloseIcon="true">
+    <DialogEvents Closed="OnDialogClosed" />
+    <DialogTemplates>
+        <Header>Upload Document</Header>
+        <Content>
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="alert alert-danger alert-dismissible mb-3">
+                    @_error
+                    <button type="button" class="btn-close" @onclick="@(() => _error = null)"></button>
+                </div>
+            }
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Title <span class="text-danger">*</span></label>
+                    <HrTextBox @bind-Value="_title" Placeholder="Document title" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Document Type <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="Guid"
+                                    TItem="DocumentTypeItem"
+                                    DataSource="@_documentTypes"
+                                    @bind-Value="_documentTypeId"
+                                    Placeholder="Select type…"
+                                    AllowFiltering="true">
+                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                    </SfDropDownList>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Description</label>
+                    <HrTextBox @bind-Value="_description"
+                               Placeholder="Optional description"
+                               Multiline="true" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Issue Date</label>
+                    <SfDatePicker TValue="DateOnly?"
+                                  @bind-Value="_issueDate"
+                                  Format="dd/MM/yyyy"
+                                  Placeholder="dd/mm/yyyy"
+                                  ShowClearButton="true" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Expiry Date</label>
+                    <SfDatePicker TValue="DateOnly?"
+                                  @bind-Value="_expiryDate"
+                                  Format="dd/MM/yyyy"
+                                  Placeholder="dd/mm/yyyy"
+                                  ShowClearButton="true" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">File <span class="text-danger">*</span></label>
+                    <InputFile class="form-control" OnChange="OnFileSelected"
+                               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
+                </div>
+            </div>
+        </Content>
+        <FooterTemplate>
+            <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="_uploading">
+                @if (_uploading)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Upload
+            </SfButton>
+            <SfButton OnClick="Cancel">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter]                 public bool IsOpen     { get; set; }
+    [Parameter] public EventCallback OnUploaded  { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+
+    private bool _visible;
+    private List<DocumentTypeItem> _documentTypes = [];
+
+    private string    _title          = string.Empty;
+    private string?   _description;
+    private Guid      _documentTypeId;
+    private DateOnly? _issueDate;
+    private DateOnly? _expiryDate;
+    private IBrowserFile? _selectedFile;
+
+    private bool    _uploading;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && !_visible)
+        {
+            Reset();
+            _documentTypes = (await DocumentService.ListDocumentTypesAsync(CompanyId))?.Items.ToList() ?? [];
+            _visible = true;
+        }
+        else if (!IsOpen && _visible)
+        {
+            _visible = false;
+        }
+    }
+
+    private void Reset()
+    {
+        _title          = string.Empty;
+        _description    = null;
+        _documentTypeId = Guid.Empty;
+        _issueDate      = null;
+        _expiryDate     = null;
+        _selectedFile   = null;
+        _error          = null;
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_title)) { _error = "Title is required."; return; }
+        if (_documentTypeId == Guid.Empty)      { _error = "Document type is required."; return; }
+        if (_selectedFile is null)              { _error = "Please select a file."; return; }
+
+        _uploading = true;
+        var ok = await DocumentService.UploadEmployeeDocumentAsync(
+            CompanyId, EmployeeId,
+            _title, _description, _documentTypeId,
+            _issueDate, _expiryDate,
+            _selectedFile);
+        _uploading = false;
+
+        if (!ok)
+        {
+            _error = "Upload failed. Check the file type and size (max 20 MB) and try again.";
+            return;
+        }
+
+        _visible = false;
+        await OnUploaded.InvokeAsync();
+    }
+
+    private async Task Cancel()
+    {
+        _visible = false;
+        await OnCancelled.InvokeAsync();
+    }
+
+    private async Task OnDialogClosed() => await OnCancelled.InvokeAsync();
+}
