@@ -1,4 +1,6 @@
+using FluentValidation;
 using HR.Modules.Documents.Domain;
+using HR.Modules.Documents.Features.CreateDocumentType;
 using HR.Modules.Documents.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,11 +13,19 @@ public static class DocumentsModule
         this IServiceCollection services,
         string connectionString)
     {
+        AddFeatureServices(services);
+
         services.AddDbContext<DocumentsDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "documents")));
 
         return services;
+    }
+
+    private static void AddFeatureServices(IServiceCollection services)
+    {
+        services.AddScoped<CreateDocumentTypeHandler>();
+        services.AddScoped<IValidator<CreateDocumentTypeRequest>, CreateDocumentTypeValidator>();
     }
 
     public static async Task MigrateDocumentsAsync(this IServiceProvider services)
