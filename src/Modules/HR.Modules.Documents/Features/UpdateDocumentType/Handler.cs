@@ -43,7 +43,7 @@ internal sealed class UpdateDocumentTypeHandler(DocumentsDbContext db, IClock cl
 
         var now = clock.UtcNowOffset();
 
-        documentType.Update(newName, request.Description, now);
+        documentType.Update(newName, request.Description, request.AllowEmployeeUpload, now);
 
         await db.SaveChangesAsync(cancellationToken);
 
@@ -53,6 +53,7 @@ internal sealed class UpdateDocumentTypeHandler(DocumentsDbContext db, IClock cl
             documentType.Name,
             documentType.Description,
             documentType.IsActive,
+            documentType.AllowEmployeeUpload,
             documentType.UpdatedAt));
     }
 }

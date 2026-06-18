@@ -6,4 +6,5 @@ internal sealed record CreateDocumentTypeResponse(
     string Name,
     string? Description,
     bool IsActive,
+    bool AllowEmployeeUpload,
     DateTimeOffset CreatedAt);

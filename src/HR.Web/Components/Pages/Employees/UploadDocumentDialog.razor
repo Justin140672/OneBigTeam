@@ -71,9 +71,10 @@
 </SfDialog>
 
 @code {
-    [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
-    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
-    [Parameter]                 public bool IsOpen     { get; set; }
+    [Parameter, EditorRequired] public Guid CompanyId        { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId       { get; set; }
+    [Parameter]                 public bool IsOpen           { get; set; }
+    [Parameter]                 public bool EmployeeSelfUpload { get; set; }
     [Parameter] public EventCallback OnUploaded  { get; set; }
     [Parameter] public EventCallback OnCancelled { get; set; }
 
@@ -95,7 +96,7 @@
         if (IsOpen && !_visible)
         {
             Reset();
-            _documentTypes = (await DocumentService.ListDocumentTypesAsync(CompanyId))?.Items.ToList() ?? [];
+            _documentTypes = (await DocumentService.ListDocumentTypesAsync(CompanyId, employeeUploadOnly: EmployeeSelfUpload))?.Items.ToList() ?? [];
             _visible = true;
         }
         else if (!IsOpen && _visible)

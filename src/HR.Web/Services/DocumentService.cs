@@ -19,12 +19,14 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
     }
 
     public async Task<DocumentTypeListResponse?> ListDocumentTypesAsync(
-        Guid companyId, CancellationToken cancellationToken = default)
+        Guid companyId, bool employeeUploadOnly = false, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await Http.GetFromJsonAsync<DocumentTypeListResponse>(
-                $"api/companies/{companyId}/document-types", cancellationToken);
+            var url = employeeUploadOnly
+                ? $"api/companies/{companyId}/document-types?employeeUploadOnly=true"
+                : $"api/companies/{companyId}/document-types";
+            return await Http.GetFromJsonAsync<DocumentTypeListResponse>(url, cancellationToken);
         }
         catch { return null; }
     }

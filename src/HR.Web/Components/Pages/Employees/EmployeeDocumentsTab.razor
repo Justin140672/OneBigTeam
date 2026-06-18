@@ -4,6 +4,7 @@
 <UploadDocumentDialog CompanyId="CompanyId"
                       EmployeeId="EmployeeId"
                       IsOpen="_uploadOpen"
+                      EmployeeSelfUpload="EmployeeSelfUpload"
                       OnUploaded="OnDocumentUploaded"
                       OnCancelled="@(() => _uploadOpen = false)" />
 
@@ -95,8 +96,9 @@ else
 }
 
 @code {
-    [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
-    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter, EditorRequired] public Guid CompanyId        { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId       { get; set; }
+    [Parameter]                 public bool EmployeeSelfUpload { get; set; }
 
     private bool _loading = true;
     private bool _uploadOpen;

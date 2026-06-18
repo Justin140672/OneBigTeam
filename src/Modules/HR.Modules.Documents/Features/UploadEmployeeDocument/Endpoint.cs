@@ -1,16 +1,17 @@
 using System.Security.Claims;
 using FastEndpoints;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Documents.Features.UploadEmployeeDocument;
 
-internal sealed class Endpoint(UploadEmployeeDocumentHandler handler)
+internal sealed class Endpoint(UploadEmployeeDocumentHandler handler, IAuthorizationService authorizationService)
     : Endpoint<UploadEmployeeDocumentRequest, UploadEmployeeDocumentResponse>
 {
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/documents");
-        Policies("employee:manage");
+        Policies("authenticated");
         AllowFileUploads();
     }
 
@@ -24,7 +25,10 @@ internal sealed class Endpoint(UploadEmployeeDocumentHandler handler)
             return;
         }
 
-        var result = await handler.HandleAsync(request, uploadedBy, cancellationToken);
+        var authResult = await authorizationService.AuthorizeAsync(User, "employee:manage");
+        var isManagerUpload = authResult.Succeeded;
+
+        var result = await handler.HandleAsync(request, uploadedBy, isManagerUpload, cancellationToken);
 
         if (result.IsFailure)
         {

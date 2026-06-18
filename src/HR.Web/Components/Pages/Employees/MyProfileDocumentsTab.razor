@@ -1,6 +1,6 @@
 @code {
-    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
 }
 
-<p class="text-muted">Documents coming soon.</p>
+<EmployeeDocumentsTab CompanyId="CompanyId" EmployeeId="EmployeeId" />

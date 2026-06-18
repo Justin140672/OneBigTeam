@@ -31,7 +31,8 @@ internal sealed class CreateDocumentTypeHandler(DocumentsDbContext db, IClock cl
             request.CompanyId,
             request.Name,
             request.Description,
-            now);
+            now,
+            request.AllowEmployeeUpload);
 
         db.DocumentTypes.Add(documentType);
         await db.SaveChangesAsync(cancellationToken);
@@ -42,6 +43,7 @@ internal sealed class CreateDocumentTypeHandler(DocumentsDbContext db, IClock cl
             documentType.Name,
             documentType.Description,
             documentType.IsActive,
+            documentType.AllowEmployeeUpload,
             documentType.CreatedAt));
     }
 }

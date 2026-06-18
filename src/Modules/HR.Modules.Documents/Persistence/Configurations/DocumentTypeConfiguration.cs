@@ -33,6 +33,11 @@ internal sealed class DocumentTypeConfiguration : IEntityTypeConfiguration<Docum
             .HasColumnName("is_active")
             .IsRequired();
 
+        builder.Property(dt => dt.AllowEmployeeUpload)
+            .HasColumnName("allow_employee_upload")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(dt => dt.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

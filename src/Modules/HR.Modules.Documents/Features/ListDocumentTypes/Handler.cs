@@ -17,9 +17,12 @@ internal sealed class ListDocumentTypesHandler(DocumentsDbContext db)
         if (!request.IncludeInactive)
             query = query.Where(dt => dt.IsActive);
 
+        if (request.EmployeeUploadOnly)
+            query = query.Where(dt => dt.AllowEmployeeUpload);
+
         var items = await query
             .OrderBy(dt => dt.Name)
-            .Select(dt => new DocumentTypeListItem(dt.Id, dt.Name, dt.Description, dt.IsActive))
+            .Select(dt => new DocumentTypeListItem(dt.Id, dt.Name, dt.Description, dt.IsActive, dt.AllowEmployeeUpload))
             .ToListAsync(cancellationToken);
 
         return Result.Success(new ListDocumentTypesResponse(items));

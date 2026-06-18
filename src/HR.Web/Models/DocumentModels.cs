@@ -16,4 +16,4 @@ public sealed record EmployeeDocumentDetailResponse(string? DownloadUrl);
 
 public sealed record DocumentTypeListResponse(IReadOnlyList<DocumentTypeItem> Items);
 
-public sealed record DocumentTypeItem(Guid Id, string Name, string? Description, bool IsActive);
+public sealed record DocumentTypeItem(Guid Id, string Name, string? Description, bool IsActive, bool AllowEmployeeUpload);

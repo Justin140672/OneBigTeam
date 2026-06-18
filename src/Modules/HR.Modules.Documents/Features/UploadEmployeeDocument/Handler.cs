@@ -13,9 +13,16 @@ internal sealed class UploadEmployeeDocumentHandler(
     IVirusScanService virusScanner,
     IClock clock)
 {
+    public Task<Result<UploadEmployeeDocumentResponse>> HandleAsync(
+        UploadEmployeeDocumentRequest request,
+        Guid uploadedBy,
+        CancellationToken cancellationToken)
+        => HandleAsync(request, uploadedBy, isManagerUpload: true, cancellationToken);
+
     public async Task<Result<UploadEmployeeDocumentResponse>> HandleAsync(
         UploadEmployeeDocumentRequest request,
         Guid uploadedBy,
+        bool isManagerUpload,
         CancellationToken cancellationToken)
     {
         var file = request.File;
@@ -43,6 +50,10 @@ internal sealed class UploadEmployeeDocumentHandler(
         if (documentType is null)
             return Result.Failure<UploadEmployeeDocumentResponse>(
                 Error.NotFound($"Document type '{request.DocumentTypeId}' was not found."));
+
+        if (!isManagerUpload && !documentType.AllowEmployeeUpload)
+            return Result.Failure<UploadEmployeeDocumentResponse>(
+                Error.Validation($"Document type '{documentType.Name}' does not allow employee uploads."));
 
         var storageKey = await storage.UploadAsync(
             fileStream,

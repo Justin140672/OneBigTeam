@@ -6,4 +6,5 @@ internal sealed record DocumentTypeListItem(
     Guid Id,
     string Name,
     string? Description,
-    bool IsActive);
+    bool IsActive,
+    bool AllowEmployeeUpload);

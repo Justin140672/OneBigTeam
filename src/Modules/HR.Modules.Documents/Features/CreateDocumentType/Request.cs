@@ -5,4 +5,5 @@ internal sealed record CreateDocumentTypeRequest
     public Guid CompanyId { get; init; }
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
+    public bool AllowEmployeeUpload { get; init; }
 }
