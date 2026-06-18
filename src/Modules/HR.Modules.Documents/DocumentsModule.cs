@@ -1,6 +1,7 @@
 using FluentValidation;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.CreateDocumentType;
+using HR.Modules.Documents.Features.ListDocumentTypes;
 using HR.Modules.Documents.Features.UpdateDocumentType;
 using HR.Modules.Documents.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +31,9 @@ public static class DocumentsModule
 
         services.AddScoped<UpdateDocumentTypeHandler>();
         services.AddScoped<IValidator<UpdateDocumentTypeRequest>, UpdateDocumentTypeValidator>();
+
+        services.AddScoped<ListDocumentTypesHandler>();
+        services.AddScoped<IValidator<ListDocumentTypesRequest>, ListDocumentTypesValidator>();
     }
 
     public static async Task MigrateDocumentsAsync(this IServiceProvider services)
