@@ -10,6 +10,7 @@
   </Folder>
   <Folder Name="/src/Modules/">
     <Project Path="src/Modules/HR.Modules.Companies/HR.Modules.Companies.csproj" />
+    <Project Path="src/Modules/HR.Modules.Documents/HR.Modules.Documents.csproj" />
     <Project Path="src/Modules/HR.Modules.Employees/HR.Modules.Employees.csproj" />
     <Project Path="src/Modules/HR.Modules.Identity/HR.Modules.Identity.csproj" />
     <Project Path="src/Modules/HR.Modules.Leave/HR.Modules.Leave.csproj" />
@@ -23,6 +24,7 @@
     <Project Path="tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj" />
      <Project Path="tests/HR.Modules.Companies.Tests/HR.Modules.Companies.Tests.csproj" />
       <Project Path="tests/HR.Integration.Tests/HR.Integration.Tests.csproj" />
+    <Project Path="tests/HR.Modules.Documents.Tests/HR.Modules.Documents.Tests.csproj" />
     <Project Path="tests/HR.Modules.Employees.Tests/HR.Modules.Employees.Tests.csproj" />
     <Project Path="tests/HR.Modules.Identity.Tests/HR.Modules.Identity.Tests.csproj" />
     <Project Path="tests/HR.Modules.Leave.Tests/HR.Modules.Leave.Tests.csproj" />

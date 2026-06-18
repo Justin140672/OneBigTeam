@@ -3,6 +3,7 @@ using HR.Api.Authentication;
 using HR.Infrastructure;
 using HR.Infrastructure.Logging;
 using HR.Modules.Companies;
+using HR.Modules.Documents;
 using HR.Modules.Employees;
 using HR.Modules.Identity;
 using HR.Modules.Leave;
@@ -18,6 +19,7 @@ var connectionString = builder.Configuration.GetConnectionString("hr")
 	?? throw new InvalidOperationException("Connection string 'hr' was not found.");
 
 builder.Services.AddCompaniesModule(connectionString);
+builder.Services.AddDocumentsModule(connectionString);
 builder.Services.AddEmployeesModule(connectionString);
 builder.Services.AddIdentityModule(connectionString);
 builder.Services.AddLeaveModule(connectionString);
@@ -61,6 +63,9 @@ DateTimeOffset? identityMigrationCheckedAt = null;
 var auditMigrationStatus = "unknown";
 string? auditMigrationError = null;
 DateTimeOffset? auditMigrationCheckedAt = null;
+var documentsMigrationStatus = "unknown";
+string? documentsMigrationError = null;
+DateTimeOffset? documentsMigrationCheckedAt = null;
 var leaveMigrationStatus = "unknown";
 string? leaveMigrationError = null;
 DateTimeOffset? leaveMigrationCheckedAt = null;
@@ -126,6 +131,19 @@ catch (Exception exception)
 
 try
 {
+	await app.Services.MigrateDocumentsAsync();
+	documentsMigrationStatus = "succeeded";
+	documentsMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+catch (Exception exception)
+{
+	documentsMigrationStatus = "failed";
+	documentsMigrationError = exception.Message;
+	documentsMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+
+try
+{
 	await app.Services.MigrateLeaveAsync();
 	await app.Services.SeedLeaveAsync();
 	leaveMigrationStatus = "succeeded";
@@ -168,6 +186,12 @@ app.MapGet("/health/startup-migrations", () =>
 			checkedAt = companiesMigrationCheckedAt,
 			error = companiesMigrationError
 		},
+		documents = new
+		{
+			status = documentsMigrationStatus,
+			checkedAt = documentsMigrationCheckedAt,
+			error = documentsMigrationError
+		},
 		employees = new
 		{
 			status = employeesMigrationStatus,
@@ -194,7 +218,7 @@ app.MapGet("/health/startup-migrations", () =>
 		}
 	};
 
-	return auditMigrationStatus == "failed" || companiesMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed" || tasksMigrationStatus == "failed"
+	return auditMigrationStatus == "failed" || companiesMigrationStatus == "failed" || documentsMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed" || tasksMigrationStatus == "failed"
 		? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
 		: Results.Ok(response);
 });
