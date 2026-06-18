@@ -21,6 +21,11 @@ internal sealed class FakeDocumentStorageService : IDocumentStorageService
     public Task<Uri> GetDownloadUrlAsync(string storageKey, CancellationToken cancellationToken)
         => Task.FromResult(new Uri($"https://storage.example.com/{storageKey}"));
 
+    public List<string> Deletions { get; } = [];
+
     public Task DeleteAsync(string storageKey, CancellationToken cancellationToken)
-        => Task.CompletedTask;
+    {
+        Deletions.Add(storageKey);
+        return Task.CompletedTask;
+    }
 }
