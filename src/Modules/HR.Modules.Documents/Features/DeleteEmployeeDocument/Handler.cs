@@ -7,42 +7,58 @@ namespace HR.Modules.Documents.Features.DeleteEmployeeDocument;
 
 internal sealed class DeleteEmployeeDocumentHandler(
     DocumentsDbContext db,
-    IDocumentStorageService storage)
+    IDocumentStorageService storage,
+    IClock clock,
+    IAuditEventPublisher auditPublisher)
 {
     public async Task<Result> HandleAsync(
         DeleteEmployeeDocumentRequest request,
+        Guid deletedBy,
         CancellationToken cancellationToken)
     {
-        var employeeDocument = await db.EmployeeDocuments
-            .SingleOrDefaultAsync(
-                ed => ed.Id         == request.EmployeeDocumentId &&
-                      ed.CompanyId  == request.CompanyId &&
-                      ed.EmployeeId == request.EmployeeId,
-                cancellationToken);
+        var row = await (
+            from ed in db.EmployeeDocuments
+            join d  in db.Documents     on ed.DocumentId    equals d.Id
+            join dt in db.DocumentTypes on d.DocumentTypeId equals dt.Id
+            where ed.Id        == request.EmployeeDocumentId
+               && ed.CompanyId == request.CompanyId
+               && ed.EmployeeId == request.EmployeeId
+            select new { ed, d, DocumentTypeName = dt.Name })
+            .SingleOrDefaultAsync(cancellationToken);
 
-        if (employeeDocument is null)
+        if (row is null)
             return Result.Failure(Error.NotFound("Employee document was not found."));
 
-        var document = await db.Documents
-            .SingleAsync(d => d.Id == employeeDocument.DocumentId, cancellationToken);
-
-        db.EmployeeDocuments.Remove(employeeDocument);
+        db.EmployeeDocuments.Remove(row.ed);
 
         var otherLinks = await db.EmployeeDocuments
             .AnyAsync(
-                ed => ed.DocumentId == document.Id &&
-                      ed.Id         != employeeDocument.Id,
+                ed => ed.DocumentId == row.d.Id &&
+                      ed.Id         != row.ed.Id,
                 cancellationToken);
 
         string? storageKeyToDelete = null;
 
         if (!otherLinks)
         {
-            storageKeyToDelete = document.StorageKey;
-            db.Documents.Remove(document);
+            storageKeyToDelete = row.d.StorageKey;
+            db.Documents.Remove(row.d);
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new DocumentDeletedAuditEvent(
+            request.CompanyId,
+            row.ed.Id,
+            request.EmployeeId,
+            row.d.Title,
+            row.DocumentTypeName,
+            row.d.FileName,
+            row.d.FileSize,
+            row.ed.IssueDate,
+            row.ed.ExpiryDate,
+            deletedBy,
+            clock.UtcNowOffset()), cancellationToken);
 
         if (storageKeyToDelete is not null)
             await storage.DeleteAsync(storageKeyToDelete, cancellationToken);

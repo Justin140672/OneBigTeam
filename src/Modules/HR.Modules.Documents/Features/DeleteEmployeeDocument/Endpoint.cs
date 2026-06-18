@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 
@@ -16,7 +17,13 @@ internal sealed class Endpoint(DeleteEmployeeDocumentHandler handler)
         DeleteEmployeeDocumentRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var deletedBy))
+        {
+            await SendResultAsync(TypedResults.Unauthorized());
+            return;
+        }
+
+        var result = await handler.HandleAsync(request, deletedBy, cancellationToken);
 
         if (result.IsFailure)
         {
