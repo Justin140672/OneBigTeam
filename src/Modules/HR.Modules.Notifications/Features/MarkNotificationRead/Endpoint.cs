@@ -1,7 +1,7 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 
-namespace HR.Modules.Tasks.Features.MarkNotificationRead;
+namespace HR.Modules.Notifications.Features.MarkNotificationRead;
 
 internal sealed class Endpoint(MarkNotificationReadHandler handler)
     : Endpoint<MarkNotificationReadRequest>

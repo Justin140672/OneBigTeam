@@ -1,10 +1,16 @@
+using HR.Modules.Notifications;
+using HR.Modules.Notifications.Contracts;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Persistence;
 using HR.SharedKernel;
 
 namespace HR.Modules.Tasks.Services;
 
-internal sealed class TaskCreator(TasksDbContext dbContext, IClock clock, IAuditEventPublisher auditPublisher) : ITaskCreator
+internal sealed class TaskCreator(
+    TasksDbContext dbContext,
+    INotificationWriter notificationWriter,
+    IClock clock,
+    IAuditEventPublisher auditPublisher) : ITaskCreator
 {
     public async Task<Guid> CreateAsync(
         Guid companyId,
@@ -27,20 +33,19 @@ internal sealed class TaskCreator(TasksDbContext dbContext, IClock clock, IAudit
             clock.UtcNowOffset(), sourceEntityId);
 
         dbContext.TaskItems.Add(task);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         if (assignedEmployeeId.HasValue)
         {
-            var notification = Notification.Create(
+            await notificationWriter.WriteAsync(
                 Guid.NewGuid(), companyId, assignedEmployeeId.Value,
                 $"New task assigned: {task.Title}",
                 task.Description,
                 task.Id,
+                NotificationType.TaskAssigned,
                 clock.UtcNowOffset(),
-                NotificationType.TaskAssigned);
-            dbContext.Notifications.Add(notification);
+                cancellationToken);
         }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
 
         await auditPublisher.PublishAsync(new TaskCreatedAuditEvent(
             task.CompanyId,

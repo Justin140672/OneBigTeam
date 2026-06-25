@@ -1,6 +1,6 @@
 using FastEndpoints;
 
-namespace HR.Modules.Tasks.Features.MarkAllNotificationsRead;
+namespace HR.Modules.Notifications.Features.MarkAllNotificationsRead;
 
 internal sealed class Endpoint(MarkAllNotificationsReadHandler handler)
     : Endpoint<MarkAllNotificationsReadRequest>

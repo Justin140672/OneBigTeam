@@ -1,4 +1,4 @@
-namespace HR.Modules.Tasks.Features.MarkNotificationRead;
+namespace HR.Modules.Notifications.Features.MarkNotificationRead;
 
 internal sealed class MarkNotificationReadRequest
 {

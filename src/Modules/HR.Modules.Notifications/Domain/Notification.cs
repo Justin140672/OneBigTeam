@@ -1,4 +1,4 @@
-namespace HR.Modules.Tasks.Domain;
+namespace HR.Modules.Notifications.Domain;
 
 internal sealed class Notification
 {
@@ -20,15 +20,15 @@ internal sealed class Notification
         Guid sourceEntityId, DateTimeOffset now,
         NotificationType type = NotificationType.TaskAssigned) => new()
     {
-        Id = id,
-        CompanyId = companyId,
-        EmployeeId = employeeId,
-        Title = title,
-        Body = body,
-        IsRead = false,
+        Id             = id,
+        CompanyId      = companyId,
+        EmployeeId     = employeeId,
+        Title          = title,
+        Body           = body,
+        IsRead         = false,
         SourceEntityId = sourceEntityId,
-        Type = type,
-        CreatedAt = now
+        Type           = type,
+        CreatedAt      = now,
     };
 
     public void MarkAsRead() => IsRead = true;

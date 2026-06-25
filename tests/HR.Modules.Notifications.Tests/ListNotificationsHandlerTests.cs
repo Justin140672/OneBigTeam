@@ -1,9 +1,9 @@
-using HR.Modules.Tasks.Domain;
-using HR.Modules.Tasks.Features.ListNotifications;
-using HR.Modules.Tasks.Persistence;
+using HR.Modules.Notifications.Domain;
+using HR.Modules.Notifications.Features.ListNotifications;
+using HR.Modules.Notifications.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace HR.Modules.Tasks.Tests;
+namespace HR.Modules.Notifications.Tests;
 
 public class ListNotificationsHandlerTests
 {
@@ -27,9 +27,9 @@ public class ListNotificationsHandlerTests
     public async Task Returns_Notifications_For_Employee()
     {
         await using var ctx = BuildContext();
-        var companyId = Guid.NewGuid();
+        var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        var otherId = Guid.NewGuid();
+        var otherId    = Guid.NewGuid();
 
         ctx.Notifications.AddRange(
             MakeNotification(companyId, employeeId, "Mine A"),
@@ -50,8 +50,8 @@ public class ListNotificationsHandlerTests
     {
         await using var ctx = BuildContext();
         var employeeId = Guid.NewGuid();
-        var companyA = Guid.NewGuid();
-        var companyB = Guid.NewGuid();
+        var companyA   = Guid.NewGuid();
+        var companyB   = Guid.NewGuid();
 
         ctx.Notifications.AddRange(
             MakeNotification(companyA, employeeId, "Company A"),
@@ -70,7 +70,7 @@ public class ListNotificationsHandlerTests
     public async Task UnreadCount_Reflects_Only_Unread_Items()
     {
         await using var ctx = BuildContext();
-        var companyId = Guid.NewGuid();
+        var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
         ctx.Notifications.AddRange(
@@ -104,13 +104,13 @@ public class ListNotificationsHandlerTests
     public async Task Orders_By_CreatedAt_Descending()
     {
         await using var ctx = BuildContext();
-        var companyId = Guid.NewGuid();
+        var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
         ctx.Notifications.AddRange(
-            MakeNotification(companyId, employeeId, "Oldest",  createdAt: Now.AddHours(-3)),
-            MakeNotification(companyId, employeeId, "Newest",  createdAt: Now),
-            MakeNotification(companyId, employeeId, "Middle",  createdAt: Now.AddHours(-1)));
+            MakeNotification(companyId, employeeId, "Oldest", createdAt: Now.AddHours(-3)),
+            MakeNotification(companyId, employeeId, "Newest", createdAt: Now),
+            MakeNotification(companyId, employeeId, "Middle", createdAt: Now.AddHours(-1)));
         await ctx.SaveChangesAsync();
 
         var result = await new ListNotificationsHandler(ctx).HandleAsync(
@@ -126,7 +126,7 @@ public class ListNotificationsHandlerTests
     public async Task Limits_To_50_Items()
     {
         await using var ctx = BuildContext();
-        var companyId = Guid.NewGuid();
+        var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
         ctx.Notifications.AddRange(
@@ -145,9 +145,9 @@ public class ListNotificationsHandlerTests
     public async Task Maps_All_Fields_Correctly()
     {
         await using var ctx = BuildContext();
-        var companyId = Guid.NewGuid();
+        var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        var sourceId = Guid.NewGuid();
+        var sourceId   = Guid.NewGuid();
 
         var n = Notification.Create(
             Guid.NewGuid(), companyId, employeeId,
@@ -168,11 +168,11 @@ public class ListNotificationsHandlerTests
         Assert.Equal(Now, item.CreatedAt);
     }
 
-    private static TasksDbContext BuildContext()
+    private static NotificationsDbContext BuildContext()
     {
-        var options = new DbContextOptionsBuilder<TasksDbContext>()
+        var options = new DbContextOptionsBuilder<NotificationsDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
-        return new TasksDbContext(options);
+        return new NotificationsDbContext(options);
     }
 }

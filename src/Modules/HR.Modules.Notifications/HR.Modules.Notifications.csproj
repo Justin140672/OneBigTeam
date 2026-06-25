@@ -2,7 +2,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Shared\HR.SharedKernel\HR.SharedKernel.csproj" />
-    <ProjectReference Include="..\HR.Modules.Notifications\HR.Modules.Notifications.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,7 +21,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="HR.Architecture.Tests" />
-    <InternalsVisibleTo Include="HR.Modules.Tasks.Tests" />
+    <InternalsVisibleTo Include="HR.Modules.Notifications.Tests" />
     <InternalsVisibleTo Include="HR.Integration.Tests" />
   </ItemGroup>
 

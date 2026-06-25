@@ -1,6 +1,6 @@
-namespace HR.Modules.Tasks.Domain;
+namespace HR.Modules.Notifications;
 
-internal enum NotificationType
+public enum NotificationType
 {
     TaskAssigned = 1,
     TaskDueSoon  = 2,

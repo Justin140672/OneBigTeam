@@ -1,9 +1,9 @@
-using HR.Modules.Tasks.Domain;
-using HR.Modules.Tasks.Features.MarkNotificationRead;
-using HR.Modules.Tasks.Persistence;
+using HR.Modules.Notifications.Domain;
+using HR.Modules.Notifications.Features.MarkNotificationRead;
+using HR.Modules.Notifications.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace HR.Modules.Tasks.Tests;
+namespace HR.Modules.Notifications.Tests;
 
 public class MarkNotificationReadHandlerTests
 {
@@ -13,7 +13,7 @@ public class MarkNotificationReadHandlerTests
     public async Task Marks_Notification_As_Read()
     {
         await using var ctx = BuildContext();
-        var companyId = Guid.NewGuid();
+        var companyId    = Guid.NewGuid();
         var notification = Notification.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
             "Task assigned", null, Guid.NewGuid(), Now);
@@ -64,7 +64,7 @@ public class MarkNotificationReadHandlerTests
     public async Task Is_Idempotent_When_Already_Read()
     {
         await using var ctx = BuildContext();
-        var companyId = Guid.NewGuid();
+        var companyId    = Guid.NewGuid();
         var notification = Notification.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
             "Task", null, Guid.NewGuid(), Now);
@@ -81,11 +81,11 @@ public class MarkNotificationReadHandlerTests
         Assert.True(saved!.IsRead);
     }
 
-    private static TasksDbContext BuildContext()
+    private static NotificationsDbContext BuildContext()
     {
-        var options = new DbContextOptionsBuilder<TasksDbContext>()
+        var options = new DbContextOptionsBuilder<NotificationsDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
-        return new TasksDbContext(options);
+        return new NotificationsDbContext(options);
     }
 }

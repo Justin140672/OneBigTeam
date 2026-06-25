@@ -1,10 +1,10 @@
-using HR.Modules.Tasks.Persistence;
+using HR.Modules.Notifications.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
-namespace HR.Modules.Tasks.Features.MarkNotificationRead;
+namespace HR.Modules.Notifications.Features.MarkNotificationRead;
 
-internal sealed class MarkNotificationReadHandler(TasksDbContext dbContext)
+internal sealed class MarkNotificationReadHandler(NotificationsDbContext dbContext)
 {
     public async Task<Result> HandleAsync(MarkNotificationReadRequest request, CancellationToken cancellationToken)
     {

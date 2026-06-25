@@ -1,9 +1,9 @@
-using HR.Modules.Tasks.Domain;
-using HR.Modules.Tasks.Features.MarkAllNotificationsRead;
-using HR.Modules.Tasks.Persistence;
+using HR.Modules.Notifications.Domain;
+using HR.Modules.Notifications.Features.MarkAllNotificationsRead;
+using HR.Modules.Notifications.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace HR.Modules.Tasks.Tests;
+namespace HR.Modules.Notifications.Tests;
 
 public class MarkAllNotificationsReadHandlerTests
 {
@@ -22,7 +22,7 @@ public class MarkAllNotificationsReadHandlerTests
     public async Task Marks_All_Unread_Notifications_As_Read()
     {
         await using var ctx = BuildContext();
-        var companyId = Guid.NewGuid();
+        var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
         ctx.Notifications.AddRange(
@@ -58,8 +58,7 @@ public class MarkAllNotificationsReadHandlerTests
             new MarkAllNotificationsReadRequest { CompanyId = companyId, EmployeeId = employeeA },
             CancellationToken.None);
 
-        var bNotif = await ctx.Notifications
-            .SingleAsync(n => n.EmployeeId == employeeB);
+        var bNotif = await ctx.Notifications.SingleAsync(n => n.EmployeeId == employeeB);
         Assert.False(bNotif.IsRead);
     }
 
@@ -68,8 +67,8 @@ public class MarkAllNotificationsReadHandlerTests
     {
         await using var ctx = BuildContext();
         var employeeId = Guid.NewGuid();
-        var companyA = Guid.NewGuid();
-        var companyB = Guid.NewGuid();
+        var companyA   = Guid.NewGuid();
+        var companyB   = Guid.NewGuid();
 
         ctx.Notifications.AddRange(
             MakeNotification(companyA, employeeId),
@@ -80,8 +79,7 @@ public class MarkAllNotificationsReadHandlerTests
             new MarkAllNotificationsReadRequest { CompanyId = companyA, EmployeeId = employeeId },
             CancellationToken.None);
 
-        var bNotif = await ctx.Notifications
-            .SingleAsync(n => n.CompanyId == companyB);
+        var bNotif = await ctx.Notifications.SingleAsync(n => n.CompanyId == companyB);
         Assert.False(bNotif.IsRead);
     }
 
@@ -98,11 +96,11 @@ public class MarkAllNotificationsReadHandlerTests
         Assert.Null(ex);
     }
 
-    private static TasksDbContext BuildContext()
+    private static NotificationsDbContext BuildContext()
     {
-        var options = new DbContextOptionsBuilder<TasksDbContext>()
+        var options = new DbContextOptionsBuilder<NotificationsDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
-        return new TasksDbContext(options);
+        return new NotificationsDbContext(options);
     }
 }

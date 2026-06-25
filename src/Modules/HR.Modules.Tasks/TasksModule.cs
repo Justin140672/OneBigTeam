@@ -7,9 +7,6 @@ using HR.Modules.Tasks.Features.GetTeamTasks;
 using HR.Modules.Tasks.Features.GetTask;
 using HR.Modules.Tasks.Features.GetUnassignedTasks;
 using HR.Modules.Tasks.Features.LeaveRequested;
-using HR.Modules.Tasks.Features.ListNotifications;
-using HR.Modules.Tasks.Features.MarkAllNotificationsRead;
-using HR.Modules.Tasks.Features.MarkNotificationRead;
 using HR.Modules.Tasks.Features.ReassignTask;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Services;
@@ -50,9 +47,6 @@ public static class TasksModule
         services.AddScoped<GetEmployeeTasksHandler>();
         services.AddScoped<ReassignTaskHandler>();
         services.AddScoped<CompleteTaskHandler>();
-        services.AddScoped<ListNotificationsHandler>();
-        services.AddScoped<MarkNotificationReadHandler>();
-        services.AddScoped<MarkAllNotificationsReadHandler>();
 
         services.AddHostedService<DueSoonNotifier>();
     }
@@ -159,37 +153,6 @@ public static class TasksModule
                 "Review responses from the May survey and prepare a summary report for leadership.",
                 TaskPriority.High, TaskSource.Manual,
                 new DateOnly(2026, 6, 10), empCtoId));
-
-        db.Notifications.AddRange(
-            Notification.Create(Guid.NewGuid(), companyId, empCtoId,
-                "New task assigned: Review Q2 performance reports",
-                "Gather scores from all department heads and summarise findings.",
-                taskQ2ReviewId, now.AddHours(-2),
-                NotificationType.TaskAssigned),
-
-            Notification.Create(Guid.NewGuid(), companyId, empCtoId,
-                "New task assigned: Prepare board meeting agenda",
-                "Draft the Q3 board meeting agenda including financial review and product roadmap.",
-                taskBoardAgendaId, now.AddHours(-1),
-                NotificationType.TaskAssigned),
-
-            Notification.Create(Guid.NewGuid(), companyId, empCtoId,
-                "New task assigned: Engineering lead interview debrief",
-                "Consolidate panel feedback and make hiring recommendation to the board.",
-                taskInterviewId, now.AddDays(-1),
-                NotificationType.TaskAssigned),
-
-            Notification.Create(Guid.NewGuid(), companyId, empCtoId,
-                "Due soon: Engineering lead interview debrief",
-                "This task is due on 22 Jun 2026.",
-                taskInterviewId, now.AddMinutes(-30),
-                NotificationType.TaskDueSoon),
-
-            Notification.Create(Guid.NewGuid(), companyId, empCtoId,
-                "Overdue: Analyse employee satisfaction survey results",
-                "This task was due on 10 Jun 2026 and has not been completed.",
-                taskSurveyId, now.AddMinutes(-15),
-                NotificationType.TaskOverdue));
 
         await db.SaveChangesAsync();
     }

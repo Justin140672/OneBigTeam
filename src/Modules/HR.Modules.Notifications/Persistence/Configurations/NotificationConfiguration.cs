@@ -1,8 +1,8 @@
-using HR.Modules.Tasks.Domain;
+using HR.Modules.Notifications.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace HR.Modules.Tasks.Persistence.Configurations;
+namespace HR.Modules.Notifications.Persistence.Configurations;
 
 internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notification>
 {
@@ -52,7 +52,6 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
 
         builder.HasIndex(n => new { n.CompanyId, n.EmployeeId, n.IsRead });
 
-        // Prevents duplicate notifications of the same type for the same task+employee.
         builder.HasIndex(n => new { n.EmployeeId, n.SourceEntityId, n.Type }).IsUnique();
     }
 }

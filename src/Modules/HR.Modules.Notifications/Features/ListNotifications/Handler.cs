@@ -1,9 +1,9 @@
-using HR.Modules.Tasks.Persistence;
+using HR.Modules.Notifications.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace HR.Modules.Tasks.Features.ListNotifications;
+namespace HR.Modules.Notifications.Features.ListNotifications;
 
-internal sealed class ListNotificationsHandler(TasksDbContext dbContext)
+internal sealed class ListNotificationsHandler(NotificationsDbContext dbContext)
 {
     public async Task<ListNotificationsResponse> HandleAsync(
         ListNotificationsRequest request,

@@ -1,3 +1,5 @@
+using HR.Modules.Notifications;
+using HR.Modules.Notifications.Contracts;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Persistence;
 using HR.SharedKernel;
@@ -38,8 +40,9 @@ internal sealed class DueSoonNotifier(IServiceScopeFactory scopeFactory) : Backg
     private async Task CheckTaskAlertsAsync(CancellationToken ct)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
-        var clock     = scope.ServiceProvider.GetRequiredService<IClock>();
+        var dbContext          = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
+        var notificationWriter = scope.ServiceProvider.GetRequiredService<INotificationWriter>();
+        var clock              = scope.ServiceProvider.GetRequiredService<IClock>();
 
         var now    = clock.UtcNowOffset();
         var today  = DateOnly.FromDateTime(now.UtcDateTime);
@@ -60,7 +63,7 @@ internal sealed class DueSoonNotifier(IServiceScopeFactory scopeFactory) : Backg
             if (isOverdue)
             {
                 await MaybeCreateAsync(
-                    dbContext, task, now,
+                    notificationWriter, task, now,
                     NotificationType.TaskOverdue,
                     $"Overdue: {task.Title}",
                     $"This task was due on {task.DueDate.Value:d MMM yyyy} and has not been completed.",
@@ -70,7 +73,7 @@ internal sealed class DueSoonNotifier(IServiceScopeFactory scopeFactory) : Backg
             {
                 var dueToday = task.DueDate.Value == today;
                 await MaybeCreateAsync(
-                    dbContext, task, now,
+                    notificationWriter, task, now,
                     NotificationType.TaskDueSoon,
                     $"Due {(dueToday ? "today" : "soon")}: {task.Title}",
                     dueToday
@@ -79,13 +82,10 @@ internal sealed class DueSoonNotifier(IServiceScopeFactory scopeFactory) : Backg
                     ct);
             }
         }
-
-        if (dbContext.ChangeTracker.HasChanges())
-            await dbContext.SaveChangesAsync(ct);
     }
 
     private static async Task MaybeCreateAsync(
-        TasksDbContext dbContext,
+        INotificationWriter notificationWriter,
         TaskItem task,
         DateTimeOffset now,
         NotificationType type,
@@ -93,15 +93,13 @@ internal sealed class DueSoonNotifier(IServiceScopeFactory scopeFactory) : Backg
         string body,
         CancellationToken ct)
     {
-        var exists = await dbContext.Notifications
-            .AnyAsync(n => n.SourceEntityId == task.Id
-                        && n.EmployeeId     == task.AssignedEmployeeId!.Value
-                        && n.Type           == type, ct);
+        var exists = await notificationWriter.ExistsAsync(
+            task.AssignedEmployeeId!.Value, task.Id, type, ct);
 
         if (exists) return;
 
-        dbContext.Notifications.Add(Notification.Create(
+        await notificationWriter.WriteAsync(
             Guid.NewGuid(), task.CompanyId, task.AssignedEmployeeId!.Value,
-            title, body, task.Id, now, type));
+            title, body, task.Id, type, now, ct);
     }
 }

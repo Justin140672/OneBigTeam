@@ -1,7 +1,7 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 
-namespace HR.Modules.Tasks.Features.ListNotifications;
+namespace HR.Modules.Notifications.Features.ListNotifications;
 
 internal sealed class Endpoint(ListNotificationsHandler handler)
     : Endpoint<ListNotificationsRequest, ListNotificationsResponse>

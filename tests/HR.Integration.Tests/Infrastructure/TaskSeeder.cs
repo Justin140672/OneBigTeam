@@ -1,3 +1,5 @@
+using HR.Modules.Notifications;
+using HR.Modules.Notifications.Contracts;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Persistence;
 using HR.SharedKernel;
@@ -21,7 +23,8 @@ internal static class TaskSeeder
         TaskItemStatus status = TaskItemStatus.Open)
     {
         using var scope = factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
+        var db                 = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
+        var notificationWriter = scope.ServiceProvider.GetRequiredService<INotificationWriter>();
 
         var now  = DateTimeOffset.UtcNow;
         var task = TaskItem.Create(
@@ -34,19 +37,18 @@ internal static class TaskSeeder
         if (status == TaskItemStatus.Cancelled)  task.Cancel(now);
 
         db.TaskItems.Add(task);
+        await db.SaveChangesAsync();
 
         if (assignedEmployeeId.HasValue)
         {
-            db.Notifications.Add(Notification.Create(
+            await notificationWriter.WriteAsync(
                 Guid.NewGuid(), companyId, assignedEmployeeId.Value,
                 $"New task assigned: {task.Title}",
                 task.Description,
                 task.Id,
-                now,
-                NotificationType.TaskAssigned));
+                NotificationType.TaskAssigned,
+                now);
         }
-
-        await db.SaveChangesAsync();
 
         return task.Id;
     }

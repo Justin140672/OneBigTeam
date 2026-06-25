@@ -1,4 +1,4 @@
-namespace HR.Modules.Tasks.Features.ListNotifications;
+namespace HR.Modules.Notifications.Features.ListNotifications;
 
 internal sealed record NotificationItem(
     Guid Id,
