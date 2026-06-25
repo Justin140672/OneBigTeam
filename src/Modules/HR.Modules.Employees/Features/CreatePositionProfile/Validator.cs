@@ -16,5 +16,10 @@ internal sealed class CreatePositionProfileValidator : AbstractValidator<CreateP
         RuleFor(r => r.Description)
             .MaximumLength(2000)
             .When(r => r.Description is not null);
+
+        RuleFor(r => r.ProbationMonthsOverride)
+            .InclusiveBetween(1, 24)
+            .When(r => r.ProbationMonthsOverride.HasValue)
+            .WithMessage("ProbationMonthsOverride must be between 1 and 24.");
     }
 }

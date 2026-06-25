@@ -105,6 +105,12 @@ internal sealed class Employee
         UpdatedAt = now;
     }
 
+    public void SetProbationEndDate(DateOnly probationEndDate, DateTimeOffset now)
+    {
+        ProbationEndDate = probationEndDate;
+        UpdatedAt = now;
+    }
+
     public void SetProfileImage(string? url, DateTimeOffset now)
     {
         ProfileImageUrl = url;

@@ -368,6 +368,10 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_managerial");
 
+                    b.Property<int?>("ProbationMonthsOverride")
+                        .HasColumnType("integer")
+                        .HasColumnName("probation_months_override");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)

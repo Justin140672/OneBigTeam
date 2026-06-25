@@ -58,6 +58,7 @@ internal sealed class CreatePositionProfileHandler
             request.Title.Trim(),
             string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             request.IsManagerial,
+            request.ProbationMonthsOverride,
             now);
 
         _dbContext.PositionProfiles.Add(profile);
@@ -70,6 +71,7 @@ internal sealed class CreatePositionProfileHandler
             profile.Title,
             profile.Description,
             profile.IsManagerial,
+            profile.ProbationMonthsOverride,
             profile.IsActive,
             profile.CreatedAt));
     }

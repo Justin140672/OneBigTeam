@@ -74,7 +74,7 @@ public class CreatePositionProfileHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         context.PositionProfiles.Add(
-            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Software Developer", null, false, now));
+            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Software Developer", null, false, null, now));
         await context.SaveChangesAsync();
 
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
@@ -142,7 +142,7 @@ public class CreatePositionProfileHandlerTests
         var companyB = Guid.NewGuid();
 
         context.PositionProfiles.Add(
-            PositionProfile.Create(Guid.NewGuid(), companyA, null, "Software Developer", null, false, now));
+            PositionProfile.Create(Guid.NewGuid(), companyA, null, "Software Developer", null, false, null, now));
         await context.SaveChangesAsync();
 
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow));

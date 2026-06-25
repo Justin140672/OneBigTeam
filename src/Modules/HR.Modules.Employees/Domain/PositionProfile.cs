@@ -10,6 +10,7 @@ internal sealed class PositionProfile
     public string Title { get; private set; } = string.Empty;
     public string? Description { get; private set; }
     public bool IsManagerial { get; private set; }
+    public int? ProbationMonthsOverride { get; private set; }
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -21,6 +22,7 @@ internal sealed class PositionProfile
         string title,
         string? description,
         bool isManagerial,
+        int? probationMonthsOverride,
         DateTimeOffset now)
     {
         return new PositionProfile
@@ -31,18 +33,20 @@ internal sealed class PositionProfile
             Title = title,
             Description = description,
             IsManagerial = isManagerial,
+            ProbationMonthsOverride = probationMonthsOverride,
             IsActive = true,
             CreatedAt = now,
             UpdatedAt = now,
         };
     }
 
-    public void Update(Guid? departmentId, string title, string? description, bool isManagerial, DateTimeOffset now)
+    public void Update(Guid? departmentId, string title, string? description, bool isManagerial, int? probationMonthsOverride, DateTimeOffset now)
     {
         DepartmentId = departmentId;
         Title = title;
         Description = description;
         IsManagerial = isManagerial;
+        ProbationMonthsOverride = probationMonthsOverride;
         UpdatedAt = now;
     }
 

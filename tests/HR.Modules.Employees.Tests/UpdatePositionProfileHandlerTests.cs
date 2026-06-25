@@ -17,7 +17,7 @@ public class UpdatePositionProfileHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Old Title", null, false, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Old Title", null, false, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -68,7 +68,7 @@ public class UpdatePositionProfileHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, "Engineer", null, false, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, "Engineer", null, false, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -94,8 +94,8 @@ public class UpdatePositionProfileHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile1 = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, now);
-        var profile2 = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Manager", null, true, now);
+        var profile1 = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, now);
+        var profile2 = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Manager", null, true, null, now);
         context.PositionProfiles.AddRange(profile1, profile2);
         await context.SaveChangesAsync();
 
@@ -122,7 +122,7 @@ public class UpdatePositionProfileHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -149,7 +149,7 @@ public class UpdatePositionProfileHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -179,7 +179,7 @@ public class UpdatePositionProfileHandlerTests
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
         context.Departments.Add(department);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 

@@ -7,5 +7,6 @@ internal sealed record UpdatePositionProfileResponse(
     string Title,
     string? Description,
     bool IsManagerial,
+    int? ProbationMonthsOverride,
     bool IsActive,
     DateTimeOffset UpdatedAt);

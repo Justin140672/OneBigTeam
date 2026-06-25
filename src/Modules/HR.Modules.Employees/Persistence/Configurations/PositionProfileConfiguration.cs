@@ -36,6 +36,9 @@ internal sealed class PositionProfileConfiguration : IEntityTypeConfiguration<Po
             .HasColumnName("is_managerial")
             .IsRequired();
 
+        builder.Property(p => p.ProbationMonthsOverride)
+            .HasColumnName("probation_months_override");
+
         builder.Property(p => p.IsActive)
             .HasColumnName("is_active")
             .IsRequired();

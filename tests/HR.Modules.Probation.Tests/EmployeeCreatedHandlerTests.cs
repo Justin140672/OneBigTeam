@@ -20,11 +20,12 @@ public class EmployeeCreatedHandlerTests
         var employeeId = Guid.NewGuid();
         var managerId = Guid.NewGuid();
         var startDate = new DateOnly(2026, 7, 1);
+        var probationEndDate = new DateOnly(2027, 1, 1);
 
         var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow));
 
         await handler.HandleAsync(
-            new EmployeeCreatedIntegrationEvent(companyId, employeeId, startDate, managerId),
+            new EmployeeCreatedIntegrationEvent(companyId, employeeId, startDate, managerId, probationEndDate),
             CancellationToken.None);
 
         var record = await context.ProbationRecords.SingleAsync();
@@ -32,26 +33,27 @@ public class EmployeeCreatedHandlerTests
         Assert.Equal(employeeId, record.EmployeeId);
         Assert.Equal(managerId, record.ManagerEmployeeId);
         Assert.Equal(startDate, record.StartDate);
-        Assert.Equal(startDate.AddDays(90), record.ExpectedEndDate);
+        Assert.Equal(probationEndDate, record.ExpectedEndDate);
         Assert.Equal(ProbationStatus.Active, record.Status);
         Assert.Null(record.Notes);
         Assert.Equal(Now, record.CreatedAt);
     }
 
     [Fact]
-    public async Task HandleAsync_Sets_ExpectedEndDate_To_90_Days_After_StartDate()
+    public async Task HandleAsync_Uses_ProbationEndDate_From_Event_As_ExpectedEndDate()
     {
         await using var context = BuildContext();
         var startDate = new DateOnly(2026, 1, 1);
+        var probationEndDate = new DateOnly(2026, 10, 15);
 
         var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow));
 
         await handler.HandleAsync(
-            new EmployeeCreatedIntegrationEvent(Guid.NewGuid(), Guid.NewGuid(), startDate, Guid.NewGuid()),
+            new EmployeeCreatedIntegrationEvent(Guid.NewGuid(), Guid.NewGuid(), startDate, Guid.NewGuid(), probationEndDate),
             CancellationToken.None);
 
         var record = await context.ProbationRecords.SingleAsync();
-        Assert.Equal(new DateOnly(2026, 4, 1), record.ExpectedEndDate);
+        Assert.Equal(probationEndDate, record.ExpectedEndDate);
     }
 
     [Fact]
@@ -62,7 +64,7 @@ public class EmployeeCreatedHandlerTests
         var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow));
 
         await handler.HandleAsync(
-            new EmployeeCreatedIntegrationEvent(Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), ManagerId: null),
+            new EmployeeCreatedIntegrationEvent(Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), ManagerId: null, new DateOnly(2027, 1, 1)),
             CancellationToken.None);
 
         Assert.Equal(0, await context.ProbationRecords.CountAsync());
@@ -75,15 +77,16 @@ public class EmployeeCreatedHandlerTests
         var companyId = Guid.NewGuid();
         var managerId = Guid.NewGuid();
         var startDate = new DateOnly(2026, 7, 1);
+        var probationEndDate = new DateOnly(2027, 1, 1);
 
         var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow));
 
         await handler.HandleAsync(
-            new EmployeeCreatedIntegrationEvent(companyId, Guid.NewGuid(), startDate, managerId),
+            new EmployeeCreatedIntegrationEvent(companyId, Guid.NewGuid(), startDate, managerId, probationEndDate),
             CancellationToken.None);
 
         await handler.HandleAsync(
-            new EmployeeCreatedIntegrationEvent(companyId, Guid.NewGuid(), startDate, managerId),
+            new EmployeeCreatedIntegrationEvent(companyId, Guid.NewGuid(), startDate, managerId, probationEndDate),
             CancellationToken.None);
 
         Assert.Equal(2, await context.ProbationRecords.CountAsync());

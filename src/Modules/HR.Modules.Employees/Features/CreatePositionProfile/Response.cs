@@ -7,5 +7,6 @@ internal sealed record CreatePositionProfileResponse(
     string Title,
     string? Description,
     bool IsManagerial,
+    int? ProbationMonthsOverride,
     bool IsActive,
     DateTimeOffset CreatedAt);

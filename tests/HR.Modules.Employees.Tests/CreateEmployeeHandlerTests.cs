@@ -17,7 +17,7 @@ public class CreateEmployeeHandlerTests
     public async Task HandleAsync_Creates_Employee_With_Draft_Status()
     {
         await using var context = BuildContext();
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyProbationSettingsReader());
         var companyId = Guid.NewGuid();
 
         var result = await handler.HandleAsync(
@@ -51,7 +51,7 @@ public class CreateEmployeeHandlerTests
     public async Task HandleAsync_Normalises_WorkEmail_To_Lowercase()
     {
         await using var context = BuildContext();
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
@@ -76,14 +76,14 @@ public class CreateEmployeeHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
-        var positionProfile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, "Developer", null, false, now);
+        var positionProfile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, "Developer", null, false, null, now);
         var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane.manager@example.com", StartDate, hasSystemAccess: true, now);
         context.Departments.Add(department);
         context.PositionProfiles.Add(positionProfile);
         context.Employees.Add(manager);
         await context.SaveChangesAsync();
 
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
@@ -115,7 +115,7 @@ public class CreateEmployeeHandlerTests
         context.Employees.Add(Employee.Create(Guid.NewGuid(), companyId, "Existing", "User", "alice.smith@example.com", StartDate, hasSystemAccess: true, now));
         await context.SaveChangesAsync();
 
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
@@ -143,7 +143,7 @@ public class CreateEmployeeHandlerTests
         context.Employees.Add(Employee.Create(Guid.NewGuid(), companyA, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now));
         await context.SaveChangesAsync();
 
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
@@ -163,7 +163,7 @@ public class CreateEmployeeHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Department_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
@@ -191,7 +191,7 @@ public class CreateEmployeeHandlerTests
         context.Departments.Add(department);
         await context.SaveChangesAsync();
 
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
@@ -213,7 +213,7 @@ public class CreateEmployeeHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_PositionProfile_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
@@ -237,11 +237,11 @@ public class CreateEmployeeHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, "Developer", null, false, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, "Developer", null, false, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
@@ -263,7 +263,7 @@ public class CreateEmployeeHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Manager_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
@@ -293,7 +293,7 @@ public class CreateEmployeeHandlerTests
         context.Employees.Add(manager);
         await context.SaveChangesAsync();
 
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
@@ -315,7 +315,7 @@ public class CreateEmployeeHandlerTests
     public async Task HandleAsync_Creates_Employee_With_HasSystemAccess_True_By_Default()
     {
         await using var context = BuildContext();
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
@@ -336,7 +336,7 @@ public class CreateEmployeeHandlerTests
     public async Task HandleAsync_Creates_Employee_With_HasSystemAccess_False_When_Specified()
     {
         await using var context = BuildContext();
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
@@ -361,7 +361,7 @@ public class CreateEmployeeHandlerTests
     public async Task HandleAsync_Sets_PreferredName_To_FirstName_When_Not_Provided()
     {
         await using var context = BuildContext();
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
@@ -386,7 +386,7 @@ public class CreateEmployeeHandlerTests
     public async Task HandleAsync_Uses_Provided_PreferredName_When_Supplied()
     {
         await using var context = BuildContext();
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyProbationSettingsReader());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
@@ -416,7 +416,7 @@ public class CreateEmployeeHandlerTests
     {
         await using var context = BuildContext();
         var publisher = new CapturingIntegrationEventPublisher();
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeCompanyProbationSettingsReader());
         var companyId = Guid.NewGuid();
 
         var result = await handler.HandleAsync(
@@ -443,7 +443,7 @@ public class CreateEmployeeHandlerTests
     {
         await using var context = BuildContext();
         var publisher = new CapturingIntegrationEventPublisher();
-        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeCompanyProbationSettingsReader());
         var companyId = Guid.NewGuid();
 
         // seed a conflicting employee so creation fails
@@ -466,6 +466,86 @@ public class CreateEmployeeHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Empty(publisher.Published);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Sets_ProbationEndDate_Using_Company_Default_When_No_Position_Profile()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var reader = new FakeCompanyProbationSettingsReader(months: 6);
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), reader);
+
+        var result = await handler.HandleAsync(
+            new CreateEmployeeRequest
+            {
+                CompanyId = companyId,
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var saved = await context.Employees.SingleAsync();
+        Assert.Equal(StartDate.AddMonths(6), saved.ProbationEndDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Sets_ProbationEndDate_Using_PositionProfile_Override_When_Present()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Senior Dev", null, false, 3, now);
+        context.PositionProfiles.Add(profile);
+        await context.SaveChangesAsync();
+
+        var reader = new FakeCompanyProbationSettingsReader(months: 6);
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), reader);
+
+        var result = await handler.HandleAsync(
+            new CreateEmployeeRequest
+            {
+                CompanyId = companyId,
+                PositionProfileId = profile.Id,
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var saved = await context.Employees.SingleAsync();
+        Assert.Equal(StartDate.AddMonths(3), saved.ProbationEndDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Published_Event_Includes_Resolved_ProbationEndDate()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var publisher = new CapturingIntegrationEventPublisher();
+        var reader = new FakeCompanyProbationSettingsReader(months: 9);
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), publisher, reader);
+
+        var result = await handler.HandleAsync(
+            new CreateEmployeeRequest
+            {
+                CompanyId = companyId,
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<EmployeeCreatedIntegrationEvent>(Assert.Single(publisher.Published));
+        Assert.Equal(StartDate.AddMonths(9), evt.ProbationEndDate);
     }
 
     private static EmployeesDbContext BuildContext()

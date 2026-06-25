@@ -10,12 +10,18 @@ internal sealed class CreateEmployeeHandler
     private readonly EmployeesDbContext _dbContext;
     private readonly IClock _clock;
     private readonly IIntegrationEventPublisher _publisher;
+    private readonly ICompanyProbationSettingsReader _probationSettingsReader;
 
-    public CreateEmployeeHandler(EmployeesDbContext dbContext, IClock clock, IIntegrationEventPublisher publisher)
+    public CreateEmployeeHandler(
+        EmployeesDbContext dbContext,
+        IClock clock,
+        IIntegrationEventPublisher publisher,
+        ICompanyProbationSettingsReader probationSettingsReader)
     {
         _dbContext = dbContext;
         _clock = clock;
         _publisher = publisher;
+        _probationSettingsReader = probationSettingsReader;
     }
 
     public async Task<Result<CreateEmployeeResponse>> HandleAsync(
@@ -52,16 +58,18 @@ internal sealed class CreateEmployeeHandler
             }
         }
 
+        PositionProfile? positionProfile = null;
         if (request.PositionProfileId is not null)
         {
-            var positionProfileExists = await _dbContext.PositionProfiles
-                .AnyAsync(
+            positionProfile = await _dbContext.PositionProfiles
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
                     p => p.Id == request.PositionProfileId &&
                          p.CompanyId == request.CompanyId &&
                          p.IsActive,
                     cancellationToken);
 
-            if (!positionProfileExists)
+            if (positionProfile is null)
             {
                 return Result.Failure<CreateEmployeeResponse>(
                     Error.NotFound($"Position profile '{request.PositionProfileId}' was not found."));
@@ -128,10 +136,15 @@ internal sealed class CreateEmployeeHandler
             employee.Assign(request.DepartmentId, request.PositionProfileId, request.ManagerId, now);
         }
 
+        var companyProbationMonths = await _probationSettingsReader.GetProbationMonthsAsync(request.CompanyId, cancellationToken);
+        var resolvedProbationMonths = positionProfile?.ProbationMonthsOverride ?? companyProbationMonths;
+        var probationEndDate = employee.StartDate.AddMonths(resolvedProbationMonths);
+        employee.SetProbationEndDate(probationEndDate, now);
+
         _dbContext.Employees.Add(employee);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        await _publisher.PublishAsync(new EmployeeCreatedIntegrationEvent(employee.CompanyId, employee.Id, employee.StartDate, employee.ManagerId), cancellationToken);
+        await _publisher.PublishAsync(new EmployeeCreatedIntegrationEvent(employee.CompanyId, employee.Id, employee.StartDate, employee.ManagerId, probationEndDate), cancellationToken);
 
         return Result.Success(new CreateEmployeeResponse(
             employee.Id,

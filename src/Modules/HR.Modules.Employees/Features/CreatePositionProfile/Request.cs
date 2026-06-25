@@ -7,4 +7,5 @@ internal sealed record CreatePositionProfileRequest
     public string Title { get; init; } = string.Empty;
     public string? Description { get; init; }
     public bool IsManagerial { get; init; }
+    public int? ProbationMonthsOverride { get; init; }
 }

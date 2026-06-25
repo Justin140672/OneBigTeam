@@ -72,6 +72,7 @@ internal sealed class UpdatePositionProfileHandler
             newTitle,
             string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             request.IsManagerial,
+            request.ProbationMonthsOverride,
             now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -83,6 +84,7 @@ internal sealed class UpdatePositionProfileHandler
             profile.Title,
             profile.Description,
             profile.IsManagerial,
+            profile.ProbationMonthsOverride,
             profile.IsActive,
             profile.UpdatedAt));
     }

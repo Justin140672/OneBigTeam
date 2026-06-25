@@ -20,15 +20,13 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
         if (integrationEvent.ManagerId is null)
             return;
 
-        var expectedEndDate = integrationEvent.StartDate.AddDays(90);
-
         var record = ProbationRecord.Create(
             Guid.NewGuid(),
             integrationEvent.CompanyId,
             integrationEvent.EmployeeId,
             integrationEvent.ManagerId.Value,
             integrationEvent.StartDate,
-            expectedEndDate,
+            integrationEvent.ProbationEndDate,
             notes: null,
             _clock.UtcNowOffset());
 
