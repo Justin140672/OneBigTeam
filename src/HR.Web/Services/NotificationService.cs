@@ -18,6 +18,21 @@ public sealed class NotificationService(IHttpClientFactory httpClientFactory)
         catch { return null; }
     }
 
+    public async Task<int> GetUnreadCountAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await Http.GetFromJsonAsync<UnreadCountResponse>(
+                $"api/companies/{companyId}/notifications/unread-count",
+                cancellationToken);
+            return result?.Count ?? 0;
+        }
+        catch { return 0; }
+    }
+
+    private sealed record UnreadCountResponse(int Count);
+
     public async Task MarkReadAsync(
         Guid companyId, Guid notificationId, CancellationToken cancellationToken = default)
     {

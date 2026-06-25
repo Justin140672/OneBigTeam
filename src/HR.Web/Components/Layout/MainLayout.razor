@@ -224,7 +224,13 @@ else
         _menuItems["PublicHolidays"]   = $"/companies/{companyId}/public-holidays";
         _menuItems["HrInbox"]          = $"/companies/{companyId}/hr/inbox";
 
-        await LoadNotificationsAsync();
+        await LoadUnreadCountAsync();
+    }
+
+    private async Task LoadUnreadCountAsync()
+    {
+        if (!Session.EmployeeId.HasValue) return;
+        _unreadCount = await NotificationService.GetUnreadCountAsync(Session.CompanyId);
     }
 
     private async Task LoadNotificationsAsync()

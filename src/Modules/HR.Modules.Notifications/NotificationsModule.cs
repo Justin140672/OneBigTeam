@@ -1,6 +1,7 @@
 using HR.Modules.Notifications.Contracts;
 using HR.Modules.Notifications.Domain;
 using HR.Modules.Notifications.Features.GetMyNotifications;
+using HR.Modules.Notifications.Features.GetUnreadNotificationCount;
 using HR.Modules.Notifications.Features.MarkAllNotificationsRead;
 using HR.Modules.Notifications.Features.MarkNotificationRead;
 using HR.Modules.Notifications.Persistence;
@@ -21,6 +22,7 @@ public static class NotificationsModule
 
         services.AddScoped<INotificationWriter, NotificationWriter>();
         services.AddScoped<GetMyNotificationsHandler>();
+        services.AddScoped<GetUnreadNotificationCountHandler>();
         services.AddScoped<MarkNotificationReadHandler>();
         services.AddScoped<MarkAllNotificationsReadHandler>();
 
