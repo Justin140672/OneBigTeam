@@ -5,9 +5,12 @@ using HR.Infrastructure.Email;
 using HR.Infrastructure.Persistence;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Infrastructure;
 
@@ -43,6 +46,9 @@ public static class InfrastructureModule
             options.Queues = ["critical", "default", "low"];
         });
 
+        services.AddHealthChecks()
+            .AddCheck<HangfireHealthCheck>("hangfire", tags: ["ready"]);
+
         return services;
     }
 
@@ -55,6 +61,67 @@ public static class InfrastructureModule
                 Authorization = [],
             });
         }
+
+        GlobalJobFilters.Filters.Add(
+            new BackgroundJobLoggingFilter(
+                app.Services.GetRequiredService<ILogger<BackgroundJobLoggingFilter>>()));
+
+        GlobalJobFilters.Filters.Add(
+            new BackgroundJobAuditFilter(
+                app.Services.GetRequiredService<IServiceScopeFactory>()));
+
+        app.MapGet("/health/background-jobs", (JobStorage jobStorage) =>
+        {
+            try
+            {
+                var api = jobStorage.GetMonitoringApi();
+                var servers = api.Servers();
+                var queues = api.Queues();
+                var stats = api.GetStatistics();
+
+                var response = new
+                {
+                    status = servers.Count == 0 ? "unhealthy"
+                           : stats.Failed > 0    ? "degraded"
+                           : "healthy",
+                    servers = servers.Select(s => new
+                    {
+                        name = s.Name,
+                        workers = s.WorkersCount,
+                        queues = s.Queues,
+                        startedAt = s.StartedAt,
+                        heartbeat = s.Heartbeat,
+                    }),
+                    queues = queues.Select(q => new
+                    {
+                        name = q.Name,
+                        length = q.Length,
+                        fetched = q.Fetched,
+                    }),
+                    statistics = new
+                    {
+                        enqueued = stats.Enqueued,
+                        processing = stats.Processing,
+                        scheduled = stats.Scheduled,
+                        failed = stats.Failed,
+                        succeeded = stats.Succeeded,
+                        recurring = stats.Recurring,
+                    },
+                    checkedAt = DateTimeOffset.UtcNow,
+                };
+
+                var statusCode = servers.Count == 0 || stats.Failed > 0
+                    ? StatusCodes.Status503ServiceUnavailable
+                    : StatusCodes.Status200OK;
+
+                return Results.Json(response, statusCode: statusCode);
+            }
+            catch (Exception ex)
+            {
+                return Results.Json(new { status = "unhealthy", error = ex.Message, checkedAt = DateTimeOffset.UtcNow },
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+        });
 
         var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
         foreach (var registrar in app.Services.GetServices<IRecurringJobRegistrar>())
