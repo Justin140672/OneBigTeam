@@ -71,6 +71,10 @@ public static class IdentityModule
             SystemRoles.HrAdministrator,
             SystemRoles.CompanyAdministrator));
 
+        builder.AddPolicy("probation:manage", RolePolicy(
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
         return builder;
     }
 

@@ -15,6 +15,7 @@
     <Project Path="src/Modules/HR.Modules.Identity/HR.Modules.Identity.csproj" />
     <Project Path="src/Modules/HR.Modules.Leave/HR.Modules.Leave.csproj" />
     <Project Path="src/Modules/HR.Modules.Notifications/HR.Modules.Notifications.csproj" />
+    <Project Path="src/Modules/HR.Modules.Probation/HR.Modules.Probation.csproj" />
     <Project Path="src/Modules/HR.Modules.Tasks/HR.Modules.Tasks.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">
@@ -30,6 +31,7 @@
     <Project Path="tests/HR.Modules.Identity.Tests/HR.Modules.Identity.Tests.csproj" />
     <Project Path="tests/HR.Modules.Leave.Tests/HR.Modules.Leave.Tests.csproj" />
     <Project Path="tests/HR.Modules.Notifications.Tests/HR.Modules.Notifications.Tests.csproj" />
+    <Project Path="tests/HR.Modules.Probation.Tests/HR.Modules.Probation.Tests.csproj" />
     <Project Path="tests/HR.Modules.Tasks.Tests/HR.Modules.Tasks.Tests.csproj" />
   </Folder>
 </Solution>

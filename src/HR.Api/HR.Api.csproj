@@ -16,6 +16,7 @@
     <ProjectReference Include="..\Modules\HR.Modules.Leave\HR.Modules.Leave.csproj" />
     <ProjectReference Include="..\Modules\HR.Modules.Tasks\HR.Modules.Tasks.csproj" />
     <ProjectReference Include="..\Modules\HR.Modules.Notifications\HR.Modules.Notifications.csproj" />
+    <ProjectReference Include="..\Modules\HR.Modules.Probation\HR.Modules.Probation.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

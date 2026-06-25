@@ -8,6 +8,7 @@ using HR.Modules.Employees;
 using HR.Modules.Identity;
 using HR.Modules.Leave;
 using HR.Modules.Notifications;
+using HR.Modules.Probation;
 using HR.Modules.Tasks;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -26,6 +27,7 @@ builder.Services.AddIdentityModule(connectionString);
 builder.Services.AddLeaveModule(connectionString);
 builder.Services.AddNotificationsModule(connectionString);
 builder.Services.AddTasksModule(connectionString);
+builder.Services.AddProbationModule(connectionString);
 builder.Services.AddInfrastructure(connectionString);
 builder.Services.AddFastEndpoints(o => o.IncludeAbstractValidators = true);
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
@@ -79,6 +81,9 @@ DateTimeOffset? tasksMigrationCheckedAt = null;
 var notificationsMigrationStatus = "unknown";
 string? notificationsMigrationError = null;
 DateTimeOffset? notificationsMigrationCheckedAt = null;
+var probationMigrationStatus = "unknown";
+string? probationMigrationError = null;
+DateTimeOffset? probationMigrationCheckedAt = null;
 
 try
 {
@@ -192,6 +197,20 @@ catch (Exception exception)
 	tasksMigrationCheckedAt = DateTimeOffset.UtcNow;
 }
 
+try
+{
+	await app.Services.MigrateProbationAsync();
+	await app.Services.SeedProbationAsync();
+	probationMigrationStatus = "succeeded";
+	probationMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+catch (Exception exception)
+{
+	probationMigrationStatus = "failed";
+	probationMigrationError = exception.Message;
+	probationMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+
 app.MapGet("/health/startup-migrations", () =>
 {
 	var response = new
@@ -243,10 +262,16 @@ app.MapGet("/health/startup-migrations", () =>
 			status = tasksMigrationStatus,
 			checkedAt = tasksMigrationCheckedAt,
 			error = tasksMigrationError
+		},
+		probation = new
+		{
+			status = probationMigrationStatus,
+			checkedAt = probationMigrationCheckedAt,
+			error = probationMigrationError
 		}
 	};
 
-	return auditMigrationStatus == "failed" || companiesMigrationStatus == "failed" || documentsMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed" || notificationsMigrationStatus == "failed" || tasksMigrationStatus == "failed"
+	return auditMigrationStatus == "failed" || companiesMigrationStatus == "failed" || documentsMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed" || notificationsMigrationStatus == "failed" || tasksMigrationStatus == "failed" || probationMigrationStatus == "failed"
 		? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
 		: Results.Ok(response);
 });

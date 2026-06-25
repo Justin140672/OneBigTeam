@@ -13,6 +13,7 @@ public class ModuleDependencyBoundariesTests
             typeof(HR.Modules.Documents.DocumentsModule).Assembly,
             typeof(HR.Modules.Tasks.TasksModule).Assembly,
             typeof(HR.Modules.Notifications.NotificationsModule).Assembly,
+            typeof(HR.Modules.Probation.ProbationModule).Assembly,
         ];
 
     [Theory]
