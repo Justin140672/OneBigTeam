@@ -1,6 +1,7 @@
 using FluentValidation;
 using HR.Modules.Probation.Features.CreateProbationRecord;
 using HR.Modules.Probation.Features.CreateProbationReview;
+using HR.Modules.Probation.Features.GetProbationReviews;
 using HR.Modules.Probation.Features.GetProbationRecord;
 using HR.Modules.Probation.Features.UpdateProbationRecord;
 using HR.Modules.Probation.Persistence;
@@ -33,6 +34,7 @@ public static class ProbationModule
         services.AddScoped<IValidator<UpdateProbationRecordRequest>, UpdateProbationRecordValidator>();
         services.AddScoped<CreateProbationReviewHandler>();
         services.AddScoped<IValidator<CreateProbationReviewRequest>, CreateProbationReviewValidator>();
+        services.AddScoped<GetProbationReviewsHandler>();
     }
 
     public static async Task MigrateProbationAsync(this IServiceProvider services)
