@@ -24,14 +24,14 @@ internal sealed class Endpoint(SetEmployeeWorkingPatternHandler handler)
 
             if (result.Error.Code == "not_found")
             {
-                await SendResultAsync(TypedResults.NotFound(businessError));
+                await Send.ResultAsync(TypedResults.NotFound(businessError));
                 return;
             }
 
-            await SendResultAsync(TypedResults.BadRequest(businessError));
+            await Send.ResultAsync(TypedResults.BadRequest(businessError));
             return;
         }
 
-        await SendAsync(result.Value!, StatusCodes.Status200OK, cancellationToken);
+        await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }
 }

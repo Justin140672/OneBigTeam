@@ -18,6 +18,6 @@ internal sealed class Endpoint(
     {
         var result = await handler.HandleAsync(request, cancellationToken);
 
-        await SendAsync(result.Value!, StatusCodes.Status200OK, cancellationToken);
+        await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }
 }

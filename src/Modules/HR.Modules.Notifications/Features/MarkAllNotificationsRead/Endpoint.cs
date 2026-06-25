@@ -14,6 +14,6 @@ internal sealed class Endpoint(MarkAllNotificationsReadHandler handler)
     public override async Task HandleAsync(MarkAllNotificationsReadRequest request, CancellationToken cancellationToken)
     {
         await handler.HandleAsync(request, cancellationToken);
-        await SendNoContentAsync(cancellationToken);
+        await Send.NoContentAsync(cancellationToken);
     }
 }

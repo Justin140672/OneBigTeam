@@ -24,13 +24,13 @@ internal sealed class Endpoint(
 
         if (invite is null)
         {
-            await SendResultAsync(TypedResults.NotFound(new { error = "Invite not found." }));
+            await Send.ResultAsync(TypedResults.NotFound(new { error = "Invite not found." }));
             return;
         }
 
         if (invite.IsClaimed)
         {
-            await SendResultAsync(TypedResults.Conflict(new { error = "This invite has already been used." }));
+            await Send.ResultAsync(TypedResults.Conflict(new { error = "This invite has already been used." }));
             return;
         }
 
@@ -38,7 +38,7 @@ internal sealed class Endpoint(
 
         if (invite.IsExpired)
         {
-            await SendResultAsync(TypedResults.BadRequest(new { error = "This invite has expired." }));
+            await Send.ResultAsync(TypedResults.BadRequest(new { error = "This invite has expired." }));
             return;
         }
 
@@ -65,7 +65,7 @@ internal sealed class Endpoint(
         invite.Claim(now);
         await db.SaveChangesAsync(ct);
 
-        await SendAsync(new AcceptInviteResponse(invite.EmployeeId), cancellation: ct);
+        await Send.ResultAsync(TypedResults.Ok(new AcceptInviteResponse(invite.EmployeeId)));
     }
 
     private static string HashPassword(string password)

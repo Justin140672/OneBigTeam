@@ -22,14 +22,14 @@ internal sealed class Endpoint(
         {
             if (result.Error.Code == "not_found")
             {
-                await SendResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
+                await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
                 return;
             }
 
-            await SendResultAsync(TypedResults.BadRequest(new { error = result.Error.Message }));
+            await Send.ResultAsync(TypedResults.BadRequest(new { error = result.Error.Message }));
             return;
         }
 
-        await SendNoContentAsync(cancellationToken);
+        await Send.NoContentAsync(cancellationToken);
     }
 }

@@ -15,6 +15,6 @@ internal sealed class Endpoint(GetUnassignedTasksHandler handler)
     public override async Task HandleAsync(GetUnassignedTasksRequest request, CancellationToken cancellationToken)
     {
         var response = await handler.HandleAsync(request, cancellationToken);
-        await SendAsync(response, StatusCodes.Status200OK, cancellationToken);
+        await Send.ResultAsync(TypedResults.Ok(response));
     }
 }

@@ -1,4 +1,5 @@
 using FastEndpoints;
+using Microsoft.AspNetCore.Http;
 
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
@@ -56,7 +57,7 @@ internal sealed class Endpoint(
                 req.EmployeeId);
         }
 
-        await SendAsync(new SendInviteResponse(invite.Token, invite.ExpiresAt), cancellation: ct);
+        await Send.ResultAsync(TypedResults.Ok(new SendInviteResponse(invite.Token, invite.ExpiresAt)));
     }
 
     private static string BuildEmailHtml(string inviteLink, DateTimeOffset expiresAt)

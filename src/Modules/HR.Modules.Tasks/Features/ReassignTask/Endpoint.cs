@@ -21,10 +21,10 @@ internal sealed class Endpoint(ReassignTaskHandler handler) : Endpoint<ReassignT
 
         if (result.IsFailure)
         {
-            await SendResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
+            await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
             return;
         }
 
-        await SendAsync(result.Value!, StatusCodes.Status200OK, cancellationToken);
+        await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }
 }

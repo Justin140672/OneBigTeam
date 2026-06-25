@@ -19,14 +19,14 @@ internal sealed class Endpoint(GetTaskHandler handler) : Endpoint<GetTaskRequest
         {
             if (result.Error.Code == "not_found")
             {
-                await SendResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
+                await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
                 return;
             }
 
-            await SendResultAsync(TypedResults.BadRequest(new { error = result.Error.Message }));
+            await Send.ResultAsync(TypedResults.BadRequest(new { error = result.Error.Message }));
             return;
         }
 
-        await SendAsync(result.Value!, StatusCodes.Status200OK, cancellationToken);
+        await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }
 }

@@ -16,7 +16,7 @@ internal sealed class Endpoint(GetMyNotificationsHandler handler)
     {
         if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var employeeId))
         {
-            await SendResultAsync(TypedResults.Unauthorized());
+            await Send.ResultAsync(TypedResults.Unauthorized());
             return;
         }
 
@@ -24,6 +24,6 @@ internal sealed class Endpoint(GetMyNotificationsHandler handler)
             new GetMyNotificationsRequest { CompanyId = request.CompanyId, EmployeeId = employeeId },
             cancellationToken);
 
-        await SendAsync(result, StatusCodes.Status200OK, cancellationToken);
+        await Send.ResultAsync(TypedResults.Ok(result));
     }
 }

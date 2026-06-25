@@ -19,23 +19,23 @@ internal sealed class Endpoint(
         var userId = currentUser.UserId;
         if (userId is null)
         {
-            await SendResultAsync(TypedResults.Forbid());
+            await Send.ResultAsync(TypedResults.Forbid());
             return;
         }
 
         if (!Guid.TryParse(currentUser.TenantId, out var companyId))
         {
-            await SendResultAsync(TypedResults.Forbid());
+            await Send.ResultAsync(TypedResults.Forbid());
             return;
         }
 
         var permissions = await authorizationService.GetEffectivePermissionsAsync(userId.Value, ct);
 
-        await SendAsync(new GetMeResponse(
+        await Send.ResultAsync(TypedResults.Ok(new GetMeResponse(
             userId.Value,
             companyId,
             currentUser.Email,
-            permissions.ToList()), StatusCodes.Status200OK, ct);
+            permissions.ToList())));
     }
 }
 

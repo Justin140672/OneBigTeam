@@ -24,23 +24,22 @@ internal sealed class Endpoint(
 
             if (result.Error.Code == "not_found")
             {
-                await SendResultAsync(TypedResults.NotFound(businessError));
+                await Send.ResultAsync(TypedResults.NotFound(businessError));
                 return;
             }
 
             if (result.Error.Code == "conflict")
             {
-                await SendResultAsync(TypedResults.Conflict(businessError));
+                await Send.ResultAsync(TypedResults.Conflict(businessError));
                 return;
             }
 
-            await SendResultAsync(TypedResults.BadRequest(businessError));
+            await Send.ResultAsync(TypedResults.BadRequest(businessError));
             return;
         }
 
-        HttpContext.Response.Headers.Location =
-            $"/api/companies/{result.Value!.CompanyId}/employees/{result.Value.Id}";
-
-        await SendAsync(result.Value, StatusCodes.Status201Created, cancellationToken);
+        await Send.ResultAsync(TypedResults.Created(
+            $"/api/companies/{result.Value!.CompanyId}/employees/{result.Value.Id}",
+            result.Value));
     }
 }

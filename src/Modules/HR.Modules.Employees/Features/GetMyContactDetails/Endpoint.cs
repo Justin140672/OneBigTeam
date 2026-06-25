@@ -15,13 +15,13 @@ internal sealed class Endpoint(GetMyContactDetailsHandler handler) : EndpointWit
     {
         if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var userId))
         {
-            await SendResultAsync(TypedResults.Unauthorized());
+            await Send.ResultAsync(TypedResults.Unauthorized());
             return;
         }
 
         if (!Guid.TryParse(Route<string>("companyId"), out var companyId))
         {
-            await SendResultAsync(TypedResults.BadRequest());
+            await Send.ResultAsync(TypedResults.BadRequest());
             return;
         }
 
@@ -29,10 +29,10 @@ internal sealed class Endpoint(GetMyContactDetailsHandler handler) : EndpointWit
 
         if (result.IsFailure)
         {
-            await SendResultAsync(TypedResults.NotFound());
+            await Send.ResultAsync(TypedResults.NotFound());
             return;
         }
 
-        await SendAsync(result.Value!, StatusCodes.Status200OK, cancellationToken);
+        await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }
 }

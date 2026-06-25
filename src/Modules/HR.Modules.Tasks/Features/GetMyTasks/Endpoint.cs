@@ -15,7 +15,7 @@ internal sealed class Endpoint(GetMyTasksHandler handler) : Endpoint<GetMyTasksR
     {
         if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var userId))
         {
-            await SendResultAsync(TypedResults.Unauthorized());
+            await Send.ResultAsync(TypedResults.Unauthorized());
             return;
         }
 
@@ -23,6 +23,6 @@ internal sealed class Endpoint(GetMyTasksHandler handler) : Endpoint<GetMyTasksR
             request with { UserId = userId },
             cancellationToken);
 
-        await SendAsync(response, StatusCodes.Status200OK, cancellationToken);
+        await Send.ResultAsync(TypedResults.Ok(response));
     }
 }

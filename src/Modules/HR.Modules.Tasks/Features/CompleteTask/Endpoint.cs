@@ -15,7 +15,7 @@ internal sealed class Endpoint(CompleteTaskHandler handler) : Endpoint<CompleteT
     {
         if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var completedBy))
         {
-            await SendResultAsync(TypedResults.Unauthorized());
+            await Send.ResultAsync(TypedResults.Unauthorized());
             return;
         }
 
@@ -29,14 +29,14 @@ internal sealed class Endpoint(CompleteTaskHandler handler) : Endpoint<CompleteT
 
             if (result.Error.Code == "not_found")
             {
-                await SendResultAsync(TypedResults.NotFound(businessError));
+                await Send.ResultAsync(TypedResults.NotFound(businessError));
                 return;
             }
 
-            await SendResultAsync(TypedResults.Conflict(businessError));
+            await Send.ResultAsync(TypedResults.Conflict(businessError));
             return;
         }
 
-        await SendAsync(result.Value!, StatusCodes.Status200OK, cancellationToken);
+        await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }
 }

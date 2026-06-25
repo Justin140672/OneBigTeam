@@ -15,6 +15,6 @@ internal sealed class Endpoint(ListNationalitiesHandler handler)
     public override async Task HandleAsync(CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(cancellationToken);
-        await SendAsync(result, StatusCodes.Status200OK, cancellationToken);
+        await Send.ResultAsync(TypedResults.Ok(result));
     }
 }

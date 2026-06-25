@@ -14,6 +14,6 @@ internal sealed class Endpoint(GetEmployeeTasksHandler handler) : Endpoint<GetEm
     public override async Task HandleAsync(GetEmployeeTasksRequest request, CancellationToken cancellationToken)
     {
         var response = await handler.HandleAsync(request, cancellationToken);
-        await SendAsync(response, StatusCodes.Status200OK, cancellationToken);
+        await Send.ResultAsync(TypedResults.Ok(response));
     }
 }

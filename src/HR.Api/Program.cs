@@ -28,6 +28,8 @@ builder.Services.AddNotificationsModule(connectionString);
 builder.Services.AddTasksModule(connectionString);
 builder.Services.AddInfrastructure(connectionString);
 builder.Services.AddFastEndpoints(o => o.IncludeAbstractValidators = true);
+builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
+    o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher>();
 

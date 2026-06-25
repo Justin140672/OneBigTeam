@@ -17,6 +17,6 @@ internal sealed class Endpoint(GetExpiringDocumentsHandler handler)
         CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(request, cancellationToken);
-        await SendAsync(result.Value!, StatusCodes.Status200OK, cancellationToken);
+        await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }
 }

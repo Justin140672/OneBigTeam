@@ -18,10 +18,10 @@ internal sealed class Endpoint(MarkNotificationReadHandler handler)
 
         if (result.IsFailure)
         {
-            await SendResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
+            await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
             return;
         }
 
-        await SendNoContentAsync(cancellationToken);
+        await Send.NoContentAsync(cancellationToken);
     }
 }

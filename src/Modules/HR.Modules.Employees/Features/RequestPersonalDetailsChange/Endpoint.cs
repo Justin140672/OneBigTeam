@@ -18,7 +18,7 @@ internal sealed class Endpoint(RequestPersonalDetailsChangeHandler handler)
     {
         if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var userId))
         {
-            await SendResultAsync(TypedResults.Unauthorized());
+            await Send.ResultAsync(TypedResults.Unauthorized());
             return;
         }
 
@@ -30,20 +30,20 @@ internal sealed class Endpoint(RequestPersonalDetailsChangeHandler handler)
 
             if (result.Error.Code == "not_found")
             {
-                await SendResultAsync(TypedResults.NotFound(businessError));
+                await Send.ResultAsync(TypedResults.NotFound(businessError));
                 return;
             }
 
             if (result.Error.Code == "forbidden")
             {
-                await SendResultAsync(TypedResults.Forbid());
+                await Send.ResultAsync(TypedResults.Forbid());
                 return;
             }
 
-            await SendResultAsync(TypedResults.BadRequest(businessError));
+            await Send.ResultAsync(TypedResults.BadRequest(businessError));
             return;
         }
 
-        await SendAsync(result.Value!, StatusCodes.Status201Created, cancellationToken);
+        await Send.ResultAsync(TypedResults.Created((string?)null, result.Value!));
     }
 }

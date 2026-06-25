@@ -21,10 +21,10 @@ internal sealed class Endpoint(GetEmployeeEmergencyContactsHandler handler)
 
         if (result.IsFailure)
         {
-            await SendResultAsync(TypedResults.NotFound());
+            await Send.ResultAsync(TypedResults.NotFound());
             return;
         }
 
-        await SendAsync(result.Value!, StatusCodes.Status200OK, cancellationToken);
+        await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }
 }

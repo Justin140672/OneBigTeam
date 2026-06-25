@@ -19,7 +19,7 @@ internal sealed class Endpoint(DownloadEmployeeDocumentHandler handler)
     {
         if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var downloadedBy))
         {
-            await SendResultAsync(TypedResults.Unauthorized());
+            await Send.ResultAsync(TypedResults.Unauthorized());
             return;
         }
 
@@ -27,10 +27,10 @@ internal sealed class Endpoint(DownloadEmployeeDocumentHandler handler)
 
         if (result.IsFailure)
         {
-            await SendResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
+            await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
             return;
         }
 
-        await SendRedirectAsync(result.Value!.ToString(), isPermanent: false, allowRemoteRedirects: true);
+        await Send.RedirectAsync(result.Value!.ToString(), isPermanent: false, allowRemoteRedirects: true);
     }
 }

@@ -24,20 +24,20 @@ internal sealed class Endpoint(
 
             if (result.Error.Code == "not_found")
             {
-                await SendResultAsync(TypedResults.NotFound(businessError));
+                await Send.ResultAsync(TypedResults.NotFound(businessError));
                 return;
             }
 
             if (result.Error.Code == "conflict")
             {
-                await SendResultAsync(TypedResults.Conflict(businessError));
+                await Send.ResultAsync(TypedResults.Conflict(businessError));
                 return;
             }
 
-            await SendResultAsync(TypedResults.BadRequest(businessError));
+            await Send.ResultAsync(TypedResults.BadRequest(businessError));
             return;
         }
 
-        await SendAsync(result.Value!, StatusCodes.Status200OK, cancellationToken);
+        await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }
 }

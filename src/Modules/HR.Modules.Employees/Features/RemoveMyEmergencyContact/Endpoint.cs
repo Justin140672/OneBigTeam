@@ -16,7 +16,7 @@ internal sealed class Endpoint(RemoveMyEmergencyContactHandler handler)
     {
         if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var employeeId))
         {
-            await SendResultAsync(TypedResults.Unauthorized());
+            await Send.ResultAsync(TypedResults.Unauthorized());
             return;
         }
 
@@ -27,10 +27,10 @@ internal sealed class Endpoint(RemoveMyEmergencyContactHandler handler)
 
         if (result.IsFailure)
         {
-            await SendResultAsync(TypedResults.NotFound());
+            await Send.ResultAsync(TypedResults.NotFound());
             return;
         }
 
-        await SendNoContentAsync(cancellationToken);
+        await Send.NoContentAsync(cancellationToken);
     }
 }
