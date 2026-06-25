@@ -142,7 +142,7 @@ public class LeaveYearHandlerTests
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        var handler = new ApproveLeaveRequestHandler(context, new FakeClock(JanuaryClockUtc),
+        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(JanuaryClockUtc),
             new NoOpIntegrationEventPublisher(), AprilStartSettings, new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new ApproveLeaveRequestRequest
