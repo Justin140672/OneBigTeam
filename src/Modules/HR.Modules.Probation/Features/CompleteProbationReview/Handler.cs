@@ -20,12 +20,12 @@ internal sealed class CompleteProbationReviewHandler
         CompleteProbationReviewRequest request,
         CancellationToken cancellationToken)
     {
-        var recordExists = await _dbContext.ProbationRecords
-            .AnyAsync(
+        var record = await _dbContext.ProbationRecords
+            .FirstOrDefaultAsync(
                 r => r.CompanyId == request.CompanyId && r.Id == request.ProbationRecordId,
                 cancellationToken);
 
-        if (!recordExists)
+        if (record is null)
             return Result.Failure<CompleteProbationReviewResponse>(
                 Error.NotFound("Probation record not found."));
 
@@ -44,7 +44,31 @@ internal sealed class CompleteProbationReviewHandler
             return Result.Failure<CompleteProbationReviewResponse>(
                 Error.Validation("Probation review is already completed."));
 
-        review.Complete(request.CompletedByEmployeeId, request.Notes, _clock.UtcNowOffset());
+        if (review.ReviewType == ProbationReviewType.FinalDecision
+            && request.Outcome is not (ProbationOutcome.Pass or ProbationOutcome.Fail))
+            return Result.Failure<CompleteProbationReviewResponse>(
+                Error.Validation("A Pass or Fail outcome is required when completing a FinalDecision review."));
+
+        if (review.ReviewType == ProbationReviewType.ExtensionConfirmation
+            && request.Outcome != ProbationOutcome.Extend)
+            return Result.Failure<CompleteProbationReviewResponse>(
+                Error.Validation("An Extend outcome is required when completing an ExtensionConfirmation review."));
+
+        if (review.ReviewType is not (ProbationReviewType.FinalDecision or ProbationReviewType.ExtensionConfirmation)
+            && request.Outcome.HasValue)
+            return Result.Failure<CompleteProbationReviewResponse>(
+                Error.Validation("Outcome can only be set on FinalDecision or ExtensionConfirmation reviews."));
+
+        var now = _clock.UtcNowOffset();
+
+        if (request.Outcome == ProbationOutcome.Pass)
+            record.Pass(request.CompletedByEmployeeId, request.DecisionDate!.Value, request.Notes, now);
+        else if (request.Outcome == ProbationOutcome.Fail)
+            record.Fail(request.CompletedByEmployeeId, request.DecisionDate!.Value, request.Notes, now);
+        else if (request.Outcome == ProbationOutcome.Extend)
+            record.Extend(request.NewExpectedEndDate!.Value, request.ExtensionReason!, request.CompletedByEmployeeId, request.DecisionDate!.Value, now);
+
+        review.Complete(request.CompletedByEmployeeId, request.Notes, now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
