@@ -1,4 +1,4 @@
-namespace HR.Modules.Notifications;
+namespace HR.SharedKernel;
 
 public enum NotificationType
 {

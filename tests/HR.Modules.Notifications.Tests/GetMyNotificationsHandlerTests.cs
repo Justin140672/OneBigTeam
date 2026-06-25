@@ -1,6 +1,7 @@
 using HR.Modules.Notifications.Domain;
 using HR.Modules.Notifications.Features.GetMyNotifications;
 using HR.Modules.Notifications.Persistence;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Notifications.Tests;

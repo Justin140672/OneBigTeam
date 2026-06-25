@@ -1,5 +1,4 @@
-using HR.Modules.Notifications;
-using HR.Modules.Notifications.Contracts;
+using HR.SharedKernel;
 
 namespace HR.Modules.Tasks.Tests.Infrastructure;
 

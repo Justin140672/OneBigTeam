@@ -1,5 +1,3 @@
-using HR.Modules.Notifications;
-using HR.Modules.Notifications.Contracts;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Persistence;
 using HR.SharedKernel;

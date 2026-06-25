@@ -1,3 +1,5 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.Notifications.Domain;
 
 internal sealed class Notification

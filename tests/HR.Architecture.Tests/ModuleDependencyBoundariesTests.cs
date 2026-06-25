@@ -8,7 +8,11 @@ public class ModuleDependencyBoundariesTests
         [
             typeof(HR.Modules.Companies.CompaniesModule).Assembly,
             typeof(HR.Modules.Identity.IdentityModule).Assembly,
-            typeof(HR.Modules.Employees.EmployeesModule).Assembly
+            typeof(HR.Modules.Employees.EmployeesModule).Assembly,
+            typeof(HR.Modules.Leave.LeaveModule).Assembly,
+            typeof(HR.Modules.Documents.DocumentsModule).Assembly,
+            typeof(HR.Modules.Tasks.TasksModule).Assembly,
+            typeof(HR.Modules.Notifications.NotificationsModule).Assembly,
         ];
 
     [Theory]

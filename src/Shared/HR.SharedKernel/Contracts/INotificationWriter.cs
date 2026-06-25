@@ -1,4 +1,4 @@
-namespace HR.Modules.Notifications.Contracts;
+namespace HR.SharedKernel;
 
 public interface INotificationWriter
 {

@@ -2,7 +2,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Shared\HR.SharedKernel\HR.SharedKernel.csproj" />
-    <ProjectReference Include="..\HR.Modules.Notifications\HR.Modules.Notifications.csproj" />
   </ItemGroup>
 
   <ItemGroup>

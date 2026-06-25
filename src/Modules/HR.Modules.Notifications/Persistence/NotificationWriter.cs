@@ -1,5 +1,5 @@
-using HR.Modules.Notifications.Contracts;
 using HR.Modules.Notifications.Domain;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Notifications.Persistence;

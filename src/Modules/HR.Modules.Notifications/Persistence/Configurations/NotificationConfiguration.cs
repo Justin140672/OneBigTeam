@@ -1,4 +1,5 @@
 using HR.Modules.Notifications.Domain;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

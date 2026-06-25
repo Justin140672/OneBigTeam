@@ -1,4 +1,3 @@
-using HR.Modules.Notifications;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.ReassignTask;
 using HR.SharedKernel;

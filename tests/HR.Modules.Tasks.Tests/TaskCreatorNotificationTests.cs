@@ -1,4 +1,3 @@
-using HR.Modules.Notifications;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Services;
 using HR.Modules.Tasks.Tests.Infrastructure;

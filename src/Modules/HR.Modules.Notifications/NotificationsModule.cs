@@ -1,5 +1,5 @@
-using HR.Modules.Notifications.Contracts;
 using HR.Modules.Notifications.Domain;
+using HR.SharedKernel;
 using HR.Modules.Notifications.Features.GetMyNotifications;
 using HR.Modules.Notifications.Features.GetUnreadNotificationCount;
 using HR.Modules.Notifications.Features.MarkAllNotificationsRead;
