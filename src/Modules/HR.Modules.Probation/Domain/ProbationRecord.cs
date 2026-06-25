@@ -44,6 +44,28 @@ internal sealed class ProbationRecord
         };
     }
 
+    public void Update(
+        Guid managerEmployeeId,
+        DateOnly expectedEndDate,
+        ProbationStatus status,
+        string? notes,
+        string? extensionReason,
+        Guid? decisionMakerEmployeeId,
+        DateOnly? decisionDate,
+        string? outcomeNotes,
+        DateTimeOffset now)
+    {
+        ManagerEmployeeId = managerEmployeeId;
+        ExpectedEndDate = expectedEndDate;
+        Status = status;
+        Notes = notes;
+        ExtensionReason = extensionReason;
+        DecisionMakerEmployeeId = decisionMakerEmployeeId;
+        DecisionDate = decisionDate;
+        OutcomeNotes = outcomeNotes;
+        UpdatedAt = now;
+    }
+
     public void MarkReviewDue(DateTimeOffset now)
     {
         Status = ProbationStatus.ReviewDue;
