@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Notifications.Persistence;
 
-internal sealed class NotificationWriter(NotificationsDbContext dbContext) : INotificationWriter
+internal sealed class NotificationWriter(NotificationsDbContext dbContext, IAuditEventPublisher auditPublisher) : INotificationWriter
 {
     public async Task WriteAsync(
         Guid id,
@@ -21,6 +21,16 @@ internal sealed class NotificationWriter(NotificationsDbContext dbContext) : INo
         var notification = Notification.Create(id, companyId, employeeId, title, body, sourceEntityId, createdAt, type, priority);
         dbContext.Notifications.Add(notification);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new NotificationCreatedAuditEvent(
+            companyId,
+            id,
+            employeeId,
+            title,
+            type.ToString(),
+            priority.ToString(),
+            sourceEntityId,
+            createdAt), cancellationToken);
     }
 
     public async Task<bool> ExistsAsync(
