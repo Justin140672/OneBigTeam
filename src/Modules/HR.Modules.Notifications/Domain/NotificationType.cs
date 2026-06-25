@@ -2,7 +2,12 @@ namespace HR.Modules.Notifications;
 
 public enum NotificationType
 {
-    TaskAssigned = 1,
-    TaskDueSoon  = 2,
-    TaskOverdue  = 3,
+    TaskAssigned     = 1,
+    TaskDueSoon      = 2,
+    TaskOverdue      = 3,
+    LeaveApproved    = 4,
+    LeaveRejected    = 5,
+    LeaveRequested   = 6,
+    DocumentExpiring = 7,
+    DocumentExpired  = 8,
 }

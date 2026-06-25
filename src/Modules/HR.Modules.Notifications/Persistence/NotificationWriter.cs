@@ -14,10 +14,11 @@ internal sealed class NotificationWriter(NotificationsDbContext dbContext) : INo
         string? body,
         Guid sourceEntityId,
         NotificationType type,
+        NotificationPriority priority,
         DateTimeOffset createdAt,
         CancellationToken cancellationToken = default)
     {
-        var notification = Notification.Create(id, companyId, employeeId, title, body, sourceEntityId, createdAt, type);
+        var notification = Notification.Create(id, companyId, employeeId, title, body, sourceEntityId, createdAt, type, priority);
         dbContext.Notifications.Add(notification);
         await dbContext.SaveChangesAsync(cancellationToken);
     }

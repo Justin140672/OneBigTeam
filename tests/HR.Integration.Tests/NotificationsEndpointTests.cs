@@ -20,25 +20,25 @@ public class NotificationsEndpointTests : IClassFixture<ApiWebApplicationFactory
             .GetAwaiter().GetResult();
     }
 
-    // ── ListNotifications ────────────────────────────────────────────────────────
+    // ── GetMyNotifications ────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task ListNotifications_Returns_Unauthorized_Without_Auth()
+    public async Task GetMyNotifications_Returns_Unauthorized_Without_Auth()
     {
         using var client = _factory.CreateClient();
         var response     = await client.GetAsync(
-            $"/api/companies/{SeededCompanyId}/employees/{Guid.NewGuid()}/notifications");
+            $"/api/companies/{SeededCompanyId}/notifications/my");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
-    public async Task ListNotifications_Returns_Empty_When_No_Notifications()
+    public async Task GetMyNotifications_Returns_Empty_When_No_Notifications()
     {
-        var employeeId   = Guid.NewGuid();
-        using var client = AuthenticatedClient(Guid.NewGuid());
+        var userId       = Guid.NewGuid();
+        using var client = AuthenticatedClient(userId);
 
         var response = await client.GetAsync(
-            $"/api/companies/{SeededCompanyId}/employees/{employeeId}/notifications");
+            $"/api/companies/{SeededCompanyId}/notifications/my");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<NotifListPayload>();
@@ -47,18 +47,18 @@ public class NotificationsEndpointTests : IClassFixture<ApiWebApplicationFactory
     }
 
     [Fact]
-    public async Task ListNotifications_Returns_Notification_When_Task_Assigned_To_Employee()
+    public async Task GetMyNotifications_Returns_Notification_When_Task_Assigned_To_Me()
     {
-        var employeeId   = Guid.NewGuid();
-        using var client = AuthenticatedClient(Guid.NewGuid());
+        // userId == employeeId — sub claim is used as employeeId
+        var userId       = Guid.NewGuid();
+        using var client = AuthenticatedClient(userId);
 
-        // Seed a task assigned to the employee — TaskCreator creates a notification alongside
         await TaskSeeder.SeedAsync(_factory, SeededCompanyId,
             title: "Notification test task",
-            assignedEmployeeId: employeeId);
+            assignedEmployeeId: userId);
 
         var response = await client.GetAsync(
-            $"/api/companies/{SeededCompanyId}/employees/{employeeId}/notifications");
+            $"/api/companies/{SeededCompanyId}/notifications/my");
         var payload  = await response.Content.ReadFromJsonAsync<NotifListPayload>();
 
         Assert.Equal(1, payload!.UnreadCount);
@@ -69,22 +69,37 @@ public class NotificationsEndpointTests : IClassFixture<ApiWebApplicationFactory
     }
 
     [Fact]
-    public async Task ListNotifications_Returns_Notifications_Newest_First()
+    public async Task GetMyNotifications_Returns_Notifications_Newest_First()
     {
-        var employeeId   = Guid.NewGuid();
-        using var client = AuthenticatedClient(Guid.NewGuid());
+        var userId       = Guid.NewGuid();
+        using var client = AuthenticatedClient(userId);
 
-        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "First task",  assignedEmployeeId: employeeId);
-        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Second task", assignedEmployeeId: employeeId);
+        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "First task",  assignedEmployeeId: userId);
+        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Second task", assignedEmployeeId: userId);
 
         var response = await client.GetAsync(
-            $"/api/companies/{SeededCompanyId}/employees/{employeeId}/notifications");
+            $"/api/companies/{SeededCompanyId}/notifications/my");
         var payload  = await response.Content.ReadFromJsonAsync<NotifListPayload>();
 
         Assert.Equal(2, payload!.UnreadCount);
-        // Most recently created should appear first
         Assert.Equal("New task assigned: Second task", payload.Items[0].Title);
         Assert.Equal("New task assigned: First task",  payload.Items[1].Title);
+    }
+
+    [Fact]
+    public async Task GetMyNotifications_Does_Not_Return_Other_Employees_Notifications()
+    {
+        var userA        = Guid.NewGuid();
+        var userB        = Guid.NewGuid();
+        using var client = AuthenticatedClient(userA);
+
+        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Task for B", assignedEmployeeId: userB);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/notifications/my");
+        var payload  = await response.Content.ReadFromJsonAsync<NotifListPayload>();
+
+        Assert.Empty(payload!.Items);
     }
 
     // ── MarkNotificationRead ─────────────────────────────────────────────────────
@@ -111,26 +126,21 @@ public class NotificationsEndpointTests : IClassFixture<ApiWebApplicationFactory
     [Fact]
     public async Task MarkNotificationRead_Returns_NoContent_And_Decrements_UnreadCount()
     {
-        var employeeId   = Guid.NewGuid();
-        using var client = AuthenticatedClient(Guid.NewGuid());
+        var userId       = Guid.NewGuid();
+        using var client = AuthenticatedClient(userId);
 
-        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Mark-read test", assignedEmployeeId: employeeId);
+        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Mark-read test", assignedEmployeeId: userId);
 
-        // Get the notification ID
-        var listResp  = await client.GetAsync(
-            $"/api/companies/{SeededCompanyId}/employees/{employeeId}/notifications");
+        var listResp    = await client.GetAsync($"/api/companies/{SeededCompanyId}/notifications/my");
         var listPayload = await listResp.Content.ReadFromJsonAsync<NotifListPayload>();
         var notifId     = listPayload!.Items[0].Id;
 
-        // Mark it as read
         var markResp = await client.PutAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/notifications/{notifId}/read",
             new { companyId = SeededCompanyId, notificationId = notifId });
         Assert.Equal(HttpStatusCode.NoContent, markResp.StatusCode);
 
-        // Verify unread count dropped to 0
-        var afterResp    = await client.GetAsync(
-            $"/api/companies/{SeededCompanyId}/employees/{employeeId}/notifications");
+        var afterResp    = await client.GetAsync($"/api/companies/{SeededCompanyId}/notifications/my");
         var afterPayload = await afterResp.Content.ReadFromJsonAsync<NotifListPayload>();
         Assert.Equal(0, afterPayload!.UnreadCount);
         Assert.True(afterPayload.Items[0].IsRead);
@@ -150,20 +160,19 @@ public class NotificationsEndpointTests : IClassFixture<ApiWebApplicationFactory
     [Fact]
     public async Task MarkAllNotificationsRead_Returns_NoContent_And_Clears_Unread_Count()
     {
-        var employeeId   = Guid.NewGuid();
-        using var client = AuthenticatedClient(Guid.NewGuid());
+        var userId       = Guid.NewGuid();
+        using var client = AuthenticatedClient(userId);
 
-        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Bulk read A", assignedEmployeeId: employeeId);
-        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Bulk read B", assignedEmployeeId: employeeId);
-        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Bulk read C", assignedEmployeeId: employeeId);
+        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Bulk read A", assignedEmployeeId: userId);
+        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Bulk read B", assignedEmployeeId: userId);
+        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Bulk read C", assignedEmployeeId: userId);
 
         var markAllResp = await client.PutAsJsonAsync(
-            $"/api/companies/{SeededCompanyId}/employees/{employeeId}/notifications/read-all",
-            new { companyId = SeededCompanyId, employeeId });
+            $"/api/companies/{SeededCompanyId}/employees/{userId}/notifications/read-all",
+            new { companyId = SeededCompanyId, employeeId = userId });
         Assert.Equal(HttpStatusCode.NoContent, markAllResp.StatusCode);
 
-        var listResp = await client.GetAsync(
-            $"/api/companies/{SeededCompanyId}/employees/{employeeId}/notifications");
+        var listResp = await client.GetAsync($"/api/companies/{SeededCompanyId}/notifications/my");
         var payload  = await listResp.Content.ReadFromJsonAsync<NotifListPayload>();
         Assert.Equal(0, payload!.UnreadCount);
         Assert.All(payload.Items, n => Assert.True(n.IsRead));

@@ -230,7 +230,7 @@ else
     private async Task LoadNotificationsAsync()
     {
         if (!Session.EmployeeId.HasValue) return;
-        var result = await NotificationService.GetAsync(Session.CompanyId, Session.EmployeeId.Value);
+        var result = await NotificationService.GetAsync(Session.CompanyId);
         if (result is null) return;
         _unreadCount = result.UnreadCount;
         _notifications = result.Items;

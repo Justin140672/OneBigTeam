@@ -88,8 +88,9 @@ public class DocumentExpiryTasksEndToEndTests : IClassFixture<ApiWebApplicationF
         await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/documents/expiry-notifications", new { });
 
-        var notifResp = await client.GetAsync(
-            $"/api/companies/{companyId}/employees/{employeeId}/notifications");
+        using var employeeClient = EmployeeClient(companyId, employeeId);
+        var notifResp = await employeeClient.GetAsync(
+            $"/api/companies/{companyId}/notifications/my");
         Assert.Equal(HttpStatusCode.OK, notifResp.StatusCode);
 
         var payload = await notifResp.Content.ReadFromJsonAsync<NotificationListPayload>();
@@ -103,6 +104,14 @@ public class DocumentExpiryTasksEndToEndTests : IClassFixture<ApiWebApplicationF
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ExpiryE2EAdmin.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        return client;
+    }
+
+    private HttpClient EmployeeClient(Guid companyId, Guid employeeId)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         return client;
     }

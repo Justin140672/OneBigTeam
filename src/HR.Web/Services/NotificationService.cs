@@ -7,12 +7,12 @@ public sealed class NotificationService(IHttpClientFactory httpClientFactory)
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
     public async Task<NotificationsResponse?> GetAsync(
-        Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
+        Guid companyId, CancellationToken cancellationToken = default)
     {
         try
         {
             return await Http.GetFromJsonAsync<NotificationsResponse>(
-                $"api/companies/{companyId}/employees/{employeeId}/notifications",
+                $"api/companies/{companyId}/notifications/my",
                 cancellationToken);
         }
         catch { return null; }

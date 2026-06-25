@@ -55,8 +55,9 @@ public class LeaveSubmittedCreatesTaskTests : IClassFixture<ApiWebApplicationFac
         await AssignPolicyAsync(client, report.Id, policyId);
         await SubmitLeaveAsync(client, report.Id);
 
-        var response = await client.GetAsync(
-            $"/api/companies/{SeededCompanyId}/employees/{manager.Id}/notifications");
+        using var managerClient = AsEmployee(manager.Id);
+        var response = await managerClient.GetAsync(
+            $"/api/companies/{SeededCompanyId}/notifications/my");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var payload = await response.Content.ReadFromJsonAsync<NotifListPayload>();
@@ -154,6 +155,14 @@ public class LeaveSubmittedCreatesTaskTests : IClassFixture<ApiWebApplicationFac
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        return client;
+    }
+
+    private HttpClient AsEmployee(Guid employeeId)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
         return client;
     }

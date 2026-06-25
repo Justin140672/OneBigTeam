@@ -7,6 +7,7 @@ public sealed record NotificationDto(
     bool IsRead,
     Guid SourceEntityId,
     string Type,
+    string Priority,
     DateTimeOffset CreatedAt);
 
 public sealed record NotificationsResponse(int UnreadCount, List<NotificationDto> Items);

@@ -38,6 +38,7 @@ public class TaskCreatorNotificationTests
         Assert.Equal("New task assigned: Review leave request", notification.Title);
         Assert.Equal("Some detail", notification.Body);
         Assert.Equal(NotificationType.TaskAssigned, notification.Type);
+        Assert.Equal(NotificationPriority.Normal, notification.Priority);
     }
 
     [Fact]
@@ -84,6 +85,31 @@ public class TaskCreatorNotificationTests
         var task = await ctx.TaskItems.SingleAsync();
         var notification = Assert.Single(notificationWriter.Written);
         Assert.Equal(task.Id, notification.SourceEntityId);
+    }
+
+    [Theory]
+    [InlineData(TaskPriority.Critical, NotificationPriority.Urgent)]
+    [InlineData(TaskPriority.High,     NotificationPriority.High)]
+    [InlineData(TaskPriority.Medium,   NotificationPriority.Normal)]
+    [InlineData(TaskPriority.Low,      NotificationPriority.Low)]
+    public async Task Priority_Maps_From_Task_Priority(TaskPriority taskPriority, NotificationPriority expectedPriority)
+    {
+        await using var ctx = BuildContext();
+        var notificationWriter = new FakeNotificationWriter();
+
+        var creator = new TaskCreator(ctx, notificationWriter, new FakeClock(Now.UtcDateTime), new FakeAuditPublisher());
+
+        await creator.CreateAsync(
+            Guid.NewGuid(), Guid.NewGuid(),
+            "A task", null,
+            taskPriority, TaskSource.Manual,
+            null,
+            assignedEmployeeId: Guid.NewGuid(),
+            assignedUserId: null,
+            sourceEntityId: null,
+            CancellationToken.None);
+
+        Assert.Equal(expectedPriority, Assert.Single(notificationWriter.Written).Priority);
     }
 
     [Fact]

@@ -10,6 +10,7 @@ public interface INotificationWriter
         string? body,
         Guid sourceEntityId,
         NotificationType type,
+        NotificationPriority priority,
         DateTimeOffset createdAt,
         CancellationToken cancellationToken = default);
 

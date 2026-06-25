@@ -11,7 +11,7 @@ public sealed class TaskService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<TaskListResponse>(
-                $"api/companies/{companyId}/tasks/mine", cancellationToken);
+                $"api/companies/{companyId}/tasks/my", cancellationToken);
         }
         catch
         {

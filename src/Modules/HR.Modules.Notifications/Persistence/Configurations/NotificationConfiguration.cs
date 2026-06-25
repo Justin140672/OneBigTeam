@@ -46,6 +46,11 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
             .IsRequired()
             .HasDefaultValue(NotificationType.TaskAssigned);
 
+        builder.Property(n => n.Priority)
+            .HasColumnName("priority")
+            .IsRequired()
+            .HasDefaultValue(NotificationPriority.Normal);
+
         builder.Property(n => n.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

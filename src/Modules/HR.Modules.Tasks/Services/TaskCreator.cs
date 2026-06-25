@@ -43,6 +43,7 @@ internal sealed class TaskCreator(
                 task.Description,
                 task.Id,
                 NotificationType.TaskAssigned,
+                ToNotificationPriority(priority),
                 clock.UtcNowOffset(),
                 cancellationToken);
         }
@@ -60,4 +61,12 @@ internal sealed class TaskCreator(
 
         return task.Id;
     }
+
+    private static NotificationPriority ToNotificationPriority(TaskPriority priority) => priority switch
+    {
+        TaskPriority.Critical => NotificationPriority.Urgent,
+        TaskPriority.High     => NotificationPriority.High,
+        TaskPriority.Medium   => NotificationPriority.Normal,
+        _                     => NotificationPriority.Low,
+    };
 }

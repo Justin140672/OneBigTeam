@@ -64,7 +64,7 @@ internal sealed class DueSoonNotifier(IServiceScopeFactory scopeFactory) : Backg
             {
                 await MaybeCreateAsync(
                     notificationWriter, task, now,
-                    NotificationType.TaskOverdue,
+                    NotificationType.TaskOverdue, NotificationPriority.Urgent,
                     $"Overdue: {task.Title}",
                     $"This task was due on {task.DueDate.Value:d MMM yyyy} and has not been completed.",
                     ct);
@@ -74,7 +74,7 @@ internal sealed class DueSoonNotifier(IServiceScopeFactory scopeFactory) : Backg
                 var dueToday = task.DueDate.Value == today;
                 await MaybeCreateAsync(
                     notificationWriter, task, now,
-                    NotificationType.TaskDueSoon,
+                    NotificationType.TaskDueSoon, NotificationPriority.High,
                     $"Due {(dueToday ? "today" : "soon")}: {task.Title}",
                     dueToday
                         ? "This task is due today."
@@ -89,6 +89,7 @@ internal sealed class DueSoonNotifier(IServiceScopeFactory scopeFactory) : Backg
         TaskItem task,
         DateTimeOffset now,
         NotificationType type,
+        NotificationPriority priority,
         string title,
         string body,
         CancellationToken ct)
@@ -100,6 +101,6 @@ internal sealed class DueSoonNotifier(IServiceScopeFactory scopeFactory) : Backg
 
         await notificationWriter.WriteAsync(
             Guid.NewGuid(), task.CompanyId, task.AssignedEmployeeId!.Value,
-            title, body, task.Id, type, now, ct);
+            title, body, task.Id, type, priority, now, ct);
     }
 }

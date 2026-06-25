@@ -12,13 +12,15 @@ internal sealed class Notification
     public bool IsRead { get; private set; }
     public Guid SourceEntityId { get; private set; }
     public NotificationType Type { get; private set; }
+    public NotificationPriority Priority { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
     public static Notification Create(
         Guid id, Guid companyId, Guid employeeId,
         string title, string? body,
         Guid sourceEntityId, DateTimeOffset now,
-        NotificationType type = NotificationType.TaskAssigned) => new()
+        NotificationType type = NotificationType.TaskAssigned,
+        NotificationPriority priority = NotificationPriority.Normal) => new()
     {
         Id             = id,
         CompanyId      = companyId,
@@ -28,6 +30,7 @@ internal sealed class Notification
         IsRead         = false,
         SourceEntityId = sourceEntityId,
         Type           = type,
+        Priority       = priority,
         CreatedAt      = now,
     };
 

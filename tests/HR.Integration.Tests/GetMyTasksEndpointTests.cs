@@ -15,7 +15,7 @@ public class GetMyTasksEndpointTests(ApiWebApplicationFactory factory) : IClassF
     {
         using var client = factory.CreateClient();
 
-        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/mine");
+        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/my");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -28,7 +28,7 @@ public class GetMyTasksEndpointTests(ApiWebApplicationFactory factory) : IClassF
         var userId = Guid.NewGuid();
         using var client = AuthenticatedClient(userId);
 
-        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/mine");
+        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/my");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
@@ -47,7 +47,7 @@ public class GetMyTasksEndpointTests(ApiWebApplicationFactory factory) : IClassF
         await TaskSeeder.SeedAsync(factory, SeededCompanyId, "Task for B", assignedUserId: userB);
 
         using var client = AuthenticatedClient(userA);
-        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/mine");
+        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/my");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
@@ -64,7 +64,7 @@ public class GetMyTasksEndpointTests(ApiWebApplicationFactory factory) : IClassF
         await TaskSeeder.SeedAsync(factory, SeededCompanyId, "Another open", assignedUserId: userId);
 
         using var client = AuthenticatedClient(userId);
-        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/mine?status=Open");
+        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/my?status=Open");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
@@ -80,7 +80,7 @@ public class GetMyTasksEndpointTests(ApiWebApplicationFactory factory) : IClassF
         await TaskSeeder.SeedAsync(factory, SeededCompanyId, "Unassigned");
 
         using var client = AuthenticatedClient(userId);
-        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/mine");
+        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/my");
 
         var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
         Assert.Empty(payload!.Items);

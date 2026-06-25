@@ -47,6 +47,7 @@ internal static class TaskSeeder
                 task.Description,
                 task.Id,
                 NotificationType.TaskAssigned,
+                NotificationPriority.Normal,
                 now);
         }
 

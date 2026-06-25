@@ -7,7 +7,7 @@ internal sealed class Endpoint(GetMyTasksHandler handler) : Endpoint<GetMyTasksR
 {
     public override void Configure()
     {
-        Get("/api/companies/{companyId:guid}/tasks/mine");
+        Get("/api/companies/{companyId:guid}/tasks/my");
         Policies("authenticated");
     }
 
