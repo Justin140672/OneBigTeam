@@ -264,7 +264,7 @@ public class LeaveYearHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new EmployeeCreatedHandler(context, new FakeClock(JanuaryClockUtc), AprilStartSettings);
-        await handler.HandleAsync(new EmployeeCreatedIntegrationEvent(companyId, employeeId), CancellationToken.None);
+        await handler.HandleAsync(new EmployeeCreatedIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 1), null), CancellationToken.None);
 
         var balance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(2026, balance.PolicyYear);

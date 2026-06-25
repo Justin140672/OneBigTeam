@@ -1,4 +1,6 @@
 namespace HR.SharedKernel;
 public sealed record EmployeeCreatedIntegrationEvent(
     Guid CompanyId,
-    Guid EmployeeId) : IIntegrationEvent;
+    Guid EmployeeId,
+    DateOnly StartDate,
+    Guid? ManagerId) : IIntegrationEvent;

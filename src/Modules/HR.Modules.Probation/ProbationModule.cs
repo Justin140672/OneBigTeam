@@ -1,11 +1,13 @@
 using FluentValidation;
 using HR.Modules.Probation.Features.CompleteProbationReview;
+using HR.Modules.Probation.Features.CreateProbationOnEmployeeCreated;
 using HR.Modules.Probation.Features.CreateProbationRecord;
 using HR.Modules.Probation.Features.CreateProbationReview;
 using HR.Modules.Probation.Features.GetProbationReviews;
 using HR.Modules.Probation.Features.GetProbationRecord;
 using HR.Modules.Probation.Features.UpdateProbationRecord;
 using HR.Modules.Probation.Persistence;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -38,6 +40,7 @@ public static class ProbationModule
         services.AddScoped<GetProbationReviewsHandler>();
         services.AddScoped<CompleteProbationReviewHandler>();
         services.AddScoped<IValidator<CompleteProbationReviewRequest>, CompleteProbationReviewValidator>();
+        services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
     }
 
     public static async Task MigrateProbationAsync(this IServiceProvider services)
