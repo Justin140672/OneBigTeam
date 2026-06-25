@@ -22,8 +22,22 @@ public sealed class NotificationPanel(IPage page)
 
     public async Task CloseAsync()
     {
-        // Click the bell again to toggle closed, or click away.
         await page.Locator(".notif-btn").ClickAsync();
+        await page.WaitForSelectorAsync(".notif-dropdown",
+            new() { State = WaitForSelectorState.Hidden, Timeout = 5_000 });
+    }
+
+    /// <summary>
+    /// Clicks "Mark all read" inside an already-open notification panel and waits
+    /// for the unread badge to be removed from the DOM.
+    /// </summary>
+    public async Task MarkAllReadAsync()
+    {
+        await page.Locator(".notif-mark-all").ClickAsync();
+        // Badge is conditionally rendered (@if unreadCount > 0); wait for it to vanish.
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.notif-badge')",
+            null, new PageWaitForFunctionOptions { Timeout = 10_000 });
     }
 
     /// <summary>Returns all notification titles currently in the open dropdown.</summary>

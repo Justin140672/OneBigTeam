@@ -658,11 +658,11 @@
                     var (token, expiresAt, _) = await InviteService.SendInviteAsync(CompanyId, created.Id, email);
                     if (token is not null)
                     {
-                        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{created.Id}?invited=true");
+                        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{created.Id}?invited=true", forceLoad: true);
                         return;
                     }
                 }
-                Navigation.NavigateTo($"/companies/{CompanyId}/employees");
+                Navigation.NavigateTo($"/companies/{CompanyId}/employees", forceLoad: true);
                 return;
             }
 
@@ -709,7 +709,7 @@
             _saving = false;
 
             if (success)
-                Navigation.NavigateTo($"/companies/{CompanyId}/employees");
+                Navigation.NavigateTo($"/companies/{CompanyId}/employees", forceLoad: true);
             else
                 _globalError = conflictMessage;
         }

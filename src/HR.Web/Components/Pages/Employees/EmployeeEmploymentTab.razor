@@ -46,7 +46,7 @@ else
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Employment Type <span class="text-danger">*</span></label>
-                            <SfDropDownList TValue="string?"
+                            <SfDropDownList TValue="string"
                                             TItem="Option"
                                             DataSource="@_employmentTypeOptions"
                                             @bind-Value="_model.EmploymentType"
@@ -236,30 +236,19 @@ else
         _error = null;
         _successMsg = null;
 
-        var tasks = new[]
-        {
-            Task.Run(async () =>
-            {
-                var r = await DepartmentService.ListDepartmentsAsync(CompanyId);
-                _departments = r?.Items ?? [];
-            }),
-            Task.Run(async () =>
-            {
-                var r = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
-                _positionProfiles = r?.Items.ToList() ?? [];
-            }),
-            Task.Run(async () =>
-            {
-                var r = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
-                _managerOptions = (r?.Items ?? [])
-                    .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "Terminated")
-                    .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
-                    .OrderBy(e => e.Name)
-                    .ToList();
-            }),
-        };
+        var deptTask    = DepartmentService.ListDepartmentsAsync(CompanyId);
+        var profileTask = PositionProfileService.ListPositionProfilesAsync(CompanyId);
+        var empListTask = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
 
-        await Task.WhenAll(tasks);
+        await Task.WhenAll(deptTask, profileTask, empListTask);
+
+        _departments      = (await deptTask)?.Items ?? [];
+        _positionProfiles = (await profileTask)?.Items.ToList() ?? [];
+        _managerOptions   = ((await empListTask)?.Items ?? [])
+            .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "Terminated")
+            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(e => e.Name)
+            .ToList();
 
         var employee = await EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
         if (employee is not null)

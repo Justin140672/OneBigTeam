@@ -7,8 +7,68 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     public async Task GoToAsync(Guid companyId, Guid employeeId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}/profile");
-        await page.WaitForSelectorAsync(".e-tab, .tab-content, [role='tablist']",
-            new() { Timeout = 20_000 });
+        // The overview tab is prerendered with .overview-grid already in the HTML.
+        // After Blazor's circuit connects, OnParametersSetAsync re-runs and briefly shows
+        // .overview-skeleton before re-fetching data. We register a MutationObserver
+        // immediately after navigation to catch that skeleton→grid cycle, which proves
+        // the circuit is connected and all Blazor event handlers are wired up.
+        await page.EvaluateAsync(@"() => {
+            window._profileReady = false;
+            let skeletonSeen = document.querySelector('.overview-skeleton') !== null;
+            const obs = new MutationObserver(() => {
+                if (!skeletonSeen && document.querySelector('.overview-skeleton')) {
+                    skeletonSeen = true;
+                }
+                if (skeletonSeen && !document.querySelector('.overview-skeleton') &&
+                    document.querySelector('.overview-grid')) {
+                    window._profileReady = true;
+                    obs.disconnect();
+                }
+            });
+            obs.observe(document.body, { subtree: true, childList: true });
+        }");
+        await page.WaitForFunctionAsync(
+            "window._profileReady === true",
+            null, new PageWaitForFunctionOptions { Timeout = 20_000 });
+    }
+
+    // ── Tab navigation ────────────────────────────────────────────────────────
+
+    public async Task OpenOverviewTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Overview" }).ClickAsync();
+        await page.WaitForSelectorAsync(".overview-grid, .overview-skeleton, .alert",
+            new() { Timeout = 15_000 });
+    }
+
+    public async Task OpenContactDetailsTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Contact Details" }).ClickAsync();
+        await page.WaitForSelectorAsync(".cd-card, .alert", new() { Timeout = 15_000 });
+    }
+
+    public async Task OpenPersonalDetailsTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Personal Details" }).ClickAsync();
+        await page.WaitForSelectorAsync(".pd-card, .alert", new() { Timeout = 15_000 });
+    }
+
+    public async Task OpenEmergencyContactsTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Emergency Contacts" }).ClickAsync();
+        await page.WaitForSelectorAsync(".ec-card, .alert", new() { Timeout = 15_000 });
+    }
+
+    public async Task OpenDocumentsTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Documents" }).ClickAsync();
+        await page.WaitForSelectorAsync(".card", new() { Timeout = 15_000 });
+    }
+
+    public async Task OpenTasksTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Tasks" }).ClickAsync();
+        await page.WaitForSelectorAsync(".e-grid, p", new() { Timeout = 15_000 });
     }
 
     // ── Leave tab ─────────────────────────────────────────────────────────────
@@ -29,7 +89,8 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     {
         var card = page.Locator(".card").Filter(new() { HasText = "Annual Leave" }).First;
         var dd   = card.Locator("dd.fs-4.fw-semibold");
-        if (!await dd.IsVisibleAsync()) return null;
+        // Wait for the balance to load — it arrives via an async API call after the tab renders.
+        await dd.WaitForAsync(new() { Timeout = 20_000 });
         var text = (await dd.TextContentAsync())?.Trim() ?? "";
         // format is "25 days" or "20.5 days"
         var parts = text.Split(' ');
@@ -85,9 +146,11 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     {
         var dialog = page.Locator(".e-dialog");
 
-        // Leave type — click the SfDropDownList input, wait for the popup, pick the option.
-        var typeInput = dialog.Locator(".e-dropdownlist input.e-input").First;
-        await typeInput.ClickAsync();
+        // Syncfusion SfDropDownList renders a readonly <input> inside a <span role="combobox">.
+        // The span intercepts all pointer events, so we must click the span, not the input.
+        // Scope to the leave-type combobox via :has() on its input's unique placeholder.
+        var typeCombobox = dialog.Locator("span[role='combobox']:has([placeholder='Select leave type'])");
+        await typeCombobox.ClickAsync();
         await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
         await page.Locator(".e-popup.e-ddl .e-list-item")
             .Filter(new() { HasText = leaveTypeName })

@@ -8,7 +8,9 @@ public sealed class DashboardPage(IPage page, string baseUrl)
     public async Task GoToAsync()
     {
         await page.GotoAsync($"{baseUrl}/");
-        await page.WaitForSelectorAsync(".widget-card", new() { Timeout = 20_000 });
+        // Wait for the task widget to finish loading: either a task item appears or the
+        // "All caught up!" empty state renders. Both are absent during the loading spinner phase.
+        await page.WaitForSelectorAsync(".task-widget-item, .widget-empty", new() { Timeout = 20_000 });
     }
 
     /// <summary>

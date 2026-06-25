@@ -166,7 +166,23 @@ else
         </div>
 
         <section class="content-area">
-            @Body
+            <ErrorBoundary>
+                <ChildContent>
+                    @Body
+                </ChildContent>
+                <ErrorContent Context="ex">
+                    <div class="container py-4">
+                        <div class="alert alert-danger d-flex align-items-start gap-3">
+                            <i class="fa-solid fa-triangle-exclamation fa-lg mt-1"></i>
+                            <div>
+                                <h5 class="mb-1">Something went wrong</h5>
+                                <p class="mb-2">An unexpected error occurred. You can try refreshing the page.</p>
+                                <a href="." class="btn btn-sm btn-outline-danger">Refresh</a>
+                            </div>
+                        </div>
+                    </div>
+                </ErrorContent>
+            </ErrorBoundary>
         </section>
     </main>
 

@@ -144,7 +144,7 @@
 
             if (created is not null)
             {
-                Navigation.NavigateTo($"/companies/{CompanyId}/position-profiles/{created.Id}");
+                Navigation.NavigateTo($"/companies/{CompanyId}/position-profiles", forceLoad: true);
                 return;
             }
 
@@ -165,7 +165,7 @@
 
             if (success)
             {
-                Navigation.NavigateTo($"/companies/{CompanyId}/position-profiles");
+                Navigation.NavigateTo($"/companies/{CompanyId}/position-profiles", forceLoad: true);
                 return;
             }
 

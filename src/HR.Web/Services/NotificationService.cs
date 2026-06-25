@@ -23,9 +23,9 @@ public sealed class NotificationService(IHttpClientFactory httpClientFactory)
     {
         try
         {
-            await Http.PutAsync(
+            await Http.PutAsJsonAsync(
                 $"api/companies/{companyId}/notifications/{notificationId}/read",
-                null, cancellationToken);
+                new { companyId, notificationId }, cancellationToken);
         }
         catch { }
     }
@@ -35,9 +35,9 @@ public sealed class NotificationService(IHttpClientFactory httpClientFactory)
     {
         try
         {
-            await Http.PutAsync(
+            await Http.PutAsJsonAsync(
                 $"api/companies/{companyId}/employees/{employeeId}/notifications/read-all",
-                null, cancellationToken);
+                new { companyId, employeeId }, cancellationToken);
         }
         catch { }
     }

@@ -29,6 +29,10 @@
                                         Placeholder="Select leave type">
                             <DropDownListFieldSettings Value="LeaveTypeId" Text="LeaveTypeName" />
                         </SfDropDownList>
+                        @if (_leaveTypeError is not null)
+                        {
+                            <div class="invalid-feedback d-block">@_leaveTypeError</div>
+                        }
                     </div>
                 </div>
 
@@ -39,6 +43,10 @@
                                       Value="_startDateTime"
                                       ValueChanged="OnStartDateChanged"
                                       Format="dd/MM/yyyy" />
+                        @if (_startDateError is not null)
+                        {
+                            <div class="invalid-feedback d-block">@_startDateError</div>
+                        }
                         <div class="mt-2">
                             <label class="form-label small text-muted">Start</label>
                             <SfDropDownList TValue="LeaveDayPart" TItem="DayPartChoice"
@@ -55,6 +63,14 @@
                                       Value="_endDateTime"
                                       ValueChanged="OnEndDateChanged"
                                       Format="dd/MM/yyyy" />
+                        @if (_endDateError is not null)
+                        {
+                            <div class="invalid-feedback d-block">@_endDateError</div>
+                        }
+                        @if (_dateRangeError is not null)
+                        {
+                            <div class="invalid-feedback d-block">@_dateRangeError</div>
+                        }
                         <div class="mt-2">
                             <label class="form-label small text-muted">End</label>
                             <SfDropDownList TValue="LeaveDayPart" TItem="DayPartChoice"
@@ -160,19 +176,24 @@
 
     private Guid _leaveTypeId;
     private DateTime _startDateTime = DateTime.Today;
+    private bool _startDateSet;
     private LeaveDayPart _startPart = LeaveDayPart.FullDay;
     private DateTime _endDateTime = DateTime.Today;
+    private bool _endDateSet;
     private LeaveDayPart _endPart = LeaveDayPart.FullDay;
     private string? _reason;
 
     private bool _submitting;
     private string? _submitError;
+    private string? _leaveTypeError;
+    private string? _startDateError;
+    private string? _endDateError;
+    private string? _dateRangeError;
 
     private DateOnly StartDate => DateOnly.FromDateTime(_startDateTime);
     private DateOnly EndDate => DateOnly.FromDateTime(_endDateTime);
 
-    private bool CanSubmit =>
-        _leaveTypeId != Guid.Empty && EndDate >= StartDate && !_submitting;
+    private bool CanSubmit => !_submitting;
 
     protected override void OnParametersSet()
     {
@@ -191,11 +212,17 @@
     {
         _leaveTypeId = Guid.Empty;
         _startDateTime = DateTime.Today;
+        _startDateSet = false;
         _startPart = LeaveDayPart.FullDay;
         _endDateTime = DateTime.Today;
+        _endDateSet = false;
         _endPart = LeaveDayPart.FullDay;
         _reason = null;
         _submitError = null;
+        _leaveTypeError = null;
+        _startDateError = null;
+        _endDateError = null;
+        _dateRangeError = null;
     }
 
     private async Task OnDialogClosed() => await OnCancelled.InvokeAsync();
@@ -206,16 +233,29 @@
         await OnCancelled.InvokeAsync();
     }
 
-    private void OnLeaveTypeChanged(Guid v) => _leaveTypeId = v;
+    private void OnLeaveTypeChanged(Guid v)
+    {
+        _leaveTypeId = v;
+        _leaveTypeError = null;
+    }
 
     private void OnStartDateChanged(DateTime v)
     {
         _startDateTime = v;
+        _startDateSet = true;
+        _startDateError = null;
+        _dateRangeError = null;
         if (_endDateTime < _startDateTime)
             _endDateTime = _startDateTime;
     }
 
-    private void OnEndDateChanged(DateTime v) => _endDateTime = v;
+    private void OnEndDateChanged(DateTime v)
+    {
+        _endDateTime = v;
+        _endDateSet = true;
+        _endDateError = null;
+        _dateRangeError = null;
+    }
     private void OnStartPartChanged(LeaveDayPart v) => _startPart = v;
     private void OnEndPartChanged(LeaveDayPart v) => _endPart = v;
 
@@ -274,7 +314,17 @@
 
     private async Task Submit()
     {
-        if (!CanSubmit) return;
+        if (_submitting) return;
+
+        _leaveTypeError = _leaveTypeId == Guid.Empty ? "Please select a leave type." : null;
+        _startDateError = !_startDateSet ? "Please select a start date." : null;
+        _endDateError   = !_endDateSet   ? "Please select an end date."   : null;
+        _dateRangeError = _startDateSet && _endDateSet && EndDate < StartDate
+            ? "End date must be on or after start date." : null;
+
+        if (_leaveTypeError is not null || _startDateError is not null ||
+            _endDateError is not null || _dateRangeError is not null)
+            return;
 
         _submitting = true;
         _submitError = null;

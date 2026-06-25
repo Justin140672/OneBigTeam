@@ -23,16 +23,29 @@ internal static class TaskSeeder
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
 
+        var now  = DateTimeOffset.UtcNow;
         var task = TaskItem.Create(
             Guid.NewGuid(), companyId, createdBy ?? Guid.NewGuid(),
             title, description, priority, source, dueDate,
-            assignedEmployeeId, assignedUserId, DateTimeOffset.UtcNow);
+            assignedEmployeeId, assignedUserId, now);
 
-        if (status == TaskItemStatus.InProgress) task.Start(DateTimeOffset.UtcNow);
-        if (status == TaskItemStatus.Completed)  task.Complete(Guid.NewGuid(), DateTimeOffset.UtcNow);
-        if (status == TaskItemStatus.Cancelled)  task.Cancel(DateTimeOffset.UtcNow);
+        if (status == TaskItemStatus.InProgress) task.Start(now);
+        if (status == TaskItemStatus.Completed)  task.Complete(Guid.NewGuid(), now);
+        if (status == TaskItemStatus.Cancelled)  task.Cancel(now);
 
         db.TaskItems.Add(task);
+
+        if (assignedEmployeeId.HasValue)
+        {
+            db.Notifications.Add(Notification.Create(
+                Guid.NewGuid(), companyId, assignedEmployeeId.Value,
+                $"New task assigned: {task.Title}",
+                task.Description,
+                task.Id,
+                now,
+                NotificationType.TaskAssigned));
+        }
+
         await db.SaveChangesAsync();
 
         return task.Id;

@@ -77,7 +77,16 @@ else
                                 <td class="text-nowrap">@FormatDate(r.EndDate, r.EndPart)</td>
                                 <td>@FormatDays(r.TotalDays)</td>
                                 <td><span class="badge @StatusBadge(r.Status)">@r.Status</span></td>
-                                <td class="text-muted">@(r.Reason ?? "—")</td>
+                                <td class="text-muted">
+                                    @if (r.Status == "Rejected" && r.RejectionReason is not null)
+                                    {
+                                        @r.RejectionReason
+                                    }
+                                    else
+                                    {
+                                        @(r.Reason ?? "—")
+                                    }
+                                </td>
                                 <td>
                                     @if (r.Status == "Pending")
                                     {

@@ -13,4 +13,5 @@ internal sealed record LeaveRequestItem(
     string EndPart,
     decimal TotalDays,
     string? Reason,
+    string? RejectionReason,
     DateTimeOffset CreatedAt);

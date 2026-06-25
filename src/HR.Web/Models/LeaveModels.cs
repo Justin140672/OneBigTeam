@@ -68,4 +68,5 @@ public sealed record LeaveRequestListItem(
     string EndPart,
     decimal TotalDays,
     string? Reason,
+    string? RejectionReason,
     DateTimeOffset CreatedAt);

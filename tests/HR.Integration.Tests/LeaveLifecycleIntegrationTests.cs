@@ -500,6 +500,25 @@ public class LeaveLifecycleIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Empty(listResponse.Items);
     }
 
+    [Fact]
+    public async Task Reject_With_Reason_Is_Returned_By_List_Endpoint()
+    {
+        var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
+
+        var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
+            "2026-12-22", "2026-12-22");
+
+        await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}/reject",
+            new { companyId, employeeId, leaveRequestId, reviewedByEmployeeId = UserId, rejectionReason = "Insufficient cover" });
+
+        var listResponse = await ListLeaveRequestsAsync(client, companyId, employeeId);
+
+        var item = Assert.Single(listResponse.Items);
+        Assert.Equal("Rejected", item.Status);
+        Assert.Equal("Insufficient cover", item.RejectionReason);
+    }
+
     // ─── Preview endpoint ──────────────────────────────────────────────────────
 
     [Fact]
@@ -678,6 +697,6 @@ public class LeaveLifecycleIntegrationTests : IClassFixture<ApiWebApplicationFac
     private sealed record BalanceResponse(Guid EmployeeId, int PolicyYear, List<BalanceItem> Balances);
     private sealed record BalanceItem(Guid LeaveTypeId, decimal EntitlementDays, decimal UsedDays, decimal AdjustmentDays, decimal RemainingDays, decimal PendingDays);
     private sealed record ListResponse(List<ListItem> Items);
-    private sealed record ListItem(Guid Id, Guid LeaveTypeId, string LeaveTypeName, string Status, DateOnly StartDate, string StartPart, DateOnly EndDate, string EndPart, decimal TotalDays, string? Reason);
+    private sealed record ListItem(Guid Id, Guid LeaveTypeId, string LeaveTypeName, string Status, DateOnly StartDate, string StartPart, DateOnly EndDate, string EndPart, decimal TotalDays, string? Reason, string? RejectionReason);
     private sealed record PreviewResponse(decimal TotalDays, decimal? RemainingBalance, bool WouldExceedBalance);
 }

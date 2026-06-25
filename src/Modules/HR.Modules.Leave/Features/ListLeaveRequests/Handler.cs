@@ -28,6 +28,7 @@ internal sealed class ListLeaveRequestsHandler(LeaveDbContext dbContext)
                     r.EndPart.ToString(),
                     r.TotalDays,
                     r.Reason,
+                    r.RejectionReason,
                     r.CreatedAt))
             .ToListAsync(cancellationToken);
 

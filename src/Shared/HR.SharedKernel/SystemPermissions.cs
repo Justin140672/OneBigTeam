@@ -6,5 +6,6 @@ namespace HR.SharedKernel;
 /// </summary>
 public static class SystemPermissions
 {
+    public static readonly Guid EmployeeEdit   = new("00000000-0000-0000-0001-000000000004");
     public static readonly Guid EmployeeCreate = new("00000000-0000-0000-0001-000000000005");
 }

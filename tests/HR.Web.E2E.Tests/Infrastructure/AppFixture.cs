@@ -27,10 +27,27 @@ public sealed class AppFixture : IAsyncLifetime
         // Strip trailing slash so page objects can safely append paths.
         WebBaseUrl = _app.GetEndpoint("web").ToString().TrimEnd('/');
 
+        // Probe until the web app is actually serving requests.
+        // StartAsync returns as soon as Aspire begins orchestrating — Postgres migrations
+        // and seed data may still be running, so we wait for a real HTTP response.
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+        var deadline = DateTime.UtcNow.AddMinutes(3);
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                var response = await http.GetAsync($"{WebBaseUrl}/login");
+                if ((int)response.StatusCode < 500) break;
+            }
+            catch { /* app not up yet */ }
+            await Task.Delay(1_000);
+        }
+
         _playwright = await Playwright.CreateAsync();
         _browser    = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
-            Headless = true,
+            Headless  = false,
+            SlowMo    = 100, // ms pause between actions — makes the run watchable
         });
     }
 

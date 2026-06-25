@@ -168,7 +168,7 @@
             _saving = false;
 
             if (created is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/public-holidays");
+                Navigation.NavigateTo($"/companies/{CompanyId}/public-holidays", forceLoad: true);
             else
                 _globalError = error ?? "Failed to create public holiday.";
         }
@@ -182,7 +182,7 @@
             _saving = false;
 
             if (updated is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/public-holidays");
+                Navigation.NavigateTo($"/companies/{CompanyId}/public-holidays", forceLoad: true);
             else
                 _globalError = error ?? "Failed to update public holiday.";
         }

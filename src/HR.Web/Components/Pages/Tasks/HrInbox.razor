@@ -3,6 +3,8 @@
 @inject TaskService TaskService
 @inject NavigationManager Navigation
 @inject AppSession Session
+@inject UserService UserService
+@using HR.SharedKernel
 
 <PageTitle>HR Inbox</PageTitle>
 
@@ -18,7 +20,13 @@
         }
     </div>
 
-    @if (_loading)
+    @if (_accessDenied)
+    {
+        <div class="alert alert-danger">
+            <i class="fa-solid fa-lock me-2"></i>You do not have permission to access the HR Inbox.
+        </div>
+    }
+    else if (_loading)
     {
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm" role="status"></div>
@@ -89,6 +97,7 @@
     [Parameter] public Guid CompanyId { get; set; }
 
     private bool _loading = true;
+    private bool _accessDenied;
     private List<UnassignedTaskItem> _items = [];
     private Guid? _claiming;
     private string? _claimError;
@@ -97,6 +106,14 @@
     protected override async Task OnInitializedAsync()
     {
         _today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        if (!await UserService.HasPermissionAsync(SystemPermissions.EmployeeEdit))
+        {
+            _accessDenied = true;
+            _loading = false;
+            return;
+        }
+
         var result = await TaskService.GetUnassignedTasksAsync(CompanyId);
         _items = result?.Items.ToList() ?? [];
         _loading = false;

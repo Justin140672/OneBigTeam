@@ -150,7 +150,7 @@
             _saving = false;
 
             if (created is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/departments/{created.Id}");
+                Navigation.NavigateTo($"/companies/{CompanyId}/departments", forceLoad: true);
             else
                 _globalError = error ?? "Failed to create department.";
         }
@@ -168,7 +168,7 @@
             _saving = false;
 
             if (updated is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/departments");
+                Navigation.NavigateTo($"/companies/{CompanyId}/departments", forceLoad: true);
             else
                 _globalError = error ?? "Failed to save department.";
         }
