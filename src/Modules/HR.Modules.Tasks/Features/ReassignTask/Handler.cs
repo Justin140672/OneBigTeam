@@ -1,10 +1,16 @@
+using HR.Modules.Notifications;
+using HR.Modules.Notifications.Contracts;
 using HR.Modules.Tasks.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Tasks.Features.ReassignTask;
 
-internal sealed class ReassignTaskHandler(TasksDbContext dbContext, IClock clock, IAuditEventPublisher auditPublisher)
+internal sealed class ReassignTaskHandler(
+    TasksDbContext dbContext,
+    INotificationWriter notificationWriter,
+    IClock clock,
+    IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<ReassignTaskResponse>> HandleAsync(
         ReassignTaskRequest request,
@@ -25,6 +31,20 @@ internal sealed class ReassignTaskHandler(TasksDbContext dbContext, IClock clock
         task.Reassign(request.AssignedEmployeeId, request.AssignedUserId, clock.UtcNowOffset());
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        var newEmployeeId = task.AssignedEmployeeId;
+        if (newEmployeeId.HasValue && newEmployeeId != previousEmployeeId)
+        {
+            await notificationWriter.WriteAsync(
+                Guid.NewGuid(), task.CompanyId, newEmployeeId.Value,
+                $"New task assigned: {task.Title}",
+                task.Description,
+                task.Id,
+                NotificationType.TaskAssigned,
+                ToNotificationPriority(task.Priority),
+                clock.UtcNowOffset(),
+                cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(new TaskReassignedAuditEvent(
             task.CompanyId,
@@ -53,4 +73,12 @@ internal sealed class ReassignTaskHandler(TasksDbContext dbContext, IClock clock
             task.CreatedAt,
             task.UpdatedAt));
     }
+
+    private static NotificationPriority ToNotificationPriority(TaskPriority priority) => priority switch
+    {
+        TaskPriority.Critical => NotificationPriority.Urgent,
+        TaskPriority.High     => NotificationPriority.High,
+        TaskPriority.Medium   => NotificationPriority.Normal,
+        _                     => NotificationPriority.Low,
+    };
 }

@@ -1,3 +1,4 @@
+using HR.Modules.Notifications;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.ReassignTask;
 using HR.SharedKernel;
@@ -12,8 +13,11 @@ public class ReassignTaskHandlerTests
     private static readonly DateTime FixedNow = new(2026, 6, 15, 9, 0, 0, DateTimeKind.Utc);
     private static readonly FakeClock Clock = new(FixedNow);
 
-    private static ReassignTaskHandler BuildHandler(TasksDbContext context, FakeAuditPublisher? audit = null) =>
-        new(context, Clock, audit ?? new FakeAuditPublisher());
+    private static ReassignTaskHandler BuildHandler(
+        TasksDbContext context,
+        FakeAuditPublisher? audit = null,
+        FakeNotificationWriter? notif = null) =>
+        new(context, notif ?? new FakeNotificationWriter(), Clock, audit ?? new FakeAuditPublisher());
 
     private static TaskItem MakeTask(Guid companyId, Guid? assignedEmployeeId = null, Guid? assignedUserId = null)
     {
@@ -215,6 +219,67 @@ public class ReassignTaskHandlerTests
             CancellationToken.None);
 
         Assert.Empty(audit.Published);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Writes_Notification_When_New_Employee_Assigned()
+    {
+        await using var context = BuildContext();
+        var companyId   = Guid.NewGuid();
+        var newEmployee = Guid.NewGuid();
+        var notif       = new FakeNotificationWriter();
+
+        var task = MakeTask(companyId);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        await BuildHandler(context, notif: notif).HandleAsync(
+            new ReassignTaskRequest { CompanyId = companyId, Id = task.Id, AssignedEmployeeId = newEmployee },
+            CancellationToken.None);
+
+        var written = Assert.Single(notif.Written);
+        Assert.Equal(companyId,   written.CompanyId);
+        Assert.Equal(newEmployee, written.EmployeeId);
+        Assert.Equal(task.Id,     written.SourceEntityId);
+        Assert.Equal(NotificationType.TaskAssigned, written.Type);
+        Assert.Equal(NotificationPriority.Normal,   written.Priority);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Write_Notification_When_Assigned_To_Same_Employee()
+    {
+        await using var context = BuildContext();
+        var companyId   = Guid.NewGuid();
+        var employeeId  = Guid.NewGuid();
+        var notif       = new FakeNotificationWriter();
+
+        var task = MakeTask(companyId, assignedEmployeeId: employeeId);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        await BuildHandler(context, notif: notif).HandleAsync(
+            new ReassignTaskRequest { CompanyId = companyId, Id = task.Id, AssignedEmployeeId = employeeId },
+            CancellationToken.None);
+
+        Assert.Empty(notif.Written);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Write_Notification_When_Employee_Cleared()
+    {
+        await using var context = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var notif      = new FakeNotificationWriter();
+
+        var task = MakeTask(companyId, assignedEmployeeId: Guid.NewGuid());
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        await BuildHandler(context, notif: notif).HandleAsync(
+            new ReassignTaskRequest { CompanyId = companyId, Id = task.Id, AssignedEmployeeId = null },
+            CancellationToken.None);
+
+        Assert.Empty(notif.Written);
     }
 
     private static TasksDbContext BuildContext()
