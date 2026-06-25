@@ -106,7 +106,7 @@ public class CreateProbationRecordEndpointTests : IClassFixture<ApiWebApplicatio
     }
 
     [Fact]
-    public async Task Post_ProbationRecords_Returns_BadRequest_For_Missing_Fields()
+    public async Task Post_ProbationRecords_Returns_UnprocessableEntity_For_Missing_Fields()
     {
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
@@ -118,7 +118,7 @@ public class CreateProbationRecordEndpointTests : IClassFixture<ApiWebApplicatio
             companyId
         });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
     private sealed record ProbationRecordPayload(
