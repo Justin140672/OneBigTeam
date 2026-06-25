@@ -112,6 +112,7 @@ public static class EmployeesModule
         services.AddScoped<RemoveMyEmergencyContactHandler>();
         services.AddScoped<GetEmployeeEmergencyContactsHandler>();
 
+        services.AddScoped<IProbationDateResolver, ProbationDateResolver>();
         services.AddScoped<IWorkingPatternProvider, WorkingPatternProvider>();
         services.AddScoped<IDirectReportsReader, DirectReportsReader>();
         services.AddScoped<IEmployeeNameReader, EmployeeNameReader>();

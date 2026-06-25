@@ -1,11 +1,13 @@
+using HR.Modules.Employees.Services;
 using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Tests.Infrastructure;
 
-public sealed class FakeCompanyProbationSettingsReader(int months = 6) : ICompanyProbationSettingsReader
+public sealed class FakeProbationDateResolver(int months = 6) : IProbationDateResolver
 {
-    public Task<int> GetProbationMonthsAsync(Guid companyId, CancellationToken cancellationToken)
-        => Task.FromResult(months);
+    public Task<DateOnly> ResolveEndDateAsync(
+        Guid companyId, int? positionMonthsOverride, DateOnly startDate, CancellationToken cancellationToken)
+        => Task.FromResult(startDate.AddMonths(positionMonthsOverride ?? months));
 }
 
 public sealed class NoOpIntegrationEventPublisher : IIntegrationEventPublisher

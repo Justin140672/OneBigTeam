@@ -1,5 +1,6 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,18 +11,18 @@ internal sealed class CreateEmployeeHandler
     private readonly EmployeesDbContext _dbContext;
     private readonly IClock _clock;
     private readonly IIntegrationEventPublisher _publisher;
-    private readonly ICompanyProbationSettingsReader _probationSettingsReader;
+    private readonly IProbationDateResolver _probationDateResolver;
 
     public CreateEmployeeHandler(
         EmployeesDbContext dbContext,
         IClock clock,
         IIntegrationEventPublisher publisher,
-        ICompanyProbationSettingsReader probationSettingsReader)
+        IProbationDateResolver probationDateResolver)
     {
         _dbContext = dbContext;
         _clock = clock;
         _publisher = publisher;
-        _probationSettingsReader = probationSettingsReader;
+        _probationDateResolver = probationDateResolver;
     }
 
     public async Task<Result<CreateEmployeeResponse>> HandleAsync(
@@ -136,9 +137,8 @@ internal sealed class CreateEmployeeHandler
             employee.Assign(request.DepartmentId, request.PositionProfileId, request.ManagerId, now);
         }
 
-        var companyProbationMonths = await _probationSettingsReader.GetProbationMonthsAsync(request.CompanyId, cancellationToken);
-        var resolvedProbationMonths = positionProfile?.ProbationMonthsOverride ?? companyProbationMonths;
-        var probationEndDate = employee.StartDate.AddMonths(resolvedProbationMonths);
+        var probationEndDate = await _probationDateResolver.ResolveEndDateAsync(
+            request.CompanyId, positionProfile?.ProbationMonthsOverride, employee.StartDate, cancellationToken);
         employee.SetProbationEndDate(probationEndDate, now);
 
         _dbContext.Employees.Add(employee);
