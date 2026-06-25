@@ -1,9 +1,9 @@
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.CompleteTask;
-using HR.Modules.Tasks.Services;
-using HR.SharedKernel;
 using HR.Modules.Tasks.Persistence;
+using HR.Modules.Tasks.Services;
 using HR.Modules.Tasks.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Tasks.Tests;
@@ -16,8 +16,11 @@ public class CompleteTaskHandlerTests
     private static readonly TaskCompletionDispatcher NoOpDispatcher =
         new(Enumerable.Empty<HR.SharedKernel.Contracts.ITaskCompletionAction>());
 
-    private static CompleteTaskHandler BuildHandler(TasksDbContext context, FakeAuditPublisher? audit = null) =>
-        new(context, Clock, audit ?? new FakeAuditPublisher(), NoOpDispatcher);
+    private static CompleteTaskHandler BuildHandler(
+        TasksDbContext context,
+        FakeAuditPublisher? audit = null,
+        FakeNotificationWriter? notif = null) =>
+        new(context, notif ?? new FakeNotificationWriter(), Clock, audit ?? new FakeAuditPublisher(), NoOpDispatcher);
 
     private static TaskItem MakeTask(Guid companyId, TaskItemStatus status = TaskItemStatus.Open)
     {
@@ -241,6 +244,53 @@ public class CompleteTaskHandlerTests
             CancellationToken.None);
 
         Assert.Empty(audit.Published);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Writes_TaskCompleted_Notification_To_Assigned_Employee()
+    {
+        await using var context = BuildContext();
+        var companyId        = Guid.NewGuid();
+        var assignedEmployee = Guid.NewGuid();
+        var notif            = new FakeNotificationWriter();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Onboarding checklist", null, TaskPriority.Medium, TaskSource.Manual,
+            null, assignedEmployee, null, DateTimeOffset.UtcNow);
+
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        await BuildHandler(context, notif: notif).HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = Guid.NewGuid() },
+            CancellationToken.None);
+
+        var written = Assert.Single(notif.Written);
+        Assert.Equal(companyId,        written.CompanyId);
+        Assert.Equal(assignedEmployee, written.EmployeeId);
+        Assert.Equal(task.Id,          written.SourceEntityId);
+        Assert.Equal(NotificationType.TaskCompleted, written.Type);
+        Assert.Equal(NotificationPriority.Normal,    written.Priority);
+        Assert.Contains("Onboarding checklist",      written.Title);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Write_Notification_When_No_Employee_Assigned()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var notif     = new FakeNotificationWriter();
+
+        var task = MakeTask(companyId);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        await BuildHandler(context, notif: notif).HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = Guid.NewGuid() },
+            CancellationToken.None);
+
+        Assert.Empty(notif.Written);
     }
 
     private static TasksDbContext BuildContext()

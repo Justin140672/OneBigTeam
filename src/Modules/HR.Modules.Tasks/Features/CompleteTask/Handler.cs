@@ -9,6 +9,7 @@ namespace HR.Modules.Tasks.Features.CompleteTask;
 
 internal sealed class CompleteTaskHandler(
     TasksDbContext dbContext,
+    INotificationWriter notificationWriter,
     IClock clock,
     IAuditEventPublisher auditPublisher,
     TaskCompletionDispatcher dispatcher)
@@ -35,6 +36,19 @@ internal sealed class CompleteTaskHandler(
         task.Complete(request.CompletedBy, clock.UtcNowOffset());
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (task.AssignedEmployeeId.HasValue)
+        {
+            await notificationWriter.WriteAsync(
+                Guid.NewGuid(), task.CompanyId, task.AssignedEmployeeId.Value,
+                $"Task completed: {task.Title}",
+                null,
+                task.Id,
+                NotificationType.TaskCompleted,
+                NotificationPriority.Normal,
+                clock.UtcNowOffset(),
+                cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(new TaskCompletedAuditEvent(
             task.CompanyId,
