@@ -29,6 +29,7 @@ builder.Services.AddNotificationsModule(connectionString);
 builder.Services.AddTasksModule(connectionString);
 builder.Services.AddProbationModule(connectionString);
 builder.Services.AddInfrastructure(connectionString);
+builder.Services.AddHangfireBackgroundJobs(connectionString);
 builder.Services.AddFastEndpoints(o => o.IncludeAbstractValidators = true);
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
     o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
@@ -285,6 +286,7 @@ if (app.Environment.IsDevelopment())
 	}).AllowAnonymous();
 }
 
+app.UseHangfireBackgroundJobs();
 app.UseLoggingMiddleware();
 app.UseAuthentication();
 app.UseIdentityModule();
