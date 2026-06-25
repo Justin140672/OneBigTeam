@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.RejectLeaveRequest;
 
-internal sealed class RejectLeaveRequestHandler(LeaveDbContext dbContext, IClock clock, IIntegrationEventPublisher publisher, ICompanyLeaveSettingsReader leaveSettingsReader, IAuditEventPublisher auditPublisher)
+internal sealed class RejectLeaveRequestHandler(LeaveDbContext dbContext, INotificationWriter notificationWriter, IClock clock, IIntegrationEventPublisher publisher, ICompanyLeaveSettingsReader leaveSettingsReader, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<RejectLeaveRequestResponse>> HandleAsync(
         RejectLeaveRequestRequest request,
@@ -46,6 +46,20 @@ internal sealed class RejectLeaveRequestHandler(LeaveDbContext dbContext, IClock
 
         leaveRequest.Reject(request.ReviewedByEmployeeId, now, request.RejectionReason);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        var body = request.RejectionReason is not null
+            ? $"Your leave from {leaveRequest.StartDate:d MMM yyyy} to {leaveRequest.EndDate:d MMM yyyy} has been rejected. Reason: {request.RejectionReason}"
+            : $"Your leave from {leaveRequest.StartDate:d MMM yyyy} to {leaveRequest.EndDate:d MMM yyyy} has been rejected.";
+
+        await notificationWriter.WriteAsync(
+            Guid.NewGuid(), leaveRequest.CompanyId, leaveRequest.EmployeeId,
+            "Your leave request has been rejected",
+            body,
+            leaveRequest.Id,
+            NotificationType.LeaveRejected,
+            NotificationPriority.Normal,
+            now,
+            cancellationToken);
 
         await auditPublisher.PublishAsync(new LeaveRejectedAuditEvent(
             leaveRequest.CompanyId,
