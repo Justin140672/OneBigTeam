@@ -21,11 +21,14 @@ else
         <div class="card-header d-flex align-items-center">
             <i class="fa-solid fa-file-lines text-muted me-2"></i>
             <h5 class="mb-0">Documents</h5>
-            <div class="ms-auto">
-                <SfButton CssClass="e-primary e-small" OnClick="@(() => _uploadOpen = true)">
-                    <i class="fa-solid fa-upload me-1"></i> Upload
-                </SfButton>
-            </div>
+            @if (!EmployeeSelfUpload)
+            {
+                <div class="ms-auto">
+                    <SfButton CssClass="e-primary e-small" OnClick="@(() => _uploadOpen = true)">
+                        <i class="fa-solid fa-upload me-1"></i> Upload
+                    </SfButton>
+                </div>
+            }
         </div>
         <div class="card-body">
             <HrGrid TValue="EmployeeDocumentListItem"
