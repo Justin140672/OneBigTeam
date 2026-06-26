@@ -140,4 +140,28 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         var badge = page.Locator(".card .badge").First;
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
+
+    /// <summary>
+    /// Returns the status badge text for the first review row in the review history grid
+    /// whose ReviewType cell contains <paramref name="reviewTypeFragment"/>.
+    /// </summary>
+    public async Task<string?> GetReviewStatusInGridAsync(string reviewTypeFragment)
+    {
+        await page.WaitForSelectorAsync(".e-grid .e-row", new() { Timeout = 10_000 });
+
+        var rows = await page.Locator(".e-grid .e-row").AllAsync();
+        foreach (var row in rows)
+        {
+            var text = await row.TextContentAsync();
+            if (text?.Contains(reviewTypeFragment, StringComparison.OrdinalIgnoreCase) != true)
+                continue;
+
+            // Status badge is within the row — grab the first badge element.
+            var badge = row.Locator(".badge").First;
+            if (await badge.IsVisibleAsync())
+                return (await badge.TextContentAsync())?.Trim();
+        }
+
+        return null;
+    }
 }

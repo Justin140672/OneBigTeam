@@ -33,6 +33,17 @@ internal sealed class CreateProbationReviewHandler
 
         var reviewType = Enum.Parse<ProbationReviewType>(request.ReviewType, ignoreCase: true);
 
+        var duplicateExists = await _dbContext.ProbationReviews
+            .AnyAsync(
+                r => r.CompanyId == request.CompanyId &&
+                     r.ProbationRecordId == request.ProbationRecordId &&
+                     r.ReviewType == reviewType,
+                cancellationToken);
+
+        if (duplicateExists)
+            return Result.Failure<CreateProbationReviewResponse>(
+                Error.Conflict($"A '{request.ReviewType}' review already exists for this probation record."));
+
         var review = ProbationReview.Create(
             Guid.NewGuid(),
             request.CompanyId,

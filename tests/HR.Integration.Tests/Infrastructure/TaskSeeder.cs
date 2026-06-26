@@ -18,7 +18,8 @@ internal static class TaskSeeder
         Guid? assignedEmployeeId = null,
         Guid? assignedUserId = null,
         Guid? createdBy = null,
-        TaskItemStatus status = TaskItemStatus.Open)
+        TaskItemStatus status = TaskItemStatus.Open,
+        Guid? sourceEntityId = null)
     {
         using var scope = factory.Services.CreateScope();
         var db                 = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
@@ -28,7 +29,8 @@ internal static class TaskSeeder
         var task = TaskItem.Create(
             Guid.NewGuid(), companyId, createdBy ?? Guid.NewGuid(),
             title, description, priority, source, dueDate,
-            assignedEmployeeId, assignedUserId, now);
+            assignedEmployeeId, assignedUserId, now,
+            sourceEntityId: sourceEntityId);
 
         if (status == TaskItemStatus.InProgress) task.Start(now);
         if (status == TaskItemStatus.Completed)  task.Complete(Guid.NewGuid(), now);

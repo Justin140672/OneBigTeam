@@ -117,6 +117,88 @@ public class CreateProbationReviewEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Post_ProbationReviews_Returns_Conflict_When_Same_ReviewType_Already_Exists()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        var userId = new Guid("eeeeeeee-0000-0000-0000-000000000004");
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, HR.Modules.Identity.Domain.SystemRoles.HrAdministrator);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var recordResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
+        {
+            companyId,
+            employeeId        = Guid.NewGuid(),
+            managerEmployeeId = Guid.NewGuid(),
+            startDate         = "2026-06-01",
+            expectedEndDate   = "2026-09-01"
+        });
+        recordResponse.EnsureSuccessStatusCode();
+        var record = await recordResponse.Content.ReadFromJsonAsync<ProbationRecordPayload>();
+
+        var first = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
+        {
+            companyId,
+            probationRecordId = record!.Id,
+            reviewType        = "ManagerCheckIn",
+            dueDate           = "2026-07-01"
+        });
+        first.EnsureSuccessStatusCode();
+
+        var duplicate = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
+        {
+            companyId,
+            probationRecordId = record.Id,
+            reviewType        = "ManagerCheckIn",
+            dueDate           = "2026-07-15"
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_ProbationReviews_Allows_Different_ReviewTypes_For_Same_Record()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        var userId = new Guid("eeeeeeee-0000-0000-0000-000000000005");
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, HR.Modules.Identity.Domain.SystemRoles.HrAdministrator);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var recordResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
+        {
+            companyId,
+            employeeId        = Guid.NewGuid(),
+            managerEmployeeId = Guid.NewGuid(),
+            startDate         = "2026-06-01",
+            expectedEndDate   = "2026-09-01"
+        });
+        recordResponse.EnsureSuccessStatusCode();
+        var record = await recordResponse.Content.ReadFromJsonAsync<ProbationRecordPayload>();
+
+        var first = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
+        {
+            companyId,
+            probationRecordId = record!.Id,
+            reviewType        = "ManagerCheckIn",
+            dueDate           = "2026-07-01"
+        });
+
+        var second = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
+        {
+            companyId,
+            probationRecordId = record.Id,
+            reviewType        = "HrReview",
+            dueDate           = "2026-08-01"
+        });
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+    }
+
     private sealed record ProbationRecordPayload(Guid Id, Guid CompanyId);
 
     private sealed record ProbationReviewPayload(

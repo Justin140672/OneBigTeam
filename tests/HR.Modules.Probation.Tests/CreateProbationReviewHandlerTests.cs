@@ -124,6 +124,110 @@ public class CreateProbationReviewHandlerTests
         Assert.Equal(2, await context.ProbationReviews.CountAsync());
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_Review_Of_Same_Type_Already_Exists()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
+
+        await handler.HandleAsync(new CreateProbationReviewRequest
+        {
+            CompanyId         = companyId,
+            ProbationRecordId = record.Id,
+            ReviewType        = "ManagerCheckIn",
+            DueDate           = new DateOnly(2026, 7, 1)
+        }, CancellationToken.None);
+
+        var duplicate = await handler.HandleAsync(new CreateProbationReviewRequest
+        {
+            CompanyId         = companyId,
+            ProbationRecordId = record.Id,
+            ReviewType        = "ManagerCheckIn",
+            DueDate           = new DateOnly(2026, 7, 15)
+        }, CancellationToken.None);
+
+        Assert.True(duplicate.IsFailure);
+        Assert.Equal("conflict", duplicate.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_Completed_Review_Of_Same_Type_Exists()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+        context.ProbationRecords.Add(record);
+
+        var existing = ProbationReview.Create(
+            Guid.NewGuid(), companyId, record.Id,
+            ProbationReviewType.HrReview, new DateOnly(2026, 7, 1), now);
+        existing.Complete(Guid.NewGuid(), null, null, now);
+        context.ProbationReviews.Add(existing);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
+
+        var result = await handler.HandleAsync(new CreateProbationReviewRequest
+        {
+            CompanyId         = companyId,
+            ProbationRecordId = record.Id,
+            ReviewType        = "HrReview",
+            DueDate           = new DateOnly(2026, 8, 1)
+        }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Different_Review_Types_For_Same_Record()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(),
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
+
+        var first = await handler.HandleAsync(new CreateProbationReviewRequest
+        {
+            CompanyId         = companyId,
+            ProbationRecordId = record.Id,
+            ReviewType        = "ManagerCheckIn",
+            DueDate           = new DateOnly(2026, 7, 1)
+        }, CancellationToken.None);
+
+        var second = await handler.HandleAsync(new CreateProbationReviewRequest
+        {
+            CompanyId         = companyId,
+            ProbationRecordId = record.Id,
+            ReviewType        = "HrReview",
+            DueDate           = new DateOnly(2026, 8, 1)
+        }, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(2, await context.ProbationReviews.CountAsync());
+    }
+
     private static ProbationDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<ProbationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
