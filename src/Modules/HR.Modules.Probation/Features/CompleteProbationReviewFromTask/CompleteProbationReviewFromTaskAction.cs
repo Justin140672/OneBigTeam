@@ -8,7 +8,8 @@ namespace HR.Modules.Probation.Features.CompleteProbationReviewFromTask;
 
 internal sealed class CompleteProbationReviewFromTaskAction(
     ProbationDbContext dbContext,
-    IClock clock) : ITaskCompletionAction
+    IClock clock,
+    IAuditEventPublisher auditPublisher) : ITaskCompletionAction
 {
     public TaskSource Source => TaskSource.ProbationReview;
 
@@ -45,6 +46,16 @@ internal sealed class CompleteProbationReviewFromTaskAction(
         review.Complete(context.CompletedBy, outcome, context.OutcomeReason, now);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new ProbationReviewCompletedAuditEvent(
+            review.CompanyId,
+            review.Id,
+            review.ProbationRecordId,
+            context.CompletedBy,
+            review.ReviewType.ToString(),
+            review.Outcome?.ToString(),
+            review.Notes,
+            now), cancellationToken);
     }
 
     // OutcomeDecision is "Pass", "Fail", or "Extend|yyyy-MM-dd".

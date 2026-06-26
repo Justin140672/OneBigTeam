@@ -14,7 +14,7 @@ public class CreateProbationRecordHandlerTests
     public async Task HandleAsync_Creates_ProbationRecord_And_Returns_Response()
     {
         await using var context = BuildContext();
-        var handler = new CreateProbationRecordHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateProbationRecordHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var managerId = Guid.NewGuid();
@@ -57,7 +57,7 @@ public class CreateProbationRecordHandlerTests
             new DateOnly(2026, 1, 1), new DateOnly(2026, 4, 1), null, now));
         await context.SaveChangesAsync();
 
-        var handler = new CreateProbationRecordHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateProbationRecordHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreateProbationRecordRequest
@@ -89,7 +89,7 @@ public class CreateProbationRecordHandlerTests
         context.ProbationRecords.Add(existing);
         await context.SaveChangesAsync();
 
-        var handler = new CreateProbationRecordHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateProbationRecordHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreateProbationRecordRequest
@@ -122,7 +122,7 @@ public class CreateProbationRecordHandlerTests
         context.ProbationRecords.Add(existing);
         await context.SaveChangesAsync();
 
-        var handler = new CreateProbationRecordHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateProbationRecordHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreateProbationRecordRequest
@@ -152,7 +152,7 @@ public class CreateProbationRecordHandlerTests
             new DateOnly(2026, 1, 1), new DateOnly(2026, 4, 1), null, now));
         await context.SaveChangesAsync();
 
-        var handler = new CreateProbationRecordHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateProbationRecordHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreateProbationRecordRequest
@@ -172,7 +172,7 @@ public class CreateProbationRecordHandlerTests
     public async Task HandleAsync_Trims_Notes()
     {
         await using var context = BuildContext();
-        var handler = new CreateProbationRecordHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateProbationRecordHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreateProbationRecordRequest

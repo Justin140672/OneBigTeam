@@ -9,11 +9,13 @@ internal sealed class CreateProbationReviewHandler
 {
     private readonly ProbationDbContext _dbContext;
     private readonly IClock _clock;
+    private readonly IAuditEventPublisher _auditPublisher;
 
-    public CreateProbationReviewHandler(ProbationDbContext dbContext, IClock clock)
+    public CreateProbationReviewHandler(ProbationDbContext dbContext, IClock clock, IAuditEventPublisher auditPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
+        _auditPublisher = auditPublisher;
     }
 
     public async Task<Result<CreateProbationReviewResponse>> HandleAsync(
@@ -41,6 +43,14 @@ internal sealed class CreateProbationReviewHandler
 
         _dbContext.ProbationReviews.Add(review);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await _auditPublisher.PublishAsync(new ProbationReviewCreatedAuditEvent(
+            review.CompanyId,
+            review.Id,
+            review.ProbationRecordId,
+            review.ReviewType.ToString(),
+            review.DueDate,
+            review.CreatedAt), cancellationToken);
 
         return Result.Success(new CreateProbationReviewResponse(
             review.Id,

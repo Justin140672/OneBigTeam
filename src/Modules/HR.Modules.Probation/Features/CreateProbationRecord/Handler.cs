@@ -9,11 +9,13 @@ internal sealed class CreateProbationRecordHandler
 {
     private readonly ProbationDbContext _dbContext;
     private readonly IClock _clock;
+    private readonly IAuditEventPublisher _auditPublisher;
 
-    public CreateProbationRecordHandler(ProbationDbContext dbContext, IClock clock)
+    public CreateProbationRecordHandler(ProbationDbContext dbContext, IClock clock, IAuditEventPublisher auditPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
+        _auditPublisher = auditPublisher;
     }
 
     public async Task<Result<CreateProbationRecordResponse>> HandleAsync(
@@ -49,6 +51,16 @@ internal sealed class CreateProbationRecordHandler
 
         _dbContext.ProbationRecords.Add(record);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await _auditPublisher.PublishAsync(new ProbationRecordCreatedAuditEvent(
+            record.CompanyId,
+            record.Id,
+            record.EmployeeId,
+            record.ManagerEmployeeId,
+            record.StartDate,
+            record.ExpectedEndDate,
+            record.Notes,
+            now), cancellationToken);
 
         return Result.Success(new CreateProbationRecordResponse(
             record.Id,

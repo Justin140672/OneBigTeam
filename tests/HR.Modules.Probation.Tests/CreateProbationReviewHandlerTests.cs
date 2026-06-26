@@ -23,7 +23,7 @@ public class CreateProbationReviewHandlerTests
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
-        var handler = new CreateProbationReviewHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new CreateProbationReviewRequest
         {
@@ -49,7 +49,7 @@ public class CreateProbationReviewHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_ProbationRecord_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new CreateProbationReviewHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new CreateProbationReviewRequest
         {
@@ -75,7 +75,7 @@ public class CreateProbationReviewHandlerTests
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
-        var handler = new CreateProbationReviewHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new CreateProbationReviewRequest
         {
@@ -102,7 +102,7 @@ public class CreateProbationReviewHandlerTests
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
-        var handler = new CreateProbationReviewHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreateProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         await handler.HandleAsync(new CreateProbationReviewRequest
         {

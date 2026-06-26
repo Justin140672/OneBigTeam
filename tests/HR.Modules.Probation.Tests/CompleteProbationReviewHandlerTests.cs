@@ -20,7 +20,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ManagerCheckIn);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -48,7 +48,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.HrReview);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -74,7 +74,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -106,7 +106,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -138,7 +138,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ExtensionConfirmation);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -171,7 +171,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -194,7 +194,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -224,7 +224,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ExtensionConfirmation);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -245,7 +245,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ExtensionConfirmation);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -268,7 +268,7 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ManagerCheckIn);
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -293,7 +293,7 @@ public class CompleteProbationReviewHandlerTests
         review.Complete(Guid.NewGuid(), null, null, Now);
         await context.SaveChangesAsync();
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -311,7 +311,7 @@ public class CompleteProbationReviewHandlerTests
     {
         await using var context = BuildContext();
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = Guid.NewGuid(),
@@ -335,7 +335,7 @@ public class CompleteProbationReviewHandlerTests
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = Guid.NewGuid(),
@@ -360,7 +360,7 @@ public class CompleteProbationReviewHandlerTests
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,
@@ -393,7 +393,7 @@ public class CompleteProbationReviewHandlerTests
         context.ProbationReviews.Add(review);
         await context.SaveChangesAsync();
 
-        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))
+        var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .HandleAsync(new CompleteProbationReviewRequest
             {
                 CompanyId = companyId,

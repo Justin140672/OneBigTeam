@@ -18,7 +18,7 @@ public class CompleteProbationReviewFromTaskActionTests
     public void Source_Is_ProbationReview()
     {
         using var context = BuildContext();
-        var action = new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow));
+        var action = new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         Assert.Equal(TaskSource.ProbationReview, action.Source);
     }
@@ -34,7 +34,7 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, completedBy, review.Id, notes: "Good progress.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow))
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var saved = await context.ProbationReviews.SingleAsync();
@@ -55,7 +55,7 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, completedBy, review.Id, outcomeDecision: "Pass", notes: "Excellent.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow))
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var savedRecord = await context.ProbationRecords.SingleAsync();
@@ -79,7 +79,7 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, completedBy, review.Id, outcomeDecision: "Fail", notes: "Did not meet targets.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow))
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var savedRecord = await context.ProbationRecords.SingleAsync();
@@ -104,7 +104,7 @@ public class CompleteProbationReviewFromTaskActionTests
             outcomeDecision: $"Extend|{newEndDate:yyyy-MM-dd}",
             notes: "Needs more time to demonstrate improvement.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow))
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var savedRecord = await context.ProbationRecords.SingleAsync();
@@ -128,7 +128,7 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, Guid.NewGuid(), review.Id);
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow))
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var savedRecord = await context.ProbationRecords.SingleAsync();
@@ -148,7 +148,7 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, Guid.NewGuid(), sourceEntityId: null);
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow))
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var review = await context.ProbationReviews.SingleAsync();
@@ -165,7 +165,7 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, Guid.NewGuid(), sourceEntityId: Guid.NewGuid());
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow))
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var review = await context.ProbationReviews.SingleAsync();
@@ -185,7 +185,7 @@ public class CompleteProbationReviewFromTaskActionTests
         var completedBy = Guid.NewGuid();
         var taskContext = BuildContext(companyId, completedBy, review.Id, notes: "Late completion.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow))
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var saved = await context.ProbationReviews.SingleAsync();
