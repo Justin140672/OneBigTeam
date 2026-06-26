@@ -233,7 +233,7 @@ public class GenerateDueProbationReviewsJobTests
         var taskCreator = new FakeTaskCreator();
         await BuildJob(context, today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc), taskCreator: taskCreator).ExecuteAsync();
 
-        Assert.Equal(TaskSource.Probation, taskCreator.Created[0].Source);
+        Assert.Equal(TaskSource.ProbationReview, taskCreator.Created[0].Source);
     }
 
     [Fact]

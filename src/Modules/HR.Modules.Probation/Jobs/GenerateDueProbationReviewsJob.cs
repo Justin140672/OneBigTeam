@@ -89,7 +89,7 @@ internal sealed class GenerateDueProbationReviewsJob(
                     $"Complete probation review — {employeeName}",
                     $"Probation {ReviewTypeLabel(review.ReviewType)} due {review.DueDate:d MMM yyyy}.",
                     TaskPriority.High,
-                    TaskSource.Probation,
+                    TaskSource.ProbationReview,
                     review.DueDate,
                     assignedEmployeeId: record.ManagerEmployeeId,
                     assignedUserId: record.ManagerEmployeeId,

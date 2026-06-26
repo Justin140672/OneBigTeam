@@ -10,7 +10,7 @@ namespace HR.Modules.Tasks.Features.CompleteTask.Actions;
 /// </summary>
 internal sealed class ProbationTaskCompletionAction(ITaskCreator taskCreator, IClock clock) : ITaskCompletionAction
 {
-    public TaskSource Source => TaskSource.Probation;
+    public TaskSource Source => TaskSource.ProbationReview;
 
     public async Task ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
     {
