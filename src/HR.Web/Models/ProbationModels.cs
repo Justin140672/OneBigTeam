@@ -27,6 +27,15 @@ public sealed record ProbationReviewModel(
 
 public sealed record ProbationReviewsResponse(IReadOnlyList<ProbationReviewModel> Items);
 
+public sealed record UpcomingProbationReviewItem(
+    Guid ReviewId,
+    Guid ProbationRecordId,
+    Guid EmployeeId,
+    string ReviewType,
+    DateOnly DueDate);
+
+public sealed record UpcomingProbationReviewsResponse(IReadOnlyList<UpcomingProbationReviewItem> Items);
+
 public sealed record ProbationReviewDetailModel(
     Guid Id,
     Guid CompanyId,

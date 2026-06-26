@@ -68,6 +68,23 @@ public sealed class ProbationService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<IReadOnlyList<UpcomingProbationReviewItem>> GetUpcomingReviewsAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<UpcomingProbationReviewsResponse>(
+                $"api/companies/{companyId}/probation-reviews/upcoming",
+                cancellationToken);
+            return response?.Items ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
     public async Task<IReadOnlyList<ProbationReviewModel>> GetProbationReviewsAsync(
         Guid companyId,
         Guid probationRecordId,

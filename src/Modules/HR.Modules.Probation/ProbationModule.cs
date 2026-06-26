@@ -10,6 +10,7 @@ using HR.Modules.Probation.Features.GetProbationRecord;
 using HR.Modules.Probation.Features.GetProbationRecordByEmployee;
 using HR.Modules.Probation.Features.GetProbationReview;
 using HR.Modules.Probation.Features.GetProbationReviews;
+using HR.Modules.Probation.Features.GetUpcomingProbationReviews;
 using HR.Modules.Probation.Features.UpdateProbationRecord;
 using HR.Modules.Probation.Jobs;
 using HR.Modules.Probation.Persistence;
@@ -48,6 +49,7 @@ public static class ProbationModule
         services.AddScoped<CreateProbationReviewHandler>();
         services.AddScoped<IValidator<CreateProbationReviewRequest>, CreateProbationReviewValidator>();
         services.AddScoped<GetProbationReviewsHandler>();
+        services.AddScoped<GetUpcomingProbationReviewsHandler>();
         services.AddScoped<CompleteProbationReviewHandler>();
         services.AddScoped<IValidator<CompleteProbationReviewRequest>, CompleteProbationReviewValidator>();
         services.AddScoped<ITaskCompletionAction, CompleteProbationReviewFromTaskAction>();
@@ -112,21 +114,21 @@ public static class ProbationModule
                 new Guid($"50000000-0000-0000-0000-{i * 3 + 1:D12}"),
                 companyId, recordId, ProbationReviewType.ManagerCheckIn,
                 startDate.AddMonths(1), now);
-            checkIn.Complete(managerId, null, now);
+            checkIn.Complete(managerId, null, null, now);
             db.ProbationReviews.Add(checkIn);
 
             var hrReview = ProbationReview.Create(
                 new Guid($"50000000-0000-0000-0000-{i * 3 + 2:D12}"),
                 companyId, recordId, ProbationReviewType.HrReview,
                 startDate.AddMonths(2), now);
-            hrReview.Complete(managerId, null, now);
+            hrReview.Complete(managerId, null, null, now);
             db.ProbationReviews.Add(hrReview);
 
             var finalReview = ProbationReview.Create(
                 new Guid($"50000000-0000-0000-0000-{i * 3 + 3:D12}"),
                 companyId, recordId, ProbationReviewType.FinalDecision,
                 expectedEnd, now);
-            finalReview.Complete(managerId, "Probation passed.", now);
+            finalReview.Complete(managerId, ProbationOutcome.Pass, "Probation passed.", now);
             db.ProbationReviews.Add(finalReview);
         }
 

@@ -116,4 +116,28 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task<bool> HasErrorAsync() =>
         await page.Locator(".alert-danger, .validation-message").First.IsVisibleAsync();
+
+    // ── Probation Tab ──────────────────────────────────────────────────────────
+
+    public async Task OpenProbationTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Probation" }).ClickAsync();
+        // Wait for the tab content to render — either a card or "No probation record" alert.
+        await page.WaitForSelectorAsync(".card, .alert-secondary", new() { Timeout = 15_000 });
+    }
+
+    /// <summary>Returns true if the probation period summary panel (progress bar card) is visible.</summary>
+    public async Task<bool> HasProbationPeriodSummaryPanelAsync() =>
+        await page.Locator(".progress").IsVisibleAsync();
+
+    /// <summary>Returns true if the Syncfusion review history grid is visible on the Probation tab.</summary>
+    public async Task<bool> HasProbationReviewsGridAsync() =>
+        await page.Locator(".e-grid").IsVisibleAsync();
+
+    /// <summary>Returns the text of the probation status badge on the Probation tab summary panel.</summary>
+    public async Task<string?> GetProbationStatusBadgeTextAsync()
+    {
+        var badge = page.Locator(".card .badge").First;
+        return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
+    }
 }

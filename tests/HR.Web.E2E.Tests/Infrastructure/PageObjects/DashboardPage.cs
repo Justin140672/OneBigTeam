@@ -42,4 +42,30 @@ public sealed class DashboardPage(IPage page, string baseUrl)
     /// <summary>Returns true if the My Tasks widget shows the "All caught up!" empty state.</summary>
     public async Task<bool> IsTaskListEmptyAsync() =>
         await page.Locator(".widget-empty").IsVisibleAsync();
+
+    // ── Upcoming Probation Reviews Widget ─────────────────────────────────────
+
+    /// <summary>Returns true if the Upcoming Probation Reviews widget header is visible.</summary>
+    public async Task<bool> HasUpcomingProbationWidgetAsync() =>
+        await page.Locator(".widget-header")
+            .Filter(new() { HasText = "Upcoming Probation Reviews" })
+            .IsVisibleAsync();
+
+    /// <summary>
+    /// Returns the employee names shown in the Upcoming Probation Reviews widget items.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetUpcomingProbationEmployeeNamesAsync()
+    {
+        // Wait for the widget body to finish loading (spinner gone).
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || " +
+            "!document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+
+        var titles = await page.Locator(".task-widget-item .task-widget-title").AllAsync();
+        var names  = new List<string>();
+        foreach (var t in titles)
+            names.Add((await t.TextContentAsync())?.Trim() ?? "");
+        return names;
+    }
 }

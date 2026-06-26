@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using HR.Web.Components.Pages.Tasks
 @using HR.Web.Components.Pages.Notifications
+@using HR.Web.Components.Pages.Probation
 @inject AppSession Session
 
 <PageTitle>Dashboard</PageTitle>
@@ -21,6 +22,9 @@
         </div>
         <div class="col-xl-5 col-lg-6">
             <RecentNotificationsWidget />
+        </div>
+        <div class="col-xl-5 col-lg-6">
+            <UpcomingProbationReviewsWidget />
         </div>
     </div>
 </div>
