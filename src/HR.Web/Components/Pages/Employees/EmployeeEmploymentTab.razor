@@ -1,6 +1,7 @@
 @inject EmployeeService EmployeeService
 @inject DepartmentService DepartmentService
 @inject PositionProfileService PositionProfileService
+@inject ProbationService ProbationService
 @using HR.SharedKernel
 
 @if (_loading)
@@ -193,6 +194,55 @@ else
             </div>
 
         </div>
+
+        @if (_probationRecord is not null)
+        {
+            <div class="col-lg-4">
+                <div class="card mb-4" data-testid="probation-summary">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Probation</h5>
+                        <span class="badge @ProbationStatusBadgeClass(_probationRecord.Status)">
+                            @ProbationStatusLabel(_probationRecord.Status)
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0 small">
+                            <dt class="col-6 text-muted fw-normal">Start Date</dt>
+                            <dd class="col-6">@_probationRecord.StartDate.ToString("dd MMM yyyy")</dd>
+                            <dt class="col-6 text-muted fw-normal">Expected End</dt>
+                            <dd class="col-6">@_probationRecord.ExpectedEndDate.ToString("dd MMM yyyy")</dd>
+                            @if (_probationRecord.DecisionDate.HasValue)
+                            {
+                                <dt class="col-6 text-muted fw-normal">Decision Date</dt>
+                                <dd class="col-6">@_probationRecord.DecisionDate.Value.ToString("dd MMM yyyy")</dd>
+                            }
+                        </dl>
+
+                        @if (_probationReviews.Count > 0)
+                        {
+                            <hr class="my-3" />
+                            <p class="small fw-semibold mb-2">Reviews</p>
+                            <table class="table table-sm table-borderless mb-0 small">
+                                <tbody>
+                                    @foreach (var review in _probationReviews)
+                                    {
+                                        <tr>
+                                            <td class="ps-0">@FormatReviewType(review.ReviewType)</td>
+                                            <td class="text-muted">@review.DueDate.ToString("dd MMM yyyy")</td>
+                                            <td class="text-end pe-0">
+                                                <span class="badge @ReviewStatusBadgeClass(review.Status)">
+                                                    @review.Status
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
     </div>
 }
 
@@ -209,6 +259,9 @@ else
     private List<DepartmentListItemModel> _departments = [];
     private List<PositionProfileListItemModel> _positionProfiles = [];
     private List<ManagerOption> _managerOptions = [];
+
+    private ProbationRecordModel? _probationRecord;
+    private IReadOnlyList<ProbationReviewModel> _probationReviews = [];
 
     private static readonly string[] _allDays =
         ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -236,11 +289,12 @@ else
         _error = null;
         _successMsg = null;
 
-        var deptTask    = DepartmentService.ListDepartmentsAsync(CompanyId);
-        var profileTask = PositionProfileService.ListPositionProfilesAsync(CompanyId);
-        var empListTask = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
+        var deptTask       = DepartmentService.ListDepartmentsAsync(CompanyId);
+        var profileTask    = PositionProfileService.ListPositionProfilesAsync(CompanyId);
+        var empListTask    = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
+        var probationTask  = ProbationService.GetProbationRecordByEmployeeAsync(CompanyId, EmployeeId);
 
-        await Task.WhenAll(deptTask, profileTask, empListTask);
+        await Task.WhenAll(deptTask, profileTask, empListTask, probationTask);
 
         _departments      = (await deptTask)?.Items ?? [];
         _positionProfiles = (await profileTask)?.Items.ToList() ?? [];
@@ -249,6 +303,10 @@ else
             .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .OrderBy(e => e.Name)
             .ToList();
+
+        _probationRecord = await probationTask;
+        if (_probationRecord is not null)
+            _probationReviews = await ProbationService.GetProbationReviewsAsync(CompanyId, _probationRecord.Id);
 
         var employee = await EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
         if (employee is not null)
@@ -340,6 +398,37 @@ else
         if (isChecked) _model.WorkingWeek.Add(day);
         else _model.WorkingWeek.Remove(day);
     }
+
+    private static string ProbationStatusBadgeClass(string status) => status switch
+    {
+        "Active"    => "bg-primary",
+        "ReviewDue" => "bg-warning text-dark",
+        "Extended"  => "bg-info text-dark",
+        "Passed"    => "bg-success",
+        "Failed"    => "bg-danger",
+        _           => "bg-secondary"
+    };
+
+    private static string ProbationStatusLabel(string status) => status switch
+    {
+        "ReviewDue" => "Review Due",
+        _           => status
+    };
+
+    private static string ReviewStatusBadgeClass(string status) => status switch
+    {
+        "Completed" => "bg-success",
+        _           => "bg-secondary"
+    };
+
+    private static string FormatReviewType(string reviewType) => reviewType switch
+    {
+        "ManagerCheckIn"          => "Manager Check-in",
+        "HrReview"                => "HR Review",
+        "FinalDecision"           => "Final Decision",
+        "ExtensionConfirmation"   => "Extension",
+        _                         => reviewType
+    };
 
     private sealed class EmploymentEditModel
     {

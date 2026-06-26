@@ -11,7 +11,8 @@ namespace HR.Web.E2E.Tests.Tests;
 [Collection("E2E")]
 public sealed class CreateEmployeeTests : IAsyncLifetime
 {
-    private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid AcmeId        = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid JamesOkaforId = Guid.Parse("30000000-0000-0000-0000-000000000002");
 
     private const string LauraEmail = "laura.bennett@acme.example";
 
@@ -77,6 +78,22 @@ public sealed class CreateEmployeeTests : IAsyncLifetime
         // ── Step 6: Back on the employee list — new employee should be present ─
         Assert.True(await empList.HasEmployeeAsync(lastName),
             $"Expected the new employee '{lastName}' to appear in the employee list after creation");
+    }
+
+    [Fact]
+    public async Task Employee_WithManager_HasProbationSummaryOnEmploymentTab()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empEdit.GoToAsync(AcmeId, JamesOkaforId);
+        await empEdit.OpenEmploymentTabAsync();
+
+        Assert.True(await empEdit.HasProbationSummaryAsync(),
+            "Expected a probation summary card on the Employment tab for an employee with a manager and a seeded probation record");
     }
 
     [Fact]

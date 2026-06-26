@@ -111,6 +111,9 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
+    public async Task<bool> HasProbationSummaryAsync() =>
+        await page.Locator("[data-testid='probation-summary']").IsVisibleAsync();
+
     public async Task<bool> HasErrorAsync() =>
         await page.Locator(".alert-danger, .validation-message").First.IsVisibleAsync();
 }

@@ -19,29 +19,21 @@ internal sealed class GetProbationRecordHandler
     {
         var record = await _dbContext.ProbationRecords
             .FirstOrDefaultAsync(
-                r => r.CompanyId == request.CompanyId && r.Id == request.Id,
+                r => r.CompanyId == request.CompanyId && r.Id == request.RecordId,
                 cancellationToken);
 
         if (record is null)
-        {
             return Result.Failure<GetProbationRecordResponse>(
                 Error.NotFound("Probation record not found."));
-        }
 
         return Result.Success(new GetProbationRecordResponse(
             record.Id,
             record.CompanyId,
-            record.EmployeeId,
-            record.ManagerEmployeeId,
-            record.StartDate,
-            record.ExpectedEndDate,
             record.Status.ToString(),
-            record.Notes,
+            record.ExpectedEndDate,
             record.ExtensionReason,
             record.DecisionDate,
             record.DecisionMakerEmployeeId,
-            record.OutcomeNotes,
-            record.CreatedAt,
-            record.UpdatedAt));
+            record.OutcomeNotes));
     }
 }

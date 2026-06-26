@@ -1,10 +1,12 @@
 using FluentValidation;
+using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Features.CompleteProbationReview;
 using HR.Modules.Probation.Features.CreateProbationOnEmployeeCreated;
 using HR.Modules.Probation.Features.CreateProbationRecord;
 using HR.Modules.Probation.Features.CreateProbationReview;
 using HR.Modules.Probation.Features.GetProbationReviews;
 using HR.Modules.Probation.Features.GetProbationRecord;
+using HR.Modules.Probation.Features.GetProbationRecordByEmployee;
 using HR.Modules.Probation.Features.UpdateProbationRecord;
 using HR.Modules.Probation.Persistence;
 using HR.SharedKernel;
@@ -33,6 +35,7 @@ public static class ProbationModule
         services.AddScoped<CreateProbationRecordHandler>();
         services.AddScoped<IValidator<CreateProbationRecordRequest>, CreateProbationRecordValidator>();
         services.AddScoped<GetProbationRecordHandler>();
+        services.AddScoped<GetProbationRecordByEmployeeHandler>();
         services.AddScoped<UpdateProbationRecordHandler>();
         services.AddScoped<IValidator<UpdateProbationRecordRequest>, UpdateProbationRecordValidator>();
         services.AddScoped<CreateProbationReviewHandler>();
@@ -58,5 +61,56 @@ public static class ProbationModule
 
         if (await db.ProbationRecords.AnyAsync())
             return;
+
+        var now = DateTimeOffset.UtcNow;
+        var acmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var betaId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+
+        // All seeded employees that have a manager (employeeId, managerId, companyId, startDate)
+        (Guid companyId, Guid employeeId, Guid managerId, DateOnly startDate)[] entries =
+        [
+            (acmeId, Guid.Parse("30000000-0000-0000-0000-000000000002"), Guid.Parse("30000000-0000-0000-0000-000000000001"), new DateOnly(2021, 3,  15)),
+            (acmeId, Guid.Parse("30000000-0000-0000-0000-000000000003"), Guid.Parse("30000000-0000-0000-0000-000000000001"), new DateOnly(2021, 9,   1)),
+            (acmeId, Guid.Parse("30000000-0000-0000-0000-000000000004"), Guid.Parse("30000000-0000-0000-0000-000000000002"), new DateOnly(2023, 2,  20)),
+            (acmeId, Guid.Parse("30000000-0000-0000-0000-000000000006"), Guid.Parse("30000000-0000-0000-0000-000000000005"), new DateOnly(2022, 11,  7)),
+            (acmeId, Guid.Parse("30000000-0000-0000-0000-000000000009"), Guid.Parse("30000000-0000-0000-0000-000000000008"), new DateOnly(2023, 5,   2)),
+            (acmeId, Guid.Parse("30000000-0000-0000-0000-000000000010"), Guid.Parse("30000000-0000-0000-0000-000000000008"), new DateOnly(2024, 1,   8)),
+            (betaId, Guid.Parse("30000000-0000-0000-0000-000000000012"), Guid.Parse("30000000-0000-0000-0000-000000000011"), new DateOnly(2023, 9,   4)),
+        ];
+
+        for (var i = 0; i < entries.Length; i++)
+        {
+            var (companyId, employeeId, managerId, startDate) = entries[i];
+            var expectedEnd = startDate.AddMonths(3);
+            var recordId    = new Guid($"40000000-0000-0000-0000-{i + 1:D12}");
+
+            var record = ProbationRecord.Create(recordId, companyId, employeeId, managerId,
+                startDate, expectedEnd, null, now);
+            record.Pass(managerId, expectedEnd, "Probation completed successfully.", now);
+            db.ProbationRecords.Add(record);
+
+            var checkIn = ProbationReview.Create(
+                new Guid($"50000000-0000-0000-0000-{i * 3 + 1:D12}"),
+                companyId, recordId, ProbationReviewType.ManagerCheckIn,
+                startDate.AddMonths(1), now);
+            checkIn.Complete(managerId, null, now);
+            db.ProbationReviews.Add(checkIn);
+
+            var hrReview = ProbationReview.Create(
+                new Guid($"50000000-0000-0000-0000-{i * 3 + 2:D12}"),
+                companyId, recordId, ProbationReviewType.HrReview,
+                startDate.AddMonths(2), now);
+            hrReview.Complete(managerId, null, now);
+            db.ProbationReviews.Add(hrReview);
+
+            var finalReview = ProbationReview.Create(
+                new Guid($"50000000-0000-0000-0000-{i * 3 + 3:D12}"),
+                companyId, recordId, ProbationReviewType.FinalDecision,
+                expectedEnd, now);
+            finalReview.Complete(managerId, "Probation passed.", now);
+            db.ProbationReviews.Add(finalReview);
+        }
+
+        await db.SaveChangesAsync();
     }
 }

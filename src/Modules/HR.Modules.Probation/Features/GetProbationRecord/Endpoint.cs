@@ -8,7 +8,7 @@ internal sealed class Endpoint(
 {
     public override void Configure()
     {
-        Get("/api/companies/{companyId:guid}/probation-records/{id:guid}");
+        Get("/api/companies/{companyId:guid}/probation-records/{recordId:guid}");
         Policies("probation:manage");
     }
 
@@ -20,13 +20,7 @@ internal sealed class Endpoint(
 
         if (result.IsFailure)
         {
-            if (result.Error.Code == "not_found")
-            {
-                await Send.ResultAsync(TypedResults.NotFound());
-                return;
-            }
-
-            await Send.ResultAsync(TypedResults.BadRequest(new { error = result.Error.Message }));
+            await Send.ResultAsync(TypedResults.NotFound());
             return;
         }
 

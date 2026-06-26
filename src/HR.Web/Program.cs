@@ -30,6 +30,7 @@ builder.Services.AddScoped<LeaveService>();
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddScoped<DocumentService>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<ProbationService>();
 builder.Services.AddScoped<DevAuthService>();
 builder.Services.AddScoped<AppSession>();
 
