@@ -1,0 +1,123 @@
+@using HR.Web.Models
+@inject ProbationService ProbationService
+@inject TaskService TaskService
+@inject AppSession Session
+
+<div class="card" data-testid="probation-review-panel">
+    <div class="card-header fw-medium">Complete Probation Review</div>
+    <div class="card-body">
+        @if (_review is not null)
+        {
+            <dl class="row mb-3 small">
+                <dt class="col-sm-4 text-muted fw-normal">Review Type</dt>
+                <dd class="col-sm-8" data-testid="review-type">@FormatReviewType(_review.ReviewType)</dd>
+
+                <dt class="col-sm-4 text-muted fw-normal">Due Date</dt>
+                <dd class="col-sm-8">@_review.DueDate.ToString("d MMM yyyy")</dd>
+
+                <dt class="col-sm-4 text-muted fw-normal">Probation Period</dt>
+                <dd class="col-sm-8">@_review.RecordStartDate.ToString("d MMM yyyy") – @_review.RecordExpectedEndDate.ToString("d MMM yyyy")</dd>
+            </dl>
+            <hr class="my-3" />
+            @if (_review.ReviewType is "FinalDecision")
+            {
+                <div class="mb-3">
+                    <label class="form-label fw-medium">Outcome <span class="text-danger">*</span></label>
+                    <select class="form-select" @bind="_outcome">
+                        <option value="">Select outcome…</option>
+                        <option value="Pass">Pass</option>
+                        <option value="Fail">Fail</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-medium">Decision Date <span class="text-danger">*</span></label>
+                    <SfDatePicker TValue="DateOnly?" @bind-Value="_decisionDate" Format="dd/MM/yyyy" />
+                </div>
+            }
+        }
+        <div class="mb-3">
+            <label class="form-label fw-medium">
+                Notes <span class="text-muted fw-normal">(optional)</span>
+            </label>
+            <textarea class="form-control"
+                      rows="3"
+                      @bind="_notes"
+                      placeholder="Enter your review notes…" />
+        </div>
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger mb-3">@_error</div>
+        }
+        <button class="btn btn-success"
+                @onclick="CompleteReviewAsync"
+                disabled="@_submitting">
+            @if (_submitting)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            }
+            <i class="fa-solid fa-check me-1"></i>Complete Review
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public TaskDetailModel Task { get; set; } = null!;
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private ProbationReviewDetailModel? _review;
+    private string? _notes;
+    private string? _outcome;
+    private DateOnly? _decisionDate;
+    private string? _error;
+    private bool _submitting;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Task.SourceEntityId.HasValue)
+            _review = await ProbationService.GetProbationReviewAsync(CompanyId, Task.SourceEntityId.Value);
+    }
+
+    private async Task CompleteReviewAsync()
+    {
+        if (_review is null) return;
+
+        if (_review.ReviewType is "FinalDecision" && string.IsNullOrWhiteSpace(_outcome))
+        {
+            _error = "An outcome is required for a Final Decision review.";
+            return;
+        }
+
+        _submitting = true;
+        _error = null;
+
+        var success = await ProbationService.CompleteReviewAsync(
+            CompanyId,
+            _review.ProbationRecordId,
+            _review.Id,
+            Session.EmployeeId ?? Guid.Empty,
+            _notes,
+            string.IsNullOrWhiteSpace(_outcome) ? null : _outcome,
+            _decisionDate);
+
+        _submitting = false;
+
+        if (success)
+        {
+            await TaskService.CompleteTaskAsync(CompanyId, Task.Id);
+            await OnCompleted.InvokeAsync();
+        }
+        else
+        {
+            _error = "Failed to complete the review. Please try again.";
+        }
+    }
+
+    private static string FormatReviewType(string reviewType) => reviewType switch
+    {
+        "ManagerCheckIn" => "Manager Check-in",
+        "HrReview"       => "HR Review",
+        "FinalDecision"  => "Final Decision",
+        _                => reviewType
+    };
+}

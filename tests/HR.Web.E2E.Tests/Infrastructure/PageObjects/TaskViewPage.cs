@@ -75,4 +75,30 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
         var parts = url.TrimEnd('/').Split('/');
         return Guid.Parse(parts[^1]);
     }
+
+    // ── Probation review panel ───────────────────────────────────────────────
+
+    /// <summary>Returns true if the "Complete Probation Review" card is present.</summary>
+    public async Task<bool> HasProbationReviewPanelAsync() =>
+        await page.Locator("[data-testid='probation-review-panel']").IsVisibleAsync();
+
+    /// <summary>Returns the review type text shown in the probation review panel.</summary>
+    public async Task<string?> GetProbationReviewTypeAsync()
+    {
+        var el = page.Locator("[data-testid='review-type']");
+        return await el.IsVisibleAsync() ? (await el.TextContentAsync())?.Trim() : null;
+    }
+
+    /// <summary>Fills the review notes textarea.</summary>
+    public async Task EnterReviewNotesAsync(string notes) =>
+        await page.GetByPlaceholder("Enter your review notes…").FillAsync(notes);
+
+    /// <summary>Clicks "Complete Review" and waits for the status badge to show Completed.</summary>
+    public async Task CompleteReviewAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Complete Review" }).ClickAsync();
+        await page.WaitForFunctionAsync(
+            "document.querySelector('.task-status-badge')?.textContent?.includes('Completed')",
+            null, new() { Timeout = 15_000 });
+    }
 }

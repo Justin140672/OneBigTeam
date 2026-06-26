@@ -1,0 +1,69 @@
+@using HR.Web.Models
+@inject TaskService TaskService
+
+<div class="card">
+    <div class="card-header fw-medium">Review Leave Request</div>
+    <div class="card-body">
+        <div class="mb-3">
+            <label class="form-label">
+                Reason <span class="text-muted">(required for rejection)</span>
+            </label>
+            <textarea class="form-control"
+                      rows="3"
+                      @bind="_reason"
+                      placeholder="Enter a reason for your decision…" />
+        </div>
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger mb-3">@_error</div>
+        }
+        <div class="d-flex gap-2">
+            <button class="btn btn-success"
+                    @onclick='() => SubmitAsync("Approve")'
+                    disabled="@_submitting">
+                @if (_submitting && _pending == "Approve")
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Approve
+            </button>
+            <button class="btn btn-outline-danger"
+                    @onclick='() => SubmitAsync("Reject")'
+                    disabled="@_submitting">
+                @if (_submitting && _pending == "Reject")
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Reject
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public TaskDetailModel Task { get; set; } = null!;
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private string? _reason;
+    private string? _error;
+    private bool _submitting;
+    private string? _pending;
+
+    private async Task SubmitAsync(string decision)
+    {
+        _pending = decision;
+        _submitting = true;
+        _error = null;
+
+        var success = await TaskService.CompleteTaskAsync(CompanyId, Task.Id, decision, _reason);
+
+        _submitting = false;
+        _pending = null;
+
+        if (success)
+            await OnCompleted.InvokeAsync();
+        else
+            _error = "Failed to submit the decision. Please try again.";
+    }
+}

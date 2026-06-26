@@ -25,3 +25,17 @@ public sealed record ProbationReviewModel(
     string? Notes);
 
 public sealed record ProbationReviewsResponse(IReadOnlyList<ProbationReviewModel> Items);
+
+public sealed record ProbationReviewDetailModel(
+    Guid Id,
+    Guid CompanyId,
+    Guid ProbationRecordId,
+    Guid EmployeeId,
+    string ReviewType,
+    DateOnly DueDate,
+    string Status,
+    DateTimeOffset? CompletedAt,
+    string? Notes,
+    DateOnly RecordStartDate,
+    DateOnly RecordExpectedEndDate,
+    string RecordStatus);

@@ -65,58 +65,15 @@
                 {
                     @if (_task.Source == "Leave")
                     {
-                        <div class="card">
-                            <div class="card-header fw-medium">Review Leave Request</div>
-                            <div class="card-body">
-                                <div class="mb-3">
-                                    <label class="form-label">
-                                        Reason <span class="text-muted">(required for rejection)</span>
-                                    </label>
-                                    <textarea class="form-control"
-                                              rows="3"
-                                              @bind="_reason"
-                                              placeholder="Enter a reason for your decision…" />
-                                </div>
-                                @if (_actionError is not null)
-                                {
-                                    <div class="alert alert-danger mb-3">@_actionError</div>
-                                }
-                                <div class="d-flex gap-2">
-                                    <button class="btn btn-success"
-                                            @onclick='() => SubmitLeaveReviewAsync("Approve")'
-                                            disabled="@_submitting">
-                                        @if (_submitting && _pendingDecision == "Approve")
-                                        {
-                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                                        }
-                                        Approve
-                                    </button>
-                                    <button class="btn btn-outline-danger"
-                                            @onclick='() => SubmitLeaveReviewAsync("Reject")'
-                                            disabled="@_submitting">
-                                        @if (_submitting && _pendingDecision == "Reject")
-                                        {
-                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                                        }
-                                        Reject
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                        <LeaveTaskPanel CompanyId="CompanyId" Task="_task" OnCompleted="ReloadAsync" />
+                    }
+                    else if (_task.Source == "ProbationReview")
+                    {
+                        <ProbationReviewPanel CompanyId="CompanyId" Task="_task" OnCompleted="ReloadAsync" />
                     }
                     else
                     {
-                        @if (_actionError is not null)
-                        {
-                            <div class="alert alert-danger mb-3">@_actionError</div>
-                        }
-                        <button class="btn btn-success" @onclick="CompleteAsync" disabled="@_submitting">
-                            @if (_submitting)
-                            {
-                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                            }
-                            <i class="fa-solid fa-check me-1"></i>Mark as Complete
-                        </button>
+                        <CompleteTaskPanel CompanyId="CompanyId" Task="_task" OnCompleted="ReloadAsync" />
                     }
                 }
             </div>
@@ -131,11 +88,6 @@
     private TaskDetailModel? _task;
     private bool _loading = true;
 
-    private string? _reason;
-    private string? _actionError;
-    private bool _submitting;
-    private string? _pendingDecision;
-
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
@@ -143,40 +95,9 @@
         _loading = false;
     }
 
-    private async Task SubmitLeaveReviewAsync(string decision)
+    private async Task ReloadAsync()
     {
-        if (_task is null) return;
-
-        _pendingDecision = decision;
-        _submitting = true;
-        _actionError = null;
-
-        var success = await TaskService.CompleteTaskAsync(CompanyId, _task.Id, decision, _reason);
-
-        _submitting = false;
-        _pendingDecision = null;
-
-        if (success)
-            _task = await TaskService.GetTaskAsync(CompanyId, TaskId);
-        else
-            _actionError = "Failed to submit the decision. Please try again.";
-    }
-
-    private async Task CompleteAsync()
-    {
-        if (_task is null) return;
-
-        _submitting = true;
-        _actionError = null;
-
-        var success = await TaskService.CompleteTaskAsync(CompanyId, _task.Id);
-
-        _submitting = false;
-
-        if (success)
-            _task = await TaskService.GetTaskAsync(CompanyId, TaskId);
-        else
-            _actionError = "Failed to complete the task. Please try again.";
+        _task = await TaskService.GetTaskAsync(CompanyId, TaskId);
     }
 
     private void GoBack()

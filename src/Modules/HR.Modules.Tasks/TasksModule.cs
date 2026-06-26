@@ -83,6 +83,8 @@ public static class TasksModule
         var taskBoardAgendaId   = Guid.Parse("a0000000-0000-0000-0000-000000000002");
         var taskInterviewId     = Guid.Parse("a0000000-0000-0000-0000-000000000003");
         var taskSurveyId        = Guid.Parse("a0000000-0000-0000-0000-000000000004");
+        // Probation review task — links to the active seeded probation review (50000000-...-000000000100)
+        var taskProbationReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000005");
 
         TaskItem Make(
             Guid id,
@@ -153,6 +155,19 @@ public static class TasksModule
                 "Review responses from the May survey and prepare a summary report for leadership.",
                 TaskPriority.High, TaskSource.Manual,
                 new DateOnly(2026, 6, 10), empCtoId));
+
+        // ProbationReview task — linked to the active seeded review in ProbationModule seed.
+        // Assigned to Sarah (dev user) so it appears in her task list during E2E tests.
+        db.TaskItems.Add(TaskItem.Create(
+            taskProbationReviewId, companyId, empCtoId,
+            "Complete probation review — Carlos Rivera",
+            "Probation manager check-in due 7 May 2026.",
+            TaskPriority.High, TaskSource.ProbationReview,
+            new DateOnly(2026, 5, 7),
+            assignedEmployeeId: empCtoId,
+            assignedUserId: devUserId,
+            now,
+            sourceEntityId: Guid.Parse("50000000-0000-0000-0000-000000000100")));
 
         await db.SaveChangesAsync();
     }

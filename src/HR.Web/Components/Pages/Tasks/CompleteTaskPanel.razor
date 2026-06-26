@@ -1,0 +1,38 @@
+@using HR.Web.Models
+@inject TaskService TaskService
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger mb-3">@_error</div>
+}
+<button class="btn btn-success" @onclick="CompleteAsync" disabled="@_submitting">
+    @if (_submitting)
+    {
+        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+    }
+    <i class="fa-solid fa-check me-1"></i>Mark as Complete
+</button>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public TaskDetailModel Task { get; set; } = null!;
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private string? _error;
+    private bool _submitting;
+
+    private async Task CompleteAsync()
+    {
+        _submitting = true;
+        _error = null;
+
+        var success = await TaskService.CompleteTaskAsync(CompanyId, Task.Id);
+
+        _submitting = false;
+
+        if (success)
+            await OnCompleted.InvokeAsync();
+        else
+            _error = "Failed to complete the task. Please try again.";
+    }
+}

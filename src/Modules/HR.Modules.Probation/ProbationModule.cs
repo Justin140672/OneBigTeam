@@ -7,6 +7,7 @@ using HR.Modules.Probation.Features.CreateProbationRecord;
 using HR.Modules.Probation.Features.CreateProbationReview;
 using HR.Modules.Probation.Features.GetProbationRecord;
 using HR.Modules.Probation.Features.GetProbationRecordByEmployee;
+using HR.Modules.Probation.Features.GetProbationReview;
 using HR.Modules.Probation.Features.GetProbationReviews;
 using HR.Modules.Probation.Features.UpdateProbationRecord;
 using HR.Modules.Probation.Jobs;
@@ -39,6 +40,7 @@ public static class ProbationModule
         services.AddScoped<IValidator<CreateProbationRecordRequest>, CreateProbationRecordValidator>();
         services.AddScoped<GetProbationRecordHandler>();
         services.AddScoped<GetProbationRecordByEmployeeHandler>();
+        services.AddScoped<GetProbationReviewHandler>();
         services.AddScoped<UpdateProbationRecordHandler>();
         services.AddScoped<IValidator<UpdateProbationRecordRequest>, UpdateProbationRecordValidator>();
         services.AddScoped<CreateProbationReviewHandler>();
@@ -124,6 +126,24 @@ public static class ProbationModule
             finalReview.Complete(managerId, "Probation passed.", now);
             db.ProbationReviews.Add(finalReview);
         }
+
+        // Active probation — Carlos Rivera on probation under James Okafor.
+        // ManagerCheckIn is overdue; record is ReviewDue.
+        // Fixed IDs so the UI/E2E tests can navigate directly to this review.
+        var activeRecordId = Guid.Parse("40000000-0000-0000-0000-000000000010");
+        var activeReviewId = Guid.Parse("50000000-0000-0000-0000-000000000100");
+        var empCarlosId    = Guid.Parse("30000000-0000-0000-0000-000000000010");
+        var empJamesId     = Guid.Parse("30000000-0000-0000-0000-000000000002");
+
+        var activeRecord = ProbationRecord.Create(
+            activeRecordId, acmeId, empCarlosId, empJamesId,
+            new DateOnly(2026, 4, 7), new DateOnly(2026, 7, 7), null, now);
+        activeRecord.MarkReviewDue(now);
+        db.ProbationRecords.Add(activeRecord);
+
+        db.ProbationReviews.Add(ProbationReview.Create(
+            activeReviewId, acmeId, activeRecordId,
+            ProbationReviewType.ManagerCheckIn, new DateOnly(2026, 5, 7), now));
 
         await db.SaveChangesAsync();
     }
