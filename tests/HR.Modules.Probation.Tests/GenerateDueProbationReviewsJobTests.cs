@@ -2,6 +2,7 @@ using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Jobs;
 using HR.Modules.Probation.Persistence;
 using HR.Modules.Probation.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -170,18 +171,145 @@ public class GenerateDueProbationReviewsJobTests
         Assert.All(reviews, r => Assert.Equal(ProbationReviewType.ManagerCheckIn, r.ReviewType));
     }
 
-    private async Task<ProbationRecord> SeedActiveRecord(ProbationDbContext context)
+    [Fact]
+    public async Task ExecuteAsync_Creates_Task_For_Each_Generated_Review()
+    {
+        await using var context = BuildContext();
+        await SeedActiveRecord(context);
+        await SeedActiveRecord(context);
+
+        var taskCreator = new FakeTaskCreator();
+        await BuildJob(context, today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc), taskCreator: taskCreator).ExecuteAsync();
+
+        Assert.Equal(2, taskCreator.Created.Count);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Task_Is_Assigned_To_Manager()
+    {
+        await using var context = BuildContext();
+        var managerId = Guid.NewGuid();
+        await SeedActiveRecord(context, managerEmployeeId: managerId);
+
+        var taskCreator = new FakeTaskCreator();
+        await BuildJob(context, today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc), taskCreator: taskCreator).ExecuteAsync();
+
+        Assert.Equal(managerId, taskCreator.Created[0].AssignedEmployeeId);
+        Assert.Equal(managerId, taskCreator.Created[0].AssignedUserId);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Task_Title_Includes_Employee_Name()
+    {
+        await using var context = BuildContext();
+        var employeeId = Guid.NewGuid();
+        await SeedActiveRecord(context, employeeId: employeeId);
+
+        var taskCreator = new FakeTaskCreator();
+        var nameReader = new FakeEmployeeNameReader(new Dictionary<Guid, string> { [employeeId] = "Jane Doe" });
+        await BuildJob(context, today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc), taskCreator: taskCreator, employeeNameReader: nameReader).ExecuteAsync();
+
+        Assert.Equal("Complete probation review — Jane Doe", taskCreator.Created[0].Title);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Task_Title_Falls_Back_When_Name_Unknown()
+    {
+        await using var context = BuildContext();
+        await SeedActiveRecord(context);
+
+        var taskCreator = new FakeTaskCreator();
+        await BuildJob(context, today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc), taskCreator: taskCreator).ExecuteAsync();
+
+        Assert.Equal("Complete probation review — Unknown Employee", taskCreator.Created[0].Title);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Task_Source_Is_Probation()
+    {
+        await using var context = BuildContext();
+        await SeedActiveRecord(context);
+
+        var taskCreator = new FakeTaskCreator();
+        await BuildJob(context, today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc), taskCreator: taskCreator).ExecuteAsync();
+
+        Assert.Equal(TaskSource.Probation, taskCreator.Created[0].Source);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Task_Priority_Is_High()
+    {
+        await using var context = BuildContext();
+        await SeedActiveRecord(context);
+
+        var taskCreator = new FakeTaskCreator();
+        await BuildJob(context, today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc), taskCreator: taskCreator).ExecuteAsync();
+
+        Assert.Equal(TaskPriority.High, taskCreator.Created[0].Priority);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Task_DueDate_Matches_Review_DueDate()
+    {
+        await using var context = BuildContext();
+        await SeedActiveRecord(context);
+
+        var taskCreator = new FakeTaskCreator();
+        await BuildJob(context, today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc), taskCreator: taskCreator).ExecuteAsync();
+
+        Assert.Equal(new DateOnly(2026, 1, 31), taskCreator.Created[0].DueDate);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Task_SourceEntityId_Is_ReviewId()
+    {
+        await using var context = BuildContext();
+        await SeedActiveRecord(context);
+
+        var taskCreator = new FakeTaskCreator();
+        await BuildJob(context, today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc), taskCreator: taskCreator).ExecuteAsync();
+
+        var review = await context.ProbationReviews.SingleAsync();
+        Assert.Equal(review.Id, taskCreator.Created[0].SourceEntityId);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_No_Tasks_Created_When_No_Reviews_Due()
+    {
+        await using var context = BuildContext();
+        await SeedActiveRecord(context);
+
+        var taskCreator = new FakeTaskCreator();
+        await BuildJob(context, today: new DateTime(2026, 1, 15, 0, 0, 0, DateTimeKind.Utc), taskCreator: taskCreator).ExecuteAsync();
+
+        Assert.Empty(taskCreator.Created);
+    }
+
+    private async Task<ProbationRecord> SeedActiveRecord(
+        ProbationDbContext context,
+        Guid? employeeId = null,
+        Guid? managerEmployeeId = null)
     {
         var record = ProbationRecord.Create(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            Guid.NewGuid(), Guid.NewGuid(),
+            employeeId ?? Guid.NewGuid(),
+            managerEmployeeId ?? Guid.NewGuid(),
             StartDate, ExpectedEndDate, null, SeedNow);
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
         return record;
     }
 
-    private static GenerateDueProbationReviewsJob BuildJob(ProbationDbContext context, DateTime today) =>
-        new(context, new FakeClock(today), NullLogger<GenerateDueProbationReviewsJob>.Instance);
+    private static GenerateDueProbationReviewsJob BuildJob(
+        ProbationDbContext context,
+        DateTime today,
+        FakeTaskCreator? taskCreator = null,
+        FakeEmployeeNameReader? employeeNameReader = null) =>
+        new(context,
+            new FakeClock(today),
+            taskCreator ?? new FakeTaskCreator(),
+            employeeNameReader ?? new FakeEmployeeNameReader(),
+            NullLogger<GenerateDueProbationReviewsJob>.Instance);
 
     private static ProbationDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<ProbationDbContext>()

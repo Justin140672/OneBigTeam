@@ -1,6 +1,7 @@
 using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -9,6 +10,8 @@ namespace HR.Modules.Probation.Jobs;
 internal sealed class GenerateDueProbationReviewsJob(
     ProbationDbContext dbContext,
     IClock clock,
+    ITaskCreator taskCreator,
+    IEmployeeNameReader employeeNameReader,
     ILogger<GenerateDueProbationReviewsJob> logger)
 {
     public async Task ExecuteAsync()
@@ -34,7 +37,7 @@ internal sealed class GenerateDueProbationReviewsJob(
             .GroupBy(r => r.ProbationRecordId)
             .ToDictionary(g => g.Key, g => g.Select(x => x.ReviewType).ToHashSet());
 
-        var reviewsToCreate = new List<ProbationReview>();
+        var reviewsToCreate = new List<(ProbationReview Review, ProbationRecord Record)>();
 
         foreach (var record in activeRecords)
         {
@@ -49,8 +52,9 @@ internal sealed class GenerateDueProbationReviewsJob(
                 if (existing.Contains(reviewType) || dueDate > today)
                     continue;
 
-                reviewsToCreate.Add(ProbationReview.Create(
-                    Guid.NewGuid(), record.CompanyId, record.Id, reviewType, dueDate, now));
+                var review = ProbationReview.Create(
+                    Guid.NewGuid(), record.CompanyId, record.Id, reviewType, dueDate, now);
+                reviewsToCreate.Add((review, record));
                 createdAny = true;
             }
 
@@ -61,13 +65,38 @@ internal sealed class GenerateDueProbationReviewsJob(
         if (reviewsToCreate.Count == 0)
             return;
 
-        dbContext.ProbationReviews.AddRange(reviewsToCreate);
+        dbContext.ProbationReviews.AddRange(reviewsToCreate.Select(x => x.Review));
         await dbContext.SaveChangesAsync();
 
         logger.LogInformation(
             "GenerateDueProbationReviewsJob created {ReviewCount} review(s) across {RecordCount} record(s)",
             reviewsToCreate.Count,
-            reviewsToCreate.Select(r => r.ProbationRecordId).Distinct().Count());
+            reviewsToCreate.Select(x => x.Review.ProbationRecordId).Distinct().Count());
+
+        foreach (var companyGroup in reviewsToCreate.GroupBy(x => x.Record.CompanyId))
+        {
+            var companyId = companyGroup.Key;
+            var employeeIds = companyGroup.Select(x => x.Record.EmployeeId).Distinct();
+            var names = await employeeNameReader.GetNamesAsync(companyId, employeeIds, CancellationToken.None);
+
+            foreach (var (review, record) in companyGroup)
+            {
+                var employeeName = names.GetValueOrDefault(record.EmployeeId, "Unknown Employee");
+
+                await taskCreator.CreateAsync(
+                    record.CompanyId,
+                    record.EmployeeId,
+                    $"Complete probation review — {employeeName}",
+                    $"Probation {ReviewTypeLabel(review.ReviewType)} due {review.DueDate:d MMM yyyy}.",
+                    TaskPriority.High,
+                    TaskSource.Probation,
+                    review.DueDate,
+                    assignedEmployeeId: record.ManagerEmployeeId,
+                    assignedUserId: record.ManagerEmployeeId,
+                    sourceEntityId: review.Id,
+                    CancellationToken.None);
+            }
+        }
     }
 
     // Reviews are scheduled proportionally across the probation period:
@@ -81,4 +110,12 @@ internal sealed class GenerateDueProbationReviewsJob(
         yield return (ProbationReviewType.HrReview, record.StartDate.AddDays(2 * totalDays / 3));
         yield return (ProbationReviewType.FinalDecision, record.ExpectedEndDate);
     }
+
+    private static string ReviewTypeLabel(ProbationReviewType reviewType) => reviewType switch
+    {
+        ProbationReviewType.ManagerCheckIn => "manager check-in",
+        ProbationReviewType.HrReview       => "HR review",
+        ProbationReviewType.FinalDecision  => "final decision",
+        _                                  => reviewType.ToString()
+    };
 }
