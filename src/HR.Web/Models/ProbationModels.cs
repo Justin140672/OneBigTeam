@@ -22,6 +22,7 @@ public sealed record ProbationReviewModel(
     DateOnly DueDate,
     string Status,
     DateTimeOffset? CompletedAt,
+    string? Outcome,
     string? Notes);
 
 public sealed record ProbationReviewsResponse(IReadOnlyList<ProbationReviewModel> Items);

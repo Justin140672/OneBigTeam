@@ -86,7 +86,7 @@ public class GenerateDueProbationReviewsJobTests
         var existing = ProbationReview.Create(
             Guid.NewGuid(), record.CompanyId, record.Id,
             ProbationReviewType.ManagerCheckIn, new DateOnly(2026, 1, 31), SeedNow);
-        existing.Complete(Guid.NewGuid(), null, SeedNow);
+        existing.Complete(Guid.NewGuid(), null, null, SeedNow);
         context.ProbationReviews.Add(existing);
         await context.SaveChangesAsync();
 

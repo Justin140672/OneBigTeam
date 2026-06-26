@@ -1,0 +1,84 @@
+@using HR.Web.Models
+@using Syncfusion.Blazor.Grids
+
+<HrGrid TValue="ProbationReviewModel"
+        DataSource="@Reviews"
+        AllowPaging="false">
+    <GridColumns>
+        <GridColumn HeaderText="Type" Width="180" AllowSorting="false" AllowFiltering="false">
+            <Template>
+                @{ var r = (context as ProbationReviewModel)!; }
+                @FormatReviewType(r.ReviewType)
+            </Template>
+        </GridColumn>
+
+        <GridColumn Field="@nameof(ProbationReviewModel.DueDate)"
+                    HeaderText="Due Date" Width="140">
+            <Template>
+                @{ var r = (context as ProbationReviewModel)!; }
+                @r.DueDate.ToString("d MMM yyyy")
+            </Template>
+        </GridColumn>
+
+        <GridColumn HeaderText="Status" Width="130" AllowSorting="false" AllowFiltering="false">
+            <Template>
+                @{ var r = (context as ProbationReviewModel)!; }
+                <span class="badge @StatusBadgeClass(r.Status)">@r.Status</span>
+            </Template>
+        </GridColumn>
+
+        <GridColumn HeaderText="Outcome" Width="120" AllowSorting="false" AllowFiltering="false">
+            <Template>
+                @{ var r = (context as ProbationReviewModel)!; }
+                @if (r.Outcome is not null)
+                {
+                    <span class="badge @OutcomeBadgeClass(r.Outcome)">@r.Outcome</span>
+                }
+            </Template>
+        </GridColumn>
+
+        <GridColumn HeaderText="Completed" Width="140" AllowSorting="false" AllowFiltering="false">
+            <Template>
+                @{ var r = (context as ProbationReviewModel)!; }
+                <span class="text-muted small">
+                    @(r.CompletedAt?.ToString("d MMM yyyy") ?? "—")
+                </span>
+            </Template>
+        </GridColumn>
+
+        <GridColumn Field="@nameof(ProbationReviewModel.Notes)"
+                    HeaderText="Notes">
+            <Template>
+                @{ var r = (context as ProbationReviewModel)!; }
+                <span class="text-muted small">@(r.Notes ?? "—")</span>
+            </Template>
+        </GridColumn>
+    </GridColumns>
+</HrGrid>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ProbationReviewModel> Reviews { get; set; } = [];
+
+    private static string FormatReviewType(string reviewType) => reviewType switch
+    {
+        "ManagerCheckIn"        => "Manager Check-in",
+        "HrReview"              => "HR Review",
+        "FinalDecision"         => "Final Decision",
+        "ExtensionConfirmation" => "Extension",
+        _                       => reviewType
+    };
+
+    private static string StatusBadgeClass(string status) => status switch
+    {
+        "Completed" => "bg-success",
+        _           => "bg-secondary"
+    };
+
+    private static string OutcomeBadgeClass(string outcome) => outcome switch
+    {
+        "Pass"   => "bg-success",
+        "Fail"   => "bg-danger",
+        "Extend" => "bg-info text-dark",
+        _        => "bg-secondary"
+    };
+}

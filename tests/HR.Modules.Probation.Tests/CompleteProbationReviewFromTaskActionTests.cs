@@ -179,7 +179,7 @@ public class CompleteProbationReviewFromTaskActionTests
         var companyId = Guid.NewGuid();
 
         var (_, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ManagerCheckIn);
-        review.Complete(Guid.NewGuid(), null, Now);
+        review.Complete(Guid.NewGuid(), null, null, Now);
         await context.SaveChangesAsync();
 
         var completedBy = Guid.NewGuid();

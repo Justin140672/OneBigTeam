@@ -1,0 +1,84 @@
+@using HR.Web.Models
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h6 class="text-muted fw-normal mb-1">Probation Period</h6>
+                <p class="mb-0 fw-medium">
+                    @Record.StartDate.ToString("d MMM yyyy") – @Record.ExpectedEndDate.ToString("d MMM yyyy")
+                    <span class="text-muted fw-normal ms-1">(@TotalMonths mo)</span>
+                </p>
+            </div>
+            <span class="badge fs-6 px-3 py-2 @StatusBadgeClass(Record.Status)">@StatusLabel(Record.Status)</span>
+        </div>
+
+        @if (Record.Status is "Active" or "ReviewDue" or "Extended")
+        {
+            <div class="mb-1 d-flex justify-content-between small text-muted">
+                <span>@ElapsedDays days elapsed</span>
+                <span>@DaysRemaining days remaining</span>
+            </div>
+            <div class="progress" style="height: 8px;">
+                <div class="progress-bar @ProgressBarClass(Record.Status)"
+                     role="progressbar"
+                     style="width: @ProgressPercent%"
+                     aria-valuenow="@ProgressPercent"
+                     aria-valuemin="0"
+                     aria-valuemax="100">
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="progress" style="height: 8px;">
+                <div class="progress-bar @ProgressBarClass(Record.Status)"
+                     role="progressbar"
+                     style="width: 100%"
+                     aria-valuenow="100"
+                     aria-valuemin="0"
+                     aria-valuemax="100">
+                </div>
+            </div>
+            @if (Record.DecisionDate.HasValue)
+            {
+                <p class="small text-muted mt-1 mb-0">Decision made @Record.DecisionDate.Value.ToString("d MMM yyyy")</p>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ProbationRecordModel Record { get; set; } = null!;
+
+    private int TotalDays     => Math.Max(1, Record.ExpectedEndDate.DayNumber - Record.StartDate.DayNumber);
+    private int TotalMonths   => (Record.ExpectedEndDate.Year - Record.StartDate.Year) * 12 + (Record.ExpectedEndDate.Month - Record.StartDate.Month);
+    private int ElapsedDays   => Math.Clamp(DateOnly.FromDateTime(DateTime.Today).DayNumber - Record.StartDate.DayNumber, 0, TotalDays);
+    private int DaysRemaining => Math.Max(0, TotalDays - ElapsedDays);
+    private int ProgressPercent => (int)Math.Round(ElapsedDays * 100.0 / TotalDays);
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "ReviewDue" => "Review Due",
+        _           => status
+    };
+
+    private static string StatusBadgeClass(string status) => status switch
+    {
+        "Active"    => "bg-primary",
+        "ReviewDue" => "bg-warning text-dark",
+        "Extended"  => "bg-info text-dark",
+        "Passed"    => "bg-success",
+        "Failed"    => "bg-danger",
+        _           => "bg-secondary"
+    };
+
+    private static string ProgressBarClass(string status) => status switch
+    {
+        "ReviewDue" => "bg-warning",
+        "Extended"  => "bg-info",
+        "Passed"    => "bg-success",
+        "Failed"    => "bg-danger",
+        _           => "bg-primary"
+    };
+}

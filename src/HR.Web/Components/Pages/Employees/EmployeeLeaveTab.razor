@@ -44,38 +44,44 @@ else
         <div class="col-12">
             <div class="card">
                 <div class="card-header fw-semibold">Pending Requests</div>
-                <div class="card-body">
-                    @if (_pendingRequests.Count > 0)
+                <div class="card-body p-0">
+                    @if (_pendingRequests.Count == 0)
                     {
-                        <div class="table-responsive">
-                            <table class="table table-sm mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Type</th>
-                                        <th>Start</th>
-                                        <th>End</th>
-                                        <th>Days</th>
-                                        <th>Reason</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var r in _pendingRequests)
-                                    {
-                                        <tr>
-                                            <td>@r.LeaveTypeName</td>
-                                            <td>@FormatDate(r.StartDate, r.StartPart)</td>
-                                            <td>@FormatDate(r.EndDate, r.EndPart)</td>
-                                            <td>@FormatDays(r.TotalDays)</td>
-                                            <td class="text-muted">@(r.Reason ?? "—")</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
+                        <p class="text-muted small p-3 mb-0">No pending requests.</p>
                     }
                     else
                     {
-                        <p class="text-muted small mb-0">No pending requests.</p>
+                        <HrGrid TValue="LeaveRequestListItem"
+                                DataSource="@_pendingRequests"
+                                AllowPaging="false">
+                            <GridColumns>
+                                <GridColumn Field="@nameof(LeaveRequestListItem.LeaveTypeName)" HeaderText="Type" />
+                                <GridColumn HeaderText="Start" Width="160" AllowSorting="false" AllowFiltering="false">
+                                    <Template>
+                                        @{ var r = (context as LeaveRequestListItem)!; }
+                                        @FormatDate(r.StartDate, r.StartPart)
+                                    </Template>
+                                </GridColumn>
+                                <GridColumn HeaderText="End" Width="160" AllowSorting="false" AllowFiltering="false">
+                                    <Template>
+                                        @{ var r = (context as LeaveRequestListItem)!; }
+                                        @FormatDate(r.EndDate, r.EndPart)
+                                    </Template>
+                                </GridColumn>
+                                <GridColumn HeaderText="Days" Width="100" AllowSorting="false" AllowFiltering="false">
+                                    <Template>
+                                        @{ var r = (context as LeaveRequestListItem)!; }
+                                        @FormatDays(r.TotalDays)
+                                    </Template>
+                                </GridColumn>
+                                <GridColumn Field="@nameof(LeaveRequestListItem.Reason)" HeaderText="Reason">
+                                    <Template>
+                                        @{ var r = (context as LeaveRequestListItem)!; }
+                                        <span class="text-muted">@(r.Reason ?? "—")</span>
+                                    </Template>
+                                </GridColumn>
+                            </GridColumns>
+                        </HrGrid>
                     }
                 </div>
             </div>
@@ -84,38 +90,44 @@ else
         <div class="col-12">
             <div class="card">
                 <div class="card-header fw-semibold">Approved Requests</div>
-                <div class="card-body">
-                    @if (_approvedRequests.Count > 0)
+                <div class="card-body p-0">
+                    @if (_approvedRequests.Count == 0)
                     {
-                        <div class="table-responsive">
-                            <table class="table table-sm mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Type</th>
-                                        <th>Start</th>
-                                        <th>End</th>
-                                        <th>Days</th>
-                                        <th>Reason</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var r in _approvedRequests)
-                                    {
-                                        <tr>
-                                            <td>@r.LeaveTypeName</td>
-                                            <td>@FormatDate(r.StartDate, r.StartPart)</td>
-                                            <td>@FormatDate(r.EndDate, r.EndPart)</td>
-                                            <td>@FormatDays(r.TotalDays)</td>
-                                            <td class="text-muted">@(r.Reason ?? "—")</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
+                        <p class="text-muted small p-3 mb-0">No approved requests.</p>
                     }
                     else
                     {
-                        <p class="text-muted small mb-0">No approved requests.</p>
+                        <HrGrid TValue="LeaveRequestListItem"
+                                DataSource="@_approvedRequests"
+                                AllowPaging="false">
+                            <GridColumns>
+                                <GridColumn Field="@nameof(LeaveRequestListItem.LeaveTypeName)" HeaderText="Type" />
+                                <GridColumn HeaderText="Start" Width="160" AllowSorting="false" AllowFiltering="false">
+                                    <Template>
+                                        @{ var r = (context as LeaveRequestListItem)!; }
+                                        @FormatDate(r.StartDate, r.StartPart)
+                                    </Template>
+                                </GridColumn>
+                                <GridColumn HeaderText="End" Width="160" AllowSorting="false" AllowFiltering="false">
+                                    <Template>
+                                        @{ var r = (context as LeaveRequestListItem)!; }
+                                        @FormatDate(r.EndDate, r.EndPart)
+                                    </Template>
+                                </GridColumn>
+                                <GridColumn HeaderText="Days" Width="100" AllowSorting="false" AllowFiltering="false">
+                                    <Template>
+                                        @{ var r = (context as LeaveRequestListItem)!; }
+                                        @FormatDays(r.TotalDays)
+                                    </Template>
+                                </GridColumn>
+                                <GridColumn Field="@nameof(LeaveRequestListItem.Reason)" HeaderText="Reason">
+                                    <Template>
+                                        @{ var r = (context as LeaveRequestListItem)!; }
+                                        <span class="text-muted">@(r.Reason ?? "—")</span>
+                                    </Template>
+                                </GridColumn>
+                            </GridColumns>
+                        </HrGrid>
                     }
                 </div>
             </div>

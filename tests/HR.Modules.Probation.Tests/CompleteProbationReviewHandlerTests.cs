@@ -290,7 +290,7 @@ public class CompleteProbationReviewHandlerTests
         var companyId = Guid.NewGuid();
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ManagerCheckIn);
-        review.Complete(Guid.NewGuid(), null, Now);
+        review.Complete(Guid.NewGuid(), null, null, Now);
         await context.SaveChangesAsync();
 
         var result = await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow))

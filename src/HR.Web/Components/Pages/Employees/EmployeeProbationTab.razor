@@ -1,0 +1,115 @@
+@using HR.Web.Models
+@inject ProbationService ProbationService
+
+@if (_loading)
+{
+    <div class="d-flex align-items-center gap-2 py-3">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span class="text-muted">Loading…</span>
+    </div>
+}
+else if (_record is null)
+{
+    <div class="alert alert-secondary">No probation record found for this employee.</div>
+}
+else
+{
+    <ProbationPeriodSummaryPanel Record="_record" />
+
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Probation Record</h5>
+                    <span class="badge @StatusBadgeClass(_record.Status)">@StatusLabel(_record.Status)</span>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0 small">
+                        <dt class="col-sm-5 text-muted fw-normal">Start Date</dt>
+                        <dd class="col-sm-7">@_record.StartDate.ToString("d MMM yyyy")</dd>
+
+                        <dt class="col-sm-5 text-muted fw-normal">Expected End</dt>
+                        <dd class="col-sm-7">@_record.ExpectedEndDate.ToString("d MMM yyyy")</dd>
+
+                        @if (_record.DecisionDate.HasValue)
+                        {
+                            <dt class="col-sm-5 text-muted fw-normal">Decision Date</dt>
+                            <dd class="col-sm-7">@_record.DecisionDate.Value.ToString("d MMM yyyy")</dd>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(_record.OutcomeNotes))
+                        {
+                            <dt class="col-sm-5 text-muted fw-normal">Outcome Notes</dt>
+                            <dd class="col-sm-7">@_record.OutcomeNotes</dd>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(_record.ExtensionReason))
+                        {
+                            <dt class="col-sm-5 text-muted fw-normal">Extension Reason</dt>
+                            <dd class="col-sm-7">@_record.ExtensionReason</dd>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(_record.Notes))
+                        {
+                            <dt class="col-sm-5 text-muted fw-normal">Notes</dt>
+                            <dd class="col-sm-7">@_record.Notes</dd>
+                        }
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Reviews</h5>
+                </div>
+                <div class="card-body p-0">
+                    @if (_reviews.Count == 0)
+                    {
+                        <p class="text-muted small p-3 mb-0">No reviews scheduled.</p>
+                    }
+                    else
+                    {
+                        <ProbationReviewHistoryGrid Reviews="_reviews" />
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private bool _loading = true;
+    private ProbationRecordModel? _record;
+    private IReadOnlyList<ProbationReviewModel> _reviews = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _record = await ProbationService.GetProbationRecordByEmployeeAsync(CompanyId, EmployeeId);
+        if (_record is not null)
+            _reviews = await ProbationService.GetProbationReviewsAsync(CompanyId, _record.Id);
+        _loading = false;
+    }
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "ReviewDue" => "Review Due",
+        _           => status
+    };
+
+    private static string StatusBadgeClass(string status) => status switch
+    {
+        "Active"    => "bg-primary",
+        "ReviewDue" => "bg-warning text-dark",
+        "Extended"  => "bg-info text-dark",
+        "Passed"    => "bg-success",
+        "Failed"    => "bg-danger",
+        _           => "bg-secondary"
+    };
+
+}

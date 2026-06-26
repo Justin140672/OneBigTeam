@@ -12,6 +12,7 @@ internal sealed class ProbationReview
     public ProbationReviewStatus Status { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
     public Guid? CompletedByEmployeeId { get; private set; }
+    public ProbationOutcome? Outcome { get; private set; }
     public string? Notes { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -37,11 +38,12 @@ internal sealed class ProbationReview
         };
     }
 
-    public void Complete(Guid completedByEmployeeId, string? notes, DateTimeOffset now)
+    public void Complete(Guid completedByEmployeeId, ProbationOutcome? outcome, string? notes, DateTimeOffset now)
     {
         Status = ProbationReviewStatus.Completed;
         CompletedAt = now;
         CompletedByEmployeeId = completedByEmployeeId;
+        Outcome = outcome;
         Notes = notes;
         UpdatedAt = now;
     }

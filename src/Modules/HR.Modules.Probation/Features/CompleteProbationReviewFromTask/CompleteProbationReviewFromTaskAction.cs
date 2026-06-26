@@ -42,7 +42,7 @@ internal sealed class CompleteProbationReviewFromTaskAction(
         else if (outcome == ProbationOutcome.Extend && extensionEndDate.HasValue)
             record.Extend(extensionEndDate.Value, context.OutcomeReason ?? "Probation extended.", context.CompletedBy, decisionDate, now);
 
-        review.Complete(context.CompletedBy, context.OutcomeReason, now);
+        review.Complete(context.CompletedBy, outcome, context.OutcomeReason, now);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }

@@ -9,4 +9,5 @@ internal sealed record CompleteProbationReviewResponse(
     string Status,
     DateTimeOffset? CompletedAt,
     Guid? CompletedByEmployeeId,
+    string? Outcome,
     string? Notes);

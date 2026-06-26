@@ -51,70 +51,79 @@ else
         <SfButton IsPrimary="true" OnClick="@(() => _showRequestForm = true)">Request Leave</SfButton>
     </div>
 
-    @if (_requests.Count > 0)
-    {
-        <div class="card">
-            <div class="card-header fw-semibold">My Requests</div>
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Type</th>
-                            <th>Start</th>
-                            <th>End</th>
-                            <th>Days</th>
-                            <th>Status</th>
-                            <th>Reason</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var r in _requests)
-                        {
-                            <tr>
-                                <td>@r.LeaveTypeName</td>
-                                <td class="text-nowrap">@FormatDate(r.StartDate, r.StartPart)</td>
-                                <td class="text-nowrap">@FormatDate(r.EndDate, r.EndPart)</td>
-                                <td>@FormatDays(r.TotalDays)</td>
-                                <td><span class="badge @StatusBadge(r.Status)">@r.Status</span></td>
-                                <td class="text-muted">
-                                    @if (r.Status == "Rejected" && r.RejectionReason is not null)
-                                    {
-                                        @r.RejectionReason
-                                    }
-                                    else
-                                    {
-                                        @(r.Reason ?? "—")
-                                    }
-                                </td>
-                                <td>
-                                    @if (r.Status == "Pending")
-                                    {
-                                        <button class="btn btn-sm btn-outline-danger"
-                                                disabled="@(_cancelling == r.Id)"
-                                                @onclick="() => CancelRequestAsync(r.Id)">
-                                            @if (_cancelling == r.Id)
-                                            {
-                                                <span class="spinner-border spinner-border-sm"></span>
-                                            }
-                                            else
-                                            {
-                                                <span>Cancel</span>
-                                            }
-                                        </button>
-                                    }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
+    <div class="card">
+        <div class="card-header fw-semibold">My Requests</div>
+        <div class="card-body p-0">
+            @if (_requests.Count == 0)
+            {
+                <p class="text-muted small p-3 mb-0">No leave requests yet.</p>
+            }
+            else
+            {
+                <HrGrid TValue="LeaveRequestListItem"
+                        DataSource="@_requests"
+                        AllowPaging="false">
+                    <GridColumns>
+                        <GridColumn Field="@nameof(LeaveRequestListItem.LeaveTypeName)" HeaderText="Type" />
+                        <GridColumn HeaderText="Start" Width="160" AllowSorting="false" AllowFiltering="false">
+                            <Template>
+                                @{ var r = (context as LeaveRequestListItem)!; }
+                                @FormatDate(r.StartDate, r.StartPart)
+                            </Template>
+                        </GridColumn>
+                        <GridColumn HeaderText="End" Width="160" AllowSorting="false" AllowFiltering="false">
+                            <Template>
+                                @{ var r = (context as LeaveRequestListItem)!; }
+                                @FormatDate(r.EndDate, r.EndPart)
+                            </Template>
+                        </GridColumn>
+                        <GridColumn HeaderText="Days" Width="100" AllowSorting="false" AllowFiltering="false">
+                            <Template>
+                                @{ var r = (context as LeaveRequestListItem)!; }
+                                @FormatDays(r.TotalDays)
+                            </Template>
+                        </GridColumn>
+                        <GridColumn HeaderText="Status" Width="120" AllowSorting="false" AllowFiltering="false">
+                            <Template>
+                                @{ var r = (context as LeaveRequestListItem)!; }
+                                <span class="badge @StatusBadge(r.Status)">@r.Status</span>
+                            </Template>
+                        </GridColumn>
+                        <GridColumn HeaderText="Reason" AllowSorting="false" AllowFiltering="false">
+                            <Template>
+                                @{ var r = (context as LeaveRequestListItem)!; }
+                                <span class="text-muted">
+                                    @(r.Status == "Rejected" && r.RejectionReason is not null
+                                        ? r.RejectionReason
+                                        : r.Reason ?? "—")
+                                </span>
+                            </Template>
+                        </GridColumn>
+                        <GridColumn Width="110" AllowSorting="false" AllowFiltering="false">
+                            <Template>
+                                @{ var r = (context as LeaveRequestListItem)!; }
+                                @if (r.Status == "Pending")
+                                {
+                                    <SfButton CssClass="e-outline e-danger e-small"
+                                              Disabled="@(_cancelling == r.Id)"
+                                              OnClick="@(() => CancelRequestAsync(r.Id))">
+                                        @if (_cancelling == r.Id)
+                                        {
+                                            <span class="spinner-border spinner-border-sm"></span>
+                                        }
+                                        else
+                                        {
+                                            <span>Cancel</span>
+                                        }
+                                    </SfButton>
+                                }
+                            </Template>
+                        </GridColumn>
+                    </GridColumns>
+                </HrGrid>
+            }
         </div>
-    }
-    else
-    {
-        <p class="text-muted">No leave requests yet.</p>
-    }
+    </div>
 
     <RequestLeaveForm CompanyId="CompanyId"
                       EmployeeId="EmployeeId"

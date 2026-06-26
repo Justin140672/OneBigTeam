@@ -10,4 +10,5 @@ internal sealed record ProbationReviewItem(
     string Status,
     DateTimeOffset? CompletedAt,
     Guid? CompletedByEmployeeId,
+    string? Outcome,
     string? Notes);

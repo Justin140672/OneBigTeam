@@ -218,27 +218,6 @@ else
                             }
                         </dl>
 
-                        @if (_probationReviews.Count > 0)
-                        {
-                            <hr class="my-3" />
-                            <p class="small fw-semibold mb-2">Reviews</p>
-                            <table class="table table-sm table-borderless mb-0 small">
-                                <tbody>
-                                    @foreach (var review in _probationReviews)
-                                    {
-                                        <tr>
-                                            <td class="ps-0">@FormatReviewType(review.ReviewType)</td>
-                                            <td class="text-muted">@review.DueDate.ToString("dd MMM yyyy")</td>
-                                            <td class="text-end pe-0">
-                                                <span class="badge @ReviewStatusBadgeClass(review.Status)">
-                                                    @review.Status
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        }
                     </div>
                 </div>
             </div>
@@ -261,7 +240,6 @@ else
     private List<ManagerOption> _managerOptions = [];
 
     private ProbationRecordModel? _probationRecord;
-    private IReadOnlyList<ProbationReviewModel> _probationReviews = [];
 
     private static readonly string[] _allDays =
         ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -305,8 +283,6 @@ else
             .ToList();
 
         _probationRecord = await probationTask;
-        if (_probationRecord is not null)
-            _probationReviews = await ProbationService.GetProbationReviewsAsync(CompanyId, _probationRecord.Id);
 
         var employee = await EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
         if (employee is not null)
@@ -413,21 +389,6 @@ else
     {
         "ReviewDue" => "Review Due",
         _           => status
-    };
-
-    private static string ReviewStatusBadgeClass(string status) => status switch
-    {
-        "Completed" => "bg-success",
-        _           => "bg-secondary"
-    };
-
-    private static string FormatReviewType(string reviewType) => reviewType switch
-    {
-        "ManagerCheckIn"          => "Manager Check-in",
-        "HrReview"                => "HR Review",
-        "FinalDecision"           => "Final Decision",
-        "ExtensionConfirmation"   => "Extension",
-        _                         => reviewType
     };
 
     private sealed class EmploymentEditModel

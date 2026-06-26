@@ -68,7 +68,7 @@ internal sealed class CompleteProbationReviewHandler
         else if (request.Outcome == ProbationOutcome.Extend)
             record.Extend(request.NewExpectedEndDate!.Value, request.ExtensionReason!, request.CompletedByEmployeeId, request.DecisionDate!.Value, now);
 
-        review.Complete(request.CompletedByEmployeeId, request.Notes, now);
+        review.Complete(request.CompletedByEmployeeId, request.Outcome, request.Notes, now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -81,6 +81,7 @@ internal sealed class CompleteProbationReviewHandler
             review.Status.ToString(),
             review.CompletedAt,
             review.CompletedByEmployeeId,
+            review.Outcome?.ToString(),
             review.Notes));
     }
 }

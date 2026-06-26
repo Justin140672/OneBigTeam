@@ -119,7 +119,7 @@ public class GetProbationReviewsHandlerTests
 
         var review = ProbationReview.Create(
             Guid.NewGuid(), companyId, record.Id, ProbationReviewType.ManagerCheckIn, new DateOnly(2026, 7, 1), Now);
-        review.Complete(completedBy, "All targets met.", Now);
+        review.Complete(completedBy, null, "All targets met.", Now);
         context.ProbationReviews.Add(review);
         await context.SaveChangesAsync();
 

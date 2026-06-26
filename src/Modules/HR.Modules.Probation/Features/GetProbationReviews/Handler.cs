@@ -37,6 +37,7 @@ internal sealed class GetProbationReviewsHandler
                 r.Status.ToString(),
                 r.CompletedAt,
                 r.CompletedByEmployeeId,
+                r.Outcome == null ? null : r.Outcome.ToString(),
                 r.Notes))
             .ToListAsync(cancellationToken);
 
