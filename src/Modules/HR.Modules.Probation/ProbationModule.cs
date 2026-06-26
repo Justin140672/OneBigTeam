@@ -1,15 +1,18 @@
 using FluentValidation;
+using Hangfire;
 using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Features.CompleteProbationReview;
 using HR.Modules.Probation.Features.CreateProbationOnEmployeeCreated;
 using HR.Modules.Probation.Features.CreateProbationRecord;
 using HR.Modules.Probation.Features.CreateProbationReview;
-using HR.Modules.Probation.Features.GetProbationReviews;
 using HR.Modules.Probation.Features.GetProbationRecord;
 using HR.Modules.Probation.Features.GetProbationRecordByEmployee;
+using HR.Modules.Probation.Features.GetProbationReviews;
 using HR.Modules.Probation.Features.UpdateProbationRecord;
+using HR.Modules.Probation.Jobs;
 using HR.Modules.Probation.Persistence;
 using HR.SharedKernel;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -44,6 +47,17 @@ public static class ProbationModule
         services.AddScoped<CompleteProbationReviewHandler>();
         services.AddScoped<IValidator<CompleteProbationReviewRequest>, CompleteProbationReviewValidator>();
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
+        services.AddScoped<GenerateDueProbationReviewsJob>();
+    }
+
+    public static WebApplication UseProbationRecurringJobs(this WebApplication app)
+    {
+        var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+        jobManager.AddOrUpdate<GenerateDueProbationReviewsJob>(
+            "generate-due-probation-reviews",
+            job => job.ExecuteAsync(),
+            Cron.Daily(1));
+        return app;
     }
 
     public static async Task MigrateProbationAsync(this IServiceProvider services)
