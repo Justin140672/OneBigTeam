@@ -5,53 +5,84 @@
 <div class="card" data-testid="probation-review-panel">
     <div class="card-header fw-medium">Complete Probation Review</div>
     <div class="card-body">
-        @if (_review is not null)
+        @if (_justCompleted)
         {
-            <dl class="row mb-3 small">
-                <dt class="col-sm-4 text-muted fw-normal">Review Type</dt>
-                <dd class="col-sm-8" data-testid="review-type">@FormatReviewType(_review.ReviewType)</dd>
-
-                <dt class="col-sm-4 text-muted fw-normal">Due Date</dt>
-                <dd class="col-sm-8">@_review.DueDate.ToString("d MMM yyyy")</dd>
-
-                <dt class="col-sm-4 text-muted fw-normal">Probation Period</dt>
-                <dd class="col-sm-8">@_review.RecordStartDate.ToString("d MMM yyyy") – @_review.RecordExpectedEndDate.ToString("d MMM yyyy")</dd>
-            </dl>
-            <hr class="my-3" />
-            @if (_review.ReviewType is "FinalDecision")
-            {
-                <div class="mb-3">
-                    <label class="form-label fw-medium">Outcome <span class="text-danger">*</span></label>
-                    <select class="form-select" @bind="_outcome">
-                        <option value="">Select outcome…</option>
-                        <option value="Pass">Pass</option>
-                        <option value="Fail">Fail</option>
-                    </select>
-                </div>
-            }
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <i class="fa-solid fa-circle-check text-success fs-5"></i>
+                <span class="fw-medium">Review completed.</span>
+                @if (_successOutcome is not null)
+                {
+                    <span>Outcome: <strong data-testid="review-outcome">@_successOutcome</strong></span>
+                }
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="DismissAsync">Done</button>
         }
-        <div class="mb-3">
-            <label class="form-label fw-medium">
-                Notes <span class="text-muted fw-normal">(optional)</span>
-            </label>
-            <textarea class="form-control"
-                      rows="3"
-                      @bind="_notes"
-                      placeholder="Enter your review notes…" />
-        </div>
-        @if (_error is not null)
+        else
         {
-            <div class="alert alert-danger mb-3">@_error</div>
-        }
-        <button class="btn btn-success"
-                @onclick="CompleteReviewAsync"
-                disabled="@_submitting">
-            @if (_submitting)
+            @if (_review is not null)
             {
-                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                <dl class="row mb-3 small">
+                    <dt class="col-sm-4 text-muted fw-normal">Review Type</dt>
+                    <dd class="col-sm-8" data-testid="review-type">@FormatReviewType(_review.ReviewType)</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Due Date</dt>
+                    <dd class="col-sm-8">@_review.DueDate.ToString("d MMM yyyy")</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Probation Period</dt>
+                    <dd class="col-sm-8">@_review.RecordStartDate.ToString("d MMM yyyy") – @_review.RecordExpectedEndDate.ToString("d MMM yyyy")</dd>
+                </dl>
+                <hr class="my-3" />
+                @if (_review.ReviewType is "FinalDecision")
+                {
+                    <div class="mb-3">
+                        <label class="form-label fw-medium">Outcome <span class="text-danger">*</span></label>
+                        <select class="form-select" @bind="_outcome">
+                            <option value="">Select outcome…</option>
+                            <option value="Pass">Pass</option>
+                            <option value="Fail">Fail</option>
+                            <option value="Extend">Extend probation</option>
+                        </select>
+                    </div>
+                    @if (_outcome == "Extend")
+                    {
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">New Probation End Date <span class="text-danger">*</span></label>
+                            <SfDatePicker TValue="DateOnly?" @bind-Value="_extensionDate" Format="dd/MM/yyyy" />
+                        </div>
+                    }
+                }
             }
-            <i class="fa-solid fa-check me-1"></i>Complete Review
-        </button>
+            <div class="mb-3">
+                <label class="form-label fw-medium">
+                    @NotesLabel(_outcome)
+                    @if (_outcome is "Fail" or "Extend")
+                    {
+                        <span class="text-danger"> *</span>
+                    }
+                    else
+                    {
+                        <span class="text-muted fw-normal"> (optional)</span>
+                    }
+                </label>
+                <textarea class="form-control"
+                          rows="3"
+                          @bind="_notes"
+                          placeholder="@NotesPlaceholder(_outcome)" />
+            </div>
+            @if (_error is not null)
+            {
+                <div class="alert alert-danger mb-3">@_error</div>
+            }
+            <button class="btn btn-success"
+                    @onclick="CompleteReviewAsync"
+                    disabled="@_submitting">
+                @if (_submitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                <i class="fa-solid fa-check me-1"></i>Complete Review
+            </button>
+        }
     </div>
 </div>
 
@@ -63,11 +94,16 @@
     private ProbationReviewDetailModel? _review;
     private string? _notes;
     private string? _outcome;
+    private DateOnly? _extensionDate;
     private string? _error;
     private bool _submitting;
+    private bool _justCompleted;
+    private string? _successOutcome;
 
     protected override async Task OnParametersSetAsync()
     {
+        if (_justCompleted) return;
+
         if (Task.SourceEntityId.HasValue)
             _review = await ProbationService.GetProbationReviewAsync(CompanyId, Task.SourceEntityId.Value);
     }
@@ -82,21 +118,67 @@
             return;
         }
 
+        if (_outcome == "Extend" && !_extensionDate.HasValue)
+        {
+            _error = "A new probation end date is required when extending.";
+            return;
+        }
+
+        if (_outcome == "Extend" && _extensionDate <= DateOnly.FromDateTime(DateTime.Today))
+        {
+            _error = "The new probation end date must be in the future.";
+            return;
+        }
+
+        if (_outcome is "Fail" or "Extend" && string.IsNullOrWhiteSpace(_notes))
+        {
+            _error = _outcome == "Extend" ? "An extension reason is required." : "A reason is required when failing probation.";
+            return;
+        }
+
         _submitting = true;
         _error = null;
 
-        var success = await TaskService.CompleteTaskAsync(
-            CompanyId, Task.Id,
-            string.IsNullOrWhiteSpace(_outcome) ? null : _outcome,
-            _notes);
+        var outcomeDecision = _outcome == "Extend"
+            ? $"Extend|{_extensionDate!.Value:yyyy-MM-dd}"
+            : string.IsNullOrWhiteSpace(_outcome) ? null : _outcome;
+
+        var success = await TaskService.CompleteTaskAsync(CompanyId, Task.Id, outcomeDecision, _notes);
 
         _submitting = false;
 
         if (success)
-            await OnCompleted.InvokeAsync();
+        {
+            _justCompleted = true;
+            _successOutcome = _outcome switch
+            {
+                "Pass"   => "Passed",
+                "Fail"   => "Failed",
+                "Extend" => "Extended",
+                _        => null
+            };
+        }
         else
+        {
             _error = "Failed to complete the review. Please try again.";
+        }
     }
+
+    private async Task DismissAsync() => await OnCompleted.InvokeAsync();
+
+    private static string NotesLabel(string? outcome) => outcome switch
+    {
+        "Fail"   => "Reason for failure",
+        "Extend" => "Extension reason",
+        _        => "Notes"
+    };
+
+    private static string NotesPlaceholder(string? outcome) => outcome switch
+    {
+        "Fail"   => "Enter the reason for failing probation…",
+        "Extend" => "Enter the reason for extending probation…",
+        _        => "Enter your review notes…"
+    };
 
     private static string FormatReviewType(string reviewType) => reviewType switch
     {

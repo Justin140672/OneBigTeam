@@ -185,10 +185,12 @@ public class CompleteProbationReviewHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_ValidationError_When_FinalDecision_Has_Extend_Outcome()
+    public async Task HandleAsync_Completes_FinalDecision_With_Extend_Outcome()
     {
         await using var context = BuildContext();
-        var companyId = Guid.NewGuid();
+        var companyId   = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+        var newEndDate  = new DateOnly(2026, 12, 1);
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
 
@@ -198,15 +200,20 @@ public class CompleteProbationReviewHandlerTests
                 CompanyId = companyId,
                 ProbationRecordId = record.Id,
                 ReviewId = review.Id,
-                CompletedByEmployeeId = Guid.NewGuid(),
+                CompletedByEmployeeId = completedBy,
                 Outcome = ProbationOutcome.Extend,
                 DecisionDate = new DateOnly(2026, 9, 1),
-                NewExpectedEndDate = new DateOnly(2026, 12, 1),
+                NewExpectedEndDate = newEndDate,
                 ExtensionReason = "Needs more time."
             }, CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("validation", result.Error.Code);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Completed", result.Value!.Status);
+
+        var savedRecord = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(ProbationStatus.Extended, savedRecord.Status);
+        Assert.Equal(newEndDate, savedRecord.ExpectedEndDate);
+        Assert.Equal("Needs more time.", savedRecord.ExtensionReason);
     }
 
     [Fact]

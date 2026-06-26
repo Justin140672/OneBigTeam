@@ -22,6 +22,11 @@ internal sealed class CompleteProbationReviewValidator : AbstractValidator<Compl
             .When(r => r.Outcome == ProbationOutcome.Extend)
             .WithMessage("NewExpectedEndDate is required when extending probation.");
 
+        RuleFor(r => r.NewExpectedEndDate)
+            .Must(date => date > DateOnly.FromDateTime(DateTime.UtcNow))
+            .When(r => r.Outcome == ProbationOutcome.Extend && r.NewExpectedEndDate.HasValue)
+            .WithMessage("NewExpectedEndDate must be in the future.");
+
         RuleFor(r => r.ExtensionReason)
             .NotEmpty()
             .When(r => r.Outcome == ProbationOutcome.Extend)

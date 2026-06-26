@@ -91,6 +91,34 @@ public class CompleteProbationReviewFromTaskActionTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_Completes_FinalDecision_With_Extend_And_Sets_Record_To_Extended()
+    {
+        await using var context = BuildContext();
+        var companyId   = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+        var newEndDate  = new DateOnly(2026, 10, 7);
+
+        var (_, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+
+        var taskContext = BuildContext(companyId, completedBy, review.Id,
+            outcomeDecision: $"Extend|{newEndDate:yyyy-MM-dd}",
+            notes: "Needs more time to demonstrate improvement.");
+
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow))
+            .ExecuteAsync(taskContext, CancellationToken.None);
+
+        var savedRecord = await context.ProbationRecords.SingleAsync();
+        Assert.Equal(ProbationStatus.Extended, savedRecord.Status);
+        Assert.Equal(newEndDate, savedRecord.ExpectedEndDate);
+        Assert.Equal(completedBy, savedRecord.DecisionMakerEmployeeId);
+        Assert.Equal(Today, savedRecord.DecisionDate);
+        Assert.Equal("Needs more time to demonstrate improvement.", savedRecord.ExtensionReason);
+
+        var savedReview = await context.ProbationReviews.SingleAsync();
+        Assert.Equal(ProbationReviewStatus.Completed, savedReview.Status);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_Completes_HrReview_Without_Outcome()
     {
         await using var context = BuildContext();

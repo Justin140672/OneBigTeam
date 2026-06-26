@@ -33,21 +33,34 @@ internal sealed class CompleteProbationReviewFromTaskAction(
         var now          = clock.UtcNowOffset();
         var decisionDate = DateOnly.FromDateTime(now.DateTime);
 
-        ProbationOutcome? outcome = context.OutcomeDecision switch
-        {
-            "Pass"   => ProbationOutcome.Pass,
-            "Fail"   => ProbationOutcome.Fail,
-            "Extend" => ProbationOutcome.Extend,
-            _        => null
-        };
+        var (outcome, extensionEndDate) = ParseOutcome(context.OutcomeDecision);
 
         if (outcome == ProbationOutcome.Pass)
             record.Pass(context.CompletedBy, decisionDate, context.OutcomeReason, now);
         else if (outcome == ProbationOutcome.Fail)
             record.Fail(context.CompletedBy, decisionDate, context.OutcomeReason, now);
+        else if (outcome == ProbationOutcome.Extend && extensionEndDate.HasValue)
+            record.Extend(extensionEndDate.Value, context.OutcomeReason ?? "Probation extended.", context.CompletedBy, decisionDate, now);
 
         review.Complete(context.CompletedBy, context.OutcomeReason, now);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    // OutcomeDecision is "Pass", "Fail", or "Extend|yyyy-MM-dd".
+    private static (ProbationOutcome? outcome, DateOnly? extensionEndDate) ParseOutcome(string? outcomeDecision)
+    {
+        if (outcomeDecision is null) return (null, null);
+
+        if (outcomeDecision.StartsWith("Extend|", StringComparison.Ordinal)
+            && DateOnly.TryParse(outcomeDecision[7..], out var d))
+            return (ProbationOutcome.Extend, d);
+
+        return outcomeDecision switch
+        {
+            "Pass" => (ProbationOutcome.Pass, null),
+            "Fail" => (ProbationOutcome.Fail, null),
+            _      => (null, null)
+        };
     }
 }

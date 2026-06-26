@@ -45,9 +45,9 @@ internal sealed class CompleteProbationReviewHandler
                 Error.Validation("Probation review is already completed."));
 
         if (review.ReviewType == ProbationReviewType.FinalDecision
-            && request.Outcome is not (ProbationOutcome.Pass or ProbationOutcome.Fail))
+            && request.Outcome is not (ProbationOutcome.Pass or ProbationOutcome.Fail or ProbationOutcome.Extend))
             return Result.Failure<CompleteProbationReviewResponse>(
-                Error.Validation("A Pass or Fail outcome is required when completing a FinalDecision review."));
+                Error.Validation("A Pass, Fail, or Extend outcome is required when completing a FinalDecision review."));
 
         if (review.ReviewType == ProbationReviewType.ExtensionConfirmation
             && request.Outcome != ProbationOutcome.Extend)
