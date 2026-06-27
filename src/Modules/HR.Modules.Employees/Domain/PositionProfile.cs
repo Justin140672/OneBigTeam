@@ -2,6 +2,8 @@ namespace HR.Modules.Employees.Domain;
 
 internal sealed class PositionProfile
 {
+    private readonly List<PositionProfileRequiredDocument> _requiredDocuments = [];
+
     private PositionProfile() { }
 
     public Guid Id { get; private set; }
@@ -14,6 +16,8 @@ internal sealed class PositionProfile
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    public IReadOnlyList<PositionProfileRequiredDocument> RequiredDocuments => _requiredDocuments.AsReadOnly();
 
     public static PositionProfile Create(
         Guid id,

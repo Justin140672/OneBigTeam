@@ -24,7 +24,15 @@ public record GetPositionProfileResponse(
     bool IsManagerial,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    IReadOnlyList<PositionProfileRequiredDocumentModel> RequiredDocuments);
+
+public record PositionProfileRequiredDocumentModel(
+    Guid Id,
+    Guid DocumentTypeId,
+    bool IsMandatory,
+    int? DueDaysAfterStart,
+    bool RequiresExpiryDate);
 
 // ── EDIT MODEL ────────────────────────────────────────────────────────────────
 

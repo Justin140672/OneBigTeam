@@ -15,6 +15,11 @@ internal sealed class PositionProfileRequiredDocument
     public DateTimeOffset CreatedAt { get; private set; }
     public Guid CreatedBy { get; private set; }
 
+    public void Deactivate()
+    {
+        IsActive = false;
+    }
+
     public static PositionProfileRequiredDocument Create(
         Guid id,
         Guid companyId,

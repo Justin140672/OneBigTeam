@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd *)",
+      "PowerShell(dotnet ef *)",
+      "PowerShell(dotnet restore *)"
+    ]
+  }
+}

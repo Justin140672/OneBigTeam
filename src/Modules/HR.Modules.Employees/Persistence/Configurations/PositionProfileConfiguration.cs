@@ -53,5 +53,13 @@ internal sealed class PositionProfileConfiguration : IEntityTypeConfiguration<Po
 
         builder.HasIndex(p => p.CompanyId);
         builder.HasIndex(p => p.DepartmentId);
+
+        builder.HasMany(p => p.RequiredDocuments)
+            .WithOne()
+            .HasForeignKey(d => d.PositionProfileId)
+            .IsRequired();
+
+        builder.Navigation(p => p.RequiredDocuments)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

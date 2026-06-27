@@ -19,6 +19,7 @@ internal sealed class GetPositionProfileHandler
     {
         var profile = await _dbContext.PositionProfiles
             .AsNoTracking()
+            .Include(p => p.RequiredDocuments)
             .SingleOrDefaultAsync(
                 p => p.Id == request.Id && p.CompanyId == request.CompanyId,
                 cancellationToken);
@@ -29,6 +30,11 @@ internal sealed class GetPositionProfileHandler
                 Error.NotFound($"Position profile with id '{request.Id}' was not found."));
         }
 
+        var requiredDocuments = profile.RequiredDocuments
+            .Where(d => d.IsActive)
+            .Select(d => new RequiredDocumentItem(d.Id, d.DocumentTypeId, d.IsMandatory, d.DueDaysAfterStart, d.RequiresExpiryDate))
+            .ToList();
+
         return Result.Success(new GetPositionProfileResponse(
             profile.Id,
             profile.CompanyId,
@@ -38,6 +44,7 @@ internal sealed class GetPositionProfileHandler
             profile.IsManagerial,
             profile.IsActive,
             profile.CreatedAt,
-            profile.UpdatedAt));
+            profile.UpdatedAt,
+            requiredDocuments));
     }
 }
