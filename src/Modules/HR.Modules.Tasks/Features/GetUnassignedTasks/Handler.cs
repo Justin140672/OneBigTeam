@@ -29,6 +29,7 @@ internal sealed class GetUnassignedTasksHandler(TasksDbContext dbContext)
                 t.Status.ToString(),
                 t.Priority.ToString(),
                 t.Source.ToString(),
+                t.ActionType.ToString(),
                 t.DueDate,
                 t.SourceEntityId,
                 t.CreatedBy,

@@ -11,7 +11,8 @@ internal sealed class CompleteProbationReviewFromTaskAction(
     IClock clock,
     IAuditEventPublisher auditPublisher) : ITaskCompletionAction
 {
-    public TaskSource Source => TaskSource.ProbationReview;
+    public TaskSource Source => TaskSource.Probation;
+    public TaskActionType ActionType => TaskActionType.Review;
 
     public async Task ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
     {

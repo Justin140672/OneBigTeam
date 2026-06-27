@@ -21,6 +21,7 @@ public class LeaveTaskCompletionActionTests
             Title:             "Review leave request — Alice",
             Description:       null,
             Source:            TaskSource.Leave,
+            ActionType:        TaskActionType.Approve,
             AssignedEmployeeId: null,
             CompletedBy:       CompletedBy,
             CompletedAt:       DateTimeOffset.UtcNow,

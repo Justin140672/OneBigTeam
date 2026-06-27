@@ -91,11 +91,12 @@ public static class TasksModule
             string title, string? description,
             TaskPriority priority, TaskSource source,
             DateOnly? dueDate, Guid? assignedEmployeeId,
-            TaskItemStatus status = TaskItemStatus.Open)
+            TaskItemStatus status = TaskItemStatus.Open,
+            TaskActionType actionType = TaskActionType.Complete)
         {
             var t = TaskItem.Create(
                 id, companyId, devUserId,
-                title, description, priority, source,
+                title, description, priority, source, actionType,
                 dueDate, assignedEmployeeId, devUserId, now);
             if (status == TaskItemStatus.InProgress) t.Start(now);
             return t;
@@ -156,13 +157,13 @@ public static class TasksModule
                 TaskPriority.High, TaskSource.Manual,
                 new DateOnly(2026, 6, 10), empCtoId));
 
-        // ProbationReview task — linked to the active seeded review in ProbationModule seed.
+        // Probation review task — linked to the active seeded review in ProbationModule seed.
         // Assigned to Sarah (dev user) so it appears in her task list during E2E tests.
         db.TaskItems.Add(TaskItem.Create(
             taskProbationReviewId, companyId, empCtoId,
             "Complete probation review — Carlos Rivera",
             "Probation manager check-in due 7 May 2026.",
-            TaskPriority.High, TaskSource.ProbationReview,
+            TaskPriority.High, TaskSource.Probation, TaskActionType.Review,
             new DateOnly(2026, 5, 7),
             assignedEmployeeId: empCtoId,
             assignedUserId: devUserId,

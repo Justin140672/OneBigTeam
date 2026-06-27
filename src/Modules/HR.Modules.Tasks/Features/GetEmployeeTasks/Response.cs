@@ -10,6 +10,7 @@ internal sealed record EmployeeTaskItem(
     string Status,
     string Priority,
     string Source,
+    string ActionType,
     DateOnly? DueDate,
     Guid? AssignedEmployeeId,
     Guid? AssignedUserId,

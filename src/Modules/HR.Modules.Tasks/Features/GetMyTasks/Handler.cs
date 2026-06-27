@@ -40,6 +40,7 @@ internal sealed class GetMyTasksHandler(TasksDbContext dbContext, IEmployeeNameR
             t.Status.ToString(),
             t.Priority.ToString(),
             t.Source.ToString(),
+            t.ActionType.ToString(),
             t.DueDate,
             t.AssignedEmployeeId,
             t.AssignedUserId,

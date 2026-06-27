@@ -9,6 +9,7 @@ public interface ITaskCreator
         string? description,
         TaskPriority priority,
         TaskSource source,
+        TaskActionType actionType,
         DateOnly? dueDate,
         Guid? assignedEmployeeId,
         Guid? assignedUserId,

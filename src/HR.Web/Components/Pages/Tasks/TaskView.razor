@@ -63,11 +63,11 @@
 
                 @if (_task.Status is "Open" or "InProgress")
                 {
-                    @if (_task.Source == "Leave")
+                    @if (_task.ActionType == "Approve" && _task.Source == "Leave")
                     {
                         <LeaveTaskPanel CompanyId="CompanyId" Task="_task" OnCompleted="ReloadAsync" />
                     }
-                    else if (_task.Source == "ProbationReview")
+                    else if (_task.ActionType == "Review" && _task.Source == "Probation")
                     {
                         <ProbationReviewPanel CompanyId="CompanyId" Task="_task" OnCompleted="ReloadAsync" />
                     }

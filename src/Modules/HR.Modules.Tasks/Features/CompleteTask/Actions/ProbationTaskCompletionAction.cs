@@ -10,7 +10,8 @@ namespace HR.Modules.Tasks.Features.CompleteTask.Actions;
 /// </summary>
 internal sealed class ProbationTaskCompletionAction(ITaskCreator taskCreator, IClock clock) : ITaskCompletionAction
 {
-    public TaskSource Source => TaskSource.ProbationReview;
+    public TaskSource Source => TaskSource.Probation;
+    public TaskActionType ActionType => TaskActionType.Review;
 
     public async Task ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
     {
@@ -25,6 +26,7 @@ internal sealed class ProbationTaskCompletionAction(ITaskCreator taskCreator, IC
             "or extension letter to the employee within three working days.",
             TaskPriority.High,
             TaskSource.Probation,
+            TaskActionType.Complete,
             dueDate,
             assignedEmployeeId: null,
             assignedUserId: null,

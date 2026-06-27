@@ -9,6 +9,7 @@ public sealed record TaskCompletionContext(
     string Title,
     string? Description,
     TaskSource Source,
+    TaskActionType ActionType,
     Guid? AssignedEmployeeId,
     Guid CompletedBy,
     DateTimeOffset CompletedAt,

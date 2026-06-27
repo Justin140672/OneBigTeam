@@ -37,6 +37,7 @@ internal sealed class RequestPersonalDetailsChangeHandler(
             description:         description,
             priority:            TaskPriority.Medium,
             source:              TaskSource.Manual,
+            actionType:          TaskActionType.Complete,
             dueDate:             null,
             assignedEmployeeId:  null,
             assignedUserId:      null,

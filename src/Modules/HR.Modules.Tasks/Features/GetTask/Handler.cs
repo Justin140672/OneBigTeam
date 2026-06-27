@@ -28,6 +28,7 @@ internal sealed class GetTaskHandler(TasksDbContext dbContext)
             task.Status.ToString(),
             task.Priority.ToString(),
             task.Source.ToString(),
+            task.ActionType.ToString(),
             task.DueDate,
             task.AssignedEmployeeId,
             task.AssignedUserId,

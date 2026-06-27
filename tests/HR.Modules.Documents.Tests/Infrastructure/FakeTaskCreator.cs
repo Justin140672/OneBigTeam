@@ -15,6 +15,7 @@ internal sealed class FakeTaskCreator : ITaskCreator
         string? description,
         TaskPriority priority,
         TaskSource source,
+        TaskActionType actionType,
         DateOnly? dueDate,
         Guid? assignedEmployeeId,
         Guid? assignedUserId,
@@ -23,7 +24,7 @@ internal sealed class FakeTaskCreator : ITaskCreator
     {
         var id = Guid.NewGuid();
         _created.Add(new CreatedTask(
-            id, companyId, title, description, priority, source,
+            id, companyId, title, description, priority, source, actionType,
             dueDate, assignedEmployeeId, assignedUserId, sourceEntityId));
         return Task.FromResult(id);
     }
@@ -35,6 +36,7 @@ internal sealed class FakeTaskCreator : ITaskCreator
         string? Description,
         TaskPriority Priority,
         TaskSource Source,
+        TaskActionType ActionType,
         DateOnly? DueDate,
         Guid? AssignedEmployeeId,
         Guid? AssignedUserId,

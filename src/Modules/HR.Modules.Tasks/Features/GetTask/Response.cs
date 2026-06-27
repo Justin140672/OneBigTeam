@@ -8,6 +8,7 @@ internal sealed record GetTaskResponse(
     string Status,
     string Priority,
     string Source,
+    string ActionType,
     DateOnly? DueDate,
     Guid? AssignedEmployeeId,
     Guid? AssignedUserId,

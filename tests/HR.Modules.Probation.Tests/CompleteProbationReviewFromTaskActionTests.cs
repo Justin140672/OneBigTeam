@@ -15,12 +15,13 @@ public class CompleteProbationReviewFromTaskActionTests
     private static readonly DateOnly Today = new(2026, 6, 25);
 
     [Fact]
-    public void Source_Is_ProbationReview()
+    public void Source_Is_Probation()
     {
         using var context = BuildContext();
         var action = new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
-        Assert.Equal(TaskSource.ProbationReview, action.Source);
+        Assert.Equal(TaskSource.Probation, action.Source);
+        Assert.Equal(TaskActionType.Review, action.ActionType);
     }
 
     [Fact]
@@ -202,7 +203,8 @@ public class CompleteProbationReviewFromTaskActionTests
             Guid.NewGuid(),
             "Complete probation review — Test Employee",
             null,
-            TaskSource.ProbationReview,
+            TaskSource.Probation,
+            TaskActionType.Review,
             null,
             completedBy,
             Now,

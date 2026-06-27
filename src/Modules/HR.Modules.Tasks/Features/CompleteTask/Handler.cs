@@ -63,6 +63,7 @@ internal sealed class CompleteTaskHandler(
             task.Title,
             task.Description,
             task.Source,
+            task.ActionType,
             task.AssignedEmployeeId,
             task.CompletedBy!.Value,
             task.CompletedAt!.Value,

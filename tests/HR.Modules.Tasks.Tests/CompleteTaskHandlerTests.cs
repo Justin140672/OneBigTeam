@@ -26,7 +26,7 @@ public class CompleteTaskHandlerTests
     {
         var t = TaskItem.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
-            "Task", null, TaskPriority.Medium, TaskSource.Manual,
+            "Task", null, TaskPriority.Medium, TaskSource.Manual, TaskActionType.Complete,
             null, null, null, DateTimeOffset.UtcNow);
 
         if (status == TaskItemStatus.InProgress) t.Start(DateTimeOffset.UtcNow);
@@ -169,7 +169,7 @@ public class CompleteTaskHandlerTests
         var task = TaskItem.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
             "Complete me", "Details",
-            TaskPriority.Critical, TaskSource.Sickness,
+            TaskPriority.Critical, TaskSource.Sickness, TaskActionType.Complete,
             new DateOnly(2026, 7, 1), assignedEmployee, null, DateTimeOffset.UtcNow);
 
         context.TaskItems.Add(task);
@@ -256,7 +256,7 @@ public class CompleteTaskHandlerTests
 
         var task = TaskItem.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
-            "Onboarding checklist", null, TaskPriority.Medium, TaskSource.Manual,
+            "Onboarding checklist", null, TaskPriority.Medium, TaskSource.Manual, TaskActionType.Complete,
             null, assignedEmployee, null, DateTimeOffset.UtcNow);
 
         context.TaskItems.Add(task);

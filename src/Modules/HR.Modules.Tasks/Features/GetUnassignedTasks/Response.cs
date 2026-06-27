@@ -10,6 +10,7 @@ internal sealed record UnassignedTaskItem(
     string Status,
     string Priority,
     string Source,
+    string ActionType,
     DateOnly? DueDate,
     Guid? SourceEntityId,
     Guid CreatedBy,

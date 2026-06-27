@@ -56,13 +56,16 @@ public sealed class DashboardPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<IReadOnlyList<string>> GetUpcomingProbationEmployeeNamesAsync()
     {
-        // Wait for the widget body to finish loading (spinner gone).
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || " +
-            "!document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        var probationWidget = page.Locator(".widget-card")
+            .Filter(new() { HasText = "Upcoming Probation Reviews" });
 
-        var titles = await page.Locator(".task-widget-item .task-widget-title").AllAsync();
+        // Wait for the widget to finish loading — items or empty state replaces the spinner.
+        await probationWidget
+            .Locator(".task-widget-item, .widget-empty")
+            .First
+            .WaitForAsync(new() { Timeout = 15_000 });
+
+        var titles = await probationWidget.Locator(".task-widget-title").AllAsync();
         var names  = new List<string>();
         foreach (var t in titles)
             names.Add((await t.TextContentAsync())?.Trim() ?? "");

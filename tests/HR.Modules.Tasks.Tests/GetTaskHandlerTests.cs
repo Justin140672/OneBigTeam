@@ -23,7 +23,7 @@ public class GetTaskHandlerTests
         var task = TaskItem.Create(
             Guid.NewGuid(), companyId, createdBy,
             "Review contract", "Check all clauses",
-            TaskPriority.High, TaskSource.Document,
+            TaskPriority.High, TaskSource.Document, TaskActionType.Complete,
             due, assignedEmployee, null, Now);
 
         context.TaskItems.Add(task);
@@ -72,7 +72,7 @@ public class GetTaskHandlerTests
 
         var task = TaskItem.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            "Some task", null, TaskPriority.Low, TaskSource.Manual,
+            "Some task", null, TaskPriority.Low, TaskSource.Manual, TaskActionType.Complete,
             null, null, null, Now);
 
         context.TaskItems.Add(task);
@@ -96,7 +96,7 @@ public class GetTaskHandlerTests
 
         var task = TaskItem.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
-            "Completed task", null, TaskPriority.Medium, TaskSource.System,
+            "Completed task", null, TaskPriority.Medium, TaskSource.System, TaskActionType.Complete,
             null, null, null, Now);
         task.Complete(completedBy, completedAt);
 

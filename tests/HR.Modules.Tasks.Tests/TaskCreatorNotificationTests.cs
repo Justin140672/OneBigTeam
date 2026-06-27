@@ -24,7 +24,7 @@ public class TaskCreatorNotificationTests
         await creator.CreateAsync(
             companyId, Guid.NewGuid(),
             "Review leave request", "Some detail",
-            TaskPriority.Medium, TaskSource.Leave,
+            TaskPriority.Medium, TaskSource.Leave, TaskActionType.Approve,
             new DateOnly(2026, 7, 1),
             assignedEmployeeId: assignedEmployeeId,
             assignedUserId: null,
@@ -51,7 +51,7 @@ public class TaskCreatorNotificationTests
         await creator.CreateAsync(
             Guid.NewGuid(), Guid.NewGuid(),
             "Unassigned task", null,
-            TaskPriority.Low, TaskSource.Manual,
+            TaskPriority.Low, TaskSource.Manual, TaskActionType.Complete,
             null,
             assignedEmployeeId: null,
             assignedUserId: null,
@@ -74,7 +74,7 @@ public class TaskCreatorNotificationTests
         await creator.CreateAsync(
             companyId, Guid.NewGuid(),
             "A task", null,
-            TaskPriority.High, TaskSource.Manual,
+            TaskPriority.High, TaskSource.Manual, TaskActionType.Complete,
             null,
             assignedEmployeeId: assignedEmployeeId,
             assignedUserId: null,
@@ -101,7 +101,7 @@ public class TaskCreatorNotificationTests
         await creator.CreateAsync(
             Guid.NewGuid(), Guid.NewGuid(),
             "A task", null,
-            taskPriority, TaskSource.Manual,
+            taskPriority, TaskSource.Manual, TaskActionType.Complete,
             null,
             assignedEmployeeId: Guid.NewGuid(),
             assignedUserId: null,
@@ -124,7 +124,7 @@ public class TaskCreatorNotificationTests
         await creator.CreateAsync(
             Guid.NewGuid(), Guid.NewGuid(),
             longTitle, null,
-            TaskPriority.Low, TaskSource.Manual,
+            TaskPriority.Low, TaskSource.Manual, TaskActionType.Complete,
             null,
             assignedEmployeeId: assignedEmployeeId,
             assignedUserId: null,

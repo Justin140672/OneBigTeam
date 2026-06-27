@@ -54,6 +54,7 @@ internal sealed class GetTeamTasksHandler(
             t.Status.ToString(),
             t.Priority.ToString(),
             t.Source.ToString(),
+            t.ActionType.ToString(),
             t.DueDate,
             t.AssignedEmployeeId,
             t.AssignedUserId,

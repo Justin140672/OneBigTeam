@@ -13,6 +13,5 @@ public enum TaskSource
     Asset = 9,
     Compliance = 10,
     Workflow = 11,
-    System = 12,
-    ProbationReview = 13
+    System = 12
 }

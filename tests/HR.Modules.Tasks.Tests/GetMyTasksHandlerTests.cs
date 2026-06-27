@@ -20,7 +20,7 @@ public class GetMyTasksHandlerTests
     {
         var t = TaskItem.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
-            title, null, TaskPriority.Medium, TaskSource.Manual,
+            title, null, TaskPriority.Medium, TaskSource.Manual, TaskActionType.Complete,
             dueDate, null, assignedUserId, Now);
 
         if (status == TaskItemStatus.InProgress) t.Start(Now);
@@ -187,7 +187,7 @@ public class GetMyTasksHandlerTests
         var task = TaskItem.Create(
             Guid.NewGuid(), companyId, createdBy,
             "Full task", "With all fields",
-            TaskPriority.Critical, TaskSource.Compliance,
+            TaskPriority.Critical, TaskSource.Compliance, TaskActionType.Complete,
             new DateOnly(2026, 12, 1), assignedEmployee, userId, Now);
 
         context.TaskItems.Add(task);

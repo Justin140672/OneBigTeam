@@ -16,7 +16,7 @@ public class TaskItemTests
         DateOnly? dueDate = null,
         Guid? assignedEmployeeId = null,
         Guid? assignedUserId = null) =>
-        TaskItem.Create(Guid.NewGuid(), CompanyId, CreatedBy, title, null, priority, source, dueDate, assignedEmployeeId, assignedUserId, Now);
+        TaskItem.Create(Guid.NewGuid(), CompanyId, CreatedBy, title, null, priority, source, TaskActionType.Complete, dueDate, assignedEmployeeId, assignedUserId, Now);
 
     [Fact]
     public void Create_Sets_Status_To_Open()
@@ -34,7 +34,7 @@ public class TaskItemTests
         var assignedUser = Guid.NewGuid();
         var due = new DateOnly(2026, 6, 30);
 
-        var task = TaskItem.Create(id, CompanyId, CreatedBy, "My Task", "Details", TaskPriority.High, TaskSource.Onboarding, due, assignedEmployee, assignedUser, Now);
+        var task = TaskItem.Create(id, CompanyId, CreatedBy, "My Task", "Details", TaskPriority.High, TaskSource.Onboarding, TaskActionType.Complete, due, assignedEmployee, assignedUser, Now);
 
         Assert.Equal(id, task.Id);
         Assert.Equal(CompanyId, task.CompanyId);

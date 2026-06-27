@@ -14,6 +14,7 @@ internal static class TaskSeeder
         string? description = null,
         TaskPriority priority = TaskPriority.Medium,
         TaskSource source = TaskSource.Manual,
+        TaskActionType actionType = TaskActionType.Complete,
         DateOnly? dueDate = null,
         Guid? assignedEmployeeId = null,
         Guid? assignedUserId = null,
@@ -28,7 +29,7 @@ internal static class TaskSeeder
         var now  = DateTimeOffset.UtcNow;
         var task = TaskItem.Create(
             Guid.NewGuid(), companyId, createdBy ?? Guid.NewGuid(),
-            title, description, priority, source, dueDate,
+            title, description, priority, source, actionType, dueDate,
             assignedEmployeeId, assignedUserId, now,
             sourceEntityId: sourceEntityId);
 

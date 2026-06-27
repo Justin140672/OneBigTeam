@@ -6,6 +6,7 @@ namespace HR.Modules.Tasks.Features.CompleteTask.Actions;
 internal sealed class LeaveTaskCompletionAction(ILeaveApprovalService leaveApprovalService) : ITaskCompletionAction
 {
     public TaskSource Source => TaskSource.Leave;
+    public TaskActionType ActionType => TaskActionType.Approve;
 
     public async Task ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken)
     {

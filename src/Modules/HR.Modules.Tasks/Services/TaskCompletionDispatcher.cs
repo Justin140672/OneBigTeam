@@ -6,7 +6,7 @@ internal sealed class TaskCompletionDispatcher(IEnumerable<ITaskCompletionAction
 {
     public async Task DispatchAsync(TaskCompletionContext context, CancellationToken cancellationToken)
     {
-        foreach (var action in actions.Where(a => a.Source == context.Source))
+        foreach (var action in actions.Where(a => a.Source == context.Source && a.ActionType == context.ActionType))
             await action.ExecuteAsync(context, cancellationToken);
     }
 }

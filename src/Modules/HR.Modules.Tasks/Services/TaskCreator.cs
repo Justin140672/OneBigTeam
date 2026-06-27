@@ -17,6 +17,7 @@ internal sealed class TaskCreator(
         string? description,
         TaskPriority priority,
         TaskSource source,
+        TaskActionType actionType,
         DateOnly? dueDate,
         Guid? assignedEmployeeId,
         Guid? assignedUserId,
@@ -27,7 +28,7 @@ internal sealed class TaskCreator(
             Guid.NewGuid(), companyId, createdBy,
             title.Trim(),
             string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
-            priority, source, dueDate, assignedEmployeeId, assignedUserId,
+            priority, source, actionType, dueDate, assignedEmployeeId, assignedUserId,
             clock.UtcNowOffset(), sourceEntityId);
 
         dbContext.TaskItems.Add(task);

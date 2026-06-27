@@ -22,7 +22,7 @@ public class ReassignTaskHandlerTests
     {
         return TaskItem.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
-            "Original title", null, TaskPriority.Medium, TaskSource.Manual,
+            "Original title", null, TaskPriority.Medium, TaskSource.Manual, TaskActionType.Complete,
             null, assignedEmployeeId, assignedUserId, DateTimeOffset.UtcNow);
     }
 
@@ -150,7 +150,7 @@ public class ReassignTaskHandlerTests
 
         var task = TaskItem.Create(
             Guid.NewGuid(), companyId, createdBy,
-            "My task", "Description", TaskPriority.High, TaskSource.Leave,
+            "My task", "Description", TaskPriority.High, TaskSource.Leave, TaskActionType.Approve,
             new DateOnly(2026, 9, 1), null, null, DateTimeOffset.UtcNow);
 
         context.TaskItems.Add(task);

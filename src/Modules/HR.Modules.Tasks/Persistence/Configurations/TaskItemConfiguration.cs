@@ -47,6 +47,12 @@ internal sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
             .HasMaxLength(30)
             .IsRequired();
 
+        builder.Property(t => t.ActionType)
+            .HasColumnName("action_type")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
         builder.Property(t => t.DueDate)
             .HasColumnName("due_date");
 

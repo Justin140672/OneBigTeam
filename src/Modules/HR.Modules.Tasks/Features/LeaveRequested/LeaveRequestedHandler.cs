@@ -27,6 +27,7 @@ internal sealed class LeaveRequestedHandler(
             $"{e.StartDate:d MMM yyyy} to {e.EndDate:d MMM yyyy} · {e.TotalDays} {dayLabel}. Review and approve or reject this request before the leave begins.",
             TaskPriority.Medium,
             TaskSource.Leave,
+            TaskActionType.Approve,
             dueDate,
             assignedEmployeeId: managerId,
             assignedUserId: managerId,

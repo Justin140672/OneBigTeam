@@ -41,7 +41,8 @@ public class ProbationReviewCompletionFromTaskEndToEndTests : IClassFixture<ApiW
         var taskId = await TaskSeeder.SeedAsync(
             _factory, companyId,
             title: "Complete probation review — Test Employee",
-            source: TaskSource.ProbationReview,
+            source: TaskSource.Probation,
+            actionType: TaskActionType.Review,
             sourceEntityId: reviewId,
             assignedEmployeeId: Guid.NewGuid());
 
@@ -66,7 +67,8 @@ public class ProbationReviewCompletionFromTaskEndToEndTests : IClassFixture<ApiW
         var taskId = await TaskSeeder.SeedAsync(
             _factory, companyId,
             title: "Complete probation review — Test Employee",
-            source: TaskSource.ProbationReview,
+            source: TaskSource.Probation,
+            actionType: TaskActionType.Review,
             sourceEntityId: reviewId,
             assignedEmployeeId: Guid.NewGuid());
 
@@ -94,7 +96,8 @@ public class ProbationReviewCompletionFromTaskEndToEndTests : IClassFixture<ApiW
         var taskId = await TaskSeeder.SeedAsync(
             _factory, companyId,
             title: "Complete probation review — Test Employee",
-            source: TaskSource.ProbationReview,
+            source: TaskSource.Probation,
+            actionType: TaskActionType.Review,
             sourceEntityId: reviewId,
             assignedEmployeeId: Guid.NewGuid());
 
