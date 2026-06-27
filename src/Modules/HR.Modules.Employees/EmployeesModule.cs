@@ -26,6 +26,7 @@ using HR.Modules.Employees.Features.ListPositionProfiles;
 using HR.Modules.Employees.Features.UpdateEmployeeProfile;
 using HR.Modules.Employees.Features.UpdateEmploymentDetails;
 using HR.Modules.Employees.Features.AddRequiredDocumentToPositionProfile;
+using HR.Modules.Employees.Features.ListRequiredDocumentsForPositionProfile;
 using HR.Modules.Employees.Features.RemoveRequiredDocumentFromPositionProfile;
 using HR.Modules.Employees.Features.UpdatePositionProfile;
 using HR.Modules.Employees.Persistence;
@@ -77,6 +78,8 @@ public static class EmployeesModule
         services.AddScoped<IValidator<AddRequiredDocumentRequest>, AddRequiredDocumentValidator>();
 
         services.AddScoped<RemoveRequiredDocumentHandler>();
+
+        services.AddScoped<ListRequiredDocumentsHandler>();
 
         services.AddScoped<CreateEmployeeHandler>();
         services.AddScoped<IValidator<CreateEmployeeRequest>, CreateEmployeeValidator>();

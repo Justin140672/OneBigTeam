@@ -216,5 +216,9 @@ public class AddRequiredDocumentHandlerTests
     {
         public Task<bool> ExistsAsync(Guid companyId, Guid documentTypeId, CancellationToken cancellationToken)
             => Task.FromResult(exists);
+
+        public Task<IReadOnlyDictionary<Guid, string>> GetNamesAsync(
+            Guid companyId, IEnumerable<Guid> documentTypeIds, CancellationToken cancellationToken)
+            => Task.FromResult<IReadOnlyDictionary<Guid, string>>(new Dictionary<Guid, string>());
     }
 }
