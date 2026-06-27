@@ -1,8 +1,6 @@
-using HR.SharedKernel;
+namespace HR.SharedKernel;
 
-namespace HR.Modules.Employees.Features.AddRequiredDocumentToPositionProfile;
-
-internal sealed record RequiredDocumentAddedAuditEvent(
+public sealed record RequiredDocumentRemovedAuditEvent(
     Guid CompanyId,
     Guid PositionProfileId,
     Guid RequiredDocumentId,
@@ -10,14 +8,14 @@ internal sealed record RequiredDocumentAddedAuditEvent(
     Guid ActorEmployeeId,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
-    string IAuditEvent.EventType => "position-profile.required-document.added";
+    string IAuditEvent.EventType => "position-profile.required-document.removed";
     string IAuditEvent.EntityType => "PositionProfile";
     Guid IAuditEvent.EntityId => PositionProfileId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
-    string? IAuditEvent.Summary => "Required document added to position profile";
-    object? IAuditEvent.Before => null;
-    object? IAuditEvent.After => new { RequiredDocumentId, DocumentTypeId };
+    string? IAuditEvent.Summary => "Required document removed from position profile";
+    object? IAuditEvent.Before => new { RequiredDocumentId, DocumentTypeId };
+    object? IAuditEvent.After => null;
     object? IAuditEvent.Metadata => null;
 }
