@@ -1,5 +1,6 @@
 using FluentValidation;
 using HR.Modules.Documents.Domain;
+using HR.SharedKernel.Contracts;
 using HR.Modules.Documents.Features.CreateDocumentType;
 using HR.Modules.Documents.Features.DeactivateDocumentType;
 using HR.Modules.Documents.Features.DeleteEmployeeDocument;
@@ -84,6 +85,8 @@ public static class DocumentsModule
         services.AddScoped<IValidator<GetExpiringDocumentsRequest>, GetExpiringDocumentsValidator>();
 
         services.AddScoped<ProcessDocumentExpiryNotificationsHandler>();
+
+        services.AddScoped<IDocumentTypeReader, DocumentTypeReader>();
     }
 
     public static async Task MigrateDocumentsAsync(this IServiceProvider services)
