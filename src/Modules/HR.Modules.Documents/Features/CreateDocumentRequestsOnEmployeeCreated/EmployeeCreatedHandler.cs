@@ -9,6 +9,8 @@ namespace HR.Modules.Documents.Features.CreateDocumentRequestsOnEmployeeCreated;
 internal sealed class EmployeeCreatedHandler(
     DocumentsDbContext dbContext,
     IPositionProfileDocumentsReader positionProfileDocumentsReader,
+    IDocumentTypeReader documentTypeReader,
+    ITaskCreator taskCreator,
     IClock clock) : IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>
 {
     public async Task HandleAsync(EmployeeCreatedIntegrationEvent e, CancellationToken cancellationToken)
@@ -49,5 +51,28 @@ internal sealed class EmployeeCreatedHandler(
 
         dbContext.DocumentRequests.AddRange(toCreate);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        var typeNames = await documentTypeReader.GetNamesAsync(
+            e.CompanyId,
+            toCreate.Select(r => r.DocumentTypeId),
+            cancellationToken);
+
+        foreach (var request in toCreate)
+        {
+            var typeName = typeNames.GetValueOrDefault(request.DocumentTypeId, "Document");
+            await taskCreator.CreateAsync(
+                e.CompanyId,
+                createdBy:           e.EmployeeId,
+                title:               $"Upload {typeName}",
+                description:         $"Please upload a copy of your {typeName}.",
+                priority:            TaskPriority.Medium,
+                source:              TaskSource.Document,
+                actionType:          TaskActionType.Upload,
+                dueDate:             request.DueDate,
+                assignedEmployeeId:  e.EmployeeId,
+                assignedUserId:      null,
+                sourceEntityId:      request.Id,
+                cancellationToken);
+        }
     }
 }

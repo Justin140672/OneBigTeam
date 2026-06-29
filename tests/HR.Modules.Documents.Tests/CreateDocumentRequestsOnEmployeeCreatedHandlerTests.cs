@@ -18,10 +18,20 @@ public class CreateDocumentRequestsOnEmployeeCreatedHandlerTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 
-    private static EmployeeCreatedHandler BuildHandler(
+    private static (EmployeeCreatedHandler Handler, FakeTaskCreator TaskCreator) BuildHandler(
         DocumentsDbContext db,
-        IReadOnlyList<PositionProfileRequiredDocumentItem> requiredDocs) =>
-        new(db, new FakePositionProfileDocumentsReader(requiredDocs), new FakeClock(FixedUtcNow));
+        IReadOnlyList<PositionProfileRequiredDocumentItem> requiredDocs,
+        IReadOnlyDictionary<Guid, string>? typeNames = null)
+    {
+        var taskCreator = new FakeTaskCreator();
+        var handler = new EmployeeCreatedHandler(
+            db,
+            new FakePositionProfileDocumentsReader(requiredDocs),
+            new FakeDocumentTypeReader(typeNames ?? new Dictionary<Guid, string>()),
+            taskCreator,
+            new FakeClock(FixedUtcNow));
+        return (handler, taskCreator);
+    }
 
     private static EmployeeCreatedIntegrationEvent MakeEvent(
         Guid companyId,
@@ -35,6 +45,8 @@ public class CreateDocumentRequestsOnEmployeeCreatedHandlerTests
         Guid? id = null) =>
         new(id ?? Guid.NewGuid(), documentTypeId, IsMandatory: true,
             DueDaysAfterStart: dueDaysAfterStart, RequiresExpiryDate: false);
+
+    // ── DocumentRequest creation ─────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Creates_DocumentRequests_For_All_Active_Required_Documents()
@@ -50,7 +62,7 @@ public class CreateDocumentRequestsOnEmployeeCreatedHandlerTests
             MakeDoc(Guid.NewGuid(), dueDaysAfterStart: null),
         };
 
-        var handler = BuildHandler(db, required);
+        var (handler, _) = BuildHandler(db, required);
         await handler.HandleAsync(MakeEvent(companyId, employeeId, positionProfileId), CancellationToken.None);
 
         var requests = await db.DocumentRequests.ToListAsync();
@@ -64,7 +76,7 @@ public class CreateDocumentRequestsOnEmployeeCreatedHandlerTests
     public async Task HandleAsync_Skips_When_PositionProfileId_Is_Null()
     {
         await using var db = BuildContext();
-        var handler = BuildHandler(db, []);
+        var (handler, _) = BuildHandler(db, []);
 
         await handler.HandleAsync(MakeEvent(Guid.NewGuid(), Guid.NewGuid(), positionProfileId: null), CancellationToken.None);
 
@@ -75,7 +87,7 @@ public class CreateDocumentRequestsOnEmployeeCreatedHandlerTests
     public async Task HandleAsync_Skips_When_No_Required_Documents_Configured()
     {
         await using var db = BuildContext();
-        var handler = BuildHandler(db, []);
+        var (handler, _) = BuildHandler(db, []);
 
         await handler.HandleAsync(MakeEvent(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
 
@@ -87,8 +99,7 @@ public class CreateDocumentRequestsOnEmployeeCreatedHandlerTests
     {
         await using var db = BuildContext();
         var docTypeId  = Guid.NewGuid();
-        var required   = new[] { MakeDoc(docTypeId, dueDaysAfterStart: 30) };
-        var handler    = BuildHandler(db, required);
+        var (handler, _) = BuildHandler(db, [MakeDoc(docTypeId, dueDaysAfterStart: 30)]);
 
         await handler.HandleAsync(MakeEvent(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
 
@@ -100,9 +111,7 @@ public class CreateDocumentRequestsOnEmployeeCreatedHandlerTests
     public async Task HandleAsync_Sets_DueDate_Null_When_DueDaysAfterStart_Is_Null()
     {
         await using var db = BuildContext();
-        var docTypeId  = Guid.NewGuid();
-        var required   = new[] { MakeDoc(docTypeId, dueDaysAfterStart: null) };
-        var handler    = BuildHandler(db, required);
+        var (handler, _) = BuildHandler(db, [MakeDoc(Guid.NewGuid(), dueDaysAfterStart: null)]);
 
         await handler.HandleAsync(MakeEvent(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
 
@@ -116,8 +125,7 @@ public class CreateDocumentRequestsOnEmployeeCreatedHandlerTests
         await using var db = BuildContext();
         var docTypeId = Guid.NewGuid();
         var reqDocId  = Guid.NewGuid();
-        var required  = new[] { MakeDoc(docTypeId, id: reqDocId) };
-        var handler   = BuildHandler(db, required);
+        var (handler, _) = BuildHandler(db, [MakeDoc(docTypeId, id: reqDocId)]);
 
         await handler.HandleAsync(MakeEvent(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
 
@@ -131,9 +139,7 @@ public class CreateDocumentRequestsOnEmployeeCreatedHandlerTests
         await using var db = BuildContext();
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        var docTypeId  = Guid.NewGuid();
-        var required   = new[] { MakeDoc(docTypeId) };
-        var handler    = BuildHandler(db, required);
+        var (handler, _) = BuildHandler(db, [MakeDoc(Guid.NewGuid())]);
         var evt        = MakeEvent(companyId, employeeId, Guid.NewGuid());
 
         await handler.HandleAsync(evt, CancellationToken.None);
@@ -147,9 +153,7 @@ public class CreateDocumentRequestsOnEmployeeCreatedHandlerTests
     {
         await using var db = BuildContext();
         var companyId  = Guid.NewGuid();
-        var docTypeId  = Guid.NewGuid();
-        var required   = new[] { MakeDoc(docTypeId) };
-        var handler    = BuildHandler(db, required);
+        var (handler, _) = BuildHandler(db, [MakeDoc(Guid.NewGuid())]);
 
         await handler.HandleAsync(MakeEvent(companyId, Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
         await handler.HandleAsync(MakeEvent(companyId, Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
@@ -161,12 +165,156 @@ public class CreateDocumentRequestsOnEmployeeCreatedHandlerTests
     public async Task HandleAsync_Sets_CreatedAt_From_Clock()
     {
         await using var db = BuildContext();
-        var required   = new[] { MakeDoc(Guid.NewGuid()) };
-        var handler    = BuildHandler(db, required);
+        var (handler, _) = BuildHandler(db, [MakeDoc(Guid.NewGuid())]);
 
         await handler.HandleAsync(MakeEvent(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
 
         var request = await db.DocumentRequests.SingleAsync();
         Assert.Equal(new DateTimeOffset(FixedUtcNow, TimeSpan.Zero), request.CreatedAt);
+    }
+
+    // ── Task creation ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_Creates_One_Upload_Task_Per_DocumentRequest()
+    {
+        await using var db = BuildContext();
+        var docTypeId1 = Guid.NewGuid();
+        var docTypeId2 = Guid.NewGuid();
+        var typeNames  = new Dictionary<Guid, string> { [docTypeId1] = "Passport", [docTypeId2] = "Right To Work" };
+        var (handler, taskCreator) = BuildHandler(db,
+            [MakeDoc(docTypeId1), MakeDoc(docTypeId2)],
+            typeNames);
+
+        await handler.HandleAsync(MakeEvent(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+
+        Assert.Equal(2, taskCreator.Created.Count);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Task_Source_Is_Document_And_ActionType_Is_Upload()
+    {
+        await using var db = BuildContext();
+        var docTypeId = Guid.NewGuid();
+        var (handler, taskCreator) = BuildHandler(db, [MakeDoc(docTypeId)],
+            new Dictionary<Guid, string> { [docTypeId] = "Passport" });
+
+        await handler.HandleAsync(MakeEvent(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+
+        var task = Assert.Single(taskCreator.Created);
+        Assert.Equal(TaskSource.Document,    task.Source);
+        Assert.Equal(TaskActionType.Upload,  task.ActionType);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Task_Is_Assigned_To_Employee()
+    {
+        await using var db = BuildContext();
+        var employeeId = Guid.NewGuid();
+        var docTypeId  = Guid.NewGuid();
+        var (handler, taskCreator) = BuildHandler(db, [MakeDoc(docTypeId)],
+            new Dictionary<Guid, string> { [docTypeId] = "Passport" });
+
+        await handler.HandleAsync(MakeEvent(Guid.NewGuid(), employeeId, Guid.NewGuid()), CancellationToken.None);
+
+        var task = Assert.Single(taskCreator.Created);
+        Assert.Equal(employeeId, task.AssignedEmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Task_DueDate_Matches_DocumentRequest_DueDate()
+    {
+        await using var db = BuildContext();
+        var docTypeId  = Guid.NewGuid();
+        var (handler, taskCreator) = BuildHandler(db, [MakeDoc(docTypeId, dueDaysAfterStart: 14)],
+            new Dictionary<Guid, string> { [docTypeId] = "Contract" });
+
+        await handler.HandleAsync(MakeEvent(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+
+        var task = Assert.Single(taskCreator.Created);
+        Assert.Equal(StartDate.AddDays(14), task.DueDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Task_DueDate_Is_Null_When_No_DueDaysAfterStart()
+    {
+        await using var db = BuildContext();
+        var docTypeId  = Guid.NewGuid();
+        var (handler, taskCreator) = BuildHandler(db, [MakeDoc(docTypeId, dueDaysAfterStart: null)],
+            new Dictionary<Guid, string> { [docTypeId] = "Certificate" });
+
+        await handler.HandleAsync(MakeEvent(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+
+        var task = Assert.Single(taskCreator.Created);
+        Assert.Null(task.DueDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Task_Title_And_Description_Include_DocumentType_Name()
+    {
+        await using var db = BuildContext();
+        var docTypeId  = Guid.NewGuid();
+        var (handler, taskCreator) = BuildHandler(db, [MakeDoc(docTypeId)],
+            new Dictionary<Guid, string> { [docTypeId] = "Driving Licence" });
+
+        await handler.HandleAsync(MakeEvent(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+
+        var task = Assert.Single(taskCreator.Created);
+        Assert.Equal("Upload Driving Licence", task.Title);
+        Assert.Equal("Please upload a copy of your Driving Licence.", task.Description);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Task_SourceEntityId_Is_DocumentRequestId()
+    {
+        await using var db = BuildContext();
+        var docTypeId  = Guid.NewGuid();
+        var (handler, taskCreator) = BuildHandler(db, [MakeDoc(docTypeId)],
+            new Dictionary<Guid, string> { [docTypeId] = "Passport" });
+
+        await handler.HandleAsync(MakeEvent(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+
+        var request = await db.DocumentRequests.SingleAsync();
+        var task    = Assert.Single(taskCreator.Created);
+        Assert.Equal(request.Id, task.SourceEntityId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_No_Tasks_When_PositionProfileId_Is_Null()
+    {
+        await using var db = BuildContext();
+        var (handler, taskCreator) = BuildHandler(db, []);
+
+        await handler.HandleAsync(MakeEvent(Guid.NewGuid(), Guid.NewGuid(), positionProfileId: null), CancellationToken.None);
+
+        Assert.Empty(taskCreator.Created);
+    }
+
+    [Fact]
+    public async Task HandleAsync_No_Tasks_When_No_Required_Documents_Configured()
+    {
+        await using var db = BuildContext();
+        var (handler, taskCreator) = BuildHandler(db, []);
+
+        await handler.HandleAsync(MakeEvent(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+
+        Assert.Empty(taskCreator.Created);
+    }
+
+    [Fact]
+    public async Task HandleAsync_No_Tasks_For_Already_Existing_DocumentType()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var docTypeId  = Guid.NewGuid();
+        var (handler, taskCreator) = BuildHandler(db, [MakeDoc(docTypeId)],
+            new Dictionary<Guid, string> { [docTypeId] = "Passport" });
+        var evt = MakeEvent(companyId, employeeId, Guid.NewGuid());
+
+        await handler.HandleAsync(evt, CancellationToken.None); // first time — creates request + task
+        await handler.HandleAsync(evt, CancellationToken.None); // second time — skips duplicate
+
+        Assert.Single(taskCreator.Created); // only one task total
     }
 }

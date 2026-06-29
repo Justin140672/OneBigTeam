@@ -3,6 +3,7 @@ using HR.Modules.Documents.Domain;
 using HR.SharedKernel;
 using HR.SharedKernel.Contracts;
 using HR.Modules.Documents.Features.CreateDocumentRequestsOnEmployeeCreated;
+using HR.Modules.Documents.Features.UploadRequestedDocument;
 using HR.Modules.Documents.Features.CreateDocumentType;
 using HR.Modules.Documents.Features.DeactivateDocumentType;
 using HR.Modules.Documents.Features.DeleteEmployeeDocument;
@@ -91,6 +92,9 @@ public static class DocumentsModule
         services.AddScoped<IDocumentTypeReader, DocumentTypeReader>();
 
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
+
+        services.AddScoped<UploadRequestedDocumentHandler>();
+        services.AddScoped<IValidator<UploadRequestedDocumentRequest>, UploadRequestedDocumentValidator>();
     }
 
     public static async Task MigrateDocumentsAsync(this IServiceProvider services)
@@ -141,6 +145,33 @@ public static class DocumentsModule
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000005"), acmeId, null, "Offer Letter – Tom Williams",        null, acmeContract,  "offer-letter-tom-williams.pdf",        102400,  "application/pdf", "seed/acme/contracts/offer-letter-tom-williams.pdf",        null,                      acmeHrMgr, now),
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000006"), acmeId, null, "Employee Handbook 2026",             null, acmeOther,     "employee-handbook-2026.pdf",          2097152,  "application/pdf", "seed/acme/other/employee-handbook-2026.pdf",               new DateOnly(2027, 1, 1),  acmeHrMgr, now),
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000007"), acmeId, null, "Remote Working Policy",             null, acmeOther,     "remote-working-policy.pdf",            307200,  "application/pdf", "seed/acme/other/remote-working-policy.pdf",                new DateOnly(2027, 6, 30), acmeHrMgr, now));
+
+            await db.SaveChangesAsync();
+        }
+
+        if (!await db.DocumentRequests.AnyAsync(r => r.CompanyId == acmeId))
+        {
+            var empTomId    = Guid.Parse("30000000-0000-0000-0000-000000000004"); // Tom Williams
+            var empCarlosId = Guid.Parse("30000000-0000-0000-0000-000000000010"); // Carlos Rivera
+
+            db.DocumentRequests.AddRange(
+                DocumentRequest.Create(
+                    Guid.Parse("b0000000-0000-0000-0000-000000000001"),
+                    acmeId, empTomId, acmePassport,
+                    positionProfileRequiredDocumentId: null,
+                    dueDate: null, requestedByEmployeeId: null, now),
+
+                DocumentRequest.Create(
+                    Guid.Parse("b0000000-0000-0000-0000-000000000002"),
+                    acmeId, empCarlosId, acmePassport,
+                    positionProfileRequiredDocumentId: null,
+                    dueDate: null, requestedByEmployeeId: null, now),
+
+                DocumentRequest.Create(
+                    Guid.Parse("b0000000-0000-0000-0000-000000000003"),
+                    acmeId, empCarlosId, acmeRightToWork,
+                    positionProfileRequiredDocumentId: null,
+                    dueDate: null, requestedByEmployeeId: null, now));
 
             await db.SaveChangesAsync();
         }

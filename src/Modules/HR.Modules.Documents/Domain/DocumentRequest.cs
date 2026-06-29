@@ -16,6 +16,13 @@ internal sealed class DocumentRequest
     public DateTimeOffset? CompletedAt { get; private set; }
     public Guid? CompletedByEmployeeId { get; private set; }
 
+    public void MarkUploaded(Guid completedByEmployeeId, DateTimeOffset now)
+    {
+        Status = DocumentRequestStatus.Uploaded;
+        CompletedAt = now;
+        CompletedByEmployeeId = completedByEmployeeId;
+    }
+
     public static DocumentRequest Create(
         Guid id,
         Guid companyId,

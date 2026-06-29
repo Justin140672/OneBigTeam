@@ -35,6 +35,7 @@ public static class TasksModule
     private static void AddFeatureServices(IServiceCollection services)
     {
         services.AddScoped<ITaskCreator, TaskCreator>();
+        services.AddScoped<ITaskCompleter, TaskCompleter>();
         services.AddScoped<TaskCompletionDispatcher>();
         services.AddScoped<ITaskCompletionAction, ProbationTaskCompletionAction>();
         services.AddScoped<ITaskCompletionAction, LeaveTaskCompletionAction>();
@@ -169,6 +170,41 @@ public static class TasksModule
             assignedUserId: devUserId,
             now,
             sourceEntityId: Guid.Parse("50000000-0000-0000-0000-000000000100")));
+
+        // Document upload tasks — linked to seeded DocumentRequests in DocumentsModule seed.
+        db.TaskItems.AddRange(
+            TaskItem.Create(
+                Guid.Parse("a0000000-0000-0000-0000-000000000010"), companyId, empDev1Id,
+                "Upload Passport",
+                "Please upload a copy of your Passport.",
+                TaskPriority.Medium, TaskSource.Document, TaskActionType.Upload,
+                dueDate: null,
+                assignedEmployeeId: empDev1Id,
+                assignedUserId: empDev1Id,
+                now,
+                sourceEntityId: Guid.Parse("b0000000-0000-0000-0000-000000000001")),
+
+            TaskItem.Create(
+                Guid.Parse("a0000000-0000-0000-0000-000000000011"), companyId, empAe2Id,
+                "Upload Passport",
+                "Please upload a copy of your Passport.",
+                TaskPriority.Medium, TaskSource.Document, TaskActionType.Upload,
+                dueDate: null,
+                assignedEmployeeId: empAe2Id,
+                assignedUserId: empAe2Id,
+                now,
+                sourceEntityId: Guid.Parse("b0000000-0000-0000-0000-000000000002")),
+
+            TaskItem.Create(
+                Guid.Parse("a0000000-0000-0000-0000-000000000012"), companyId, empAe2Id,
+                "Upload Right To Work",
+                "Please upload a copy of your Right To Work.",
+                TaskPriority.Medium, TaskSource.Document, TaskActionType.Upload,
+                dueDate: null,
+                assignedEmployeeId: empAe2Id,
+                assignedUserId: empAe2Id,
+                now,
+                sourceEntityId: Guid.Parse("b0000000-0000-0000-0000-000000000003")));
 
         await db.SaveChangesAsync();
     }

@@ -92,6 +92,26 @@ internal sealed record DocumentDownloadedAuditEvent(
     object? IAuditEvent.Metadata       => new { FileName, DocumentTypeName, EmployeeId };
 }
 
+internal sealed record DocumentRequestFulfilledAuditEvent(
+    Guid CompanyId,
+    Guid DocumentRequestId,
+    Guid EmployeeId,
+    string DocumentTypeName,
+    Guid FulfilledBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType       => "document_request.fulfilled";
+    string IAuditEvent.EntityType      => "DocumentRequest";
+    Guid   IAuditEvent.EntityId        => DocumentRequestId;
+    Guid?  IAuditEvent.ActorUserId     => FulfilledBy;
+    Guid?  IAuditEvent.ActorEmployeeId => EmployeeId;
+    Guid?  IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary        => $"Document request for '{DocumentTypeName}' fulfilled";
+    object? IAuditEvent.Before         => new { Status = "Requested" };
+    object? IAuditEvent.After          => new { Status = "Uploaded", FulfilledBy };
+    object? IAuditEvent.Metadata       => null;
+}
+
 internal sealed record DocumentUploadedAuditEvent(
     Guid CompanyId,
     Guid EmployeeDocumentId,

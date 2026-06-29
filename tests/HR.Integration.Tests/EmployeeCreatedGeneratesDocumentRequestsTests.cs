@@ -22,6 +22,8 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests : IClassFixture<ApiWe
             .GetAwaiter().GetResult();
     }
 
+    // ── DocumentRequest creation ──────────────────────────────────────────────────
+
     [Fact]
     public async Task CreateEmployee_WithPositionProfile_GeneratesDocumentRequests_For_Each_RequiredDocument()
     {
@@ -147,6 +149,90 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests : IClassFixture<ApiWe
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
+    // ── Upload task creation ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CreateEmployee_WithPositionProfile_Creates_One_Upload_Task_Per_DocumentRequest()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+
+        var profileId  = await CreatePositionProfileAsync(client, companyId, "Engineer");
+        var docTypeId1 = await CreateDocumentTypeAsync(client, companyId, "Passport");
+        var docTypeId2 = await CreateDocumentTypeAsync(client, companyId, "Right To Work");
+        await AddRequiredDocumentAsync(client, companyId, profileId, docTypeId1, isMandatory: true,  dueDays: 30);
+        await AddRequiredDocumentAsync(client, companyId, profileId, docTypeId2, isMandatory: false, dueDays: null);
+
+        var employeeId = await CreateEmployeeAsync(client, companyId, profileId);
+
+        var tasks = await GetEmployeeTasksAsync(client, companyId, employeeId);
+        var uploadTasks = tasks.Where(t => t.Source == "Document").ToList();
+        Assert.Equal(2, uploadTasks.Count);
+    }
+
+    [Fact]
+    public async Task CreateEmployee_WithPositionProfile_Upload_Tasks_Are_Assigned_To_Employee()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+
+        var profileId = await CreatePositionProfileAsync(client, companyId, "Analyst");
+        var docTypeId = await CreateDocumentTypeAsync(client, companyId, "Passport");
+        await AddRequiredDocumentAsync(client, companyId, profileId, docTypeId, isMandatory: true, dueDays: null);
+
+        var employeeId = await CreateEmployeeAsync(client, companyId, profileId);
+
+        var tasks      = await GetEmployeeTasksAsync(client, companyId, employeeId);
+        var uploadTask = Assert.Single(tasks.Where(t => t.Source == "Document"));
+        Assert.Equal(employeeId, uploadTask.AssignedEmployeeId);
+    }
+
+    [Fact]
+    public async Task CreateEmployee_WithPositionProfile_Upload_Task_ActionType_Is_Upload()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+
+        var profileId = await CreatePositionProfileAsync(client, companyId, "Coordinator");
+        var docTypeId = await CreateDocumentTypeAsync(client, companyId, "Certificate");
+        await AddRequiredDocumentAsync(client, companyId, profileId, docTypeId, isMandatory: true, dueDays: null);
+
+        var employeeId = await CreateEmployeeAsync(client, companyId, profileId);
+
+        var tasks      = await GetEmployeeTasksAsync(client, companyId, employeeId);
+        var uploadTask = Assert.Single(tasks.Where(t => t.Source == "Document"));
+        Assert.Equal("Upload", uploadTask.ActionType);
+    }
+
+    [Fact]
+    public async Task CreateEmployee_WithPositionProfile_Upload_Task_DueDate_Matches_DocumentRequest()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+
+        var profileId = await CreatePositionProfileAsync(client, companyId, "Developer");
+        var docTypeId = await CreateDocumentTypeAsync(client, companyId, "Contract");
+        await AddRequiredDocumentAsync(client, companyId, profileId, docTypeId, isMandatory: true, dueDays: 30);
+
+        var employeeId = await CreateEmployeeAsync(client, companyId, profileId);
+
+        var tasks      = await GetEmployeeTasksAsync(client, companyId, employeeId);
+        var uploadTask = Assert.Single(tasks.Where(t => t.Source == "Document"));
+        Assert.Equal(new DateOnly(2026, 7, 1).AddDays(30), uploadTask.DueDate);
+    }
+
+    [Fact]
+    public async Task CreateEmployee_WithoutPositionProfile_Creates_No_Upload_Tasks()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+
+        var employeeId = await CreateEmployeeAsync(client, companyId, positionProfileId: null);
+
+        var tasks = await GetEmployeeTasksAsync(client, companyId, employeeId);
+        Assert.Empty(tasks.Where(t => t.Source == "Document"));
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private HttpClient AuthenticatedClient(Guid companyId)
@@ -217,6 +303,22 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests : IClassFixture<ApiWe
             .ToListAsync();
     }
 
+    private async Task<List<TaskItem>> GetEmployeeTasksAsync(HttpClient client, Guid companyId, Guid employeeId)
+    {
+        var resp = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/tasks");
+        resp.EnsureSuccessStatusCode();
+        var payload = await resp.Content.ReadFromJsonAsync<TaskListPayload>();
+        return payload!.Items.ToList();
+    }
+
     private sealed record IdPayload(Guid Id);
     private sealed record EmpPayload(Guid Id);
+    private sealed record TaskListPayload(IReadOnlyList<TaskItem> Items);
+    private sealed record TaskItem(
+        Guid Id,
+        string Title,
+        string Source,
+        string ActionType,
+        DateOnly? DueDate,
+        Guid? AssignedEmployeeId);
 }
