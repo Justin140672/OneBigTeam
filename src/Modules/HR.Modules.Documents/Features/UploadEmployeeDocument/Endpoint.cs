@@ -33,17 +33,15 @@ internal sealed class Endpoint(UploadEmployeeDocumentHandler handler, IAuthoriza
             return;
         }
 
-        var authResult    = await authorizationService.AuthorizeAsync(User, "employee:manage");
-        var isManagerUpload = authResult.Succeeded;
+        var isManagerUpload = (await authorizationService.AuthorizeAsync(User, "employee:manage")).Succeeded;
 
-        // Non-managers may only upload to their own employee record.
-        if (!isManagerUpload && uploadedBy != request.EmployeeId)
+        if (!isManagerUpload)
         {
             await Send.ResultAsync(TypedResults.Forbid());
             return;
         }
 
-        var result = await handler.HandleAsync(request, uploadedBy, isManagerUpload, cancellationToken);
+        var result = await handler.HandleAsync(request, uploadedBy, isManagerUpload: true, cancellationToken);
 
         if (result.IsFailure)
         {

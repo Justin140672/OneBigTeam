@@ -278,43 +278,7 @@ public class UploadEmployeeDocumentHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_Validation_When_Employee_Uploads_Disallowed_Type()
-    {
-        await using var db = BuildContext();
-        var companyId      = Guid.NewGuid();
-        var docType        = await SeedDocumentType(db, companyId, allowEmployeeUpload: false);
-        var handler        = BuildHandler(db);
-
-        var result = await handler.HandleAsync(
-            BuildRequest(companyId, Guid.NewGuid(), docType.Id),
-            uploadedBy:      Guid.NewGuid(),
-            isManagerUpload: false,
-            CancellationToken.None);
-
-        Assert.True(result.IsFailure);
-        Assert.Equal("validation", result.Error.Code);
-        Assert.Contains("does not allow employee uploads", result.Error.Message, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Succeeds_When_Employee_Uploads_Allowed_Type()
-    {
-        await using var db = BuildContext();
-        var companyId      = Guid.NewGuid();
-        var docType        = await SeedDocumentType(db, companyId, allowEmployeeUpload: true);
-        var handler        = BuildHandler(db);
-
-        var result = await handler.HandleAsync(
-            BuildRequest(companyId, Guid.NewGuid(), docType.Id),
-            uploadedBy:      Guid.NewGuid(),
-            isManagerUpload: false,
-            CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Manager_Can_Upload_Disallowed_Type()
+    public async Task HandleAsync_Manager_Can_Upload_Any_Document_Type()
     {
         await using var db = BuildContext();
         var companyId      = Guid.NewGuid();

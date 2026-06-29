@@ -61,9 +61,9 @@ public class UploadEmployeeDocumentEndpointTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
-    public async Task Returns_UnprocessableEntity_When_DocType_Disallows_Employee_Upload()
+    public async Task Returns_Forbidden_For_Employee_Upload_Even_To_Own_Record()
     {
-        // Non-manager uploading to own employee record; doc type has AllowEmployeeUpload = false
+        // Employees must use the document-request upload endpoint; direct upload is manager-only.
         var userId       = Guid.NewGuid();
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
@@ -72,7 +72,7 @@ public class UploadEmployeeDocumentEndpointTests : IClassFixture<ApiWebApplicati
         var response = await client.PostAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{userId}/documents",
             BuildPdfUpload(AcmeContractTypeId));
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
