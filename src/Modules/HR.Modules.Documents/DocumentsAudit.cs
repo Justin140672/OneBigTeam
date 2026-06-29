@@ -92,6 +92,7 @@ internal sealed record DocumentDownloadedAuditEvent(
     object? IAuditEvent.Metadata       => new { FileName, DocumentTypeName, EmployeeId };
 }
 
+
 internal sealed record DocumentRequestFulfilledAuditEvent(
     Guid CompanyId,
     Guid DocumentRequestId,

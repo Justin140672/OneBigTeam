@@ -6,6 +6,7 @@ using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Tasks.Persistence;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -141,6 +142,21 @@ public class UploadRequestedDocumentEndpointTests : IClassFixture<ApiWebApplicat
         db.DocumentRequests.Add(request);
 
         await db.SaveChangesAsync();
+
+        var taskCreator = scope.ServiceProvider.GetRequiredService<ITaskCreator>();
+        await taskCreator.CreateAsync(
+            companyId,
+            createdBy:          AdminUser,
+            title:              "Upload Passport",
+            description:        "Please upload a copy of your Passport.",
+            priority:           TaskPriority.Medium,
+            source:             TaskSource.Document,
+            actionType:         TaskActionType.Upload,
+            dueDate:            null,
+            assignedEmployeeId: employeeId,
+            assignedUserId:     null,
+            sourceEntityId:     request.Id,
+            CancellationToken.None);
 
         return (companyId, employeeId, request.Id);
     }
