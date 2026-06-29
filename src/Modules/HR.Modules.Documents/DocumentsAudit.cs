@@ -113,6 +113,26 @@ internal sealed record DocumentRequestFulfilledAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
+internal sealed record DocumentRequestCancelledAuditEvent(
+    Guid CompanyId,
+    Guid DocumentRequestId,
+    Guid EmployeeId,
+    string DocumentTypeName,
+    Guid CancelledBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType       => "document_request.cancelled";
+    string IAuditEvent.EntityType      => "DocumentRequest";
+    Guid   IAuditEvent.EntityId        => DocumentRequestId;
+    Guid?  IAuditEvent.ActorUserId     => CancelledBy;
+    Guid?  IAuditEvent.ActorEmployeeId => null;
+    Guid?  IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary        => $"Document request for '{DocumentTypeName}' cancelled";
+    object? IAuditEvent.Before         => new { Status = "Requested" };
+    object? IAuditEvent.After          => new { Status = "Cancelled", CancelledBy };
+    object? IAuditEvent.Metadata       => null;
+}
+
 internal sealed record DocumentUploadedAuditEvent(
     Guid CompanyId,
     Guid EmployeeDocumentId,

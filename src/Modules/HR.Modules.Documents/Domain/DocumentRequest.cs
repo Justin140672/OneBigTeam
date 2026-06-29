@@ -16,6 +16,15 @@ internal sealed class DocumentRequest
     public DateTimeOffset? CompletedAt { get; private set; }
     public Guid? CompletedByEmployeeId { get; private set; }
 
+    public void Cancel(DateTimeOffset now)
+    {
+        if (Status != DocumentRequestStatus.Requested)
+            throw new InvalidOperationException($"Cannot cancel a document request with status '{Status}'.");
+
+        Status = DocumentRequestStatus.Cancelled;
+        CompletedAt = now;
+    }
+
     public void MarkUploaded(Guid completedByEmployeeId, DateTimeOffset now)
     {
         Status = DocumentRequestStatus.Uploaded;
