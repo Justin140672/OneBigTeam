@@ -6,4 +6,6 @@ internal sealed class RequestAdditionalEmployeeDocumentRequest
     public Guid EmployeeId     { get; init; }
     public Guid DocumentTypeId { get; init; }
     public DateOnly? DueDate   { get; init; }
+    public bool IsMandatory    { get; init; }
+    public string? Notes       { get; init; }
 }

@@ -24,4 +24,7 @@ public sealed record DocumentRequestListItem(
     Guid      Id,
     string    DocumentTypeName,
     DateOnly? DueDate,
-    string    Status);
+    string    Status,
+    Guid?     RequestedByEmployeeId,
+    string?   RequestedByName,
+    DateTimeOffset CreatedAt);

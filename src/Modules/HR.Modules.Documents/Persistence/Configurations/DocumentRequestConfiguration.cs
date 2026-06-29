@@ -40,6 +40,14 @@ internal sealed class DocumentRequestConfiguration : IEntityTypeConfiguration<Do
         builder.Property(r => r.DueDate)
             .HasColumnName("due_date");
 
+        builder.Property(r => r.IsMandatory)
+            .HasColumnName("is_mandatory")
+            .IsRequired();
+
+        builder.Property(r => r.Notes)
+            .HasColumnName("notes")
+            .HasMaxLength(1000);
+
         builder.Property(r => r.RequestedByEmployeeId)
             .HasColumnName("requested_by_employee_id");
 

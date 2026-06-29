@@ -149,6 +149,55 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<bool> CancelDocumentRequestAsync(
+        Guid companyId, Guid employeeId, Guid documentRequestId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync(
+                $"api/companies/{companyId}/employees/{employeeId}/document-requests/{documentRequestId}",
+                cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<string?> RequestDocumentAsync(
+        Guid companyId,
+        Guid employeeId,
+        Guid documentTypeId,
+        DateOnly? dueDate,
+        bool isMandatory,
+        string? notes,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var body = new { documentTypeId, dueDate = dueDate?.ToString("yyyy-MM-dd"), isMandatory, notes };
+            var response = await Http.PostAsJsonAsync(
+                $"api/companies/{companyId}/employees/{employeeId}/document-requests",
+                body, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return null;
+
+            try
+            {
+                var json = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+                if (json.TryGetProperty("error", out var errorProp))
+                    return errorProp.GetString();
+            }
+            catch { }
+
+            return $"Request failed ({(int)response.StatusCode}).";
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+    }
+
     public async Task<bool> DeleteEmployeeDocumentAsync(
         Guid companyId, Guid employeeId, Guid employeeDocumentId,
         CancellationToken cancellationToken = default)

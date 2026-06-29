@@ -46,6 +46,8 @@ internal sealed class RequestAdditionalEmployeeDocumentHandler(
             request.DocumentTypeId,
             positionProfileRequiredDocumentId: null,
             request.DueDate,
+            request.IsMandatory,
+            request.Notes,
             requestedByEmployeeId: requestedBy,
             now);
 
@@ -82,6 +84,8 @@ internal sealed class RequestAdditionalEmployeeDocumentHandler(
             documentRequest.DocumentTypeId,
             documentType.Name,
             documentRequest.DueDate,
+            documentRequest.IsMandatory,
+            documentRequest.Notes,
             documentRequest.Status.ToString(),
             documentRequest.CreatedAt));
     }

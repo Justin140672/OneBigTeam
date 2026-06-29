@@ -138,6 +138,7 @@ public class UploadRequestedDocumentEndpointTests : IClassFixture<ApiWebApplicat
         var request = DocumentRequest.Create(
             Guid.NewGuid(), companyId, employeeId, docType.Id,
             positionProfileRequiredDocumentId: null, dueDate: null,
+            isMandatory: false, notes: null,
             requestedByEmployeeId: null, DateTimeOffset.UtcNow);
         db.DocumentRequests.Add(request);
 

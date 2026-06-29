@@ -74,6 +74,40 @@ public sealed class EmployeeDocumentsTabTests(AppFixture fixture) : E2ETestBase(
     }
 
     [Fact]
+    public async Task Admin_Documents_Tab_Shows_Request_Document_Button()
+    {
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await empAdmin.GoToAsync(AcmeId, TomId);
+        await empAdmin.OpenDocumentsTabAsync();
+
+        Assert.True(await empAdmin.HasRequestDocumentButtonAsync(),
+            "Expected a 'Request Document' button to be visible on the admin Documents tab");
+    }
+
+    [Fact]
+    public async Task Request_Document_Dialog_Creates_New_Document_Request()
+    {
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await empAdmin.GoToAsync(AcmeId, TomId);
+        await empAdmin.OpenDocumentsTabAsync();
+
+        // Request a document type that doesn't already have an open request for Tom
+        await empAdmin.RequestDocumentAsync("Driving Licence");
+
+        // After the dialog closes the tab reloads — the new request should appear
+        Assert.True(await empAdmin.HasDocumentRequestAsync("Driving Licence"),
+            "Expected the newly requested 'Driving Licence' to appear in the Document Requests section");
+    }
+
+    [Fact]
     public async Task Working_Pattern_Override_Can_Be_Set_Via_Admin_Profile()
     {
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);

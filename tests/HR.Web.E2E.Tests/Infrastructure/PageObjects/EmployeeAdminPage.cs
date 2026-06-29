@@ -58,6 +58,39 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
 
+    /// <summary>Returns true if the Request Document button is visible on the Documents tab.</summary>
+    public async Task<bool> HasRequestDocumentButtonAsync() =>
+        await page.GetByRole(AriaRole.Button, new() { Name = "Request Document" }).IsVisibleAsync();
+
+    /// <summary>
+    /// Opens the Request Document dialog, selects the given document type, and submits.
+    /// Waits for the dialog to close before returning.
+    /// </summary>
+    public async Task RequestDocumentAsync(string documentTypeName, DateOnly? dueDate = null)
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Request Document" }).ClickAsync();
+
+        // Wait for the dialog to appear
+        await page.WaitForSelectorAsync(".e-dialog", new() { Timeout = 10_000 });
+
+        // Select document type from the Syncfusion dropdown
+        await page.Locator(".e-dialog .e-dropdownlist").ClickAsync();
+        await page.GetByRole(AriaRole.Option, new() { Name = documentTypeName }).ClickAsync();
+
+        if (dueDate.HasValue)
+        {
+            await page.Locator(".e-dialog input.e-datepicker").FillAsync(dueDate.Value.ToString("dd/MM/yyyy"));
+            await page.Keyboard.PressAsync("Tab");
+        }
+
+        await page.Locator(".e-dialog").GetByRole(AriaRole.Button, new() { Name = "Request" }).ClickAsync();
+
+        // Wait for dialog to close
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.e-dialog') || !document.querySelector('.e-dialog').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 10_000 });
+    }
+
     // ── Working Pattern section (Details tab) ─────────────────────────────────
 
     /// <summary>Ensures the "Override company defaults" checkbox is checked.</summary>

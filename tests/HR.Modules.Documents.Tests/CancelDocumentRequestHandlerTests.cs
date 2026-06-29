@@ -33,7 +33,7 @@ public class CancelDocumentRequestHandlerTests
 
         var request = DocumentRequest.Create(
             Guid.NewGuid(), companyId, employeeId, docType.Id,
-            null, null, null, DateTimeOffset.UtcNow);
+            null, null, false, null, null, DateTimeOffset.UtcNow);
         db.DocumentRequests.Add(request);
 
         await db.SaveChangesAsync();

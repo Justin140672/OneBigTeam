@@ -208,7 +208,7 @@ public class RequestAdditionalEmployeeDocumentHandlerTests
         // Seed an existing request for the same employee+type
         db.DocumentRequests.Add(DocumentRequest.Create(
             Guid.NewGuid(), companyId, employeeId, docType.Id,
-            null, null, null, DateTimeOffset.UtcNow));
+            null, null, false, null, null, DateTimeOffset.UtcNow));
         await db.SaveChangesAsync();
 
         var (handler, _, _) = BuildHandler(db);

@@ -56,6 +56,7 @@ public class UploadRequestedDocumentHandlerTests
         var r = DocumentRequest.Create(
             Guid.NewGuid(), companyId, employeeId, documentTypeId,
             positionProfileRequiredDocumentId: null, dueDate: null,
+            isMandatory: false, notes: null,
             requestedByEmployeeId: null, DateTimeOffset.UtcNow);
         if (status == DocumentRequestStatus.Uploaded)
             r.MarkUploaded(employeeId, DateTimeOffset.UtcNow);

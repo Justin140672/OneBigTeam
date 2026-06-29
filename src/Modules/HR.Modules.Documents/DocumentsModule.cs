@@ -167,31 +167,31 @@ public static class DocumentsModule
                     Guid.Parse("b0000000-0000-0000-0000-000000000001"),
                     acmeId, empTomId, acmePassport,
                     positionProfileRequiredDocumentId: null,
-                    dueDate: null, requestedByEmployeeId: null, now),
+                    dueDate: null, isMandatory: true, notes: null, requestedByEmployeeId: null, now),
 
                 DocumentRequest.Create(
                     Guid.Parse("b0000000-0000-0000-0000-000000000002"),
                     acmeId, empCarlosId, acmePassport,
                     positionProfileRequiredDocumentId: null,
-                    dueDate: null, requestedByEmployeeId: null, now),
+                    dueDate: null, isMandatory: true, notes: null, requestedByEmployeeId: null, now),
 
                 DocumentRequest.Create(
                     Guid.Parse("b0000000-0000-0000-0000-000000000003"),
                     acmeId, empCarlosId, acmeRightToWork,
                     positionProfileRequiredDocumentId: null,
-                    dueDate: null, requestedByEmployeeId: null, now),
+                    dueDate: null, isMandatory: true, notes: null, requestedByEmployeeId: null, now),
 
                 DocumentRequest.Create(
                     Guid.Parse("b0000000-0000-0000-0000-000000000004"),
                     acmeId, empJamesId, acmePassport,
                     positionProfileRequiredDocumentId: null,
-                    dueDate: null, requestedByEmployeeId: null, now),
+                    dueDate: null, isMandatory: true, notes: null, requestedByEmployeeId: null, now),
 
                 DocumentRequest.Create(
                     Guid.Parse("b0000000-0000-0000-0000-000000000005"),
                     acmeId, empJamesId, acmeRightToWork,
                     positionProfileRequiredDocumentId: null,
-                    dueDate: null, requestedByEmployeeId: null, now));
+                    dueDate: null, isMandatory: true, notes: null, requestedByEmployeeId: null, now));
 
             await db.SaveChangesAsync();
         }

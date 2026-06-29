@@ -13,8 +13,11 @@
                 <thead class="table-light">
                     <tr>
                         <th>Document Type</th>
-                        <th width="140">Due Date</th>
-                        <th width="140">Status</th>
+                        <th width="130">Due Date</th>
+                        <th width="130">Status</th>
+                        <th width="160">Requested By</th>
+                        <th width="130">Requested Date</th>
+                        <th width="100"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -28,6 +31,34 @@
                             </td>
                             <td class="align-middle">
                                 <span class="badge @css">@label</span>
+                            </td>
+                            <td class="align-middle text-muted small">
+                                @(r.RequestedByName ?? "—")
+                            </td>
+                            <td class="align-middle text-muted small">
+                                @r.CreatedAt.LocalDateTime.ToString("d MMM yyyy")
+                            </td>
+                            <td class="align-middle text-end">
+                                @if (r.Status == "Requested" && !EmployeeSelfUpload)
+                                {
+                                    @if (_cancelTargetId == r.Id)
+                                    {
+                                        <span class="me-2 text-muted small">Cancel?</span>
+                                        <SfButton CssClass="e-danger e-small me-1"
+                                                  OnClick="() => ConfirmCancelRequestAsync(r.Id)">
+                                            Yes
+                                        </SfButton>
+                                        <SfButton CssClass="e-small" OnClick="ClearCancelTarget">No</SfButton>
+                                    }
+                                    else
+                                    {
+                                        <SfButton CssClass="e-outline e-small"
+                                                  OnClick="() => _cancelTargetId = r.Id"
+                                                  title="Cancel request">
+                                            Cancel
+                                        </SfButton>
+                                    }
+                                }
                             </td>
                         </tr>
                     }
@@ -45,6 +76,12 @@
                           EmployeeSelfUpload="false"
                           OnUploaded="OnDocumentUploaded"
                           OnCancelled="@(() => _uploadOpen = false)" />
+
+    <RequestDocumentDialog CompanyId="CompanyId"
+                           EmployeeId="EmployeeId"
+                           IsOpen="_requestOpen"
+                           OnRequested="OnDocumentRequested"
+                           OnCancelled="@(() => _requestOpen = false)" />
 }
 
 @if (_loading)
@@ -62,7 +99,10 @@ else
             <h5 class="mb-0">Documents</h5>
             @if (!EmployeeSelfUpload)
             {
-                <div class="ms-auto">
+                <div class="ms-auto d-flex gap-2">
+                    <SfButton CssClass="e-outline e-small" OnClick="@(() => _requestOpen = true)">
+                        <i class="fa-solid fa-file-circle-plus me-1"></i> Request Document
+                    </SfButton>
                     <SfButton CssClass="e-primary e-small" OnClick="@(() => _uploadOpen = true)">
                         <i class="fa-solid fa-upload me-1"></i> Upload
                     </SfButton>
@@ -145,10 +185,12 @@ else
     private bool _loading = true;
     private bool _requestsLoading = true;
     private bool _uploadOpen;
+    private bool _requestOpen;
     private List<EmployeeDocumentListItem>  _documents = [];
     private List<DocumentRequestListItem>   _requests  = [];
 
     private Guid? _deleteTargetId;
+    private Guid? _cancelTargetId;
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 
@@ -173,6 +215,12 @@ else
         await LoadAsync();
     }
 
+    private async Task OnDocumentRequested()
+    {
+        _requestOpen = false;
+        await LoadAsync();
+    }
+
     private async Task DownloadAsync(Guid employeeDocumentId)
     {
         var url = await DocumentService.GetDownloadUrlAsync(CompanyId, EmployeeId, employeeDocumentId);
@@ -180,8 +228,17 @@ else
             await JS.InvokeVoidAsync("window.open", url, "_blank");
     }
 
-    private void StartDelete(Guid id) => _deleteTargetId = id;
-    private void CancelDelete()       => _deleteTargetId = null;
+    private void StartDelete(Guid id)   => _deleteTargetId = id;
+    private void CancelDelete()         => _deleteTargetId = null;
+
+    private void ClearCancelTarget()    => _cancelTargetId = null;
+
+    private async Task ConfirmCancelRequestAsync(Guid id)
+    {
+        _cancelTargetId = null;
+        await DocumentService.CancelDocumentRequestAsync(CompanyId, EmployeeId, id);
+        await LoadAsync();
+    }
 
     private async Task ConfirmDeleteAsync(Guid id)
     {

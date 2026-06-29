@@ -4,7 +4,10 @@ internal sealed record ListDocumentRequestsResponse(
     IReadOnlyList<DocumentRequestListItem> Items);
 
 internal sealed record DocumentRequestListItem(
-    Guid     Id,
-    string   DocumentTypeName,
+    Guid      Id,
+    string    DocumentTypeName,
     DateOnly? DueDate,
-    string   Status);
+    string    Status,
+    Guid?     RequestedByEmployeeId,
+    string?   RequestedByName,
+    DateTimeOffset CreatedAt);

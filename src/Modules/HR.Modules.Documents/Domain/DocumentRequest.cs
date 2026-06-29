@@ -11,6 +11,8 @@ internal sealed class DocumentRequest
     public Guid? PositionProfileRequiredDocumentId { get; private set; }
     public DocumentRequestStatus Status { get; private set; }
     public DateOnly? DueDate { get; private set; }
+    public bool IsMandatory { get; private set; }
+    public string? Notes { get; private set; }
     public Guid? RequestedByEmployeeId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
@@ -39,6 +41,8 @@ internal sealed class DocumentRequest
         Guid documentTypeId,
         Guid? positionProfileRequiredDocumentId,
         DateOnly? dueDate,
+        bool isMandatory,
+        string? notes,
         Guid? requestedByEmployeeId,
         DateTimeOffset now) => new()
     {
@@ -49,6 +53,8 @@ internal sealed class DocumentRequest
         PositionProfileRequiredDocumentId = positionProfileRequiredDocumentId,
         Status                           = DocumentRequestStatus.Requested,
         DueDate                          = dueDate,
+        IsMandatory                      = isMandatory,
+        Notes                            = notes,
         RequestedByEmployeeId            = requestedByEmployeeId,
         CreatedAt                        = now,
     };

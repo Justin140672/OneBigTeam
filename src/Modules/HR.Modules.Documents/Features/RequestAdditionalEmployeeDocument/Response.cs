@@ -7,5 +7,7 @@ internal sealed record RequestAdditionalEmployeeDocumentResponse(
     Guid     DocumentTypeId,
     string   DocumentTypeName,
     DateOnly? DueDate,
+    bool     IsMandatory,
+    string?  Notes,
     string   Status,
     DateTimeOffset CreatedAt);

@@ -42,6 +42,8 @@ internal sealed class EmployeeCreatedHandler(
                 dueDate: doc.DueDaysAfterStart.HasValue
                     ? e.StartDate.AddDays(doc.DueDaysAfterStart.Value)
                     : null,
+                isMandatory: true,
+                notes: null,
                 requestedByEmployeeId: null,
                 now))
             .ToList();
