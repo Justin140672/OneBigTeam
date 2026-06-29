@@ -7,8 +7,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// <summary>
 /// Verifies the Documents tab on the self-service My Profile page:
 /// - Seeded documents are visible to the employee.
-/// - The download action initiates a file download.
-/// - The upload button is present for employees.
+/// - The download action opens the document in a new tab (window.open).
+/// - The upload button is hidden for employees (EmployeeSelfUpload=true hides it).
 /// </summary>
 [Collection("E2E")]
 public sealed class SelfServiceDocumentTests : IAsyncLifetime
@@ -80,11 +80,11 @@ public sealed class SelfServiceDocumentTests : IAsyncLifetime
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
 
-        // The self-service documents tab renders with EmployeeSelfUpload="true",
-        // so an "Upload" button should be visible.
+        // EmployeeDocumentsTab renders the Upload button only when !EmployeeSelfUpload.
+        // The self-service view passes EmployeeSelfUpload="true", so Upload must be hidden.
         var uploadBtn = _page.GetByRole(AriaRole.Button, new() { Name = "Upload" });
-        Assert.True(await uploadBtn.IsVisibleAsync(),
-            "Expected an 'Upload' button to be visible on the self-service Documents tab");
+        Assert.False(await uploadBtn.IsVisibleAsync(),
+            "Expected no 'Upload' button on the self-service Documents tab — upload is disabled for employees");
     }
 
     [Fact]
@@ -107,17 +107,18 @@ public sealed class SelfServiceDocumentTests : IAsyncLifetime
         await _page.WaitForSelectorAsync(".e-gridcontent td, .card-body td",
             new() { Timeout = 15_000 });
 
-        // Start listening for a download before clicking.
-        var downloadTask = _page.WaitForDownloadAsync();
+        // DownloadAsync calls JS.InvokeVoidAsync("window.open", url, "_blank") which opens a
+        // popup tab rather than triggering a browser file download.  Listen for the popup
+        // before clicking so we don't miss the event if it fires before we start waiting.
+        var popupTask = _page.WaitForPopupAsync();
 
-        // Click the first download icon button (fa-download).
-        var downloadBtn = _page.Locator("button[title*='ownload'], button .fa-download")
-            .First;
+        // The download button has title="Download" (rendered by Syncfusion SfButton).
+        var downloadBtn = _page.Locator("[title='Download']").First;
         await downloadBtn.ClickAsync();
 
-        // The download should start within 15 seconds.
-        var download = await downloadTask.WaitAsync(TimeSpan.FromSeconds(15));
-        Assert.False(string.IsNullOrEmpty(download.SuggestedFilename),
-            "Expected a non-empty filename for the downloaded document");
+        // The popup (new tab) should open within 15 seconds.
+        var popup = await popupTask.WaitAsync(TimeSpan.FromSeconds(15));
+        Assert.NotNull(popup);
+        await popup.CloseAsync();
     }
 }

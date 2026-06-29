@@ -105,14 +105,23 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     }
 
     /// <summary>
-    /// Returns the status of the most recently submitted leave request row
-    /// whose reason matches <paramref name="reasonFragment"/>.
+    /// Returns the status badge text for the leave request row whose text contains
+    /// <paramref name="reasonFragment"/>. When a request is rejected the Reason column
+    /// switches to the rejection reason, so pass <paramref name="altFragment"/> as the
+    /// rejection reason to find the row in that case.
     /// </summary>
-    public async Task<string?> GetLeaveRequestStatusAsync(string reasonFragment)
+    public async Task<string?> GetLeaveRequestStatusAsync(string reasonFragment, string? altFragment = null)
     {
         var row = page.Locator("table tbody tr")
             .Filter(new() { HasText = reasonFragment })
             .First;
+
+        if (!await row.IsVisibleAsync() && altFragment is not null)
+        {
+            row = page.Locator("table tbody tr")
+                .Filter(new() { HasText = altFragment })
+                .First;
+        }
 
         if (!await row.IsVisibleAsync()) return null;
 

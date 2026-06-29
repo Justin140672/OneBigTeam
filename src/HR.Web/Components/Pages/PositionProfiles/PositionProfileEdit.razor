@@ -32,55 +32,56 @@
             <div class="alert alert-danger">@_globalError</div>
         }
 
-        <div class="row">
-            <div class="col-lg-7">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Position Profile Details</h5>
-                    </div>
-                    <div class="card-body @(_isViewMode ? "view-mode" : "")">
-                        <div class="mb-3">
-                            <label class="form-label">Title <span class="text-danger">*</span></label>
-                            <HrTextBox @bind-Value="_model.Title" Placeholder="e.g. Senior Software Engineer" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Description</label>
-                            <HrTextBox @bind-Value="_model.Description" Placeholder="Optional description" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Department</label>
-                            <SfDropDownList TValue="Guid?"
-                                            TItem="DepartmentListItemModel"
-                                            DataSource="@_departments"
-                                            @bind-Value="_model.DepartmentId"
-                                            Placeholder="None"
-                                            AllowFiltering="true">
-                                <DropDownListFieldSettings Value="Id" Text="Name" />
-                            </SfDropDownList>
-                        </div>
-                        <div class="mb-3">
-                            <SfCheckBox TChecked="bool"
-                                        Label="Managerial role"
-                                        @bind-Checked="_model.IsManagerial" />
+        @if (IsNew)
+        {
+            <div class="row">
+                <div class="col-lg-7">
+                    <div class="card mb-4">
+                        <div class="card-header"><h5 class="mb-0">Position Profile Details</h5></div>
+                        <div class="card-body">
+                            @DetailsFormFields
                         </div>
                     </div>
-                </div>
-
-                <div class="d-flex gap-2 align-items-center mt-3">
-                    @if (!_isViewMode)
-                    {
-                        <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
-                            @if (_saving)
-                            {
-                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                            }
-                            Save
-                        </SfButton>
-                    }
-                    <SfButton OnClick="Cancel" Disabled="@_saving">@(_isViewMode ? "Close" : "Cancel")</SfButton>
+                    @FormButtons
                 </div>
             </div>
-        </div>
+        }
+        else
+        {
+            <SfTab>
+                <TabItems>
+                    <TabItem>
+                        <ChildContent><TabHeader Text="Details" /></ChildContent>
+                        <ContentTemplate>
+                            <div class="mt-4">
+                                <div class="row">
+                                    <div class="col-lg-7">
+                                        <div class="card mb-4">
+                                            <div class="card-header"><h5 class="mb-0">Position Profile Details</h5></div>
+                                            <div class="card-body @(_isViewMode ? "view-mode" : "")">
+                                                @DetailsFormFields
+                                            </div>
+                                        </div>
+                                        @FormButtons
+                                    </div>
+                                </div>
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+                    <TabItem>
+                        <ChildContent><TabHeader Text="Required Documents" /></ChildContent>
+                        <ContentTemplate>
+                            <div class="mt-4">
+                                <PositionProfileRequiredDocumentsTab
+                                    CompanyId="CompanyId"
+                                    PositionProfileId="Id!.Value"
+                                    CanEdit="!_isViewMode" />
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+                </TabItems>
+            </SfTab>
+        }
     }
 </div>
 
@@ -175,4 +176,49 @@
 
     private void Cancel() =>
         Navigation.NavigateTo($"/companies/{CompanyId}/position-profiles");
+
+    private RenderFragment DetailsFormFields => __builder =>
+    {
+        <div class="mb-3">
+            <label class="form-label">Title <span class="text-danger">*</span></label>
+            <HrTextBox @bind-Value="_model.Title" Placeholder="e.g. Senior Software Engineer" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Description</label>
+            <HrTextBox @bind-Value="_model.Description" Placeholder="Optional description" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Department</label>
+            <SfDropDownList TValue="Guid?"
+                            TItem="DepartmentListItemModel"
+                            DataSource="@_departments"
+                            @bind-Value="_model.DepartmentId"
+                            Placeholder="None"
+                            AllowFiltering="true">
+                <DropDownListFieldSettings Value="Id" Text="Name" />
+            </SfDropDownList>
+        </div>
+        <div class="mb-3">
+            <SfCheckBox TChecked="bool"
+                        Label="Managerial role"
+                        @bind-Checked="_model.IsManagerial" />
+        </div>
+    };
+
+    private RenderFragment FormButtons => __builder =>
+    {
+        <div class="d-flex gap-2 align-items-center mt-3">
+            @if (!_isViewMode)
+            {
+                <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
+                    @if (_saving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Save
+                </SfButton>
+            }
+            <SfButton OnClick="Cancel" Disabled="@_saving">@(_isViewMode ? "Close" : "Cancel")</SfButton>
+        </div>
+    };
 }

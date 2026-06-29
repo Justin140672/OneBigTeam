@@ -123,7 +123,7 @@ public sealed class ContactDetailsTabTests : IAsyncLifetime
         await profile.OpenContactDetailsTabAsync();
         await contactDetails.WaitForLoadAsync();
 
-        var content = await _page.ContentAsync();
-        Assert.Contains(uniqueEmail, content, StringComparison.OrdinalIgnoreCase);
+        var savedEmail = await contactDetails.GetPersonalEmailAsync();
+        Assert.Equal(uniqueEmail, savedEmail, StringComparer.OrdinalIgnoreCase);
     }
 }

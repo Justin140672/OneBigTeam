@@ -47,4 +47,58 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
 
     public async Task<bool> HasErrorAsync() =>
         await page.Locator(".alert-danger, .validation-message").First.IsVisibleAsync();
+
+    public async Task OpenRequiredDocumentsTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Required Documents" }).ClickAsync();
+        // Wait for the tab content to be interactive — either the Add button or the empty-state text.
+        await page.WaitForSelectorAsync(
+            "button:has-text('Add'), .text-muted:has-text('No required documents')",
+            new() { Timeout = 15_000 });
+    }
+
+    public async Task<bool> HasRequiredDocumentsTabAsync() =>
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Required Documents" }).IsVisibleAsync();
+
+    public async Task ClickAddRequiredDocumentAsync() =>
+        await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
+
+    public async Task SelectDocumentTypeInDialogAsync(string documentTypeName)
+    {
+        // Wait for the SfDialog container — Syncfusion sets role="dialog" on the outer element.
+        await page.Locator("[role='dialog']").WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+
+        // Syncfusion SfDropDownList puts role='combobox' on the outer SPAN wrapper, not the inner input.
+        // Clicking the span opens the popup.
+        await page.Locator("[role='dialog'] span[role='combobox']").First.ClickAsync();
+
+        // Click the matching item in the open popup.
+        await page.Locator(".e-popup-open .e-list-item")
+            .Filter(new() { HasText = documentTypeName })
+            .First
+            .ClickAsync(new() { Timeout = 10_000 });
+    }
+
+    public async Task SubmitAddDialogAsync()
+    {
+        await page.Locator("[role='dialog'] .e-footer-content button:has-text('Add')").ClickAsync();
+        await page.Locator("[role='dialog']").WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    public async Task<bool> HasRequiredDocumentInGridAsync(string documentTypeName)
+    {
+        var rows = page.Locator(".e-grid .e-row").Filter(new() { HasText = documentTypeName });
+        return await rows.CountAsync() > 0;
+    }
+
+    public async Task ClickRemoveRequiredDocumentAsync(string documentTypeName)
+    {
+        var row = page.Locator(".e-grid .e-row").Filter(new() { HasText = documentTypeName }).First;
+        await row.GetByTitle("Remove").ClickAsync();
+    }
+
+    public async Task ConfirmRemoveAsync() =>
+        await page.GetByRole(AriaRole.Button, new() { Name = "Yes" }).ClickAsync();
 }

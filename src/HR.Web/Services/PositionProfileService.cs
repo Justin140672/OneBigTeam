@@ -53,6 +53,56 @@ public class PositionProfileService(IHttpClientFactory httpClientFactory)
         return (null, "Failed to create position profile.");
     }
 
+    public async Task<ListRequiredDocumentsResponse?> ListRequiredDocumentsAsync(
+        Guid companyId, Guid positionProfileId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<ListRequiredDocumentsResponse>(
+                $"api/companies/{companyId}/position-profiles/{positionProfileId}/required-documents");
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<(bool Success, string? Error)> AddRequiredDocumentAsync(
+        Guid companyId, Guid positionProfileId, AddRequiredDocumentToProfileRequest request)
+    {
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/position-profiles/{positionProfileId}/required-documents", request);
+
+        if (response.IsSuccessStatusCode)
+            return (true, null);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+            return (false, body?.Error ?? "This document type is already required.");
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return (false, "Position profile or document type not found.");
+
+        return (false, "Failed to add required document.");
+    }
+
+    public async Task<bool> RemoveRequiredDocumentAsync(
+        Guid companyId, Guid positionProfileId, Guid requiredDocumentId)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync(
+                $"api/companies/{companyId}/position-profiles/{positionProfileId}/required-documents/{requiredDocumentId}");
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public async Task<(bool Success, string? Error)> UpdatePositionProfileAsync(
         Guid companyId, Guid id, UpdatePositionProfileRequest request)
     {

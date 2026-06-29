@@ -19,7 +19,8 @@ internal sealed class GetProbationRecordByEmployeeHandler
     {
         var record = await _dbContext.ProbationRecords
             .Where(r => r.CompanyId == request.CompanyId && r.EmployeeId == request.EmployeeId)
-            .OrderByDescending(r => r.CreatedAt)
+            .OrderByDescending(r => r.StartDate)
+            .ThenByDescending(r => r.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (record is null)

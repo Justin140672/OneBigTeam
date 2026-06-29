@@ -97,7 +97,7 @@ public static class TasksModule
             var t = TaskItem.Create(
                 id, companyId, devUserId,
                 title, description, priority, source, actionType,
-                dueDate, assignedEmployeeId, devUserId, now);
+                dueDate, assignedEmployeeId, assignedEmployeeId, now);
             if (status == TaskItemStatus.InProgress) t.Start(now);
             return t;
         }

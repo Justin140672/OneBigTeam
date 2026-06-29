@@ -1,0 +1,139 @@
+@inject PositionProfileService PositionProfileService
+
+<AddRequiredDocumentDialog CompanyId="CompanyId"
+                           PositionProfileId="PositionProfileId"
+                           IsOpen="_addOpen"
+                           OnAdded="OnDocumentAdded"
+                           OnCancelled="@(() => _addOpen = false)" />
+
+@if (_loading)
+{
+    <div class="d-flex align-items-center gap-2 py-3">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span class="text-muted">Loading…</span>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header d-flex align-items-center">
+            <i class="fa-solid fa-file-circle-check text-muted me-2"></i>
+            <h5 class="mb-0">Required Documents</h5>
+            @if (CanEdit)
+            {
+                <div class="ms-auto">
+                    <SfButton CssClass="e-primary e-small" OnClick="@(() => _addOpen = true)">
+                        <i class="fa-solid fa-plus me-1"></i> Add
+                    </SfButton>
+                </div>
+            }
+        </div>
+        <div class="card-body p-0">
+            @if (_documents.Count == 0)
+            {
+                <p class="text-muted small p-3 mb-0">No required documents configured for this position profile.</p>
+            }
+            else
+            {
+                <HrGrid TValue="RequiredDocumentListItemModel"
+                        DataSource="@_documents"
+                        AllowPaging="false">
+                    <GridColumns>
+                        <GridColumn Field="@nameof(RequiredDocumentListItemModel.DocumentTypeName)"
+                                    HeaderText="Document Type" />
+                        <GridColumn Field="@nameof(RequiredDocumentListItemModel.IsMandatory)"
+                                    HeaderText="Mandatory" Width="120" AllowSorting="false" AllowFiltering="false">
+                            <Template>
+                                @{ var r = (context as RequiredDocumentListItemModel)!; }
+                                <span class="badge @(r.IsMandatory ? "text-bg-primary" : "text-bg-secondary")">
+                                    @(r.IsMandatory ? "Yes" : "No")
+                                </span>
+                            </Template>
+                        </GridColumn>
+                        <GridColumn Field="@nameof(RequiredDocumentListItemModel.DueDaysAfterStart)"
+                                    HeaderText="Due Days After Start" Width="180">
+                            <Template>
+                                @{ var r = (context as RequiredDocumentListItemModel)!; }
+                                <span class="text-muted small">
+                                    @(r.DueDaysAfterStart.HasValue ? r.DueDaysAfterStart.ToString() : "—")
+                                </span>
+                            </Template>
+                        </GridColumn>
+                        <GridColumn Field="@nameof(RequiredDocumentListItemModel.RequiresExpiryDate)"
+                                    HeaderText="Requires Expiry" Width="150" AllowSorting="false" AllowFiltering="false">
+                            <Template>
+                                @{ var r = (context as RequiredDocumentListItemModel)!; }
+                                <span class="badge @(r.RequiresExpiryDate ? "text-bg-info" : "text-bg-secondary")">
+                                    @(r.RequiresExpiryDate ? "Yes" : "No")
+                                </span>
+                            </Template>
+                        </GridColumn>
+                        @if (CanEdit)
+                        {
+                            <GridColumn HeaderText="" Width="160" AllowSorting="false" AllowFiltering="false"
+                                        TextAlign="TextAlign.Right">
+                                <Template>
+                                    @{ var r = (context as RequiredDocumentListItemModel)!; }
+                                    @if (_removeTargetId == r.Id)
+                                    {
+                                        <span class="me-2 text-muted small">Remove?</span>
+                                        <SfButton CssClass="e-danger e-small me-1"
+                                                  OnClick="() => ConfirmRemoveAsync(r.Id)">
+                                            Yes
+                                        </SfButton>
+                                        <SfButton CssClass="e-small" OnClick="CancelRemove">No</SfButton>
+                                    }
+                                    else
+                                    {
+                                        <SfButton CssClass="e-danger e-outline e-small"
+                                                  OnClick="() => StartRemove(r.Id)"
+                                                  title="Remove">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </SfButton>
+                                    }
+                                </Template>
+                            </GridColumn>
+                        }
+                    </GridColumns>
+                </HrGrid>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid PositionProfileId { get; set; }
+    [Parameter] public bool CanEdit { get; set; }
+
+    private bool  _loading = true;
+    private bool  _addOpen;
+    private Guid? _removeTargetId;
+    private List<RequiredDocumentListItemModel> _documents = [];
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading   = _documents.Count == 0;
+        _documents = (await PositionProfileService.ListRequiredDocumentsAsync(CompanyId, PositionProfileId))?.Items.ToList() ?? [];
+        _loading   = false;
+        StateHasChanged();
+    }
+
+    private async Task OnDocumentAdded()
+    {
+        _addOpen = false;
+        await LoadAsync();
+    }
+
+    private void StartRemove(Guid id)  => _removeTargetId = id;
+    private void CancelRemove()        => _removeTargetId = null;
+
+    private async Task ConfirmRemoveAsync(Guid id)
+    {
+        _removeTargetId = null;
+        await PositionProfileService.RemoveRequiredDocumentAsync(CompanyId, PositionProfileId, id);
+        await LoadAsync();
+    }
+}

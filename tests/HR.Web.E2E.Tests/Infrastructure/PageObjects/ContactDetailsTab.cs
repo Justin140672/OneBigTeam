@@ -88,4 +88,13 @@ public sealed class ContactDetailsTab(IPage page)
             ? (await input.InputValueAsync()).Trim()
             : null;
     }
+
+    /// <summary>Returns the current value of the Personal Email input via the live DOM property.</summary>
+    public async Task<string?> GetPersonalEmailAsync()
+    {
+        var input = page.GetByPlaceholder("e.g. name@personal.com");
+        return await input.IsVisibleAsync()
+            ? (await input.InputValueAsync()).Trim()
+            : null;
+    }
 }

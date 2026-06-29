@@ -93,10 +93,12 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     public async Task EnterReviewNotesAsync(string notes) =>
         await page.GetByPlaceholder("Enter your review notes…").FillAsync(notes);
 
-    /// <summary>Clicks "Complete Review" and waits for the status badge to show Completed.</summary>
+    /// <summary>Clicks "Complete Review", dismisses the confirmation, and waits for the status badge to show Completed.</summary>
     public async Task CompleteReviewAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Complete Review" }).ClickAsync();
+        // Panel shows "Review completed." with a Done button before reloading the task.
+        await page.GetByRole(AriaRole.Button, new() { Name = "Done" }).ClickAsync();
         await page.WaitForFunctionAsync(
             "document.querySelector('.task-status-badge')?.textContent?.includes('Completed')",
             null, new() { Timeout = 15_000 });

@@ -106,7 +106,8 @@ public sealed class LeaveRejectionTests : IAsyncLifetime
 
         await _page.WaitForSelectorAsync("table tbody tr", new() { Timeout = 15_000 });
 
-        var rejectedStatus = await profile.GetLeaveRequestStatusAsync(reason);
+        // After rejection the Reason column shows RejectionReason, not the original leave reason.
+        var rejectedStatus = await profile.GetLeaveRequestStatusAsync(reason, RejectionReason);
         Assert.Equal("Rejected", rejectedStatus);
 
         // The rejection reason is stored in the leave request's Reason field and displayed in the table.

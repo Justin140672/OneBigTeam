@@ -72,18 +72,14 @@ public sealed class ProfileTasksTabTests : IAsyncLifetime
 
         await _page.WaitForSelectorAsync(".e-grid, .task-cell", new() { Timeout = 15_000 });
 
-        // Click the "View" toolbar button on the first task row.
-        // Syncfusion grid toolbar action with id 'hr-view' opens the task.
-        var viewBtn = _page.Locator("[id='hr-view'], [title='View task']").First;
+        // The View toolbar button starts disabled (e-overlay) until a row is selected.
+        // Always select the first row first, then wait for Syncfusion to enable the button.
+        await _page.Locator(".e-row").First.ClickAsync();
+        await _page.WaitForFunctionAsync(
+            "!document.querySelector('[id=\"hr-view\"]')?.classList?.contains('e-overlay')",
+            null, new PageWaitForFunctionOptions { Timeout = 10_000 });
 
-        if (!await viewBtn.IsVisibleAsync())
-        {
-            // Fallback: select the first row then click the toolbar button.
-            await _page.Locator(".e-row").First.ClickAsync();
-            viewBtn = _page.Locator("[id='hr-view'], [title='View task']").First;
-        }
-
-        await viewBtn.ClickAsync();
+        await _page.Locator("[id='hr-view']").ClickAsync();
 
         // Should navigate to /tasks/{id}
         await _page.WaitForURLAsync(new Regex("/tasks/"), new() { Timeout = 15_000 });

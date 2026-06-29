@@ -1,0 +1,128 @@
+@inject DocumentService DocumentService
+@inject PositionProfileService PositionProfileService
+
+<SfDialog @bind-Visible="_visible" IsModal="true" Width="520px" ShowCloseIcon="true">
+    <DialogEvents Closed="OnDialogClosed" />
+    <DialogTemplates>
+        <Header>Add Required Document</Header>
+        <Content>
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="alert alert-danger alert-dismissible mb-3">
+                    @_error
+                    <button type="button" class="btn-close" @onclick="@(() => _error = null)"></button>
+                </div>
+            }
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label">Document Type <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="Guid"
+                                    TItem="DocumentTypeItem"
+                                    DataSource="@_documentTypes"
+                                    @bind-Value="_documentTypeId"
+                                    Placeholder="Select document type…"
+                                    AllowFiltering="true">
+                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                    </SfDropDownList>
+                </div>
+                <div class="col-12">
+                    <SfCheckBox TChecked="bool" Label="Mandatory" @bind-Checked="_isMandatory" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Due Days After Start</label>
+                    <HrNumericTextBox TValue="int?" @bind-Value="_dueDaysAfterStart" Min="0" Placeholder="e.g. 30" />
+                </div>
+                <div class="col-12">
+                    <SfCheckBox TChecked="bool" Label="Requires Expiry Date" @bind-Checked="_requiresExpiryDate" />
+                </div>
+            </div>
+        </Content>
+        <FooterTemplate>
+            <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="_saving">
+                @if (_saving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Add
+            </SfButton>
+            <SfButton OnClick="Cancel">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid PositionProfileId { get; set; }
+    [Parameter]                 public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnAdded { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+
+    private bool _visible;
+    private List<DocumentTypeItem> _documentTypes = [];
+
+    private Guid    _documentTypeId;
+    private bool    _isMandatory    = true;
+    private int?    _dueDaysAfterStart;
+    private bool    _requiresExpiryDate;
+    private bool    _saving;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && !_visible)
+        {
+            Reset();
+            _documentTypes = (await DocumentService.ListDocumentTypesAsync(CompanyId))?.Items.ToList() ?? [];
+            _visible = true;
+        }
+        else if (!IsOpen && _visible)
+        {
+            _visible = false;
+        }
+    }
+
+    private void Reset()
+    {
+        _documentTypeId     = Guid.Empty;
+        _isMandatory        = true;
+        _dueDaysAfterStart  = null;
+        _requiresExpiryDate = false;
+        _error              = null;
+    }
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+
+        if (_documentTypeId == Guid.Empty)
+        {
+            _error = "Please select a document type.";
+            return;
+        }
+
+        _saving = true;
+        var request = new AddRequiredDocumentToProfileRequest(
+            CompanyId, PositionProfileId, _documentTypeId,
+            _isMandatory, _dueDaysAfterStart, _requiresExpiryDate);
+        var (success, error) = await PositionProfileService.AddRequiredDocumentAsync(
+            CompanyId, PositionProfileId, request);
+        _saving = false;
+
+        if (!success)
+        {
+            _error = error ?? "Failed to add required document.";
+            return;
+        }
+
+        _visible = false;
+        await OnAdded.InvokeAsync();
+    }
+
+    private async Task Cancel()
+    {
+        _visible = false;
+        await OnCancelled.InvokeAsync();
+    }
+
+    private async Task OnDialogClosed() => await OnCancelled.InvokeAsync();
+}

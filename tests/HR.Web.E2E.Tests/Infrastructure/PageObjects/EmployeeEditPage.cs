@@ -28,7 +28,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     // ── New Employee — Personal Information ───────────────────────────────────
 
     public async Task FillFirstNameAsync(string value) =>
-        await page.GetByPlaceholder("First name").FillAsync(value);
+        await page.GetByPlaceholder("First name", new() { Exact = true }).FillAsync(value);
 
     public async Task FillLastNameAsync(string value) =>
         await page.GetByPlaceholder("Last name").FillAsync(value);
@@ -73,7 +73,9 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task OpenEmploymentTabAsync()
     {
         await page.GetByRole(AriaRole.Tab, new() { Name = "Employment" }).ClickAsync();
-        await page.WaitForSelectorAsync(".card-header", new() { Timeout = 15_000 });
+        // Wait for the Employment-tab-specific heading — the generic .card-header selector
+        // would resolve immediately against the Details tab's already-rendered card headers.
+        await page.WaitForSelectorAsync(".card-header:has-text('Employment Details')", new() { Timeout = 15_000 });
     }
 
     /// <summary>
@@ -86,6 +88,9 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             .First;
         await managerGroup.Locator("span[role='combobox']").First.ClickAsync();
         await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        // Wait for list items to be populated before trying to click one — the popup can
+        // appear before Syncfusion binds the DataSource when AllowFiltering is enabled.
+        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item", new() { Timeout = 15_000 });
         await page.Locator(".e-popup.e-ddl .e-list-item")
             .Filter(new() { HasText = managerNameFragment })
             .First

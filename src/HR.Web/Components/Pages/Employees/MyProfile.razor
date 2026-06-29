@@ -15,7 +15,7 @@
                     <div class="mt-4">
                         <MyProfileOverviewTab CompanyId="CompanyId"
                                              EmployeeId="EmployeeId"
-                                             OnNavigateToLeave="() => _activeTabIndex = 4"
+                                             OnNavigateToLeave="NavigateToLeaveAndOpen"
                                              OnNavigateToDocuments="() => _activeTabIndex = 5"
                                              OnNavigateToTasks="() => _activeTabIndex = 6" />
                     </div>
@@ -42,7 +42,8 @@
             <TabItem>
                 <ChildContent><TabHeader Text="Leave" /></ChildContent>
                 <ContentTemplate>
-                    <div class="mt-4"><MyProfileLeaveTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
+                    <div class="mt-4"><MyProfileLeaveTab CompanyId="CompanyId" EmployeeId="EmployeeId"
+                                                         AutoOpenToken="_leaveAutoOpenToken" /></div>
                 </ContentTemplate>
             </TabItem>
             <TabItem>
@@ -66,4 +67,11 @@
     [Parameter] public Guid EmployeeId { get; set; }
 
     private int _activeTabIndex;
+    private int _leaveAutoOpenToken;
+
+    private void NavigateToLeaveAndOpen()
+    {
+        _activeTabIndex = 4;
+        _leaveAutoOpenToken++;
+    }
 }
