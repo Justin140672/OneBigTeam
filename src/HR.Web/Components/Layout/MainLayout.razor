@@ -292,9 +292,22 @@ else
 
     private void ToggleSidebar() => SidebarOpen = !SidebarOpen;
 
-    private void ToggleTheme()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var stored = await JS.InvokeAsync<string>("getTheme");
+            if (stored == "dark" && !IsDark)
+            {
+                IsDark = true;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task ToggleTheme()
     {
         IsDark = !IsDark;
-        JS.InvokeAsync<object>("setTheme", IsDark);
+        await JS.InvokeVoidAsync("setTheme", IsDark);
     }
 }

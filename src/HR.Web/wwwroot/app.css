@@ -80,3 +80,396 @@ h1:focus {
         content: "An error has occurred."
     }
 
+/* ── Dashboard widgets ───────────────────────────────────────────
+   Shared by MyTasksWidget, TeamTasksWidget, UpcomingProbationReviewsWidget,
+   RecentNotificationsWidget and any future dashboard card.
+   ──────────────────────────────────────────────────────────────── */
+
+.widget-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+/* ── Header ──────────────────────────────────────────── */
+
+.widget-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.widget-icon {
+    color: #6366f1;
+    font-size: 1rem;
+}
+
+.widget-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.widget-count-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    background: #6366f1;
+    color: #fff;
+    border-radius: 10px;
+    padding: 1px 7px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.widget-view-all {
+    font-size: 0.8rem;
+    color: #6366f1;
+    text-decoration: none;
+}
+
+.widget-view-all:hover {
+    text-decoration: underline;
+}
+
+/* ── Stats bar ───────────────────────────────────────── */
+
+.widget-stats {
+    display: flex;
+    gap: 20px;
+    padding: 8px 16px;
+    background: #fafafa;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.widget-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.widget-stat--danger {
+    color: #dc2626;
+}
+
+.widget-stat-value {
+    font-weight: 700;
+    color: #111827;
+}
+
+.widget-stat--danger .widget-stat-value {
+    color: #dc2626;
+}
+
+.widget-stat-label {
+    color: #9ca3af;
+}
+
+/* ── Body / list ─────────────────────────────────────── */
+
+.widget-body {
+    padding: 4px 0;
+}
+
+.widget-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px;
+    color: #9ca3af;
+    font-size: 0.875rem;
+}
+
+/* ── Task / review list items ────────────────────────── */
+
+.task-widget-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #f9fafb;
+    transition: background 0.1s;
+}
+
+.task-widget-item:last-child {
+    border-bottom: none;
+}
+
+.task-widget-item:hover {
+    background: #f9fafb;
+}
+
+/* ── Priority dot ────────────────────────────────────── */
+
+.priority-pip {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.priority-pip--critical { background: #dc2626; }
+.priority-pip--high     { background: #f97316; }
+.priority-pip--medium   { background: #eab308; }
+.priority-pip--low      { background: #d1d5db; }
+
+/* ── Item text ───────────────────────────────────────── */
+
+.task-widget-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.task-widget-title {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.task-widget-meta {
+    display: block;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-top: 1px;
+}
+
+/* ── Due date badge ──────────────────────────────────── */
+
+.due-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.due-badge--overdue { background: #fee2e2; color: #dc2626; }
+.due-badge--today   { background: #ffedd5; color: #ea580c; }
+.due-badge--soon    { background: #fef3c7; color: #ca8a04; }
+.due-badge--normal  { background: #f3f4f6; color: #6b7280; }
+
+/* ── Dark mode ───────────────────────────────────────────────────
+   Uses html[data-theme="dark"] so specificity (0,2,1) beats every
+   scoped Blazor rule (max 0,2,0) without needing !important.
+   Bootstrap dark mode is activated separately via data-bs-theme="dark"
+   on <html>, which Bootstrap 5.3 handles natively.
+   ──────────────────────────────────────────────────────────────── */
+
+/* Body */
+html[data-theme="dark"] body {
+    background-color: #111827;
+    color: #f9fafb;
+}
+
+/* ── Layout shell ────────────────────────────────────── */
+
+html[data-theme="dark"] .top-bar {
+    background: #1f2937;
+    border-bottom-color: #374151;
+    color: #f9fafb;
+}
+
+html[data-theme="dark"] .page-title {
+    color: #f9fafb;
+}
+
+html[data-theme="dark"] .top-bar-user:hover {
+    background: #374151;
+}
+
+html[data-theme="dark"] .top-bar-job-title {
+    color: #9ca3af;
+}
+
+html[data-theme="dark"] .theme-toggle {
+    color: #9ca3af;
+}
+
+html[data-theme="dark"] .theme-toggle:hover {
+    background: #374151;
+    color: #f9fafb;
+}
+
+/* ── Notification bell ───────────────────────────────── */
+
+html[data-theme="dark"] .notif-btn {
+    color: #9ca3af;
+}
+
+html[data-theme="dark"] .notif-btn:hover,
+html[data-theme="dark"] .notif-open .notif-btn {
+    background: #374151;
+    color: #f9fafb;
+}
+
+html[data-theme="dark"] .notif-dropdown {
+    background: #1f2937;
+    border-color: #374151;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+html[data-theme="dark"] .notif-header {
+    border-bottom-color: #374151;
+}
+
+html[data-theme="dark"] .notif-header-title {
+    color: #f9fafb;
+}
+
+html[data-theme="dark"] .notif-item {
+    border-bottom-color: #374151;
+}
+
+html[data-theme="dark"] .notif-item:hover {
+    background: rgba(255,255,255,0.04);
+}
+
+html[data-theme="dark"] .notif-unread {
+    background: rgba(99,102,241,0.12);
+}
+
+html[data-theme="dark"] .notif-item-title {
+    color: #f9fafb;
+}
+
+html[data-theme="dark"] .notif-item-body {
+    color: #9ca3af;
+}
+
+html[data-theme="dark"] .notif-empty {
+    color: #6b7280;
+}
+
+html[data-theme="dark"] .notif-item-time {
+    color: #6b7280;
+}
+
+html[data-theme="dark"] .notif-type-label--assigned {
+    background: rgba(109,40,217,0.25);
+    color: #a78bfa;
+}
+
+html[data-theme="dark"] .notif-type-label--due-soon {
+    background: rgba(146,64,14,0.25);
+    color: #fcd34d;
+}
+
+html[data-theme="dark"] .notif-type-label--overdue {
+    background: rgba(153,27,27,0.25);
+    color: #fca5a5;
+}
+
+/* ── Dashboard widgets ───────────────────────────────── */
+
+html[data-theme="dark"] .widget-card {
+    background: #1f2937;
+    border-color: #374151;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+html[data-theme="dark"] .widget-header {
+    border-bottom-color: #374151;
+}
+
+html[data-theme="dark"] .widget-title {
+    color: #f9fafb;
+}
+
+html[data-theme="dark"] .widget-stats {
+    background: #111827;
+    border-bottom-color: #374151;
+}
+
+html[data-theme="dark"] .widget-stat {
+    color: #9ca3af;
+}
+
+html[data-theme="dark"] .widget-stat-value {
+    color: #f9fafb;
+}
+
+html[data-theme="dark"] .widget-stat--danger {
+    color: #f87171;
+}
+
+html[data-theme="dark"] .widget-stat--danger .widget-stat-value {
+    color: #f87171;
+}
+
+html[data-theme="dark"] .widget-stat-label {
+    color: #6b7280;
+}
+
+html[data-theme="dark"] .widget-empty {
+    color: #6b7280;
+}
+
+html[data-theme="dark"] .task-widget-item {
+    border-bottom-color: #374151;
+}
+
+html[data-theme="dark"] .task-widget-item:hover {
+    background: rgba(255,255,255,0.04);
+}
+
+html[data-theme="dark"] .task-widget-title {
+    color: #f9fafb;
+}
+
+html[data-theme="dark"] .task-widget-meta {
+    color: #6b7280;
+}
+
+html[data-theme="dark"] .due-badge--overdue { background: rgba(220,38,38,0.18);  color: #f87171; }
+html[data-theme="dark"] .due-badge--today   { background: rgba(234,88,12,0.18);  color: #fb923c; }
+html[data-theme="dark"] .due-badge--soon    { background: rgba(202,138,4,0.18);  color: #fbbf24; }
+html[data-theme="dark"] .due-badge--normal  { background: #374151;               color: #d1d5db; }
+
+/* ── Notification widget (RecentNotificationsWidget) ─── */
+
+html[data-theme="dark"] .notif-widget-item {
+    border-bottom-color: #374151;
+}
+
+html[data-theme="dark"] .notif-widget-item--unread {
+    background: rgba(99,102,241,0.1);
+}
+
+html[data-theme="dark"] .notif-widget-icon-wrap {
+    background: #374151;
+    color: #9ca3af;
+}
+
+html[data-theme="dark"] .notif-widget-title {
+    color: #f9fafb;
+}
+
+html[data-theme="dark"] .notif-widget-meta {
+    color: #6b7280;
+}
+
+html[data-theme="dark"] .notif-widget-dot {
+    background: #818cf8;
+}
+
+/* ── Dashboard heading (Home.razor) ──────────────────── */
+
+html[data-theme="dark"] .dashboard-greeting {
+    border-bottom-color: #374151;
+}
+
+html[data-theme="dark"] .dashboard-heading {
+    color: #f9fafb;
+}
+

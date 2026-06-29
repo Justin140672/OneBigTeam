@@ -8,17 +8,6 @@
 <div class="container-fluid py-4">
     <h1 class="mb-3">Public Holidays</h1>
 
-    <div class="d-flex align-items-center gap-2 mb-3">
-        <label class="form-label mb-0">Year</label>
-        <HrNumericTextBox TValue="int"
-                          @bind-Value="_year"
-                          Min="2000"
-                          Max="2100"
-                          Format="0"
-                          Width="100px" />
-        <SfButton OnClick="LoadAsync">Apply</SfButton>
-    </div>
-
     @if (IsLoading)
     {
         <div class="d-flex align-items-center gap-2">
@@ -36,11 +25,12 @@
                 TValue="PublicHolidayListItemModel"
                 DataSource="@Items"
                 Toolbar="@GridToolbar"
-                AllowFiltering="false">
+                AllowFiltering="true">
             <GridEvents TValue="PublicHolidayListItemModel" OnToolbarClick="OnToolbarClick"
                         RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
             <GridPageSettings PageSize="20" />
             <GridColumns>
+                <GridColumn Field="@nameof(PublicHolidayListItemModel.Year)" HeaderText="Year" Width="90" />
                 <GridColumn Field="@nameof(PublicHolidayListItemModel.Date)" HeaderText="Date" Width="140" Format="d" />
                 <GridColumn Field="@nameof(PublicHolidayListItemModel.Name)" HeaderText="Name" Width="260" />
                 <GridColumn Field="@nameof(PublicHolidayListItemModel.CountryCode)" HeaderText="Country" Width="110" />
@@ -58,11 +48,9 @@
 </div>
 
 @code {
-    private int _year = DateTime.UtcNow.Year;
-
     protected override async Task<IReadOnlyList<PublicHolidayListItemModel>?> FetchItemsAsync(string? search)
     {
-        var result = await PublicHolidayService.ListAsync(CompanyId, _year);
+        var result = await PublicHolidayService.ListAsync(CompanyId);
         return result?.Items;
     }
 

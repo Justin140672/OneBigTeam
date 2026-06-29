@@ -42,16 +42,4 @@ public sealed class PublicHolidayListPage(IPage page, string baseUrl)
         return names;
     }
 
-    /// <summary>Applies a year filter by filling the year numeric input and clicking Apply.</summary>
-    public async Task FilterByYearAsync(int year)
-    {
-        // Syncfusion puts class e-numerictextbox ON the <input> itself, not on a wrapper.
-        var yearInput = page.Locator("input.e-numerictextbox").First;
-        await yearInput.FillAsync(year.ToString());
-        await page.Keyboard.PressAsync("Tab");
-        await page.GetByRole(AriaRole.Button, new() { Name = "Apply" }).ClickAsync();
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
-    }
 }

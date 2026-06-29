@@ -169,7 +169,7 @@ else
 
         var balanceTask  = LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
         var requestsTask = LeaveService.ListLeaveRequestsAsync(CompanyId, EmployeeId);
-        var holidaysTask = PublicHolidayService.ListAsync(CompanyId, DateTime.UtcNow.Year);
+        var holidaysTask = PublicHolidayService.ListAsync(CompanyId);
 
         await Task.WhenAll(balanceTask, requestsTask, holidaysTask);
 

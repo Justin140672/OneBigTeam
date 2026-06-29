@@ -3,5 +3,4 @@ namespace HR.Modules.Leave.Features.ListPublicHolidays;
 internal sealed record ListPublicHolidaysRequest
 {
     public Guid CompanyId { get; init; }
-    public int Year { get; init; }
 }

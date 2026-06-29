@@ -10,7 +10,10 @@ public record PublicHolidayListItemModel(
     DateOnly Date,
     string Name,
     string CountryCode,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt)
+{
+    public int Year => Date.Year;
+}
 
 // ── CREATE ────────────────────────────────────────────────────────────────────
 

@@ -100,7 +100,7 @@
 
         if (!IsNew)
         {
-            var list = await PublicHolidayService.ListAsync(CompanyId, DateTime.UtcNow.Year);
+            var list = await PublicHolidayService.ListAsync(CompanyId);
             var existing = list?.Items.FirstOrDefault(h => h.Id == Id);
 
             if (existing is not null)
@@ -108,22 +108,6 @@
                 _model.Date = existing.Date.ToDateTime(TimeOnly.MinValue);
                 _model.Name = existing.Name;
                 _model.CountryCode = existing.CountryCode;
-            }
-            else
-            {
-                // Try adjacent years in case the holiday is in a different year
-                foreach (var year in new[] { DateTime.UtcNow.Year - 1, DateTime.UtcNow.Year + 1 })
-                {
-                    var result = await PublicHolidayService.ListAsync(CompanyId, year);
-                    existing = result?.Items.FirstOrDefault(h => h.Id == Id);
-                    if (existing is not null)
-                    {
-                        _model.Date = existing.Date.ToDateTime(TimeOnly.MinValue);
-                        _model.Name = existing.Name;
-                        _model.CountryCode = existing.CountryCode;
-                        break;
-                    }
-                }
             }
         }
 

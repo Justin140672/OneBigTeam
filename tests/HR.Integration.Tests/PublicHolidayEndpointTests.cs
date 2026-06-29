@@ -89,7 +89,7 @@ public class PublicHolidayEndpointTests : IClassFixture<ApiWebApplicationFactory
     }
 
     [Fact]
-    public async Task Get_PublicHolidays_Returns_List_For_Year()
+    public async Task Get_PublicHolidays_Returns_All_For_Company()
     {
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
@@ -99,9 +99,9 @@ public class PublicHolidayEndpointTests : IClassFixture<ApiWebApplicationFactory
             new { companyId, date = "2026-03-17", name = "St Patrick's Day", countryCode = "IE" });
         await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/public-holidays",
-            new { companyId, date = "2026-06-01", name = "June Bank Holiday", countryCode = "IE" });
+            new { companyId, date = "2027-06-01", name = "June Bank Holiday", countryCode = "IE" });
 
-        var response = await client.GetAsync($"/api/companies/{companyId}/public-holidays?year=2026");
+        var response = await client.GetAsync($"/api/companies/{companyId}/public-holidays");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ListPayload>();

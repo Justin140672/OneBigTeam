@@ -8,7 +8,6 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Verifies HR Administrator CRUD workflows for public holidays:
 /// - Seeded public holidays appear in the list.
 /// - A new holiday can be created and appears in the list.
-/// - The year filter shows only the relevant year's holidays.
 /// </summary>
 [Collection("E2E")]
 public sealed class PublicHolidayManagementTests(AppFixture fixture) : E2ETestBase(fixture)
@@ -27,9 +26,8 @@ public sealed class PublicHolidayManagementTests(AppFixture fixture) : E2ETestBa
         await login.LoginAsync(LauraEmail);
 
         await phList.GoToAsync(AcmeId);
-        await phList.FilterByYearAsync(2026);
 
-        // The seeded 2026 holidays include Christmas Day and New Year's Day.
+        // The seeded holidays include Christmas Day and New Year's Day.
         Assert.True(await phList.HasHolidayAsync("Christmas Day"),
             "Expected 'Christmas Day' in the 2026 public holidays list");
         Assert.True(await phList.HasHolidayAsync("New Year"),
@@ -58,11 +56,8 @@ public sealed class PublicHolidayManagementTests(AppFixture fixture) : E2ETestBa
         await phEdit.FillCountryCodeAsync("GB");
         await phEdit.SaveAsync();
 
-        // After save, filter by 2027 to see the new holiday.
-        await phList.FilterByYearAsync(2027);
-
         Assert.True(await phList.HasHolidayAsync(holidayName),
-            $"Expected the new holiday '{holidayName}' to appear in the 2027 public holidays list");
+            $"Expected the new holiday '{holidayName}' to appear in the public holidays list");
     }
 
     [Fact]

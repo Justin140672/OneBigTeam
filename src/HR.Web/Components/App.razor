@@ -13,6 +13,19 @@
     <script src="https://kit.fontawesome.com/9749fcd59c.js" crossorigin="anonymous"></script>
     <link href="_content/Syncfusion.Blazor.Themes/bootstrap5.css" rel="stylesheet" />
     <link id="sf-dark-theme" href="_content/Syncfusion.Blazor.Themes/bootstrap5-dark.css" rel="stylesheet" disabled />
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('theme');
+                if (t === 'dark') {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    document.documentElement.setAttribute('data-bs-theme', 'dark');
+                    var l = document.getElementById('sf-dark-theme');
+                    if (l) l.disabled = false;
+                }
+            } catch {}
+        })();
+    </script>
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet />

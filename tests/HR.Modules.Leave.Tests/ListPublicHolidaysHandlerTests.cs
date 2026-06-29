@@ -1,41 +1,37 @@
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.ListPublicHolidays;
 using HR.Modules.Leave.Persistence;
-using HR.Modules.Leave.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Tests;
 
 public class ListPublicHolidaysHandlerTests
 {
-    private static readonly DateTime FixedUtcNow = new(2026, 6, 12, 9, 0, 0, DateTimeKind.Utc);
-
     private static LeaveDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<LeaveDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 
+    private static readonly DateTimeOffset Now = new(2026, 6, 12, 9, 0, 0, TimeSpan.Zero);
+
     [Fact]
-    public async Task HandleAsync_Returns_Holidays_For_Requested_Year()
+    public async Task HandleAsync_Returns_All_Holidays_For_Company()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
-        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         context.PublicHolidays.AddRange(
-            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 1, 1), "New Year's Day", "GB", now),
-            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 12, 25), "Christmas Day", "GB", now),
-            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2027, 1, 1), "New Year's Day 2027", "GB", now));
+            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 1, 1),  "New Year's Day",      "GB", Now),
+            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 12, 25), "Christmas Day",       "GB", Now),
+            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2027, 1, 1),  "New Year's Day 2027", "GB", Now));
         await context.SaveChangesAsync();
 
-        var handler = new ListPublicHolidaysHandler(context, new FakeClock(FixedUtcNow));
-
+        var handler = new ListPublicHolidaysHandler(context);
         var result = await handler.HandleAsync(
-            new ListPublicHolidaysRequest { CompanyId = companyId, Year = 2026 },
+            new ListPublicHolidaysRequest { CompanyId = companyId },
             CancellationToken.None);
 
-        Assert.Equal(2, result.Items.Count);
-        Assert.All(result.Items, item => Assert.Equal(2026, item.Date.Year));
+        Assert.Equal(3, result.Items.Count);
     }
 
     [Fact]
@@ -43,56 +39,53 @@ public class ListPublicHolidaysHandlerTests
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
-        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         context.PublicHolidays.AddRange(
-            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 12, 25), "Christmas Day", "GB", now),
-            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 1, 1), "New Year's Day", "GB", now),
-            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 4, 3), "Good Friday", "GB", now));
+            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 12, 25), "Christmas Day", "GB", Now),
+            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 1, 1),   "New Year's Day", "GB", Now),
+            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 4, 3),   "Good Friday",    "GB", Now));
         await context.SaveChangesAsync();
 
-        var handler = new ListPublicHolidaysHandler(context, new FakeClock(FixedUtcNow));
-
+        var handler = new ListPublicHolidaysHandler(context);
         var result = await handler.HandleAsync(
-            new ListPublicHolidaysRequest { CompanyId = companyId, Year = 2026 },
+            new ListPublicHolidaysRequest { CompanyId = companyId },
             CancellationToken.None);
 
         Assert.Equal(3, result.Items.Count);
-        Assert.Equal(new DateOnly(2026, 1, 1), result.Items[0].Date);
-        Assert.Equal(new DateOnly(2026, 4, 3), result.Items[1].Date);
+        Assert.Equal(new DateOnly(2026, 1, 1),   result.Items[0].Date);
+        Assert.Equal(new DateOnly(2026, 4, 3),   result.Items[1].Date);
         Assert.Equal(new DateOnly(2026, 12, 25), result.Items[2].Date);
     }
 
     [Fact]
-    public async Task HandleAsync_Uses_Current_Year_When_Year_Is_Zero()
+    public async Task HandleAsync_Returns_Holidays_Across_Multiple_Years()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
-        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         context.PublicHolidays.AddRange(
-            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 12, 25), "Christmas Day", "GB", now),
-            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2025, 12, 25), "Christmas Day 2025", "GB", now));
+            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2025, 12, 25), "Christmas Day 2025", "GB", Now),
+            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 12, 25), "Christmas Day 2026", "GB", Now),
+            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2027, 12, 25), "Christmas Day 2027", "GB", Now));
         await context.SaveChangesAsync();
 
-        var handler = new ListPublicHolidaysHandler(context, new FakeClock(FixedUtcNow));
-
+        var handler = new ListPublicHolidaysHandler(context);
         var result = await handler.HandleAsync(
-            new ListPublicHolidaysRequest { CompanyId = companyId, Year = 0 },
+            new ListPublicHolidaysRequest { CompanyId = companyId },
             CancellationToken.None);
 
-        Assert.Single(result.Items);
-        Assert.Equal(2026, result.Items[0].Date.Year);
+        Assert.Equal(3, result.Items.Count);
+        Assert.Equal(3, result.Items.Select(i => i.Date.Year).Distinct().Count());
     }
 
     [Fact]
     public async Task HandleAsync_Returns_Empty_When_No_Holidays_Exist()
     {
         await using var context = BuildContext();
-        var handler = new ListPublicHolidaysHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new ListPublicHolidaysHandler(context);
 
         var result = await handler.HandleAsync(
-            new ListPublicHolidaysRequest { CompanyId = Guid.NewGuid(), Year = 2026 },
+            new ListPublicHolidaysRequest { CompanyId = Guid.NewGuid() },
             CancellationToken.None);
 
         Assert.Empty(result.Items);
@@ -104,17 +97,15 @@ public class ListPublicHolidaysHandlerTests
         await using var context = BuildContext();
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
-        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         context.PublicHolidays.AddRange(
-            PublicHoliday.Create(Guid.NewGuid(), companyA, new DateOnly(2026, 12, 25), "Christmas Day", "GB", now),
-            PublicHoliday.Create(Guid.NewGuid(), companyB, new DateOnly(2026, 12, 25), "Christmas Day", "GB", now));
+            PublicHoliday.Create(Guid.NewGuid(), companyA, new DateOnly(2026, 12, 25), "Christmas Day", "GB", Now),
+            PublicHoliday.Create(Guid.NewGuid(), companyB, new DateOnly(2026, 12, 25), "Christmas Day", "GB", Now));
         await context.SaveChangesAsync();
 
-        var handler = new ListPublicHolidaysHandler(context, new FakeClock(FixedUtcNow));
-
+        var handler = new ListPublicHolidaysHandler(context);
         var result = await handler.HandleAsync(
-            new ListPublicHolidaysRequest { CompanyId = companyA, Year = 2026 },
+            new ListPublicHolidaysRequest { CompanyId = companyA },
             CancellationToken.None);
 
         Assert.Single(result.Items);

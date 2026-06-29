@@ -6,12 +6,12 @@ public class PublicHolidayService(IHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
-    public async Task<ListPublicHolidaysResponse?> ListAsync(Guid companyId, int year)
+    public async Task<ListPublicHolidaysResponse?> ListAsync(Guid companyId)
     {
         try
         {
             return await Http.GetFromJsonAsync<ListPublicHolidaysResponse>(
-                $"api/companies/{companyId}/public-holidays?year={year}");
+                $"api/companies/{companyId}/public-holidays");
         }
         catch (HttpRequestException)
         {
