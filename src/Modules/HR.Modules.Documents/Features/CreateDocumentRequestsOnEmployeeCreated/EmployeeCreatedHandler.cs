@@ -36,9 +36,11 @@ internal sealed class EmployeeCreatedHandler(
                 e.CompanyId,
                 e.EmployeeId,
                 doc.DocumentTypeId,
-                doc.IsMandatory,
-                doc.DueDaysAfterStart,
-                doc.RequiresExpiryDate,
+                positionProfileRequiredDocumentId: doc.Id,
+                dueDate: doc.DueDaysAfterStart.HasValue
+                    ? e.StartDate.AddDays(doc.DueDaysAfterStart.Value)
+                    : null,
+                requestedByEmployeeId: null,
                 now))
             .ToList();
 

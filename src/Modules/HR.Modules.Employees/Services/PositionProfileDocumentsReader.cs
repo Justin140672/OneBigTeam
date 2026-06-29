@@ -18,6 +18,7 @@ internal sealed class PositionProfileDocumentsReader(EmployeesDbContext dbContex
                      && d.PositionProfileId == positionProfileId
                      && d.IsActive)
             .Select(d => new PositionProfileRequiredDocumentItem(
+                d.Id,
                 d.DocumentTypeId,
                 d.IsMandatory,
                 d.DueDaysAfterStart,

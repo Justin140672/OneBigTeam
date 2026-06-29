@@ -9,11 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies the cross-module side effect: creating an employee whose position profile
-/// has required documents automatically generates DocumentRequest records via
-/// EmployeeCreatedIntegrationEvent → Documents.EmployeeCreatedHandler.
-/// </summary>
 public class EmployeeCreatedGeneratesDocumentRequestsTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
@@ -46,13 +41,13 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests : IClassFixture<ApiWe
         Assert.Equal(2, requests.Count);
         Assert.All(requests, r => Assert.Equal(employeeId, r.EmployeeId));
         Assert.All(requests, r => Assert.Equal(companyId, r.CompanyId));
-        Assert.All(requests, r => Assert.Equal(DocumentRequestStatus.Pending, r.Status));
+        Assert.All(requests, r => Assert.Equal(DocumentRequestStatus.Requested, r.Status));
         Assert.Contains(requests, r => r.DocumentTypeId == docTypeId1);
         Assert.Contains(requests, r => r.DocumentTypeId == docTypeId2);
     }
 
     [Fact]
-    public async Task CreateEmployee_WithPositionProfile_Preserves_IsMandatory_And_DueDays()
+    public async Task CreateEmployee_WithPositionProfile_Sets_DueDate_From_DueDaysAfterStart()
     {
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
@@ -64,12 +59,11 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests : IClassFixture<ApiWe
         var employeeId = await CreateEmployeeAsync(client, companyId, profileId);
 
         var request = Assert.Single(await GetDocumentRequestsAsync(employeeId));
-        Assert.True(request.IsMandatory);
-        Assert.Equal(14, request.DueDaysAfterStart);
+        Assert.Equal(new DateOnly(2026, 7, 1).AddDays(14), request.DueDate);
     }
 
     [Fact]
-    public async Task CreateEmployee_WithPositionProfile_CreatesRequestForOptionalDocument()
+    public async Task CreateEmployee_WithPositionProfile_Sets_DueDate_Null_When_DueDaysAfterStart_Not_Set()
     {
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
@@ -81,7 +75,23 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests : IClassFixture<ApiWe
         var employeeId = await CreateEmployeeAsync(client, companyId, profileId);
 
         var request = Assert.Single(await GetDocumentRequestsAsync(employeeId));
-        Assert.False(request.IsMandatory);
+        Assert.Null(request.DueDate);
+    }
+
+    [Fact]
+    public async Task CreateEmployee_WithPositionProfile_Sets_PositionProfileRequiredDocumentId()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+
+        var profileId = await CreatePositionProfileAsync(client, companyId, "Designer");
+        var docTypeId = await CreateDocumentTypeAsync(client, companyId, "Portfolio");
+        await AddRequiredDocumentAsync(client, companyId, profileId, docTypeId, isMandatory: true, dueDays: null);
+
+        var employeeId = await CreateEmployeeAsync(client, companyId, profileId);
+
+        var request = Assert.Single(await GetDocumentRequestsAsync(employeeId));
+        Assert.NotNull(request.PositionProfileRequiredDocumentId);
     }
 
     [Fact]
@@ -108,9 +118,8 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests : IClassFixture<ApiWe
     }
 
     [Fact]
-    public async Task CreateEmployee_WithPositionProfile_DoesNotDuplicateExistingRequests_On_SecondCreate()
+    public async Task CreateEmployee_WithPositionProfile_DoesNotDuplicateRequests_For_Different_Employees()
     {
-        // Re-running the handler (e.g. via retry) should not double-create requests.
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
 
@@ -118,7 +127,6 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests : IClassFixture<ApiWe
         var docTypeId = await CreateDocumentTypeAsync(client, companyId, "Certificate");
         await AddRequiredDocumentAsync(client, companyId, profileId, docTypeId, isMandatory: true, dueDays: null);
 
-        // Create two separate employees on the same profile — each should get their own request.
         var emp1 = await CreateEmployeeAsync(client, companyId, profileId);
         var emp2 = await CreateEmployeeAsync(client, companyId, profileId);
 

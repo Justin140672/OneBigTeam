@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HR.Modules.Documents.Migrations
 {
     [DbContext(typeof(DocumentsDbContext))]
-    [Migration("20260629131030_AddDocumentRequests")]
+    [Migration("20260629132503_AddDocumentRequests")]
     partial class AddDocumentRequests
     {
         /// <inheritdoc />
@@ -122,6 +122,14 @@ namespace HR.Modules.Documents.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");
 
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<Guid?>("CompletedByEmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("completed_by_employee_id");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -130,25 +138,21 @@ namespace HR.Modules.Documents.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("document_type_id");
 
-                    b.Property<int?>("DueDaysAfterStart")
-                        .HasColumnType("integer")
-                        .HasColumnName("due_days_after_start");
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("due_date");
 
                     b.Property<Guid>("EmployeeId")
                         .HasColumnType("uuid")
                         .HasColumnName("employee_id");
 
-                    b.Property<DateTimeOffset?>("FulfilledAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("fulfilled_at");
+                    b.Property<Guid?>("PositionProfileRequiredDocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("position_profile_required_document_id");
 
-                    b.Property<bool>("IsMandatory")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_mandatory");
-
-                    b.Property<bool>("RequiresExpiryDate")
-                        .HasColumnType("boolean")
-                        .HasColumnName("requires_expiry_date");
+                    b.Property<Guid?>("RequestedByEmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by_employee_id");
 
                     b.Property<string>("Status")
                         .IsRequired()

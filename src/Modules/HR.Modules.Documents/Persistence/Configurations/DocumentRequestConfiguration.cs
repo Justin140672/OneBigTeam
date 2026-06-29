@@ -28,16 +28,8 @@ internal sealed class DocumentRequestConfiguration : IEntityTypeConfiguration<Do
             .HasColumnName("document_type_id")
             .IsRequired();
 
-        builder.Property(r => r.IsMandatory)
-            .HasColumnName("is_mandatory")
-            .IsRequired();
-
-        builder.Property(r => r.DueDaysAfterStart)
-            .HasColumnName("due_days_after_start");
-
-        builder.Property(r => r.RequiresExpiryDate)
-            .HasColumnName("requires_expiry_date")
-            .IsRequired();
+        builder.Property(r => r.PositionProfileRequiredDocumentId)
+            .HasColumnName("position_profile_required_document_id");
 
         builder.Property(r => r.Status)
             .HasColumnName("status")
@@ -45,12 +37,21 @@ internal sealed class DocumentRequestConfiguration : IEntityTypeConfiguration<Do
             .HasMaxLength(20)
             .IsRequired();
 
+        builder.Property(r => r.DueDate)
+            .HasColumnName("due_date");
+
+        builder.Property(r => r.RequestedByEmployeeId)
+            .HasColumnName("requested_by_employee_id");
+
         builder.Property(r => r.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
 
-        builder.Property(r => r.FulfilledAt)
-            .HasColumnName("fulfilled_at");
+        builder.Property(r => r.CompletedAt)
+            .HasColumnName("completed_at");
+
+        builder.Property(r => r.CompletedByEmployeeId)
+            .HasColumnName("completed_by_employee_id");
 
         builder.HasIndex(r => new { r.CompanyId, r.EmployeeId });
         builder.HasIndex(r => new { r.EmployeeId, r.DocumentTypeId }).IsUnique();
