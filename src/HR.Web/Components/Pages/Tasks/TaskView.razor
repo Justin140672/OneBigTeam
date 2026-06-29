@@ -71,6 +71,13 @@
                     {
                         <ProbationReviewPanel CompanyId="CompanyId" Task="_task" OnCompleted="ReloadAsync" />
                     }
+                    else if (_task.ActionType == "Upload" && _task.Source == "Document")
+                    {
+                        <DocumentUploadTaskPanel CompanyId="CompanyId"
+                                                 EmployeeId="@(_task.AssignedEmployeeId ?? Session.EmployeeId ?? Guid.Empty)"
+                                                 Task="_task"
+                                                 OnCompleted="ReloadAsync" />
+                    }
                     else
                     {
                         <CompleteTaskPanel CompanyId="CompanyId" Task="_task" OnCompleted="ReloadAsync" />

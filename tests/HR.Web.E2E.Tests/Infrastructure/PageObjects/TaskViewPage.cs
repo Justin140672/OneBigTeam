@@ -76,6 +76,37 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
         return Guid.Parse(parts[^1]);
     }
 
+    // ── Document upload panel ────────────────────────────────────────────────
+
+    /// <summary>Returns true if the document upload panel is present and visible.</summary>
+    public async Task<bool> HasDocumentUploadPanelAsync() =>
+        await page.Locator("[data-testid='document-upload-panel']").IsVisibleAsync();
+
+    /// <summary>Fills the title input in the document upload panel.</summary>
+    public async Task SetDocumentTitleAsync(string title)
+    {
+        var panel = page.Locator("[data-testid='document-upload-panel']");
+        var input = panel.GetByPlaceholder("Document title");
+        await input.ClearAsync();
+        await input.FillAsync(title);
+    }
+
+    /// <summary>Sets the file to be uploaded via the document upload panel's file input.</summary>
+    public async Task AttachUploadFileAsync(string filePath)
+    {
+        var fileInput = page.Locator("[data-testid='document-upload-panel'] input[type='file']");
+        await fileInput.SetInputFilesAsync(filePath);
+    }
+
+    /// <summary>Clicks "Upload Document" and waits for the task status to change to Completed.</summary>
+    public async Task SubmitDocumentUploadAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Upload Document" }).ClickAsync();
+        await page.WaitForFunctionAsync(
+            "document.querySelector('.task-status-badge')?.textContent?.includes('Completed')",
+            null, new() { Timeout = 20_000 });
+    }
+
     // ── Probation review panel ───────────────────────────────────────────────
 
     /// <summary>Returns true if the "Complete Probation Review" card is present.</summary>

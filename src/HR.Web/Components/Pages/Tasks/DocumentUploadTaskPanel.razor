@@ -1,0 +1,95 @@
+@using HR.Web.Models
+@inject DocumentService DocumentService
+
+<div class="card" data-testid="document-upload-panel">
+    <div class="card-header fw-medium">Upload Document</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-12">
+                <label class="form-label">Title <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" @bind="_title" placeholder="Document title" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Issue Date</label>
+                <SfDatePicker TValue="DateOnly?"
+                              @bind-Value="_issueDate"
+                              Format="dd/MM/yyyy"
+                              Placeholder="dd/mm/yyyy"
+                              ShowClearButton="true" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Expiry Date</label>
+                <SfDatePicker TValue="DateOnly?"
+                              @bind-Value="_expiryDate"
+                              Format="dd/MM/yyyy"
+                              Placeholder="dd/mm/yyyy"
+                              ShowClearButton="true" />
+            </div>
+            <div class="col-12">
+                <label class="form-label">File <span class="text-danger">*</span></label>
+                <InputFile class="form-control" OnChange="OnFileSelected"
+                           accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
+                <div class="form-text">Accepted: PDF, Word, JPG, PNG. Max 20 MB.</div>
+            </div>
+        </div>
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger mt-3">@_error</div>
+        }
+
+        <div class="mt-3">
+            <button class="btn btn-primary" @onclick="SubmitAsync" disabled="@_uploading">
+                @if (_uploading)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                <i class="fa-solid fa-upload me-1"></i>Upload Document
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter, EditorRequired] public TaskDetailModel Task { get; set; } = null!;
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private string    _title   = string.Empty;
+    private DateOnly? _issueDate;
+    private DateOnly? _expiryDate;
+    private IBrowserFile? _selectedFile;
+    private bool    _uploading;
+    private string? _error;
+
+    protected override void OnParametersSet()
+    {
+        if (string.IsNullOrEmpty(_title))
+            _title = Task.Title.StartsWith("Upload ", StringComparison.OrdinalIgnoreCase)
+                ? Task.Title["Upload ".Length..]
+                : Task.Title;
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_title)) { _error = "Title is required."; return; }
+        if (_selectedFile is null)             { _error = "Please select a file."; return; }
+        if (!Task.SourceEntityId.HasValue)     { _error = "This task is not linked to a document request."; return; }
+
+        _uploading = true;
+        _error = await DocumentService.UploadRequestedDocumentAsync(
+            CompanyId, EmployeeId, Task.SourceEntityId.Value,
+            _title, description: null, _issueDate, _expiryDate,
+            _selectedFile);
+        _uploading = false;
+
+        if (_error is not null) return;
+
+        await OnCompleted.InvokeAsync();
+    }
+}

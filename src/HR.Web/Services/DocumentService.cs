@@ -84,6 +84,54 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<string?> UploadRequestedDocumentAsync(
+        Guid companyId,
+        Guid employeeId,
+        Guid documentRequestId,
+        string title,
+        string? description,
+        DateOnly? issueDate,
+        DateOnly? expiryDate,
+        IBrowserFile file,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            content.Add(new StringContent(title), "Title");
+            if (!string.IsNullOrWhiteSpace(description))
+                content.Add(new StringContent(description), "Description");
+            if (issueDate.HasValue)
+                content.Add(new StringContent(issueDate.Value.ToString("yyyy-MM-dd")), "IssueDate");
+            if (expiryDate.HasValue)
+                content.Add(new StringContent(expiryDate.Value.ToString("yyyy-MM-dd")), "ExpiryDate");
+
+            await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
+            content.Add(new StreamContent(stream), "File", file.Name);
+
+            var response = await Http.PostAsync(
+                $"api/companies/{companyId}/employees/{employeeId}/document-requests/{documentRequestId}/upload",
+                content, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return null;
+
+            try
+            {
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+                if (body.TryGetProperty("error", out var errorProp))
+                    return errorProp.GetString();
+            }
+            catch { }
+
+            return $"Upload failed ({(int)response.StatusCode}).";
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+    }
+
     public async Task<bool> DeleteEmployeeDocumentAsync(
         Guid companyId, Guid employeeId, Guid employeeDocumentId,
         CancellationToken cancellationToken = default)
