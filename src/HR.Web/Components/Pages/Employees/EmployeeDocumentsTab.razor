@@ -1,12 +1,51 @@
 @inject DocumentService DocumentService
 @inject IJSRuntime JS
 
-<UploadDocumentDialog CompanyId="CompanyId"
-                      EmployeeId="EmployeeId"
-                      IsOpen="_uploadOpen"
-                      EmployeeSelfUpload="EmployeeSelfUpload"
-                      OnUploaded="OnDocumentUploaded"
-                      OnCancelled="@(() => _uploadOpen = false)" />
+@if (!_requestsLoading && _requests.Count > 0)
+{
+    <div class="card mb-4" data-testid="admin-document-requests-section">
+        <div class="card-header d-flex align-items-center">
+            <i class="fa-solid fa-inbox text-muted me-2"></i>
+            <h5 class="mb-0">Document Requests</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Document Type</th>
+                        <th width="140">Due Date</th>
+                        <th width="140">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in _requests)
+                    {
+                        var (css, label) = GetRequestBadge(r);
+                        <tr>
+                            <td class="align-middle">@r.DocumentTypeName</td>
+                            <td class="align-middle text-muted small">
+                                @(r.DueDate?.ToString("d MMM yyyy") ?? "—")
+                            </td>
+                            <td class="align-middle">
+                                <span class="badge @css">@label</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@if (!EmployeeSelfUpload)
+{
+    <UploadDocumentDialog CompanyId="CompanyId"
+                          EmployeeId="EmployeeId"
+                          IsOpen="_uploadOpen"
+                          EmployeeSelfUpload="false"
+                          OnUploaded="OnDocumentUploaded"
+                          OnCancelled="@(() => _uploadOpen = false)" />
+}
 
 @if (_loading)
 {
@@ -104,8 +143,10 @@ else
     [Parameter]                 public bool EmployeeSelfUpload { get; set; }
 
     private bool _loading = true;
+    private bool _requestsLoading = true;
     private bool _uploadOpen;
-    private List<EmployeeDocumentListItem> _documents = [];
+    private List<EmployeeDocumentListItem>  _documents = [];
+    private List<DocumentRequestListItem>   _requests  = [];
 
     private Guid? _deleteTargetId;
 
@@ -113,9 +154,16 @@ else
 
     private async Task LoadAsync()
     {
-        _loading   = _documents.Count == 0;
-        _documents = (await DocumentService.ListEmployeeDocumentsAsync(CompanyId, EmployeeId))?.Items.ToList() ?? [];
-        _loading   = false;
+        _loading         = _documents.Count == 0;
+        _requestsLoading = true;
+
+        var docTask     = DocumentService.ListEmployeeDocumentsAsync(CompanyId, EmployeeId);
+        var requestTask = DocumentService.ListDocumentRequestsAsync(CompanyId, EmployeeId);
+
+        _documents       = (await docTask)?.Items.ToList()     ?? [];
+        _requests        = (await requestTask)?.Items.ToList() ?? [];
+        _loading         = false;
+        _requestsLoading = false;
         StateHasChanged();
     }
 
@@ -140,6 +188,21 @@ else
         _deleteTargetId = null;
         await DocumentService.DeleteEmployeeDocumentAsync(CompanyId, EmployeeId, id);
         await LoadAsync();
+    }
+
+    private static (string Css, string Label) GetRequestBadge(DocumentRequestListItem r)
+    {
+        if (r.Status == "Requested" && r.DueDate.HasValue && r.DueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow))
+            return ("text-bg-danger",    "Overdue");
+
+        return r.Status switch
+        {
+            "Requested" => ("text-bg-warning",   "Requested"),
+            "Uploaded"  => ("text-bg-success",   "Uploaded"),
+            "Cancelled" => ("text-bg-secondary", "Cancelled"),
+            "Expired"   => ("text-bg-danger",    "Expired"),
+            _           => ("text-bg-secondary", r.Status),
+        };
     }
 
     private static (string Css, string Label) GetStatusBadge(EmployeeDocumentListItem doc)

@@ -41,6 +41,39 @@ public sealed class EmployeeDocumentsTabTests(AppFixture fixture) : E2ETestBase(
     }
 
     [Fact]
+    public async Task Admin_Documents_Tab_Shows_Document_Requests_Section()
+    {
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await empAdmin.GoToAsync(AcmeId, TomId);
+        await empAdmin.OpenDocumentsTabAsync();
+
+        Assert.True(await empAdmin.HasDocumentRequestsSectionAsync(),
+            "Expected the Document Requests section to be visible on Tom's Documents tab");
+
+        Assert.True(await empAdmin.HasDocumentRequestAsync("Passport"),
+            "Expected Tom's seeded Passport document request to appear in the Document Requests section");
+    }
+
+    [Fact]
+    public async Task Admin_Documents_Tab_Shows_Requested_Status_Badge_For_Outstanding_Request()
+    {
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await empAdmin.GoToAsync(AcmeId, TomId);
+        await empAdmin.OpenDocumentsTabAsync();
+
+        var status = await empAdmin.GetDocumentRequestStatusAsync("Passport");
+        Assert.Equal("Requested", status);
+    }
+
+    [Fact]
     public async Task Working_Pattern_Override_Can_Be_Set_Via_Admin_Profile()
     {
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);

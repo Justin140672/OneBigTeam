@@ -47,11 +47,9 @@ public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(f
     }
 
     [Fact]
-    public async Task SelfServiceDocumentsTab_ManagerUploadButton_IsHiddenForEmployee()
+    public async Task SelfServiceDocumentsTab_HasNoUploadButtonsAnywhere()
     {
-        // The "Upload" button in the Documents card header (for manager uploads) must
-        // be hidden when EmployeeSelfUpload=true. The Requested Documents section has
-        // its own upload buttons, which are separate.
+        // Documents are uploaded via tasks only — no Upload button should appear anywhere on this tab.
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
 
@@ -65,14 +63,8 @@ public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(f
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
 
-        // The manager upload button lives in the Documents card header (has the e-primary CSS class).
-        // Scope to the Documents card to avoid matching the request-upload buttons.
-        var documentsCard = _page.Locator(".card").Filter(new() { HasText = "Documents" })
-                                 .Filter(new() { HasNot = _page.Locator("[data-testid='requested-docs-section']") })
-                                 .First;
-        var managerUploadBtn = documentsCard.Locator(".card-header").GetByRole(AriaRole.Button, new() { Name = "Upload" });
-        Assert.False(await managerUploadBtn.IsVisibleAsync(),
-            "Manager upload button must be hidden in self-service view");
+        var uploadBtns = _page.GetByRole(AriaRole.Button, new() { Name = "Upload" });
+        Assert.Equal(0, await uploadBtns.CountAsync());
     }
 
     [Fact]
@@ -97,27 +89,6 @@ public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(f
 
         var content = await requestedSection.TextContentAsync();
         Assert.Contains("Passport", content, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task SelfServiceDocumentsTab_OpenRequest_ShowsUploadButton()
-    {
-        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
-        var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(TomEmail);
-
-        await profile.GoToAsync(AcmeId, TomId);
-        await profile.OpenDocumentsTabAsync();
-
-        await _page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
-
-        var uploadBtn = _page.Locator("[data-testid='upload-request-btn']").First;
-        Assert.True(await uploadBtn.IsVisibleAsync(),
-            "Expected an Upload button for Tom's open Passport request");
     }
 
     [Fact]

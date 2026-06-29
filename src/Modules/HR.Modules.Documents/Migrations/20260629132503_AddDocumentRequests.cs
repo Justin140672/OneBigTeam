@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -11,107 +11,48 @@ namespace HR.Modules.Documents.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "due_days_after_start",
+            migrationBuilder.CreateTable(
+                name: "document_requests",
                 schema: "documents",
-                table: "document_requests");
+                columns: table => new
+                {
+                    id                                    = table.Column<Guid>(type: "uuid", nullable: false),
+                    company_id                            = table.Column<Guid>(type: "uuid", nullable: false),
+                    employee_id                           = table.Column<Guid>(type: "uuid", nullable: false),
+                    document_type_id                      = table.Column<Guid>(type: "uuid", nullable: false),
+                    position_profile_required_document_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    status                                = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    due_date                              = table.Column<DateOnly>(type: "date", nullable: true),
+                    requested_by_employee_id              = table.Column<Guid>(type: "uuid", nullable: true),
+                    created_at                            = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    completed_at                          = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    completed_by_employee_id              = table.Column<Guid>(type: "uuid", nullable: true),
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_document_requests", x => x.id);
+                });
 
-            migrationBuilder.DropColumn(
-                name: "is_mandatory",
-                schema: "documents",
-                table: "document_requests");
-
-            migrationBuilder.DropColumn(
-                name: "requires_expiry_date",
-                schema: "documents",
-                table: "document_requests");
-
-            migrationBuilder.RenameColumn(
-                name: "fulfilled_at",
+            migrationBuilder.CreateIndex(
+                name: "IX_document_requests_company_id_employee_id",
                 schema: "documents",
                 table: "document_requests",
-                newName: "completed_at");
+                columns: new[] { "company_id", "employee_id" });
 
-            migrationBuilder.AddColumn<Guid>(
-                name: "completed_by_employee_id",
+            migrationBuilder.CreateIndex(
+                name: "IX_document_requests_employee_id_document_type_id",
                 schema: "documents",
                 table: "document_requests",
-                type: "uuid",
-                nullable: true);
-
-            migrationBuilder.AddColumn<DateOnly>(
-                name: "due_date",
-                schema: "documents",
-                table: "document_requests",
-                type: "date",
-                nullable: true);
-
-            migrationBuilder.AddColumn<Guid>(
-                name: "position_profile_required_document_id",
-                schema: "documents",
-                table: "document_requests",
-                type: "uuid",
-                nullable: true);
-
-            migrationBuilder.AddColumn<Guid>(
-                name: "requested_by_employee_id",
-                schema: "documents",
-                table: "document_requests",
-                type: "uuid",
-                nullable: true);
+                columns: new[] { "employee_id", "document_type_id" },
+                unique: true);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "completed_by_employee_id",
-                schema: "documents",
-                table: "document_requests");
-
-            migrationBuilder.DropColumn(
-                name: "due_date",
-                schema: "documents",
-                table: "document_requests");
-
-            migrationBuilder.DropColumn(
-                name: "position_profile_required_document_id",
-                schema: "documents",
-                table: "document_requests");
-
-            migrationBuilder.DropColumn(
-                name: "requested_by_employee_id",
-                schema: "documents",
-                table: "document_requests");
-
-            migrationBuilder.RenameColumn(
-                name: "completed_at",
-                schema: "documents",
-                table: "document_requests",
-                newName: "fulfilled_at");
-
-            migrationBuilder.AddColumn<int>(
-                name: "due_days_after_start",
-                schema: "documents",
-                table: "document_requests",
-                type: "integer",
-                nullable: true);
-
-            migrationBuilder.AddColumn<bool>(
-                name: "is_mandatory",
-                schema: "documents",
-                table: "document_requests",
-                type: "boolean",
-                nullable: false,
-                defaultValue: false);
-
-            migrationBuilder.AddColumn<bool>(
-                name: "requires_expiry_date",
-                schema: "documents",
-                table: "document_requests",
-                type: "boolean",
-                nullable: false,
-                defaultValue: false);
+            migrationBuilder.DropTable(
+                name: "document_requests",
+                schema: "documents");
         }
     }
 }

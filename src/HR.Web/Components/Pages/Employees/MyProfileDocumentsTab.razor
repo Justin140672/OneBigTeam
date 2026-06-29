@@ -1,11 +1,5 @@
 @inject DocumentService DocumentService
 
-<UploadRequestedDocumentDialog @ref="_uploadDialog"
-                               CompanyId="CompanyId"
-                               EmployeeId="EmployeeId"
-                               OnUploaded="OnRequestUploadedAsync"
-                               OnCancelled="@(() => { })" />
-
 @if (!_loading && (_openRequests.Count > 0 || _completedRequests.Count > 0))
 {
     <div class="card mb-4" data-testid="requested-docs-section">
@@ -20,7 +14,6 @@
                         <th>Document Type</th>
                         <th width="140">Due Date</th>
                         <th width="120">Status</th>
-                        <th width="100"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -34,13 +27,6 @@
                             <td class="align-middle">
                                 <span class="badge text-bg-warning">Requested</span>
                             </td>
-                            <td class="align-middle text-end">
-                                <button class="btn btn-primary btn-sm"
-                                        data-testid="upload-request-btn"
-                                        @onclick="() => OpenUpload(r)">
-                                    <i class="fa-solid fa-upload me-1"></i>Upload
-                                </button>
-                            </td>
                         </tr>
                     }
                     @foreach (var r in _completedRequests)
@@ -53,7 +39,6 @@
                             <td class="align-middle">
                                 <span class="badge text-bg-success">Uploaded</span>
                             </td>
-                            <td></td>
                         </tr>
                     }
                 </tbody>
@@ -67,8 +52,6 @@
 @code {
     [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
-
-    private UploadRequestedDocumentDialog _uploadDialog = null!;
 
     private List<DocumentRequestListItem> _openRequests      = [];
     private List<DocumentRequestListItem> _completedRequests = [];
@@ -84,13 +67,5 @@
         _openRequests      = all.Where(r => r.Status == "Requested").ToList();
         _completedRequests = all.Where(r => r.Status == "Uploaded").ToList();
         _loading = false;
-    }
-
-    private void OpenUpload(DocumentRequestListItem request) => _uploadDialog.Open(request);
-
-    private async Task OnRequestUploadedAsync()
-    {
-        await LoadAsync();
-        StateHasChanged();
     }
 }

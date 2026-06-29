@@ -37,6 +37,27 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
             .First
             .IsVisibleAsync();
 
+    /// <summary>Returns true if the Document Requests section is visible on the Documents tab.</summary>
+    public async Task<bool> HasDocumentRequestsSectionAsync() =>
+        await page.Locator("[data-testid='admin-document-requests-section']").IsVisibleAsync();
+
+    /// <summary>Returns true if any row in the Document Requests section contains <paramref name="documentTypeName"/>.</summary>
+    public async Task<bool> HasDocumentRequestAsync(string documentTypeName) =>
+        await page.Locator("[data-testid='admin-document-requests-section'] td")
+            .Filter(new() { HasText = documentTypeName })
+            .First
+            .IsVisibleAsync();
+
+    /// <summary>Returns the status badge text for the first request matching <paramref name="documentTypeName"/>.</summary>
+    public async Task<string?> GetDocumentRequestStatusAsync(string documentTypeName)
+    {
+        var row = page.Locator("[data-testid='admin-document-requests-section'] tr")
+            .Filter(new() { HasText = documentTypeName })
+            .First;
+        var badge = row.Locator(".badge");
+        return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
+    }
+
     // ── Working Pattern section (Details tab) ─────────────────────────────────
 
     /// <summary>Ensures the "Override company defaults" checkbox is checked.</summary>
