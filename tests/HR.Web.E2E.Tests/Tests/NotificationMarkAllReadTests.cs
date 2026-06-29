@@ -10,7 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// James opens the notification panel, clicks "Mark all read", and the unread badge disappears.
 /// </summary>
 [Collection("E2E")]
-public sealed class NotificationMarkAllReadTests : IAsyncLifetime
+public sealed class NotificationMarkAllReadTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");
@@ -21,20 +21,6 @@ public sealed class NotificationMarkAllReadTests : IAsyncLifetime
     // Dates that don't conflict with the approval or rejection tests
     private const string StartDate = "02/11/2026";
     private const string EndDate   = "06/11/2026";
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public NotificationMarkAllReadTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task Submitting_Leave_Then_Marking_All_Notifications_Read_Clears_Unread_Badge()

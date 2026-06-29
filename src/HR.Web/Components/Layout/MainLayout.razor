@@ -166,7 +166,7 @@ else
         </div>
 
         <section class="content-area">
-            <ErrorBoundary>
+            <ErrorBoundary @ref="_errorBoundary">
                 <ChildContent>
                     @Body
                 </ChildContent>
@@ -176,8 +176,9 @@ else
                             <i class="fa-solid fa-triangle-exclamation fa-lg mt-1"></i>
                             <div>
                                 <h5 class="mb-1">Something went wrong</h5>
-                                <p class="mb-2">An unexpected error occurred. You can try refreshing the page.</p>
-                                <a href="." class="btn btn-sm btn-outline-danger">Refresh</a>
+                                <p class="mb-2">An unexpected error occurred. You can try refreshing the page or navigating away.</p>
+                                <a href="." class="btn btn-sm btn-outline-danger me-2">Refresh</a>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="ClearError">Try again</button>
                             </div>
                         </div>
                     </div>
@@ -190,13 +191,9 @@ else
 
 }
 
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
-</div>
-
 @code {
+    private ErrorBoundary? _errorBoundary;
+
     private bool SidebarOpen { get; set; } = true;
     private bool IsDark { get; set; }
 
@@ -288,6 +285,10 @@ else
         if (diff.TotalDays < 7) return $"{(int)diff.TotalDays}d ago";
         return dt.ToString("d MMM");
     }
+
+    private void ClearError() => _errorBoundary?.Recover();
+
+    protected override void OnParametersSet() => _errorBoundary?.Recover();
 
     private void ToggleSidebar() => SidebarOpen = !SidebarOpen;
 

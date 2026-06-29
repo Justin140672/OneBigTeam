@@ -81,14 +81,22 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
         Assert.Equal(5m, payload!.TotalDays);
     }
 
-    private async Task<(HttpClient Client, Guid CompanyId, Guid LeaveTypeId)> SetupCompanyAsync(bool excludePublicHolidays)
+    private HttpClient ClientForCompany(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, UserId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        return client;
+    }
 
-        // Create company
-        var createResp = await client.PostAsJsonAsync("/api/companies", new
+    private async Task<(HttpClient Client, Guid CompanyId, Guid LeaveTypeId)> SetupCompanyAsync(bool excludePublicHolidays)
+    {
+        // Create company — route has no {companyId}, so any tenant is fine here
+        var bootstrapClient = _factory.CreateClient();
+        bootstrapClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
+        bootstrapClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, UserId.ToString());
+
+        var createResp = await bootstrapClient.PostAsJsonAsync("/api/companies", new
         {
             name = $"PH Test {Guid.NewGuid():N}",
             addresses = new[] { new { type = "RegisteredOffice", line1 = "1 Test St", city = "London", countryCode = "GB" } }
@@ -96,6 +104,9 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
         createResp.EnsureSuccessStatusCode();
         var company = await createResp.Content.ReadFromJsonAsync<CompanyPayload>();
         var companyId = company!.Id;
+
+        // All subsequent calls use a client authenticated as this company
+        var client = ClientForCompany(companyId);
 
         // Update settings
         await client.PutAsJsonAsync($"/api/companies/{companyId}/settings", new

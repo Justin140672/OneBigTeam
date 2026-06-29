@@ -77,7 +77,7 @@ public class GetPositionProfileEndpointTests : IClassFixture<ApiWebApplicationFa
     }
 
     [Fact]
-    public async Task Get_PositionProfile_Returns_NotFound_When_Profile_Belongs_To_Different_Company()
+    public async Task Get_PositionProfile_Returns_Forbidden_When_Route_Company_Does_Not_Match_Auth_Tenant()
     {
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
@@ -94,9 +94,10 @@ public class GetPositionProfileEndpointTests : IClassFixture<ApiWebApplicationFa
         var created = await createResponse.Content.ReadFromJsonAsync<PositionProfilePayload>();
         Assert.NotNull(created);
 
+        // Authenticated as companyA but route targets companyB — middleware blocks it.
         var response = await client.GetAsync($"/api/companies/{companyB}/position-profiles/{created!.Id}");
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     private sealed record PositionProfilePayload(

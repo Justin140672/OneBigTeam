@@ -12,26 +12,12 @@ namespace HR.Web.E2E.Tests.Tests;
 /// which has no required documents in the seed data.
 /// </summary>
 [Collection("E2E")]
-public sealed class PositionProfileRequiredDocumentsTabTests : IAsyncLifetime
+public sealed class PositionProfileRequiredDocumentsTabTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId            = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid SoftwareEngineerId = Guid.Parse("20000000-0000-0000-0000-000000000003");
 
     private const string LauraEmail = "laura.bennett@acme.example";
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public PositionProfileRequiredDocumentsTabTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task RequiredDocumentsTab_IsVisible_When_EditingExistingProfile()

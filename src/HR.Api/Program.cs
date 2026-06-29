@@ -289,6 +289,7 @@ if (app.Environment.IsDevelopment())
 app.UseHangfireBackgroundJobs();
 app.UseProbationRecurringJobs();
 app.UseLoggingMiddleware();
+app.UseRouting();
 app.UseAuthentication();
 app.UseIdentityModule();
 app.UseAuthorization();

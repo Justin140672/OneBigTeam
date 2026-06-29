@@ -11,27 +11,13 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - An unauthenticated request to a protected page is redirected to login.
 /// </summary>
 [Collection("E2E")]
-public sealed class UnauthorizedAccessTests : IAsyncLifetime
+public sealed class UnauthorizedAccessTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId   = Guid.Parse("30000000-0000-0000-0000-000000000004");
     private static readonly Guid JamesId = Guid.Parse("30000000-0000-0000-0000-000000000002");
 
     private const string TomEmail = "tom.williams@acme.example";
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public UnauthorizedAccessTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task Employee_CannotAccess_HrInbox()

@@ -4,6 +4,7 @@ using System.Security.Claims;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 
 namespace HR.Integration.Tests;
 
@@ -113,5 +114,79 @@ public class RequireTenantMiddlewareUnitTests
         await middleware.InvokeAsync(context);
 
         Assert.True(nextCalled);
+    }
+}
+
+public class TenantRouteAuthorizationMiddlewareTests
+{
+    [Fact]
+    public async Task Middleware_Passes_Through_Unauthenticated_Request()
+    {
+        var context = new DefaultHttpContext();
+        context.Response.Body = new MemoryStream();
+        context.Request.RouteValues["companyId"] = Guid.NewGuid().ToString();
+
+        var nextCalled = false;
+        var middleware = new TenantRouteAuthorizationMiddleware(_ => { nextCalled = true; return Task.CompletedTask; });
+
+        await middleware.InvokeAsync(context);
+
+        Assert.True(nextCalled);
+    }
+
+    [Fact]
+    public async Task Middleware_Passes_Through_When_No_CompanyId_In_Route()
+    {
+        var context = new DefaultHttpContext();
+        context.Response.Body = new MemoryStream();
+        context.User = AuthenticatedUserWithCompany(Guid.NewGuid());
+        // No companyId route value
+
+        var nextCalled = false;
+        var middleware = new TenantRouteAuthorizationMiddleware(_ => { nextCalled = true; return Task.CompletedTask; });
+
+        await middleware.InvokeAsync(context);
+
+        Assert.True(nextCalled);
+    }
+
+    [Fact]
+    public async Task Middleware_Passes_Through_When_Route_Company_Matches_Auth_Tenant()
+    {
+        var companyId = Guid.NewGuid();
+        var context = new DefaultHttpContext();
+        context.Response.Body = new MemoryStream();
+        context.User = AuthenticatedUserWithCompany(companyId);
+        context.Request.RouteValues["companyId"] = companyId.ToString();
+
+        var nextCalled = false;
+        var middleware = new TenantRouteAuthorizationMiddleware(_ => { nextCalled = true; return Task.CompletedTask; });
+
+        await middleware.InvokeAsync(context);
+
+        Assert.True(nextCalled);
+    }
+
+    [Fact]
+    public async Task Middleware_Returns_403_When_Route_Company_Does_Not_Match_Auth_Tenant()
+    {
+        var context = new DefaultHttpContext();
+        context.Response.Body = new MemoryStream();
+        context.User = AuthenticatedUserWithCompany(Guid.NewGuid()); // companyA
+        context.Request.RouteValues["companyId"] = Guid.NewGuid().ToString(); // companyB — mismatch
+
+        var nextCalled = false;
+        var middleware = new TenantRouteAuthorizationMiddleware(_ => { nextCalled = true; return Task.CompletedTask; });
+
+        await middleware.InvokeAsync(context);
+
+        Assert.False(nextCalled);
+        Assert.Equal(StatusCodes.Status403Forbidden, context.Response.StatusCode);
+    }
+
+    private static ClaimsPrincipal AuthenticatedUserWithCompany(Guid companyId)
+    {
+        var claims = new[] { new Claim("company_id", companyId.ToString()) };
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "test"));
     }
 }

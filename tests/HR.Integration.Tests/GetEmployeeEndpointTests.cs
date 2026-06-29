@@ -86,7 +86,7 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
     }
 
     [Fact]
-    public async Task Get_Employee_Returns_NotFound_When_Employee_Belongs_To_Different_Company()
+    public async Task Get_Employee_Returns_Forbidden_When_Route_Company_Does_Not_Match_Auth_Tenant()
     {
         using var client = _factory.CreateClient();
         var companyA = Guid.NewGuid();
@@ -111,10 +111,10 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         var created = await createResponse.Content.ReadFromJsonAsync<EmployeePayload>();
         Assert.NotNull(created);
 
-        // Request the employee using company B's scope
+        // Authenticated as companyA but route targets companyB — middleware blocks it.
         var response = await client.GetAsync($"/api/companies/{companyB}/employees/{created!.Id}");
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

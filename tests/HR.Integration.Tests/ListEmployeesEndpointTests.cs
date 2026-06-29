@@ -128,7 +128,7 @@ public class ListEmployeesEndpointTests : IClassFixture<ApiWebApplicationFactory
     }
 
     [Fact]
-    public async Task Get_Employees_Does_Not_Return_Employees_From_Other_Companies()
+    public async Task Get_Employees_Returns_Forbidden_When_Route_Company_Does_Not_Match_Auth_Tenant()
     {
         using var client = _factory.CreateClient();
         var companyA = Guid.NewGuid();
@@ -138,11 +138,10 @@ public class ListEmployeesEndpointTests : IClassFixture<ApiWebApplicationFactory
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyA.ToString());
         await CreateEmployeeAsync(client, companyA, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com");
 
+        // Authenticated as companyA but route targets companyB — middleware blocks it.
         var response = await client.GetAsync($"/api/companies/{companyB}/employees");
 
-        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
-        Assert.NotNull(payload);
-        Assert.Equal(0, payload!.TotalCount);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     private static async Task CreateEmployeeAsync(HttpClient client, Guid companyId, string firstName, string lastName, string workEmail)

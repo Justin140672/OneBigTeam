@@ -10,7 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// was never approved.
 /// </summary>
 [Collection("E2E")]
-public sealed class LeaveCancellationTests : IAsyncLifetime
+public sealed class LeaveCancellationTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");
@@ -20,20 +20,6 @@ public sealed class LeaveCancellationTests : IAsyncLifetime
     // Dates chosen to avoid collisions with other E2E tests.
     private const string StartDate = "12/01/2026";
     private const string EndDate   = "16/01/2026"; // Mon–Fri = 5 working days
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public LeaveCancellationTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task CancellingPendingLeaveRequest_RemovesItFromTheTable()

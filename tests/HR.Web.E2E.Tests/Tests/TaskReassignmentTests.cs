@@ -14,7 +14,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// (ID: a0000000-0000-0000-0000-000000000002) and reassigns it to James Okafor.
 /// </summary>
 [Collection("E2E")]
-public sealed class TaskReassignmentTests : IAsyncLifetime
+public sealed class TaskReassignmentTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid SarahId = Guid.Parse("30000000-0000-0000-0000-000000000001");
@@ -25,20 +25,6 @@ public sealed class TaskReassignmentTests : IAsyncLifetime
     private const string LauraEmail = "laura.bennett@acme.example";
     private const string SarahEmail = "sarah.chen@acme.example";
     private const string JamesEmail = "james.okafor@acme.example";
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public TaskReassignmentTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task ReassignTask_TransfersOwnership_ToNewEmployee()

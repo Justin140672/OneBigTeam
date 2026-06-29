@@ -32,6 +32,7 @@ public static class IdentityModule
     {
         app.UseMiddleware<SupabaseCurrentUserResolutionMiddleware>();
         app.UseMiddleware<RequireTenantMiddleware>();
+        app.UseMiddleware<TenantRouteAuthorizationMiddleware>();
         return app;
     }
 

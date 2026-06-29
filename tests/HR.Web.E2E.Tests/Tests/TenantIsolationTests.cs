@@ -9,7 +9,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// pages that belong to Company 2 (Beta Corp).
 /// </summary>
 [Collection("E2E")]
-public sealed class TenantIsolationTests : IAsyncLifetime
+public sealed class TenantIsolationTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     // ── Company 1 — Acme Corporation ─────────────────────────────────────────
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -25,20 +25,6 @@ public sealed class TenantIsolationTests : IAsyncLifetime
 
     private const string StartDate = "05/10/2026";
     private const string EndDate   = "09/10/2026";
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public TenantIsolationTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task BetaCorpLeaveTask_IsInvisibleToAcmeManager_AndTaskUrlIsBlocked()

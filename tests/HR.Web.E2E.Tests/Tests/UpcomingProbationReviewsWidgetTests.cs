@@ -11,23 +11,9 @@ namespace HR.Web.E2E.Tests.Tests;
 /// a pending ManagerCheckIn review — this review should appear in the widget.
 /// </summary>
 [Collection("E2E")]
-public sealed class UpcomingProbationReviewsWidgetTests : IAsyncLifetime
+public sealed class UpcomingProbationReviewsWidgetTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private const string LauraEmail = "laura.bennett@acme.example";
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public UpcomingProbationReviewsWidgetTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task Dashboard_ShowsUpcomingProbationReviewsWidget()

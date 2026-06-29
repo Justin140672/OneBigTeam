@@ -9,27 +9,13 @@ namespace HR.Web.E2E.Tests.Tests;
 /// via the Employment tab on the admin employee profile.
 /// </summary>
 [Collection("E2E")]
-public sealed class AssignManagerTests : IAsyncLifetime
+public sealed class AssignManagerTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     // Marcus Diallo — seeded HR Advisor with no manager set, suitable as the target for this test.
     private static readonly Guid MarcusId = Guid.Parse("30000000-0000-0000-0000-000000000006");
 
     private const string LauraEmail = "laura.bennett@acme.example";
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public AssignManagerTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task AssignManager_SavesSuccessfully_AndReflectsOnAdminProfile()

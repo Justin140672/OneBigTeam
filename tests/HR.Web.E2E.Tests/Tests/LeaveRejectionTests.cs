@@ -5,7 +5,7 @@ using Microsoft.Playwright;
 namespace HR.Web.E2E.Tests.Tests;
 
 [Collection("E2E")]
-public sealed class LeaveRejectionTests : IAsyncLifetime
+public sealed class LeaveRejectionTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId   = Guid.Parse("30000000-0000-0000-0000-000000000004");
@@ -18,20 +18,6 @@ public sealed class LeaveRejectionTests : IAsyncLifetime
     private const string EndDate   = "21/08/2026"; // Mon–Fri = 5 working days
 
     private const string RejectionReason = "Insufficient team cover during sprint release";
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public LeaveRejectionTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task SubmittingLeave_ThenRejectingWithReason_ShowsRejectedStatusAndReason()

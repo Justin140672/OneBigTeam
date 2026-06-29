@@ -5,7 +5,7 @@ using Microsoft.Playwright;
 namespace HR.Web.E2E.Tests.Tests;
 
 [Collection("E2E")]
-public sealed class LeaveApprovalTests : IAsyncLifetime
+public sealed class LeaveApprovalTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     // ── Well-known seed GUIDs ─────────────────────────────────────────────────
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -18,20 +18,6 @@ public sealed class LeaveApprovalTests : IAsyncLifetime
     // ── Leave dates (mid-July 2026 — no UK bank holidays) ────────────────────
     private const string StartDate = "06/07/2026";
     private const string EndDate   = "10/07/2026"; // Mon–Fri = 5 working days
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public LeaveApprovalTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task SubmittingLeave_ThenApprovingAsManager_UpdatesStatusAndBalance()

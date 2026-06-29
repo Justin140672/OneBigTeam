@@ -37,14 +37,15 @@ public class GetTaskEndpointTests(ApiWebApplicationFactory factory) : IClassFixt
     }
 
     [Fact]
-    public async Task Get_Task_Returns_NotFound_When_Task_Belongs_To_Different_Company()
+    public async Task Get_Task_Returns_Forbidden_When_Route_Company_Does_Not_Match_Auth_Tenant()
     {
         var taskId = await TaskSeeder.SeedAsync(factory, SeededCompanyId, "Private task", priority: TaskPriority.Low);
 
+        // Authenticated as SeededCompanyId but route targets a different company — middleware blocks it.
         using var client = AuthenticatedClient();
         var response = await client.GetAsync($"/api/companies/{Guid.NewGuid()}/tasks/{taskId}");
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     // ── Happy path ─────────────────────────────────────────────────────────────

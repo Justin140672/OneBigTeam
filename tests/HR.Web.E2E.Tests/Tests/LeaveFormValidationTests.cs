@@ -11,26 +11,12 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - Start date is required.
 /// </summary>
 [Collection("E2E")]
-public sealed class LeaveFormValidationTests : IAsyncLifetime
+public sealed class LeaveFormValidationTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");
 
     private const string TomEmail = "tom.williams@acme.example";
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public LeaveFormValidationTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task SubmitLeaveRequest_WithEndDateBeforeStartDate_IsRejected()

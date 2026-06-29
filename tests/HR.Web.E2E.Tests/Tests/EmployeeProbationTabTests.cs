@@ -11,26 +11,12 @@ namespace HR.Web.E2E.Tests.Tests;
 /// who has an active probation record with a pending ManagerCheckIn review.
 /// </summary>
 [Collection("E2E")]
-public sealed class EmployeeProbationTabTests : IAsyncLifetime
+public sealed class EmployeeProbationTabTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId       = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid CarlosRivera = Guid.Parse("30000000-0000-0000-0000-000000000010");
 
     private const string LauraEmail = "laura.bennett@acme.example";
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public EmployeeProbationTabTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task ProbationTab_IsVisible_On_Employee_Edit_Page()

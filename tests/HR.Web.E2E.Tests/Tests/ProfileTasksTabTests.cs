@@ -11,7 +11,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - Clicking a task navigates to the Task View page.
 /// </summary>
 [Collection("E2E")]
-public sealed class ProfileTasksTabTests : IAsyncLifetime
+public sealed class ProfileTasksTabTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");
@@ -20,20 +20,6 @@ public sealed class ProfileTasksTabTests : IAsyncLifetime
 
     // Tom has a seeded "Schedule probation review" task assigned to him.
     private const string TomTaskFragment = "probation review";
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public ProfileTasksTabTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task TasksTab_ShowsAssignedTasks_ForEmployee()

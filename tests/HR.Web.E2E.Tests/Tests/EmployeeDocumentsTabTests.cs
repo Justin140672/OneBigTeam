@@ -9,26 +9,12 @@ namespace HR.Web.E2E.Tests.Tests;
 /// and that HR can see document titles in the grid.
 /// </summary>
 [Collection("E2E")]
-public sealed class EmployeeDocumentsTabTests : IAsyncLifetime
+public sealed class EmployeeDocumentsTabTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");
 
     private const string LauraEmail = "laura.bennett@acme.example";
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public EmployeeDocumentsTabTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task Admin_Documents_Tab_Shows_Seeded_Employee_Documents()

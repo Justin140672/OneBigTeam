@@ -19,11 +19,11 @@ public class PublicHolidayEndpointTests : IClassFixture<ApiWebApplicationFactory
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient()
+    private HttpClient AuthenticatedClient(Guid? companyId = null)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, CompanyId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, (companyId ?? CompanyId).ToString());
         return client;
     }
 
@@ -42,8 +42,8 @@ public class PublicHolidayEndpointTests : IClassFixture<ApiWebApplicationFactory
     [Fact]
     public async Task Post_PublicHoliday_Returns_Created_With_Location_Header()
     {
-        using var client = AuthenticatedClient();
         var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/public-holidays",
@@ -63,8 +63,8 @@ public class PublicHolidayEndpointTests : IClassFixture<ApiWebApplicationFactory
     [Fact]
     public async Task Post_PublicHoliday_Returns_Conflict_For_Duplicate_Date()
     {
-        using var client = AuthenticatedClient();
         var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
 
         var first = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/public-holidays",
@@ -91,8 +91,8 @@ public class PublicHolidayEndpointTests : IClassFixture<ApiWebApplicationFactory
     [Fact]
     public async Task Get_PublicHolidays_Returns_List_For_Year()
     {
-        using var client = AuthenticatedClient();
         var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
 
         await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/public-holidays",
@@ -124,8 +124,8 @@ public class PublicHolidayEndpointTests : IClassFixture<ApiWebApplicationFactory
     [Fact]
     public async Task Put_PublicHoliday_Returns_Ok_With_Updated_Values()
     {
-        using var client = AuthenticatedClient();
         var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
 
         var createResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/public-holidays",
@@ -145,8 +145,8 @@ public class PublicHolidayEndpointTests : IClassFixture<ApiWebApplicationFactory
     [Fact]
     public async Task Put_PublicHoliday_Returns_NotFound_When_Not_Exist()
     {
-        using var client = AuthenticatedClient();
         var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/public-holidays/{Guid.NewGuid()}",
@@ -158,8 +158,8 @@ public class PublicHolidayEndpointTests : IClassFixture<ApiWebApplicationFactory
     [Fact]
     public async Task Put_PublicHoliday_Returns_Conflict_When_Date_Already_Taken()
     {
-        using var client = AuthenticatedClient();
         var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
 
         var r1 = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/public-holidays",

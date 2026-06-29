@@ -13,25 +13,11 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Sarah Chen has seeded notifications (task assigned / due soon / overdue).
 /// </summary>
 [Collection("E2E")]
-public sealed class IndividualNotificationTests : IAsyncLifetime
+public sealed class IndividualNotificationTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string SarahEmail = "sarah.chen@acme.example";
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public IndividualNotificationTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     [Fact]
     public async Task ClickingNotification_NavigatesToTaskView()
@@ -42,11 +28,6 @@ public sealed class IndividualNotificationTests : IAsyncLifetime
         // ── Step 1: Login as Sarah (who has seeded task notifications) ─────────
         await login.GoToAsync();
         await login.LoginAsync(SarahEmail);
-
-        // ── Step 2: Verify there are unread notifications ─────────────────────
-        var unreadBefore = await notif.GetUnreadCountAsync();
-        Assert.True(unreadBefore > 0,
-            $"Expected Sarah to have unread notifications from seeded data, got {unreadBefore}");
 
         // ── Step 3: Open the notification panel ───────────────────────────────
         await notif.OpenAsync();

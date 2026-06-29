@@ -16,7 +16,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// this test simply verifies the completed state is visible on the probation tab.
 /// </summary>
 [Collection("E2E")]
-public sealed class ProbationReviewFlowTests : IAsyncLifetime
+public sealed class ProbationReviewFlowTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId           = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid CarlosRivera      = Guid.Parse("30000000-0000-0000-0000-000000000010");
@@ -24,20 +24,6 @@ public sealed class ProbationReviewFlowTests : IAsyncLifetime
 
     private const string SarahEmail = "sarah.chen@acme.example";
     private const string LauraEmail = "laura.bennett@acme.example";
-
-    private readonly AppFixture _fixture;
-    private IBrowserContext _context = null!;
-    private IPage           _page    = null!;
-
-    public ProbationReviewFlowTests(AppFixture fixture) => _fixture = fixture;
-
-    public async Task InitializeAsync()
-    {
-        _context = await _fixture.Browser.NewContextAsync();
-        _page    = await _context.NewPageAsync();
-    }
-
-    public async Task DisposeAsync() => await _context.DisposeAsync();
 
     /// <summary>
     /// Full flow: task view → complete review → probation tab shows Completed.
