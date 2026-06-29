@@ -79,17 +79,24 @@ public sealed class UnauthorizedAccessTests(AppFixture fixture) : E2ETestBase(fi
             $"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees/{JamesId}");
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
-        // ── Step 3: James's personal details should not be accessible ──────────
-        var content = await _page.ContentAsync();
+        // ── Step 3: Must be redirected away from the admin edit URL ───────────
+        var finalUrl = _page.Url;
+        Assert.DoesNotContain($"/employees/{JamesId}", finalUrl);
+    }
 
-        // The page must either redirect away, show an error, or at minimum NOT expose
-        // James's full admin profile data (e.g. salary-grade, HR notes, etc.).
-        var exposesAdminData =
-            content.Contains("HR Notes",     StringComparison.OrdinalIgnoreCase) &&
-            content.Contains("James Okafor", StringComparison.OrdinalIgnoreCase);
+    [Fact]
+    public async Task Employee_DoesNotSee_AdminSidebarNav()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
 
-        Assert.False(exposesAdminData,
-            "Tom (Employee) should not be able to view the full admin profile of another employee");
+        // ── Step 1: Login as Tom (plain Employee) ─────────────────────────────
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        // ── Step 2: Sidebar nav items (People, Leave, HR) must be hidden ──────
+        var navMenu = _page.Locator(".app-nav-menu");
+        Assert.False(await navMenu.IsVisibleAsync(),
+            "Tom (Employee) should not see the admin navigation menu in the sidebar");
     }
 
     [Fact]

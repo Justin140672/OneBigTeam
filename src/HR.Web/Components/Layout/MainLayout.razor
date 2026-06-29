@@ -3,6 +3,8 @@
 @inject IJSRuntime JS
 @inject AppSession Session
 @inject NotificationService NotificationService
+@inject DevAuthService DevAuth
+@inject IWebHostEnvironment Env
 
 @if (!Session.IsLoaded)
 {
@@ -18,6 +20,8 @@ else
 
 <div class="app-shell">
 
+    @if (Session.CanManageEmployees)
+    {
     <SfSidebar Width="280px"
                Type="SidebarType.Push"
                @bind-IsOpen="SidebarOpen"
@@ -60,25 +64,19 @@ else
                 </MenuItems>
             </SfMenu>
 
-        <div class="sidebar-footer">
-            <a href="/login" class="sidebar-login-link">
-                <i class="fa-solid fa-right-to-bracket"></i>
-                @if (SidebarOpen)
-                {
-                    <span>Switch account</span>
-                }
-            </a>
-        </div>
-
         </ChildContent>
 
     </SfSidebar>
+    }
 
     <main class="main-content">
         <div class="top-bar">
-            <button class="mobile-menu-button" @onclick="ToggleSidebar">
-                <i class="fa-solid fa-bars"></i>
-            </button>
+            @if (Session.CanManageEmployees)
+            {
+                <button class="mobile-menu-button" @onclick="ToggleSidebar">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+            }
             <span class="page-title">Dashboard</span>
             <div class="top-bar-actions">
                 @if (Session.IsLoaded && Session.EmployeeId.HasValue)
@@ -152,6 +150,20 @@ else
                         </span>
                     </a>
                 }
+                @if (Env.IsDevelopment())
+                {
+                    <div class="dev-persona-switcher">
+                        <select class="form-select form-select-sm dev-persona-select"
+                                @onchange="OnPersonaSwitchAsync"
+                                title="Switch dev persona">
+                            <option value="">Switch user…</option>
+                            @foreach (var p in _personas)
+                            {
+                                <option value="@p.UserId">@p.Name (@p.JobTitle)</option>
+                            }
+                        </select>
+                    </div>
+                }
                 <button class="theme-toggle" @onclick="ToggleTheme" title="@(IsDark ? "Switch to light mode" : "Switch to dark mode")">
                     @if (IsDark)
                     {
@@ -201,6 +213,8 @@ else
     private List<NotificationDto> _notifications = [];
     private bool _notifOpen;
 
+    private IReadOnlyList<DevPersonaDto> _personas = [];
+
     private readonly Dictionary<string, string> _menuItems = new()
     {
         ["Employees"]        = "/",
@@ -222,6 +236,9 @@ else
         _menuItems["HrInbox"]          = $"/companies/{companyId}/hr/inbox";
 
         await LoadUnreadCountAsync();
+
+        if (Env.IsDevelopment())
+            _personas = await DevAuth.GetPersonasAsync();
     }
 
     private async Task LoadUnreadCountAsync()
@@ -291,6 +308,14 @@ else
     protected override void OnParametersSet() => _errorBoundary?.Recover();
 
     private void ToggleSidebar() => SidebarOpen = !SidebarOpen;
+
+    private async Task OnPersonaSwitchAsync(Microsoft.AspNetCore.Components.ChangeEventArgs e)
+    {
+        var userId = e.Value?.ToString();
+        if (string.IsNullOrEmpty(userId)) return;
+        var ok = await DevAuth.SwitchAsync(userId);
+        if (ok) NavigationManager.NavigateTo("/", forceLoad: true);
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

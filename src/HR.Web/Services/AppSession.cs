@@ -15,6 +15,8 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory)
     public string? Email { get; private set; }
     public IReadOnlyList<Guid> PermissionIds { get; private set; } = [];
 
+    public bool CanManageEmployees => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000004"));
+
     // Employee (null if user has no linked employee record)
     public Guid? EmployeeId { get; private set; }
     public string? FirstName { get; private set; }

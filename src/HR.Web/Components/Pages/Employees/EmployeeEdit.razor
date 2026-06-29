@@ -7,6 +7,7 @@
 @inject PositionProfileService PositionProfileService
 @inject InviteService InviteService
 @inject NavigationManager Navigation
+@inject AppSession Session
 @using HR.SharedKernel
 
 <PageTitle>@PageTitle</PageTitle>
@@ -556,6 +557,13 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        await Session.InitialiseAsync();
+        if (!Session.CanManageEmployees)
+        {
+            Navigation.NavigateTo("/", replace: true);
+            return;
+        }
+
         _isViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
         _loading = true;
         _globalError = null;
