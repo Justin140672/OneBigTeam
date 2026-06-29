@@ -11,6 +11,7 @@ using HR.Modules.Documents.Features.DownloadEmployeeDocument;
 using HR.Modules.Documents.Features.GetEmployeeDocument;
 using HR.Modules.Documents.Features.GetExpiringDocuments;
 using HR.Modules.Documents.Features.ProcessDocumentExpiryNotifications;
+using HR.Modules.Documents.Features.ListDocumentRequests;
 using HR.Modules.Documents.Features.ListEmployeeDocuments;
 using HR.Modules.Documents.Features.UploadEmployeeDocument;
 using HR.Modules.Documents.Services;
@@ -80,6 +81,8 @@ public static class DocumentsModule
 
         services.AddScoped<ListEmployeeDocumentsHandler>();
         services.AddScoped<IValidator<ListEmployeeDocumentsRequest>, ListEmployeeDocumentsValidator>();
+
+        services.AddScoped<ListDocumentRequestsHandler>();
 
         services.AddScoped<DeleteEmployeeDocumentHandler>();
         services.AddScoped<DownloadEmployeeDocumentHandler>();
@@ -151,6 +154,7 @@ public static class DocumentsModule
 
         if (!await db.DocumentRequests.AnyAsync(r => r.CompanyId == acmeId))
         {
+            var empJamesId  = Guid.Parse("30000000-0000-0000-0000-000000000002"); // James Okafor
             var empTomId    = Guid.Parse("30000000-0000-0000-0000-000000000004"); // Tom Williams
             var empCarlosId = Guid.Parse("30000000-0000-0000-0000-000000000010"); // Carlos Rivera
 
@@ -170,6 +174,18 @@ public static class DocumentsModule
                 DocumentRequest.Create(
                     Guid.Parse("b0000000-0000-0000-0000-000000000003"),
                     acmeId, empCarlosId, acmeRightToWork,
+                    positionProfileRequiredDocumentId: null,
+                    dueDate: null, requestedByEmployeeId: null, now),
+
+                DocumentRequest.Create(
+                    Guid.Parse("b0000000-0000-0000-0000-000000000004"),
+                    acmeId, empJamesId, acmePassport,
+                    positionProfileRequiredDocumentId: null,
+                    dueDate: null, requestedByEmployeeId: null, now),
+
+                DocumentRequest.Create(
+                    Guid.Parse("b0000000-0000-0000-0000-000000000005"),
+                    acmeId, empJamesId, acmeRightToWork,
                     positionProfileRequiredDocumentId: null,
                     dueDate: null, requestedByEmployeeId: null, now));
 

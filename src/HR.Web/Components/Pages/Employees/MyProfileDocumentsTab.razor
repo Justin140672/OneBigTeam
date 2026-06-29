@@ -1,6 +1,96 @@
-@code {
-    [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
-    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+@inject DocumentService DocumentService
+
+<UploadRequestedDocumentDialog @ref="_uploadDialog"
+                               CompanyId="CompanyId"
+                               EmployeeId="EmployeeId"
+                               OnUploaded="OnRequestUploadedAsync"
+                               OnCancelled="@(() => { })" />
+
+@if (!_loading && (_openRequests.Count > 0 || _completedRequests.Count > 0))
+{
+    <div class="card mb-4" data-testid="requested-docs-section">
+        <div class="card-header d-flex align-items-center">
+            <i class="fa-solid fa-inbox text-muted me-2"></i>
+            <h5 class="mb-0">Requested Documents</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Document Type</th>
+                        <th width="140">Due Date</th>
+                        <th width="120">Status</th>
+                        <th width="100"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in _openRequests)
+                    {
+                        <tr>
+                            <td class="align-middle">@r.DocumentTypeName</td>
+                            <td class="align-middle text-muted small">
+                                @(r.DueDate?.ToString("d MMM yyyy") ?? "—")
+                            </td>
+                            <td class="align-middle">
+                                <span class="badge text-bg-warning">Requested</span>
+                            </td>
+                            <td class="align-middle text-end">
+                                <button class="btn btn-primary btn-sm"
+                                        data-testid="upload-request-btn"
+                                        @onclick="() => OpenUpload(r)">
+                                    <i class="fa-solid fa-upload me-1"></i>Upload
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var r in _completedRequests)
+                    {
+                        <tr class="text-muted">
+                            <td class="align-middle">@r.DocumentTypeName</td>
+                            <td class="align-middle small">
+                                @(r.DueDate?.ToString("d MMM yyyy") ?? "—")
+                            </td>
+                            <td class="align-middle">
+                                <span class="badge text-bg-success">Uploaded</span>
+                            </td>
+                            <td></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
 }
 
 <EmployeeDocumentsTab CompanyId="CompanyId" EmployeeId="EmployeeId" EmployeeSelfUpload="true" />
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private UploadRequestedDocumentDialog _uploadDialog = null!;
+
+    private List<DocumentRequestListItem> _openRequests      = [];
+    private List<DocumentRequestListItem> _completedRequests = [];
+    private bool _loading = true;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var response = await DocumentService.ListDocumentRequestsAsync(CompanyId, EmployeeId);
+        var all = response?.Items ?? [];
+        _openRequests      = all.Where(r => r.Status == "Requested").ToList();
+        _completedRequests = all.Where(r => r.Status == "Uploaded").ToList();
+        _loading = false;
+    }
+
+    private void OpenUpload(DocumentRequestListItem request) => _uploadDialog.Open(request);
+
+    private async Task OnRequestUploadedAsync()
+    {
+        await LoadAsync();
+        StateHasChanged();
+    }
+}

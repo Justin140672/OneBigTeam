@@ -1,0 +1,122 @@
+@inject DocumentService DocumentService
+
+<SfDialog @bind-Visible="_visible" IsModal="true" Width="540px" ShowCloseIcon="true">
+    <DialogEvents Closed="OnDialogClosed" />
+    <DialogTemplates>
+        <Header>Upload @_request?.DocumentTypeName</Header>
+        <Content>
+            @if (_error is not null)
+            {
+                <div class="alert alert-danger alert-dismissible mb-3">
+                    @_error
+                    <button type="button" class="btn-close" @onclick="@(() => _error = null)"></button>
+                </div>
+            }
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label">Title <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" @bind="_title" placeholder="Document title" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Issue Date</label>
+                    <SfDatePicker TValue="DateOnly?"
+                                  @bind-Value="_issueDate"
+                                  Format="dd/MM/yyyy"
+                                  Placeholder="dd/mm/yyyy"
+                                  ShowClearButton="true" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Expiry Date</label>
+                    <SfDatePicker TValue="DateOnly?"
+                                  @bind-Value="_expiryDate"
+                                  Format="dd/MM/yyyy"
+                                  Placeholder="dd/mm/yyyy"
+                                  ShowClearButton="true" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">File <span class="text-danger">*</span></label>
+                    <InputFile class="form-control" OnChange="OnFileSelected"
+                               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
+                    <div class="form-text">Accepted: PDF, Word, JPG, PNG. Max 20 MB.</div>
+                </div>
+            </div>
+        </Content>
+        <FooterTemplate>
+            <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="_uploading">
+                @if (_uploading)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Upload
+            </SfButton>
+            <SfButton OnClick="Cancel">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter]                 public bool IsOpen     { get; set; }
+    [Parameter] public EventCallback OnUploaded  { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+
+    private DocumentRequestListItem? _request;
+    private bool _visible;
+
+    private string    _title     = string.Empty;
+    private DateOnly? _issueDate;
+    private DateOnly? _expiryDate;
+    private IBrowserFile? _selectedFile;
+    private bool    _uploading;
+    private string? _error;
+
+    public void Open(DocumentRequestListItem request)
+    {
+        _request      = request;
+        _title        = request.DocumentTypeName;
+        _issueDate    = null;
+        _expiryDate   = null;
+        _selectedFile = null;
+        _error        = null;
+        _visible      = true;
+        StateHasChanged();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!IsOpen && _visible)
+            _visible = false;
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
+
+    private async Task SubmitAsync()
+    {
+        if (_request is null) return;
+
+        _error = null;
+        if (string.IsNullOrWhiteSpace(_title)) { _error = "Title is required."; return; }
+        if (_selectedFile is null)             { _error = "Please select a file."; return; }
+
+        _uploading = true;
+        _error = await DocumentService.UploadRequestedDocumentAsync(
+            CompanyId, EmployeeId, _request.Id,
+            _title, description: null, _issueDate, _expiryDate,
+            _selectedFile);
+        _uploading = false;
+
+        if (_error is not null) return;
+
+        _visible = false;
+        await OnUploaded.InvokeAsync();
+    }
+
+    private async Task Cancel()
+    {
+        _visible = false;
+        await OnCancelled.InvokeAsync();
+    }
+
+    private async Task OnDialogClosed() => await OnCancelled.InvokeAsync();
+}

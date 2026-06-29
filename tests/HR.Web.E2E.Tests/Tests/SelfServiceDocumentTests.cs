@@ -5,10 +5,11 @@ using Microsoft.Playwright;
 namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
-/// Verifies the Documents tab on the self-service My Profile page:
-/// - Seeded documents are visible to the employee.
-/// - The download action opens the document in a new tab (window.open).
-/// - The upload button is hidden for employees (EmployeeSelfUpload=true hides it).
+/// Verifies the Documents tab on the self-service My Profile page.
+///
+/// Tom Williams (30000000-...-004) has:
+///   - Seeded uploaded docs: Employment Contract, Offer Letter
+///   - Seeded document request: Passport (b0000000-...-001, task a0000000-...-010)
 /// </summary>
 [Collection("E2E")]
 public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(fixture)
@@ -24,21 +25,16 @@ public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(f
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Login as Tom ──────────────────────────────────────────────
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
-        // ── Step 2: Navigate to Tom's self-service profile ────────────────────
         await profile.GoToAsync(AcmeId, TomId);
         await profile.OpenDocumentsTabAsync();
 
-        // Wait for spinner to disappear.
         await _page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
 
-        // ── Step 3: Tom's seeded documents should be visible ──────────────────
-        // Tom has "Employment Contract" and "Offer Letter" assigned in the seed data.
         var content = await _page.ContentAsync();
 
         Assert.True(
@@ -51,7 +47,36 @@ public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(f
     }
 
     [Fact]
-    public async Task SelfServiceDocumentsTab_ShowsUploadButton()
+    public async Task SelfServiceDocumentsTab_ManagerUploadButton_IsHiddenForEmployee()
+    {
+        // The "Upload" button in the Documents card header (for manager uploads) must
+        // be hidden when EmployeeSelfUpload=true. The Requested Documents section has
+        // its own upload buttons, which are separate.
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await profile.GoToAsync(AcmeId, TomId);
+        await profile.OpenDocumentsTabAsync();
+
+        await _page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+
+        // The manager upload button lives in the Documents card header (has the e-primary CSS class).
+        // Scope to the Documents card to avoid matching the request-upload buttons.
+        var documentsCard = _page.Locator(".card").Filter(new() { HasText = "Documents" })
+                                 .Filter(new() { HasNot = _page.Locator("[data-testid='requested-docs-section']") })
+                                 .First;
+        var managerUploadBtn = documentsCard.Locator(".card-header").GetByRole(AriaRole.Button, new() { Name = "Upload" });
+        Assert.False(await managerUploadBtn.IsVisibleAsync(),
+            "Manager upload button must be hidden in self-service view");
+    }
+
+    [Fact]
+    public async Task SelfServiceDocumentsTab_ShowsRequestedDocumentsSection()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
@@ -66,11 +91,33 @@ public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(f
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
 
-        // EmployeeDocumentsTab renders the Upload button only when !EmployeeSelfUpload.
-        // The self-service view passes EmployeeSelfUpload="true", so Upload must be hidden.
-        var uploadBtn = _page.GetByRole(AriaRole.Button, new() { Name = "Upload" });
-        Assert.False(await uploadBtn.IsVisibleAsync(),
-            "Expected no 'Upload' button on the self-service Documents tab — upload is disabled for employees");
+        var requestedSection = _page.Locator("[data-testid='requested-docs-section']");
+        Assert.True(await requestedSection.IsVisibleAsync(),
+            "Expected the 'Requested Documents' section to be visible for Tom, who has a Passport request");
+
+        var content = await requestedSection.TextContentAsync();
+        Assert.Contains("Passport", content, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SelfServiceDocumentsTab_OpenRequest_ShowsUploadButton()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await profile.GoToAsync(AcmeId, TomId);
+        await profile.OpenDocumentsTabAsync();
+
+        await _page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+
+        var uploadBtn = _page.Locator("[data-testid='upload-request-btn']").First;
+        Assert.True(await uploadBtn.IsVisibleAsync(),
+            "Expected an Upload button for Tom's open Passport request");
     }
 
     [Fact]
@@ -89,20 +136,14 @@ public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(f
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
 
-        // Wait for at least one row to appear in the documents grid.
         await _page.WaitForSelectorAsync(".e-gridcontent td, .card-body td",
             new() { Timeout = 15_000 });
 
-        // DownloadAsync calls JS.InvokeVoidAsync("window.open", url, "_blank") which opens a
-        // popup tab rather than triggering a browser file download.  Listen for the popup
-        // before clicking so we don't miss the event if it fires before we start waiting.
         var popupTask = _page.WaitForPopupAsync();
 
-        // The download button has title="Download" (rendered by Syncfusion SfButton).
         var downloadBtn = _page.Locator("[title='Download']").First;
         await downloadBtn.ClickAsync();
 
-        // The popup (new tab) should open within 15 seconds.
         var popup = await popupTask.WaitAsync(TimeSpan.FromSeconds(15));
         Assert.NotNull(popup);
         await popup.CloseAsync();

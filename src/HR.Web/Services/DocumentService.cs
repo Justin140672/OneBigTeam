@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using HR.Web.Models;
@@ -16,6 +17,18 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         {
             return await Http.GetFromJsonAsync<EmployeeDocumentListResponse>(
                 $"api/companies/{companyId}/employees/{employeeId}/documents", cancellationToken);
+        }
+        catch { return null; }
+    }
+
+    public async Task<DocumentRequestListResponse?> ListDocumentRequestsAsync(
+        Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<DocumentRequestListResponse>(
+                $"api/companies/{companyId}/employees/{employeeId}/document-requests",
+                cancellationToken);
         }
         catch { return null; }
     }
@@ -58,7 +71,9 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
                 content.Add(new StringContent(expiryDate.Value.ToString("yyyy-MM-dd")), "ExpiryDate");
 
             await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
-            content.Add(new StreamContent(stream), "File", file.Name);
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+            content.Add(fileContent, "File", file.Name);
 
             var response = await Http.PostAsync(
                 $"api/companies/{companyId}/employees/{employeeId}/documents",
@@ -107,7 +122,9 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
                 content.Add(new StringContent(expiryDate.Value.ToString("yyyy-MM-dd")), "ExpiryDate");
 
             await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
-            content.Add(new StreamContent(stream), "File", file.Name);
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+            content.Add(fileContent, "File", file.Name);
 
             var response = await Http.PostAsync(
                 $"api/companies/{companyId}/employees/{employeeId}/document-requests/{documentRequestId}/upload",

@@ -26,7 +26,8 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
-        await page.WaitForSelectorAsync(".e-grid, .card", new() { Timeout = 15_000 });
+        // Wait for Syncfusion grid rows to be in the DOM (not just the card shell)
+        await page.WaitForSelectorAsync(".e-gridcontent td, .card-body td", new() { Timeout = 15_000 });
     }
 
     /// <summary>Returns true if any grid cell in the Documents tab contains <paramref name="titleFragment"/>.</summary>

@@ -30,9 +30,10 @@ internal sealed class DevAuthHandler : AuthenticationHandler<AuthenticationSchem
 
         var claims = new[]
         {
-            new Claim("sub",        persona.UserId),
-            new Claim("email",      persona.Email),
-            new Claim("company_id", persona.CompanyId),
+            new Claim("sub",                          persona.UserId),
+            new Claim(ClaimTypes.NameIdentifier,      persona.UserId),
+            new Claim("email",                        persona.Email),
+            new Claim("company_id",                   persona.CompanyId),
         };
 
         var identity  = new ClaimsIdentity(claims, Scheme.Name);

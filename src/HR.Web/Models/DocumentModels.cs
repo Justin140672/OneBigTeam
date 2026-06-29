@@ -17,3 +17,11 @@ public sealed record EmployeeDocumentDetailResponse(string? DownloadUrl);
 public sealed record DocumentTypeListResponse(IReadOnlyList<DocumentTypeItem> Items);
 
 public sealed record DocumentTypeItem(Guid Id, string Name, string? Description, bool IsActive, bool AllowEmployeeUpload);
+
+public sealed record DocumentRequestListResponse(IReadOnlyList<DocumentRequestListItem> Items);
+
+public sealed record DocumentRequestListItem(
+    Guid      Id,
+    string    DocumentTypeName,
+    DateOnly? DueDate,
+    string    Status);

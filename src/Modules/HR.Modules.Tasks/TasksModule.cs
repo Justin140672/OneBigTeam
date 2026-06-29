@@ -174,6 +174,28 @@ public static class TasksModule
         // Document upload tasks — linked to seeded DocumentRequests in DocumentsModule seed.
         db.TaskItems.AddRange(
             TaskItem.Create(
+                Guid.Parse("a0000000-0000-0000-0000-000000000013"), companyId, empSenDev1Id,
+                "Upload Passport",
+                "Please upload a copy of your Passport.",
+                TaskPriority.Medium, TaskSource.Document, TaskActionType.Upload,
+                dueDate: null,
+                assignedEmployeeId: empSenDev1Id,
+                assignedUserId: empSenDev1Id,
+                now,
+                sourceEntityId: Guid.Parse("b0000000-0000-0000-0000-000000000004")),
+
+            TaskItem.Create(
+                Guid.Parse("a0000000-0000-0000-0000-000000000014"), companyId, empSenDev1Id,
+                "Upload Right To Work",
+                "Please upload a copy of your Right To Work.",
+                TaskPriority.Medium, TaskSource.Document, TaskActionType.Upload,
+                dueDate: null,
+                assignedEmployeeId: empSenDev1Id,
+                assignedUserId: empSenDev1Id,
+                now,
+                sourceEntityId: Guid.Parse("b0000000-0000-0000-0000-000000000005")),
+
+            TaskItem.Create(
                 Guid.Parse("a0000000-0000-0000-0000-000000000010"), companyId, empDev1Id,
                 "Upload Passport",
                 "Please upload a copy of your Passport.",
