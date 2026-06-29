@@ -13,6 +13,7 @@ internal class DocumentsDbContext : DbContext
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<DocumentType> DocumentTypes => Set<DocumentType>();
     public DbSet<EmployeeDocument> EmployeeDocuments => Set<EmployeeDocument>();
+    public DbSet<DocumentRequest> DocumentRequests => Set<DocumentRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

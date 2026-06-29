@@ -1,6 +1,8 @@
 using FluentValidation;
 using HR.Modules.Documents.Domain;
+using HR.SharedKernel;
 using HR.SharedKernel.Contracts;
+using HR.Modules.Documents.Features.CreateDocumentRequestsOnEmployeeCreated;
 using HR.Modules.Documents.Features.CreateDocumentType;
 using HR.Modules.Documents.Features.DeactivateDocumentType;
 using HR.Modules.Documents.Features.DeleteEmployeeDocument;
@@ -87,6 +89,8 @@ public static class DocumentsModule
         services.AddScoped<ProcessDocumentExpiryNotificationsHandler>();
 
         services.AddScoped<IDocumentTypeReader, DocumentTypeReader>();
+
+        services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
     }
 
     public static async Task MigrateDocumentsAsync(this IServiceProvider services)

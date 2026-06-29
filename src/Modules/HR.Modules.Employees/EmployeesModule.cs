@@ -127,6 +127,7 @@ public static class EmployeesModule
         services.AddScoped<IDirectReportsReader, DirectReportsReader>();
         services.AddScoped<IEmployeeNameReader, EmployeeNameReader>();
         services.AddScoped<IManagerReader, ManagerReader>();
+        services.AddScoped<IPositionProfileDocumentsReader, PositionProfileDocumentsReader>();
     }
 
     public static async Task MigrateEmployeesAsync(this IServiceProvider services)

@@ -144,7 +144,7 @@ internal sealed class CreateEmployeeHandler
         _dbContext.Employees.Add(employee);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        await _publisher.PublishAsync(new EmployeeCreatedIntegrationEvent(employee.CompanyId, employee.Id, employee.StartDate, employee.ManagerId, probationEndDate), cancellationToken);
+        await _publisher.PublishAsync(new EmployeeCreatedIntegrationEvent(employee.CompanyId, employee.Id, employee.StartDate, employee.ManagerId, probationEndDate, employee.PositionProfileId), cancellationToken);
 
         return Result.Success(new CreateEmployeeResponse(
             employee.Id,
