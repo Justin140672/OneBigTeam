@@ -60,14 +60,15 @@ namespace HR.Modules.Assets.Persistence.Migrations
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     company_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    asset_number = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    category_id = table.Column<Guid>(type: "uuid", nullable: false),
                     name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    asset_tag = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    asset_category_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    manufacturer = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    model = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     serial_number = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     purchase_date = table.Column<DateOnly>(type: "date", nullable: true),
                     purchase_price = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: true),
-                    notes = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
@@ -113,10 +114,10 @@ namespace HR.Modules.Assets.Persistence.Migrations
                 column: "company_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_assets_company_id_asset_tag",
+                name: "IX_assets_company_id_asset_number",
                 schema: "assets",
                 table: "assets",
-                columns: new[] { "company_id", "asset_tag" },
+                columns: new[] { "company_id", "asset_number" },
                 unique: true);
 
             migrationBuilder.CreateIndex(

@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HR.Modules.Assets.Persistence.Migrations
 {
     [DbContext(typeof(AssetsDbContext))]
-    [Migration("20260630122447_InitialCreate")]
+    [Migration("20260630122957_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -32,15 +32,15 @@ namespace HR.Modules.Assets.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid>("AssetCategoryId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("asset_category_id");
-
-                    b.Property<string>("AssetTag")
+                    b.Property<string>("AssetNumber")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("asset_tag");
+                        .HasColumnName("asset_number");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("category_id");
 
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
@@ -50,16 +50,21 @@ namespace HR.Modules.Assets.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("Manufacturer")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("manufacturer");
+
+                    b.Property<string>("Model")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("model");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("notes");
 
                     b.Property<DateOnly?>("PurchaseDate")
                         .HasColumnType("date")
@@ -89,7 +94,7 @@ namespace HR.Modules.Assets.Persistence.Migrations
 
                     b.HasIndex("CompanyId");
 
-                    b.HasIndex("CompanyId", "AssetTag")
+                    b.HasIndex("CompanyId", "AssetNumber")
                         .IsUnique();
 
                     b.HasIndex("CompanyId", "Status");

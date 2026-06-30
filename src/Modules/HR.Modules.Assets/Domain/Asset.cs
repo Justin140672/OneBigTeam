@@ -6,63 +6,68 @@ internal sealed class Asset
 
     public Guid Id { get; private set; }
     public Guid CompanyId { get; private set; }
+    public string AssetNumber { get; private set; } = string.Empty;
+    public Guid CategoryId { get; private set; }
     public string Name { get; private set; } = string.Empty;
-    public string AssetTag { get; private set; } = string.Empty;
-    public Guid AssetCategoryId { get; private set; }
-    public AssetStatus Status { get; private set; }
+    public string? Manufacturer { get; private set; }
+    public string? Model { get; private set; }
     public string? SerialNumber { get; private set; }
     public DateOnly? PurchaseDate { get; private set; }
     public decimal? PurchasePrice { get; private set; }
-    public string? Notes { get; private set; }
+    public AssetStatus Status { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
     public static Asset Create(
         Guid id,
         Guid companyId,
+        string assetNumber,
+        Guid categoryId,
         string name,
-        string assetTag,
-        Guid assetCategoryId,
+        string? manufacturer,
+        string? model,
         string? serialNumber,
         DateOnly? purchaseDate,
         decimal? purchasePrice,
-        string? notes,
         DateTimeOffset now)
     {
         return new Asset
         {
             Id = id,
             CompanyId = companyId,
+            AssetNumber = assetNumber,
+            CategoryId = categoryId,
             Name = name,
-            AssetTag = assetTag,
-            AssetCategoryId = assetCategoryId,
-            Status = AssetStatus.Available,
+            Manufacturer = manufacturer,
+            Model = model,
             SerialNumber = serialNumber,
             PurchaseDate = purchaseDate,
             PurchasePrice = purchasePrice,
-            Notes = notes,
+            Status = AssetStatus.Available,
             CreatedAt = now,
             UpdatedAt = now
         };
     }
 
     public void Update(
+        string assetNumber,
+        Guid categoryId,
         string name,
-        string assetTag,
-        Guid assetCategoryId,
+        string? manufacturer,
+        string? model,
         string? serialNumber,
         DateOnly? purchaseDate,
         decimal? purchasePrice,
-        string? notes,
         DateTimeOffset now)
     {
+        AssetNumber = assetNumber;
+        CategoryId = categoryId;
         Name = name;
-        AssetTag = assetTag;
-        AssetCategoryId = assetCategoryId;
+        Manufacturer = manufacturer;
+        Model = model;
         SerialNumber = serialNumber;
         PurchaseDate = purchaseDate;
         PurchasePrice = purchasePrice;
-        Notes = notes;
         UpdatedAt = now;
     }
 

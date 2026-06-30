@@ -20,25 +20,27 @@ internal sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
             .HasColumnName("company_id")
             .IsRequired();
 
+        builder.Property(a => a.AssetNumber)
+            .HasColumnName("asset_number")
+            .HasMaxLength(50)
+            .IsRequired();
+
+        builder.Property(a => a.CategoryId)
+            .HasColumnName("category_id")
+            .IsRequired();
+
         builder.Property(a => a.Name)
             .HasColumnName("name")
             .HasMaxLength(200)
             .IsRequired();
 
-        builder.Property(a => a.AssetTag)
-            .HasColumnName("asset_tag")
-            .HasMaxLength(50)
-            .IsRequired();
+        builder.Property(a => a.Manufacturer)
+            .HasColumnName("manufacturer")
+            .HasMaxLength(100);
 
-        builder.Property(a => a.AssetCategoryId)
-            .HasColumnName("asset_category_id")
-            .IsRequired();
-
-        builder.Property(a => a.Status)
-            .HasColumnName("status")
-            .HasConversion<string>()
-            .HasMaxLength(20)
-            .IsRequired();
+        builder.Property(a => a.Model)
+            .HasColumnName("model")
+            .HasMaxLength(100);
 
         builder.Property(a => a.SerialNumber)
             .HasColumnName("serial_number")
@@ -51,9 +53,11 @@ internal sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
             .HasColumnName("purchase_price")
             .HasPrecision(18, 2);
 
-        builder.Property(a => a.Notes)
-            .HasColumnName("notes")
-            .HasMaxLength(2000);
+        builder.Property(a => a.Status)
+            .HasColumnName("status")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
 
         builder.Property(a => a.CreatedAt)
             .HasColumnName("created_at")
@@ -64,7 +68,7 @@ internal sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
             .IsRequired();
 
         builder.HasIndex(a => a.CompanyId);
-        builder.HasIndex(a => new { a.CompanyId, a.AssetTag }).IsUnique();
+        builder.HasIndex(a => new { a.CompanyId, a.AssetNumber }).IsUnique();
         builder.HasIndex(a => new { a.CompanyId, a.Status });
     }
 }
