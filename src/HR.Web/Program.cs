@@ -1,5 +1,6 @@
 using HR.Web.Components;
 using HR.Web.Services;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
 using Syncfusion.Blazor;
 
@@ -31,11 +32,14 @@ builder.Services.AddScoped<LeaveService>();
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddScoped<DocumentService>();
 builder.Services.AddScoped<EmploymentTypeService>();
+builder.Services.AddScoped<LeaveTypeService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<ProbationService>();
 builder.Services.AddScoped<DevAuthService>();
 builder.Services.AddScoped<AppSession>();
 builder.Services.AddScoped<AuthenticationStateProvider, AppSessionAuthStateProvider>();
+builder.Services.AddAuthentication("NoOp")
+    .AddScheme<AuthenticationSchemeOptions, NoOpAuthenticationHandler>("NoOp", _ => { });
 builder.Services.AddAuthorizationCore();
 builder.Services.AddCascadingAuthenticationState();
 

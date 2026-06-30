@@ -1,0 +1,208 @@
+@page "/companies/{CompanyId:guid}/leave-types/new"
+@page "/companies/{CompanyId:guid}/leave-types/{Id:guid}"
+@page "/companies/{CompanyId:guid}/leave-types/{Id:guid}/view"
+@rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject LeaveTypeService LeaveTypeService
+@inject NavigationManager Navigation
+
+<PageTitle>@PageTitle</PageTitle>
+
+<div class="container py-4">
+    <SfBreadcrumb Class="mb-3">
+        <BreadcrumbItems>
+            <BreadcrumbItem Text="Leave Types" Url="@($"/companies/{CompanyId}/leave-types")" />
+            <BreadcrumbItem Text="@PageTitle" />
+        </BreadcrumbItems>
+    </SfBreadcrumb>
+
+    @if (_loading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span>Loading…</span>
+        </div>
+    }
+    else
+    {
+        <h1 class="mb-4">@PageTitle</h1>
+
+        @if (!string.IsNullOrEmpty(_globalError))
+        {
+            <div class="alert alert-danger">@_globalError</div>
+        }
+
+        <div class="row">
+            <div class="col-lg-7">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Leave Type Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <HrTextBox @bind-Value="_model.Name" Placeholder="e.g. Annual Leave" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Code <span class="text-danger">*</span></label>
+                                <HrTextBox @bind-Value="_model.Code" Placeholder="e.g. ANNUAL" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Default Days <span class="text-danger">*</span></label>
+                                <SfNumericTextBox TValue="int" @bind-Value="_model.DefaultEntitlementDays"
+                                                  Min="0" Step="1" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Accrual Method <span class="text-danger">*</span></label>
+                                <SfDropDownList TValue="string" TItem="Option"
+                                               DataSource="@_accrualOptions"
+                                               @bind-Value="_model.AccrualMethod"
+                                               Placeholder="Select method">
+                                    <DropDownListFieldSettings Value="Value" Text="Label" />
+                                </SfDropDownList>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Behaviour <span class="text-danger">*</span></label>
+                                <SfDropDownList TValue="string" TItem="Option"
+                                               DataSource="@_behaviourOptions"
+                                               @bind-Value="_model.Behaviour"
+                                               Placeholder="Select behaviour">
+                                    <DropDownListFieldSettings Value="Value" Text="Label" />
+                                </SfDropDownList>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-3">
+                    @if (!_isViewMode)
+                    {
+                        @if (!string.IsNullOrEmpty(_successMsg))
+                        {
+                            <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
+                        }
+                        <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
+                            @if (_saving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            Save
+                        </SfButton>
+                    }
+                    <SfButton OnClick="Cancel" Disabled="@_saving">@(_isViewMode ? "Close" : "Cancel")</SfButton>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+
+    private bool _isViewMode;
+    private bool IsNew => Id is null || Id == Guid.Empty;
+    private string PageTitle => IsNew ? "Add Leave Type"
+        : _model.Name.Trim().Length > 0 ? _model.Name
+        : _isViewMode ? "View Leave Type" : "Edit Leave Type";
+
+    private bool _loading = true;
+    private bool _saving;
+    private string? _globalError;
+    private string? _successMsg;
+
+    private readonly LeaveTypeEditModel _model = new();
+
+    private static readonly Option[] _accrualOptions =
+    [
+        new("None",        "None"),
+        new("Monthly",     "Monthly"),
+        new("Fortnightly", "Fortnightly"),
+        new("Annual",      "Annual"),
+    ];
+
+    private static readonly Option[] _behaviourOptions =
+    [
+        new("Standard",  "Standard"),
+        new("Sickness",  "Sickness"),
+        new("Maternity", "Maternity"),
+        new("Paternity", "Paternity"),
+        new("Parental",  "Parental"),
+        new("Unpaid",    "Unpaid"),
+        new("Toil",      "Time Off in Lieu"),
+    ];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
+        _loading = true;
+        _globalError = null;
+        _successMsg = null;
+
+        if (!IsNew)
+        {
+            var list = await LeaveTypeService.ListLeaveTypesAsync(CompanyId, includeInactive: true);
+            var existing = list?.Items.FirstOrDefault(t => t.Id == Id);
+            if (existing is not null)
+            {
+                _model.Name = existing.Name;
+                _model.Code = existing.Code;
+                _model.DefaultEntitlementDays = existing.DefaultEntitlementDays;
+                _model.AccrualMethod = existing.AccrualMethod;
+                _model.Behaviour = existing.Behaviour;
+            }
+        }
+
+        _loading = false;
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        _globalError = null;
+        _successMsg = null;
+
+        if (IsNew)
+        {
+            var request = new CreateLeaveTypeRequest(
+                CompanyId,
+                _model.Name.Trim(),
+                _model.Code.Trim().ToUpperInvariant(),
+                _model.DefaultEntitlementDays,
+                _model.AccrualMethod,
+                _model.Behaviour);
+
+            var (created, error) = await LeaveTypeService.CreateAsync(CompanyId, request);
+            _saving = false;
+
+            if (created is not null)
+                Navigation.NavigateTo($"/companies/{CompanyId}/leave-types", forceLoad: true);
+            else
+                _globalError = error ?? "Failed to create leave type.";
+        }
+        else
+        {
+            var request = new UpdateLeaveTypeRequest(
+                CompanyId,
+                Id!.Value,
+                _model.Name.Trim(),
+                _model.Code.Trim().ToUpperInvariant(),
+                _model.DefaultEntitlementDays,
+                _model.AccrualMethod,
+                _model.Behaviour);
+
+            var (updated, error) = await LeaveTypeService.UpdateAsync(CompanyId, Id!.Value, request);
+            _saving = false;
+
+            if (updated is not null)
+                Navigation.NavigateTo($"/companies/{CompanyId}/leave-types", forceLoad: true);
+            else
+                _globalError = error ?? "Failed to save leave type.";
+        }
+    }
+
+    private void Cancel() => Navigation.NavigateTo($"/companies/{CompanyId}/leave-types");
+
+    private sealed record Option(string Value, string Label);
+}

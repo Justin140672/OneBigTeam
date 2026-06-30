@@ -17,6 +17,10 @@ using HR.Modules.Leave.Features.SubmitLeaveRequest;
 using HR.Modules.Leave.Features.PreviewLeaveRequest;
 using HR.Modules.Leave.Features.AwardToil;
 using HR.Modules.Leave.Features.InitialiseEmployeeLeave;
+using HR.Modules.Leave.Features.ListLeaveTypes;
+using HR.Modules.Leave.Features.CreateLeaveType;
+using HR.Modules.Leave.Features.UpdateLeaveType;
+using HR.Modules.Leave.Features.DeactivateLeaveType;
 using HR.Modules.Leave.Persistence;
 using HR.Modules.Leave.Services;
 using HR.SharedKernel;
@@ -73,6 +77,14 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         services.AddScoped<ListPublicHolidaysHandler>();
         services.AddScoped<UpdatePublicHolidayHandler>();
         services.AddScoped<IValidator<UpdatePublicHolidayRequest>, UpdatePublicHolidayValidator>();
+        services.AddScoped<ListLeaveTypesHandler>();
+        services.AddScoped<IValidator<ListLeaveTypesRequest>, ListLeaveTypesValidator>();
+        services.AddScoped<CreateLeaveTypeHandler>();
+        services.AddScoped<IValidator<CreateLeaveTypeRequest>, CreateLeaveTypeValidator>();
+        services.AddScoped<UpdateLeaveTypeHandler>();
+        services.AddScoped<IValidator<UpdateLeaveTypeRequest>, UpdateLeaveTypeValidator>();
+        services.AddScoped<DeactivateLeaveTypeHandler>();
+        services.AddScoped<IValidator<DeactivateLeaveTypeRequest>, DeactivateLeaveTypeValidator>();
     }
 
     public static async Task MigrateLeaveAsync(this IServiceProvider services)

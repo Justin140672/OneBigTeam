@@ -34,7 +34,7 @@ public class UpdateEmploymentDetailsEndpointTests : IClassFixture<ApiWebApplicat
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{Guid.NewGuid()}/employees/{Guid.NewGuid()}/employment",
-            new { employeeNumber = "EMP-001", employmentType = "Permanent", status = "Active", startDate = "2026-01-01" });
+            new { employeeNumber = "EMP-001", employmentTypeId = (Guid?)null, status = "Active", startDate = "2026-01-01" });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -56,7 +56,7 @@ public class UpdateEmploymentDetailsEndpointTests : IClassFixture<ApiWebApplicat
                 companyId,
                 id = employee.Id,
                 employeeNumber = "EMP-001",
-                employmentType = "Permanent",
+                employmentTypeId = (Guid?)null,
                 status = "Active",
                 startDate = "2026-01-15",
                 continuousServiceDate = "2026-01-15"
@@ -67,7 +67,6 @@ public class UpdateEmploymentDetailsEndpointTests : IClassFixture<ApiWebApplicat
         var payload = await response.Content.ReadFromJsonAsync<EmploymentPayload>();
         Assert.NotNull(payload);
         Assert.Equal("EMP-001", payload!.EmployeeNumber);
-        Assert.Equal("Permanent", payload.EmploymentType);
         Assert.Equal("Active", payload.Status);
         Assert.Equal(new DateOnly(2026, 1, 15), payload.StartDate);
         Assert.Equal(new DateOnly(2026, 1, 15), payload.ContinuousServiceDate);
@@ -90,7 +89,7 @@ public class UpdateEmploymentDetailsEndpointTests : IClassFixture<ApiWebApplicat
                 companyId,
                 id = employee.Id,
                 employeeNumber = "",
-                employmentType = "Permanent",
+                employmentTypeId = (Guid?)null,
                 status = "Active",
                 startDate = "2026-01-15"
             });
@@ -99,7 +98,7 @@ public class UpdateEmploymentDetailsEndpointTests : IClassFixture<ApiWebApplicat
     }
 
     [Fact]
-    public async Task Put_Employment_Returns_UnprocessableEntity_When_EmploymentType_Is_Missing()
+    public async Task Put_Employment_Returns_UnprocessableEntity_When_EmploymentTypeId_Is_Empty_Guid()
     {
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
@@ -115,7 +114,7 @@ public class UpdateEmploymentDetailsEndpointTests : IClassFixture<ApiWebApplicat
                 companyId,
                 id = employee.Id,
                 employeeNumber = "EMP-001",
-                employmentType = (string?)null,
+                employmentTypeId = Guid.Empty,
                 status = "Active",
                 startDate = "2026-01-15"
             });
@@ -139,7 +138,7 @@ public class UpdateEmploymentDetailsEndpointTests : IClassFixture<ApiWebApplicat
                 companyId,
                 id = unknownId,
                 employeeNumber = "EMP-001",
-                employmentType = "Permanent",
+                employmentTypeId = (Guid?)null,
                 status = "Active",
                 startDate = "2026-01-15"
             });
@@ -170,7 +169,7 @@ public class UpdateEmploymentDetailsEndpointTests : IClassFixture<ApiWebApplicat
         Guid Id,
         Guid CompanyId,
         string? EmployeeNumber,
-        string? EmploymentType,
+        Guid? EmploymentTypeId,
         string Status,
         DateOnly StartDate,
         DateOnly? ContinuousServiceDate,

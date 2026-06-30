@@ -54,6 +54,7 @@ else
                     </MenuItem>
                     <MenuItem Text="Leave" IconCss="fa-solid fa-calendar-days">
                         <MenuItems>
+                            <MenuItem Text="Leave Types" Url="@_menuItems["LeaveTypes"]" />
                             <MenuItem Text="Public Holidays" Url="@_menuItems["PublicHolidays"]" />
                         </MenuItems>
                     </MenuItem>
@@ -222,6 +223,7 @@ else
         ["Departments"]      = "/",
         ["PositionProfiles"] = "/",
         ["EmploymentTypes"]  = "/",
+        ["LeaveTypes"]       = "/",
         ["PublicHolidays"]   = "/",
         ["HrInbox"]          = "/",
     };
@@ -235,6 +237,7 @@ else
         _menuItems["Departments"]      = $"/companies/{companyId}/departments";
         _menuItems["PositionProfiles"] = $"/companies/{companyId}/position-profiles";
         _menuItems["EmploymentTypes"]  = $"/companies/{companyId}/employment-types";
+        _menuItems["LeaveTypes"]       = $"/companies/{companyId}/leave-types";
         _menuItems["PublicHolidays"]   = $"/companies/{companyId}/public-holidays";
         _menuItems["HrInbox"]          = $"/companies/{companyId}/hr/inbox";
 

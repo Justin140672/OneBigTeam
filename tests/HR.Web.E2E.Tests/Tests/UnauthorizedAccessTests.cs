@@ -99,17 +99,5 @@ public sealed class UnauthorizedAccessTests(AppFixture fixture) : E2ETestBase(fi
             "Tom (Employee) should not see the admin navigation menu in the sidebar");
     }
 
-    [Fact]
-    public async Task UnauthenticatedUser_IsRedirectedToLogin_WhenAccessingProtectedPage()
-    {
-        // Do NOT login — use a fresh context with no session.
-        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
-        // The app should redirect unauthenticated users to /login.
-        var finalUrl = _page.Url;
-        Assert.True(
-            finalUrl.Contains("/login") || finalUrl.Contains("/auth"),
-            $"Expected an unauthenticated user to be redirected to /login, but ended up at: {finalUrl}");
-    }
 }

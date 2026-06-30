@@ -1,0 +1,113 @@
+@page "/companies/{CompanyId:guid}/leave-types"
+@rendermode InteractiveServer
+@inherits SearchPageBase<LeaveTypeListItemModel>
+@inject LeaveTypeService LeaveTypeService
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+<PageTitle>Leave Types</PageTitle>
+
+<div class="container-fluid py-4">
+    <h1 class="mb-3">Leave Types</h1>
+
+    <div class="form-check form-switch mb-3">
+        <input class="form-check-input" type="checkbox" id="showInactive"
+               @bind="_showInactive" @bind:after="LoadAsync" />
+        <label class="form-check-label" for="showInactive">Show inactive</label>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span>Loading leave types…</span>
+        </div>
+    }
+    else if (Error is not null)
+    {
+        <div class="alert alert-danger">@Error</div>
+    }
+    else
+    {
+        @if (ActionError is not null)
+        {
+            <div class="alert alert-danger alert-dismissible">
+                @ActionError
+                <button type="button" class="btn-close" @onclick="ClearActionError"></button>
+            </div>
+        }
+
+        <HrGrid @ref="Grid"
+                TValue="LeaveTypeListItemModel"
+                DataSource="@Items"
+                Toolbar="@GridToolbar"
+                AllowFiltering="false">
+            <GridEvents TValue="LeaveTypeListItemModel" OnToolbarClick="OnToolbarClick"
+                        RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
+            <GridPageSettings PageSize="20" />
+            <GridColumns>
+                <GridColumn Field="@nameof(LeaveTypeListItemModel.Name)" HeaderText="Name" Width="200">
+                    <Template>
+                        @{
+                            var row = (context as LeaveTypeListItemModel)!;
+                            <a href="/companies/@CompanyId/leave-types/@row.Id">@row.Name</a>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(LeaveTypeListItemModel.Code)" HeaderText="Code" Width="100" />
+                <GridColumn Field="@nameof(LeaveTypeListItemModel.DefaultEntitlementDays)" HeaderText="Days" Width="80" />
+                <GridColumn Field="@nameof(LeaveTypeListItemModel.AccrualMethod)" HeaderText="Accrual" Width="120" />
+                <GridColumn Field="@nameof(LeaveTypeListItemModel.Behaviour)" HeaderText="Behaviour" Width="130" />
+                <GridColumn Field="@nameof(LeaveTypeListItemModel.IsActive)" HeaderText="Status" Width="100">
+                    <Template>
+                        @{
+                            var row = (context as LeaveTypeListItemModel)!;
+                            <span class="badge @(row.IsActive ? "bg-success" : "bg-secondary")">
+                                @(row.IsActive ? "Active" : "Inactive")
+                            </span>
+                        }
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </HrGrid>
+    }
+</div>
+
+@code {
+    private bool _showInactive;
+
+    protected override void ConfigureToolbar()
+    {
+        AddToolbarAction(
+            id:      "hr-deactivate",
+            text:    "Deactivate",
+            icon:    "fa-solid fa-circle-xmark",
+            onClick: async item =>
+            {
+                if (!item.IsActive) return;
+                await Deactivate(item);
+            },
+            tooltip: "Deactivate selected leave type");
+    }
+
+    protected override async Task<IReadOnlyList<LeaveTypeListItemModel>?> FetchItemsAsync(string? search)
+    {
+        var result = await LeaveTypeService.ListLeaveTypesAsync(CompanyId, _showInactive);
+        return result?.Items;
+    }
+
+    protected override string LoadErrorMessage => "Failed to load leave types.";
+
+    protected override string? GetAddUrl()  => $"/companies/{CompanyId}/leave-types/new";
+    protected override string? GetEditUrl(LeaveTypeListItemModel item) => $"/companies/{CompanyId}/leave-types/{item.Id}";
+    protected override string? GetViewUrl(LeaveTypeListItemModel item) => $"/companies/{CompanyId}/leave-types/{item.Id}/view";
+
+    private async Task Deactivate(LeaveTypeListItemModel item)
+    {
+        ClearActionError();
+        var error = await LeaveTypeService.DeactivateAsync(CompanyId, item.Id);
+        if (error is not null)
+            SetActionError(error);
+        else
+            await LoadAsync();
+    }
+}
