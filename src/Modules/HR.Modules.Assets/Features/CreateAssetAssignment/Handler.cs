@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Assets.Features.CreateAssetAssignment;
 
-internal sealed class CreateAssetAssignmentHandler(AssetsDbContext db, IClock clock)
+internal sealed class CreateAssetAssignmentHandler(AssetsDbContext db, IClock clock, ITaskCreator taskCreator)
 {
     public async Task<Result<CreateAssetAssignmentResponse>> HandleAsync(
         CreateAssetAssignmentRequest request,
@@ -32,6 +32,20 @@ internal sealed class CreateAssetAssignmentHandler(AssetsDbContext db, IClock cl
 
         db.AssetAssignments.Add(assignment);
         await db.SaveChangesAsync(cancellationToken);
+
+        await taskCreator.CreateAsync(
+            request.CompanyId,
+            createdBy:          request.AssignedBy,
+            title:              $"Acknowledge receipt of asset",
+            description:        $"Please acknowledge that you have received and accepted responsibility for the assigned asset.",
+            priority:           TaskPriority.Medium,
+            source:             TaskSource.Asset,
+            actionType:         TaskActionType.Acknowledge,
+            dueDate:            DateOnly.FromDateTime(clock.UtcNow.AddDays(7)),
+            assignedEmployeeId: request.EmployeeId,
+            assignedUserId:     null,
+            sourceEntityId:     assignment.Id,
+            cancellationToken);
 
         return Result.Success(new CreateAssetAssignmentResponse(
             assignment.Id, assignment.CompanyId, assignment.AssetId,

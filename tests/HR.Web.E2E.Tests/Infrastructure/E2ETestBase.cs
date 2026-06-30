@@ -30,6 +30,8 @@ public abstract class E2ETestBase(AppFixture fixture) : IAsyncLifetime
     {
         await _context.DisposeAsync();
         // Let the Blazor Server circuit disconnect before the next test switches personas.
-        await Task.Delay(1_500);
+        // 1 500 ms is not enough on a warm app under load — the lingering circuit can
+        // still be making API calls when the next test navigates and switches auth persona.
+        await Task.Delay(3_000);
     }
 }

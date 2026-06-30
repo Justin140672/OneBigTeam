@@ -7,25 +7,16 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     public async Task GoToAsync(Guid companyId, Guid employeeId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}/profile");
-        // The overview tab is prerendered with .overview-grid already in the HTML.
-        // After Blazor's circuit connects, OnParametersSetAsync re-runs and briefly shows
-        // .overview-skeleton before re-fetching data. We register a MutationObserver
-        // immediately after navigation to catch that skeleton→grid cycle, which proves
-        // the circuit is connected and all Blazor event handlers are wired up.
+        // Poll until the circuit is connected and data loaded: grid visible, no skeleton.
         await page.EvaluateAsync(@"() => {
             window._profileReady = false;
-            let skeletonSeen = document.querySelector('.overview-skeleton') !== null;
-            const obs = new MutationObserver(() => {
-                if (!skeletonSeen && document.querySelector('.overview-skeleton')) {
-                    skeletonSeen = true;
-                }
-                if (skeletonSeen && !document.querySelector('.overview-skeleton') &&
+            const poll = setInterval(() => {
+                if (!document.querySelector('.overview-skeleton') &&
                     document.querySelector('.overview-grid')) {
                     window._profileReady = true;
-                    obs.disconnect();
+                    clearInterval(poll);
                 }
-            });
-            obs.observe(document.body, { subtree: true, childList: true });
+            }, 500);
         }");
         await page.WaitForFunctionAsync(
             "window._profileReady === true",
