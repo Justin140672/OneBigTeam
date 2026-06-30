@@ -40,6 +40,7 @@ public static class TasksModule
         services.AddScoped<TaskCompletionDispatcher>();
         services.AddScoped<ITaskCompletionAction, ProbationTaskCompletionAction>();
         services.AddScoped<ITaskCompletionAction, LeaveTaskCompletionAction>();
+        services.AddScoped<ITaskCompletionAction, AssetTaskCompletionAction>();
         services.AddScoped<IIntegrationEventHandler<LeaveRequestedIntegrationEvent>, LeaveRequestedHandler>();
 
         services.AddScoped<GetTaskHandler>();
@@ -171,6 +172,29 @@ public static class TasksModule
             assignedUserId: devUserId,
             now,
             sourceEntityId: Guid.Parse("50000000-0000-0000-0000-000000000100")));
+
+        // Asset acknowledgement tasks — linked to seeded AssetAssignments in AssetsModule seed.
+        db.TaskItems.Add(TaskItem.Create(
+            Guid.Parse("a0000000-0000-0000-0000-000000000020"), companyId, empCtoId,
+            "Acknowledge receipt of asset",
+            "Please acknowledge that you have received and accepted responsibility for the assigned asset.",
+            TaskPriority.Medium, TaskSource.Asset, TaskActionType.Acknowledge,
+            dueDate: new DateOnly(2026, 7, 7),
+            assignedEmployeeId: empDev1Id,  // Tom Williams — MacBook Pro
+            assignedUserId: empDev1Id,
+            now,
+            sourceEntityId: Guid.Parse("c0000000-0000-0000-0000-000000000003")));
+
+        db.TaskItems.Add(TaskItem.Create(
+            Guid.Parse("a0000000-0000-0000-0000-000000000021"), companyId, empCtoId,
+            "Acknowledge receipt of asset",
+            "Please acknowledge that you have received and accepted responsibility for the assigned asset.",
+            TaskPriority.Medium, TaskSource.Asset, TaskActionType.Acknowledge,
+            dueDate: new DateOnly(2026, 7, 7),
+            assignedEmployeeId: empCtoId,   // Sarah Chen — Dell monitor
+            assignedUserId: devUserId,
+            now,
+            sourceEntityId: Guid.Parse("c0000000-0000-0000-0000-000000000005")));
 
         // Document upload tasks — linked to seeded DocumentRequests in DocumentsModule seed.
         db.TaskItems.AddRange(

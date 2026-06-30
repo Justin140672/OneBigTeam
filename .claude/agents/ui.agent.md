@@ -48,9 +48,18 @@ Your job is to do exactly these things when requested:
 - Show a count summary below the grid: `@_items.Count resource(s)`.
 - Place the primary action button (e.g. "+ Add …") right-aligned in the page header.
 
+## Playwright E2E Tests
+When the lead developer requests Playwright tests alongside UI work, create them in `tests/HR.Web.E2E.Tests/`. Follow the existing patterns:
+- Page objects go in `tests/HR.Web.E2E.Tests/Infrastructure/PageObjects/`
+- Test classes go in `tests/HR.Web.E2E.Tests/Tests/`
+- All test classes must be decorated with `[Collection("E2E")]` and inherit `E2ETestBase`
+- Use seeded data (fixed GUIDs) rather than creating data dynamically in tests
+- Add methods to existing page objects (e.g. `TaskViewPage.cs`) rather than creating new ones for minor additions
+- Do **not** run the Playwright tests — only write them. Running E2E tests requires a live browser and full environment.
+
 ## Constraints
-- Work only in `src/HR.Web` unless a minimal change to a shared model is required.
-- Do not create or modify API endpoints, DbContexts, EF models, validators, tests, migrations, or seed data.
+- Work only in `src/HR.Web` and `tests/HR.Web.E2E.Tests` unless a minimal change to a shared model is required.
+- Do not create or modify API endpoints, DbContexts, EF models, validators, migrations, or non-E2E tests.
 - Do not introduce a different UI framework.
 - Prefer the repository's existing Blazor component structure, routing patterns, and service-registration style.
 - Use typed request and response models in the service — no anonymous objects or inline `HttpClient` calls in page components.

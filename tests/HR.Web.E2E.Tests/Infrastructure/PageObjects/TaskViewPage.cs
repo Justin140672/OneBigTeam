@@ -107,6 +107,29 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
             null, new() { Timeout = 20_000 });
     }
 
+    // ── Asset acknowledgement panel ──────────────────────────────────────────
+
+    /// <summary>Returns true if the asset acknowledgement panel is present and visible.</summary>
+    public async Task<bool> HasAssetAcknowledgementPanelAsync() =>
+        await page.Locator("[data-testid='asset-acknowledgement-panel']").IsVisibleAsync();
+
+    /// <summary>Returns the asset number shown in the acknowledgement panel, or null if absent.</summary>
+    public async Task<string?> GetAcknowledgementAssetNumberAsync()
+    {
+        var panel = page.Locator("[data-testid='asset-acknowledgement-panel']");
+        var dd = panel.Locator("dd").First;
+        return await dd.IsVisibleAsync() ? (await dd.TextContentAsync())?.Trim() : null;
+    }
+
+    /// <summary>Clicks "I Acknowledge Receipt" and waits for the task status to become Completed.</summary>
+    public async Task AcknowledgeAssetAsync()
+    {
+        await page.Locator("[data-testid='acknowledge-btn']").ClickAsync();
+        await page.WaitForFunctionAsync(
+            "document.querySelector('.task-status-badge')?.textContent?.includes('Completed')",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
     // ── Probation review panel ───────────────────────────────────────────────
 
     /// <summary>Returns true if the "Complete Probation Review" card is present.</summary>

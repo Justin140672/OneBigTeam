@@ -31,6 +31,7 @@ builder.Services.AddScoped<PublicHolidayService>();
 builder.Services.AddScoped<LeaveService>();
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddScoped<DocumentService>();
+builder.Services.AddScoped<AssetService>();
 builder.Services.AddScoped<EmploymentTypeService>();
 builder.Services.AddScoped<LeaveTypeService>();
 builder.Services.AddScoped<NotificationService>();
