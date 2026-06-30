@@ -101,9 +101,21 @@ internal sealed class UpdateEmploymentDetailsHandler
             }
         }
 
+        if (request.EmploymentTypeId.HasValue)
+        {
+            var etExists = await _dbContext.EmploymentTypes
+                .AnyAsync(
+                    t => t.Id == request.EmploymentTypeId && t.CompanyId == request.CompanyId && t.IsActive,
+                    cancellationToken);
+
+            if (!etExists)
+                return Result.Failure<UpdateEmploymentDetailsResponse>(
+                    Error.NotFound($"Employment type '{request.EmploymentTypeId}' was not found or is inactive."));
+        }
+
         employee.UpdateEmploymentDetails(
             request.EmployeeNumber,
-            request.EmploymentType,
+            request.EmploymentTypeId,
             request.StartDate,
             request.ContinuousServiceDate,
             request.ProbationEndDate,
@@ -120,7 +132,7 @@ internal sealed class UpdateEmploymentDetailsHandler
             employee.Id,
             employee.CompanyId,
             employee.EmployeeNumber,
-            employee.EmploymentType,
+            employee.EmploymentTypeId,
             employee.Status,
             employee.DepartmentId,
             employee.PositionProfileId,

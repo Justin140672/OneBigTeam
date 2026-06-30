@@ -13,7 +13,7 @@ public class UpdateEmploymentDetailsValidatorTests
         CompanyId = Guid.NewGuid(),
         Id = Guid.NewGuid(),
         EmployeeNumber = "EMP-001",
-        EmploymentType = EmploymentType.Permanent,
+        EmploymentTypeId = Guid.NewGuid(),
         Status = EmploymentStatus.Active,
         StartDate = new DateOnly(2026, 1, 1)
     };
@@ -42,11 +42,18 @@ public class UpdateEmploymentDetailsValidatorTests
     }
 
     [Fact]
-    public void Validate_Fails_When_EmploymentType_Is_Null()
+    public void Validate_Passes_When_EmploymentTypeId_Is_Null()
     {
-        var result = _validator.Validate(ValidRequest() with { EmploymentType = null });
+        var result = _validator.Validate(ValidRequest() with { EmploymentTypeId = null });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_EmploymentTypeId_Is_Empty_Guid()
+    {
+        var result = _validator.Validate(ValidRequest() with { EmploymentTypeId = Guid.Empty });
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmploymentDetailsRequest.EmploymentType));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmploymentDetailsRequest.EmploymentTypeId));
     }
 
     [Fact]

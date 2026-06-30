@@ -34,14 +34,14 @@ public class ListEmployeesValidatorTests
     }
 
     [Fact]
-    public void Validate_Fails_When_PageSize_Exceeds_100()
+    public void Validate_Fails_When_PageSize_Exceeds_500()
     {
         var validator = new ListEmployeesValidator();
 
         var result = validator.Validate(new ListEmployeesRequest
         {
             CompanyId = Guid.NewGuid(),
-            PageSize = 101
+            PageSize = 501
         });
 
         Assert.False(result.IsValid);

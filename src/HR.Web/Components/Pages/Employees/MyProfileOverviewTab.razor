@@ -54,7 +54,7 @@ else
                 <dd>@LengthOfService(_employee.StartDate)</dd>
 
                 <dt>Employment Type</dt>
-                <dd>@EmploymentTypeLabel(_employee.EmploymentType)</dd>
+                <dd>@(_employee.EmploymentTypeName ?? "—")</dd>
             </dl>
         </div>
 
@@ -238,16 +238,6 @@ else
             _          => "< 1 month"
         };
     }
-
-    private static string EmploymentTypeLabel(string? type) => type switch
-    {
-        "Permanent"  => "Permanent",
-        "FixedTerm"  => "Fixed Term",
-        "Contractor" => "Contractor",
-        "Casual"     => "Casual",
-        "Apprentice" => "Apprentice",
-        _            => "—"
-    };
 
     private static string FormatDays(decimal? days) =>
         days is null ? "—" : $"{days:0.##} {(days == 1m ? "day" : "days")}";

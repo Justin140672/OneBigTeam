@@ -30,6 +30,7 @@ builder.Services.AddScoped<PublicHolidayService>();
 builder.Services.AddScoped<LeaveService>();
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddScoped<DocumentService>();
+builder.Services.AddScoped<EmploymentTypeService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<ProbationService>();
 builder.Services.AddScoped<DevAuthService>();

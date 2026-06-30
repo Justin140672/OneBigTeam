@@ -3,6 +3,7 @@ using System;
 using HR.Modules.Employees.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HR.Modules.Employees.Migrations
 {
     [DbContext(typeof(EmployeesDbContext))]
-    partial class EmployeesDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260630071923_AddEmploymentTypesTable")]
+    partial class AddEmploymentTypesTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -181,9 +184,10 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("employee_number");
 
-                    b.Property<Guid?>("EmploymentTypeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("employment_type_id");
+                    b.Property<string>("EmploymentType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("employment_type");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
@@ -303,8 +307,6 @@ namespace HR.Modules.Employees.Migrations
                     b.HasIndex("CompanyId");
 
                     b.HasIndex("DepartmentId");
-
-                    b.HasIndex("EmploymentTypeId");
 
                     b.HasIndex("ManagerId");
 
@@ -486,14 +488,6 @@ namespace HR.Modules.Employees.Migrations
                     b.HasIndex("PositionProfileId");
 
                     b.ToTable("position_profile_required_documents", "employees");
-                });
-
-            modelBuilder.Entity("HR.Modules.Employees.Domain.Employee", b =>
-                {
-                    b.HasOne("HR.Modules.Employees.Domain.EmploymentType", null)
-                        .WithMany()
-                        .HasForeignKey("EmploymentTypeId")
-                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("HR.Modules.Employees.Domain.PositionProfileRequiredDocument", b =>

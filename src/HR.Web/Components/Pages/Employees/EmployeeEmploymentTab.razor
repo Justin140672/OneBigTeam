@@ -2,6 +2,7 @@
 @inject DepartmentService DepartmentService
 @inject PositionProfileService PositionProfileService
 @inject ProbationService ProbationService
+@inject EmploymentTypeService EmploymentTypeService
 @using HR.SharedKernel
 
 @if (_loading)
@@ -47,12 +48,13 @@ else
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Employment Type <span class="text-danger">*</span></label>
-                            <SfDropDownList TValue="string"
-                                            TItem="Option"
-                                            DataSource="@_employmentTypeOptions"
-                                            @bind-Value="_model.EmploymentType"
-                                            Placeholder="Select type">
-                                <DropDownListFieldSettings Value="Value" Text="Label" />
+                            <SfDropDownList TValue="Guid?"
+                                            TItem="EmploymentTypeListItemModel"
+                                            DataSource="@_employmentTypes"
+                                            @bind-Value="_model.EmploymentTypeId"
+                                            Placeholder="Select type"
+                                            ShowClearButton="true">
+                                <DropDownListFieldSettings Value="Id" Text="Name" />
                             </SfDropDownList>
                         </div>
                     </div>
@@ -238,6 +240,7 @@ else
     private List<DepartmentListItemModel> _departments = [];
     private List<PositionProfileListItemModel> _positionProfiles = [];
     private List<ManagerOption> _managerOptions = [];
+    private List<EmploymentTypeListItemModel> _employmentTypes = [];
 
     private ProbationRecordModel? _probationRecord;
 
@@ -252,15 +255,6 @@ else
         new("Terminated", "Leaver"),
     ];
 
-    private static readonly Option[] _employmentTypeOptions =
-    [
-        new("Permanent",  "Permanent"),
-        new("FixedTerm",  "Fixed Term"),
-        new("Contractor", "Contractor"),
-        new("Casual",     "Casual"),
-        new("Apprentice", "Apprentice"),
-    ];
-
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
@@ -271,11 +265,13 @@ else
         var profileTask    = PositionProfileService.ListPositionProfilesAsync(CompanyId);
         var empListTask    = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
         var probationTask  = ProbationService.GetProbationRecordByEmployeeAsync(CompanyId, EmployeeId);
+        var empTypesTask   = EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
 
-        await Task.WhenAll(deptTask, profileTask, empListTask, probationTask);
+        await Task.WhenAll(deptTask, profileTask, empListTask, probationTask, empTypesTask);
 
         _departments      = (await deptTask)?.Items ?? [];
         _positionProfiles = (await profileTask)?.Items.ToList() ?? [];
+        _employmentTypes  = (await empTypesTask)?.Items ?? [];
         _managerOptions   = ((await empListTask)?.Items ?? [])
             .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "Terminated")
             .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
@@ -294,7 +290,7 @@ else
     private void PopulateModel(GetEmployeeResponse e)
     {
         _model.EmployeeNumber        = e.EmployeeNumber ?? string.Empty;
-        _model.EmploymentType        = e.EmploymentType;
+        _model.EmploymentTypeId      = e.EmploymentTypeId;
         _model.Status                = e.Status is "Draft" or "Active" or "OnLeave" or "Suspended" or "Terminated"
                                            ? e.Status
                                            : "Active";
@@ -347,7 +343,7 @@ else
             CompanyId,
             EmployeeId,
             string.IsNullOrWhiteSpace(_model.EmployeeNumber) ? null : _model.EmployeeNumber.Trim(),
-            _model.EmploymentType,
+            _model.EmploymentTypeId,
             _model.Status,
             _model.DepartmentId,
             _model.PositionProfileId,
@@ -394,7 +390,7 @@ else
     private sealed class EmploymentEditModel
     {
         public string EmployeeNumber { get; set; } = string.Empty;
-        public string? EmploymentType { get; set; }
+        public Guid? EmploymentTypeId { get; set; }
         public string Status { get; set; } = "Active";
         public Guid? DepartmentId { get; set; }
         public Guid? PositionProfileId { get; set; }

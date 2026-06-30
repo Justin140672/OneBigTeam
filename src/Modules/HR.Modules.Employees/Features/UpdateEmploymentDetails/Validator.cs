@@ -20,8 +20,8 @@ internal sealed class UpdateEmploymentDetailsValidator : AbstractValidator<Updat
             .NotEmpty().WithMessage("Employee number is required.")
             .MaximumLength(50);
 
-        RuleFor(r => r.EmploymentType)
-            .NotNull().WithMessage("Employment type is required.");
+        RuleFor(r => r.EmploymentTypeId)
+            .NotEqual(Guid.Empty).When(r => r.EmploymentTypeId.HasValue);
 
         RuleFor(r => r.Notes)
             .MaximumLength(4000)

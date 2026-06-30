@@ -35,7 +35,7 @@ internal sealed class Employee
     public string? PostCode { get; private set; }
     public string? Country { get; private set; }
     public string? EmployeeNumber { get; private set; }
-    public EmploymentType? EmploymentType { get; private set; }
+    public Guid? EmploymentTypeId { get; private set; }
     public DateOnly? ContinuousServiceDate { get; private set; }
     public DateOnly? ProbationEndDate { get; private set; }
     public DateOnly? LeavingDate { get; private set; }
@@ -183,7 +183,7 @@ internal sealed class Employee
 
     public void UpdateEmploymentDetails(
         string? employeeNumber,
-        EmploymentType? employmentType,
+        Guid? employmentTypeId,
         DateOnly startDate,
         DateOnly? continuousServiceDate,
         DateOnly? probationEndDate,
@@ -192,7 +192,7 @@ internal sealed class Employee
         DateTimeOffset now)
     {
         EmployeeNumber        = Norm(employeeNumber);
-        EmploymentType        = employmentType;
+        EmploymentTypeId      = employmentTypeId;
         StartDate             = startDate;
         ContinuousServiceDate = continuousServiceDate;
         ProbationEndDate      = probationEndDate;

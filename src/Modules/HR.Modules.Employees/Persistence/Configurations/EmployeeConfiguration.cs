@@ -132,10 +132,13 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .HasColumnName("employee_number")
             .HasMaxLength(50);
 
-        builder.Property(e => e.EmploymentType)
-            .HasColumnName("employment_type")
-            .HasConversion<string>()
-            .HasMaxLength(20);
+        builder.Property(e => e.EmploymentTypeId)
+            .HasColumnName("employment_type_id");
+
+        builder.HasOne<EmploymentType>()
+            .WithMany()
+            .HasForeignKey(e => e.EmploymentTypeId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.Property(e => e.ContinuousServiceDate)
             .HasColumnName("continuous_service_date");

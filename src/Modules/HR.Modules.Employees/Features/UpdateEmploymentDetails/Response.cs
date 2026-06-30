@@ -7,7 +7,7 @@ internal sealed record UpdateEmploymentDetailsResponse(
     Guid Id,
     Guid CompanyId,
     string? EmployeeNumber,
-    EmploymentType? EmploymentType,
+    Guid? EmploymentTypeId,
     EmploymentStatus Status,
     Guid? DepartmentId,
     Guid? PositionProfileId,

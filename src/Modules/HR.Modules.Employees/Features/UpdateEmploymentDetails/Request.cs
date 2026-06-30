@@ -8,7 +8,7 @@ internal sealed record UpdateEmploymentDetailsRequest
     public Guid CompanyId { get; init; }
     public Guid Id { get; init; }
     public string? EmployeeNumber { get; init; }
-    public EmploymentType? EmploymentType { get; init; }
+    public Guid? EmploymentTypeId { get; init; }
     public EmploymentStatus Status { get; init; }
     public Guid? DepartmentId { get; init; }
     public Guid? PositionProfileId { get; init; }

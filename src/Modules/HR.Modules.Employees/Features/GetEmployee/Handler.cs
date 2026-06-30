@@ -50,7 +50,11 @@ internal sealed class GetEmployeeHandler
                 e.WorkingDaysOverride,
                 e.HoursPerDayOverride,
                 e.EmployeeNumber,
-                e.EmploymentType,
+                e.EmploymentTypeId,
+                EmploymentTypeName = _dbContext.EmploymentTypes
+                    .Where(t => t.Id == e.EmploymentTypeId)
+                    .Select(t => t.Name)
+                    .FirstOrDefault(),
                 e.ContinuousServiceDate,
                 e.ProbationEndDate,
                 e.LeavingDate,
@@ -110,7 +114,8 @@ internal sealed class GetEmployeeHandler
             result.WorkingDaysOverride,
             result.HoursPerDayOverride,
             result.EmployeeNumber,
-            result.EmploymentType,
+            result.EmploymentTypeId,
+            result.EmploymentTypeName,
             result.ContinuousServiceDate,
             result.ProbationEndDate,
             result.LeavingDate,
