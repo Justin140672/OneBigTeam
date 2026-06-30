@@ -2,6 +2,7 @@ using FluentValidation;
 using HR.Modules.Assets.Features.CreateAsset;
 using HR.Modules.Assets.Features.CreateAssetAssignment;
 using HR.Modules.Assets.Features.CreateAssetCategory;
+using HR.Modules.Assets.Features.ListAssetCategories;
 using HR.Modules.Assets.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +32,7 @@ public static class AssetsModule
         services.AddScoped<IValidator<CreateAssetRequest>, CreateAssetValidator>();
         services.AddScoped<CreateAssetAssignmentHandler>();
         services.AddScoped<IValidator<CreateAssetAssignmentRequest>, CreateAssetAssignmentValidator>();
+        services.AddScoped<ListAssetCategoriesHandler>();
     }
 
     public static async Task MigrateAssetsAsync(this IServiceProvider services)

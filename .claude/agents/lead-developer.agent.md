@@ -67,14 +67,20 @@ If any criterion is marked **Violation**, halt and report the specific violation
 
 ### 2. Test handoff
 - After the implementation is complete, hand off to the test agent.
-- Ask the test agent to review impacted behavior and run or identify the most relevant automated tests as targeted validation; this does not replace the full-solution test run required in Step 3.
-- Require the test agent to report failures clearly and distinguish product issues from test issues.
+- Ask the test agent to **write** the required tests only — do not ask it to run any tests. Running tests is exclusively the responsibility of Step 3.
+- Require the test agent to report the files it created and any risks or assumptions.
 
 ### 3. Final checks
 After both handoffs complete, verify the repository state yourself:
-- Run a full build for the workspace.
-- Run all automated tests for the solution, **excluding the Playwright E2E project** (`HR.Web.E2E.Tests`). Use `dotnet test --filter "FullyQualifiedName!~HR.Web.E2E.Tests"` or exclude that project explicitly with `--ignore-project`. The E2E tests require a running browser and full environment — they are validated separately and must never be run as part of the automated CI check here.
-- Confirm that build and test execution completed successfully before reporting completion.
+- Run a full build for the workspace: `dotnet build`
+- Run tests by specifying each test project path **individually**, omitting `HR.Web.E2E.Tests` entirely. Do not use a solution-level `dotnet test` — it will pick up the E2E project. Run the following three commands:
+  ```
+  dotnet test tests/HR.Architecture.Tests/HR.Architecture.Tests.csproj
+  dotnet test tests/HR.Modules.Assets.Tests/HR.Modules.Assets.Tests.csproj
+  dotnet test tests/HR.Integration.Tests/HR.Integration.Tests.csproj
+  ```
+  Add any other non-E2E test projects that exist in the solution. Never run `tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj` — it requires a live browser and full environment.
+- Confirm that build and all test projects passed before reporting completion.
 
 If the user request does not include a UI component, skip Steps 4 and 5 entirely and omit the post-UI reconfirmation fields from the final summary.
 
@@ -85,8 +91,8 @@ If the user request does not include a UI component, skip Steps 4 and 5 entirely
 - Require the ui agent to report the files changed and any risks or assumptions.
 
 ### 5. Reconfirmation after UI work
-- After the ui agent completes, run a full build for the workspace again.
-- Run all automated tests for the solution again, **excluding the Playwright E2E project** (`HR.Web.E2E.Tests`) using the same filter as Step 3.
+- After the ui agent completes, run a full build for the workspace again: `dotnet build`
+- Run each non-E2E test project individually using the same project-by-project approach as Step 3. Never run `HR.Web.E2E.Tests`.
 - Confirm that build and test execution still complete successfully before reporting completion.
 
 ## Output requirements
