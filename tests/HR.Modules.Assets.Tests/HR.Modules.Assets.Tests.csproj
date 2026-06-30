@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -12,10 +12,9 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.9" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.9" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <PrivateAssets>all</PrivateAssets>
@@ -28,14 +27,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Modules\HR.Modules.Companies\HR.Modules.Companies.csproj" />
-    <ProjectReference Include="..\..\src\Modules\HR.Modules.Documents\HR.Modules.Documents.csproj" />
-    <ProjectReference Include="..\..\src\Modules\HR.Modules.Identity\HR.Modules.Identity.csproj" />
-    <ProjectReference Include="..\..\src\Modules\HR.Modules.Employees\HR.Modules.Employees.csproj" />
-    <ProjectReference Include="..\..\src\Modules\HR.Modules.Leave\HR.Modules.Leave.csproj" />
-    <ProjectReference Include="..\..\src\Modules\HR.Modules.Tasks\HR.Modules.Tasks.csproj" />
-    <ProjectReference Include="..\..\src\Modules\HR.Modules.Notifications\HR.Modules.Notifications.csproj" />
-    <ProjectReference Include="..\..\src\Modules\HR.Modules.Probation\HR.Modules.Probation.csproj" />
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Assets\HR.Modules.Assets.csproj" />
   </ItemGroup>
 
