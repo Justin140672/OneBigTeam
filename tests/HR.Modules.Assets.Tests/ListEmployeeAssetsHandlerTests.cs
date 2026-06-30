@@ -17,11 +17,13 @@ public class ListEmployeeAssetsHandlerTests
         return new AssetsDbContext(options);
     }
 
-    private static Asset SeedAsset(AssetsDbContext db, Guid companyId, string assetNumber = "A001", string name = "Laptop")
+    private static (Asset asset, AssetCategory category) SeedAsset(AssetsDbContext db, Guid companyId, string assetNumber = "A001", string name = "Laptop")
     {
-        var asset = Asset.Create(Guid.NewGuid(), companyId, assetNumber, Guid.NewGuid(), name, "Dell", "XPS 15", "SN-001", null, null, FixedOffset);
+        var category = AssetCategory.Create(Guid.NewGuid(), companyId, "IT Equipment", null, FixedOffset);
+        db.AssetCategories.Add(category);
+        var asset = Asset.Create(Guid.NewGuid(), companyId, assetNumber, category.Id, name, "Dell", "XPS 15", "SN-001", null, null, FixedOffset);
         db.Assets.Add(asset);
-        return asset;
+        return (asset, category);
     }
 
     private static AssetAssignment SeedAssignment(AssetsDbContext db, Guid companyId, Guid assetId, Guid employeeId, DateTimeOffset? returnedAt = null)
@@ -40,7 +42,7 @@ public class ListEmployeeAssetsHandlerTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        var asset = SeedAsset(db, companyId);
+        var (asset, _) = SeedAsset(db, companyId);
         SeedAssignment(db, companyId, asset.Id, employeeId);
         await db.SaveChangesAsync();
 
@@ -60,7 +62,7 @@ public class ListEmployeeAssetsHandlerTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        var asset = SeedAsset(db, companyId);
+        var (asset, _) = SeedAsset(db, companyId);
         SeedAssignment(db, companyId, asset.Id, employeeId, returnedAt: FixedOffset.AddDays(1));
         await db.SaveChangesAsync();
 
@@ -80,7 +82,7 @@ public class ListEmployeeAssetsHandlerTests
         var employeeId = Guid.NewGuid();
         var otherEmployeeId = Guid.NewGuid();
 
-        var asset = SeedAsset(db, companyId);
+        var (asset, _) = SeedAsset(db, companyId);
         SeedAssignment(db, companyId, asset.Id, otherEmployeeId);
         await db.SaveChangesAsync();
 
@@ -100,7 +102,7 @@ public class ListEmployeeAssetsHandlerTests
         var otherCompanyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        var asset = SeedAsset(db, otherCompanyId);
+        var (asset, _) = SeedAsset(db, otherCompanyId);
         SeedAssignment(db, otherCompanyId, asset.Id, employeeId);
         await db.SaveChangesAsync();
 
@@ -119,8 +121,8 @@ public class ListEmployeeAssetsHandlerTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        var asset1 = SeedAsset(db, companyId, "A001", "Laptop");
-        var asset2 = SeedAsset(db, companyId, "A002", "Desk");
+        var (asset1, _) = SeedAsset(db, companyId, "A001", "Laptop");
+        var (asset2, _) = SeedAsset(db, companyId, "A002", "Desk");
 
         var earlier = FixedOffset.AddDays(-1);
         var later = FixedOffset;
@@ -146,7 +148,9 @@ public class ListEmployeeAssetsHandlerTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        var asset = Asset.Create(Guid.NewGuid(), companyId, "B099", Guid.NewGuid(), "Monitor", "LG", "27UN850", "SN-XYZ", null, null, FixedOffset);
+        var category = AssetCategory.Create(Guid.NewGuid(), companyId, "Peripherals", null, FixedOffset);
+        db.AssetCategories.Add(category);
+        var asset = Asset.Create(Guid.NewGuid(), companyId, "B099", category.Id, "Monitor", "LG", "27UN850", "SN-XYZ", null, null, FixedOffset);
         db.Assets.Add(asset);
         var assignment = AssetAssignment.Create(Guid.NewGuid(), companyId, asset.Id, employeeId, Guid.NewGuid(), "Handle carefully", FixedOffset);
         db.AssetAssignments.Add(assignment);
@@ -168,6 +172,66 @@ public class ListEmployeeAssetsHandlerTests
         Assert.Equal("LG", item.Manufacturer);
         Assert.Equal("27UN850", item.Model);
         Assert.Equal("SN-XYZ", item.SerialNumber);
+        Assert.Equal("Peripherals", item.CategoryName);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Maps_CategoryName_From_Join()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var (asset, category) = SeedAsset(db, companyId);
+        SeedAssignment(db, companyId, asset.Id, employeeId);
+        await db.SaveChangesAsync();
+
+        var handler = new ListEmployeeAssetsHandler(db);
+        var result = await handler.HandleAsync(
+            new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            CancellationToken.None);
+
+        Assert.Single(result);
+        Assert.Equal(category.Name, result[0].CategoryName);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_IsAcknowledged_False_When_Not_Acknowledged()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var (asset, _) = SeedAsset(db, companyId);
+        SeedAssignment(db, companyId, asset.Id, employeeId);
+        await db.SaveChangesAsync();
+
+        var handler = new ListEmployeeAssetsHandler(db);
+        var result = await handler.HandleAsync(
+            new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            CancellationToken.None);
+
+        Assert.False(result[0].IsAcknowledged);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_IsAcknowledged_True_When_Acknowledged()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var (asset, _) = SeedAsset(db, companyId);
+        var assignment = SeedAssignment(db, companyId, asset.Id, employeeId);
+        assignment.Acknowledge(FixedOffset);
+        await db.SaveChangesAsync();
+
+        var handler = new ListEmployeeAssetsHandler(db);
+        var result = await handler.HandleAsync(
+            new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            CancellationToken.None);
+
+        Assert.True(result[0].IsAcknowledged);
     }
 
     [Fact]

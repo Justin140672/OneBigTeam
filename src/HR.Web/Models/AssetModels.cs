@@ -11,4 +11,9 @@ public sealed record EmployeeAssetItem(
     string Name,
     string? Manufacturer,
     string? Model,
-    string? SerialNumber);
+    string? SerialNumber,
+    string? CategoryName,
+    bool IsAcknowledged)
+{
+    public string AcknowledgementStatus => IsAcknowledged ? "Acknowledged" : "Pending";
+}

@@ -25,11 +25,17 @@ internal sealed class ListEmployeeAssetsHandler(AssetsDbContext db)
             .Where(a => assetIds.Contains(a.Id))
             .ToDictionaryAsync(a => a.Id, cancellationToken);
 
+        var categoryIds = assets.Values.Select(a => a.CategoryId).Distinct().ToList();
+        var categories = await db.AssetCategories
+            .Where(c => categoryIds.Contains(c.Id))
+            .ToDictionaryAsync(c => c.Id, c => c.Name, cancellationToken);
+
         return assignments
             .Where(aa => assets.ContainsKey(aa.AssetId))
             .Select(aa =>
             {
                 var asset = assets[aa.AssetId];
+                categories.TryGetValue(asset.CategoryId, out var categoryName);
                 return new ListEmployeeAssetsResponse(
                     aa.Id,
                     aa.AssetId,
@@ -41,7 +47,9 @@ internal sealed class ListEmployeeAssetsHandler(AssetsDbContext db)
                     asset.Name,
                     asset.Manufacturer,
                     asset.Model,
-                    asset.SerialNumber);
+                    asset.SerialNumber,
+                    categoryName,
+                    aa.AcknowledgedAt is not null);
             })
             .ToList();
     }

@@ -1,0 +1,68 @@
+@inject AssetService AssetService
+
+@if (_loading)
+{
+    <div class="d-flex align-items-center gap-2">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span>Loading assets…</span>
+    </div>
+}
+else
+{
+    <HrGrid TValue="EmployeeAssetItem"
+            DataSource="@_assets"
+            AllowFiltering="false"
+            AllowPaging="false"
+            AllowSorting="false"
+            Toolbar="@_toolbar"
+            data-testid="my-assets-grid">
+        <GridColumns>
+            <GridColumn HeaderText="Asset">
+                <Template>
+                    @{
+                        var item = (EmployeeAssetItem)context;
+                    }
+                    <div>
+                        <span class="fw-medium">@item.AssetNumber</span>
+                        <span class="text-muted ms-2">@item.Name</span>
+                    </div>
+                </Template>
+            </GridColumn>
+            <GridColumn Field="@nameof(EmployeeAssetItem.CategoryName)" HeaderText="Category" Width="180" />
+            <GridColumn Field="@nameof(EmployeeAssetItem.AssignedAt)" HeaderText="Assigned" Width="140" Format="d" />
+            <GridColumn HeaderText="Status" Width="160">
+                <Template>
+                    @{
+                        var item = (EmployeeAssetItem)context;
+                    }
+                    @if (item.IsAcknowledged)
+                    {
+                        <span class="badge text-bg-success">Acknowledged</span>
+                    }
+                    else
+                    {
+                        <span class="badge text-bg-warning">Pending</span>
+                    }
+                </Template>
+            </GridColumn>
+        </GridColumns>
+    </HrGrid>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private List<EmployeeAssetItem> _assets = [];
+    private bool _loading = true;
+    private static readonly IEnumerable<object> _toolbar = [];
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = _assets.Count == 0;
+        _assets = await AssetService.GetEmployeeAssignmentsAsync(CompanyId, EmployeeId) ?? [];
+        _loading = false;
+    }
+}

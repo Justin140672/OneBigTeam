@@ -11,4 +11,6 @@ internal sealed record ListEmployeeAssetsResponse(
     string Name,
     string? Manufacturer,
     string? Model,
-    string? SerialNumber);
+    string? SerialNumber,
+    string? CategoryName,
+    bool IsAcknowledged);

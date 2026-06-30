@@ -62,6 +62,31 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-grid, p", new() { Timeout = 15_000 });
     }
 
+    public async Task OpenAssetsTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Assets" }).ClickAsync();
+        await page.WaitForSelectorAsync(".e-grid, .spinner-border", new() { Timeout = 15_000 });
+        // Wait for the spinner to disappear before asserting grid content.
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border')",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
+    /// <summary>Returns true if the assets grid has at least one data row.</summary>
+    public async Task<bool> HasAssetsTableAsync() =>
+        await page.Locator(".e-grid .e-row").CountAsync() > 0;
+
+    /// <summary>Returns all text content from the first column (Asset) in the assets grid.</summary>
+    public async Task<IReadOnlyList<string>> GetAssetNumbersAsync()
+    {
+        var cells = await page.Locator(".e-grid .e-row .e-rowcell:first-child").AllTextContentsAsync();
+        return cells.Select(t => t.Trim()).ToList();
+    }
+
+    /// <summary>Returns the number of data rows in the assets grid.</summary>
+    public async Task<int> GetAssetRowCountAsync() =>
+        await page.Locator(".e-grid .e-row").CountAsync();
+
     // ── Leave tab ─────────────────────────────────────────────────────────────
 
     public async Task OpenLeaveTabAsync()
