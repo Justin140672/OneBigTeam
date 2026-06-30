@@ -33,5 +33,6 @@
     <Project Path="tests/HR.Modules.Notifications.Tests/HR.Modules.Notifications.Tests.csproj" />
     <Project Path="tests/HR.Modules.Probation.Tests/HR.Modules.Probation.Tests.csproj" />
     <Project Path="tests/HR.Modules.Tasks.Tests/HR.Modules.Tasks.Tests.csproj" />
+    <Project Path="tests/HR.Web.Tests/HR.Web.Tests.csproj" />
   </Folder>
 </Solution>

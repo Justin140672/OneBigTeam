@@ -31,22 +31,45 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
     }
 
     /// <summary>Returns true if any grid cell in the Documents tab contains <paramref name="titleFragment"/>.</summary>
-    public async Task<bool> HasDocumentAsync(string titleFragment) =>
-        await page.Locator(".e-gridcontent td, .card-body td")
-            .Filter(new() { HasText = titleFragment })
-            .First
-            .IsVisibleAsync();
+    public async Task<bool> HasDocumentAsync(string titleFragment)
+    {
+        try
+        {
+            await page.Locator(".e-gridcontent td, .card-body td")
+                .Filter(new() { HasText = titleFragment })
+                .First
+                .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>Returns true if the Document Requests section is visible on the Documents tab.</summary>
     public async Task<bool> HasDocumentRequestsSectionAsync() =>
         await page.Locator("[data-testid='admin-document-requests-section']").IsVisibleAsync();
 
-    /// <summary>Returns true if any row in the Document Requests section contains <paramref name="documentTypeName"/>.</summary>
-    public async Task<bool> HasDocumentRequestAsync(string documentTypeName) =>
-        await page.Locator("[data-testid='admin-document-requests-section'] td")
-            .Filter(new() { HasText = documentTypeName })
-            .First
-            .IsVisibleAsync();
+    /// <summary>
+    /// Returns true if any row in the Document Requests section contains <paramref name="documentTypeName"/>.
+    /// Uses a retrying wait so that data reloaded after an action has time to appear.
+    /// </summary>
+    public async Task<bool> HasDocumentRequestAsync(string documentTypeName)
+    {
+        try
+        {
+            await page.Locator("[data-testid='admin-document-requests-section'] td")
+                .Filter(new() { HasText = documentTypeName })
+                .First
+                .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>Returns the status badge text for the first request matching <paramref name="documentTypeName"/>.</summary>
     public async Task<string?> GetDocumentRequestStatusAsync(string documentTypeName)
@@ -70,25 +93,32 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Request Document" }).ClickAsync();
 
-        // Wait for the dialog to appear
-        await page.WaitForSelectorAsync(".e-dialog", new() { Timeout = 10_000 });
+        // Wait for the request-document dialog specifically (avoids matching the grid's column chooser dialog)
+        await page.WaitForSelectorAsync(".request-document-dialog", new() { Timeout = 10_000 });
 
-        // Select document type from the Syncfusion dropdown
-        await page.Locator(".e-dialog .e-dropdownlist").ClickAsync();
-        await page.GetByRole(AriaRole.Option, new() { Name = documentTypeName }).ClickAsync();
+        // Select document type from the Syncfusion dropdown (click the combobox span, not the hidden input)
+        await page.Locator(".request-document-dialog span[role='combobox']").ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = documentTypeName })
+            .First
+            .ClickAsync();
 
         if (dueDate.HasValue)
         {
-            await page.Locator(".e-dialog input.e-datepicker").FillAsync(dueDate.Value.ToString("dd/MM/yyyy"));
+            await page.Locator(".request-document-dialog input.e-datepicker").FillAsync(dueDate.Value.ToString("dd/MM/yyyy"));
             await page.Keyboard.PressAsync("Tab");
         }
 
-        await page.Locator(".e-dialog").GetByRole(AriaRole.Button, new() { Name = "Request" }).ClickAsync();
+        await page.Locator(".request-document-dialog").GetByRole(AriaRole.Button, new() { Name = "Request" }).ClickAsync();
 
-        // Wait for dialog to close
+        // Wait for dialog to close then for the requests section to reload
         await page.WaitForFunctionAsync(
-            "!document.querySelector('.e-dialog') || !document.querySelector('.e-dialog').offsetParent",
+            "!document.querySelector('.request-document-dialog') || !document.querySelector('.request-document-dialog').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 10_000 });
+
+        // Wait for the document requests section to re-render with updated data
+        await page.WaitForSelectorAsync("[data-testid='admin-document-requests-section']", new() { Timeout = 10_000 });
     }
 
     // ── Working Pattern section (Details tab) ─────────────────────────────────

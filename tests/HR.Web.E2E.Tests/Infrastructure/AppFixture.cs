@@ -15,6 +15,10 @@ public sealed class AppFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        // Kill any stale testhost processes from a previous run — they hold Aspire's
+        // ports and cause "Service postgres should have valid address at this point".
+        KillStaleTestHosts();
+
         // Ensure DevAuth is active in child processes launched by Aspire.
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
 
@@ -56,5 +60,19 @@ public sealed class AppFixture : IAsyncLifetime
         if (_browser   != null) await _browser.DisposeAsync();
         _playwright?.Dispose();
         if (_app       != null) await _app.DisposeAsync();
+    }
+
+    private static void KillStaleTestHosts()
+    {
+        try
+        {
+            var current = System.Diagnostics.Process.GetCurrentProcess();
+            foreach (var p in System.Diagnostics.Process.GetProcessesByName("testhost"))
+            {
+                if (p.Id == current.Id) continue;
+                try { p.Kill(entireProcessTree: true); } catch { /* best-effort */ }
+            }
+        }
+        catch { /* best-effort */ }
     }
 }

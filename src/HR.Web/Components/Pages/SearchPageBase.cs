@@ -58,7 +58,14 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
                     Disabled    = !_hasSelection,
                 });
 
-            items.AddRange(new object[] { "Print", "ExcelExport", "CsvExport", "PdfExport", "ColumnChooser" });
+            items.AddRange(new object[]
+            {
+                new ItemModel { Id = "hr-print",   Text = "Print",   PrefixIcon = "fa-solid fa-print",         TooltipText = "Print" },
+                new ItemModel { Id = "hr-excel",   Text = "Excel",   PrefixIcon = "fa-solid fa-file-excel",    TooltipText = "Export to Excel" },
+                new ItemModel { Id = "hr-csv",     Text = "CSV",     PrefixIcon = "fa-solid fa-file-csv",      TooltipText = "Export to CSV" },
+                new ItemModel { Id = "hr-pdf",     Text = "PDF",     PrefixIcon = "fa-solid fa-file-pdf",      TooltipText = "Export to PDF" },
+                new ItemModel { Id = "hr-columns", Text = "Columns", PrefixIcon = "fa-solid fa-table-columns", TooltipText = "Show/hide columns" },
+            });
             return items;
         }
     }
@@ -97,21 +104,25 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
                 if (url is not null) Navigation.NavigateTo(url);
                 break;
 
-            // Built-in toolbar item IDs carry a grid-ID prefix: "{gridId}_excelexport" etc.
-            case var id when id.EndsWith("_excelexport", StringComparison.OrdinalIgnoreCase):
+            case "hr-print":
+                if (Grid is not null) await Grid.PrintAsync();
+                break;
+
+            case "hr-excel":
                 if (Grid is not null) await Grid.ExportToExcelAsync(new ExcelExportProperties());
                 break;
 
-            case var id when id.EndsWith("_csvexport", StringComparison.OrdinalIgnoreCase):
+            case "hr-csv":
                 if (Grid is not null) await Grid.ExportToCsvAsync(new ExcelExportProperties());
                 break;
 
-            case var id when id.EndsWith("_pdfexport", StringComparison.OrdinalIgnoreCase):
+            case "hr-pdf":
                 if (Grid is not null) await Grid.ExportToPdfAsync(new PdfExportProperties());
                 break;
 
-            // Print and ColumnChooser are handled client-side by Syncfusion.
-            // Fall through to check registered custom actions.
+            case "hr-columns":
+                if (Grid is not null) await Grid.OpenColumnChooserAsync(0, 0);
+                break;
             default:
                 var customAction = _customActions.FirstOrDefault(a => a.Id == args.Item.Id);
                 if (customAction is not null && _hasSelection && Grid is not null)

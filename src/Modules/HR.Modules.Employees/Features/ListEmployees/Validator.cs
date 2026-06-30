@@ -13,7 +13,7 @@ internal sealed class ListEmployeesValidator : AbstractValidator<ListEmployeesRe
             .GreaterThanOrEqualTo(1);
 
         RuleFor(r => r.PageSize)
-            .InclusiveBetween(1, 100);
+            .InclusiveBetween(1, 500);
 
         RuleFor(r => r.Search)
             .MaximumLength(200)

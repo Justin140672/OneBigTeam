@@ -88,10 +88,11 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             .First;
         await managerGroup.Locator("span[role='combobox']").First.ClickAsync();
         await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        // Wait for list items to be populated before trying to click one — the popup can
-        // appear before Syncfusion binds the DataSource when AllowFiltering is enabled.
-        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item", new() { Timeout = 15_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
+        // Type into the filter input — required for AllowFiltering dropdowns.
+        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
+        await filterInput.FillAsync(managerNameFragment);
+        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
             .Filter(new() { HasText = managerNameFragment })
             .First
             .ClickAsync();

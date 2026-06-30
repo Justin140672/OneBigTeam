@@ -1,6 +1,7 @@
 @page "/companies/{CompanyId:guid}/employees/{EmployeeId:guid}/profile"
 @rendermode InteractiveServer
 @inject AppSession Session
+@inject NavigationManager Navigation
 
 <PageTitle>My Profile</PageTitle>
 
@@ -68,6 +69,18 @@
 
     private int _activeTabIndex;
     private int _leaveAutoOpenToken;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.InitialiseAsync();
+
+        // Redirect if the URL's company or employee doesn't match the signed-in user.
+        // This prevents cross-tenant profile URL access.
+        if (Session.CompanyId != CompanyId || Session.EmployeeId != (Guid?)EmployeeId)
+        {
+            Navigation.NavigateTo("/", replace: true);
+        }
+    }
 
     private void NavigateToLeaveAndOpen()
     {

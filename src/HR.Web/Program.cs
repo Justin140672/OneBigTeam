@@ -1,5 +1,6 @@
 using HR.Web.Components;
 using HR.Web.Services;
+using Microsoft.AspNetCore.Components.Authorization;
 using Syncfusion.Blazor;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -33,6 +34,9 @@ builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<ProbationService>();
 builder.Services.AddScoped<DevAuthService>();
 builder.Services.AddScoped<AppSession>();
+builder.Services.AddScoped<AuthenticationStateProvider, AppSessionAuthStateProvider>();
+builder.Services.AddAuthorizationCore();
+builder.Services.AddCascadingAuthenticationState();
 
 Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(
     builder.Configuration["Syncfusion:LicenseKey"] ?? string.Empty);

@@ -19,6 +19,11 @@ public abstract class E2ETestBase(AppFixture fixture) : IAsyncLifetime
     {
         _context = await _fixture.Browser.NewContextAsync();
         _page    = await _context.NewPageAsync();
+
+        // Sensible defaults: actions wait up to 15 s, navigation up to 30 s.
+        // Individual waits can still override with an explicit Timeout option.
+        _page.SetDefaultTimeout(15_000);
+        _page.SetDefaultNavigationTimeout(30_000);
     }
 
     public async Task DisposeAsync()

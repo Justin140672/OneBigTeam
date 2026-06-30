@@ -101,10 +101,13 @@ public sealed class TenantIsolationTests(AppFixture fixture) : E2ETestBase(fixtu
         await _page.GotoAsync(
             $"{_fixture.WebBaseUrl}/companies/{BetaCorpId}/employees/{BobId}/profile");
 
-        // The app should either redirect away or show an error — it must NOT render
-        // Bob's personal profile data under James's Acme session.
+        // The app should redirect away or show an error — the page must NOT remain on
+        // Bob's BetaCorp profile URL. We check the URL rather than page content because
+        // Bob's name also appears in the dev persona switcher which is always in the topbar.
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
-        var content = await _page.ContentAsync();
-        Assert.DoesNotContain("Bob Taylor", content, StringComparison.OrdinalIgnoreCase);
+
+        var finalUrl = _page.Url;
+        var expectedBlockedPath = $"/companies/{BetaCorpId}/employees/{BobId}/profile";
+        Assert.DoesNotContain(expectedBlockedPath, finalUrl, StringComparison.OrdinalIgnoreCase);
     }
 }
