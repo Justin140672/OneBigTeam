@@ -9,6 +9,8 @@ using HR.Modules.Assets.Features.GetAsset;
 using HR.Modules.Assets.Features.GetAssetAssignment;
 using HR.Modules.Assets.Features.ListAssets;
 using HR.Modules.Assets.Features.ListEmployeeAssets;
+using HR.Modules.Assets.Features.RequestAssetReturn;
+using HR.Modules.Assets.Features.ReturnAssetAssignment;
 using HR.Modules.Assets.Features.RetireAsset;
 using HR.Modules.Assets.Features.UpdateAsset;
 using HR.Modules.Assets.Features.UpdateAssetCategory;
@@ -38,6 +40,7 @@ public static class AssetsModule
     private static void AddFeatureServices(IServiceCollection services)
     {
         services.AddScoped<IAssetAcknowledgementService, AssetAcknowledgementService>();
+        services.AddScoped<IAssetReturnService, AssetReturnService>();
         services.AddScoped<CreateAssetCategoryHandler>();
         services.AddScoped<IValidator<CreateAssetCategoryRequest>, CreateAssetCategoryValidator>();
         services.AddScoped<CreateAssetHandler>();
@@ -53,6 +56,7 @@ public static class AssetsModule
         services.AddScoped<UpdateAssetHandler>();
         services.AddScoped<ListEmployeeAssetsHandler>();
         services.AddScoped<RetireAssetHandler>();
+        services.AddScoped<RequestAssetReturnHandler>();
         services.AddScoped<IValidator<UpdateAssetRequest>, UpdateAssetValidator>();
     }
 

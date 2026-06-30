@@ -84,6 +84,12 @@
                                                        Task="_task"
                                                        OnCompleted="ReloadAsync" />
                     }
+                    else if (_task.ActionType == "Return" && _task.Source == "Asset")
+                    {
+                        <AssetReturnTaskPanel CompanyId="CompanyId"
+                                              Task="_task"
+                                              OnCompleted="ReloadAsync" />
+                    }
                     else
                     {
                         <CompleteTaskPanel CompanyId="CompanyId" Task="_task" OnCompleted="ReloadAsync" />

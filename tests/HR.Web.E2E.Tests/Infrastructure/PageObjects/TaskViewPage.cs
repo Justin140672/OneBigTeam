@@ -130,6 +130,29 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
     }
 
+    // ── Asset return panel ───────────────────────────────────────────────────
+
+    /// <summary>Returns true if the asset return panel is present and visible.</summary>
+    public async Task<bool> HasAssetReturnPanelAsync() =>
+        await page.Locator("[data-testid='asset-return-panel']").IsVisibleAsync();
+
+    /// <summary>Returns the asset number shown in the return panel, or null if absent.</summary>
+    public async Task<string?> GetReturnAssetNumberAsync()
+    {
+        var panel = page.Locator("[data-testid='asset-return-panel']");
+        var dd = panel.Locator("dd").First;
+        return await dd.IsVisibleAsync() ? (await dd.TextContentAsync())?.Trim() : null;
+    }
+
+    /// <summary>Clicks "Confirm Return" and waits for the task status to become Completed.</summary>
+    public async Task ConfirmReturnAsync()
+    {
+        await page.Locator("[data-testid='return-btn']").ClickAsync();
+        await page.WaitForFunctionAsync(
+            "document.querySelector('.task-status-badge')?.textContent?.includes('Completed')",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
     // ── Probation review panel ───────────────────────────────────────────────
 
     /// <summary>Returns true if the "Complete Probation Review" card is present.</summary>

@@ -1,0 +1,108 @@
+@using HR.Web.Models
+@inject AssetService AssetService
+@inject TaskService TaskService
+
+<div class="card" data-testid="asset-return-panel">
+    <div class="card-header fw-medium">Asset Return</div>
+    <div class="card-body">
+        @if (_loading)
+        {
+            <div class="d-flex align-items-center gap-2">
+                <div class="spinner-border spinner-border-sm" role="status"></div>
+                <span>Loading asset details…</span>
+            </div>
+        }
+        else if (_asset is null)
+        {
+            <div class="alert alert-warning mb-0">
+                Asset details could not be loaded. Please contact your HR administrator.
+            </div>
+        }
+        else
+        {
+            <dl class="row mb-3">
+                <dt class="col-sm-4 text-muted fw-normal">Asset Number</dt>
+                <dd class="col-sm-8">@_asset.AssetNumber</dd>
+
+                <dt class="col-sm-4 text-muted fw-normal">Name</dt>
+                <dd class="col-sm-8">@_asset.Name</dd>
+
+                @if (_asset.Manufacturer is not null)
+                {
+                    <dt class="col-sm-4 text-muted fw-normal">Manufacturer</dt>
+                    <dd class="col-sm-8">@_asset.Manufacturer</dd>
+                }
+
+                @if (_asset.Model is not null)
+                {
+                    <dt class="col-sm-4 text-muted fw-normal">Model</dt>
+                    <dd class="col-sm-8">@_asset.Model</dd>
+                }
+
+                @if (_asset.SerialNumber is not null)
+                {
+                    <dt class="col-sm-4 text-muted fw-normal">Serial Number</dt>
+                    <dd class="col-sm-8">@_asset.SerialNumber</dd>
+                }
+
+                <dt class="col-sm-4 text-muted fw-normal">Assigned At</dt>
+                <dd class="col-sm-8">@_asset.AssignedAt.ToString("d MMM yyyy")</dd>
+            </dl>
+
+            @if (_error is not null)
+            {
+                <div class="alert alert-danger">@_error</div>
+            }
+
+            <button class="btn btn-warning" data-testid="return-btn" @onclick="ReturnAsync" disabled="@_submitting">
+                @if (_submitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                <i class="fa-solid fa-box-arrow-in-right me-1"></i>Confirm Return
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public TaskDetailModel Task { get; set; } = null!;
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private EmployeeAssetItem? _asset;
+    private bool _loading = true;
+    private bool _submitting;
+    private string? _error;
+
+    protected override async System.Threading.Tasks.Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var employeeId = Task.AssignedEmployeeId ?? Guid.Empty;
+        if (employeeId != Guid.Empty && Task.SourceEntityId.HasValue)
+        {
+            var items = await AssetService.GetEmployeeAssignmentsAsync(CompanyId, employeeId);
+            _asset = items?.FirstOrDefault(i => i.Id == Task.SourceEntityId.Value);
+        }
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async System.Threading.Tasks.Task ReturnAsync()
+    {
+        _error = null;
+        _submitting = true;
+
+        var success = await TaskService.CompleteTaskAsync(CompanyId, Task.Id);
+        _submitting = false;
+
+        if (!success)
+        {
+            _error = "Failed to complete the task. Please try again.";
+            return;
+        }
+
+        await OnCompleted.InvokeAsync();
+    }
+}

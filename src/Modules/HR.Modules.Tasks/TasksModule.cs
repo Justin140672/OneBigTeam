@@ -41,6 +41,7 @@ public static class TasksModule
         services.AddScoped<ITaskCompletionAction, ProbationTaskCompletionAction>();
         services.AddScoped<ITaskCompletionAction, LeaveTaskCompletionAction>();
         services.AddScoped<ITaskCompletionAction, AssetTaskCompletionAction>();
+        services.AddScoped<ITaskCompletionAction, AssetReturnTaskCompletionAction>();
         services.AddScoped<IIntegrationEventHandler<LeaveRequestedIntegrationEvent>, LeaveRequestedHandler>();
 
         services.AddScoped<GetTaskHandler>();
@@ -191,6 +192,18 @@ public static class TasksModule
             "Please acknowledge that you have received and accepted responsibility for the assigned asset.",
             TaskPriority.Medium, TaskSource.Asset, TaskActionType.Acknowledge,
             dueDate: new DateOnly(2026, 7, 7),
+            assignedEmployeeId: empCtoId,   // Sarah Chen — Dell monitor
+            assignedUserId: devUserId,
+            now,
+            sourceEntityId: Guid.Parse("c0000000-0000-0000-0000-000000000005")));
+
+        // Asset return task for Sarah — linked to her Dell monitor assignment.
+        db.TaskItems.Add(TaskItem.Create(
+            Guid.Parse("a0000000-0000-0000-0000-000000000022"), companyId, empCtoId,
+            "Return asset",
+            "Please return the assigned asset.",
+            TaskPriority.Medium, TaskSource.Asset, TaskActionType.Return,
+            dueDate: new DateOnly(2026, 7, 14),
             assignedEmployeeId: empCtoId,   // Sarah Chen — Dell monitor
             assignedUserId: devUserId,
             now,
