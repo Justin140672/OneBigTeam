@@ -86,6 +86,41 @@ public class AssetsModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(Asset))!);
     }
 
+    // ── AssetCategory ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void AssetCategory_Entity_Is_Not_Public()
+    {
+        var entityType = ModuleAssembly.GetTypes().Single(t => t.Name == "AssetCategory");
+        Assert.False(entityType.IsPublic, "AssetCategory entity must be internal, not public.");
+    }
+
+    [Fact]
+    public void AssetCategory_Entity_Maps_To_Correct_Table_And_Schema()
+    {
+        using var context = BuildContext();
+        var entityType = context.Model.FindEntityType(typeof(AssetCategory))!;
+        Assert.Equal("asset_categories", entityType.GetTableName());
+        Assert.Equal("assets", entityType.GetSchema());
+    }
+
+    [Fact]
+    public void AssetCategory_Entity_Primary_Key_Is_Guid()
+    {
+        using var context = BuildContext();
+        var entityType = context.Model.FindEntityType(typeof(AssetCategory))!;
+        var pk = entityType.FindPrimaryKey()!;
+        Assert.Single(pk.Properties);
+        Assert.Equal(typeof(Guid), pk.Properties[0].ClrType);
+    }
+
+    [Fact]
+    public void AssetCategory_Entity_All_Columns_Are_snake_case()
+    {
+        using var context = BuildContext();
+        AssertSnakeCase(context.Model.FindEntityType(typeof(AssetCategory))!);
+    }
+
     // ── AssetAssignment ──────────────────────────────────────────────────────────
 
     [Fact]

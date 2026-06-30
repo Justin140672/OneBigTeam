@@ -29,17 +29,15 @@ namespace HR.Modules.Assets.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid>("AssetCategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("asset_category_id");
+
                     b.Property<string>("AssetTag")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("asset_tag");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("category");
 
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
@@ -150,6 +148,46 @@ namespace HR.Modules.Assets.Persistence.Migrations
                     b.HasIndex("AssetId", "ReturnedAt");
 
                     b.ToTable("asset_assignments", "assets");
+                });
+
+            modelBuilder.Entity("HR.Modules.Assets.Domain.AssetCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.ToTable("asset_categories", "assets");
                 });
 #pragma warning restore 612, 618
         }

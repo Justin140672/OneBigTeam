@@ -1,3 +1,5 @@
+using FluentValidation;
+using HR.Modules.Assets.Features.CreateAssetCategory;
 using HR.Modules.Assets.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,11 +12,19 @@ public static class AssetsModule
         this IServiceCollection services,
         string connectionString)
     {
+        AddFeatureServices(services);
+
         services.AddDbContext<AssetsDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "assets")));
 
         return services;
+    }
+
+    private static void AddFeatureServices(IServiceCollection services)
+    {
+        services.AddScoped<CreateAssetCategoryHandler>();
+        services.AddScoped<IValidator<CreateAssetCategoryRequest>, CreateAssetCategoryValidator>();
     }
 
     public static async Task MigrateAssetsAsync(this IServiceProvider services)

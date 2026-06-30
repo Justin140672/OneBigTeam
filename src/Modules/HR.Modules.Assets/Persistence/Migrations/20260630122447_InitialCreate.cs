@@ -36,6 +36,24 @@ namespace HR.Modules.Assets.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "asset_categories",
+                schema: "assets",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    company_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    is_active = table.Column<bool>(type: "boolean", nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_asset_categories", x => x.id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "assets",
                 schema: "assets",
                 columns: table => new
@@ -44,7 +62,7 @@ namespace HR.Modules.Assets.Persistence.Migrations
                     company_id = table.Column<Guid>(type: "uuid", nullable: false),
                     name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     asset_tag = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    category = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
+                    asset_category_id = table.Column<Guid>(type: "uuid", nullable: false),
                     status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     serial_number = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     purchase_date = table.Column<DateOnly>(type: "date", nullable: true),
@@ -83,6 +101,12 @@ namespace HR.Modules.Assets.Persistence.Migrations
                 column: "employee_id");
 
             migrationBuilder.CreateIndex(
+                name: "IX_asset_categories_company_id",
+                schema: "assets",
+                table: "asset_categories",
+                column: "company_id");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_assets_company_id",
                 schema: "assets",
                 table: "assets",
@@ -107,6 +131,10 @@ namespace HR.Modules.Assets.Persistence.Migrations
         {
             migrationBuilder.DropTable(
                 name: "asset_assignments",
+                schema: "assets");
+
+            migrationBuilder.DropTable(
+                name: "asset_categories",
                 schema: "assets");
 
             migrationBuilder.DropTable(

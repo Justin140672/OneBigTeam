@@ -8,7 +8,7 @@ internal sealed class Asset
     public Guid CompanyId { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string AssetTag { get; private set; } = string.Empty;
-    public AssetCategory Category { get; private set; }
+    public Guid AssetCategoryId { get; private set; }
     public AssetStatus Status { get; private set; }
     public string? SerialNumber { get; private set; }
     public DateOnly? PurchaseDate { get; private set; }
@@ -22,7 +22,7 @@ internal sealed class Asset
         Guid companyId,
         string name,
         string assetTag,
-        AssetCategory category,
+        Guid assetCategoryId,
         string? serialNumber,
         DateOnly? purchaseDate,
         decimal? purchasePrice,
@@ -35,7 +35,7 @@ internal sealed class Asset
             CompanyId = companyId,
             Name = name,
             AssetTag = assetTag,
-            Category = category,
+            AssetCategoryId = assetCategoryId,
             Status = AssetStatus.Available,
             SerialNumber = serialNumber,
             PurchaseDate = purchaseDate,
@@ -49,7 +49,7 @@ internal sealed class Asset
     public void Update(
         string name,
         string assetTag,
-        AssetCategory category,
+        Guid assetCategoryId,
         string? serialNumber,
         DateOnly? purchaseDate,
         decimal? purchasePrice,
@@ -58,7 +58,7 @@ internal sealed class Asset
     {
         Name = name;
         AssetTag = assetTag;
-        Category = category;
+        AssetCategoryId = assetCategoryId;
         SerialNumber = serialNumber;
         PurchaseDate = purchaseDate;
         PurchasePrice = purchasePrice;

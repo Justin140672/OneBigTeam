@@ -30,10 +30,8 @@ internal sealed class AssetConfiguration : IEntityTypeConfiguration<Asset>
             .HasMaxLength(50)
             .IsRequired();
 
-        builder.Property(a => a.Category)
-            .HasColumnName("category")
-            .HasConversion<string>()
-            .HasMaxLength(30)
+        builder.Property(a => a.AssetCategoryId)
+            .HasColumnName("asset_category_id")
             .IsRequired();
 
         builder.Property(a => a.Status)

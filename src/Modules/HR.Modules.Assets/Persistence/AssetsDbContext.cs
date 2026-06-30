@@ -12,6 +12,7 @@ internal sealed class AssetsDbContext : DbContext
 
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<AssetAssignment> AssetAssignments => Set<AssetAssignment>();
+    public DbSet<AssetCategory> AssetCategories => Set<AssetCategory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
