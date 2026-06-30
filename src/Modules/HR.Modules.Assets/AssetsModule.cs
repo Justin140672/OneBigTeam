@@ -1,4 +1,5 @@
 using FluentValidation;
+using HR.Modules.Assets.Features.AcknowledgeAssetAssignment;
 using HR.Modules.Assets.Features.CreateAsset;
 using HR.Modules.Assets.Features.CreateAssetAssignment;
 using HR.Modules.Assets.Features.CreateAssetCategory;
@@ -13,6 +14,7 @@ using HR.Modules.Assets.Features.UpdateAsset;
 using HR.Modules.Assets.Features.UpdateAssetCategory;
 using HR.Modules.Assets.Domain;
 using HR.Modules.Assets.Persistence;
+using HR.SharedKernel.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -35,6 +37,7 @@ public static class AssetsModule
 
     private static void AddFeatureServices(IServiceCollection services)
     {
+        services.AddScoped<IAssetAcknowledgementService, AssetAcknowledgementService>();
         services.AddScoped<CreateAssetCategoryHandler>();
         services.AddScoped<IValidator<CreateAssetCategoryRequest>, CreateAssetCategoryValidator>();
         services.AddScoped<CreateAssetHandler>();

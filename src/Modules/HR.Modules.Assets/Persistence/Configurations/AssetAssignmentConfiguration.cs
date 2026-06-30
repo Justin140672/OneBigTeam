@@ -36,6 +36,9 @@ internal sealed class AssetAssignmentConfiguration : IEntityTypeConfiguration<As
             .HasColumnName("assigned_at")
             .IsRequired();
 
+        builder.Property(a => a.AcknowledgedAt)
+            .HasColumnName("acknowledged_at");
+
         builder.Property(a => a.ReturnedAt)
             .HasColumnName("returned_at");
 
