@@ -1,7 +1,7 @@
 ---
 description: "Use when creating or updating the Blazor user interface for this solution. Trigger for data service creation, list screen creation, edit screen creation, and Syncfusion-based UI work in the HR.Web project only."
 name: "ui"
-tools: [read, search, edit]
+tools: [Read, Glob, Grep, Edit, Write, Bash]
 user-invocable: true
 disable-model-invocation: false
 agents: []

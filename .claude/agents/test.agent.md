@@ -1,7 +1,7 @@
 ---
 description: "Use when creating unit tests for model or request validation, integration tests for this solution using Aspire.Hosting.Testing and the DistributedApplicationTestingBuilder pattern, or architecture tests that enforce module structure rules. Trigger for test project scaffolding, xUnit test creation, validator test coverage, Aspire end-to-end integration test generation, and architecture rule enforcement only."
 name: "test"
-tools: [read, search, edit]
+tools: [Read, Glob, Grep, Edit, Write, Bash]
 user-invocable: true
 disable-model-invocation: false
 agents: []

@@ -1,7 +1,7 @@
 ---
 description: "Use when you need a reliability-first lead developer for architecture, technical planning, risk review, implementation strategy, and orchestration across developer, test, and ui agents."
 name: "Lead Developer"
-tools: [read, search, execute, todo, agent]
+tools: [Read, Glob, Grep, Edit, Write, Bash, Agent]
 agents: [developer, test, ui, Explore]
 argument-hint: "Feature/problem context, constraints, reliability expectations, and desired outcome"
 user-invocable: true
@@ -73,7 +73,7 @@ If any criterion is marked **Violation**, halt and report the specific violation
 ### 3. Final checks
 After both handoffs complete, verify the repository state yourself:
 - Run a full build for the workspace.
-- Run all automated tests for the solution.
+- Run all automated tests for the solution, **excluding the Playwright E2E project** (`HR.Web.E2E.Tests`). Use `dotnet test --filter "FullyQualifiedName!~HR.Web.E2E.Tests"` or exclude that project explicitly with `--ignore-project`. The E2E tests require a running browser and full environment — they are validated separately and must never be run as part of the automated CI check here.
 - Confirm that build and test execution completed successfully before reporting completion.
 
 If the user request does not include a UI component, skip Steps 4 and 5 entirely and omit the post-UI reconfirmation fields from the final summary.
@@ -86,7 +86,7 @@ If the user request does not include a UI component, skip Steps 4 and 5 entirely
 
 ### 5. Reconfirmation after UI work
 - After the ui agent completes, run a full build for the workspace again.
-- Run all automated tests for the solution again.
+- Run all automated tests for the solution again, **excluding the Playwright E2E project** (`HR.Web.E2E.Tests`) using the same filter as Step 3.
 - Confirm that build and test execution still complete successfully before reporting completion.
 
 ## Output requirements

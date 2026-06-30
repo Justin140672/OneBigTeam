@@ -1,7 +1,7 @@
 ---
 description: "Use when creating a data model, adding it to a DbContext, and creating FastEndpoints endpoints. Trigger for entity creation, model scaffolding, DbContext updates, and FastEndpoints CRUD endpoint generation only."
 name: "developer"
-tools: [read, search, edit]
+tools: [Read, Glob, Grep, Edit, Write, Bash]
 user-invocable: true
 disable-model-invocation: false
 agents: []
