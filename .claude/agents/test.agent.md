@@ -50,10 +50,9 @@ When adding EF-model architecture tests:
 3. Add focused unit tests for validators and model-related validation behavior.
 4. Add Aspire integration tests using DistributedApplicationTestingBuilder against the AppHost, preferably behind a shared helper or fixture.
 5. When a new module or entity is added, add architecture tests per the Architecture Test Responsibilities table above.
-6. Build and run the relevant tests to verify the new coverage.
+6. Do **not** build or run any tests. Your responsibility ends at writing the test files. The Lead Developer agent runs the tests in its final checks step.
 
 ## Output Format
 - State which test projects were created or updated.
 - State which test files were created or updated.
 - State any required production-project reference or solution changes.
-- Report build or test results and any blocker.
