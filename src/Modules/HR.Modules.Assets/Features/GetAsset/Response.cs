@@ -13,4 +13,5 @@ internal sealed record GetAssetResponse(
     decimal? PurchasePrice,
     string Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? CategoryName);

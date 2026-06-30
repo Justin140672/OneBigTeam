@@ -16,6 +16,11 @@ internal sealed class GetAssetHandler(AssetsDbContext db)
         if (asset is null)
             return Result.Failure<GetAssetResponse>(Error.NotFound("Asset not found."));
 
+        var categoryName = await db.AssetCategories
+            .Where(c => c.Id == asset.CategoryId)
+            .Select(c => c.Name)
+            .FirstOrDefaultAsync(cancellationToken);
+
         return Result.Success(new GetAssetResponse(
             asset.Id,
             asset.CompanyId,
@@ -29,6 +34,7 @@ internal sealed class GetAssetHandler(AssetsDbContext db)
             asset.PurchasePrice,
             asset.Status.ToString(),
             asset.CreatedAt,
-            asset.UpdatedAt));
+            asset.UpdatedAt,
+            categoryName));
     }
 }

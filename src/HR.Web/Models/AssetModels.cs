@@ -17,3 +17,19 @@ public sealed record EmployeeAssetItem(
 {
     public string AcknowledgementStatus => IsAcknowledged ? "Acknowledged" : "Pending";
 }
+
+public sealed record AssetDetailModel(
+    Guid Id,
+    Guid CompanyId,
+    string AssetNumber,
+    Guid CategoryId,
+    string Name,
+    string? Manufacturer,
+    string? Model,
+    string? SerialNumber,
+    DateOnly? PurchaseDate,
+    decimal? PurchasePrice,
+    string Status,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    string? CategoryName);

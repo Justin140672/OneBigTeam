@@ -17,4 +17,15 @@ public sealed class AssetService(IHttpClientFactory httpClientFactory)
         }
         catch { return null; }
     }
+
+    public async Task<AssetDetailModel?> GetAssetAsync(
+        Guid companyId, Guid assetId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<AssetDetailModel>(
+                $"api/companies/{companyId}/assets/{assetId}", cancellationToken);
+        }
+        catch { return null; }
+    }
 }

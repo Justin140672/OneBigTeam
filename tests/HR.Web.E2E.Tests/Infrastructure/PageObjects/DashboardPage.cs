@@ -43,6 +43,16 @@ public sealed class DashboardPage(IPage page, string baseUrl)
     public async Task<bool> IsTaskListEmptyAsync() =>
         await page.Locator(".widget-empty").IsVisibleAsync();
 
+    /// <summary>Clicks the "View all" link in the My Tasks widget and waits for navigation.</summary>
+    public async Task ClickViewAllTasksAsync()
+    {
+        var myTasksWidget = page.Locator(".widget-card")
+            .Filter(new() { HasText = "My Tasks" })
+            .First;
+        await myTasksWidget.Locator(".widget-view-all").ClickAsync();
+        await page.WaitForURLAsync(new Regex("/profile"), new() { Timeout = 15_000 });
+    }
+
     // ── Upcoming Probation Reviews Widget ─────────────────────────────────────
 
     /// <summary>Returns true if the Upcoming Probation Reviews widget header is visible.</summary>

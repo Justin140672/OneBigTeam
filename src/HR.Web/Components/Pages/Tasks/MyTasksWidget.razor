@@ -99,7 +99,7 @@ else
     {
         _today      = DateOnly.FromDateTime(DateTime.UtcNow);
         _profileUrl = Session.EmployeeId.HasValue
-            ? $"/companies/{Session.CompanyId}/employees/{Session.EmployeeId.Value}/profile"
+            ? $"/companies/{Session.CompanyId}/employees/{Session.EmployeeId.Value}/profile?tab=tasks"
             : "#";
 
         var result = await TaskService.GetMyTasksAsync(Session.CompanyId);

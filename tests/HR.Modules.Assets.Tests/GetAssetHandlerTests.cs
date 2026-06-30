@@ -143,4 +143,21 @@ public class GetAssetHandlerTests
         Assert.Equal(3000m, result.Value.PurchasePrice);
         Assert.Equal(new DateTimeOffset(FixedUtcNow, TimeSpan.Zero), result.Value.CreatedAt);
     }
+
+    [Fact]
+    public async Task HandleAsync_Returns_CategoryName_From_Joined_Category()
+    {
+        await using var db = BuildContext();
+        var (_, companyId, assetId) = await SeedAssetAsync(db, "ASSET-CAT", "Monitor");
+        var handler = new GetAssetHandler(db);
+
+        var result = await handler.HandleAsync(new GetAssetRequest
+        {
+            CompanyId = companyId,
+            Id = assetId
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Electronics", result.Value!.CategoryName);
+    }
 }

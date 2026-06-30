@@ -23,6 +23,20 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
             null, new PageWaitForFunctionOptions { Timeout = 20_000 });
     }
 
+    /// <summary>Waits for the profile page to load after a redirect (e.g. from "View all" link).</summary>
+    public async Task WaitForLoadAsync()
+    {
+        await page.WaitForSelectorAsync(".e-tab", new() { Timeout = 20_000 });
+    }
+
+    /// <summary>Returns the name of the currently active tab.</summary>
+    public async Task<string> GetActiveTabNameAsync()
+    {
+        var active = page.Locator("[role='tab'][aria-selected='true']").First;
+        await active.WaitForAsync(new() { Timeout = 10_000 });
+        return (await active.TextContentAsync())?.Trim() ?? "";
+    }
+
     // ── Tab navigation ────────────────────────────────────────────────────────
 
     public async Task OpenOverviewTabAsync()

@@ -1,0 +1,144 @@
+@page "/companies/{CompanyId:guid}/assets/{Id:guid}/view"
+@rendermode InteractiveServer
+@inject AssetService AssetService
+@inject IJSRuntime JS
+
+<PageTitle>@(_asset?.Name ?? "Asset")</PageTitle>
+
+<div class="container py-4" data-testid="asset-detail-page">
+
+    @if (_loading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span>Loading…</span>
+        </div>
+    }
+    else if (_asset is null)
+    {
+        <div class="alert alert-danger">Asset not found.</div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="GoBack">
+                <i class="fa-solid fa-arrow-left me-1"></i>Back
+            </button>
+            <div>
+                <h1 class="mb-0 fs-4" data-testid="asset-title">@_asset.AssetNumber — @_asset.Name</h1>
+            </div>
+            <span class="ms-2 @StatusBadgeClass" data-testid="asset-status-badge">@_asset.Status</span>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Asset Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4">Asset Number</dt>
+                            <dd class="col-sm-8" data-testid="asset-number">@_asset.AssetNumber</dd>
+
+                            <dt class="col-sm-4">Name</dt>
+                            <dd class="col-sm-8" data-testid="asset-name">@_asset.Name</dd>
+
+                            <dt class="col-sm-4">Category</dt>
+                            <dd class="col-sm-8" data-testid="asset-category">@(_asset.CategoryName ?? "—")</dd>
+
+                            <dt class="col-sm-4">Status</dt>
+                            <dd class="col-sm-8">
+                                <span class="@StatusBadgeClass" data-testid="asset-status">@_asset.Status</span>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Specifications</h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4">Manufacturer</dt>
+                            <dd class="col-sm-8" data-testid="asset-manufacturer">@(_asset.Manufacturer ?? "—")</dd>
+
+                            <dt class="col-sm-4">Model</dt>
+                            <dd class="col-sm-8" data-testid="asset-model">@(_asset.Model ?? "—")</dd>
+
+                            <dt class="col-sm-4">Serial Number</dt>
+                            <dd class="col-sm-8" data-testid="asset-serial">@(_asset.SerialNumber ?? "—")</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Purchase Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4">Purchase Date</dt>
+                            <dd class="col-sm-8" data-testid="asset-purchase-date">
+                                @(_asset.PurchaseDate.HasValue ? _asset.PurchaseDate.Value.ToString("d MMM yyyy") : "—")
+                            </dd>
+
+                            <dt class="col-sm-4">Purchase Price</dt>
+                            <dd class="col-sm-8" data-testid="asset-purchase-price">
+                                @(_asset.PurchasePrice.HasValue ? _asset.PurchasePrice.Value.ToString("C") : "—")
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Record</h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">Created</dt>
+                            <dd class="col-sm-7" data-testid="asset-created-at">
+                                @_asset.CreatedAt.LocalDateTime.ToString("d MMM yyyy HH:mm")
+                            </dd>
+
+                            <dt class="col-sm-5">Last Updated</dt>
+                            <dd class="col-sm-7" data-testid="asset-updated-at">
+                                @_asset.UpdatedAt.LocalDateTime.ToString("d MMM yyyy HH:mm")
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid Id { get; set; }
+
+    private AssetDetailModel? _asset;
+    private bool _loading = true;
+
+    private string StatusBadgeClass => _asset?.Status switch
+    {
+        "Available"        => "badge text-bg-success",
+        "Assigned"         => "badge text-bg-primary",
+        "Retired"          => "badge text-bg-secondary",
+        "UnderMaintenance" => "badge text-bg-warning",
+        _                  => "badge text-bg-light"
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _asset = await AssetService.GetAssetAsync(CompanyId, Id);
+        _loading = false;
+    }
+
+    private async Task GoBack() => await JS.InvokeVoidAsync("history.back");
+}
