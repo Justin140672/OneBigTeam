@@ -5,6 +5,7 @@ using HR.Modules.Assets.Features.CreateAssetCategory;
 using HR.Modules.Assets.Features.DeactivateAssetCategory;
 using HR.Modules.Assets.Features.ListAssetCategories;
 using HR.Modules.Assets.Features.GetAsset;
+using HR.Modules.Assets.Features.GetAssetAssignment;
 using HR.Modules.Assets.Features.ListAssets;
 using HR.Modules.Assets.Features.RetireAsset;
 using HR.Modules.Assets.Features.UpdateAsset;
@@ -43,6 +44,7 @@ public static class AssetsModule
         services.AddScoped<UpdateAssetCategoryHandler>();
         services.AddScoped<DeactivateAssetCategoryHandler>();
         services.AddScoped<GetAssetHandler>();
+        services.AddScoped<GetAssetAssignmentHandler>();
         services.AddScoped<UpdateAssetHandler>();
         services.AddScoped<RetireAssetHandler>();
         services.AddScoped<IValidator<UpdateAssetRequest>, UpdateAssetValidator>();
