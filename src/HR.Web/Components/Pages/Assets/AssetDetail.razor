@@ -121,13 +121,23 @@
         <div class="card mt-4" data-testid="asset-assignments-section">
             <div class="card-header d-flex align-items-center justify-content-between">
                 <h5 class="mb-0">Assignments</h5>
-                @if (_asset.Status == "Available")
-                {
-                    <button class="btn btn-primary btn-sm" @onclick="OpenAssignDialog"
-                            data-testid="assign-to-employee-btn">
-                        <i class="fa-solid fa-user-plus me-1"></i>Assign to Employee
-                    </button>
-                }
+                <div class="d-flex gap-2">
+                    @if (_asset.Status == "Available")
+                    {
+                        <button class="btn btn-primary btn-sm" @onclick="OpenAssignDialog"
+                                data-testid="assign-to-employee-btn">
+                            <i class="fa-solid fa-user-plus me-1"></i>Assign to Employee
+                        </button>
+                    }
+                    @if (_asset.Status == "Assigned" && ActiveAssignment is not null)
+                    {
+                        <button class="btn btn-warning btn-sm" @onclick="RequestReturnAsync"
+                                disabled="@_returnRequesting"
+                                data-testid="request-return-btn">
+                            <i class="fa-solid fa-rotate-left me-1"></i>Request Return
+                        </button>
+                    }
+                </div>
             </div>
             <div class="card-body p-0">
                 @if (_assignmentsLoading)
@@ -244,6 +254,10 @@
     private List<EmployeeListItemModel> _employees = [];
     private string? _assignSuccess;
     private string? _assignError;
+    private bool _returnRequesting;
+
+    private AssetAssignmentItem? ActiveAssignment =>
+        _assignments.FirstOrDefault(a => a.ReturnedAt is null);
 
     private string StatusBadgeClass => _asset?.Status switch
     {
@@ -305,6 +319,30 @@
 
         // Reload the asset (status changes to Assigned) and assignments list
         _asset = await AssetService.GetAssetAsync(CompanyId, Id);
+        _assignments = await AssetService.GetAssetAssignmentsAsync(CompanyId, Id) ?? [];
+    }
+
+    private async Task RequestReturnAsync()
+    {
+        var assignment = ActiveAssignment;
+        if (assignment is null) return;
+
+        _returnRequesting = true;
+        _assignSuccess = null;
+        _assignError = null;
+
+        var requestedBy = Session.EmployeeId ?? Session.UserId;
+        var ok = await AssetService.RequestReturnAsync(CompanyId, assignment.Id, requestedBy);
+
+        _returnRequesting = false;
+
+        if (!ok)
+        {
+            _assignError = "Failed to request return. The return may already have been requested.";
+            return;
+        }
+
+        _assignSuccess = "Return requested successfully.";
         _assignments = await AssetService.GetAssetAssignmentsAsync(CompanyId, Id) ?? [];
     }
 }

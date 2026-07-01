@@ -111,4 +111,21 @@ public sealed class AssetAssignmentsSectionTests(AppFixture fixture) : E2ETestBa
         Assert.True(await detail.HasAssignmentsGridRowsAsync(),
             "Expected at least one assignment row for Tom's MacBook");
     }
+
+    [Fact]
+    public async Task AssetDetail_RequestReturnButton_IsVisible_WhenAssetIsAssigned()
+    {
+        var login  = new LoginPage(_page, _fixture.WebBaseUrl);
+        var detail = new AssetDetailPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await detail.GoToAsync(AcmeId, TomAssetId);
+        await detail.WaitForAssignmentsSectionAsync();
+
+        Assert.True(await detail.IsRequestReturnButtonVisibleAsync(),
+            "The 'Request Return' button should be visible when the asset is in Assigned status");
+    }
+
 }

@@ -79,4 +79,19 @@ public sealed class AssetDetailPage(IPage page, string baseUrl)
             "!document.querySelector('.assign-to-employee-dialog') || !document.querySelector('.assign-to-employee-dialog').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 10_000 });
     }
+
+    public async Task<bool> IsRequestReturnButtonVisibleAsync() =>
+        await page.Locator("[data-testid='request-return-btn']").IsVisibleAsync();
+
+    public async Task<bool> IsRequestReturnButtonDisabledAsync() =>
+        await page.Locator("[data-testid='request-return-btn']").IsDisabledAsync();
+
+    public async Task ClickRequestReturnAsync() =>
+        await page.Locator("[data-testid='request-return-btn']").ClickAsync();
+
+    public async Task<bool> IsAssignSuccessMessageVisibleAsync() =>
+        await page.Locator("[data-testid='assign-success-message']").IsVisibleAsync();
+
+    public async Task<string> GetAssignSuccessMessageAsync() =>
+        (await page.Locator("[data-testid='assign-success-message']").TextContentAsync())?.Trim() ?? "";
 }

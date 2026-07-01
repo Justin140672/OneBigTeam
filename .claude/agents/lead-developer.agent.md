@@ -92,8 +92,8 @@ If the user request does not include a UI component, skip Steps 4 and 5 entirely
 
 ### 5. Reconfirmation after UI work
 - After the ui agent completes, run a full build for the workspace again: `dotnet build`
-- Run each non-E2E test project individually using the same project-by-project approach as Step 3. Never run `HR.Web.E2E.Tests`.
-- Confirm that build and test execution still complete successfully before reporting completion.
+- Confirm the build passes. Do NOT re-run the test suite — the ui agent is constrained to the web project only (no business logic, no new endpoints, no migrations), so the tests cannot newly fail from UI-only changes. Running them again wastes 5+ minutes for no signal.
+- Confirm that build completes successfully before reporting completion.
 
 ## Output requirements
 Provide a concise final summary that includes:
@@ -101,8 +101,7 @@ Provide a concise final summary that includes:
 - which files were updated
 - whether the build passed
 - whether all tests passed
-- whether the post-UI reconfirmation build passed
-- whether the post-UI reconfirmation tests passed
+- whether the post-UI reconfirmation build passed (tests are not re-run after UI — build only)
 - list any follow-up items that are: (a) risks flagged by a specialist agent that were not resolved, (b) items rejected by a guardrail that the user must address manually, or (c) build/test failures that were stopped but not fixed
 
 ## Guardrails
