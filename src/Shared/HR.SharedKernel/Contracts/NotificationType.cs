@@ -13,4 +13,8 @@ public enum NotificationType
     TaskCompleted         = 9,
     AssetAssigned         = 10,
     AssetReturnRequested  = 11,
+    AssetAcknowledgementReminder = 12,
+    AssetReturnReminder          = 13,
+    AssetAcknowledgementOverdue  = 14,
+    AssetReturnOverdue           = 15,
 }

@@ -1,4 +1,5 @@
 using FluentValidation;
+using Hangfire;
 using HR.Modules.Assets.Features.AcknowledgeAssetAssignment;
 using HR.Modules.Assets.Features.CreateAsset;
 using HR.Modules.Assets.Features.CreateAssetAssignment;
@@ -16,8 +17,10 @@ using HR.Modules.Assets.Features.RetireAsset;
 using HR.Modules.Assets.Features.UpdateAsset;
 using HR.Modules.Assets.Features.UpdateAssetCategory;
 using HR.Modules.Assets.Domain;
+using HR.Modules.Assets.Jobs;
 using HR.Modules.Assets.Persistence;
 using HR.SharedKernel.Contracts;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -60,6 +63,17 @@ public static class AssetsModule
         services.AddScoped<RetireAssetHandler>();
         services.AddScoped<RequestAssetReturnHandler>();
         services.AddScoped<IValidator<UpdateAssetRequest>, UpdateAssetValidator>();
+        services.AddScoped<AssetReminderJob>();
+    }
+
+    public static WebApplication UseAssetsRecurringJobs(this WebApplication app)
+    {
+        var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+        jobManager.AddOrUpdate<AssetReminderJob>(
+            "asset-reminders",
+            job => job.ExecuteAsync(),
+            Cron.Daily(2));
+        return app;
     }
 
     public static async Task MigrateAssetsAsync(this IServiceProvider services)
