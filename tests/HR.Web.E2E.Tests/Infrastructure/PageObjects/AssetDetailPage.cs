@@ -39,4 +39,44 @@ public sealed class AssetDetailPage(IPage page, string baseUrl)
 
     public async Task<bool> IsNotFoundAlertVisibleAsync() =>
         await page.Locator(".alert-danger").IsVisibleAsync();
+
+    // ── Assignments section ───────────────────────────────────────────────────
+
+    public async Task WaitForAssignmentsSectionAsync()
+    {
+        await page.WaitForSelectorAsync("[data-testid='asset-assignments-section']",
+            new() { Timeout = 15_000 });
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
+    public async Task<bool> IsAssignmentsSectionVisibleAsync() =>
+        await page.Locator("[data-testid='asset-assignments-section']").IsVisibleAsync();
+
+    public async Task<bool> HasAssignmentsGridRowsAsync() =>
+        await page.Locator("[data-testid='asset-assignments-grid'] .e-row").CountAsync() > 0;
+
+    public async Task<int> GetAssignmentsGridRowCountAsync() =>
+        await page.Locator("[data-testid='asset-assignments-grid'] .e-row").CountAsync();
+
+    public async Task<bool> IsAssignToEmployeeButtonVisibleAsync() =>
+        await page.Locator("[data-testid='assign-to-employee-btn']").IsVisibleAsync();
+
+    public async Task OpenAssignToEmployeeDialogAsync()
+    {
+        await page.Locator("[data-testid='assign-to-employee-btn']").ClickAsync();
+        await page.WaitForSelectorAsync(".assign-to-employee-dialog", new() { Timeout = 10_000 });
+    }
+
+    public async Task<bool> IsAssignToEmployeeDialogVisibleAsync() =>
+        await page.Locator(".assign-to-employee-dialog").IsVisibleAsync();
+
+    public async Task CloseAssignToEmployeeDialogAsync()
+    {
+        await page.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.assign-to-employee-dialog') || !document.querySelector('.assign-to-employee-dialog').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 10_000 });
+    }
 }

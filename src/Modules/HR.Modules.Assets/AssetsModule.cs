@@ -8,6 +8,7 @@ using HR.Modules.Assets.Features.ListAssetCategories;
 using HR.Modules.Assets.Features.GetAsset;
 using HR.Modules.Assets.Features.GetAssetAssignment;
 using HR.Modules.Assets.Features.ListAssets;
+using HR.Modules.Assets.Features.ListAssetAssignments;
 using HR.Modules.Assets.Features.ListEmployeeAssets;
 using HR.Modules.Assets.Features.RequestAssetReturn;
 using HR.Modules.Assets.Features.ReturnAssetAssignment;
@@ -54,6 +55,7 @@ public static class AssetsModule
         services.AddScoped<GetAssetHandler>();
         services.AddScoped<GetAssetAssignmentHandler>();
         services.AddScoped<UpdateAssetHandler>();
+        services.AddScoped<ListAssetAssignmentsHandler>();
         services.AddScoped<ListEmployeeAssetsHandler>();
         services.AddScoped<RetireAssetHandler>();
         services.AddScoped<RequestAssetReturnHandler>();

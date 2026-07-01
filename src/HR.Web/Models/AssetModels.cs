@@ -18,6 +18,23 @@ public sealed record EmployeeAssetItem(
     public string AcknowledgementStatus => IsAcknowledged ? "Acknowledged" : "Pending";
 }
 
+public sealed record AvailableAssetItem(
+    Guid Id,
+    string AssetNumber,
+    string Name,
+    string? Manufacturer,
+    string? Model);
+
+public sealed record AssetAssignmentItem(
+    Guid Id,
+    Guid AssetId,
+    Guid EmployeeId,
+    Guid AssignedBy,
+    DateTimeOffset AssignedAt,
+    DateTimeOffset? AcknowledgedAt,
+    DateTimeOffset? ReturnedAt,
+    string? Notes);
+
 public sealed record AssetDetailModel(
     Guid Id,
     Guid CompanyId,

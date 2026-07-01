@@ -505,6 +505,15 @@
                 </TabItem>
 
                 <TabItem>
+                    <ChildContent><TabHeader Text="Assets" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <EmployeeAssetsTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
+                <TabItem>
                     <ChildContent><TabHeader Text="Compensation" /></ChildContent>
                     <ContentTemplate>
                         <div class="mt-4">

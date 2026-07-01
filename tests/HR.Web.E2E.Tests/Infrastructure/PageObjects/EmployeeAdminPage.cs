@@ -121,6 +121,83 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("[data-testid='admin-document-requests-section']", new() { Timeout = 10_000 });
     }
 
+    // ── Assets tab ────────────────────────────────────────────────────────────
+
+    public async Task OpenAssetsTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Assets" }).ClickAsync();
+        // Wait for the spinner to disappear, then ensure either the grid or the
+        // empty-state placeholder has rendered.
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSelectorAsync("[data-testid='employee-assets-grid'], .text-muted",
+            new() { Timeout = 15_000 });
+    }
+
+    /// <summary>Returns true if the assets grid has at least one data row.</summary>
+    public async Task<bool> HasAssetsGridRowsAsync() =>
+        await page.Locator("[data-testid='employee-assets-grid'] .e-row").CountAsync() > 0;
+
+    /// <summary>Returns all asset numbers visible in the first cell of the assets grid.</summary>
+    public async Task<IReadOnlyList<string>> GetAssetsGridAssetNumbersAsync()
+    {
+        var spans = await page
+            .Locator("[data-testid='employee-assets-grid'] .e-row .e-rowcell:first-child .fw-medium")
+            .AllTextContentsAsync();
+        return spans.Select(t => t.Trim()).ToList();
+    }
+
+    /// <summary>Returns true if the Assign Asset button is visible on the Assets tab.</summary>
+    public async Task<bool> HasAssignAssetButtonAsync() =>
+        await page.GetByRole(AriaRole.Button, new() { Name = "Assign Asset" }).IsVisibleAsync();
+
+    /// <summary>Returns true if the Request Return button is visible on the Assets tab.</summary>
+    public async Task<bool> HasRequestReturnButtonAsync() =>
+        await page.GetByRole(AriaRole.Button, new() { Name = "Request Return" }).IsVisibleAsync();
+
+    /// <summary>Returns true if the Request Return button is currently disabled.</summary>
+    public async Task<bool> IsRequestReturnButtonDisabledAsync()
+    {
+        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Request Return" });
+        return await btn.IsDisabledAsync();
+    }
+
+    /// <summary>
+    /// Clicks the first row in the assets grid to select it, then waits for Blazor
+    /// to re-render (the Request Return button re-evaluates its Disabled binding).
+    /// </summary>
+    public async Task SelectFirstAssetRowAsync()
+    {
+        var firstRow = page.Locator("[data-testid='employee-assets-grid'] .e-row").First;
+        await firstRow.ClickAsync();
+        // Give Blazor time to process the RowSelected event and re-render.
+        await page.WaitForTimeoutAsync(500);
+    }
+
+    /// <summary>
+    /// Opens the Assign Asset dialog and asserts the dialog header is visible.
+    /// Does not complete the assignment — use this to verify the dialog opens correctly.
+    /// </summary>
+    public async Task OpenAssignAssetDialogAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Assign Asset" }).ClickAsync();
+        await page.WaitForSelectorAsync(".e-dialog", new() { Timeout = 10_000 });
+    }
+
+    /// <summary>Returns true if the Assign Asset dialog is currently visible.</summary>
+    public async Task<bool> IsAssignAssetDialogVisibleAsync() =>
+        await page.Locator(".e-dialog").IsVisibleAsync();
+
+    /// <summary>Dismisses the Assign Asset dialog by clicking Cancel.</summary>
+    public async Task CloseAssignAssetDialogAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.e-dialog') || !document.querySelector('.e-dialog').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 10_000 });
+    }
+
     // ── Working Pattern section (Details tab) ─────────────────────────────────
 
     /// <summary>Ensures the "Override company defaults" checkbox is checked.</summary>
