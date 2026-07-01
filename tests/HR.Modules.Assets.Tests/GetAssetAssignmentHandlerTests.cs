@@ -46,7 +46,7 @@ public class GetAssetAssignmentHandlerTests
 
         var assetId = assetResult.Value!.Id;
 
-        var assignmentHandler = new CreateAssetAssignmentHandler(db, clock, taskCreator);
+        var assignmentHandler = new CreateAssetAssignmentHandler(db, clock, taskCreator, new FakeNotificationWriter());
         var assignmentResult = await assignmentHandler.HandleAsync(new CreateAssetAssignmentRequest
         {
             CompanyId = companyId,

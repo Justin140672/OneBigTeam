@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Assets.Features.RequestAssetReturn;
 
-internal sealed class RequestAssetReturnHandler(AssetsDbContext db, ITaskCreator taskCreator, IClock clock)
+internal sealed class RequestAssetReturnHandler(AssetsDbContext db, ITaskCreator taskCreator, IClock clock, INotificationWriter notificationWriter)
 {
     public async Task<Result> HandleAsync(
         RequestAssetReturnRequest request,
@@ -22,6 +22,8 @@ internal sealed class RequestAssetReturnHandler(AssetsDbContext db, ITaskCreator
         if (!assignment.IsActive)
             return Result.Failure(Error.Conflict("Asset has already been returned."));
 
+        var now = clock.UtcNowOffset();
+
         await taskCreator.CreateAsync(
             request.CompanyId,
             createdBy:          request.RequestedBy,
@@ -34,6 +36,18 @@ internal sealed class RequestAssetReturnHandler(AssetsDbContext db, ITaskCreator
             assignedEmployeeId: assignment.EmployeeId,
             assignedUserId:     null,
             sourceEntityId:     assignment.Id,
+            cancellationToken);
+
+        await notificationWriter.WriteAsync(
+            Guid.NewGuid(),
+            request.CompanyId,
+            assignment.EmployeeId,
+            "Asset return requested",
+            "You have been asked to return an assigned asset.",
+            assignment.Id,
+            NotificationType.AssetReturnRequested,
+            NotificationPriority.Normal,
+            now,
             cancellationToken);
 
         return Result.Success();

@@ -53,7 +53,8 @@ public class CreateAssetAssignmentHandlerTests
         var (assetId, companyId) = await SeedAvailableAssetAsync(db);
         var clock = new FakeClock(FixedUtcNow);
         var taskCreator = new FakeTaskCreator();
-        var handler = new CreateAssetAssignmentHandler(db, clock, taskCreator);
+        var notificationWriter = new FakeNotificationWriter();
+        var handler = new CreateAssetAssignmentHandler(db, clock, taskCreator, notificationWriter);
         var employeeId = Guid.NewGuid();
         var assignedBy = Guid.NewGuid();
 
@@ -87,6 +88,16 @@ public class CreateAssetAssignmentHandlerTests
         Assert.Null(task.AssignedUserId);
         Assert.Equal(result.Value.Id, task.SourceEntityId);
         Assert.Equal(DateOnly.FromDateTime(FixedUtcNow.AddDays(7)), task.DueDate);
+
+        Assert.Single(notificationWriter.Written);
+        var notification = notificationWriter.Written[0];
+        Assert.Equal(companyId, notification.CompanyId);
+        Assert.Equal(employeeId, notification.EmployeeId);
+        Assert.Equal("Asset assigned to you", notification.Title);
+        Assert.Contains("Laptop", notification.Body!);
+        Assert.Equal(result.Value!.Id, notification.SourceEntityId);
+        Assert.Equal(NotificationType.AssetAssigned, notification.Type);
+        Assert.Equal(NotificationPriority.Normal, notification.Priority);
     }
 
     [Fact]
@@ -95,7 +106,7 @@ public class CreateAssetAssignmentHandlerTests
         await using var db = BuildContext();
         var clock = new FakeClock(FixedUtcNow);
         var taskCreator = new FakeTaskCreator();
-        var handler = new CreateAssetAssignmentHandler(db, clock, taskCreator);
+        var handler = new CreateAssetAssignmentHandler(db, clock, taskCreator, new FakeNotificationWriter());
 
         var result = await handler.HandleAsync(new CreateAssetAssignmentRequest
         {
@@ -117,7 +128,7 @@ public class CreateAssetAssignmentHandlerTests
         var (assetId, companyId) = await SeedAvailableAssetAsync(db);
         var clock = new FakeClock(FixedUtcNow);
         var taskCreator = new FakeTaskCreator();
-        var handler = new CreateAssetAssignmentHandler(db, clock, taskCreator);
+        var handler = new CreateAssetAssignmentHandler(db, clock, taskCreator, new FakeNotificationWriter());
 
         // First assignment — should succeed
         var firstResult = await handler.HandleAsync(new CreateAssetAssignmentRequest

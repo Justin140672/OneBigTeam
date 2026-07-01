@@ -40,7 +40,7 @@ public class AssetReturnServiceTests
                 Name = "Laptop"
             }, CancellationToken.None);
 
-        var assignmentResult = await new CreateAssetAssignmentHandler(db, clock, new FakeTaskCreator()).HandleAsync(
+        var assignmentResult = await new CreateAssetAssignmentHandler(db, clock, new FakeTaskCreator(), new FakeNotificationWriter()).HandleAsync(
             new CreateAssetAssignmentRequest
             {
                 CompanyId = companyId,

@@ -10,5 +10,7 @@ public enum NotificationType
     LeaveRequested   = 6,
     DocumentExpiring = 7,
     DocumentExpired  = 8,
-    TaskCompleted    = 9,
+    TaskCompleted         = 9,
+    AssetAssigned         = 10,
+    AssetReturnRequested  = 11,
 }

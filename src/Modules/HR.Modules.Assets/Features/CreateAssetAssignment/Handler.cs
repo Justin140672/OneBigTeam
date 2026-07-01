@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Assets.Features.CreateAssetAssignment;
 
-internal sealed class CreateAssetAssignmentHandler(AssetsDbContext db, IClock clock, ITaskCreator taskCreator)
+internal sealed class CreateAssetAssignmentHandler(AssetsDbContext db, IClock clock, ITaskCreator taskCreator, INotificationWriter notificationWriter)
 {
     public async Task<Result<CreateAssetAssignmentResponse>> HandleAsync(
         CreateAssetAssignmentRequest request,
@@ -45,6 +45,18 @@ internal sealed class CreateAssetAssignmentHandler(AssetsDbContext db, IClock cl
             assignedEmployeeId: request.EmployeeId,
             assignedUserId:     null,
             sourceEntityId:     assignment.Id,
+            cancellationToken);
+
+        await notificationWriter.WriteAsync(
+            Guid.NewGuid(),
+            request.CompanyId,
+            request.EmployeeId,
+            "Asset assigned to you",
+            $"The asset \"{asset.Name}\" has been assigned to you.",
+            assignment.Id,
+            NotificationType.AssetAssigned,
+            NotificationPriority.Normal,
+            now,
             cancellationToken);
 
         return Result.Success(new CreateAssetAssignmentResponse(

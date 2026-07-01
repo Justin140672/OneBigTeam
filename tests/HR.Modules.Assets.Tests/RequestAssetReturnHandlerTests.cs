@@ -42,7 +42,7 @@ public class RequestAssetReturnHandlerTests
             Name = "Laptop"
         }, CancellationToken.None);
 
-        var assignmentResult = await new CreateAssetAssignmentHandler(db, clock, new FakeTaskCreator()).HandleAsync(
+        var assignmentResult = await new CreateAssetAssignmentHandler(db, clock, new FakeTaskCreator(), new FakeNotificationWriter()).HandleAsync(
             new CreateAssetAssignmentRequest
             {
                 CompanyId = companyId,
@@ -61,8 +61,9 @@ public class RequestAssetReturnHandlerTests
         var (assignmentId, employeeId, companyId) = await SeedActiveAssignmentAsync(db);
         var clock = new FakeClock(FixedUtcNow);
         var taskCreator = new FakeTaskCreator();
+        var notificationWriter = new FakeNotificationWriter();
         var requestedBy = Guid.NewGuid();
-        var handler = new RequestAssetReturnHandler(db, taskCreator, clock);
+        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, notificationWriter);
 
         var result = await handler.HandleAsync(new RequestAssetReturnRequest
         {
@@ -84,6 +85,15 @@ public class RequestAssetReturnHandlerTests
         Assert.Null(task.AssignedUserId);
         Assert.Equal(assignmentId, task.SourceEntityId);
         Assert.Equal(DateOnly.FromDateTime(FixedUtcNow.AddDays(7)), task.DueDate);
+
+        Assert.Single(notificationWriter.Written);
+        var notification = notificationWriter.Written[0];
+        Assert.Equal(companyId, notification.CompanyId);
+        Assert.Equal(employeeId, notification.EmployeeId);
+        Assert.Equal("Asset return requested", notification.Title);
+        Assert.Equal(assignmentId, notification.SourceEntityId);
+        Assert.Equal(NotificationType.AssetReturnRequested, notification.Type);
+        Assert.Equal(NotificationPriority.Normal, notification.Priority);
     }
 
     [Fact]
@@ -92,7 +102,7 @@ public class RequestAssetReturnHandlerTests
         await using var db = BuildContext();
         var clock = new FakeClock(FixedUtcNow);
         var taskCreator = new FakeTaskCreator();
-        var handler = new RequestAssetReturnHandler(db, taskCreator, clock);
+        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, new FakeNotificationWriter());
 
         var result = await handler.HandleAsync(new RequestAssetReturnRequest
         {
@@ -118,7 +128,7 @@ public class RequestAssetReturnHandlerTests
         await db.SaveChangesAsync();
 
         var taskCreator = new FakeTaskCreator();
-        var handler = new RequestAssetReturnHandler(db, taskCreator, clock);
+        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, new FakeNotificationWriter());
 
         var result = await handler.HandleAsync(new RequestAssetReturnRequest
         {
@@ -139,7 +149,7 @@ public class RequestAssetReturnHandlerTests
         var (assignmentId, _, _) = await SeedActiveAssignmentAsync(db);
         var clock = new FakeClock(FixedUtcNow);
         var taskCreator = new FakeTaskCreator();
-        var handler = new RequestAssetReturnHandler(db, taskCreator, clock);
+        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, new FakeNotificationWriter());
 
         var result = await handler.HandleAsync(new RequestAssetReturnRequest
         {
