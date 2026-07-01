@@ -49,7 +49,8 @@ internal sealed class GetEmployeeTasksHandler(TasksDbContext dbContext, IEmploye
             t.CompletedBy,
             t.CompletedAt,
             t.CreatedAt,
-            t.UpdatedAt)).ToList();
+            t.UpdatedAt,
+            t.SourceEntityId)).ToList();
 
         return new GetEmployeeTasksResponse(items);
     }

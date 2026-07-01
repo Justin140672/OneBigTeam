@@ -156,9 +156,52 @@ public class ListEmployeeAssetsEndpointTests : IClassFixture<ApiWebApplicationFa
         Assert.NotEqual(default, item.AssignedAt);
     }
 
+    [Fact]
+    public async Task Get_Employee_Assets_Excludes_Returned_Assignments()
+    {
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        using var client = AdminClient(companyId);
+
+        var categoryId   = await CreateCategoryAsync(client, companyId);
+        var assetId      = await CreateAssetAsync(client, companyId, categoryId, $"RET-{Guid.NewGuid():N}");
+        var assignmentId = await AssignAssetAsync(client, companyId, assetId, employeeId);
+
+        // Verify the assignment shows before return.
+        var before = await client.GetFromJsonAsync<List<EmployeeAssetPayload>>(
+            $"/api/companies/{companyId}/employees/{employeeId}/assets");
+        Assert.Single(before!);
+
+        // Request return and complete via task completion flow — or use the request-return endpoint.
+        var requestReturnResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/asset-assignments/{assignmentId}/request-return",
+            new { companyId, id = assignmentId, requestedBy = AdminUserId });
+        requestReturnResp.EnsureSuccessStatusCode();
+
+        // Complete the return task that was created.
+        var tasksResp = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/tasks");
+        var tasksPayload = await tasksResp.Content.ReadFromJsonAsync<TaskListPayload>();
+        var returnTask = tasksPayload!.Items.FirstOrDefault(t => t.ActionType == "Return");
+        Assert.NotNull(returnTask);
+
+        var completeResp = await client.PostAsync(
+            $"/api/companies/{companyId}/tasks/{returnTask!.Id}/complete",
+            new System.Net.Http.StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
+        completeResp.EnsureSuccessStatusCode();
+
+        // Assignment should no longer appear since it is no longer active.
+        var after = await client.GetFromJsonAsync<List<EmployeeAssetPayload>>(
+            $"/api/companies/{companyId}/employees/{employeeId}/assets");
+        Assert.NotNull(after);
+        Assert.Empty(after!);
+    }
+
     private sealed record CategoryPayload(Guid Id);
     private sealed record AssetIdPayload(Guid Id);
     private sealed record AssignmentIdPayload(Guid Id);
+    private sealed record TaskListPayload(IReadOnlyList<TaskItemPayload> Items);
+    private sealed record TaskItemPayload(Guid Id, string ActionType, string Status);
 
     private sealed record EmployeeAssetPayload(
         Guid Id,

@@ -76,6 +76,13 @@ public static class IdentityModule
             SystemRoles.HrAdministrator,
             SystemRoles.CompanyAdministrator));
 
+        // Asset domain policies
+        builder.AddPolicy("asset:view", RolePolicy(
+            SystemRoles.Employee,
+            SystemRoles.Manager,
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
         return builder;
     }
 

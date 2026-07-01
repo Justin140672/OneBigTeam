@@ -113,12 +113,13 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     public async Task<bool> HasAssetAcknowledgementPanelAsync() =>
         await page.Locator("[data-testid='asset-acknowledgement-panel']").IsVisibleAsync();
 
-    /// <summary>Returns the asset number shown in the acknowledgement panel, or null if absent.</summary>
+    /// <summary>Returns the asset number shown in the acknowledgement panel, waiting for async load.</summary>
     public async Task<string?> GetAcknowledgementAssetNumberAsync()
     {
         var panel = page.Locator("[data-testid='asset-acknowledgement-panel']");
         var dd = panel.Locator("dd").First;
-        return await dd.IsVisibleAsync() ? (await dd.TextContentAsync())?.Trim() : null;
+        await dd.WaitForAsync(new() { Timeout = 10_000 });
+        return (await dd.TextContentAsync())?.Trim();
     }
 
     /// <summary>Clicks "I Acknowledge Receipt" and waits for the task status to become Completed.</summary>
@@ -136,12 +137,13 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     public async Task<bool> HasAssetReturnPanelAsync() =>
         await page.Locator("[data-testid='asset-return-panel']").IsVisibleAsync();
 
-    /// <summary>Returns the asset number shown in the return panel, or null if absent.</summary>
+    /// <summary>Returns the asset number shown in the return panel, waiting for async load.</summary>
     public async Task<string?> GetReturnAssetNumberAsync()
     {
         var panel = page.Locator("[data-testid='asset-return-panel']");
         var dd = panel.Locator("dd").First;
-        return await dd.IsVisibleAsync() ? (await dd.TextContentAsync())?.Trim() : null;
+        await dd.WaitForAsync(new() { Timeout = 10_000 });
+        return (await dd.TextContentAsync())?.Trim();
     }
 
     /// <summary>Clicks "Confirm Return" and waits for the task status to become Completed.</summary>

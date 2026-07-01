@@ -90,11 +90,11 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     public async Task<bool> HasAssetsTableAsync() =>
         await page.Locator(".e-grid .e-row").CountAsync() > 0;
 
-    /// <summary>Returns all text content from the first column (Asset) in the assets grid.</summary>
+    /// <summary>Returns all asset numbers from the first column (Asset) in the assets grid.</summary>
     public async Task<IReadOnlyList<string>> GetAssetNumbersAsync()
     {
-        var cells = await page.Locator(".e-grid .e-row .e-rowcell:first-child").AllTextContentsAsync();
-        return cells.Select(t => t.Trim()).ToList();
+        var spans = await page.Locator(".e-grid .e-row .e-rowcell:first-child .fw-medium").AllTextContentsAsync();
+        return spans.Select(t => t.Trim()).ToList();
     }
 
     /// <summary>Returns the number of data rows in the assets grid.</summary>

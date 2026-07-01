@@ -9,7 +9,7 @@ internal sealed class Endpoint(GetAssetHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/assets/{id:guid}");
-        Policies("employee:manage");
+        Policies("asset:view");
     }
 
     public override async Task HandleAsync(GetAssetRequest request, CancellationToken cancellationToken)

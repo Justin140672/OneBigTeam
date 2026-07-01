@@ -93,6 +93,40 @@ public class GetAssetEndpointTests : IClassFixture<ApiWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Get_Asset_Returns_All_Optional_Fields_When_Set()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AdminClient(companyId);
+        var category = await CreateCategoryAsync(client, companyId);
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/assets", new
+        {
+            companyId,
+            assetNumber  = "OPT-001",
+            categoryId   = category.Id,
+            name         = "ThinkPad X1",
+            manufacturer = "Lenovo",
+            model        = "ThinkPad X1 Carbon Gen 12",
+            serialNumber = "SN-ABC-123",
+            purchaseDate = "2024-06-01",
+            purchasePrice = 1499.99m
+        });
+        response.EnsureSuccessStatusCode();
+        var created = await response.Content.ReadFromJsonAsync<AssetPayload>();
+
+        var getResp = await client.GetAsync($"/api/companies/{companyId}/assets/{created!.Id}");
+        Assert.Equal(HttpStatusCode.OK, getResp.StatusCode);
+
+        var payload = await getResp.Content.ReadFromJsonAsync<AssetPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("Lenovo",                       payload!.Manufacturer);
+        Assert.Equal("ThinkPad X1 Carbon Gen 12",   payload.Model);
+        Assert.Equal("SN-ABC-123",                   payload.SerialNumber);
+        Assert.Equal(new DateOnly(2024, 6, 1),       payload.PurchaseDate);
+        Assert.Equal(1499.99m,                       payload.PurchasePrice);
+    }
+
+    [Fact]
     public async Task Get_Asset_Returns_NotFound_When_Asset_Belongs_To_Different_Company()
     {
         var companyId = Guid.NewGuid();

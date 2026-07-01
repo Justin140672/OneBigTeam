@@ -16,12 +16,14 @@ namespace HR.Web.E2E.Tests.Tests;
 [Collection("E2E")]
 public sealed class ProfileAssetsTabTests(AppFixture fixture) : E2ETestBase(fixture)
 {
-    private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private static readonly Guid SarahId = Guid.Parse("30000000-0000-0000-0000-000000000001");
-    private static readonly Guid TomId   = Guid.Parse("30000000-0000-0000-0000-000000000004");
+    private static readonly Guid AcmeId   = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid SarahId  = Guid.Parse("30000000-0000-0000-0000-000000000001");
+    private static readonly Guid TomId    = Guid.Parse("30000000-0000-0000-0000-000000000004");
+    private static readonly Guid CarlosId = Guid.Parse("30000000-0000-0000-0000-000000000010");
 
-    private const string SarahEmail = "sarah.chen@acme.example";
-    private const string TomEmail   = "tom.williams@acme.example";
+    private const string SarahEmail  = "sarah.chen@acme.example";
+    private const string TomEmail    = "tom.williams@acme.example";
+    private const string CarlosEmail = "carlos.rivera@acme.example";
 
     [Fact]
     public async Task AssetsTab_IsVisible_OnMyProfile()
@@ -90,5 +92,26 @@ public sealed class ProfileAssetsTabTests(AppFixture fixture) : E2ETestBase(fixt
 
         var assetNumbers = await profile.GetAssetNumbersAsync();
         Assert.Contains("ASSET-0001", assetNumbers);
+    }
+
+    [Fact]
+    public async Task AssetsTab_IsVisible_And_Shows_Empty_State_For_Employee_Without_Assets()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(CarlosEmail);
+
+        await profile.GoToAsync(AcmeId, CarlosId);
+
+        var assetsTab = _page.GetByRole(AriaRole.Tab, new() { Name = "Assets" });
+        Assert.True(await assetsTab.IsVisibleAsync(),
+            "Assets tab should be visible even when the employee has no assigned assets");
+
+        await profile.OpenAssetsTabAsync();
+
+        Assert.False(await profile.HasAssetsTableAsync(),
+            "Expected no asset rows for Carlos who has no seeded assets");
     }
 }
