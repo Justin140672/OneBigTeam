@@ -34,7 +34,7 @@ public class RequestAssetReturnHandlerTests
             Name = "Electronics"
         }, CancellationToken.None);
 
-        var assetResult = await new CreateAssetHandler(db, clock).HandleAsync(new CreateAssetRequest
+        var assetResult = await new CreateAssetHandler(db, clock, new FakeAuditPublisher()).HandleAsync(new CreateAssetRequest
         {
             CompanyId = companyId,
             AssetNumber = "ASSET-001",
@@ -42,7 +42,7 @@ public class RequestAssetReturnHandlerTests
             Name = "Laptop"
         }, CancellationToken.None);
 
-        var assignmentResult = await new CreateAssetAssignmentHandler(db, clock, new FakeTaskCreator(), new FakeNotificationWriter()).HandleAsync(
+        var assignmentResult = await new CreateAssetAssignmentHandler(db, clock, new FakeTaskCreator(), new FakeNotificationWriter(), new FakeAuditPublisher()).HandleAsync(
             new CreateAssetAssignmentRequest
             {
                 CompanyId = companyId,
@@ -63,7 +63,7 @@ public class RequestAssetReturnHandlerTests
         var taskCreator = new FakeTaskCreator();
         var notificationWriter = new FakeNotificationWriter();
         var requestedBy = Guid.NewGuid();
-        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, notificationWriter);
+        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, notificationWriter, new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new RequestAssetReturnRequest
         {
@@ -102,7 +102,7 @@ public class RequestAssetReturnHandlerTests
         await using var db = BuildContext();
         var clock = new FakeClock(FixedUtcNow);
         var taskCreator = new FakeTaskCreator();
-        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, new FakeNotificationWriter());
+        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, new FakeNotificationWriter(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new RequestAssetReturnRequest
         {
@@ -128,7 +128,7 @@ public class RequestAssetReturnHandlerTests
         await db.SaveChangesAsync();
 
         var taskCreator = new FakeTaskCreator();
-        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, new FakeNotificationWriter());
+        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, new FakeNotificationWriter(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new RequestAssetReturnRequest
         {
@@ -149,7 +149,7 @@ public class RequestAssetReturnHandlerTests
         var (assignmentId, _, _) = await SeedActiveAssignmentAsync(db);
         var clock = new FakeClock(FixedUtcNow);
         var taskCreator = new FakeTaskCreator();
-        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, new FakeNotificationWriter());
+        var handler = new RequestAssetReturnHandler(db, taskCreator, clock, new FakeNotificationWriter(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new RequestAssetReturnRequest
         {
@@ -161,5 +161,49 @@ public class RequestAssetReturnHandlerTests
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
         Assert.Empty(taskCreator.Created);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_AssetReturnRequested_Audit_Event_On_Success()
+    {
+        await using var db = BuildContext();
+        var (assignmentId, employeeId, companyId) = await SeedActiveAssignmentAsync(db);
+        var clock = new FakeClock(FixedUtcNow);
+        var auditPublisher = new FakeAuditPublisher();
+        var requestedBy = Guid.NewGuid();
+        var handler = new RequestAssetReturnHandler(db, new FakeTaskCreator(), clock, new FakeNotificationWriter(), auditPublisher);
+
+        var result = await handler.HandleAsync(new RequestAssetReturnRequest
+        {
+            CompanyId = companyId,
+            Id = assignmentId,
+            RequestedBy = requestedBy
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.Single(auditPublisher.Published);
+        Assert.Equal("asset.return_requested", evt.EventType);
+        Assert.Equal(assignmentId, evt.EntityId);
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(requestedBy, evt.ActorUserId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_Audit_Event_When_Assignment_Not_Found()
+    {
+        await using var db = BuildContext();
+        var clock = new FakeClock(FixedUtcNow);
+        var auditPublisher = new FakeAuditPublisher();
+        var handler = new RequestAssetReturnHandler(db, new FakeTaskCreator(), clock, new FakeNotificationWriter(), auditPublisher);
+
+        var result = await handler.HandleAsync(new RequestAssetReturnRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            Id = Guid.NewGuid(),
+            RequestedBy = Guid.NewGuid()
+        }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Empty(auditPublisher.Published);
     }
 }

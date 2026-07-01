@@ -182,20 +182,42 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
     public async Task OpenAssignAssetDialogAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Assign Asset" }).ClickAsync();
-        await page.WaitForSelectorAsync(".e-dialog", new() { Timeout = 10_000 });
+        // The grid keeps a hidden "Choose Columns" dialog (.e-ccdlg) in the DOM at all times,
+        // so .e-dialog is ambiguous. Scope to the modal Assign Asset dialog via aria role + name.
+        await page.GetByRole(AriaRole.Dialog, new() { Name = "Assign Asset" })
+            .WaitForAsync(new() { Timeout = 15_000 });
     }
 
     /// <summary>Returns true if the Assign Asset dialog is currently visible.</summary>
     public async Task<bool> IsAssignAssetDialogVisibleAsync() =>
-        await page.Locator(".e-dialog").IsVisibleAsync();
+        await page.GetByRole(AriaRole.Dialog, new() { Name = "Assign Asset" }).IsVisibleAsync();
+
+    /// <summary>
+    /// Selects the asset matching <paramref name="assetFragment"/> in the Assign Asset dialog
+    /// and clicks Assign. Waits for the dialog to close and the grid to refresh.
+    /// Call <see cref="OpenAssignAssetDialogAsync"/> first.
+    /// </summary>
+    public async Task SelectAssetAndConfirmAsync(string assetFragment)
+    {
+        var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = "Assign Asset" });
+        var combobox = dialog.Locator("span[role='combobox']");
+        await combobox.ClickAsync();
+        var targetItem = page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = assetFragment })
+            .First;
+        await targetItem.WaitForAsync(new() { Timeout = 10_000 });
+        await targetItem.ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Assign" }).ClickAsync();
+        await page.GetByRole(AriaRole.Dialog, new() { Name = "Assign Asset" })
+            .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
 
     /// <summary>Dismisses the Assign Asset dialog by clicking Cancel.</summary>
     public async Task CloseAssignAssetDialogAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.e-dialog') || !document.querySelector('.e-dialog').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 10_000 });
+        await page.GetByRole(AriaRole.Dialog, new() { Name = "Assign Asset" })
+            .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
     // ── Working Pattern section (Details tab) ─────────────────────────────────

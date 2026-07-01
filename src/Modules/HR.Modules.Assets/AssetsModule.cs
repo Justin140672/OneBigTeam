@@ -89,6 +89,7 @@ public static class AssetsModule
         var tomAssignmentId   = Guid.Parse("c0000000-0000-0000-0000-000000000003");
         var sarahAssetId      = Guid.Parse("c0000000-0000-0000-0000-000000000004");
         var sarahAssignmentId = Guid.Parse("c0000000-0000-0000-0000-000000000005");
+        var availableAssetId  = Guid.Parse("c0000000-0000-0000-0000-000000000006");
 
         var category = AssetCategory.Create(categoryId, companyId, "IT Equipment",
             "Laptops, monitors and peripherals", now);
@@ -113,6 +114,13 @@ public static class AssetsModule
         db.Assets.Add(sarahAsset);
         db.AssetAssignments.Add(AssetAssignment.Create(sarahAssignmentId, companyId,
             sarahAssetId, sarahId, sarahId, notes: "Home office monitor", now));
+
+        // Available asset — not assigned, so it appears in the "Assign Asset" dialog dropdown.
+        var availableAsset = Asset.Create(availableAssetId, companyId, "ASSET-0003", categoryId,
+            "Logitech MX Keys", "Logitech", "MX Keys Advanced",
+            "LGT-0003", purchaseDate: new DateOnly(2024, 6, 1),
+            purchasePrice: 129.00m, now);
+        db.Assets.Add(availableAsset);
 
         await db.SaveChangesAsync();
     }

@@ -34,7 +34,7 @@ public class CreateAssetAssignmentHandlerTests
             Description = null
         }, CancellationToken.None);
 
-        var assetHandler = new CreateAssetHandler(db, clock);
+        var assetHandler = new CreateAssetHandler(db, clock, new FakeAuditPublisher());
         var assetResult = await assetHandler.HandleAsync(new CreateAssetRequest
         {
             CompanyId = companyId,
@@ -54,7 +54,7 @@ public class CreateAssetAssignmentHandlerTests
         var clock = new FakeClock(FixedUtcNow);
         var taskCreator = new FakeTaskCreator();
         var notificationWriter = new FakeNotificationWriter();
-        var handler = new CreateAssetAssignmentHandler(db, clock, taskCreator, notificationWriter);
+        var handler = new CreateAssetAssignmentHandler(db, clock, taskCreator, notificationWriter, new FakeAuditPublisher());
         var employeeId = Guid.NewGuid();
         var assignedBy = Guid.NewGuid();
 
@@ -106,7 +106,7 @@ public class CreateAssetAssignmentHandlerTests
         await using var db = BuildContext();
         var clock = new FakeClock(FixedUtcNow);
         var taskCreator = new FakeTaskCreator();
-        var handler = new CreateAssetAssignmentHandler(db, clock, taskCreator, new FakeNotificationWriter());
+        var handler = new CreateAssetAssignmentHandler(db, clock, taskCreator, new FakeNotificationWriter(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new CreateAssetAssignmentRequest
         {
@@ -128,7 +128,7 @@ public class CreateAssetAssignmentHandlerTests
         var (assetId, companyId) = await SeedAvailableAssetAsync(db);
         var clock = new FakeClock(FixedUtcNow);
         var taskCreator = new FakeTaskCreator();
-        var handler = new CreateAssetAssignmentHandler(db, clock, taskCreator, new FakeNotificationWriter());
+        var handler = new CreateAssetAssignmentHandler(db, clock, taskCreator, new FakeNotificationWriter(), new FakeAuditPublisher());
 
         // First assignment — should succeed
         var firstResult = await handler.HandleAsync(new CreateAssetAssignmentRequest
@@ -153,5 +153,53 @@ public class CreateAssetAssignmentHandlerTests
         Assert.True(secondResult.IsFailure);
         Assert.Equal("conflict", secondResult.Error.Code);
         Assert.Single(taskCreator.Created); // only one task was created (for the first assignment)
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_AssetAssigned_Audit_Event_On_Success()
+    {
+        await using var db = BuildContext();
+        var (assetId, companyId) = await SeedAvailableAssetAsync(db);
+        var clock = new FakeClock(FixedUtcNow);
+        var auditPublisher = new FakeAuditPublisher();
+        var handler = new CreateAssetAssignmentHandler(db, clock, new FakeTaskCreator(), new FakeNotificationWriter(), auditPublisher);
+        var employeeId = Guid.NewGuid();
+        var assignedBy = Guid.NewGuid();
+
+        var result = await handler.HandleAsync(new CreateAssetAssignmentRequest
+        {
+            CompanyId = companyId,
+            AssetId = assetId,
+            EmployeeId = employeeId,
+            AssignedBy = assignedBy
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.Single(auditPublisher.Published);
+        Assert.Equal("asset.assigned", evt.EventType);
+        Assert.Equal(result.Value!.Id, evt.EntityId);
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(assignedBy, evt.ActorUserId);
+        Assert.Null(evt.ActorEmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_Audit_Event_When_Asset_Not_Found()
+    {
+        await using var db = BuildContext();
+        var clock = new FakeClock(FixedUtcNow);
+        var auditPublisher = new FakeAuditPublisher();
+        var handler = new CreateAssetAssignmentHandler(db, clock, new FakeTaskCreator(), new FakeNotificationWriter(), auditPublisher);
+
+        var result = await handler.HandleAsync(new CreateAssetAssignmentRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            AssetId = Guid.NewGuid(),
+            EmployeeId = Guid.NewGuid(),
+            AssignedBy = Guid.NewGuid()
+        }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Empty(auditPublisher.Published);
     }
 }

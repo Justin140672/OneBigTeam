@@ -28,6 +28,11 @@ public abstract class E2ETestBase(AppFixture fixture) : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
+        // Navigate away before closing so that any Blazor error boundary or faulted circuit
+        // is torn down cleanly on the server side, preventing its error UI from bleeding into
+        // the next test's fresh context via a reconnecting circuit.
+        try { await _page.GotoAsync("about:blank"); } catch { /* ignore navigation errors on teardown */ }
+
         await _context.DisposeAsync();
         // Let the Blazor Server circuit disconnect before the next test switches personas.
         // 1 500 ms is not enough on a warm app under load — the lingering circuit can

@@ -27,8 +27,11 @@ public sealed class OverviewTab(IPage page)
         return (await dt.Locator("~ dd").First.TextContentAsync())?.Trim();
     }
 
-    public async Task ClickRequestLeaveAsync() =>
+    public async Task ClickRequestLeaveAsync()
+    {
         await page.Locator(".action-btn").Filter(new() { HasText = "Request Leave" }).ClickAsync();
+        await page.WaitForSelectorAsync(".e-dialog", new() { Timeout = 10_000 });
+    }
 
     public async Task ClickViewDocumentsAsync() =>
         await page.Locator(".action-btn").Filter(new() { HasText = "View Documents" }).ClickAsync();

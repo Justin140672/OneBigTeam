@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Assets.Features.CreateAsset;
 
-internal sealed class CreateAssetHandler(AssetsDbContext db, IClock clock)
+internal sealed class CreateAssetHandler(AssetsDbContext db, IClock clock, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<CreateAssetResponse>> HandleAsync(
         CreateAssetRequest request,
@@ -35,6 +35,13 @@ internal sealed class CreateAssetHandler(AssetsDbContext db, IClock clock)
 
         db.Assets.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new AssetCreatedAuditEvent(
+            entity.CompanyId,
+            entity.Id,
+            entity.AssetNumber,
+            entity.Name,
+            now), cancellationToken);
 
         return Result.Success(new CreateAssetResponse(
             entity.Id, entity.CompanyId, entity.AssetNumber, entity.CategoryId,

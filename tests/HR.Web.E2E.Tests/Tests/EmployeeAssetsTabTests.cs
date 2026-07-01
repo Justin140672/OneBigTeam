@@ -195,4 +195,30 @@ public sealed class EmployeeAssetsTabTests(AppFixture fixture) : E2ETestBase(fix
         Assert.False(await empAdmin.IsAssignAssetDialogVisibleAsync(),
             "Expected the Assign Asset dialog to close after clicking Cancel");
     }
+
+    [Fact]
+    public async Task AssetsTab_AssigningAvailableAsset_AddsRowToGrid()
+    {
+        // Carlos has no assets. ASSET-0003 (Logitech MX Keys) is seeded as Available.
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empAdmin.GoToAsync(AcmeId, CarlosId);
+        await empAdmin.OpenAssetsTabAsync();
+
+        Assert.False(await empAdmin.HasAssetsGridRowsAsync(),
+            "Carlos should have no assets before assignment");
+
+        await empAdmin.OpenAssignAssetDialogAsync();
+        await empAdmin.SelectAssetAndConfirmAsync("ASSET-0003");
+
+        Assert.True(await empAdmin.HasAssetsGridRowsAsync(),
+            "Carlos should have one asset row after assignment");
+
+        var assetNumbers = await empAdmin.GetAssetsGridAssetNumbersAsync();
+        Assert.Contains("ASSET-0003", assetNumbers);
+    }
 }

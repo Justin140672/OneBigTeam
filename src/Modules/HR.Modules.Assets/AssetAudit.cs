@@ -2,6 +2,64 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Assets;
 
+internal sealed record AssetCreatedAuditEvent(
+    Guid CompanyId,
+    Guid AssetId,
+    string AssetNumber,
+    string Name,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "asset.created";
+    string IAuditEvent.EntityType => "Asset";
+    Guid IAuditEvent.EntityId => AssetId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"Asset '{Name}' ({AssetNumber}) created";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { AssetNumber, Name };
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record AssetAssignedAuditEvent(
+    Guid CompanyId,
+    Guid AssignmentId,
+    Guid AssetId,
+    Guid EmployeeId,
+    Guid AssignedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "asset.assigned";
+    string IAuditEvent.EntityType => "AssetAssignment";
+    Guid IAuditEvent.EntityId => AssignmentId;
+    Guid? IAuditEvent.ActorUserId => AssignedBy;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Asset assigned to employee";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { AssetId, EmployeeId, AssignedBy };
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record AssetReturnRequestedAuditEvent(
+    Guid CompanyId,
+    Guid AssignmentId,
+    Guid EmployeeId,
+    Guid RequestedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "asset.return_requested";
+    string IAuditEvent.EntityType => "AssetAssignment";
+    Guid IAuditEvent.EntityId => AssignmentId;
+    Guid? IAuditEvent.ActorUserId => RequestedBy;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Asset return requested";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { RequestedBy };
+    object? IAuditEvent.Metadata => null;
+}
+
 internal sealed record AssetAssignmentAcknowledgedAuditEvent(
     Guid CompanyId,
     Guid AssignmentId,

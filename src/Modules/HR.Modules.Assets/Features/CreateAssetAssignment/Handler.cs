@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Assets.Features.CreateAssetAssignment;
 
-internal sealed class CreateAssetAssignmentHandler(AssetsDbContext db, IClock clock, ITaskCreator taskCreator, INotificationWriter notificationWriter)
+internal sealed class CreateAssetAssignmentHandler(AssetsDbContext db, IClock clock, ITaskCreator taskCreator, INotificationWriter notificationWriter, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<CreateAssetAssignmentResponse>> HandleAsync(
         CreateAssetAssignmentRequest request,
@@ -32,6 +32,14 @@ internal sealed class CreateAssetAssignmentHandler(AssetsDbContext db, IClock cl
 
         db.AssetAssignments.Add(assignment);
         await db.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new AssetAssignedAuditEvent(
+            assignment.CompanyId,
+            assignment.Id,
+            assignment.AssetId,
+            assignment.EmployeeId,
+            assignment.AssignedBy,
+            now), cancellationToken);
 
         await taskCreator.CreateAsync(
             request.CompanyId,

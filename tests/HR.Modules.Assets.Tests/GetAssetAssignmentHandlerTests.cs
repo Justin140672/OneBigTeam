@@ -35,7 +35,7 @@ public class GetAssetAssignmentHandlerTests
             Name = "Electronics"
         }, CancellationToken.None);
 
-        var assetHandler = new CreateAssetHandler(db, clock);
+        var assetHandler = new CreateAssetHandler(db, clock, new FakeAuditPublisher());
         var assetResult = await assetHandler.HandleAsync(new CreateAssetRequest
         {
             CompanyId = companyId,
@@ -46,7 +46,7 @@ public class GetAssetAssignmentHandlerTests
 
         var assetId = assetResult.Value!.Id;
 
-        var assignmentHandler = new CreateAssetAssignmentHandler(db, clock, taskCreator, new FakeNotificationWriter());
+        var assignmentHandler = new CreateAssetAssignmentHandler(db, clock, taskCreator, new FakeNotificationWriter(), new FakeAuditPublisher());
         var assignmentResult = await assignmentHandler.HandleAsync(new CreateAssetAssignmentRequest
         {
             CompanyId = companyId,

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Assets.Features.RequestAssetReturn;
 
-internal sealed class RequestAssetReturnHandler(AssetsDbContext db, ITaskCreator taskCreator, IClock clock, INotificationWriter notificationWriter)
+internal sealed class RequestAssetReturnHandler(AssetsDbContext db, ITaskCreator taskCreator, IClock clock, INotificationWriter notificationWriter, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result> HandleAsync(
         RequestAssetReturnRequest request,
@@ -49,6 +49,13 @@ internal sealed class RequestAssetReturnHandler(AssetsDbContext db, ITaskCreator
             NotificationPriority.Normal,
             now,
             cancellationToken);
+
+        await auditPublisher.PublishAsync(new AssetReturnRequestedAuditEvent(
+            request.CompanyId,
+            assignment.Id,
+            assignment.EmployeeId,
+            request.RequestedBy,
+            now), cancellationToken);
 
         return Result.Success();
     }

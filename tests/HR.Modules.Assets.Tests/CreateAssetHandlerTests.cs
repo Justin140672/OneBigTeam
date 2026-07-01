@@ -3,6 +3,7 @@ using HR.Modules.Assets.Features.CreateAsset;
 using HR.Modules.Assets.Features.CreateAssetCategory;
 using HR.Modules.Assets.Persistence;
 using HR.Modules.Assets.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Assets.Tests;
@@ -38,7 +39,7 @@ public class CreateAssetHandlerTests
     {
         await using var db = BuildContext();
         var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new CreateAssetRequest
         {
@@ -73,7 +74,7 @@ public class CreateAssetHandlerTests
     {
         await using var db = BuildContext();
         var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new CreateAssetRequest
         {
@@ -101,7 +102,7 @@ public class CreateAssetHandlerTests
     {
         await using var db = BuildContext();
         var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new CreateAssetRequest
         {
@@ -120,7 +121,7 @@ public class CreateAssetHandlerTests
     {
         await using var db = BuildContext();
         var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new CreateAssetRequest
         {
@@ -140,7 +141,7 @@ public class CreateAssetHandlerTests
     {
         await using var db = BuildContext();
         var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         await handler.HandleAsync(new CreateAssetRequest
         {
@@ -161,7 +162,7 @@ public class CreateAssetHandlerTests
     {
         await using var db = BuildContext();
         var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var request = new CreateAssetRequest
         {
@@ -184,7 +185,7 @@ public class CreateAssetHandlerTests
         await using var db = BuildContext();
         var (categoryId1, companyId1) = await SeedActiveCategoryAsync(db);
         var (categoryId2, companyId2) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         await handler.HandleAsync(new CreateAssetRequest
         {
@@ -209,7 +210,7 @@ public class CreateAssetHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Category_Does_Not_Exist()
     {
         await using var db = BuildContext();
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new CreateAssetRequest
         {
@@ -228,7 +229,7 @@ public class CreateAssetHandlerTests
     {
         await using var db = BuildContext();
         var (categoryId, _) = await SeedActiveCategoryAsync(db);
-        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(new CreateAssetRequest
         {
@@ -240,5 +241,55 @@ public class CreateAssetHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_AssetCreated_Audit_Event_On_Success()
+    {
+        await using var db = BuildContext();
+        var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
+        var auditPublisher = new FakeAuditPublisher();
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), auditPublisher);
+
+        var result = await handler.HandleAsync(new CreateAssetRequest
+        {
+            CompanyId = companyId,
+            AssetNumber = "AUDIT-001",
+            CategoryId = categoryId,
+            Name = "Audited Laptop"
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.Single(auditPublisher.Published);
+        Assert.Equal("asset.created", evt.EventType);
+        Assert.Equal(result.Value!.Id, evt.EntityId);
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Null(evt.ActorUserId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_Audit_Event_On_Failure()
+    {
+        await using var db = BuildContext();
+        var (categoryId, companyId) = await SeedActiveCategoryAsync(db);
+        var auditPublisher = new FakeAuditPublisher();
+        var handler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), auditPublisher);
+
+        var request = new CreateAssetRequest
+        {
+            CompanyId = companyId,
+            AssetNumber = "DUPE",
+            CategoryId = categoryId,
+            Name = "First"
+        };
+        await handler.HandleAsync(request, CancellationToken.None);
+        auditPublisher.Published.ToList(); // reset not needed — just verify count below
+
+        var auditPublisher2 = new FakeAuditPublisher();
+        var handler2 = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), auditPublisher2);
+        var result = await handler2.HandleAsync(request with { Name = "Duplicate" }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Empty(auditPublisher2.Published);
     }
 }

@@ -3,6 +3,7 @@
 @using HR.Web.Components.Pages.Tasks
 @using HR.Web.Components.Pages.Notifications
 @using HR.Web.Components.Pages.Probation
+@using HR.Web.Components.Pages.Assets
 @inject AppSession Session
 
 <PageTitle>Dashboard</PageTitle>
@@ -25,6 +26,9 @@
         </div>
         <div class="col-xl-5 col-lg-6">
             <UpcomingProbationReviewsWidget />
+        </div>
+        <div class="col-xl-5 col-lg-6">
+            <MyAssetsWidget />
         </div>
     </div>
 </div>

@@ -107,8 +107,13 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     {
         var leaveTab = page.GetByRole(AriaRole.Tab, new() { Name = "Leave" });
         await leaveTab.ClickAsync();
-        // Wait for the leave balance card or the "No leave requests yet" message.
-        await page.WaitForSelectorAsync(".card-header, p.text-muted", new() { Timeout = 15_000 });
+        // Wait for the balance data to load from the API — the Annual Leave card's value must
+        // be present before we proceed. Waiting for just .card-header is not enough because
+        // that element renders before the async balance fetch completes, leaving _allBalances
+        // empty and the leave-type dropdown with no items when the dialog opens.
+        await page.Locator(".card").Filter(new() { HasText = "Annual Leave" })
+            .Locator("dd.fs-4.fw-semibold")
+            .WaitForAsync(new() { Timeout = 20_000 });
     }
 
     /// <summary>
@@ -190,11 +195,13 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
         // Scope to the leave-type combobox via :has() on its input's unique placeholder.
         var typeCombobox = dialog.Locator("span[role='combobox']:has([placeholder='Select leave type'])");
         await typeCombobox.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
+        // Wait for the specific list item to exist in the popup — not just the popup container,
+        // because Syncfusion renders items asynchronously after the popup opens.
+        var targetItem = page.Locator(".e-popup.e-ddl .e-list-item")
             .Filter(new() { HasText = leaveTypeName })
-            .First
-            .ClickAsync();
+            .First;
+        await targetItem.WaitForAsync(new() { Timeout = 10_000 });
+        await targetItem.ClickAsync();
 
         // Start date — fill into the first SfDatePicker input.
         var dateInputs = dialog.Locator(".e-date-wrapper input.e-input");

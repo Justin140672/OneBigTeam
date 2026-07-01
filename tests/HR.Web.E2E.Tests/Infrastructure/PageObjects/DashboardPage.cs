@@ -81,4 +81,76 @@ public sealed class DashboardPage(IPage page, string baseUrl)
             names.Add((await t.TextContentAsync())?.Trim() ?? "");
         return names;
     }
+
+    // ── My Assets Widget ──────────────────────────────────────────────────────
+
+    private ILocator MyAssetsWidget =>
+        page.Locator(".widget-card").Filter(new() { HasText = "My Assets" }).First;
+
+    /// <summary>Waits for the My Assets widget to finish loading (spinner gone).</summary>
+    private async Task WaitForMyAssetsWidgetAsync()
+    {
+        // Wait until either an asset item or the empty state is present.
+        await MyAssetsWidget
+            .Locator(".task-widget-item, .widget-empty")
+            .First
+            .WaitForAsync(new() { Timeout = 15_000 });
+    }
+
+    /// <summary>Returns true if the My Assets widget header is visible on the dashboard.</summary>
+    public async Task<bool> HasMyAssetsWidgetAsync() =>
+        await page.Locator(".widget-header")
+            .Filter(new() { HasText = "My Assets" })
+            .IsVisibleAsync();
+
+    /// <summary>Returns the asset names listed in the My Assets widget.</summary>
+    public async Task<IReadOnlyList<string>> GetMyAssetNamesAsync()
+    {
+        await WaitForMyAssetsWidgetAsync();
+
+        var titles = await MyAssetsWidget.Locator(".task-widget-title").AllAsync();
+        var names  = new List<string>();
+        foreach (var t in titles)
+            names.Add((await t.TextContentAsync())?.Trim() ?? "");
+        return names;
+    }
+
+    /// <summary>Returns true if the My Assets widget shows the "No assets assigned." empty state.</summary>
+    public async Task<bool> IsMyAssetsWidgetEmptyAsync()
+    {
+        await WaitForMyAssetsWidgetAsync();
+        return await MyAssetsWidget.Locator(".widget-empty").IsVisibleAsync();
+    }
+
+    /// <summary>
+    /// Returns the acknowledgement badge text ("Pending" or "Acknowledged") for the
+    /// asset whose name contains <paramref name="assetNameFragment"/>.
+    /// </summary>
+    public async Task<string> GetMyAssetAcknowledgementBadgeAsync(string assetNameFragment)
+    {
+        await WaitForMyAssetsWidgetAsync();
+
+        var item = MyAssetsWidget.Locator(".task-widget-item")
+            .Filter(new() { HasText = assetNameFragment })
+            .First;
+
+        var badge = item.Locator(".due-badge");
+        return (await badge.TextContentAsync())?.Trim() ?? "";
+    }
+
+    /// <summary>
+    /// Clicks the asset item whose name contains <paramref name="assetNameFragment"/>
+    /// and waits for navigation to the asset detail page.
+    /// </summary>
+    public async Task ClickMyAssetAsync(string assetNameFragment)
+    {
+        await WaitForMyAssetsWidgetAsync();
+
+        var item = MyAssetsWidget.Locator(".task-widget-item")
+            .Filter(new() { HasText = assetNameFragment })
+            .First;
+
+        await item.ClickAsync();
+        await page.WaitForURLAsync(new System.Text.RegularExpressions.Regex("/assets/"), new() { Timeout = 15_000 });
+    }
 }

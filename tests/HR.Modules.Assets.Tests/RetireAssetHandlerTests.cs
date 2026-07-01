@@ -35,7 +35,7 @@ public class RetireAssetHandlerTests
             Description = null
         }, CancellationToken.None);
 
-        var assetHandler = new CreateAssetHandler(db, clock);
+        var assetHandler = new CreateAssetHandler(db, clock, new FakeAuditPublisher());
         var assetResult = await assetHandler.HandleAsync(new CreateAssetRequest
         {
             CompanyId = companyId,
