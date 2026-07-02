@@ -2,6 +2,46 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Sickness;
 
+internal sealed record SicknessEvidenceRequestedAuditEvent(
+    Guid EvidenceRequestId,
+    Guid SicknessRecordId,
+    Guid CompanyId,
+    Guid EmployeeId,
+    DateOnly DueDate,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "sickness.evidence_requested";
+    string IAuditEvent.EntityType => "SicknessEvidenceRequest";
+    Guid IAuditEvent.EntityId => EvidenceRequestId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Fit note evidence requested";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { SicknessRecordId, DueDate };
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record SicknessEvidenceFulfilledAuditEvent(
+    Guid EvidenceRequestId,
+    Guid SicknessRecordId,
+    Guid CompanyId,
+    Guid EmployeeId,
+    DateTimeOffset FulfilledAt,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "sickness.evidence_fulfilled";
+    string IAuditEvent.EntityType => "SicknessEvidenceRequest";
+    Guid IAuditEvent.EntityId => EvidenceRequestId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Fit note evidence fulfilled";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { SicknessRecordId, FulfilledAt };
+    object? IAuditEvent.Metadata => null;
+}
+
 internal sealed record SicknessUpdatedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,

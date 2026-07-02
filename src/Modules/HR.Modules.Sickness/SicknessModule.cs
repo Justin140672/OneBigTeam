@@ -1,5 +1,6 @@
 using Hangfire;
 using HR.Modules.Sickness.Features.CloseSicknessRecord;
+using HR.Modules.Sickness.Features.FulfilEvidenceRequest;
 using HR.Modules.Sickness.Features.CreateSicknessCategory;
 using HR.Modules.Sickness.Features.DeactivateSicknessCategory;
 using HR.Modules.Sickness.Features.GetSicknessRecord;
@@ -11,6 +12,7 @@ using HR.Modules.Sickness.Features.UpdateSicknessRecord;
 using HR.Modules.Sickness.Features.UpdateSicknessCategory;
 using HR.Modules.Sickness.Jobs;
 using HR.Modules.Sickness.Persistence;
+using HR.SharedKernel.Contracts;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,6 +47,7 @@ public static class SicknessModule
         services.AddScoped<UpdateSicknessRecordHandler>();
         services.AddScoped<CloseSicknessRecordHandler>();
         services.AddScoped<FitNoteRequestJob>();
+        services.AddScoped<ITaskCompletionAction, SicknessEvidenceUploadCompletionAction>();
     }
 
     public static WebApplication UseSicknessRecurringJobs(this WebApplication app)

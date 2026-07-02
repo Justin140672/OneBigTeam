@@ -9,6 +9,7 @@ internal sealed class FitNoteRequestJob(
     SicknessDbContext db,
     ICompanySicknessSettingsReader sicknessSettingsReader,
     IIntegrationEventPublisher eventPublisher,
+    IAuditEventPublisher auditPublisher,
     IClock clock)
 {
     private static readonly Guid SystemUserId = Guid.Empty;
@@ -91,6 +92,16 @@ internal sealed class FitNoteRequestJob(
                         EvidenceRequestId: request.Id,
                         DueDate:          dueDate,
                         OccurredAt:       now),
+                    CancellationToken.None);
+
+                await auditPublisher.PublishAsync(
+                    new SicknessEvidenceRequestedAuditEvent(
+                        EvidenceRequestId: request.Id,
+                        SicknessRecordId:  request.SicknessRecordId,
+                        CompanyId:         companyId,
+                        EmployeeId:        employeeId,
+                        DueDate:           dueDate,
+                        OccurredAt:        now),
                     CancellationToken.None);
             }
         }

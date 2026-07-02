@@ -73,6 +73,12 @@ internal sealed class SicknessRecord
         UpdatedAt = now;
     }
 
+    public void ReceiveEvidence(DateTimeOffset now)
+    {
+        EvidenceStatus = SicknessEvidenceStatus.Received;
+        UpdatedAt = now;
+    }
+
     public void Update(
         Guid categoryId,
         DateOnly startDate,
