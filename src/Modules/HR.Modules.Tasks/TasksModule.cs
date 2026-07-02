@@ -7,6 +7,7 @@ using HR.Modules.Tasks.Features.GetTeamTasks;
 using HR.Modules.Tasks.Features.GetTask;
 using HR.Modules.Tasks.Features.GetUnassignedTasks;
 using HR.Modules.Tasks.Features.LeaveRequested;
+using HR.Modules.Tasks.Features.SicknessEvidenceRequested;
 using HR.Modules.Tasks.Features.ReassignTask;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Services;
@@ -43,6 +44,7 @@ public static class TasksModule
         services.AddScoped<ITaskCompletionAction, AssetTaskCompletionAction>();
         services.AddScoped<ITaskCompletionAction, AssetReturnTaskCompletionAction>();
         services.AddScoped<IIntegrationEventHandler<LeaveRequestedIntegrationEvent>, LeaveRequestedHandler>();
+        services.AddScoped<IIntegrationEventHandler<SicknessEvidenceRequestedIntegrationEvent>, SicknessEvidenceRequestedHandler>();
 
         services.AddScoped<GetTaskHandler>();
         services.AddScoped<GetUnassignedTasksHandler>();

@@ -8,6 +8,7 @@ namespace HR.Modules.Sickness.Jobs;
 internal sealed class FitNoteRequestJob(
     SicknessDbContext db,
     ICompanySicknessSettingsReader sicknessSettingsReader,
+    IIntegrationEventPublisher eventPublisher,
     IClock clock)
 {
     private static readonly Guid SystemUserId = Guid.Empty;
@@ -58,6 +59,8 @@ internal sealed class FitNoteRequestJob(
 
             var dueDate = today.AddDays(DueDateDaysFromNow);
 
+            var newRequests = new List<(SicknessEvidenceRequest Request, Guid EmployeeId)>();
+
             foreach (var record in eligibleRecords)
             {
                 if (existingRequestRecordIds.Contains(record.Id))
@@ -73,9 +76,23 @@ internal sealed class FitNoteRequestJob(
                     now);
 
                 db.SicknessEvidenceRequests.Add(evidenceRequest);
+                newRequests.Add((evidenceRequest, record.EmployeeId));
             }
 
             await db.SaveChangesAsync();
+
+            foreach (var (request, employeeId) in newRequests)
+            {
+                await eventPublisher.PublishAsync(
+                    new SicknessEvidenceRequestedIntegrationEvent(
+                        CompanyId:        companyId,
+                        EmployeeId:       employeeId,
+                        SicknessRecordId: request.SicknessRecordId,
+                        EvidenceRequestId: request.Id,
+                        DueDate:          dueDate,
+                        OccurredAt:       now),
+                    CancellationToken.None);
+            }
         }
     }
 }
