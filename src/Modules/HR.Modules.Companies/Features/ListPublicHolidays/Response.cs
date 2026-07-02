@@ -1,4 +1,4 @@
-namespace HR.Modules.Leave.Features.ListPublicHolidays;
+namespace HR.Modules.Companies.Features.ListPublicHolidays;
 
 internal sealed record ListPublicHolidaysResponse(IReadOnlyList<PublicHolidayItem> Items);
 

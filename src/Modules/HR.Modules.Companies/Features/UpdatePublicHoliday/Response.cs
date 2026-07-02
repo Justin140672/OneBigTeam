@@ -1,4 +1,4 @@
-namespace HR.Modules.Leave.Features.UpdatePublicHoliday;
+namespace HR.Modules.Companies.Features.UpdatePublicHoliday;
 
 internal sealed record UpdatePublicHolidayResponse(
     Guid Id,

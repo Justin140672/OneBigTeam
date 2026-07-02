@@ -206,6 +206,12 @@ namespace HR.Modules.Companies.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("exclude_public_holidays_from_leave");
 
+                    b.Property<bool>("ExcludePublicHolidaysFromSickness")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("exclude_public_holidays_from_sickness");
+
                     b.Property<decimal>("HoursPerDay")
                         .HasPrecision(4, 2)
                         .HasColumnType("numeric(4,2)")
@@ -245,6 +251,44 @@ namespace HR.Modules.Companies.Migrations
                         {
                             t.HasCheckConstraint("CK_company_settings_leave_year_start_month", "leave_year_start_month BETWEEN 1 AND 12");
                         });
+                });
+
+            modelBuilder.Entity("HR.Modules.Companies.Domain.PublicHoliday", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("CountryCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("country_code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "Date")
+                        .HasDatabaseName("IX_public_holidays_company_id_date");
+
+                    b.ToTable("public_holidays", "companies");
                 });
 
             modelBuilder.Entity("HR.Modules.Companies.Domain.OutboxMessage", b =>

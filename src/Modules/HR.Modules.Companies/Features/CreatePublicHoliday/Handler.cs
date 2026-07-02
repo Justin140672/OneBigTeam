@@ -1,16 +1,16 @@
-using HR.Modules.Leave.Domain;
-using HR.Modules.Leave.Persistence;
+using HR.Modules.Companies.Domain;
+using HR.Modules.Companies.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
-namespace HR.Modules.Leave.Features.CreatePublicHoliday;
+namespace HR.Modules.Companies.Features.CreatePublicHoliday;
 
 internal sealed class CreatePublicHolidayHandler
 {
-    private readonly LeaveDbContext _dbContext;
+    private readonly CompaniesDbContext _dbContext;
     private readonly IClock _clock;
 
-    public CreatePublicHolidayHandler(LeaveDbContext dbContext, IClock clock)
+    public CreatePublicHolidayHandler(CompaniesDbContext dbContext, IClock clock)
     {
         _dbContext = dbContext;
         _clock = clock;

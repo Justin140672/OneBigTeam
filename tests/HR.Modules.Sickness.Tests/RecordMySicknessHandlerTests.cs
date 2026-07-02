@@ -1,7 +1,9 @@
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Features.RecordMySickness;
+using HR.Modules.Sickness.Features.RecordSickness;
 using HR.Modules.Sickness.Persistence;
 using HR.Modules.Sickness.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Tests;
@@ -10,6 +12,8 @@ public class RecordMySicknessHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 7, 1, 9, 0, 0, DateTimeKind.Utc);
     private static readonly DateOnly StartDate = new(2026, 7, 1);
+
+    private static readonly WorkingPattern DefaultPattern = WorkingPattern.Default;
 
     private static SicknessDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<SicknessDbContext>()
@@ -25,16 +29,26 @@ public class RecordMySicknessHandlerTests
         return category.Id;
     }
 
+    private static RecordMySicknessHandler BuildHandler(
+        SicknessDbContext db,
+        WorkingPattern? pattern = null,
+        bool excludePublicHolidays = false,
+        IReadOnlyCollection<DateOnly>? publicHolidays = null) =>
+        new(db,
+            new FakeClock(FixedUtcNow),
+            new FakeWorkingPatternProvider(pattern ?? DefaultPattern),
+            new FakeCompanySicknessSettingsReader(excludePublicHolidays),
+            new FakePublicHolidayReader(publicHolidays));
+
     [Fact]
-    public async Task HandleAsync_Creates_SicknessRecord()
+    public async Task HandleAsync_Creates_SicknessRecord_With_No_EndDate()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
 
-        var handler = new RecordMySicknessHandler(db, new FakeClock(FixedUtcNow));
-        var result = await handler.HandleAsync(new RecordMySicknessRequest
+        var result = await BuildHandler(db).HandleAsync(new RecordMySicknessRequest
         {
             CompanyId = companyId,
             EmployeeId = employeeId,
@@ -59,6 +73,100 @@ public class RecordMySicknessHandlerTests
         var saved = await db.SicknessRecords.SingleAsync();
         Assert.Equal(companyId, saved.CompanyId);
         Assert.Equal(employeeId, saved.EmployeeId);
+        Assert.Null(saved.TotalDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_TotalDays_Is_Null_When_No_EndDate()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+
+        var result = await BuildHandler(db).HandleAsync(new RecordMySicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = Guid.NewGuid(),
+            CategoryId = categoryId,
+            StartDate = StartDate,
+            StartDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var saved = await db.SicknessRecords.SingleAsync();
+        Assert.Null(saved.TotalDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Calculates_TotalDays_For_FullDay_Single_Day()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+
+        var result = await BuildHandler(db).HandleAsync(new RecordMySicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = Guid.NewGuid(),
+            CategoryId = categoryId,
+            StartDate = new DateOnly(2026, 7, 1),
+            StartDayPart = SicknessDayPart.FullDay,
+            EndDate = new DateOnly(2026, 7, 1),
+            EndDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var saved = await db.SicknessRecords.SingleAsync();
+        Assert.Equal(1m, saved.TotalDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Calculates_TotalDays_For_HalfDayPM()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+
+        var result = await BuildHandler(db).HandleAsync(new RecordMySicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = Guid.NewGuid(),
+            CategoryId = categoryId,
+            StartDate = new DateOnly(2026, 7, 1),
+            StartDayPart = SicknessDayPart.HalfDayPM,
+            EndDate = new DateOnly(2026, 7, 1),
+            EndDayPart = SicknessDayPart.HalfDayPM
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var saved = await db.SicknessRecords.SingleAsync();
+        Assert.Equal(0.5m, saved.TotalDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Excludes_Public_Holidays_When_Setting_Is_Enabled()
+    {
+        var publicHolidays = new List<DateOnly> { new(2026, 7, 2) };
+
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+
+        var result = await BuildHandler(db, excludePublicHolidays: true, publicHolidays: publicHolidays)
+            .HandleAsync(new RecordMySicknessRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = Guid.NewGuid(),
+                CategoryId = categoryId,
+                StartDate = new DateOnly(2026, 7, 1),
+                StartDayPart = SicknessDayPart.FullDay,
+                EndDate = new DateOnly(2026, 7, 3),
+                EndDayPart = SicknessDayPart.FullDay
+            }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var saved = await db.SicknessRecords.SingleAsync();
+        Assert.Equal(2m, saved.TotalDays);
     }
 
     [Fact]
@@ -68,8 +176,7 @@ public class RecordMySicknessHandlerTests
         var companyId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
 
-        var handler = new RecordMySicknessHandler(db, new FakeClock(FixedUtcNow));
-        var result = await handler.HandleAsync(new RecordMySicknessRequest
+        var result = await BuildHandler(db).HandleAsync(new RecordMySicknessRequest
         {
             CompanyId = companyId,
             EmployeeId = Guid.NewGuid(),
@@ -88,9 +195,7 @@ public class RecordMySicknessHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Category_Does_Not_Exist()
     {
         await using var db = BuildContext();
-        var handler = new RecordMySicknessHandler(db, new FakeClock(FixedUtcNow));
-
-        var result = await handler.HandleAsync(new RecordMySicknessRequest
+        var result = await BuildHandler(db).HandleAsync(new RecordMySicknessRequest
         {
             CompanyId = Guid.NewGuid(),
             EmployeeId = Guid.NewGuid(),
@@ -109,8 +214,7 @@ public class RecordMySicknessHandlerTests
         await using var db = BuildContext();
         var categoryId = await SeedCategory(db, Guid.NewGuid()); // different company
 
-        var handler = new RecordMySicknessHandler(db, new FakeClock(FixedUtcNow));
-        var result = await handler.HandleAsync(new RecordMySicknessRequest
+        var result = await BuildHandler(db).HandleAsync(new RecordMySicknessRequest
         {
             CompanyId = Guid.NewGuid(),
             EmployeeId = Guid.NewGuid(),
@@ -130,8 +234,7 @@ public class RecordMySicknessHandlerTests
         var companyId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
 
-        var handler = new RecordMySicknessHandler(db, new FakeClock(FixedUtcNow));
-        var result = await handler.HandleAsync(new RecordMySicknessRequest
+        var result = await BuildHandler(db).HandleAsync(new RecordMySicknessRequest
         {
             CompanyId = companyId,
             EmployeeId = Guid.NewGuid(),

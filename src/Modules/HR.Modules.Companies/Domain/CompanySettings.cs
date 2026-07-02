@@ -15,6 +15,7 @@ internal sealed class CompanySettings
     public decimal DefaultHolidayAllowance { get; private set; }
     public int ProbationMonths { get; private set; }
     public bool ExcludePublicHolidaysFromLeave { get; private set; }
+    public bool ExcludePublicHolidaysFromSickness { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -32,6 +33,7 @@ internal sealed class CompanySettings
             DefaultHolidayAllowance = 25,
             ProbationMonths = 6,
             ExcludePublicHolidaysFromLeave = true,
+            ExcludePublicHolidaysFromSickness = false,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -46,6 +48,7 @@ internal sealed class CompanySettings
         decimal defaultHolidayAllowance,
         int probationMonths,
         bool excludePublicHolidaysFromLeave,
+        bool excludePublicHolidaysFromSickness,
         DateTimeOffset now)
     {
         TimeZone = timeZone;
@@ -56,6 +59,7 @@ internal sealed class CompanySettings
         DefaultHolidayAllowance = defaultHolidayAllowance;
         ProbationMonths = probationMonths;
         ExcludePublicHolidaysFromLeave = excludePublicHolidaysFromLeave;
+        ExcludePublicHolidaysFromSickness = excludePublicHolidaysFromSickness;
         UpdatedAt = now;
     }
 }

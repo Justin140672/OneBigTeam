@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace HR.Modules.Leave.Features.CreatePublicHoliday;
+namespace HR.Modules.Companies.Features.CreatePublicHoliday;
 
 internal sealed class CreatePublicHolidayValidator : AbstractValidator<CreatePublicHolidayRequest>
 {

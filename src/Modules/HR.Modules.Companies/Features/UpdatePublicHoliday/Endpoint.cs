@@ -1,7 +1,7 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 
-namespace HR.Modules.Leave.Features.UpdatePublicHoliday;
+namespace HR.Modules.Companies.Features.UpdatePublicHoliday;
 
 internal sealed class Endpoint(
     UpdatePublicHolidayHandler handler) : Endpoint<UpdatePublicHolidayRequest, UpdatePublicHolidayResponse>

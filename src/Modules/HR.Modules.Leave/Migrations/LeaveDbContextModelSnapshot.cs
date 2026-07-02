@@ -332,43 +332,6 @@ namespace HR.Modules.Leave.Migrations
                     b.ToTable("leave_types", "leave");
                 });
 
-            modelBuilder.Entity("HR.Modules.Leave.Domain.PublicHoliday", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("company_id");
-
-                    b.Property<string>("CountryCode")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
-                        .HasColumnName("country_code");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateOnly>("Date")
-                        .HasColumnType("date")
-                        .HasColumnName("date");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId", "Date")
-                        .HasDatabaseName("IX_public_holidays_company_id_date");
-
-                    b.ToTable("public_holidays", "leave");
-                });
 
             modelBuilder.Entity("HR.Modules.Leave.Domain.ToilTransaction", b =>
                 {

@@ -1,6 +1,6 @@
-using HR.Modules.Leave.Domain;
+using HR.Modules.Companies.Domain;
 
-namespace HR.Modules.Leave.Tests;
+namespace HR.Modules.Companies.Tests;
 
 public class PublicHolidayTests
 {

@@ -1,16 +1,16 @@
-using HR.Modules.Leave.Domain;
-using HR.Modules.Leave.Features.UpdatePublicHoliday;
-using HR.Modules.Leave.Persistence;
+using HR.Modules.Companies.Domain;
+using HR.Modules.Companies.Features.UpdatePublicHoliday;
+using HR.Modules.Companies.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace HR.Modules.Leave.Tests;
+namespace HR.Modules.Companies.Tests;
 
 public class UpdatePublicHolidayHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 12, 9, 0, 0, TimeSpan.Zero);
 
-    private static LeaveDbContext BuildContext() =>
-        new(new DbContextOptionsBuilder<LeaveDbContext>()
+    private static CompaniesDbContext BuildContext() =>
+        new(new DbContextOptionsBuilder<CompaniesDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 

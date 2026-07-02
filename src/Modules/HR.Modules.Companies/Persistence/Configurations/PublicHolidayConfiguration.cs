@@ -1,8 +1,8 @@
-using HR.Modules.Leave.Domain;
+using HR.Modules.Companies.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace HR.Modules.Leave.Persistence.Configurations;
+namespace HR.Modules.Companies.Persistence.Configurations;
 
 internal sealed class PublicHolidayConfiguration : IEntityTypeConfiguration<PublicHoliday>
 {

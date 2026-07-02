@@ -1,11 +1,11 @@
-using HR.Modules.Leave.Persistence;
+using HR.Modules.Companies.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace HR.Modules.Leave.Features.ListPublicHolidays;
+namespace HR.Modules.Companies.Features.ListPublicHolidays;
 
-internal sealed class ListPublicHolidaysHandler(LeaveDbContext dbContext)
+internal sealed class ListPublicHolidaysHandler(CompaniesDbContext dbContext)
 {
-    private readonly LeaveDbContext _dbContext = dbContext;
+    private readonly CompaniesDbContext _dbContext = dbContext;
 
     public async Task<ListPublicHolidaysResponse> HandleAsync(
         ListPublicHolidaysRequest request,

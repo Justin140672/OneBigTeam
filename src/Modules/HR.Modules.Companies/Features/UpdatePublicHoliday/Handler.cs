@@ -1,14 +1,14 @@
-using HR.Modules.Leave.Persistence;
+using HR.Modules.Companies.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
-namespace HR.Modules.Leave.Features.UpdatePublicHoliday;
+namespace HR.Modules.Companies.Features.UpdatePublicHoliday;
 
 internal sealed class UpdatePublicHolidayHandler
 {
-    private readonly LeaveDbContext _dbContext;
+    private readonly CompaniesDbContext _dbContext;
 
-    public UpdatePublicHolidayHandler(LeaveDbContext dbContext)
+    public UpdatePublicHolidayHandler(CompaniesDbContext dbContext)
     {
         _dbContext = dbContext;
     }

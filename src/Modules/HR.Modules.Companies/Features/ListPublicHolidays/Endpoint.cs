@@ -1,7 +1,7 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 
-namespace HR.Modules.Leave.Features.ListPublicHolidays;
+namespace HR.Modules.Companies.Features.ListPublicHolidays;
 
 internal sealed class Endpoint(
     ListPublicHolidaysHandler handler) : Endpoint<ListPublicHolidaysRequest, ListPublicHolidaysResponse>

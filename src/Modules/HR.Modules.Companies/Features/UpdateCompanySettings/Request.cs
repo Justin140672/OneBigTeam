@@ -13,4 +13,5 @@ internal sealed record UpdateCompanySettingsRequest
 	public decimal DefaultHolidayAllowance { get; init; }
 	public int ProbationMonths { get; init; }
 	public bool ExcludePublicHolidaysFromLeave { get; init; } = true;
+	public bool ExcludePublicHolidaysFromSickness { get; init; } = false;
 }

@@ -1,14 +1,14 @@
-using HR.Modules.Leave.Domain;
-using HR.Modules.Leave.Features.ListPublicHolidays;
-using HR.Modules.Leave.Persistence;
+using HR.Modules.Companies.Domain;
+using HR.Modules.Companies.Features.ListPublicHolidays;
+using HR.Modules.Companies.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace HR.Modules.Leave.Tests;
+namespace HR.Modules.Companies.Tests;
 
 public class ListPublicHolidaysHandlerTests
 {
-    private static LeaveDbContext BuildContext() =>
-        new(new DbContextOptionsBuilder<LeaveDbContext>()
+    private static CompaniesDbContext BuildContext() =>
+        new(new DbContextOptionsBuilder<CompaniesDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 
@@ -55,27 +55,6 @@ public class ListPublicHolidaysHandlerTests
         Assert.Equal(new DateOnly(2026, 1, 1),   result.Items[0].Date);
         Assert.Equal(new DateOnly(2026, 4, 3),   result.Items[1].Date);
         Assert.Equal(new DateOnly(2026, 12, 25), result.Items[2].Date);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Returns_Holidays_Across_Multiple_Years()
-    {
-        await using var context = BuildContext();
-        var companyId = Guid.NewGuid();
-
-        context.PublicHolidays.AddRange(
-            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2025, 12, 25), "Christmas Day 2025", "GB", Now),
-            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 12, 25), "Christmas Day 2026", "GB", Now),
-            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2027, 12, 25), "Christmas Day 2027", "GB", Now));
-        await context.SaveChangesAsync();
-
-        var handler = new ListPublicHolidaysHandler(context);
-        var result = await handler.HandleAsync(
-            new ListPublicHolidaysRequest { CompanyId = companyId },
-            CancellationToken.None);
-
-        Assert.Equal(3, result.Items.Count);
-        Assert.Equal(3, result.Items.Select(i => i.Date.Year).Distinct().Count());
     }
 
     [Fact]

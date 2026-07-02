@@ -56,6 +56,11 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(settings => settings.ExcludePublicHolidaysFromSickness)
+            .HasColumnName("exclude_public_holidays_from_sickness")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(settings => settings.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

@@ -1,9 +1,8 @@
-namespace HR.Modules.Leave.Features.UpdatePublicHoliday;
+namespace HR.Modules.Companies.Features.CreatePublicHoliday;
 
-internal sealed record UpdatePublicHolidayRequest
+internal sealed record CreatePublicHolidayRequest
 {
     public Guid CompanyId { get; init; }
-    public Guid Id { get; init; }
     public DateOnly Date { get; init; }
     public string Name { get; init; } = string.Empty;
     public string CountryCode { get; init; } = string.Empty;

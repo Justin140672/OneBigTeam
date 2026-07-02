@@ -62,7 +62,7 @@ public class LeaveYearHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new SubmitLeaveRequestHandler(context, new FakeClock(JanuaryClockUtc),
-            new FakeWorkingPatternProvider(), AprilStartSettings, new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+            new FakeWorkingPatternProvider(), AprilStartSettings, new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new SubmitLeaveRequestRequest
         {
@@ -101,7 +101,7 @@ public class LeaveYearHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new SubmitLeaveRequestHandler(context, new FakeClock(JanuaryClockUtc),
-            new FakeWorkingPatternProvider(), AprilStartSettings, new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
+            new FakeWorkingPatternProvider(), AprilStartSettings, new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new SubmitLeaveRequestRequest
         {

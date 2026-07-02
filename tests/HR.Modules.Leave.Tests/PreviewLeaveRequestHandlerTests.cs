@@ -23,11 +23,13 @@ public class PreviewLeaveRequestHandlerTests
     private static PreviewLeaveRequestHandler BuildHandler(
         LeaveDbContext context,
         FakeCompanyLeaveSettingsReader? settings = null,
-        FakeWorkingPatternProvider? workingPattern = null) =>
+        FakeWorkingPatternProvider? workingPattern = null,
+        FakePublicHolidayReader? publicHolidayReader = null) =>
         new(context,
             new FakeClock(FixedUtcNow),
             workingPattern ?? new FakeWorkingPatternProvider(),
-            settings ?? new FakeCompanyLeaveSettingsReader());
+            settings ?? new FakeCompanyLeaveSettingsReader(),
+            publicHolidayReader ?? new FakePublicHolidayReader());
 
     // 2026-08-03 = Monday, 2026-08-07 = Friday
     private static PreviewLeaveRequestRequest BaseRequest(Guid companyId, Guid employeeId, Guid leaveTypeId) => new()
@@ -104,14 +106,13 @@ public class PreviewLeaveRequestHandlerTests
             AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, Now);
         // Wednesday 2026-08-05 is a public holiday
         context.LeaveTypes.Add(leaveType);
-        context.PublicHolidays.Add(
-            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 8, 5), "Summer Bank Holiday", "GB", Now));
         await context.SaveChangesAsync();
 
         var settings = new FakeCompanyLeaveSettingsReader(
             CompanyLeaveSettings.Default with { ExcludePublicHolidaysFromLeave = true });
+        var reader = new FakePublicHolidayReader([new DateOnly(2026, 8, 5)], "Summer Bank Holiday");
 
-        var result = await BuildHandler(context, settings).HandleAsync(
+        var result = await BuildHandler(context, settings, publicHolidayReader: reader).HandleAsync(
             BaseRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -131,14 +132,13 @@ public class PreviewLeaveRequestHandlerTests
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
             AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, Now);
         context.LeaveTypes.Add(leaveType);
-        context.PublicHolidays.Add(
-            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 8, 5), "Summer Bank Holiday", "GB", Now));
         await context.SaveChangesAsync();
 
         var settings = new FakeCompanyLeaveSettingsReader(
             CompanyLeaveSettings.Default with { ExcludePublicHolidaysFromLeave = false });
 
-        var result = await BuildHandler(context, settings).HandleAsync(
+        // Reader would return a holiday but exclusion is OFF so it's not consulted
+        var result = await BuildHandler(context, settings, publicHolidayReader: new FakePublicHolidayReader([new DateOnly(2026, 8, 5)])).HandleAsync(
             BaseRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -156,16 +156,15 @@ public class PreviewLeaveRequestHandlerTests
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
             AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, Now);
         context.LeaveTypes.Add(leaveType);
-        // 2026-08-08 = Saturday — not a working day in default Mon–Fri pattern
-        context.PublicHolidays.Add(
-            PublicHoliday.Create(Guid.NewGuid(), companyId, new DateOnly(2026, 8, 8), "Weekend Holiday", "GB", Now));
         await context.SaveChangesAsync();
 
         var settings = new FakeCompanyLeaveSettingsReader(
             CompanyLeaveSettings.Default with { ExcludePublicHolidaysFromLeave = true });
+        // 2026-08-08 = Saturday — not a working day in default Mon–Fri pattern
+        var reader = new FakePublicHolidayReader([new DateOnly(2026, 8, 8)], "Weekend Holiday");
 
         // Request spans Mon–Mon (2026-08-03 to 2026-08-10) = 6 working days; Sat holiday has no effect
-        var result = await BuildHandler(context, settings).HandleAsync(
+        var result = await BuildHandler(context, settings, publicHolidayReader: reader).HandleAsync(
             BaseRequest(companyId, employeeId, leaveType.Id) with
             {
                 EndDate = new DateOnly(2026, 8, 10)

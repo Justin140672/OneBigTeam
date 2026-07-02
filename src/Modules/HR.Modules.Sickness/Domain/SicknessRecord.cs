@@ -28,6 +28,9 @@ internal sealed class SicknessRecord
         Guid categoryId,
         DateOnly startDate,
         SicknessDayPart startDayPart,
+        DateOnly? endDate,
+        SicknessDayPart? endDayPart,
+        decimal? totalDays,
         string? notes,
         DateTimeOffset now)
     {
@@ -37,9 +40,12 @@ internal sealed class SicknessRecord
             CompanyId = companyId,
             EmployeeId = employeeId,
             CategoryId = categoryId,
-            Status = SicknessStatus.Active,
+            Status = endDate.HasValue ? SicknessStatus.Closed : SicknessStatus.Active,
             StartDate = startDate,
             StartDayPart = startDayPart,
+            EndDate = endDate,
+            EndDayPart = endDayPart,
+            TotalDays = totalDays,
             EvidenceStatus = SicknessEvidenceStatus.NotRequired,
             Notes = notes,
             CreatedAt = now,

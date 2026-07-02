@@ -1,6 +1,6 @@
-using HR.Modules.Leave.Features.UpdatePublicHoliday;
+using HR.Modules.Companies.Features.UpdatePublicHoliday;
 
-namespace HR.Modules.Leave.Tests;
+namespace HR.Modules.Companies.Tests;
 
 public class UpdatePublicHolidayValidatorTests
 {
@@ -12,6 +12,13 @@ public class UpdatePublicHolidayValidatorTests
         Name = "Christmas Day",
         CountryCode = "GB"
     };
+
+    [Fact]
+    public void Validate_Passes_For_Valid_Request()
+    {
+        var v = new UpdatePublicHolidayValidator();
+        Assert.True(v.Validate(ValidRequest()).IsValid);
+    }
 
     [Fact]
     public void Validate_Fails_When_CompanyId_Is_Empty()
@@ -74,13 +81,6 @@ public class UpdatePublicHolidayValidatorTests
         var result = v.Validate(ValidRequest() with { CountryCode = new string('X', 11) });
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdatePublicHolidayRequest.CountryCode));
-    }
-
-    [Fact]
-    public void Validate_Passes_For_Valid_Request()
-    {
-        var v = new UpdatePublicHolidayValidator();
-        Assert.True(v.Validate(ValidRequest()).IsValid);
     }
 
     [Fact]

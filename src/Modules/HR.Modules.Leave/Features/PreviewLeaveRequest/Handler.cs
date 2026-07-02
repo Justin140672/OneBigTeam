@@ -9,7 +9,8 @@ internal sealed class PreviewLeaveRequestHandler(
     LeaveDbContext dbContext,
     IClock clock,
     IWorkingPatternProvider workingPatternProvider,
-    ICompanyLeaveSettingsReader leaveSettingsReader)
+    ICompanyLeaveSettingsReader leaveSettingsReader,
+    IPublicHolidayReader publicHolidayReader)
 {
     public async Task<Result<PreviewLeaveRequestResponse>> HandleAsync(
         PreviewLeaveRequestRequest request,
@@ -34,12 +35,8 @@ internal sealed class PreviewLeaveRequestHandler(
 
         if (leaveSettings.ExcludePublicHolidaysFromLeave)
         {
-            var holidays = await dbContext.PublicHolidays
-                .Where(h => h.CompanyId == request.CompanyId
-                         && h.Date >= request.StartDate
-                         && h.Date <= request.EndDate)
-                .Select(h => new { h.Date, h.Name })
-                .ToListAsync(cancellationToken);
+            var holidays = await publicHolidayReader.GetPublicHolidaysAsync(
+                request.CompanyId, request.StartDate, request.EndDate, cancellationToken);
 
             publicHolidayDates = holidays.Select(h => h.Date).ToList();
             excludedHolidays = holidays

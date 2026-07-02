@@ -3,9 +3,6 @@ using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.ApproveLeaveRequest;
 using HR.Modules.Leave.Features.AssignLeavePolicyToEmployee;
 using HR.Modules.Leave.Features.CancelLeaveRequest;
-using HR.Modules.Leave.Features.CreatePublicHoliday;
-using HR.Modules.Leave.Features.ListPublicHolidays;
-using HR.Modules.Leave.Features.UpdatePublicHoliday;
 using HR.Modules.Leave.Features.RejectLeaveRequest;
 using HR.Modules.Leave.Features.CreateLeavePolicy;
 using HR.Modules.Leave.Features.UpdateLeavePolicy;
@@ -72,11 +69,6 @@ public static class LeaveModule
         services.AddScoped<IValidator<AwardToilRequest>, AwardToilValidator>();
 services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddScoped<ILeaveApprovalService, LeaveApprovalService>();
-        services.AddScoped<CreatePublicHolidayHandler>();
-        services.AddScoped<IValidator<CreatePublicHolidayRequest>, CreatePublicHolidayValidator>();
-        services.AddScoped<ListPublicHolidaysHandler>();
-        services.AddScoped<UpdatePublicHolidayHandler>();
-        services.AddScoped<IValidator<UpdatePublicHolidayRequest>, UpdatePublicHolidayValidator>();
         services.AddScoped<ListLeaveTypesHandler>();
         services.AddScoped<IValidator<ListLeaveTypesRequest>, ListLeaveTypesValidator>();
         services.AddScoped<CreateLeaveTypeHandler>();
@@ -116,31 +108,6 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
             await db.SaveChangesAsync();
         }
 
-        if (!await db.PublicHolidays.AnyAsync())
-        {
-            db.PublicHolidays.AddRange(
-                // 2025 — England & Wales
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000101"), companyId, new DateOnly(2025,  1,  1), "New Year's Day",              "GB", now),
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000102"), companyId, new DateOnly(2025,  4, 18), "Good Friday",                 "GB", now),
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000103"), companyId, new DateOnly(2025,  4, 21), "Easter Monday",               "GB", now),
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000104"), companyId, new DateOnly(2025,  5,  5), "Early May Bank Holiday",      "GB", now),
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000105"), companyId, new DateOnly(2025,  5, 26), "Spring Bank Holiday",         "GB", now),
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000106"), companyId, new DateOnly(2025,  8, 25), "Summer Bank Holiday",         "GB", now),
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000107"), companyId, new DateOnly(2025, 12, 25), "Christmas Day",               "GB", now),
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000108"), companyId, new DateOnly(2025, 12, 26), "Boxing Day",                  "GB", now),
-
-                // 2026 — England & Wales
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000201"), companyId, new DateOnly(2026,  1,  1), "New Year's Day",              "GB", now),
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000202"), companyId, new DateOnly(2026,  4,  3), "Good Friday",                 "GB", now),
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000203"), companyId, new DateOnly(2026,  4,  6), "Easter Monday",               "GB", now),
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000204"), companyId, new DateOnly(2026,  5,  4), "Early May Bank Holiday",      "GB", now),
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000205"), companyId, new DateOnly(2026,  5, 25), "Spring Bank Holiday",         "GB", now),
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000206"), companyId, new DateOnly(2026,  8, 31), "Summer Bank Holiday",         "GB", now),
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000207"), companyId, new DateOnly(2026, 12, 25), "Christmas Day",               "GB", now),
-                PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000208"), companyId, new DateOnly(2026, 12, 28), "Boxing Day (substitute)",     "GB", now));
-
-            await db.SaveChangesAsync();
-        }
 
         if (!await db.LeavePolicies.AnyAsync(lp => lp.CompanyId == companyId))
         {

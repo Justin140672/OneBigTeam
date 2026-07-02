@@ -30,13 +30,15 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
                 defaults.CompanyId, defaults.TimeZone, defaults.Locale,
                 (int)defaults.WorkingDays, defaults.HoursPerDay, defaults.LeaveYearStartMonth,
                 defaults.DefaultHolidayAllowance, defaults.ProbationMonths,
-                defaults.ExcludePublicHolidaysFromLeave, defaults.UpdatedAt));
+                defaults.ExcludePublicHolidaysFromLeave, defaults.ExcludePublicHolidaysFromSickness,
+                defaults.UpdatedAt));
         }
 
         return Result.Success(new GetCompanySettingsResponse(
             settings.CompanyId, settings.TimeZone, settings.Locale,
             (int)settings.WorkingDays, settings.HoursPerDay, settings.LeaveYearStartMonth,
             settings.DefaultHolidayAllowance, settings.ProbationMonths,
-            settings.ExcludePublicHolidaysFromLeave, settings.UpdatedAt));
+            settings.ExcludePublicHolidaysFromLeave, settings.ExcludePublicHolidaysFromSickness,
+            settings.UpdatedAt));
     }
 }

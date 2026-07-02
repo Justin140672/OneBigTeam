@@ -1,17 +1,17 @@
-using HR.Modules.Leave.Domain;
-using HR.Modules.Leave.Features.CreatePublicHoliday;
-using HR.Modules.Leave.Persistence;
-using HR.Modules.Leave.Tests.Infrastructure;
+using HR.Modules.Companies.Domain;
+using HR.Modules.Companies.Features.CreatePublicHoliday;
+using HR.Modules.Companies.Persistence;
+using HR.Modules.Companies.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
-namespace HR.Modules.Leave.Tests;
+namespace HR.Modules.Companies.Tests;
 
 public class CreatePublicHolidayHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 12, 9, 0, 0, DateTimeKind.Utc);
 
-    private static LeaveDbContext BuildContext() =>
-        new(new DbContextOptionsBuilder<LeaveDbContext>()
+    private static CompaniesDbContext BuildContext() =>
+        new(new DbContextOptionsBuilder<CompaniesDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 

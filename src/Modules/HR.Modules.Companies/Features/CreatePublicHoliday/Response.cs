@@ -1,4 +1,4 @@
-namespace HR.Modules.Leave.Features.CreatePublicHoliday;
+namespace HR.Modules.Companies.Features.CreatePublicHoliday;
 
 internal sealed record CreatePublicHolidayResponse(
     Guid Id,

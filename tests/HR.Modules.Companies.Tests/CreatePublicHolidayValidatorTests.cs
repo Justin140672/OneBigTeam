@@ -1,6 +1,6 @@
-using HR.Modules.Leave.Features.CreatePublicHoliday;
+using HR.Modules.Companies.Features.CreatePublicHoliday;
 
-namespace HR.Modules.Leave.Tests;
+namespace HR.Modules.Companies.Tests;
 
 public class CreatePublicHolidayValidatorTests
 {

@@ -1,4 +1,4 @@
-namespace HR.Modules.Leave.Domain;
+namespace HR.Modules.Companies.Domain;
 
 internal sealed class PublicHoliday
 {
