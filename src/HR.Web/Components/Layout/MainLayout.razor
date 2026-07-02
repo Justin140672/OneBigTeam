@@ -65,6 +65,11 @@ else
                             <MenuItem Text="Public Holidays" Url="@_menuItems["PublicHolidays"]" />
                         </MenuItems>
                     </MenuItem>
+                    <MenuItem Text="Sickness" IconCss="fa-solid fa-virus">
+                        <MenuItems>
+                            <MenuItem Text="Sickness Categories" Url="@_menuItems["SicknessCategories"]" />
+                        </MenuItems>
+                    </MenuItem>
                     <MenuItem Text="HR" IconCss="fa-solid fa-inbox">
                         <MenuItems>
                             <MenuItem Text="HR Inbox" Url="@_menuItems["HrInbox"]" />
@@ -236,8 +241,9 @@ else
         ["LeaveTypes"]       = "/",
         ["LeavePolicies"]    = "/",
         ["PublicHolidays"]   = "/",
-        ["HrInbox"]          = "/",
-        ["DocumentTypes"]    = "/",
+        ["HrInbox"]             = "/",
+        ["DocumentTypes"]       = "/",
+        ["SicknessCategories"]  = "/",
     };
 
     protected override async Task OnInitializedAsync()
@@ -254,8 +260,9 @@ else
         _menuItems["LeaveTypes"]       = $"/companies/{companyId}/leave-types";
         _menuItems["LeavePolicies"]    = $"/companies/{companyId}/leave-policies";
         _menuItems["PublicHolidays"]   = $"/companies/{companyId}/public-holidays";
-        _menuItems["HrInbox"]          = $"/companies/{companyId}/hr/inbox";
-        _menuItems["DocumentTypes"]    = $"/companies/{companyId}/document-types";
+        _menuItems["HrInbox"]             = $"/companies/{companyId}/hr/inbox";
+        _menuItems["DocumentTypes"]       = $"/companies/{companyId}/document-types";
+        _menuItems["SicknessCategories"]  = $"/companies/{companyId}/sickness-categories";
 
         await LoadUnreadCountAsync();
 

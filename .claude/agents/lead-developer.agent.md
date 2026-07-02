@@ -94,9 +94,17 @@ If the user request does not include a UI component, skip Steps 4 and 5 entirely
 - Require the ui agent to keep changes strictly within the web project. Any change outside the web project (e.g., a new API endpoint, a shared DTO, or a service registration) must be flagged as out-of-scope and deferred to the developer agent.
 - Require the ui agent to report the files changed and any risks or assumptions.
 
+### 4a. E2E test handoff (mandatory after every UI handoff)
+- After the ui agent completes, hand off to the test agent to write E2E tests for the new UI.
+- The test agent must write Playwright-based E2E tests in `tests/HR.Web.E2E.Tests/` covering the new pages, following the pattern of existing E2E tests (e.g. `EmploymentTypeManagementTests.cs`, `LeaveTypeManagementTests.cs`).
+- Each new list page and edit page must have E2E coverage for: loading the page, creating a record, editing a record, and any delete/deactivate action.
+- Add any required Page Object classes in `tests/HR.Web.E2E.Tests/Infrastructure/PageObjects/`.
+- Explicitly instruct the test agent to write the tests only — do not ask it to run them. The E2E tests require a live browser and full environment and must never be run by the lead developer or test agent.
+- Require the test agent to report the files it created and any risks or assumptions.
+
 ### 5. Reconfirmation after UI work
-- After the ui agent completes, run a full build for the workspace again: `dotnet build`
-- Confirm the build passes. Do NOT re-run the test suite — the ui agent is constrained to the web project only (no business logic, no new endpoints, no migrations), so the tests cannot newly fail from UI-only changes. Running them again wastes 5+ minutes for no signal.
+- After both the ui agent and the E2E test agent complete, run a full build for the workspace again: `dotnet build`
+- Confirm the build passes. Do NOT run the E2E test suite — it requires a live browser and full environment.
 - Confirm that build completes successfully before reporting completion.
 
 ## Output requirements
@@ -105,7 +113,8 @@ Provide a concise final summary that includes:
 - which files were updated
 - whether the build passed
 - whether all tests passed
-- whether the post-UI reconfirmation build passed (tests are not re-run after UI — build only)
+- whether E2E tests were written (files created by the test agent after the UI handoff)
+- whether the post-UI reconfirmation build passed (E2E tests are not run — build only)
 - list any follow-up items that are: (a) risks flagged by a specialist agent that were not resolved, (b) items rejected by a guardrail that the user must address manually, or (c) build/test failures that were stopped but not fixed
 
 ## New Module Checklist

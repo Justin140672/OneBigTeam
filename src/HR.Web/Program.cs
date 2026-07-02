@@ -37,6 +37,7 @@ builder.Services.AddScoped<EmploymentTypeService>();
 builder.Services.AddScoped<LeaveTypeService>();
 builder.Services.AddScoped<LeavePolicyService>();
 builder.Services.AddScoped<DocumentTypeService>();
+builder.Services.AddScoped<SicknessCategoryService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<ProbationService>();
 builder.Services.AddScoped<DevAuthService>();

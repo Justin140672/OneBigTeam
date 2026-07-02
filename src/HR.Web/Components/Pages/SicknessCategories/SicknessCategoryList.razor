@@ -1,0 +1,105 @@
+@page "/companies/{CompanyId:guid}/sickness-categories"
+@rendermode InteractiveServer
+@inherits SearchPageBase<SicknessCategoryListItemModel>
+@inject SicknessCategoryService SicknessCategoryService
+@inject AppSession Session
+
+<PageTitle>Sickness Categories</PageTitle>
+
+<div class="container-fluid py-4">
+    <h1 class="mb-3">Sickness Categories</h1>
+
+    @if (IsLoading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span>Loading sickness categories…</span>
+        </div>
+    }
+    else if (Error is not null)
+    {
+        <div class="alert alert-danger">@Error</div>
+    }
+    else
+    {
+        @if (ActionError is not null)
+        {
+            <div class="alert alert-danger alert-dismissible">
+                @ActionError
+                <button type="button" class="btn-close" @onclick="ClearActionError"></button>
+            </div>
+        }
+
+        <HrGrid @ref="Grid"
+                TValue="SicknessCategoryListItemModel"
+                DataSource="@Items"
+                Toolbar="@GridToolbar"
+                AllowFiltering="false">
+            <GridEvents TValue="SicknessCategoryListItemModel" OnToolbarClick="OnToolbarClick"
+                        RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
+            <GridPageSettings PageSize="20" />
+            <GridColumns>
+                <GridColumn Field="@nameof(SicknessCategoryListItemModel.Name)" HeaderText="Name" Width="220">
+                    <Template>
+                        @{
+                            var row = (context as SicknessCategoryListItemModel)!;
+                            <a href="/companies/@CompanyId/sickness-categories/@row.Id">@row.Name</a>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(SicknessCategoryListItemModel.DisplayOrder)" HeaderText="Display Order" Width="160" />
+                <GridColumn Field="@nameof(SicknessCategoryListItemModel.IsActive)" HeaderText="Status" Width="110">
+                    <Template>
+                        @{
+                            var row = (context as SicknessCategoryListItemModel)!;
+                            <span class="badge @(row.IsActive ? "bg-success" : "bg-secondary")">
+                                @(row.IsActive ? "Active" : "Inactive")
+                            </span>
+                        }
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </HrGrid>
+    }
+</div>
+
+@code {
+    protected override Task OnBeforeLoadAsync()
+    {
+        if (!Session.CanManageEmployees)
+            Navigation.NavigateTo("/", replace: true);
+        return Task.CompletedTask;
+    }
+
+    protected override void ConfigureToolbar()
+    {
+        AddToolbarAction(
+            id:      "hr-delete",
+            text:    "Delete",
+            icon:    "fa-solid fa-trash",
+            onClick: async item => await Delete(item),
+            tooltip: "Delete selected sickness category");
+    }
+
+    protected override async Task<IReadOnlyList<SicknessCategoryListItemModel>?> FetchItemsAsync(string? search)
+    {
+        var result = await SicknessCategoryService.ListSicknessCategoriesAsync(CompanyId);
+        return result?.Items;
+    }
+
+    protected override string LoadErrorMessage => "Failed to load sickness categories.";
+
+    protected override string? GetAddUrl()  => $"/companies/{CompanyId}/sickness-categories/new";
+    protected override string? GetEditUrl(SicknessCategoryListItemModel item) => $"/companies/{CompanyId}/sickness-categories/{item.Id}";
+    protected override string? GetViewUrl(SicknessCategoryListItemModel item) => $"/companies/{CompanyId}/sickness-categories/{item.Id}/view";
+
+    private async Task Delete(SicknessCategoryListItemModel item)
+    {
+        ClearActionError();
+        var error = await SicknessCategoryService.DeleteAsync(CompanyId, item.Id);
+        if (error is not null)
+            SetActionError(error);
+        else
+            await LoadAsync();
+    }
+}
