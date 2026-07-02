@@ -33,12 +33,14 @@ public class RecordMySicknessHandlerTests
         SicknessDbContext db,
         WorkingPattern? pattern = null,
         bool excludePublicHolidays = false,
-        IReadOnlyCollection<DateOnly>? publicHolidays = null) =>
+        IReadOnlyCollection<DateOnly>? publicHolidays = null,
+        FakeAuditEventPublisher? auditPublisher = null) =>
         new(db,
             new FakeClock(FixedUtcNow),
             new FakeWorkingPatternProvider(pattern ?? DefaultPattern),
             new FakeCompanySicknessSettingsReader(excludePublicHolidays),
-            new FakePublicHolidayReader(publicHolidays));
+            new FakePublicHolidayReader(publicHolidays),
+            auditPublisher ?? new FakeAuditEventPublisher());
 
     [Fact]
     public async Task HandleAsync_Creates_SicknessRecord_With_No_EndDate()
@@ -246,5 +248,124 @@ public class RecordMySicknessHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Null(result.Value!.Notes);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_Employee_Already_Has_Open_Record()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+
+        // Create the first (open) record
+        var firstResult = await BuildHandler(db).HandleAsync(new RecordMySicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            CategoryId = categoryId,
+            StartDate = StartDate,
+            StartDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(firstResult.IsSuccess);
+
+        // Attempt to create a second open record for the same employee
+        var secondResult = await BuildHandler(db).HandleAsync(new RecordMySicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            CategoryId = categoryId,
+            StartDate = StartDate.AddDays(1),
+            StartDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(secondResult.IsFailure);
+        Assert.Equal("conflict", secondResult.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_On_Success()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var auditPublisher = new FakeAuditEventPublisher();
+
+        var result = await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new RecordMySicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            CategoryId = categoryId,
+            StartDate = StartDate,
+            StartDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(auditPublisher.PublishedEvents);
+
+        var auditEvent = Assert.IsType<SicknessRecordedAuditEvent>(auditPublisher.PublishedEvents[0]);
+        Assert.Equal(companyId, auditEvent.CompanyId);
+        Assert.Equal(employeeId, auditEvent.EmployeeId);
+        Assert.Equal(result.Value!.Id, auditEvent.SicknessRecordId);
+        Assert.Equal(categoryId, auditEvent.CategoryId);
+        Assert.Equal(StartDate, auditEvent.StartDate);
+        Assert.Equal(new DateTimeOffset(FixedUtcNow, TimeSpan.Zero), auditEvent.OccurredAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_Audit_Event_When_Category_Not_Found()
+    {
+        await using var db = BuildContext();
+        var auditPublisher = new FakeAuditEventPublisher();
+
+        var result = await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new RecordMySicknessRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            EmployeeId = Guid.NewGuid(),
+            CategoryId = Guid.NewGuid(),
+            StartDate = StartDate,
+            StartDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Empty(auditPublisher.PublishedEvents);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_Audit_Event_When_Conflict()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var auditPublisher = new FakeAuditEventPublisher();
+
+        // First record succeeds
+        await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new RecordMySicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            CategoryId = categoryId,
+            StartDate = StartDate,
+            StartDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        auditPublisher.PublishedEvents.Clear();
+
+        // Second record conflicts
+        var result = await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new RecordMySicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            CategoryId = categoryId,
+            StartDate = StartDate.AddDays(1),
+            StartDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+        Assert.Empty(auditPublisher.PublishedEvents);
     }
 }

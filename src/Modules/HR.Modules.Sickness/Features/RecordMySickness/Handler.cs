@@ -11,7 +11,8 @@ internal sealed class RecordMySicknessHandler(
     IClock clock,
     IWorkingPatternProvider workingPatternProvider,
     ICompanySicknessSettingsReader sicknessSettingsReader,
-    IPublicHolidayReader publicHolidayReader)
+    IPublicHolidayReader publicHolidayReader,
+    IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<RecordSicknessResponse>> HandleAsync(
         RecordMySicknessRequest request,
@@ -22,6 +23,12 @@ internal sealed class RecordMySicknessHandler(
 
         if (!categoryExists)
             return Result.Failure<RecordSicknessResponse>(Error.NotFound("Sickness category not found."));
+
+        var hasOpenRecord = await db.SicknessRecords
+            .AnyAsync(r => r.EmployeeId == request.EmployeeId && r.CompanyId == request.CompanyId && r.EndDate == null, cancellationToken);
+
+        if (hasOpenRecord)
+            return Result.Failure<RecordSicknessResponse>(Error.Conflict("Employee already has an open sickness record."));
 
         decimal? totalDays = null;
 
@@ -64,6 +71,16 @@ internal sealed class RecordMySicknessHandler(
 
         db.SicknessRecords.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new SicknessRecordedAuditEvent(
+            entity.CompanyId,
+            entity.EmployeeId,
+            entity.Id,
+            entity.CategoryId,
+            entity.StartDate,
+            entity.EndDate,
+            entity.TotalDays,
+            now), cancellationToken);
 
         return Result.Success(new RecordSicknessResponse(
             entity.Id,

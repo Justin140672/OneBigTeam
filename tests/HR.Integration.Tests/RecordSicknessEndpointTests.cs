@@ -142,6 +142,42 @@ public class RecordSicknessEndpointTests : IClassFixture<ApiWebApplicationFactor
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Post_SicknessRecords_Returns_Conflict_When_Employee_Already_Has_Open_Record()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        using var client = AdminClient(companyId);
+        var categoryId = await CreateCategory(client, companyId);
+
+        // Create the first open record
+        var firstResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/sickness-records",
+            new
+            {
+                companyId,
+                employeeId,
+                categoryId,
+                startDate = "2026-07-01",
+                startDayPart = 0
+            });
+        Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
+
+        // Attempt a second open record for the same employee
+        var secondResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/sickness-records",
+            new
+            {
+                companyId,
+                employeeId,
+                categoryId,
+                startDate = "2026-07-02",
+                startDayPart = 0
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
+    }
+
     private sealed record CategoryPayload(Guid Id);
 
     private sealed record SicknessRecordPayload(
