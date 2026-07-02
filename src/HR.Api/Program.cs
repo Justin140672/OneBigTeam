@@ -338,6 +338,7 @@ if (app.Environment.IsDevelopment())
 app.UseHangfireBackgroundJobs();
 app.UseProbationRecurringJobs();
 app.UseAssetsRecurringJobs();
+app.UseSicknessRecurringJobs();
 app.UseLoggingMiddleware();
 app.UseRouting();
 app.UseAuthentication();
