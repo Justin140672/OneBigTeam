@@ -11,7 +11,8 @@ internal sealed record CompanySettingsAuditSnapshot(
     decimal DefaultHolidayAllowance,
     int ProbationMonths,
     bool ExcludePublicHolidaysFromLeave,
-    bool ExcludePublicHolidaysFromSickness);
+    bool ExcludePublicHolidaysFromSickness,
+    int? FitNoteRequiredAfterDays);
 
 internal sealed record CompanySettingsUpdatedAuditEvent(
     Guid CompanyId,

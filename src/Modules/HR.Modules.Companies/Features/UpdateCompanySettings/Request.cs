@@ -14,4 +14,5 @@ internal sealed record UpdateCompanySettingsRequest
 	public int ProbationMonths { get; init; }
 	public bool ExcludePublicHolidaysFromLeave { get; init; } = true;
 	public bool ExcludePublicHolidaysFromSickness { get; init; } = false;
+	public int? FitNoteRequiredAfterDays { get; init; }
 }

@@ -13,4 +13,5 @@ internal sealed record CompanySettingsUpdatedIntegrationEvent(
 	int ProbationMonths,
 	bool ExcludePublicHolidaysFromLeave,
 	bool ExcludePublicHolidaysFromSickness,
+	int? FitNoteRequiredAfterDays,
 	DateTimeOffset OccurredAt);

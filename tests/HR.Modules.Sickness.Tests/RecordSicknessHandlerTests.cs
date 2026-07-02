@@ -34,11 +34,12 @@ public class RecordSicknessHandlerTests
         WorkingPattern? pattern = null,
         bool excludePublicHolidays = false,
         IReadOnlyCollection<DateOnly>? publicHolidays = null,
-        FakeAuditEventPublisher? auditPublisher = null) =>
+        FakeAuditEventPublisher? auditPublisher = null,
+        int? fitNoteRequiredAfterDays = null) =>
         new(db,
             new FakeClock(FixedUtcNow),
             new FakeWorkingPatternProvider(pattern ?? DefaultPattern),
-            new FakeCompanySicknessSettingsReader(excludePublicHolidays),
+            new FakeCompanySicknessSettingsReader(excludePublicHolidays, fitNoteRequiredAfterDays),
             new FakePublicHolidayReader(publicHolidays),
             auditPublisher ?? new FakeAuditEventPublisher());
 
@@ -474,5 +475,94 @@ public class RecordSicknessHandlerTests
         Assert.True(result.IsFailure);
         Assert.Equal("conflict", result.Error.Code);
         Assert.Empty(auditPublisher.PublishedEvents);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Sets_EvidenceStatus_NotRequired_When_FitNote_Setting_Is_Null()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+
+        var result = await BuildHandler(db, fitNoteRequiredAfterDays: null).HandleAsync(new RecordSicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = Guid.NewGuid(),
+            CategoryId = categoryId,
+            StartDate = StartDate,
+            StartDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SicknessEvidenceStatus.NotRequired, result.Value!.EvidenceStatus);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Sets_EvidenceStatus_Pending_When_Open_Record_And_FitNote_Setting_Is_Set()
+    {
+        // No end date — total_days is null, fit note enabled → Pending
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+
+        var result = await BuildHandler(db, fitNoteRequiredAfterDays: 7).HandleAsync(new RecordSicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = Guid.NewGuid(),
+            CategoryId = categoryId,
+            StartDate = StartDate,
+            StartDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SicknessEvidenceStatus.Pending, result.Value!.EvidenceStatus);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Sets_EvidenceStatus_NotRequired_When_TotalDays_Below_Threshold()
+    {
+        // 2026-07-01 to 2026-07-03 = 3 days, threshold = 7 → NotRequired
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+
+        var result = await BuildHandler(db, fitNoteRequiredAfterDays: 7).HandleAsync(new RecordSicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = Guid.NewGuid(),
+            CategoryId = categoryId,
+            StartDate = new DateOnly(2026, 7, 1),
+            StartDayPart = SicknessDayPart.FullDay,
+            EndDate = new DateOnly(2026, 7, 3),
+            EndDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SicknessEvidenceStatus.NotRequired, result.Value!.EvidenceStatus);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Sets_EvidenceStatus_Pending_When_TotalDays_Meets_Threshold()
+    {
+        // Mon 2026-06-22 to Mon 2026-06-29 = 6 working days (Mon–Fri = 5, next Mon = 6),
+        // threshold = 5 → Pending
+        // Use 2026-07-07 (Tue) to 2026-07-14 (Tue) = 6 working days (Tue Wed Thu Fri + Mon Tue)
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+
+        var result = await BuildHandler(db, fitNoteRequiredAfterDays: 5).HandleAsync(new RecordSicknessRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = Guid.NewGuid(),
+            CategoryId = categoryId,
+            StartDate = new DateOnly(2026, 7, 7),
+            StartDayPart = SicknessDayPart.FullDay,
+            EndDate = new DateOnly(2026, 7, 14),
+            EndDayPart = SicknessDayPart.FullDay
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SicknessEvidenceStatus.Pending, result.Value!.EvidenceStatus);
     }
 }

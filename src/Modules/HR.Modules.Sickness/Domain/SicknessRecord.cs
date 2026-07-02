@@ -32,6 +32,7 @@ internal sealed class SicknessRecord
         SicknessDayPart? endDayPart,
         decimal? totalDays,
         string? notes,
+        SicknessEvidenceStatus evidenceStatus,
         DateTimeOffset now)
     {
         return new SicknessRecord
@@ -46,7 +47,7 @@ internal sealed class SicknessRecord
             EndDate = endDate,
             EndDayPart = endDayPart,
             TotalDays = totalDays,
-            EvidenceStatus = SicknessEvidenceStatus.NotRequired,
+            EvidenceStatus = evidenceStatus,
             Notes = notes,
             CreatedAt = now,
             UpdatedAt = now

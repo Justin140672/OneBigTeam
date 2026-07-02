@@ -16,6 +16,7 @@ internal sealed class CompanySettings
     public int ProbationMonths { get; private set; }
     public bool ExcludePublicHolidaysFromLeave { get; private set; }
     public bool ExcludePublicHolidaysFromSickness { get; private set; }
+    public int? FitNoteRequiredAfterDays { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -34,6 +35,7 @@ internal sealed class CompanySettings
             ProbationMonths = 6,
             ExcludePublicHolidaysFromLeave = true,
             ExcludePublicHolidaysFromSickness = false,
+            FitNoteRequiredAfterDays = null,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -49,6 +51,7 @@ internal sealed class CompanySettings
         int probationMonths,
         bool excludePublicHolidaysFromLeave,
         bool excludePublicHolidaysFromSickness,
+        int? fitNoteRequiredAfterDays,
         DateTimeOffset now)
     {
         TimeZone = timeZone;
@@ -60,6 +63,7 @@ internal sealed class CompanySettings
         ProbationMonths = probationMonths;
         ExcludePublicHolidaysFromLeave = excludePublicHolidaysFromLeave;
         ExcludePublicHolidaysFromSickness = excludePublicHolidaysFromSickness;
+        FitNoteRequiredAfterDays = fitNoteRequiredAfterDays;
         UpdatedAt = now;
     }
 }

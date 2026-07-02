@@ -31,6 +31,7 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
                 (int)defaults.WorkingDays, defaults.HoursPerDay, defaults.LeaveYearStartMonth,
                 defaults.DefaultHolidayAllowance, defaults.ProbationMonths,
                 defaults.ExcludePublicHolidaysFromLeave, defaults.ExcludePublicHolidaysFromSickness,
+                defaults.FitNoteRequiredAfterDays,
                 defaults.UpdatedAt));
         }
 
@@ -39,6 +40,7 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
             (int)settings.WorkingDays, settings.HoursPerDay, settings.LeaveYearStartMonth,
             settings.DefaultHolidayAllowance, settings.ProbationMonths,
             settings.ExcludePublicHolidaysFromLeave, settings.ExcludePublicHolidaysFromSickness,
+            settings.FitNoteRequiredAfterDays,
             settings.UpdatedAt));
     }
 }

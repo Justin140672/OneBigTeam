@@ -11,4 +11,5 @@ internal sealed record GetCompanySettingsResponse(
     int ProbationMonths,
     bool ExcludePublicHolidaysFromLeave,
     bool ExcludePublicHolidaysFromSickness,
+    int? FitNoteRequiredAfterDays,
     DateTimeOffset UpdatedAt);

@@ -212,6 +212,10 @@ namespace HR.Modules.Companies.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("exclude_public_holidays_from_sickness");
 
+                    b.Property<int?>("FitNoteRequiredAfterDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("fit_note_required_after_days");
+
                     b.Property<decimal>("HoursPerDay")
                         .HasPrecision(4, 2)
                         .HasColumnType("numeric(4,2)")

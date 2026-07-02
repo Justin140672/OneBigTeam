@@ -40,9 +40,11 @@ public sealed class SicknessCategoryListPage(IPage page, string baseUrl)
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Delete" });
         await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await btn.ClickAsync();
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        // Wait for the row to disappear from the grid after the delete + reload cycle.
+        await page.Locator(".e-rowcell")
+            .Filter(new() { HasText = nameFragment })
+            .First
+            .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
     public async Task<bool> IsActiveAsync(string nameFragment)

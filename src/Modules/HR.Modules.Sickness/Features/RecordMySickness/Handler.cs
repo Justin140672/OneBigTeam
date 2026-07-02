@@ -31,15 +31,14 @@ internal sealed class RecordMySicknessHandler(
             return Result.Failure<RecordSicknessResponse>(Error.Conflict("Employee already has an open sickness record."));
 
         decimal? totalDays = null;
+        var sicknessSettings = await sicknessSettingsReader.GetSicknessSettingsAsync(
+            request.CompanyId, cancellationToken);
 
         if (request.EndDate.HasValue)
         {
             var endDayPart = request.EndDayPart ?? SicknessDayPart.FullDay;
             var workingPattern = await workingPatternProvider.GetEffectivePatternAsync(
                 request.CompanyId, request.EmployeeId, cancellationToken);
-
-            var sicknessSettings = await sicknessSettingsReader.GetSicknessSettingsAsync(
-                request.CompanyId, cancellationToken);
 
             IReadOnlyCollection<DateOnly>? publicHolidays = null;
             if (sicknessSettings.ExcludePublicHolidaysFromSickness)
@@ -55,6 +54,8 @@ internal sealed class RecordMySicknessHandler(
                 workingPattern, publicHolidays);
         }
 
+        var evidenceStatus = FitNoteEvaluator.EvaluateOnCreate(sicknessSettings.FitNoteRequiredAfterDays, totalDays);
+
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
         var entity = SicknessRecord.Create(
             Guid.NewGuid(),
@@ -67,6 +68,7 @@ internal sealed class RecordMySicknessHandler(
             request.EndDayPart,
             totalDays,
             request.Notes,
+            evidenceStatus,
             now);
 
         db.SicknessRecords.Add(entity);

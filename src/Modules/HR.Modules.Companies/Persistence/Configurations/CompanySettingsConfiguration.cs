@@ -61,6 +61,10 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(settings => settings.FitNoteRequiredAfterDays)
+            .HasColumnName("fit_note_required_after_days")
+            .IsRequired(false);
+
         builder.Property(settings => settings.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

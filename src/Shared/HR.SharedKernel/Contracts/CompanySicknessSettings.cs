@@ -1,6 +1,6 @@
 namespace HR.SharedKernel;
 
-public sealed record CompanySicknessSettings(bool ExcludePublicHolidaysFromSickness)
+public sealed record CompanySicknessSettings(bool ExcludePublicHolidaysFromSickness, int? FitNoteRequiredAfterDays)
 {
-    public static CompanySicknessSettings Default { get; } = new(ExcludePublicHolidaysFromSickness: false);
+    public static CompanySicknessSettings Default { get; } = new(ExcludePublicHolidaysFromSickness: false, FitNoteRequiredAfterDays: null);
 }
