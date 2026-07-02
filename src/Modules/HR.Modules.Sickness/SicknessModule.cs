@@ -1,3 +1,7 @@
+using HR.Modules.Sickness.Features.CreateSicknessCategory;
+using HR.Modules.Sickness.Features.DeactivateSicknessCategory;
+using HR.Modules.Sickness.Features.ListSicknessCategories;
+using HR.Modules.Sickness.Features.UpdateSicknessCategory;
 using HR.Modules.Sickness.Persistence;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
@@ -11,11 +15,21 @@ public static class SicknessModule
         this IServiceCollection services,
         string connectionString)
     {
+        AddFeatureServices(services);
+
         services.AddDbContext<SicknessDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "sickness")));
 
         return services;
+    }
+
+    private static void AddFeatureServices(IServiceCollection services)
+    {
+        services.AddScoped<ListSicknessCategoriesHandler>();
+        services.AddScoped<CreateSicknessCategoryHandler>();
+        services.AddScoped<UpdateSicknessCategoryHandler>();
+        services.AddScoped<DeactivateSicknessCategoryHandler>();
     }
 
     public static async Task MigrateSicknessAsync(this IServiceProvider services)

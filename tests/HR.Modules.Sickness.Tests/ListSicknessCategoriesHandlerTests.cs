@@ -1,0 +1,103 @@
+using HR.Modules.Sickness.Domain;
+using HR.Modules.Sickness.Features.ListSicknessCategories;
+using HR.Modules.Sickness.Persistence;
+using HR.Modules.Sickness.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+
+namespace HR.Modules.Sickness.Tests;
+
+public class ListSicknessCategoriesHandlerTests
+{
+    private static readonly DateTime FixedUtcNow = new(2026, 6, 30, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTimeOffset FixedOffset = new(FixedUtcNow, TimeSpan.Zero);
+
+    [Fact]
+    public async Task HandleAsync_Returns_All_Categories_For_Company_Including_Inactive()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+
+        db.SicknessCategories.Add(SicknessCategory.Create(Guid.NewGuid(), companyId, "Cold", 1, FixedOffset));
+        db.SicknessCategories.Add(SicknessCategory.Create(Guid.NewGuid(), companyId, "Flu", 2, FixedOffset));
+        db.SicknessCategories.Add(SicknessCategory.Create(Guid.NewGuid(), otherCompanyId, "Other", 1, FixedOffset));
+        await db.SaveChangesAsync();
+
+        var inactive = SicknessCategory.Create(Guid.NewGuid(), companyId, "Inactive", 3, FixedOffset);
+        inactive.Deactivate(FixedOffset);
+        db.SicknessCategories.Add(inactive);
+        await db.SaveChangesAsync();
+
+        var handler = new ListSicknessCategoriesHandler(db);
+
+        var result = await handler.HandleAsync(new ListSicknessCategoriesRequest { CompanyId = companyId }, CancellationToken.None);
+
+        Assert.Equal(3, result.Count);
+        Assert.All(result, r => Assert.Equal(companyId, r.CompanyId));
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Categories_Ordered_By_DisplayOrder()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        db.SicknessCategories.Add(SicknessCategory.Create(Guid.NewGuid(), companyId, "Flu", 3, FixedOffset));
+        db.SicknessCategories.Add(SicknessCategory.Create(Guid.NewGuid(), companyId, "Cold", 1, FixedOffset));
+        db.SicknessCategories.Add(SicknessCategory.Create(Guid.NewGuid(), companyId, "Back Pain", 2, FixedOffset));
+        await db.SaveChangesAsync();
+
+        var handler = new ListSicknessCategoriesHandler(db);
+
+        var result = await handler.HandleAsync(new ListSicknessCategoriesRequest { CompanyId = companyId }, CancellationToken.None);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal("Cold", result[0].Name);
+        Assert.Equal("Back Pain", result[1].Name);
+        Assert.Equal("Flu", result[2].Name);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Empty_List_When_No_Categories()
+    {
+        await using var db = BuildContext();
+        var handler = new ListSicknessCategoriesHandler(db);
+
+        var result = await handler.HandleAsync(new ListSicknessCategoriesRequest { CompanyId = Guid.NewGuid() }, CancellationToken.None);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Maps_All_Fields_Correctly()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var id = Guid.NewGuid();
+
+        db.SicknessCategories.Add(SicknessCategory.Create(id, companyId, "Cold", 5, FixedOffset));
+        await db.SaveChangesAsync();
+
+        var handler = new ListSicknessCategoriesHandler(db);
+
+        var result = await handler.HandleAsync(new ListSicknessCategoriesRequest { CompanyId = companyId }, CancellationToken.None);
+
+        Assert.Single(result);
+        var item = result[0];
+        Assert.Equal(id, item.Id);
+        Assert.Equal(companyId, item.CompanyId);
+        Assert.Equal("Cold", item.Name);
+        Assert.Equal(5, item.DisplayOrder);
+        Assert.True(item.IsActive);
+        Assert.Equal(FixedOffset, item.CreatedAt);
+        Assert.Equal(FixedOffset, item.UpdatedAt);
+    }
+
+    private static SicknessDbContext BuildContext()
+    {
+        var options = new DbContextOptionsBuilder<SicknessDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+        return new SicknessDbContext(options);
+    }
+}

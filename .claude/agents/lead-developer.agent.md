@@ -68,6 +68,9 @@ If any criterion is marked **Violation**, halt and report the specific violation
 ### 2. Test handoff
 - After the implementation is complete, hand off to the test agent.
 - Ask the test agent to **write** the required tests only — do not ask it to run any tests. Running tests is exclusively the responsibility of Step 3.
+- Explicitly instruct the test agent to write **both**:
+  - Unit tests in `tests/HR.Modules.<Name>.Tests/` — handler tests and validator tests for every slice.
+  - Integration tests in `tests/HR.Integration.Tests/` — one test class per endpoint, covering the happy path, 401 for anonymous requests, 404/409 conflict cases, and validation failures. Follow the pattern of existing files such as `CreateAssetCategoryEndpointTests.cs`, `UpdateAssetCategoryEndpointTests.cs`, and `DeactivateAssetCategoryEndpointTests.cs`.
 - Require the test agent to report the files it created and any risks or assumptions.
 
 ### 3. Final checks

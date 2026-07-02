@@ -109,8 +109,8 @@ namespace HR.Modules.Sickness.Persistence.Migrations
                 column: "category_id");
 
             // Seed default sickness categories for Acme (company 00000000-0000-0000-0000-000000000001)
-            var now = new DateTimeOffset(2026, 7, 2, 0, 0, 0, TimeSpan.Zero).ToString("O");
-            var companyId = "00000000-0000-0000-0000-000000000001";
+            var now = new DateTimeOffset(2026, 7, 2, 0, 0, 0, TimeSpan.Zero);
+            var companyId = new Guid("00000000-0000-0000-0000-000000000001");
 
             migrationBuilder.InsertData(
                 schema: "sickness",
@@ -118,11 +118,11 @@ namespace HR.Modules.Sickness.Persistence.Migrations
                 columns: new[] { "id", "company_id", "name", "is_active", "display_order", "created_at", "updated_at" },
                 values: new object[,]
                 {
-                    { "d0000000-0000-0000-0000-000000000001", companyId, "Illness",              true, 1, now, now },
-                    { "d0000000-0000-0000-0000-000000000002", companyId, "Injury",               true, 2, now, now },
-                    { "d0000000-0000-0000-0000-000000000003", companyId, "Medical Appointment",  true, 3, now, now },
-                    { "d0000000-0000-0000-0000-000000000004", companyId, "Dependent Care",       true, 4, now, now },
-                    { "d0000000-0000-0000-0000-000000000005", companyId, "Other",                true, 5, now, now }
+                    { new Guid("d0000000-0000-0000-0000-000000000001"), companyId, "Illness",             true, 1, now, now },
+                    { new Guid("d0000000-0000-0000-0000-000000000002"), companyId, "Injury",              true, 2, now, now },
+                    { new Guid("d0000000-0000-0000-0000-000000000003"), companyId, "Medical Appointment", true, 3, now, now },
+                    { new Guid("d0000000-0000-0000-0000-000000000004"), companyId, "Dependent Care",      true, 4, now, now },
+                    { new Guid("d0000000-0000-0000-0000-000000000005"), companyId, "Other",               true, 5, now, now }
                 });
         }
 
