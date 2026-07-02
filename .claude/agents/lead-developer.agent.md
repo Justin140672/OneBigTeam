@@ -73,10 +73,11 @@ If any criterion is marked **Violation**, halt and report the specific violation
 ### 3. Final checks
 After both handoffs complete, verify the repository state yourself:
 - Run a full build for the workspace: `dotnet build`
-- Run tests by specifying each test project path **individually**, omitting `HR.Web.E2E.Tests` entirely. Do not use a solution-level `dotnet test` — it will pick up the E2E project. Run the following three commands:
+- Run tests by specifying each test project path **individually**, omitting `HR.Web.E2E.Tests` entirely. Do not use a solution-level `dotnet test` — it will pick up the E2E project. Run the following commands:
   ```
   dotnet test tests/HR.Architecture.Tests/HR.Architecture.Tests.csproj
   dotnet test tests/HR.Modules.Assets.Tests/HR.Modules.Assets.Tests.csproj
+  dotnet test tests/HR.Modules.Sickness.Tests/HR.Modules.Sickness.Tests.csproj
   dotnet test tests/HR.Integration.Tests/HR.Integration.Tests.csproj
   ```
   Add any other non-E2E test projects that exist in the solution. Never run `tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj` — it requires a live browser and full environment.
@@ -103,6 +104,15 @@ Provide a concise final summary that includes:
 - whether all tests passed
 - whether the post-UI reconfirmation build passed (tests are not re-run after UI — build only)
 - list any follow-up items that are: (a) risks flagged by a specialist agent that were not resolved, (b) items rejected by a guardrail that the user must address manually, or (c) build/test failures that were stopped but not fixed
+
+## New Module Checklist
+When any task creates a new `HR.Modules.*` project, the following steps are **mandatory** — delegate them to the appropriate specialist agents and verify each before moving on:
+
+1. **Unit test project** — create `tests/HR.Modules.<Name>.Tests/HR.Modules.<Name>.Tests.csproj` matching the structure of `tests/HR.Modules.Assets.Tests/`. Add `<InternalsVisibleTo Include="HR.Modules.<Name>.Tests" />` (plus `HR.Architecture.Tests` and `HR.Integration.Tests`) to the new module's `.csproj`.
+2. **Architecture tests** — add the new module's assembly to `tests/HR.Architecture.Tests/ModuleDependencyBoundariesTests.cs` (the theory data that checks module boundary rules), and create a `<Name>ModuleArchitectureTests.cs` file in that project covering: public surface limited to `*Module.cs`, DbContext is internal, schema name matches module name, table names are snake_case, no cross-module references.
+3. **Test project in the run list** — add `dotnet test tests/HR.Modules.<Name>.Tests/HR.Modules.<Name>.Tests.csproj` to the Final Checks step above.
+
+Do not report a new module as complete until all three items are done, the build passes, and all test projects pass.
 
 ## Guardrails
 - Keep changes minimal and focused on the user request.

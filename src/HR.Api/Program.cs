@@ -9,6 +9,7 @@ using HR.Modules.Identity;
 using HR.Modules.Leave;
 using HR.Modules.Notifications;
 using HR.Modules.Assets;
+using HR.Modules.Sickness;
 using HR.Modules.Probation;
 using HR.Modules.Tasks;
 using HR.SharedKernel;
@@ -30,6 +31,7 @@ builder.Services.AddNotificationsModule(connectionString);
 builder.Services.AddTasksModule(connectionString);
 builder.Services.AddProbationModule(connectionString);
 builder.Services.AddAssetsModule(connectionString);
+builder.Services.AddSicknessModule(connectionString);
 builder.Services.AddInfrastructure(connectionString);
 builder.Services.AddHangfireBackgroundJobs(connectionString);
 builder.Services.AddFastEndpoints(o => o.IncludeAbstractValidators = true);
@@ -90,6 +92,9 @@ DateTimeOffset? probationMigrationCheckedAt = null;
 var assetsMigrationStatus = "unknown";
 string? assetsMigrationError = null;
 DateTimeOffset? assetsMigrationCheckedAt = null;
+var sicknessMigrationStatus = "unknown";
+string? sicknessMigrationError = null;
+DateTimeOffset? sicknessMigrationCheckedAt = null;
 
 try
 {
@@ -231,6 +236,19 @@ catch (Exception exception)
 	assetsMigrationCheckedAt = DateTimeOffset.UtcNow;
 }
 
+try
+{
+	await app.Services.MigrateSicknessAsync();
+	sicknessMigrationStatus = "succeeded";
+	sicknessMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+catch (Exception exception)
+{
+	sicknessMigrationStatus = "failed";
+	sicknessMigrationError = exception.Message;
+	sicknessMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+
 app.MapGet("/health/startup-migrations", () =>
 {
 	var response = new
@@ -294,10 +312,16 @@ app.MapGet("/health/startup-migrations", () =>
 			status = assetsMigrationStatus,
 			checkedAt = assetsMigrationCheckedAt,
 			error = assetsMigrationError
+		},
+		sickness = new
+		{
+			status = sicknessMigrationStatus,
+			checkedAt = sicknessMigrationCheckedAt,
+			error = sicknessMigrationError
 		}
 	};
 
-	return auditMigrationStatus == "failed" || companiesMigrationStatus == "failed" || documentsMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed" || notificationsMigrationStatus == "failed" || tasksMigrationStatus == "failed" || probationMigrationStatus == "failed" || assetsMigrationStatus == "failed"
+	return auditMigrationStatus == "failed" || companiesMigrationStatus == "failed" || documentsMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed" || notificationsMigrationStatus == "failed" || tasksMigrationStatus == "failed" || probationMigrationStatus == "failed" || assetsMigrationStatus == "failed" || sicknessMigrationStatus == "failed"
 		? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
 		: Results.Ok(response);
 });
