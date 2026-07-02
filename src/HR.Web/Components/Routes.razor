@@ -1,15 +1,37 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Navigation
+@inject IWebHostEnvironment Env
 
 <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
-        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
-            <NotAuthorized>
-                @{
-                    Navigation.NavigateTo("/login", replace: true);
+        <ErrorBoundary @ref="_errorBoundary">
+            <ChildContent>
+                <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                    <NotAuthorized>
+                        @{
+                            if (!Navigation.Uri.EndsWith("/login", StringComparison.OrdinalIgnoreCase))
+                                Navigation.NavigateTo("/login", replace: true);
+                        }
+                    </NotAuthorized>
+                </AuthorizeRouteView>
+            </ChildContent>
+            <ErrorContent Context="ex">
+                @if (Env.IsDevelopment())
+                {
+                    <div style="padding:2rem;font-family:monospace;background:#fee;border:2px solid red;margin:1rem">
+                        <h2>Unhandled exception (dev only)</h2>
+                        <p><strong>@ex.GetType().FullName</strong></p>
+                        <pre style="white-space:pre-wrap">@ex.Message</pre>
+                        <pre style="white-space:pre-wrap;font-size:.8em;color:#666">@ex.StackTrace</pre>
+                        <button @onclick="() => _errorBoundary?.Recover()">Recover</button>
+                    </div>
                 }
-            </NotAuthorized>
-        </AuthorizeRouteView>
+            </ErrorContent>
+        </ErrorBoundary>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>
+
+@code {
+    private ErrorBoundary? _errorBoundary;
+}

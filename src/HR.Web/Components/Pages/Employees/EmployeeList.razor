@@ -4,6 +4,7 @@
 @using HR.SharedKernel
 @inject EmployeeService EmployeeService
 @inject UserService UserService
+@inject AppSession Session
 
 <PageTitle>Employees</PageTitle>
 
@@ -70,6 +71,11 @@
 
     protected override async Task OnBeforeLoadAsync()
     {
+        if (!Session.CanManageEmployees)
+        {
+            Navigation.NavigateTo("/", replace: true);
+            return;
+        }
         _canCreateEmployee = await UserService.HasPermissionAsync(SystemPermissions.EmployeeCreate);
     }
 

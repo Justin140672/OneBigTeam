@@ -113,4 +113,22 @@ public sealed class PositionProfileManagementTests(AppFixture fixture) : E2ETest
         Assert.True(await ppEdit.HasErrorAsync(),
             "Expected a validation error when saving a position profile with no title");
     }
+
+    [Fact]
+    public async Task PlainEmployee_IsRedirectedAway_FromPositionProfilesPage()
+    {
+        const string tomEmail = "tom.williams@acme.example";
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(tomEmail);
+
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/position-profiles");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        var finalUrl = _page.Url;
+        Assert.False(finalUrl.Contains("/position-profiles"),
+            $"Expected a plain employee to be redirected away from the position profiles page, but ended up at: {finalUrl}");
+    }
 }

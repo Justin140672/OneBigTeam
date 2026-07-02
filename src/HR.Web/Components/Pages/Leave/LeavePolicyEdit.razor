@@ -1,8 +1,8 @@
-@page "/companies/{CompanyId:guid}/employment-types/new"
-@page "/companies/{CompanyId:guid}/employment-types/{Id:guid}"
-@page "/companies/{CompanyId:guid}/employment-types/{Id:guid}/view"
+@page "/companies/{CompanyId:guid}/leave-policies/new"
+@page "/companies/{CompanyId:guid}/leave-policies/{Id:guid}"
+@page "/companies/{CompanyId:guid}/leave-policies/{Id:guid}/view"
 @rendermode InteractiveServer
-@inject EmploymentTypeService EmploymentTypeService
+@inject LeavePolicyService LeavePolicyService
 @inject NavigationManager Navigation
 
 <PageTitle>@PageTitle</PageTitle>
@@ -10,7 +10,7 @@
 <div class="container py-4">
     <SfBreadcrumb Class="mb-3">
         <BreadcrumbItems>
-            <BreadcrumbItem Text="Employment Types" Url="@($"/companies/{CompanyId}/employment-types")" />
+            <BreadcrumbItem Text="Leave Policies" Url="@($"/companies/{CompanyId}/leave-policies")" />
             <BreadcrumbItem Text="@PageTitle" />
         </BreadcrumbItems>
     </SfBreadcrumb>
@@ -35,16 +35,28 @@
             <div class="col-lg-7">
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5 class="mb-0">Employment Type Details</h5>
+                        <h5 class="mb-0">Leave Policy Details</h5>
                     </div>
                     <div class="card-body @(_isViewMode ? "view-mode" : "")">
                         <div class="mb-3">
                             <label class="form-label">Name <span class="text-danger">*</span></label>
-                            <HrTextBox @bind-Value="_model.Name" Placeholder="e.g. Permanent, Contractor" />
+                            <HrTextBox @bind-Value="_model.Name" Placeholder="e.g. Standard Policy" />
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Description</label>
                             <HrTextBox @bind-Value="_model.Description" Placeholder="Optional description" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Carry Over Days <span class="text-danger">*</span></label>
+                            <SfNumericTextBox TValue="int" @bind-Value="_model.CarryOverDays"
+                                             Min="0" Step="1" />
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="allowNegativeBalance"
+                                       @bind="_model.AllowNegativeBalance" />
+                                <label class="form-check-label" for="allowNegativeBalance">Allow negative balance</label>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -77,16 +89,16 @@
 
     private bool _isViewMode;
     private bool IsNew => Id is null || Id == Guid.Empty;
-    private string PageTitle => IsNew ? "Add Employment Type"
+    private string PageTitle => IsNew ? "Add Leave Policy"
         : _model.Name.Trim().Length > 0 ? _model.Name
-        : _isViewMode ? "View Employment Type" : "Edit Employment Type";
+        : _isViewMode ? "View Leave Policy" : "Edit Leave Policy";
 
     private bool _loading = true;
     private bool _saving;
     private string? _globalError;
     private string? _successMsg;
 
-    private readonly EmploymentTypeEditModel _model = new();
+    private readonly LeavePolicyEditModel _model = new();
 
     protected override async Task OnParametersSetAsync()
     {
@@ -97,12 +109,14 @@
 
         if (!IsNew)
         {
-            var list = await EmploymentTypeService.ListEmploymentTypesAsync(CompanyId, includeInactive: true);
-            var existing = list?.Items.FirstOrDefault(e => e.Id == Id);
+            var list = await LeavePolicyService.ListLeavePoliciesAsync(CompanyId);
+            var existing = list?.Items.FirstOrDefault(p => p.Id == Id);
             if (existing is not null)
             {
                 _model.Name = existing.Name;
                 _model.Description = existing.Description;
+                _model.CarryOverDays = existing.CarryOverDays;
+                _model.AllowNegativeBalance = existing.AllowNegativeBalance;
             }
         }
 
@@ -117,36 +131,40 @@
 
         if (IsNew)
         {
-            var request = new CreateEmploymentTypeRequest(
+            var request = new CreateLeavePolicyRequest(
                 CompanyId,
                 _model.Name.Trim(),
-                string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim());
+                string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim(),
+                _model.CarryOverDays,
+                _model.AllowNegativeBalance);
 
-            var (created, error) = await EmploymentTypeService.CreateAsync(CompanyId, request);
+            var (created, error) = await LeavePolicyService.CreateAsync(CompanyId, request);
             _saving = false;
 
             if (created is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/employment-types", forceLoad: true);
+                Navigation.NavigateTo($"/companies/{CompanyId}/leave-policies", forceLoad: true);
             else
-                _globalError = error ?? "Failed to create employment type.";
+                _globalError = error ?? "Failed to create leave policy.";
         }
         else
         {
-            var request = new UpdateEmploymentTypeRequest(
+            var request = new UpdateLeavePolicyRequest(
                 CompanyId,
                 Id!.Value,
                 _model.Name.Trim(),
-                string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim());
+                string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim(),
+                _model.CarryOverDays,
+                _model.AllowNegativeBalance);
 
-            var (updated, error) = await EmploymentTypeService.UpdateAsync(CompanyId, Id!.Value, request);
+            var (updated, error) = await LeavePolicyService.UpdateAsync(CompanyId, Id!.Value, request);
             _saving = false;
 
             if (updated is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/employment-types", forceLoad: true);
+                Navigation.NavigateTo($"/companies/{CompanyId}/leave-policies", forceLoad: true);
             else
-                _globalError = error ?? "Failed to save employment type.";
+                _globalError = error ?? "Failed to save leave policy.";
         }
     }
 
-    private void Cancel() => Navigation.NavigateTo($"/companies/{CompanyId}/employment-types");
+    private void Cancel() => Navigation.NavigateTo($"/companies/{CompanyId}/leave-policies");
 }

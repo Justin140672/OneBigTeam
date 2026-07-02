@@ -12,7 +12,7 @@ public class LeaveTypeService(IHttpClientFactory httpClientFactory)
         {
             var url = $"api/companies/{companyId}/leave-types";
             if (!includeInactive) url += "?isActive=true";
-            return await Http.GetFromJsonAsync<ListLeaveTypesResponse>(url);
+            return await Http.GetFromJsonAsync<ListLeaveTypesResponse>(url, HrApiJsonOptions.Default);
         }
         catch (HttpRequestException)
         {

@@ -12,8 +12,7 @@ public sealed class NotificationService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<NotificationsResponse>(
-                $"api/companies/{companyId}/notifications/my",
-                cancellationToken);
+                $"api/companies/{companyId}/notifications/my", HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }
     }
@@ -24,8 +23,7 @@ public sealed class NotificationService(IHttpClientFactory httpClientFactory)
         try
         {
             var result = await Http.GetFromJsonAsync<UnreadCountResponse>(
-                $"api/companies/{companyId}/notifications/unread-count",
-                cancellationToken);
+                $"api/companies/{companyId}/notifications/unread-count", HrApiJsonOptions.Default, cancellationToken);
             return result?.Count ?? 0;
         }
         catch { return 0; }

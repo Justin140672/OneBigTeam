@@ -10,7 +10,7 @@ public class CompanyService(IHttpClientFactory httpClientFactory)
     {
         try
         {
-            return await Http.GetFromJsonAsync<GetCompanySettingsResponse>($"api/companies/{id}/settings");
+            return await Http.GetFromJsonAsync<GetCompanySettingsResponse>($"api/companies/{id}/settings", HrApiJsonOptions.Default);
         }
         catch (HttpRequestException)
         {
@@ -22,7 +22,7 @@ public class CompanyService(IHttpClientFactory httpClientFactory)
     {
         try
         {
-            return await Http.GetFromJsonAsync<GetCompanyResponse>($"api/companies/{id}");
+            return await Http.GetFromJsonAsync<GetCompanyResponse>($"api/companies/{id}", HrApiJsonOptions.Default);
         }
         catch (HttpRequestException)
         {

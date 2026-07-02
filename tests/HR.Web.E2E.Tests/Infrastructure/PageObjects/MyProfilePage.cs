@@ -136,7 +136,8 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     public async Task ClickRequestLeaveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Request Leave" }).ClickAsync();
-        await page.WaitForSelectorAsync(".e-dialog", new() { Timeout = 10_000 });
+        await page.GetByRole(AriaRole.Dialog, new() { Name = "Request Leave" })
+            .WaitForAsync(new() { Timeout = 10_000 });
     }
 
     /// <summary>
@@ -188,7 +189,7 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
         string endDate,     // dd/MM/yyyy
         string? reason = null)
     {
-        var dialog = page.Locator(".e-dialog");
+        var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = "Request Leave" });
 
         // Syncfusion SfDropDownList renders a readonly <input> inside a <span role="combobox">.
         // The span intercepts all pointer events, so we must click the span, not the input.
@@ -226,6 +227,7 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Submit Request" }).ClickAsync();
         // Dialog closes on success; wait for it to disappear.
-        await page.WaitForSelectorAsync(".e-dialog", new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+        await page.GetByRole(AriaRole.Dialog, new() { Name = "Request Leave" })
+            .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 }

@@ -84,4 +84,22 @@ public sealed class PublicHolidayManagementTests(AppFixture fixture) : E2ETestBa
         Assert.True(await phEdit.HasErrorAsync(),
             "Expected validation errors when saving a public holiday with missing required fields");
     }
+
+    [Fact]
+    public async Task PlainEmployee_IsRedirectedAway_FromPublicHolidaysPage()
+    {
+        const string tomEmail = "tom.williams@acme.example";
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(tomEmail);
+
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/public-holidays");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        var finalUrl = _page.Url;
+        Assert.False(finalUrl.Contains("/public-holidays"),
+            $"Expected a plain employee to be redirected away from the public holidays page, but ended up at: {finalUrl}");
+    }
 }

@@ -12,7 +12,7 @@ public class DepartmentService(IHttpClientFactory httpClientFactory)
         {
             var url = $"api/companies/{companyId}/departments";
             if (includeInactive) url += "?includeInactive=true";
-            return await Http.GetFromJsonAsync<ListDepartmentsResponse>(url);
+            return await Http.GetFromJsonAsync<ListDepartmentsResponse>(url, HrApiJsonOptions.Default);
         }
         catch (HttpRequestException)
         {

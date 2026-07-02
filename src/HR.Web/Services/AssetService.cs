@@ -13,7 +13,7 @@ public sealed class AssetService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<List<EmployeeAssetItem>>(
-                $"api/companies/{companyId}/employees/{employeeId}/assets", cancellationToken);
+                $"api/companies/{companyId}/employees/{employeeId}/assets", HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }
     }
@@ -24,7 +24,7 @@ public sealed class AssetService(IHttpClientFactory httpClientFactory)
         try
         {
             var all = await Http.GetFromJsonAsync<List<AvailableAssetItem>>(
-                $"api/companies/{companyId}/assets?status=Available", cancellationToken);
+                $"api/companies/{companyId}/assets?status=Available", HrApiJsonOptions.Default, cancellationToken);
             return all;
         }
         catch { return null; }
@@ -66,7 +66,7 @@ public sealed class AssetService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<List<AssetAssignmentItem>>(
-                $"api/companies/{companyId}/assets/{assetId}/assignments", cancellationToken);
+                $"api/companies/{companyId}/assets/{assetId}/assignments", HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }
     }
@@ -77,8 +77,83 @@ public sealed class AssetService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<AssetDetailModel>(
-                $"api/companies/{companyId}/assets/{assetId}", cancellationToken);
+                $"api/companies/{companyId}/assets/{assetId}", HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }
     }
+
+    // ── Admin asset list / CRUD ────────────────────────────────────────────
+
+    public async Task<ListAssetsAdminResponse?> ListAssetsAsync(Guid companyId)
+    {
+        try
+        {
+            var items = await Http.GetFromJsonAsync<List<AssetListItemModel>>(
+                $"api/companies/{companyId}/assets", HrApiJsonOptions.Default);
+            return items is null ? null : new ListAssetsAdminResponse(items);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<(CreateAssetResponse? Result, string? Error)> CreateAssetAsync(
+        Guid companyId, CreateAssetRequest request)
+    {
+        var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/assets", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var created = await response.Content.ReadFromJsonAsync<CreateAssetResponse>();
+            return (created, null);
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+            return (null, body?.Error ?? "An asset with that number already exists.");
+        }
+
+        return (null, "Failed to create asset.");
+    }
+
+    public async Task<(UpdateAssetResponse? Result, string? Error)> UpdateAssetAsync(
+        Guid companyId, Guid id, UpdateAssetRequest request)
+    {
+        var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/assets/{id}", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<UpdateAssetResponse>();
+            return (updated, null);
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+            return (null, body?.Error ?? "An asset with that number already exists.");
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return (null, "Asset not found.");
+
+        return (null, "Failed to update asset.");
+    }
+
+    public async Task<string?> RetireAssetAsync(Guid companyId, Guid id)
+    {
+        var response = await Http.DeleteAsync($"api/companies/{companyId}/assets/{id}");
+
+        if (response.IsSuccessStatusCode)
+            return null;
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return "Asset not found.";
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+        return body?.Error ?? "Failed to retire asset.";
+    }
+
+    private sealed record ErrorEnvelope(string? Error);
 }

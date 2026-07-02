@@ -7,24 +7,8 @@ public sealed class EmploymentTypeListPage(IPage page, string baseUrl)
     public async Task GoToAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employment-types");
-        await page.EvaluateAsync(@"() => {
-            window._listReady = false;
-            let spinnerSeen = document.querySelector('.spinner-border') !== null;
-            const obs = new MutationObserver(() => {
-                if (!spinnerSeen && document.querySelector('.spinner-border')) {
-                    spinnerSeen = true;
-                }
-                if (spinnerSeen && !document.querySelector('.spinner-border') &&
-                    document.querySelector('.e-grid')) {
-                    window._listReady = true;
-                    obs.disconnect();
-                }
-            });
-            obs.observe(document.body, { subtree: true, childList: true });
-        }");
-        await page.WaitForFunctionAsync(
-            "window._listReady === true",
-            null, new PageWaitForFunctionOptions { Timeout = 20_000 });
+        // Grid renders only when IsLoading=false; spinner and grid are mutually exclusive branches.
+        await page.WaitForSelectorAsync(".e-grid, .alert-danger", new() { Timeout = 20_000 });
     }
 
     public async Task ClickNewAsync()
@@ -45,7 +29,10 @@ public sealed class EmploymentTypeListPage(IPage page, string baseUrl)
             .Filter(new() { HasText = nameFragment })
             .First;
         await row.ClickAsync();
-        await page.Locator(".e-toolbar-item[title='Deactivate']").ClickAsync();
+        // Blazor re-renders the toolbar after row selection; wait for the button to be enabled.
+        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Deactivate" });
+        await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await btn.ClickAsync();
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });

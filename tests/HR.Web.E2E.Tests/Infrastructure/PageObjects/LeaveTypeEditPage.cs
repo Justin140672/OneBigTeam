@@ -14,7 +14,7 @@ public sealed class LeaveTypeEditPage(IPage page, string baseUrl)
         await page.GetByPlaceholder("e.g. Annual Leave").FillAsync(name);
 
     public async Task FillCodeAsync(string code) =>
-        await page.GetByPlaceholder("e.g. ANNUAL").FillAsync(code);
+        await page.GetByPlaceholder("e.g. ANNUAL", new() { Exact = true }).FillAsync(code);
 
     public async Task FillDefaultDaysAsync(int days)
     {

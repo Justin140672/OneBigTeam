@@ -207,7 +207,7 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
             .First;
         await targetItem.WaitForAsync(new() { Timeout = 10_000 });
         await targetItem.ClickAsync();
-        await page.GetByRole(AriaRole.Button, new() { Name = "Assign" }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Assign", Exact = true }).ClickAsync();
         await page.GetByRole(AriaRole.Dialog, new() { Name = "Assign Asset" })
             .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }

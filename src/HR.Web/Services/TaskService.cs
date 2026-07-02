@@ -11,7 +11,7 @@ public sealed class TaskService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<TaskListResponse>(
-                $"api/companies/{companyId}/tasks/my", cancellationToken);
+                $"api/companies/{companyId}/tasks/my", HrApiJsonOptions.Default, cancellationToken);
         }
         catch
         {
@@ -24,7 +24,7 @@ public sealed class TaskService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<TaskListResponse>(
-                $"api/companies/{companyId}/employees/{employeeId}/tasks", cancellationToken);
+                $"api/companies/{companyId}/employees/{employeeId}/tasks", HrApiJsonOptions.Default, cancellationToken);
         }
         catch
         {
@@ -37,7 +37,7 @@ public sealed class TaskService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<TaskDetailModel>(
-                $"api/companies/{companyId}/tasks/{taskId}", cancellationToken);
+                $"api/companies/{companyId}/tasks/{taskId}", HrApiJsonOptions.Default, cancellationToken);
         }
         catch
         {
@@ -50,7 +50,7 @@ public sealed class TaskService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<TaskListResponse>(
-                $"api/companies/{companyId}/employees/{managerId}/team-tasks", cancellationToken);
+                $"api/companies/{companyId}/employees/{managerId}/team-tasks", HrApiJsonOptions.Default, cancellationToken);
         }
         catch
         {
@@ -63,7 +63,7 @@ public sealed class TaskService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<UnassignedTaskListResponse>(
-                $"api/companies/{companyId}/tasks/unassigned", cancellationToken);
+                $"api/companies/{companyId}/tasks/unassigned", HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }
     }

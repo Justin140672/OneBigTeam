@@ -11,7 +11,7 @@ public class PositionProfileService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<ListPositionProfilesResponse>(
-                $"api/companies/{companyId}/position-profiles");
+                $"api/companies/{companyId}/position-profiles", HrApiJsonOptions.Default);
         }
         catch (HttpRequestException)
         {
@@ -24,7 +24,7 @@ public class PositionProfileService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<GetPositionProfileResponse>(
-                $"api/companies/{companyId}/position-profiles/{id}");
+                $"api/companies/{companyId}/position-profiles/{id}", HrApiJsonOptions.Default);
         }
         catch (HttpRequestException)
         {
@@ -59,7 +59,7 @@ public class PositionProfileService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<ListRequiredDocumentsResponse>(
-                $"api/companies/{companyId}/position-profiles/{positionProfileId}/required-documents");
+                $"api/companies/{companyId}/position-profiles/{positionProfileId}/required-documents", HrApiJsonOptions.Default);
         }
         catch (HttpRequestException)
         {

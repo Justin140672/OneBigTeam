@@ -1,6 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
-
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -8,12 +6,6 @@ namespace HR.Web.Services;
 public sealed class LeaveService(IHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
-
-    // The API server serialises enums as strings; the default client options don't, so we need explicit options.
-    private static readonly JsonSerializerOptions EnumOptions = new()
-    {
-        Converters = { new JsonStringEnumConverter() }
-    };
 
     public async Task<bool> CancelLeaveRequestAsync(
         Guid companyId,
@@ -42,8 +34,7 @@ public sealed class LeaveService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<LeaveRequestListResponse>(
-                $"api/companies/{companyId}/employees/{employeeId}/leave-requests",
-                cancellationToken);
+                $"api/companies/{companyId}/employees/{employeeId}/leave-requests", HrApiJsonOptions.Default, cancellationToken);
         }
         catch
         {
@@ -60,8 +51,7 @@ public sealed class LeaveService(IHttpClientFactory httpClientFactory)
         {
             var year = DateTime.UtcNow.Year;
             return await Http.GetFromJsonAsync<LeaveBalanceResponse>(
-                $"api/companies/{companyId}/employees/{employeeId}/leave-balances?policyYear={year}",
-                cancellationToken);
+                $"api/companies/{companyId}/employees/{employeeId}/leave-balances?policyYear={year}", HrApiJsonOptions.Default, cancellationToken);
         }
         catch
         {
@@ -79,10 +69,10 @@ public sealed class LeaveService(IHttpClientFactory httpClientFactory)
         {
             var httpResponse = await Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/employees/{employeeId}/leave-requests/preview",
-                request, EnumOptions, cancellationToken);
+                request, HrApiJsonOptions.Default, cancellationToken);
 
             if (httpResponse.IsSuccessStatusCode)
-                return (await httpResponse.Content.ReadFromJsonAsync<PreviewLeaveResponse>(EnumOptions, cancellationToken), null);
+                return (await httpResponse.Content.ReadFromJsonAsync<PreviewLeaveResponse>(HrApiJsonOptions.Default, cancellationToken), null);
 
             return (null, "Unable to calculate preview.");
         }
@@ -106,10 +96,10 @@ public sealed class LeaveService(IHttpClientFactory httpClientFactory)
         {
             var httpResponse = await Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/employees/{employeeId}/leave-requests",
-                request, EnumOptions, cancellationToken);
+                request, HrApiJsonOptions.Default, cancellationToken);
 
             if (httpResponse.IsSuccessStatusCode)
-                return (await httpResponse.Content.ReadFromJsonAsync<SubmitLeaveResponse>(EnumOptions, cancellationToken), null);
+                return (await httpResponse.Content.ReadFromJsonAsync<SubmitLeaveResponse>(HrApiJsonOptions.Default, cancellationToken), null);
 
             var body = await httpResponse.Content.ReadAsStringAsync(cancellationToken);
             try

@@ -12,7 +12,7 @@ public class EmploymentTypeService(IHttpClientFactory httpClientFactory)
         {
             var url = $"api/companies/{companyId}/employment-types";
             if (!includeInactive) url += "?isActive=true";
-            return await Http.GetFromJsonAsync<ListEmploymentTypesResponse>(url);
+            return await Http.GetFromJsonAsync<ListEmploymentTypesResponse>(url, HrApiJsonOptions.Default);
         }
         catch (HttpRequestException)
         {

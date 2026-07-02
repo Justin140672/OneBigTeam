@@ -11,7 +11,7 @@ public class PublicHolidayService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<ListPublicHolidaysResponse>(
-                $"api/companies/{companyId}/public-holidays");
+                $"api/companies/{companyId}/public-holidays", HrApiJsonOptions.Default);
         }
         catch (HttpRequestException)
         {

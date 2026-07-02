@@ -18,6 +18,46 @@ public sealed record DocumentTypeListResponse(IReadOnlyList<DocumentTypeItem> It
 
 public sealed record DocumentTypeItem(Guid Id, string Name, string? Description, bool IsActive, bool AllowEmployeeUpload);
 
+// --- Document Type CRUD models ---
+
+public record ListDocumentTypesAdminResponse(List<DocumentTypeListItemModel> Items);
+
+public record DocumentTypeListItemModel(
+    Guid Id,
+    string Name,
+    string? Description,
+    bool IsActive,
+    bool AllowEmployeeUpload);
+
+public record CreateDocumentTypeRequest(Guid CompanyId, string Name, string? Description, bool AllowEmployeeUpload);
+
+public record CreateDocumentTypeResponse(
+    Guid Id,
+    Guid CompanyId,
+    string Name,
+    string? Description,
+    bool IsActive,
+    bool AllowEmployeeUpload,
+    DateTimeOffset CreatedAt);
+
+public record UpdateDocumentTypeRequest(Guid CompanyId, Guid DocumentTypeId, string Name, string? Description, bool AllowEmployeeUpload);
+
+public record UpdateDocumentTypeResponse(
+    Guid Id,
+    Guid CompanyId,
+    string Name,
+    string? Description,
+    bool IsActive,
+    bool AllowEmployeeUpload,
+    DateTimeOffset UpdatedAt);
+
+public sealed class DocumentTypeEditModel
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public bool AllowEmployeeUpload { get; set; }
+}
+
 public sealed record DocumentRequestListResponse(IReadOnlyList<DocumentRequestListItem> Items);
 
 public sealed record DocumentRequestListItem(

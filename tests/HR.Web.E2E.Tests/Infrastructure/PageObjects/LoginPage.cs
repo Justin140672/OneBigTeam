@@ -4,8 +4,12 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 public sealed class LoginPage(IPage page, string baseUrl)
 {
-    public async Task GoToAsync() =>
+    public async Task GoToAsync()
+    {
         await page.GotoAsync($"{baseUrl}/login");
+        // Wait for the Blazor circuit to render the interactive form before LoginAsync tries to fill it.
+        await page.WaitForSelectorAsync("[placeholder='you@example.com']", new() { Timeout = 30_000 });
+    }
 
     public async Task LoginAsync(string email, string password = "password")
     {

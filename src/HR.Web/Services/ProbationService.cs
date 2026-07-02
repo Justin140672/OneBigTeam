@@ -14,8 +14,7 @@ public sealed class ProbationService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<ProbationRecordModel>(
-                $"api/companies/{companyId}/employees/{employeeId}/probation-record",
-                cancellationToken);
+                $"api/companies/{companyId}/employees/{employeeId}/probation-record", HrApiJsonOptions.Default, cancellationToken);
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -35,8 +34,7 @@ public sealed class ProbationService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<ProbationReviewDetailModel>(
-                $"api/companies/{companyId}/probation-reviews/{reviewId}",
-                cancellationToken);
+                $"api/companies/{companyId}/probation-reviews/{reviewId}", HrApiJsonOptions.Default, cancellationToken);
         }
         catch
         {
@@ -75,8 +73,7 @@ public sealed class ProbationService(IHttpClientFactory httpClientFactory)
         try
         {
             var response = await Http.GetFromJsonAsync<UpcomingProbationReviewsResponse>(
-                $"api/companies/{companyId}/probation-reviews/upcoming",
-                cancellationToken);
+                $"api/companies/{companyId}/probation-reviews/upcoming", HrApiJsonOptions.Default, cancellationToken);
             return response?.Items ?? [];
         }
         catch
@@ -93,8 +90,7 @@ public sealed class ProbationService(IHttpClientFactory httpClientFactory)
         try
         {
             var response = await Http.GetFromJsonAsync<ProbationReviewsResponse>(
-                $"api/companies/{companyId}/probation-records/{probationRecordId}/reviews",
-                cancellationToken);
+                $"api/companies/{companyId}/probation-records/{probationRecordId}/reviews", HrApiJsonOptions.Default, cancellationToken);
             return response?.Items ?? [];
         }
         catch

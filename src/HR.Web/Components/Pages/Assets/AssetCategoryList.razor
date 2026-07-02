@@ -1,25 +1,19 @@
-@page "/companies/{CompanyId:guid}/employment-types"
+@page "/companies/{CompanyId:guid}/asset-categories"
 @rendermode InteractiveServer
-@inherits SearchPageBase<EmploymentTypeListItemModel>
-@inject EmploymentTypeService EmploymentTypeService
+@inherits SearchPageBase<AssetCategoryListItemModel>
+@inject AssetCategoryService AssetCategoryService
 @inject AppSession Session
 
-<PageTitle>Employment Types</PageTitle>
+<PageTitle>Asset Categories</PageTitle>
 
 <div class="container-fluid py-4">
-    <h1 class="mb-3">Employment Types</h1>
-
-    <div class="form-check form-switch mb-3">
-        <input class="form-check-input" type="checkbox" id="showInactive"
-               @bind="_showInactive" @bind:after="LoadAsync" />
-        <label class="form-check-label" for="showInactive">Show inactive</label>
-    </div>
+    <h1 class="mb-3">Asset Categories</h1>
 
     @if (IsLoading)
     {
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm" role="status"></div>
-            <span>Loading employment types…</span>
+            <span>Loading asset categories…</span>
         </div>
     }
     else if (Error is not null)
@@ -37,27 +31,27 @@
         }
 
         <HrGrid @ref="Grid"
-                TValue="EmploymentTypeListItemModel"
+                TValue="AssetCategoryListItemModel"
                 DataSource="@Items"
                 Toolbar="@GridToolbar"
                 AllowFiltering="false">
-            <GridEvents TValue="EmploymentTypeListItemModel" OnToolbarClick="OnToolbarClick"
+            <GridEvents TValue="AssetCategoryListItemModel" OnToolbarClick="OnToolbarClick"
                         RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
             <GridPageSettings PageSize="20" />
             <GridColumns>
-                <GridColumn Field="@nameof(EmploymentTypeListItemModel.Name)" HeaderText="Name" Width="220">
+                <GridColumn Field="@nameof(AssetCategoryListItemModel.Name)" HeaderText="Name" Width="220">
                     <Template>
                         @{
-                            var row = (context as EmploymentTypeListItemModel)!;
-                            <a href="/companies/@CompanyId/employment-types/@row.Id">@row.Name</a>
+                            var row = (context as AssetCategoryListItemModel)!;
+                            <a href="/companies/@CompanyId/asset-categories/@row.Id">@row.Name</a>
                         }
                     </Template>
                 </GridColumn>
-                <GridColumn Field="@nameof(EmploymentTypeListItemModel.Description)" HeaderText="Description" Width="300" />
-                <GridColumn Field="@nameof(EmploymentTypeListItemModel.IsActive)" HeaderText="Status" Width="110">
+                <GridColumn Field="@nameof(AssetCategoryListItemModel.Description)" HeaderText="Description" Width="300" />
+                <GridColumn Field="@nameof(AssetCategoryListItemModel.IsActive)" HeaderText="Status" Width="110">
                     <Template>
                         @{
-                            var row = (context as EmploymentTypeListItemModel)!;
+                            var row = (context as AssetCategoryListItemModel)!;
                             <span class="badge @(row.IsActive ? "bg-success" : "bg-secondary")">
                                 @(row.IsActive ? "Active" : "Inactive")
                             </span>
@@ -70,8 +64,6 @@
 </div>
 
 @code {
-    private bool _showInactive;
-
     protected override Task OnBeforeLoadAsync()
     {
         if (!Session.CanManageEmployees)
@@ -90,25 +82,25 @@
                 if (!item.IsActive) return;
                 await Deactivate(item);
             },
-            tooltip: "Deactivate selected employment type");
+            tooltip: "Deactivate selected asset category");
     }
 
-    protected override async Task<IReadOnlyList<EmploymentTypeListItemModel>?> FetchItemsAsync(string? search)
+    protected override async Task<IReadOnlyList<AssetCategoryListItemModel>?> FetchItemsAsync(string? search)
     {
-        var result = await EmploymentTypeService.ListEmploymentTypesAsync(CompanyId, _showInactive);
+        var result = await AssetCategoryService.ListAssetCategoriesAsync(CompanyId);
         return result?.Items;
     }
 
-    protected override string LoadErrorMessage => "Failed to load employment types.";
+    protected override string LoadErrorMessage => "Failed to load asset categories.";
 
-    protected override string? GetAddUrl()  => $"/companies/{CompanyId}/employment-types/new";
-    protected override string? GetEditUrl(EmploymentTypeListItemModel item) => $"/companies/{CompanyId}/employment-types/{item.Id}";
-    protected override string? GetViewUrl(EmploymentTypeListItemModel item) => $"/companies/{CompanyId}/employment-types/{item.Id}/view";
+    protected override string? GetAddUrl()  => $"/companies/{CompanyId}/asset-categories/new";
+    protected override string? GetEditUrl(AssetCategoryListItemModel item) => $"/companies/{CompanyId}/asset-categories/{item.Id}";
+    protected override string? GetViewUrl(AssetCategoryListItemModel item) => $"/companies/{CompanyId}/asset-categories/{item.Id}/view";
 
-    private async Task Deactivate(EmploymentTypeListItemModel item)
+    private async Task Deactivate(AssetCategoryListItemModel item)
     {
         ClearActionError();
-        var error = await EmploymentTypeService.DeactivateAsync(CompanyId, item.Id);
+        var error = await AssetCategoryService.DeactivateAsync(CompanyId, item.Id);
         if (error is not null)
             SetActionError(error);
         else

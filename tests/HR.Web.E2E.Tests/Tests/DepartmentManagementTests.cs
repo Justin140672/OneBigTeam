@@ -87,4 +87,22 @@ public sealed class DepartmentManagementTests(AppFixture fixture) : E2ETestBase(
         Assert.True(await deptEdit.HasErrorAsync(),
             "Expected a validation error when saving a department with no name");
     }
+
+    [Fact]
+    public async Task PlainEmployee_IsRedirectedAway_FromDepartmentsPage()
+    {
+        const string tomEmail = "tom.williams@acme.example";
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(tomEmail);
+
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/departments");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        var finalUrl = _page.Url;
+        Assert.False(finalUrl.Contains("/departments"),
+            $"Expected a plain employee to be redirected away from the departments page, but ended up at: {finalUrl}");
+    }
 }

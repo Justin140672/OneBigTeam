@@ -1,8 +1,8 @@
-@page "/companies/{CompanyId:guid}/employment-types/new"
-@page "/companies/{CompanyId:guid}/employment-types/{Id:guid}"
-@page "/companies/{CompanyId:guid}/employment-types/{Id:guid}/view"
+@page "/companies/{CompanyId:guid}/asset-categories/new"
+@page "/companies/{CompanyId:guid}/asset-categories/{Id:guid}"
+@page "/companies/{CompanyId:guid}/asset-categories/{Id:guid}/view"
 @rendermode InteractiveServer
-@inject EmploymentTypeService EmploymentTypeService
+@inject AssetCategoryService AssetCategoryService
 @inject NavigationManager Navigation
 
 <PageTitle>@PageTitle</PageTitle>
@@ -10,7 +10,7 @@
 <div class="container py-4">
     <SfBreadcrumb Class="mb-3">
         <BreadcrumbItems>
-            <BreadcrumbItem Text="Employment Types" Url="@($"/companies/{CompanyId}/employment-types")" />
+            <BreadcrumbItem Text="Asset Categories" Url="@($"/companies/{CompanyId}/asset-categories")" />
             <BreadcrumbItem Text="@PageTitle" />
         </BreadcrumbItems>
     </SfBreadcrumb>
@@ -35,12 +35,12 @@
             <div class="col-lg-7">
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5 class="mb-0">Employment Type Details</h5>
+                        <h5 class="mb-0">Asset Category Details</h5>
                     </div>
                     <div class="card-body @(_isViewMode ? "view-mode" : "")">
                         <div class="mb-3">
                             <label class="form-label">Name <span class="text-danger">*</span></label>
-                            <HrTextBox @bind-Value="_model.Name" Placeholder="e.g. Permanent, Contractor" />
+                            <HrTextBox @bind-Value="_model.Name" Placeholder="e.g. Laptops, Furniture" />
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Description</label>
@@ -77,16 +77,16 @@
 
     private bool _isViewMode;
     private bool IsNew => Id is null || Id == Guid.Empty;
-    private string PageTitle => IsNew ? "Add Employment Type"
+    private string PageTitle => IsNew ? "Add Asset Category"
         : _model.Name.Trim().Length > 0 ? _model.Name
-        : _isViewMode ? "View Employment Type" : "Edit Employment Type";
+        : _isViewMode ? "View Asset Category" : "Edit Asset Category";
 
     private bool _loading = true;
     private bool _saving;
     private string? _globalError;
     private string? _successMsg;
 
-    private readonly EmploymentTypeEditModel _model = new();
+    private readonly AssetCategoryEditModel _model = new();
 
     protected override async Task OnParametersSetAsync()
     {
@@ -97,7 +97,7 @@
 
         if (!IsNew)
         {
-            var list = await EmploymentTypeService.ListEmploymentTypesAsync(CompanyId, includeInactive: true);
+            var list = await AssetCategoryService.ListAssetCategoriesAsync(CompanyId);
             var existing = list?.Items.FirstOrDefault(e => e.Id == Id);
             if (existing is not null)
             {
@@ -117,36 +117,36 @@
 
         if (IsNew)
         {
-            var request = new CreateEmploymentTypeRequest(
+            var request = new CreateAssetCategoryRequest(
                 CompanyId,
                 _model.Name.Trim(),
                 string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim());
 
-            var (created, error) = await EmploymentTypeService.CreateAsync(CompanyId, request);
+            var (created, error) = await AssetCategoryService.CreateAsync(CompanyId, request);
             _saving = false;
 
             if (created is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/employment-types", forceLoad: true);
+                Navigation.NavigateTo($"/companies/{CompanyId}/asset-categories", forceLoad: true);
             else
-                _globalError = error ?? "Failed to create employment type.";
+                _globalError = error ?? "Failed to create asset category.";
         }
         else
         {
-            var request = new UpdateEmploymentTypeRequest(
+            var request = new UpdateAssetCategoryRequest(
                 CompanyId,
                 Id!.Value,
                 _model.Name.Trim(),
                 string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim());
 
-            var (updated, error) = await EmploymentTypeService.UpdateAsync(CompanyId, Id!.Value, request);
+            var (updated, error) = await AssetCategoryService.UpdateAsync(CompanyId, Id!.Value, request);
             _saving = false;
 
             if (updated is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/employment-types", forceLoad: true);
+                Navigation.NavigateTo($"/companies/{CompanyId}/asset-categories", forceLoad: true);
             else
-                _globalError = error ?? "Failed to save employment type.";
+                _globalError = error ?? "Failed to save asset category.";
         }
     }
 
-    private void Cancel() => Navigation.NavigateTo($"/companies/{CompanyId}/employment-types");
+    private void Cancel() => Navigation.NavigateTo($"/companies/{CompanyId}/asset-categories");
 }

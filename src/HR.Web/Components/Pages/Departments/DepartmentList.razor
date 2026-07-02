@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inherits SearchPageBase<DepartmentListItemModel>
 @inject DepartmentService DepartmentService
+@inject AppSession Session
 
 <PageTitle>Departments</PageTitle>
 
@@ -81,6 +82,13 @@
 @code {
     private Dictionary<Guid, string> _nameMap = new();
     private bool _showInactive;
+
+    protected override Task OnBeforeLoadAsync()
+    {
+        if (!Session.CanManageEmployees)
+            Navigation.NavigateTo("/", replace: true);
+        return Task.CompletedTask;
+    }
 
     protected override void ConfigureToolbar()
     {

@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inherits SearchPageBase<PublicHolidayListItemModel>
 @inject PublicHolidayService PublicHolidayService
+@inject AppSession Session
 
 <PageTitle>Public Holidays</PageTitle>
 
@@ -48,6 +49,13 @@
 </div>
 
 @code {
+    protected override Task OnBeforeLoadAsync()
+    {
+        if (!Session.CanManageEmployees)
+            Navigation.NavigateTo("/", replace: true);
+        return Task.CompletedTask;
+    }
+
     protected override async Task<IReadOnlyList<PublicHolidayListItemModel>?> FetchItemsAsync(string? search)
     {
         var result = await PublicHolidayService.ListAsync(CompanyId);

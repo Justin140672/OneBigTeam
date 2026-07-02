@@ -55,7 +55,7 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory)
     {
         if (IsLoaded) return;
 
-        var me = await Http.GetFromJsonAsync<MeResponse>("api/me");
+        var me = await Http.GetFromJsonAsync<MeResponse>("api/me", HrApiJsonOptions.Default);
         if (me is null) return;
 
         UserId    = me.UserId;
@@ -63,9 +63,9 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory)
         Email     = me.Email;
         PermissionIds = me.PermissionIds;
 
-        var companyTask  = Http.GetFromJsonAsync<GetCompanyResponse>($"api/companies/{me.CompanyId}");
-        var settingsTask = Http.GetFromJsonAsync<GetCompanySettingsResponse>($"api/companies/{me.CompanyId}/settings");
-        var employeeTask = Http.GetFromJsonAsync<MyEmployeeResponse>($"api/companies/{me.CompanyId}/employees/me");
+        var companyTask  = Http.GetFromJsonAsync<GetCompanyResponse>($"api/companies/{me.CompanyId}", HrApiJsonOptions.Default);
+        var settingsTask = Http.GetFromJsonAsync<GetCompanySettingsResponse>($"api/companies/{me.CompanyId}/settings", HrApiJsonOptions.Default);
+        var employeeTask = Http.GetFromJsonAsync<MyEmployeeResponse>($"api/companies/{me.CompanyId}/employees/me", HrApiJsonOptions.Default);
 
         await Task.WhenAll(companyTask, settingsTask, employeeTask);
 

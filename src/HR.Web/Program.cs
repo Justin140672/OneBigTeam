@@ -9,7 +9,7 @@ builder.AddServiceDefaults();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents(options => options.DetailedErrors = builder.Environment.IsDevelopment());
 
 builder.Services.AddHttpClient("hrapi", c =>
 {
@@ -32,8 +32,11 @@ builder.Services.AddScoped<LeaveService>();
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddScoped<DocumentService>();
 builder.Services.AddScoped<AssetService>();
+builder.Services.AddScoped<AssetCategoryService>();
 builder.Services.AddScoped<EmploymentTypeService>();
 builder.Services.AddScoped<LeaveTypeService>();
+builder.Services.AddScoped<LeavePolicyService>();
+builder.Services.AddScoped<DocumentTypeService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<ProbationService>();
 builder.Services.AddScoped<DevAuthService>();
@@ -61,6 +64,20 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 app.UseHttpsRedirection();
 
 app.UseAntiforgery();
+
+// Blazor's form-handling middleware throws when a POST arrives without __blazor_form_name.
+// This can happen when a previous circuit fails mid-request and the browser retries with a
+// stale enhanced-navigation POST. Catch it here and redirect to a clean page rather than
+// crashing the request pipeline (which would make the error-UI bleed into the next circuit).
+app.Use(async (context, next) =>
+{
+    try { await next(context); }
+    catch (InvalidOperationException ex) when (
+        ex.Message.StartsWith("The POST request does not specify which form"))
+    {
+        context.Response.Redirect("/");
+    }
+});
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

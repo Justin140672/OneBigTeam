@@ -1,0 +1,117 @@
+@page "/companies/{CompanyId:guid}/assets"
+@rendermode InteractiveServer
+@inherits SearchPageBase<AssetListItemModel>
+@inject AssetService AssetService
+@inject AppSession Session
+
+<PageTitle>Assets</PageTitle>
+
+<div class="container-fluid py-4">
+    <h1 class="mb-3">Assets</h1>
+
+    @if (IsLoading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span>Loading assets…</span>
+        </div>
+    }
+    else if (Error is not null)
+    {
+        <div class="alert alert-danger">@Error</div>
+    }
+    else
+    {
+        @if (ActionError is not null)
+        {
+            <div class="alert alert-danger alert-dismissible">
+                @ActionError
+                <button type="button" class="btn-close" @onclick="ClearActionError"></button>
+            </div>
+        }
+
+        <HrGrid @ref="Grid"
+                TValue="AssetListItemModel"
+                DataSource="@Items"
+                Toolbar="@GridToolbar"
+                AllowFiltering="false">
+            <GridEvents TValue="AssetListItemModel" OnToolbarClick="OnToolbarClick"
+                        RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
+            <GridPageSettings PageSize="20" />
+            <GridColumns>
+                <GridColumn Field="@nameof(AssetListItemModel.AssetNumber)" HeaderText="Asset #" Width="140">
+                    <Template>
+                        @{
+                            var row = (context as AssetListItemModel)!;
+                            <a href="/companies/@CompanyId/assets/@row.Id">@row.AssetNumber</a>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(AssetListItemModel.Name)" HeaderText="Name" Width="220" />
+                <GridColumn Field="@nameof(AssetListItemModel.Manufacturer)" HeaderText="Manufacturer" Width="160" />
+                <GridColumn Field="@nameof(AssetListItemModel.Model)" HeaderText="Model" Width="160" />
+                <GridColumn Field="@nameof(AssetListItemModel.Status)" HeaderText="Status" Width="120">
+                    <Template>
+                        @{
+                            var row = (context as AssetListItemModel)!;
+                            var css = row.Status switch
+                            {
+                                "Available"   => "bg-success",
+                                "Assigned"    => "bg-primary",
+                                "UnderRepair" => "bg-warning text-dark",
+                                "Retired"     => "bg-secondary",
+                                _             => "bg-secondary"
+                            };
+                            <span class="badge @css">@row.Status</span>
+                        }
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </HrGrid>
+    }
+</div>
+
+@code {
+    protected override Task OnBeforeLoadAsync()
+    {
+        if (!Session.CanManageEmployees)
+            Navigation.NavigateTo("/", replace: true);
+        return Task.CompletedTask;
+    }
+
+    protected override void ConfigureToolbar()
+    {
+        AddToolbarAction(
+            id:      "hr-retire",
+            text:    "Retire",
+            icon:    "fa-solid fa-circle-xmark",
+            onClick: async item =>
+            {
+                if (item.Status == "Retired") return;
+                await Retire(item);
+            },
+            tooltip: "Retire selected asset");
+    }
+
+    protected override async Task<IReadOnlyList<AssetListItemModel>?> FetchItemsAsync(string? search)
+    {
+        var result = await AssetService.ListAssetsAsync(CompanyId);
+        return result?.Items;
+    }
+
+    protected override string LoadErrorMessage => "Failed to load assets.";
+
+    protected override string? GetAddUrl()  => $"/companies/{CompanyId}/assets/new";
+    protected override string? GetEditUrl(AssetListItemModel item) => $"/companies/{CompanyId}/assets/{item.Id}";
+    protected override string? GetViewUrl(AssetListItemModel item) => $"/companies/{CompanyId}/assets/{item.Id}/view";
+
+    private async Task Retire(AssetListItemModel item)
+    {
+        ClearActionError();
+        var error = await AssetService.RetireAssetAsync(CompanyId, item.Id);
+        if (error is not null)
+            SetActionError(error);
+        else
+            await LoadAsync();
+    }
+}

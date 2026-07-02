@@ -85,6 +85,21 @@ public sealed class UnauthorizedAccessTests(AppFixture fixture) : E2ETestBase(fi
     }
 
     [Fact]
+    public async Task Employee_CannotAccess_EmployeeList()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        var finalUrl = _page.Url;
+        Assert.DoesNotContain("/employees", finalUrl);
+    }
+
+    [Fact]
     public async Task Employee_DoesNotSee_AdminSidebarNav()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);

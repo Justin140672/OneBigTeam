@@ -1,13 +1,13 @@
-@page "/companies/{CompanyId:guid}/leave-types"
+@page "/companies/{CompanyId:guid}/document-types"
 @rendermode InteractiveServer
-@inherits SearchPageBase<LeaveTypeListItemModel>
-@inject LeaveTypeService LeaveTypeService
+@inherits SearchPageBase<DocumentTypeListItemModel>
+@inject DocumentTypeService DocumentTypeService
 @inject AppSession Session
 
-<PageTitle>Leave Types</PageTitle>
+<PageTitle>Document Types</PageTitle>
 
 <div class="container-fluid py-4">
-    <h1 class="mb-3">Leave Types</h1>
+    <h1 class="mb-3">Document Types</h1>
 
     <div class="form-check form-switch mb-3">
         <input class="form-check-input" type="checkbox" id="showInactive"
@@ -19,7 +19,7 @@
     {
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm" role="status"></div>
-            <span>Loading leave types…</span>
+            <span>Loading document types…</span>
         </div>
     }
     else if (Error is not null)
@@ -37,30 +37,37 @@
         }
 
         <HrGrid @ref="Grid"
-                TValue="LeaveTypeListItemModel"
+                TValue="DocumentTypeListItemModel"
                 DataSource="@Items"
                 Toolbar="@GridToolbar"
                 AllowFiltering="false">
-            <GridEvents TValue="LeaveTypeListItemModel" OnToolbarClick="OnToolbarClick"
+            <GridEvents TValue="DocumentTypeListItemModel" OnToolbarClick="OnToolbarClick"
                         RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
             <GridPageSettings PageSize="20" />
             <GridColumns>
-                <GridColumn Field="@nameof(LeaveTypeListItemModel.Name)" HeaderText="Name" Width="200">
+                <GridColumn Field="@nameof(DocumentTypeListItemModel.Name)" HeaderText="Name" Width="220">
                     <Template>
                         @{
-                            var row = (context as LeaveTypeListItemModel)!;
-                            <a href="/companies/@CompanyId/leave-types/@row.Id">@row.Name</a>
+                            var row = (context as DocumentTypeListItemModel)!;
+                            <a href="/companies/@CompanyId/document-types/@row.Id">@row.Name</a>
                         }
                     </Template>
                 </GridColumn>
-                <GridColumn Field="@nameof(LeaveTypeListItemModel.Code)" HeaderText="Code" Width="100" />
-                <GridColumn Field="@nameof(LeaveTypeListItemModel.DefaultEntitlementDays)" HeaderText="Days" Width="80" />
-                <GridColumn Field="@nameof(LeaveTypeListItemModel.AccrualMethod)" HeaderText="Accrual" Width="120" />
-                <GridColumn Field="@nameof(LeaveTypeListItemModel.Behaviour)" HeaderText="Behaviour" Width="130" />
-                <GridColumn Field="@nameof(LeaveTypeListItemModel.IsActive)" HeaderText="Status" Width="100">
+                <GridColumn Field="@nameof(DocumentTypeListItemModel.Description)" HeaderText="Description" Width="300" />
+                <GridColumn Field="@nameof(DocumentTypeListItemModel.AllowEmployeeUpload)" HeaderText="Employee Upload" Width="160">
                     <Template>
                         @{
-                            var row = (context as LeaveTypeListItemModel)!;
+                            var row = (context as DocumentTypeListItemModel)!;
+                            <span class="badge @(row.AllowEmployeeUpload ? "bg-success" : "bg-secondary")">
+                                @(row.AllowEmployeeUpload ? "Yes" : "No")
+                            </span>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(DocumentTypeListItemModel.IsActive)" HeaderText="Status" Width="110">
+                    <Template>
+                        @{
+                            var row = (context as DocumentTypeListItemModel)!;
                             <span class="badge @(row.IsActive ? "bg-success" : "bg-secondary")">
                                 @(row.IsActive ? "Active" : "Inactive")
                             </span>
@@ -93,25 +100,25 @@
                 if (!item.IsActive) return;
                 await Deactivate(item);
             },
-            tooltip: "Deactivate selected leave type");
+            tooltip: "Deactivate selected document type");
     }
 
-    protected override async Task<IReadOnlyList<LeaveTypeListItemModel>?> FetchItemsAsync(string? search)
+    protected override async Task<IReadOnlyList<DocumentTypeListItemModel>?> FetchItemsAsync(string? search)
     {
-        var result = await LeaveTypeService.ListLeaveTypesAsync(CompanyId, _showInactive);
+        var result = await DocumentTypeService.ListDocumentTypesAsync(CompanyId, _showInactive);
         return result?.Items;
     }
 
-    protected override string LoadErrorMessage => "Failed to load leave types.";
+    protected override string LoadErrorMessage => "Failed to load document types.";
 
-    protected override string? GetAddUrl()  => $"/companies/{CompanyId}/leave-types/new";
-    protected override string? GetEditUrl(LeaveTypeListItemModel item) => $"/companies/{CompanyId}/leave-types/{item.Id}";
-    protected override string? GetViewUrl(LeaveTypeListItemModel item) => $"/companies/{CompanyId}/leave-types/{item.Id}/view";
+    protected override string? GetAddUrl()  => $"/companies/{CompanyId}/document-types/new";
+    protected override string? GetEditUrl(DocumentTypeListItemModel item) => $"/companies/{CompanyId}/document-types/{item.Id}";
+    protected override string? GetViewUrl(DocumentTypeListItemModel item) => $"/companies/{CompanyId}/document-types/{item.Id}/view";
 
-    private async Task Deactivate(LeaveTypeListItemModel item)
+    private async Task Deactivate(DocumentTypeListItemModel item)
     {
         ClearActionError();
-        var error = await LeaveTypeService.DeactivateAsync(CompanyId, item.Id);
+        var error = await DocumentTypeService.DeactivateAsync(CompanyId, item.Id);
         if (error is not null)
             SetActionError(error);
         else

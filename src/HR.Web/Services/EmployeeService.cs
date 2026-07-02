@@ -21,7 +21,7 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<ListEmployeesResponse>(
-                $"api/companies/{companyId}/employees?{query}");
+                $"api/companies/{companyId}/employees?{query}", HrApiJsonOptions.Default);
         }
         catch (HttpRequestException)
         {
@@ -34,7 +34,7 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<GetEmployeeResponse>(
-                $"api/companies/{companyId}/employees/{id}");
+                $"api/companies/{companyId}/employees/{id}", HrApiJsonOptions.Default);
         }
         catch
         {
@@ -67,7 +67,7 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<GetMyPersonalDetailsResponse>(
-                $"api/companies/{companyId}/employees/me/personal-details", cancellationToken);
+                $"api/companies/{companyId}/employees/me/personal-details", HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }
     }
@@ -102,7 +102,7 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<GetMyContactDetailsResponse>(
-                $"api/companies/{companyId}/employees/me/contact-details", cancellationToken);
+                $"api/companies/{companyId}/employees/me/contact-details", HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }
     }
@@ -139,7 +139,7 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<GetEmergencyContactsResponse>(
-                $"api/companies/{companyId}/employees/me/emergency-contacts", cancellationToken);
+                $"api/companies/{companyId}/employees/me/emergency-contacts", HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }
     }
@@ -224,7 +224,7 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<GetEmergencyContactsResponse>(
-                $"api/companies/{companyId}/employees/{employeeId}/emergency-contacts", cancellationToken);
+                $"api/companies/{companyId}/employees/{employeeId}/emergency-contacts", HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }
     }
@@ -237,7 +237,7 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<ListNationalitiesResponse>(
-                "api/nationalities", cancellationToken);
+                "api/nationalities", HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }
     }

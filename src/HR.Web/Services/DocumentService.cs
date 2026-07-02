@@ -16,7 +16,7 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<EmployeeDocumentListResponse>(
-                $"api/companies/{companyId}/employees/{employeeId}/documents", cancellationToken);
+                $"api/companies/{companyId}/employees/{employeeId}/documents", HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }
     }
@@ -27,8 +27,7 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         try
         {
             return await Http.GetFromJsonAsync<DocumentRequestListResponse>(
-                $"api/companies/{companyId}/employees/{employeeId}/document-requests",
-                cancellationToken);
+                $"api/companies/{companyId}/employees/{employeeId}/document-requests", HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }
     }
@@ -41,7 +40,7 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
             var url = employeeUploadOnly
                 ? $"api/companies/{companyId}/document-types?employeeUploadOnly=true"
                 : $"api/companies/{companyId}/document-types";
-            return await Http.GetFromJsonAsync<DocumentTypeListResponse>(url, cancellationToken);
+            return await Http.GetFromJsonAsync<DocumentTypeListResponse>(url, HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }
     }
@@ -219,8 +218,7 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         try
         {
             var doc = await Http.GetFromJsonAsync<EmployeeDocumentDetailResponse>(
-                $"api/companies/{companyId}/employees/{employeeId}/documents/{employeeDocumentId}",
-                cancellationToken);
+                $"api/companies/{companyId}/employees/{employeeId}/documents/{employeeDocumentId}", HrApiJsonOptions.Default, cancellationToken);
             return doc?.DownloadUrl;
         }
         catch { return null; }
