@@ -1,6 +1,8 @@
 using HR.Modules.Sickness.Features.CreateSicknessCategory;
 using HR.Modules.Sickness.Features.DeactivateSicknessCategory;
 using HR.Modules.Sickness.Features.ListSicknessCategories;
+using HR.Modules.Sickness.Features.RecordMySickness;
+using HR.Modules.Sickness.Features.RecordSickness;
 using HR.Modules.Sickness.Features.UpdateSicknessCategory;
 using HR.Modules.Sickness.Persistence;
 using Microsoft.AspNetCore.Builder;
@@ -30,6 +32,8 @@ public static class SicknessModule
         services.AddScoped<CreateSicknessCategoryHandler>();
         services.AddScoped<UpdateSicknessCategoryHandler>();
         services.AddScoped<DeactivateSicknessCategoryHandler>();
+        services.AddScoped<RecordSicknessHandler>();
+        services.AddScoped<RecordMySicknessHandler>();
     }
 
     public static async Task MigrateSicknessAsync(this IServiceProvider services)
