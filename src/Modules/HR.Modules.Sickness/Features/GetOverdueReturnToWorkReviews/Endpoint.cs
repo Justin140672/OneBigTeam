@@ -9,7 +9,7 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/return-to-work-reviews/overdue");
-        Policies("employee:manage");
+        Policies("sickness:manage");
     }
 
     public override async Task HandleAsync(

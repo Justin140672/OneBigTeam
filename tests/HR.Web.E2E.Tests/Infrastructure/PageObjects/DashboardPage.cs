@@ -153,4 +153,23 @@ public sealed class DashboardPage(IPage page, string baseUrl)
         await item.ClickAsync();
         await page.WaitForURLAsync(new System.Text.RegularExpressions.Regex("/assets/"), new() { Timeout = 15_000 });
     }
+
+    // ── Sickness Dashboard Widgets ────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns true if a widget with the given header title is present on the dashboard.
+    /// Used to verify HR-only sickness widgets (Current Sickness Absence, Overdue
+    /// Return-to-Work Reviews, Missing Fit Notes) are shown/hidden based on permissions.
+    /// </summary>
+    public async Task<bool> HasWidgetAsync(string widgetTitle) =>
+        await page.Locator(".widget-header")
+            .Filter(new() { HasText = widgetTitle })
+            .IsVisibleAsync();
+
+    /// <summary>Waits for the named widget to finish loading (spinner replaced by items/empty state).</summary>
+    public async Task WaitForWidgetLoadedAsync(string widgetTitle)
+    {
+        var widget = page.Locator(".widget-card").Filter(new() { HasText = widgetTitle }).First;
+        await widget.Locator(".task-widget-item, .widget-empty").First.WaitForAsync(new() { Timeout = 15_000 });
+    }
 }

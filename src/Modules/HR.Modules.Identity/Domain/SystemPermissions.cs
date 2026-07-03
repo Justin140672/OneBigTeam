@@ -30,4 +30,8 @@ internal static class SystemPermissions
 
     // role
     public static readonly Guid RoleAssign = new("00000000-0000-0000-0001-000000000013");
+
+    // sickness
+    public static readonly Guid SicknessRead   = new("00000000-0000-0000-0001-000000000014");
+    public static readonly Guid SicknessManage = new("00000000-0000-0000-0001-000000000015");
 }

@@ -9,7 +9,7 @@ internal sealed class Endpoint(RecordSicknessHandler handler)
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/sickness-records");
-        Policies("employee:manage");
+        Policies("sickness:manage");
     }
 
     public override async Task HandleAsync(RecordSicknessRequest request, CancellationToken cancellationToken)

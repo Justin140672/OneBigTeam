@@ -40,6 +40,22 @@ public sealed class SicknessService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<ListEmployeeSicknessRecordsResponseModel?> GetMySicknessRecordsAsync(
+        Guid companyId,
+        Guid employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<ListEmployeeSicknessRecordsResponseModel>(
+                $"api/companies/{companyId}/employees/{employeeId}/sickness-records/my", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public async Task<(bool Success, string? Error)> RecordSicknessAsync(
         Guid companyId,
         Guid employeeId,

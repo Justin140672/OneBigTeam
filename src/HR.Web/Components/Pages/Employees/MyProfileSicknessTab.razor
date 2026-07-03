@@ -1,0 +1,71 @@
+@inject SicknessService SicknessService
+
+@if (_loading)
+{
+    <div class="d-flex align-items-center gap-2">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span>Loading…</span>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header fw-semibold">My Sickness Records</div>
+        <div class="card-body p-0">
+            @if (_records.Count == 0)
+            {
+                <p class="text-muted small p-3 mb-0">No sickness records yet.</p>
+            }
+            else
+            {
+                <HrGrid TValue="SicknessRecordListItemModel"
+                        DataSource="@_records"
+                        AllowPaging="false">
+                    <GridColumns>
+                        <GridColumn HeaderText="Start" Width="160" AllowSorting="false" AllowFiltering="false">
+                            <Template>
+                                @{ var r = (context as SicknessRecordListItemModel)!; }
+                                @FormatDate(r.StartDate, r.StartDayPart)
+                            </Template>
+                        </GridColumn>
+                        <GridColumn HeaderText="End" Width="160" AllowSorting="false" AllowFiltering="false">
+                            <Template>
+                                @{ var r = (context as SicknessRecordListItemModel)!; }
+                                @(r.EndDate is not null ? r.EndDate.Value.ToString("dd MMM yyyy") : "—")
+                            </Template>
+                        </GridColumn>
+                        <GridColumn HeaderText="Days" Width="100" AllowSorting="false" AllowFiltering="false">
+                            <Template>
+                                @{ var r = (context as SicknessRecordListItemModel)!; }
+                                @(r.TotalDays is not null ? $"{r.TotalDays:0.##}" : "—")
+                            </Template>
+                        </GridColumn>
+                        <GridColumn Field="@nameof(SicknessRecordListItemModel.Status)" HeaderText="Status" Width="120" />
+                        <GridColumn Field="@nameof(SicknessRecordListItemModel.EvidenceStatus)" HeaderText="Evidence" Width="140" />
+                    </GridColumns>
+                </HrGrid>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private bool _loading = true;
+    private List<SicknessRecordListItemModel> _records = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+
+        var response = await SicknessService.GetMySicknessRecordsAsync(CompanyId, EmployeeId);
+        _records = response?.Records ?? [];
+
+        _loading = false;
+    }
+
+    private static string FormatDate(DateOnly date, string part) =>
+        part == "FullDay" ? date.ToString("dd MMM yyyy") : $"{date:dd MMM yyyy} ({part})";
+}

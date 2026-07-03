@@ -35,20 +35,21 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
             RolePermission.Create(SystemRoles.Employee, SystemPermissions.LeaveRequest),
             RolePermission.Create(SystemRoles.Employee, SystemPermissions.DocumentRead),
 
-            // Manager: self.read, self.edit, employee.read, leave.request, leave.approve, document.read
+            // Manager: self.read, self.edit, employee.read, leave.request, leave.approve, document.read, sickness.read
             RolePermission.Create(SystemRoles.Manager, SystemPermissions.SelfRead),
             RolePermission.Create(SystemRoles.Manager, SystemPermissions.SelfEdit),
             RolePermission.Create(SystemRoles.Manager, SystemPermissions.EmployeeRead),
             RolePermission.Create(SystemRoles.Manager, SystemPermissions.LeaveRequest),
             RolePermission.Create(SystemRoles.Manager, SystemPermissions.LeaveApprove),
             RolePermission.Create(SystemRoles.Manager, SystemPermissions.DocumentRead),
+            RolePermission.Create(SystemRoles.Manager, SystemPermissions.SicknessRead),
 
             // Recruiter: employee.read, employee.create, document.read
             RolePermission.Create(SystemRoles.Recruiter, SystemPermissions.EmployeeRead),
             RolePermission.Create(SystemRoles.Recruiter, SystemPermissions.EmployeeCreate),
             RolePermission.Create(SystemRoles.Recruiter, SystemPermissions.DocumentRead),
 
-            // HR Administrator: employee.read/edit/create/delete, leave.approve, document.manage, company.read
+            // HR Administrator: employee.read/edit/create/delete, leave.approve, document.manage, company.read, sickness.read/manage
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.EmployeeRead),
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.EmployeeEdit),
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.EmployeeCreate),
@@ -56,6 +57,8 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.LeaveApprove),
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.DocumentManage),
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.CompanyRead),
+            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.SicknessRead),
+            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.SicknessManage),
 
             // Finance: self.read, employee.read, company.read
             RolePermission.Create(SystemRoles.Finance, SystemPermissions.SelfRead),
@@ -74,7 +77,9 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
             RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.DocumentManage),
             RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.CompanyRead),
             RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.CompanyEdit),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.RoleAssign)
+            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.RoleAssign),
+            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.SicknessRead),
+            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.SicknessManage)
         );
     }
 }

@@ -54,7 +54,11 @@ internal sealed class PermissionConfiguration : IEntityTypeConfiguration<Permiss
             Permission.Create(SystemPermissions.CompanyEdit,     "company.edit",     seedDate),
 
             // role
-            Permission.Create(SystemPermissions.RoleAssign,      "role.assign",      seedDate)
+            Permission.Create(SystemPermissions.RoleAssign,      "role.assign",      seedDate),
+
+            // sickness
+            Permission.Create(SystemPermissions.SicknessRead,    "sickness.read",    seedDate),
+            Permission.Create(SystemPermissions.SicknessManage,  "sickness.manage",  seedDate)
         );
     }
 }

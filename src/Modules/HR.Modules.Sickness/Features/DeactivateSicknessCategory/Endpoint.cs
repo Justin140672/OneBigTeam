@@ -9,7 +9,7 @@ internal sealed class Endpoint(DeactivateSicknessCategoryHandler handler)
     public override void Configure()
     {
         Delete("/api/companies/{companyId:guid}/sickness-categories/{id:guid}");
-        Policies("employee:manage");
+        Policies("sickness:manage");
     }
 
     public override async Task HandleAsync(DeactivateSicknessCategoryRequest request, CancellationToken cancellationToken)

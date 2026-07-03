@@ -87,6 +87,17 @@ public static class IdentityModule
             SystemRoles.HrAdministrator,
             SystemRoles.CompanyAdministrator));
 
+        // Sickness domain — HR-only management of categories/records
+        builder.AddPolicy("sickness:manage", RolePolicy(
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
+        // Sickness domain — team visibility for managers plus HR/Admin auditing
+        builder.AddPolicy("sickness:view-team", RolePolicy(
+            SystemRoles.Manager,
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
         // Asset domain policies
         builder.AddPolicy("asset:view", RolePolicy(
             SystemRoles.Employee,
