@@ -18,4 +18,6 @@ public enum NotificationType
     AssetAcknowledgementOverdue  = 14,
     AssetReturnOverdue           = 15,
     SicknessRecorded             = 16,
+    SicknessEvidenceReminder     = 17,
+    SicknessEvidenceOverdue      = 18,
 }

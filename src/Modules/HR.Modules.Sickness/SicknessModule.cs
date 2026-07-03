@@ -49,6 +49,7 @@ public static class SicknessModule
         services.AddScoped<UpdateSicknessRecordHandler>();
         services.AddScoped<CloseSicknessRecordHandler>();
         services.AddScoped<FitNoteRequestJob>();
+        services.AddScoped<SicknessEvidenceReminderJob>();
         services.AddScoped<ITaskCompletionAction, SicknessEvidenceUploadCompletionAction>();
         services.AddScoped<ITaskCompletionAction, CompleteReturnToWorkReviewFromTaskAction>();
     }
@@ -60,6 +61,10 @@ public static class SicknessModule
             "fit-note-requests",
             job => job.ExecuteAsync(),
             Cron.Daily(3));
+        jobManager.AddOrUpdate<SicknessEvidenceReminderJob>(
+            "sickness-evidence-reminders",
+            job => job.ExecuteAsync(),
+            Cron.Daily(4));
         return app;
     }
 
