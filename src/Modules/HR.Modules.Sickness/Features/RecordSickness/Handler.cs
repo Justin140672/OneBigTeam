@@ -1,6 +1,7 @@
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Features.RecordSickness;
@@ -11,7 +12,10 @@ internal sealed class RecordSicknessHandler(
     IWorkingPatternProvider workingPatternProvider,
     ICompanySicknessSettingsReader sicknessSettingsReader,
     IPublicHolidayReader publicHolidayReader,
-    IAuditEventPublisher auditPublisher)
+    IAuditEventPublisher auditPublisher,
+    IManagerReader managerReader,
+    IEmployeeNameReader employeeNameReader,
+    INotificationWriter notificationWriter)
 {
     public async Task<Result<RecordSicknessResponse>> HandleAsync(
         RecordSicknessRequest request,
@@ -72,6 +76,23 @@ internal sealed class RecordSicknessHandler(
 
         db.SicknessRecords.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
+
+        var managerId = await managerReader.GetManagerIdAsync(entity.CompanyId, entity.EmployeeId, cancellationToken);
+        if (managerId.HasValue)
+        {
+            var names = await employeeNameReader.GetNamesAsync(entity.CompanyId, [entity.EmployeeId], cancellationToken);
+            var employeeName = names.GetValueOrDefault(entity.EmployeeId, "Unknown Employee");
+
+            await notificationWriter.WriteAsync(
+                Guid.NewGuid(), entity.CompanyId, managerId.Value,
+                $"Sickness recorded — {employeeName}",
+                $"{employeeName} has been recorded as sick from {entity.StartDate:d MMM yyyy}.",
+                entity.Id,
+                NotificationType.SicknessRecorded,
+                NotificationPriority.Normal,
+                now,
+                cancellationToken);
+        }
 
         await auditPublisher.PublishAsync(new SicknessRecordedAuditEvent(
             entity.CompanyId,

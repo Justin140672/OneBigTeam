@@ -46,6 +46,7 @@ public static class TasksModule
         services.AddScoped<ITaskCompletionAction, AssetReturnTaskCompletionAction>();
         services.AddScoped<IIntegrationEventHandler<LeaveRequestedIntegrationEvent>, LeaveRequestedHandler>();
         services.AddScoped<IIntegrationEventHandler<SicknessEvidenceRequestedIntegrationEvent>, SicknessEvidenceRequestedHandler>();
+        services.AddScoped<IIntegrationEventHandler<SicknessEvidenceRequestedIntegrationEvent>, NotifyHrOfFitNoteThresholdHandler>();
         services.AddScoped<IIntegrationEventHandler<ReturnToWorkReviewRequiredIntegrationEvent>, ReturnToWorkReviewRequiredHandler>();
 
         services.AddScoped<GetTaskHandler>();

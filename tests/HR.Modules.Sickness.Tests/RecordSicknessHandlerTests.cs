@@ -35,13 +35,19 @@ public class RecordSicknessHandlerTests
         bool excludePublicHolidays = false,
         IReadOnlyCollection<DateOnly>? publicHolidays = null,
         FakeAuditEventPublisher? auditPublisher = null,
-        int? fitNoteRequiredAfterDays = null) =>
+        int? fitNoteRequiredAfterDays = null,
+        FakeManagerReader? managerReader = null,
+        FakeEmployeeNameReader? employeeNameReader = null,
+        FakeNotificationWriter? notificationWriter = null) =>
         new(db,
             new FakeClock(FixedUtcNow),
             new FakeWorkingPatternProvider(pattern ?? DefaultPattern),
             new FakeCompanySicknessSettingsReader(excludePublicHolidays, fitNoteRequiredAfterDays),
             new FakePublicHolidayReader(publicHolidays),
-            auditPublisher ?? new FakeAuditEventPublisher());
+            auditPublisher ?? new FakeAuditEventPublisher(),
+            managerReader ?? new FakeManagerReader(),
+            employeeNameReader ?? new FakeEmployeeNameReader(),
+            notificationWriter ?? new FakeNotificationWriter());
 
     [Fact]
     public async Task HandleAsync_Creates_SicknessRecord_With_No_EndDate()
@@ -564,5 +570,65 @@ public class RecordSicknessHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(SicknessEvidenceStatus.Pending, result.Value!.EvidenceStatus);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Notifies_Manager_When_Employee_Has_Manager()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var notificationWriter = new FakeNotificationWriter();
+        var employeeNameReader = new FakeEmployeeNameReader(new Dictionary<Guid, string> { [employeeId] = "Jane Doe" });
+
+        var result = await BuildHandler(
+                db,
+                managerReader: new FakeManagerReader(managerId),
+                employeeNameReader: employeeNameReader,
+                notificationWriter: notificationWriter)
+            .HandleAsync(new RecordSicknessRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                CategoryId = categoryId,
+                StartDate = StartDate,
+                StartDayPart = SicknessDayPart.FullDay
+            }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(notificationWriter.Written);
+        var notification = notificationWriter.Written[0];
+        Assert.Equal(managerId, notification.EmployeeId);
+        Assert.Equal(companyId, notification.CompanyId);
+        Assert.Equal(NotificationType.SicknessRecorded, notification.Type);
+        Assert.Contains("Jane Doe", notification.Title);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Notify_When_Employee_Has_No_Manager()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var notificationWriter = new FakeNotificationWriter();
+
+        var result = await BuildHandler(
+                db,
+                managerReader: new FakeManagerReader(null),
+                notificationWriter: notificationWriter)
+            .HandleAsync(new RecordSicknessRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                CategoryId = categoryId,
+                StartDate = StartDate,
+                StartDayPart = SicknessDayPart.FullDay
+            }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(notificationWriter.Written);
     }
 }
