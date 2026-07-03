@@ -8,6 +8,7 @@ using HR.Modules.Tasks.Features.GetTask;
 using HR.Modules.Tasks.Features.GetUnassignedTasks;
 using HR.Modules.Tasks.Features.LeaveRequested;
 using HR.Modules.Tasks.Features.ReturnToWorkReviewRequired;
+using HR.Modules.Tasks.Features.SicknessEvidenceOverdue;
 using HR.Modules.Tasks.Features.SicknessEvidenceRequested;
 using HR.Modules.Tasks.Features.ReassignTask;
 using HR.Modules.Tasks.Persistence;
@@ -47,6 +48,7 @@ public static class TasksModule
         services.AddScoped<IIntegrationEventHandler<LeaveRequestedIntegrationEvent>, LeaveRequestedHandler>();
         services.AddScoped<IIntegrationEventHandler<SicknessEvidenceRequestedIntegrationEvent>, SicknessEvidenceRequestedHandler>();
         services.AddScoped<IIntegrationEventHandler<SicknessEvidenceRequestedIntegrationEvent>, NotifyHrOfFitNoteThresholdHandler>();
+        services.AddScoped<IIntegrationEventHandler<SicknessEvidenceOverdueIntegrationEvent>, NotifyHrOfOverdueFitNoteHandler>();
         services.AddScoped<IIntegrationEventHandler<ReturnToWorkReviewRequiredIntegrationEvent>, ReturnToWorkReviewRequiredHandler>();
 
         services.AddScoped<GetTaskHandler>();

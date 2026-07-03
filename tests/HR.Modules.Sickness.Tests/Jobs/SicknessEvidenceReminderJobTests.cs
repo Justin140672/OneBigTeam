@@ -20,8 +20,9 @@ public class SicknessEvidenceReminderJobTests
 
     private static SicknessEvidenceReminderJob BuildJob(
         SicknessDbContext db,
-        FakeNotificationWriter writer) =>
-        new(db, writer, new FakeClock(FixedUtcNow));
+        FakeNotificationWriter writer,
+        FakeIntegrationEventPublisher? eventPublisher = null) =>
+        new(db, writer, eventPublisher ?? new FakeIntegrationEventPublisher(), new FakeClock(FixedUtcNow));
 
     private static async Task<(Guid recordId, Guid employeeId, Guid companyId)> SeedRecordAsync(
         SicknessDbContext db)
@@ -129,7 +130,8 @@ public class SicknessEvidenceReminderJobTests
         var request = await SeedRequestAsync(db, recordId, companyId, Today.AddDays(-1));
 
         var writer = new FakeNotificationWriter();
-        var job = BuildJob(db, writer);
+        var events = new FakeIntegrationEventPublisher();
+        var job = BuildJob(db, writer, events);
 
         await job.ExecuteAsync();
 
@@ -141,6 +143,12 @@ public class SicknessEvidenceReminderJobTests
         Assert.Equal(employeeId, overdue.EmployeeId);
         Assert.Equal(request.Id, overdue.SourceEntityId);
         Assert.Equal(NotificationPriority.High, overdue.Priority);
+
+        var overdueEvent = Assert.Single(events.PublishedEvents.OfType<SicknessEvidenceOverdueIntegrationEvent>());
+        Assert.Equal(companyId, overdueEvent.CompanyId);
+        Assert.Equal(employeeId, overdueEvent.EmployeeId);
+        Assert.Equal(recordId, overdueEvent.SicknessRecordId);
+        Assert.Equal(request.Id, overdueEvent.EvidenceRequestId);
     }
 
     [Fact]
@@ -151,12 +159,14 @@ public class SicknessEvidenceReminderJobTests
         await SeedRequestAsync(db, recordId, companyId, Today.AddDays(-5), SicknessEvidenceRequestStatus.Overdue);
 
         var writer = new FakeNotificationWriter();
-        var job = BuildJob(db, writer);
+        var events = new FakeIntegrationEventPublisher();
+        var job = BuildJob(db, writer, events);
 
         await job.ExecuteAsync();
         await job.ExecuteAsync();
 
         Assert.DoesNotContain(writer.Written, n => n.Type == NotificationType.SicknessEvidenceOverdue);
+        Assert.Empty(events.PublishedEvents.OfType<SicknessEvidenceOverdueIntegrationEvent>());
     }
 
     [Fact]

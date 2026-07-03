@@ -8,6 +8,7 @@ namespace HR.Modules.Sickness.Jobs;
 internal sealed class SicknessEvidenceReminderJob(
     SicknessDbContext db,
     INotificationWriter notificationWriter,
+    IIntegrationEventPublisher eventPublisher,
     IClock clock)
 {
     private const int ReminderWindowDays = 2;
@@ -79,6 +80,14 @@ internal sealed class SicknessEvidenceReminderJob(
                 NotificationType.SicknessEvidenceOverdue,
                 NotificationPriority.High,
                 now);
+
+            await eventPublisher.PublishAsync(new SicknessEvidenceOverdueIntegrationEvent(
+                item.Request.CompanyId,
+                item.EmployeeId,
+                item.Request.SicknessRecordId,
+                item.Request.Id,
+                item.Request.DueDate,
+                now), CancellationToken.None);
         }
 
         if (overdueRequests.Count > 0)
