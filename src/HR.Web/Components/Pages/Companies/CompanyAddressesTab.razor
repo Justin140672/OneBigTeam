@@ -5,32 +5,36 @@
             <p class="text-muted">No addresses found.</p>
         }
 
-        @foreach (var (addr, i) in Addresses.Select((a, i) => (a, i)))
-        {
-            <div class="border rounded p-3 mb-3">
-                <h6 class="text-uppercase text-muted small mb-3">@addr.Type</h6>
-                <div class="row g-3">
-                    <div class="col-12">
-                        <SfTextBox @bind-Value="addr.Line1" Placeholder="Line 1" FloatLabelType="FloatLabelType.Auto" />
-                    </div>
-                    <div class="col-12">
-                        <SfTextBox @bind-Value="addr.Line2" Placeholder="Line 2" FloatLabelType="FloatLabelType.Auto" />
-                    </div>
-                    <div class="col-md-6">
-                        <SfTextBox @bind-Value="addr.City" Placeholder="City" FloatLabelType="FloatLabelType.Auto" />
-                    </div>
-                    <div class="col-md-6">
-                        <SfTextBox @bind-Value="addr.Region" Placeholder="Region" FloatLabelType="FloatLabelType.Auto" />
-                    </div>
-                    <div class="col-md-6">
-                        <SfTextBox @bind-Value="addr.PostalCode" Placeholder="Postal Code" FloatLabelType="FloatLabelType.Auto" />
-                    </div>
-                    <div class="col-md-6">
-                        <SfTextBox @bind-Value="addr.CountryCode" Placeholder="Country Code (2-letter)" FloatLabelType="FloatLabelType.Auto" MaxLength="2" />
+        <div class="row g-3">
+            @foreach (var (addr, i) in Addresses.Select((a, i) => (a, i)))
+            {
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100">
+                        <h6 class="text-uppercase text-muted small mb-3">@addr.Type</h6>
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <SfTextBox @bind-Value="addr.Line1" Placeholder="Line 1" FloatLabelType="FloatLabelType.Auto" />
+                            </div>
+                            <div class="col-12">
+                                <SfTextBox @bind-Value="addr.Line2" Placeholder="Line 2" FloatLabelType="FloatLabelType.Auto" />
+                            </div>
+                            <div class="col-md-6">
+                                <SfTextBox @bind-Value="addr.City" Placeholder="City" FloatLabelType="FloatLabelType.Auto" />
+                            </div>
+                            <div class="col-md-6">
+                                <SfTextBox @bind-Value="addr.Region" Placeholder="Region" FloatLabelType="FloatLabelType.Auto" />
+                            </div>
+                            <div class="col-md-6">
+                                <SfTextBox @bind-Value="addr.PostalCode" Placeholder="Postal Code" FloatLabelType="FloatLabelType.Auto" />
+                            </div>
+                            <div class="col-md-6">
+                                <SfTextBox @bind-Value="addr.CountryCode" Placeholder="Country Code (2-letter)" FloatLabelType="FloatLabelType.Auto" MaxLength="2" />
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        }
+            }
+        </div>
     </div>
 </div>
 

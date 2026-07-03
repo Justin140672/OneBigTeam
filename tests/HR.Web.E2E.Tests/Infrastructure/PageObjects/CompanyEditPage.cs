@@ -69,47 +69,21 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     }
 
     /// <summary>
-    /// Locates a Syncfusion SfTextBox (FloatLabelType.Auto) by scoping to its containing
-    /// column and filtering by the floating label text — SfTextBox renders the Placeholder
-    /// prop as a floating label, not a native HTML placeholder attribute, so GetByPlaceholder
-    /// doesn't match it (unlike plain HTML inputs elsewhere in this app).
+    /// Locates a Syncfusion SfNumericTextBox (FloatLabelType.Auto) by scoping to its
+    /// containing column and filtering by the floating label text — it renders the
+    /// Placeholder prop as a floating label, not a native HTML placeholder attribute,
+    /// so GetByPlaceholder doesn't match it (unlike plain HTML inputs elsewhere in this app).
     /// </summary>
-    private ILocator TextBoxByLabel(string labelText) =>
-        page.Locator(".col-md-6").Filter(new() { HasText = labelText }).First.Locator("input").First;
-
-    /// <summary>Same rationale as <see cref="TextBoxByLabel"/>, for SfNumericTextBox fields.</summary>
     private ILocator NumericBoxByLabel(string columnClass, string labelText) =>
         page.Locator(columnClass).Filter(new() { HasText = labelText }).First.Locator("input").First;
 
     /// <summary>
-    /// Fills a text input and confirms the value actually stuck before returning, retrying
-    /// if not. FillAsync + a bare Tab press can race with Blazor's server round-trip for the
-    /// two-way bound value, especially when another interaction follows immediately — a plain
-    /// "fire and forget" fill silently loses the update in that case (observed with
-    /// DefaultHolidayAllowance reverting to its seeded default after save+reload).
-    /// </summary>
-    private async Task FillTextAndVerifyAsync(ILocator input, string value, int maxAttempts = 3)
-    {
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            await input.FillAsync(value);
-            await page.Keyboard.PressAsync("Tab");
-
-            if (await input.InputValueAsync() == value)
-                return;
-
-            if (attempt < maxAttempts)
-                await page.WaitForTimeoutAsync(200);
-        }
-
-        throw new PlaywrightException(
-            $"Input value did not stick after {maxAttempts} attempts: expected '{value}', got '{await input.InputValueAsync()}'.");
-    }
-
-    /// <summary>
-    /// Same rationale as <see cref="FillTextAndVerifyAsync"/>, but compares parsed decimal
-    /// values instead of raw strings — Syncfusion's SfNumericTextBox reformats the displayed
-    /// value (e.g. "28" becomes "28.00"), so a strict string comparison would always mismatch.
+    /// Fills a numeric input and confirms the parsed value actually stuck before returning,
+    /// retrying if not — Syncfusion's SfNumericTextBox reformats the displayed value (e.g.
+    /// "28" becomes "28.00"), so a strict string comparison would always mismatch, and a
+    /// bare "fire and forget" fill can race with Blazor's server round-trip for the
+    /// two-way bound value (observed with DefaultHolidayAllowance reverting to its seeded
+    /// default after save+reload).
     /// </summary>
     private async Task FillNumericAndVerifyAsync(ILocator input, string value, decimal expected, int maxAttempts = 3)
     {
@@ -167,22 +141,6 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
             await input.PressSequentiallyAsync(text);
         await page.Keyboard.PressAsync("Tab");
     }
-
-    /// <summary>Returns the current value of the Time Zone text field.</summary>
-    public async Task<string> GetTimeZoneAsync() =>
-        await TextBoxByLabel("Time Zone").InputValueAsync();
-
-    /// <summary>Sets the Time Zone text field.</summary>
-    public async Task SetTimeZoneAsync(string value) =>
-        await FillTextAndVerifyAsync(TextBoxByLabel("Time Zone"), value);
-
-    /// <summary>Returns the current value of the Locale text field.</summary>
-    public async Task<string> GetLocaleAsync() =>
-        await TextBoxByLabel("Locale").InputValueAsync();
-
-    /// <summary>Sets the Locale text field.</summary>
-    public async Task SetLocaleAsync(string value) =>
-        await FillTextAndVerifyAsync(TextBoxByLabel("Locale"), value);
 
     /// <summary>Sets the "Hours Per Day" numeric field.</summary>
     public async Task SetHoursPerDayAsync(decimal hours) =>

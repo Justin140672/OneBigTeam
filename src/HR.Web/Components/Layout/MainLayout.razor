@@ -50,6 +50,7 @@ else
                                     <MenuItem Text="Departments" Url="@_menuItems["Departments"]" />
                                     <MenuItem Text="Position Profiles" Url="@_menuItems["PositionProfiles"]" />
                                     <MenuItem Text="Employment Types" Url="@_menuItems["EmploymentTypes"]" />
+                                    <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
                                 </MenuItems>
                             </MenuItem>
                             <MenuItem Text="Assets" IconCss="fa-solid fa-box">
@@ -63,17 +64,12 @@ else
                                     <MenuItem Text="Leave Types" Url="@_menuItems["LeaveTypes"]" />
                                     <MenuItem Text="Leave Policies" Url="@_menuItems["LeavePolicies"]" />
                                     <MenuItem Text="Public Holidays" Url="@_menuItems["PublicHolidays"]" />
-                                </MenuItems>
-                            </MenuItem>
-                            <MenuItem Text="Sickness" IconCss="fa-solid fa-virus">
-                                <MenuItems>
                                     <MenuItem Text="Sickness Categories" Url="@_menuItems["SicknessCategories"]" />
                                 </MenuItems>
                             </MenuItem>
                             <MenuItem Text="HR" IconCss="fa-solid fa-inbox">
                                 <MenuItems>
                                     <MenuItem Text="HR Inbox" Url="@_menuItems["HrInbox"]" />
-                                    <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
                                 </MenuItems>
                             </MenuItem>
                             @if (Session.CanManageCompany)

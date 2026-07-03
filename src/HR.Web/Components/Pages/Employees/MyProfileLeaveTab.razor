@@ -62,6 +62,7 @@ else
             {
                 <HrGrid TValue="LeaveRequestListItem"
                         DataSource="@_requests"
+                        AllowFiltering="false"
                         AllowPaging="false">
                     <GridColumns>
                         <GridColumn Field="@nameof(LeaveRequestListItem.LeaveTypeName)" HeaderText="Type" />

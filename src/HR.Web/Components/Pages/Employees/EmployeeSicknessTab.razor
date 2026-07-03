@@ -37,6 +37,7 @@ else
         <div class="card-body">
             <HrGrid TValue="SicknessRecordListItemModel"
                     DataSource="@_records"
+                    AllowFiltering="false"
                     AllowPaging="false">
                 <GridColumns>
                     <GridColumn Field="@nameof(SicknessRecordListItemModel.StartDate)"

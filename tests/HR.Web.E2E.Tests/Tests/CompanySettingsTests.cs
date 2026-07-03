@@ -9,9 +9,13 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - FitNoteRequiredAfterDays (nullable numeric)
 /// - ReturnToWorkRequiredAfterDays (nullable numeric)
 ///
-/// as well as the pre-existing settings (TimeZone, Locale, working week,
-/// HoursPerDay, LeaveYearStartMonth, DefaultHolidayAllowance, ProbationMonths,
+/// as well as the pre-existing settings (working week, HoursPerDay,
+/// LeaveYearStartMonth, DefaultHolidayAllowance, ProbationMonths,
 /// ExcludePublicHolidaysFromLeave).
+///
+/// TimeZone and Locale are saved via UpdateCompanySettingsRequest on the
+/// backend but are no longer editable from this tab's UI, so they're not
+/// exercised here.
 ///
 /// All of these are saved via UpdateCompanySettingsRequest and re-hydrated on
 /// CompanyEdit's OnInitializedAsync from GetCompanySettingsAsync, so the tests
@@ -81,10 +85,6 @@ public sealed class CompanySettingsTests(AppFixture fixture) : E2ETestBase(fixtu
         var desiredExcludeLeave    = !initialExcludeLeave;
         var desiredSaturday        = !initialSaturday;
 
-        // Text fields.
-        await companyEdit.SetTimeZoneAsync("Europe/London");
-        await companyEdit.SetLocaleAsync("en-GB");
-
         // Working week.
         await companyEdit.SetWorkingDayAsync("Saturday", desiredSaturday);
 
@@ -111,8 +111,6 @@ public sealed class CompanySettingsTests(AppFixture fixture) : E2ETestBase(fixtu
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenSettingsTabAsync();
 
-        Assert.Equal("Europe/London", await companyEdit.GetTimeZoneAsync());
-        Assert.Equal("en-GB", await companyEdit.GetLocaleAsync());
         Assert.Equal(desiredSaturday, await companyEdit.IsWorkingDayCheckedAsync("Saturday"));
         Assert.Equal(7.5m, await companyEdit.GetHoursPerDayAsync());
         Assert.Equal(28m, await companyEdit.GetDefaultHolidayAllowanceAsync());

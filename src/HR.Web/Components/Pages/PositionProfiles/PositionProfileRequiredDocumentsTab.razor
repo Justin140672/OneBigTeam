@@ -37,6 +37,7 @@ else
             {
                 <HrGrid TValue="RequiredDocumentListItemModel"
                         DataSource="@_documents"
+                        AllowFiltering="false"
                         AllowPaging="false">
                     <GridColumns>
                         <GridColumn Field="@nameof(RequiredDocumentListItemModel.DocumentTypeName)"

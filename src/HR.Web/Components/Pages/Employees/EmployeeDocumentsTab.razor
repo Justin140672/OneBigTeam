@@ -110,6 +110,7 @@ else
         <div class="card-body">
             <HrGrid TValue="EmployeeDocumentListItem"
                     DataSource="@_documents"
+                    AllowFiltering="false"
                     AllowPaging="false">
                 <GridColumns>
                     <GridColumn Field="@nameof(EmployeeDocumentListItem.Title)"

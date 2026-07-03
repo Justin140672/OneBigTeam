@@ -82,7 +82,7 @@ h1:focus {
 
 /* ── Dashboard widgets ───────────────────────────────────────────
    Shared by MyTasksWidget, TeamTasksWidget, UpcomingProbationReviewsWidget,
-   RecentNotificationsWidget and any future dashboard card.
+   HrInboxWidget and any future dashboard card.
    ──────────────────────────────────────────────────────────────── */
 
 .widget-card {
@@ -447,33 +447,6 @@ html[data-theme="dark"] .due-badge--overdue { background: rgba(220,38,38,0.18); 
 html[data-theme="dark"] .due-badge--today   { background: rgba(234,88,12,0.18);  color: #fb923c; }
 html[data-theme="dark"] .due-badge--soon    { background: rgba(202,138,4,0.18);  color: #fbbf24; }
 html[data-theme="dark"] .due-badge--normal  { background: #374151;               color: #d1d5db; }
-
-/* ── Notification widget (RecentNotificationsWidget) ─── */
-
-html[data-theme="dark"] .notif-widget-item {
-    border-bottom-color: #374151;
-}
-
-html[data-theme="dark"] .notif-widget-item--unread {
-    background: rgba(99,102,241,0.1);
-}
-
-html[data-theme="dark"] .notif-widget-icon-wrap {
-    background: #374151;
-    color: #9ca3af;
-}
-
-html[data-theme="dark"] .notif-widget-title {
-    color: #f9fafb;
-}
-
-html[data-theme="dark"] .notif-widget-meta {
-    color: #6b7280;
-}
-
-html[data-theme="dark"] .notif-widget-dot {
-    background: #818cf8;
-}
 
 /* ── Dashboard heading (Home.razor) ──────────────────── */
 
