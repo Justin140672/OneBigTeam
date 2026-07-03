@@ -20,7 +20,7 @@
     }
     else
     {
-        <div class="d-flex align-items-center gap-3 mb-4">
+        <div class="d-flex align-items-center gap-3 mb-1">
             <button class="btn btn-outline-secondary btn-sm" @onclick="GoBack">
                 <i class="fa-solid fa-arrow-left me-1"></i>Back
             </button>
@@ -29,6 +29,7 @@
                 @StatusLabel(_task.Status)
             </span>
         </div>
+        <p class="text-muted mb-4">Review the details, assignment, and history of this task.</p>
 
         <div class="row g-4">
             <div class="col-lg-8">

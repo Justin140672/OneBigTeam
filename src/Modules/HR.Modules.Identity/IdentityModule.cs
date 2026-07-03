@@ -124,7 +124,8 @@ public static class IdentityModule
     /// <summary>
     /// Seeds development personas with identity records and appropriate roles so
     /// the DevAuthHandler has valid, permission-bearing identities for each persona.
-    /// Safe to call on every startup (idempotent).
+    /// Safe to call on every startup: reconciles role assignments to match the list
+    /// below, adding missing roles and removing ones no longer declared.
     /// </summary>
     public static async Task SeedDevUserAsync(this IServiceProvider services)
     {
@@ -134,7 +135,7 @@ public static class IdentityModule
 
         var personas = new[]
         {
-            (Id: new Guid("30000000-0000-0000-0000-000000000001"), First: "Sarah",  Last: "Chen",    Email: "sarah.chen@acme.example",         Roles: new[] { SystemRoles.HrAdministrator }),
+            (Id: new Guid("30000000-0000-0000-0000-000000000001"), First: "Sarah",  Last: "Chen",    Email: "sarah.chen@acme.example",         Roles: new[] { SystemRoles.CompanyAdministrator }),
             (Id: new Guid("30000000-0000-0000-0000-000000000002"), First: "James",  Last: "Okafor",  Email: "james.okafor@acme.example",       Roles: new[] { SystemRoles.Employee, SystemRoles.Manager }),
             (Id: new Guid("30000000-0000-0000-0000-000000000004"), First: "Tom",    Last: "Williams", Email: "tom.williams@acme.example",       Roles: new[] { SystemRoles.Employee }),
             (Id: new Guid("30000000-0000-0000-0000-000000000010"), First: "Carlos", Last: "Rivera",   Email: "carlos.rivera@acme.example",      Roles: new[] { SystemRoles.Employee }),
@@ -161,6 +162,13 @@ public static class IdentityModule
                 if (!roleExists)
                     db.UserRoles.Add(UserRole.Create(persona.Id, roleId, now));
             }
+
+            // Reconcile: drop any previously-seeded roles that are no longer declared above,
+            // so re-running against an existing dev database converges on the current mapping.
+            var stale = await db.UserRoles
+                .Where(ur => ur.UserId == persona.Id && !persona.Roles.Contains(ur.RoleId))
+                .ToListAsync();
+            db.UserRoles.RemoveRange(stale);
         }
 
         await db.SaveChangesAsync();

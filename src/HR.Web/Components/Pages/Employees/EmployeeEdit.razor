@@ -30,7 +30,8 @@
     }
     else if (IsNew)
     {
-        <h1 class="mb-4">Add Employee</h1>
+        <h1 class="mb-1">Add Employee</h1>
+        <p class="text-muted mb-4">Add a new employee and set up their employment, contact, and system access details.</p>
 
         @if (!string.IsNullOrEmpty(_globalError))
         {
@@ -204,13 +205,14 @@
     }
     else
     {
-        <div class="d-flex align-items-center gap-3 mb-3">
+        <div class="d-flex align-items-center gap-3 mb-1">
             <h1 class="mb-0">@(_employee?.FirstName) @(_employee?.LastName)</h1>
             @if (_employee is not null)
             {
                 <span class="badge rounded-pill px-3 py-2 fs-6 fw-normal @StatusBadgeClass(_employee.Status)">@StatusDisplayName(_employee.Status)</span>
             }
         </div>
+        <p class="text-muted mb-3">View and manage this employee's profile, employment, leave, and documents.</p>
 
         @if (!string.IsNullOrEmpty(_globalError))
         {

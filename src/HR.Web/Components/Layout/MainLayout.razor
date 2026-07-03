@@ -76,6 +76,10 @@ else
                             <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
                         </MenuItems>
                     </MenuItem>
+                    @if (Session.CanManageCompany)
+                    {
+                        <MenuItem Text="Company" IconCss="fa-solid fa-building" Url="@_menuItems["Company"]" />
+                    }
                 </MenuItems>
             </SfMenu>
 
@@ -244,6 +248,7 @@ else
         ["HrInbox"]             = "/",
         ["DocumentTypes"]       = "/",
         ["SicknessCategories"]  = "/",
+        ["Company"]             = "/",
     };
 
     protected override async Task OnInitializedAsync()
@@ -263,6 +268,7 @@ else
         _menuItems["HrInbox"]             = $"/companies/{companyId}/hr/inbox";
         _menuItems["DocumentTypes"]       = $"/companies/{companyId}/document-types";
         _menuItems["SicknessCategories"]  = $"/companies/{companyId}/sickness-categories";
+        _menuItems["Company"]             = $"/companies/{companyId}/edit";
 
         await LoadUnreadCountAsync();
 
