@@ -15,7 +15,7 @@ using HR.Modules.Probation.Features.UpdateProbationRecord;
 using HR.Modules.Probation.Jobs;
 using HR.Modules.Probation.Persistence;
 using HR.SharedKernel;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

@@ -1,6 +1,6 @@
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Features.ListRequiredDocumentsForPositionProfile;

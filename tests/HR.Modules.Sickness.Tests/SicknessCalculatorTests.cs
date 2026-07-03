@@ -1,4 +1,5 @@
 using HR.Modules.Sickness.Domain;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 
 namespace HR.Modules.Sickness.Tests;

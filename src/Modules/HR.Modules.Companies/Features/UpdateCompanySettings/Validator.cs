@@ -1,4 +1,5 @@
 using FluentValidation;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Features.UpdateCompanySettings;

@@ -20,7 +20,7 @@ using HR.Modules.Sickness.Features.UpdateSicknessRecord;
 using HR.Modules.Sickness.Features.UpdateSicknessCategory;
 using HR.Modules.Sickness.Jobs;
 using HR.Modules.Sickness.Persistence;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

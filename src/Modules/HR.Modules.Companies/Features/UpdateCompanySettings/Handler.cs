@@ -2,6 +2,7 @@ using System.Text.Json;
 using HR.Modules.Companies.Contracts.Events;
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Persistence;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

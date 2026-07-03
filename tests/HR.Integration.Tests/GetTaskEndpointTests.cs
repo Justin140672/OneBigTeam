@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 
 namespace HR.Integration.Tests;

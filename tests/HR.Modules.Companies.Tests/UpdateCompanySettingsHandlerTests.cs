@@ -4,6 +4,7 @@ using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Features.UpdateCompanySettings;
 using HR.Modules.Companies.Persistence;
 using HR.Modules.Companies.Tests.Infrastructure;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

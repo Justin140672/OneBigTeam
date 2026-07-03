@@ -1,4 +1,5 @@
 using HR.Modules.Companies.Features.UpdateCompanySettings;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Tests;

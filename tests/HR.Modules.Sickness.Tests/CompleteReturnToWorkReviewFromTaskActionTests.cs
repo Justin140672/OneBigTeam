@@ -3,7 +3,7 @@ using HR.Modules.Sickness.Features.CompleteReturnToWorkReviewFromTask;
 using HR.Modules.Sickness.Persistence;
 using HR.Modules.Sickness.Tests.Infrastructure;
 using HR.SharedKernel;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using HR.Modules.Sickness;
 

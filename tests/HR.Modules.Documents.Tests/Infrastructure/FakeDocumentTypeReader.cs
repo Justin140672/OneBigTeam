@@ -1,4 +1,4 @@
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Documents.Tests.Infrastructure;
 

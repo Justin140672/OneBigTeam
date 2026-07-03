@@ -1,4 +1,6 @@
-namespace HR.SharedKernel.Contracts;
+using HR.SharedKernel;
+
+namespace HR.Infrastructure.Abstractions;
 
 public interface ILeaveApprovalService
 {

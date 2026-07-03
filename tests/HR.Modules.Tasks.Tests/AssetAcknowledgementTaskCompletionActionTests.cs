@@ -1,7 +1,7 @@
 using HR.Modules.Tasks.Features.CompleteTask.Actions;
 using HR.Modules.Tasks.Tests.Infrastructure;
 using HR.SharedKernel;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Tasks.Tests;
 

@@ -2,7 +2,7 @@ using HR.Modules.Leave.Features.ApproveLeaveRequest;
 using HR.Modules.Leave.Features.RejectLeaveRequest;
 using HR.Modules.Leave.Persistence;
 using HR.SharedKernel;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Services;

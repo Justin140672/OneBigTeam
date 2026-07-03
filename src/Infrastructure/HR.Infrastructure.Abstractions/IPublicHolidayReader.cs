@@ -1,4 +1,4 @@
-namespace HR.SharedKernel;
+namespace HR.Infrastructure.Abstractions;
 
 public interface IPublicHolidayReader
 {

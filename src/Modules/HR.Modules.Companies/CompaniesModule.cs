@@ -13,6 +13,7 @@ using HR.Modules.Companies.Features.UploadCompanyLogo;
 using HR.Modules.Companies.Persistence;
 using HR.Modules.Companies.Services;
 using HR.Modules.Companies.Storage;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 
 using Microsoft.EntityFrameworkCore;

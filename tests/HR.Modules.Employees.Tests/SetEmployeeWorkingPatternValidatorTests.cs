@@ -1,4 +1,5 @@
 using HR.Modules.Employees.Features.SetEmployeeWorkingPattern;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Tests;

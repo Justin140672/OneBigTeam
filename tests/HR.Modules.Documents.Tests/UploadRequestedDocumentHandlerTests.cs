@@ -3,6 +3,7 @@ using HR.Modules.Documents.Features.UploadRequestedDocument;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
 using HR.Modules.Documents.Tests.Infrastructure;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;

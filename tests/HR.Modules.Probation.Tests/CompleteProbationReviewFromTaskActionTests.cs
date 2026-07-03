@@ -3,7 +3,7 @@ using HR.Modules.Probation.Features.CompleteProbationReviewFromTask;
 using HR.Modules.Probation.Persistence;
 using HR.Modules.Probation.Tests.Infrastructure;
 using HR.SharedKernel;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Probation.Tests;

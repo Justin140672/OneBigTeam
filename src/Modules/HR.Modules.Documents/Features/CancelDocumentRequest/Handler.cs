@@ -1,5 +1,6 @@
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

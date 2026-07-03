@@ -2,6 +2,7 @@ using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.SetEmployeeWorkingPattern;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Tests.Infrastructure;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

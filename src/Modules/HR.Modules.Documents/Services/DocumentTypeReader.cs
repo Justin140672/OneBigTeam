@@ -1,5 +1,5 @@
 using HR.Modules.Documents.Persistence;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Services;

@@ -3,6 +3,7 @@ using HR.Modules.Tasks.Features.CompleteTask;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Services;
 using HR.Modules.Tasks.Tests.Infrastructure;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,7 +15,7 @@ public class CompleteTaskHandlerTests
     private static readonly FakeClock Clock = new(FixedNow);
 
     private static readonly TaskCompletionDispatcher NoOpDispatcher =
-        new(Enumerable.Empty<HR.SharedKernel.Contracts.ITaskCompletionAction>());
+        new(Enumerable.Empty<ITaskCompletionAction>());
 
     private static CompleteTaskHandler BuildHandler(
         TasksDbContext context,

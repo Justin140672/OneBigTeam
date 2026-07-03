@@ -1,6 +1,7 @@
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.GetMyTasks;
 using HR.Modules.Tasks.Tests.Infrastructure;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using HR.Modules.Tasks.Persistence;
 using Microsoft.EntityFrameworkCore;

@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 
 namespace HR.Web.Models;

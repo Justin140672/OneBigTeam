@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\..\Shared\HR.SharedKernel\HR.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\HR.Infrastructure.Abstractions\HR.Infrastructure.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

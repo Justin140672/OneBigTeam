@@ -3,6 +3,7 @@ using HR.Modules.Sickness.Features.RecordMySickness;
 using HR.Modules.Sickness.Features.RecordSickness;
 using HR.Modules.Sickness.Persistence;
 using HR.Modules.Sickness.Tests.Infrastructure;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

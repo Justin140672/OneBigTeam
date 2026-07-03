@@ -2,6 +2,7 @@ using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Jobs;
 using HR.Modules.Probation.Persistence;
 using HR.Modules.Probation.Tests.Infrastructure;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;

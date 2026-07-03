@@ -2,6 +2,7 @@ using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Features.CreateCompany;
 using HR.Modules.Companies.Persistence;
 using HR.Modules.Companies.Tests.Infrastructure;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

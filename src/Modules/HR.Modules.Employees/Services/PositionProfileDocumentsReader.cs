@@ -1,5 +1,5 @@
 using HR.Modules.Employees.Persistence;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Services;

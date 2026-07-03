@@ -3,7 +3,7 @@ using HR.Modules.Documents.Features.CreateDocumentRequestsOnEmployeeCreated;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Tests.Infrastructure;
 using HR.SharedKernel;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Tests;

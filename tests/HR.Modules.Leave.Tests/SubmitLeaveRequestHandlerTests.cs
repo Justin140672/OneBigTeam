@@ -2,6 +2,7 @@ using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.SubmitLeaveRequest;
 using HR.Modules.Leave.Persistence;
 using HR.Modules.Leave.Tests.Infrastructure;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 
 using Microsoft.EntityFrameworkCore;

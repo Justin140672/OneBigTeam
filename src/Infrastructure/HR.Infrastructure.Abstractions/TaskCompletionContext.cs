@@ -1,4 +1,4 @@
-namespace HR.SharedKernel.Contracts;
+namespace HR.Infrastructure.Abstractions;
 
 /// <summary>
 /// Data passed to every <see cref="ITaskCompletionAction"/> when a task transitions to Completed.

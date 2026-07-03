@@ -21,7 +21,7 @@ using HR.Modules.Leave.Features.DeactivateLeaveType;
 using HR.Modules.Leave.Persistence;
 using HR.Modules.Leave.Services;
 using HR.SharedKernel;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

@@ -1,7 +1,7 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.ListRequiredDocumentsForPositionProfile;
 using HR.Modules.Employees.Persistence;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Tests;

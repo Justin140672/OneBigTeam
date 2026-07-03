@@ -1,5 +1,6 @@
 using HR.Modules.Tasks.Features.LeaveRequested;
 using HR.Modules.Tasks.Tests.Infrastructure;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 
 namespace HR.Modules.Tasks.Tests;

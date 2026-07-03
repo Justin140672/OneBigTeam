@@ -1,5 +1,6 @@
 using HR.Modules.Notifications.Persistence;
 using HR.Modules.Notifications.Tests.Infrastructure;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

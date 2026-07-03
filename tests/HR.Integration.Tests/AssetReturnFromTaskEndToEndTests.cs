@@ -3,6 +3,7 @@ using System.Text;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Tasks.Domain;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 
 namespace HR.Integration.Tests;

@@ -1,7 +1,7 @@
 using FluentValidation;
 using HR.Modules.Documents.Domain;
 using HR.SharedKernel;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Features.CreateDocumentRequestsOnEmployeeCreated;
 using HR.Modules.Documents.Features.UploadRequestedDocument;
 using HR.Modules.Documents.Features.CreateDocumentType;

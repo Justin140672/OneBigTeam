@@ -1,5 +1,5 @@
 using HR.SharedKernel;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Tasks.Features.SicknessEvidenceOverdue;
 

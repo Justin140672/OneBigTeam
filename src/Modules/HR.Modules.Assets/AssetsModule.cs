@@ -19,7 +19,7 @@ using HR.Modules.Assets.Features.UpdateAssetCategory;
 using HR.Modules.Assets.Domain;
 using HR.Modules.Assets.Jobs;
 using HR.Modules.Assets.Persistence;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

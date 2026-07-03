@@ -1,7 +1,7 @@
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Persistence;
 using HR.SharedKernel;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Tasks.Services;

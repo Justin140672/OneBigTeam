@@ -1,4 +1,4 @@
-namespace HR.SharedKernel.Contracts;
+namespace HR.Infrastructure.Abstractions;
 
 public interface IEmployeeNameReader
 {

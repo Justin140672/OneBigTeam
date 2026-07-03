@@ -1,4 +1,5 @@
 using HR.Modules.Notifications.Domain;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using HR.Modules.Notifications.Features.GetMyNotifications;
 using HR.Modules.Notifications.Features.GetUnreadNotificationCount;

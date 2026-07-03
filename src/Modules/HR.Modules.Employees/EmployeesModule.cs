@@ -36,7 +36,7 @@ using HR.Modules.Employees.Features.DeactivateEmploymentType;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
 using HR.SharedKernel;
-using HR.SharedKernel.Contracts;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

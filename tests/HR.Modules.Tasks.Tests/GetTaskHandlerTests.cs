@@ -1,4 +1,5 @@
 using HR.Modules.Tasks.Domain;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using HR.Modules.Tasks.Features.GetTask;
 using HR.Modules.Tasks.Persistence;

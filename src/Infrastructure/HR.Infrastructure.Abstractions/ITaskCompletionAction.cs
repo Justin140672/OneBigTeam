@@ -1,4 +1,4 @@
-namespace HR.SharedKernel.Contracts;
+namespace HR.Infrastructure.Abstractions;
 
 /// <summary>
 /// Implement this interface in any module to react when a task of a given

@@ -7,6 +7,7 @@
   </Folder>
   <Folder Name="/src/Infrastructure/">
     <Project Path="src/Infrastructure/HR.Infrastructure/HR.Infrastructure.csproj" />
+    <Project Path="src/Infrastructure/HR.Infrastructure.Abstractions/HR.Infrastructure.Abstractions.csproj" />
   </Folder>
   <Folder Name="/src/Modules/">
     <Project Path="src/Modules/HR.Modules.Companies/HR.Modules.Companies.csproj" />

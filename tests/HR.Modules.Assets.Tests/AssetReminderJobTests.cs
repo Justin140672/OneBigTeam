@@ -5,6 +5,7 @@ using HR.Modules.Assets.Features.CreateAssetCategory;
 using HR.Modules.Assets.Jobs;
 using HR.Modules.Assets.Persistence;
 using HR.Modules.Assets.Tests.Infrastructure;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

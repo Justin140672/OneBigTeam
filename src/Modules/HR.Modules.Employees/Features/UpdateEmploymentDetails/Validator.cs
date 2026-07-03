@@ -1,5 +1,6 @@
 using FluentValidation;
 using HR.Modules.Employees.Domain;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Features.UpdateEmploymentDetails;

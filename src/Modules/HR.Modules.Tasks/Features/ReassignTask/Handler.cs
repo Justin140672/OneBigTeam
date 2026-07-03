@@ -1,4 +1,5 @@
 using HR.Modules.Tasks.Persistence;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 

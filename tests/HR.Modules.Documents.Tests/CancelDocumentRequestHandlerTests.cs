@@ -2,6 +2,7 @@ using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.CancelDocumentRequest;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Tests.Infrastructure;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
