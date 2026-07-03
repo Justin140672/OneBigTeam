@@ -33,6 +33,9 @@ public sealed class CompanySettingsEditModel
     [Range(0, 24)]
     public int ProbationMonths { get; set; } = 3;
     public bool ExcludePublicHolidaysFromLeave { get; set; } = true;
+    public bool ExcludePublicHolidaysFromSickness { get; set; }
+    public int? FitNoteRequiredAfterDays { get; set; }
+    public int? ReturnToWorkRequiredAfterDays { get; set; }
 }
 
 public sealed class CompanyBrandingEditModel

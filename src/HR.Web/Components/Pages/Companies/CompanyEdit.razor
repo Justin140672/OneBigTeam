@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @inject CompanyService CompanyService
 @inject NavigationManager Navigation
+@inject AppSession Session
 @using HR.SharedKernel
 
 <PageTitle>Edit Company</PageTitle>
@@ -94,6 +95,16 @@
     protected override async Task OnInitializedAsync()
     {
         _isViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
+
+        // Editing (not just viewing) company settings/profile/branding is admin-only,
+        // matching the "company:manage" policy that guards the underlying save endpoints.
+        await Session.InitialiseAsync();
+        if (!_isViewMode && !Session.CanManageCompany)
+        {
+            Navigation.NavigateTo("/", replace: true);
+            return;
+        }
+
         _company = await CompanyService.GetCompanyAsync(Id);
         if (_company is not null)
         {
@@ -108,6 +119,25 @@
                 PostalCode = a.PostalCode,
                 CountryCode = a.CountryCode
             }).ToList();
+
+            var settings = await CompanyService.GetCompanySettingsAsync(Id);
+            if (settings is not null)
+            {
+                _settings.TimeZone = settings.TimeZone;
+                _settings.Locale = settings.Locale;
+                _settings.WorkingWeek = Enum.GetValues<WorkingDays>()
+                    .Where(day => day != WorkingDays.None && ((WorkingDays)settings.WorkingDays).HasFlag(day))
+                    .Select(day => day.ToString())
+                    .ToHashSet();
+                _settings.HoursPerDay = settings.HoursPerDay;
+                _settings.LeaveYearStartMonth = settings.LeaveYearStartMonth;
+                _settings.DefaultHolidayAllowance = settings.DefaultHolidayAllowance;
+                _settings.ProbationMonths = settings.ProbationMonths;
+                _settings.ExcludePublicHolidaysFromLeave = settings.ExcludePublicHolidaysFromLeave;
+                _settings.ExcludePublicHolidaysFromSickness = settings.ExcludePublicHolidaysFromSickness;
+                _settings.FitNoteRequiredAfterDays = settings.FitNoteRequiredAfterDays;
+                _settings.ReturnToWorkRequiredAfterDays = settings.ReturnToWorkRequiredAfterDays;
+            }
         }
         _loading = false;
     }
@@ -132,7 +162,9 @@
             Id, _settings.TimeZone, _settings.Locale,
             workingDays, _settings.HoursPerDay,
             _settings.LeaveYearStartMonth, _settings.DefaultHolidayAllowance,
-            _settings.ProbationMonths, _settings.ExcludePublicHolidaysFromLeave);
+            _settings.ProbationMonths, _settings.ExcludePublicHolidaysFromLeave,
+            _settings.ExcludePublicHolidaysFromSickness, _settings.FitNoteRequiredAfterDays,
+            _settings.ReturnToWorkRequiredAfterDays);
 
         var companyResult = await CompanyService.UpdateCompanyAsync(Id, profileReq);
         var settingsResult = await CompanyService.UpdateCompanySettingsAsync(Id, settingsReq);

@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HR.Modules.Identity.Domain;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
@@ -31,11 +32,17 @@ internal sealed class Endpoint(
 
         var permissions = await authorizationService.GetEffectivePermissionsAsync(userId.Value, ct);
 
+        // Mirrors the "company:manage" policy roles exactly (HR.Modules.Identity.IdentityModule.AddRolePolicies)
+        // so the Company Settings UI gate matches what the update/read endpoints actually allow.
+        var roles = await authorizationService.GetEffectiveRolesAsync(userId.Value, ct);
+        var canManageCompany = roles.Contains(SystemRoles.HrAdministrator) || roles.Contains(SystemRoles.CompanyAdministrator);
+
         await Send.ResultAsync(TypedResults.Ok(new GetMeResponse(
             userId.Value,
             companyId,
             currentUser.Email,
-            permissions.ToList())));
+            permissions.ToList(),
+            canManageCompany)));
     }
 }
 
@@ -43,4 +50,5 @@ internal sealed record GetMeResponse(
     Guid UserId,
     Guid CompanyId,
     string? Email,
-    List<Guid> PermissionIds);
+    List<Guid> PermissionIds,
+    bool CanManageCompany);

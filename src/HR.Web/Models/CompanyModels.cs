@@ -68,6 +68,9 @@ public record GetCompanySettingsResponse(
     decimal DefaultHolidayAllowance,
     int ProbationMonths,
     bool ExcludePublicHolidaysFromLeave,
+    bool ExcludePublicHolidaysFromSickness,
+    int? FitNoteRequiredAfterDays,
+    int? ReturnToWorkRequiredAfterDays,
     DateTime UpdatedAt);
 
 public record UpdateCompanySettingsRequest(
@@ -79,7 +82,10 @@ public record UpdateCompanySettingsRequest(
     int LeaveYearStartMonth,
     decimal DefaultHolidayAllowance,
     int ProbationMonths,
-    bool ExcludePublicHolidaysFromLeave);
+    bool ExcludePublicHolidaysFromLeave,
+    bool ExcludePublicHolidaysFromSickness,
+    int? FitNoteRequiredAfterDays,
+    int? ReturnToWorkRequiredAfterDays);
 
 public record UpdateCompanySettingsResponse(
     Guid CompanyId,
@@ -91,6 +97,9 @@ public record UpdateCompanySettingsResponse(
     decimal DefaultHolidayAllowance,
     int ProbationMonths,
     bool ExcludePublicHolidaysFromLeave,
+    bool ExcludePublicHolidaysFromSickness,
+    int? FitNoteRequiredAfterDays,
+    int? ReturnToWorkRequiredAfterDays,
     DateTime UpdatedAt);
 
 // ── LOGO UPLOAD ───────────────────────────────────────────────────────────────

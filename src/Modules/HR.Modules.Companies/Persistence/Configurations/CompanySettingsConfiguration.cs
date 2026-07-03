@@ -65,6 +65,10 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .HasColumnName("fit_note_required_after_days")
             .IsRequired(false);
 
+        builder.Property(settings => settings.ReturnToWorkRequiredAfterDays)
+            .HasColumnName("return_to_work_required_after_days")
+            .IsRequired(false);
+
         builder.Property(settings => settings.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

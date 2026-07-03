@@ -6,7 +6,8 @@ public sealed record MeResponse(
     Guid UserId,
     Guid CompanyId,
     string? Email,
-    List<Guid> PermissionIds);
+    List<Guid> PermissionIds,
+    bool CanManageCompany);
 
 public sealed record MyEmployeeResponse(
     Guid EmployeeId,

@@ -13,6 +13,7 @@ internal sealed class SicknessDbContext : DbContext
     public DbSet<SicknessCategory> SicknessCategories => Set<SicknessCategory>();
     public DbSet<SicknessRecord> SicknessRecords => Set<SicknessRecord>();
     public DbSet<SicknessEvidenceRequest> SicknessEvidenceRequests => Set<SicknessEvidenceRequest>();
+    public DbSet<ReturnToWorkReview> ReturnToWorkReviews => Set<ReturnToWorkReview>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

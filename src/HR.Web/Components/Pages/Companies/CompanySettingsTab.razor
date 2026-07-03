@@ -53,6 +53,26 @@
                             Checked="@Model.ExcludePublicHolidaysFromLeave"
                             CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromLeave = v)" />
             </div>
+            <div class="col-12">
+                <label class="form-label fw-semibold">Sickness</label>
+            </div>
+            <div class="col-12">
+                <SfCheckBox TChecked="bool" Label="Exclude public holidays from sickness"
+                            Checked="@Model.ExcludePublicHolidaysFromSickness"
+                            CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromSickness = v)" />
+            </div>
+            <div class="col-md-4">
+                <SfNumericTextBox TValue="int?" @bind-Value="Model.FitNoteRequiredAfterDays"
+                                  Placeholder="Fit Note Required After (Days)"
+                                  FloatLabelType="FloatLabelType.Auto"
+                                  Min="0" />
+            </div>
+            <div class="col-md-4">
+                <SfNumericTextBox TValue="int?" @bind-Value="Model.ReturnToWorkRequiredAfterDays"
+                                  Placeholder="Return-to-Work Review Required After (Days)"
+                                  FloatLabelType="FloatLabelType.Auto"
+                                  Min="0" />
+            </div>
         </div>
     </div>
 </div>

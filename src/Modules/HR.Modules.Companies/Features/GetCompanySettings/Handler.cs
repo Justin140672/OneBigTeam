@@ -32,6 +32,7 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
                 defaults.DefaultHolidayAllowance, defaults.ProbationMonths,
                 defaults.ExcludePublicHolidaysFromLeave, defaults.ExcludePublicHolidaysFromSickness,
                 defaults.FitNoteRequiredAfterDays,
+                defaults.ReturnToWorkRequiredAfterDays,
                 defaults.UpdatedAt));
         }
 
@@ -41,6 +42,7 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
             settings.DefaultHolidayAllowance, settings.ProbationMonths,
             settings.ExcludePublicHolidaysFromLeave, settings.ExcludePublicHolidaysFromSickness,
             settings.FitNoteRequiredAfterDays,
+            settings.ReturnToWorkRequiredAfterDays,
             settings.UpdatedAt));
     }
 }

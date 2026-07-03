@@ -16,6 +16,7 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory)
     public IReadOnlyList<Guid> PermissionIds { get; private set; } = [];
 
     public bool CanManageEmployees => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000004"));
+    public bool CanManageCompany { get; private set; }
 
     // Employee (null if user has no linked employee record)
     public Guid? EmployeeId { get; private set; }
@@ -62,6 +63,7 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory)
         CompanyId = me.CompanyId;
         Email     = me.Email;
         PermissionIds = me.PermissionIds;
+        CanManageCompany = me.CanManageCompany;
 
         var companyTask  = Http.GetFromJsonAsync<GetCompanyResponse>($"api/companies/{me.CompanyId}", HrApiJsonOptions.Default);
         var settingsTask = Http.GetFromJsonAsync<GetCompanySettingsResponse>($"api/companies/{me.CompanyId}/settings", HrApiJsonOptions.Default);

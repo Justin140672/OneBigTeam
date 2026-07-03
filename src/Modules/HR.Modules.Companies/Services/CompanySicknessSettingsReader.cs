@@ -15,6 +15,9 @@ internal sealed class CompanySicknessSettingsReader(CompaniesDbContext dbContext
         if (settings is null)
             return CompanySicknessSettings.Default;
 
-        return new CompanySicknessSettings(settings.ExcludePublicHolidaysFromSickness, settings.FitNoteRequiredAfterDays);
+        return new CompanySicknessSettings(
+            settings.ExcludePublicHolidaysFromSickness,
+            settings.FitNoteRequiredAfterDays,
+            settings.ReturnToWorkRequiredAfterDays);
     }
 }

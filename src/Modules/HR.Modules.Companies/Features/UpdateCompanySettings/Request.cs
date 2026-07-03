@@ -15,4 +15,5 @@ internal sealed record UpdateCompanySettingsRequest
 	public bool ExcludePublicHolidaysFromLeave { get; init; } = true;
 	public bool ExcludePublicHolidaysFromSickness { get; init; } = false;
 	public int? FitNoteRequiredAfterDays { get; init; }
+	public int? ReturnToWorkRequiredAfterDays { get; init; }
 }

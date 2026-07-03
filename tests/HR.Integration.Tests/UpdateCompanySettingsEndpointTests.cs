@@ -73,7 +73,10 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
             hoursPerDay = 7.5,
             leaveYearStartMonth = 4,
             defaultHolidayAllowance = 28,
-            probationMonths = 3
+            probationMonths = 3,
+            excludePublicHolidaysFromSickness = true,
+            fitNoteRequiredAfterDays = 7,
+            returnToWorkRequiredAfterDays = 3
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -83,6 +86,9 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(createdCompany.Id, payload!.CompanyId);
         Assert.Equal("Europe/London", payload.TimeZone);
         Assert.Equal(28, payload.DefaultHolidayAllowance);
+        Assert.True(payload.ExcludePublicHolidaysFromSickness);
+        Assert.Equal(7, payload.FitNoteRequiredAfterDays);
+        Assert.Equal(3, payload.ReturnToWorkRequiredAfterDays);
     }
 
     [Fact]
@@ -116,5 +122,8 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
         decimal DefaultHolidayAllowance,
         int ProbationMonths,
         bool ExcludePublicHolidaysFromLeave,
+        bool ExcludePublicHolidaysFromSickness,
+        int? FitNoteRequiredAfterDays,
+        int? ReturnToWorkRequiredAfterDays,
         DateTimeOffset UpdatedAt);
 }

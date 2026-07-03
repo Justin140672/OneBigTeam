@@ -1,3 +1,4 @@
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -5,11 +6,33 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace HR.Modules.Companies.Migrations
 {
     /// <inheritdoc />
-    public partial class AddPublicHolidays : Migration
+    public partial class AddSicknessSettingsAndPublicHolidays : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddColumn<bool>(
+                name: "exclude_public_holidays_from_sickness",
+                schema: "companies",
+                table: "company_settings",
+                type: "boolean",
+                nullable: false,
+                defaultValue: false);
+
+            migrationBuilder.AddColumn<int>(
+                name: "fit_note_required_after_days",
+                schema: "companies",
+                table: "company_settings",
+                type: "integer",
+                nullable: true);
+
+            migrationBuilder.AddColumn<int>(
+                name: "return_to_work_required_after_days",
+                schema: "companies",
+                table: "company_settings",
+                type: "integer",
+                nullable: true);
+
             migrationBuilder.CreateTable(
                 name: "public_holidays",
                 schema: "companies",
@@ -40,6 +63,21 @@ namespace HR.Modules.Companies.Migrations
             migrationBuilder.DropTable(
                 name: "public_holidays",
                 schema: "companies");
+
+            migrationBuilder.DropColumn(
+                name: "exclude_public_holidays_from_sickness",
+                schema: "companies",
+                table: "company_settings");
+
+            migrationBuilder.DropColumn(
+                name: "fit_note_required_after_days",
+                schema: "companies",
+                table: "company_settings");
+
+            migrationBuilder.DropColumn(
+                name: "return_to_work_required_after_days",
+                schema: "companies",
+                table: "company_settings");
         }
     }
 }

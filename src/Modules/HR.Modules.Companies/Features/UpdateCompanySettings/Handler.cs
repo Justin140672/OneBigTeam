@@ -50,7 +50,8 @@ internal sealed class UpdateCompanySettingsHandler
 				company.Settings.ProbationMonths,
 				company.Settings.ExcludePublicHolidaysFromLeave,
 				company.Settings.ExcludePublicHolidaysFromSickness,
-				company.Settings.FitNoteRequiredAfterDays);
+				company.Settings.FitNoteRequiredAfterDays,
+				company.Settings.ReturnToWorkRequiredAfterDays);
 
 		var settings = company.Settings ?? CompanySettings.CreateDefault(company.Id, now);
 		settings.Update(
@@ -64,6 +65,7 @@ internal sealed class UpdateCompanySettingsHandler
 			request.ExcludePublicHolidaysFromLeave,
 			request.ExcludePublicHolidaysFromSickness,
 			request.FitNoteRequiredAfterDays,
+			request.ReturnToWorkRequiredAfterDays,
 			now);
 
 		company.SetSettings(settings, now);
@@ -80,6 +82,7 @@ internal sealed class UpdateCompanySettingsHandler
 			settings.ExcludePublicHolidaysFromLeave,
 			settings.ExcludePublicHolidaysFromSickness,
 			settings.FitNoteRequiredAfterDays,
+			settings.ReturnToWorkRequiredAfterDays,
 			now));
 
 		var outboxMessage = OutboxMessage.CreatePending(
@@ -108,7 +111,8 @@ internal sealed class UpdateCompanySettingsHandler
 					settings.ProbationMonths,
 					settings.ExcludePublicHolidaysFromLeave,
 					settings.ExcludePublicHolidaysFromSickness,
-					settings.FitNoteRequiredAfterDays)),
+					settings.FitNoteRequiredAfterDays,
+					settings.ReturnToWorkRequiredAfterDays)),
 			cancellationToken);
 
 		return Result.Success(new UpdateCompanySettingsResponse(
@@ -123,6 +127,7 @@ internal sealed class UpdateCompanySettingsHandler
 			settings.ExcludePublicHolidaysFromLeave,
 			settings.ExcludePublicHolidaysFromSickness,
 			settings.FitNoteRequiredAfterDays,
+			settings.ReturnToWorkRequiredAfterDays,
 			settings.UpdatedAt));
 	}
 }

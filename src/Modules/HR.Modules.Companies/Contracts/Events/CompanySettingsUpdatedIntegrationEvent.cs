@@ -14,4 +14,5 @@ internal sealed record CompanySettingsUpdatedIntegrationEvent(
 	bool ExcludePublicHolidaysFromLeave,
 	bool ExcludePublicHolidaysFromSickness,
 	int? FitNoteRequiredAfterDays,
+	int? ReturnToWorkRequiredAfterDays,
 	DateTimeOffset OccurredAt);
