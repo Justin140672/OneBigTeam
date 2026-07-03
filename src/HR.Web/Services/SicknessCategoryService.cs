@@ -6,12 +6,15 @@ public class SicknessCategoryService(IHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
-    public async Task<ListSicknessCategoriesResponse?> ListSicknessCategoriesAsync(Guid companyId)
+    // Defaults to true (no filtering) so existing callers that resolve category names for
+    // historical records keep seeing deactivated categories. The list page explicitly
+    // passes false to filter to active-only by default.
+    public async Task<ListSicknessCategoriesResponse?> ListSicknessCategoriesAsync(Guid companyId, bool includeInactive = true)
     {
         try
         {
-            var items = await Http.GetFromJsonAsync<List<SicknessCategoryListItemModel>>(
-                $"api/companies/{companyId}/sickness-categories");
+            var url = $"api/companies/{companyId}/sickness-categories?includeInactive={(includeInactive ? "true" : "false")}";
+            var items = await Http.GetFromJsonAsync<List<SicknessCategoryListItemModel>>(url);
             return items is null ? null : new ListSicknessCategoriesResponse(items);
         }
         catch (HttpRequestException)

@@ -65,8 +65,7 @@ public sealed class EmploymentTypeManagementTests(AppFixture fixture) : E2ETestB
         await typeList.DeactivateAsync(typeName);
 
         // Show inactive and verify
-        await _page.Locator("#showInactive").CheckAsync();
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 10_000 });
+        await typeList.ShowInactiveAsync();
 
         Assert.True(await typeList.HasItemAsync(typeName),
             "Expected deactivated type to appear when 'Show inactive' is enabled");

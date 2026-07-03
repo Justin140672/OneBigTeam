@@ -9,8 +9,13 @@ internal sealed class ListAssetCategoriesHandler(AssetsDbContext db)
         ListAssetCategoriesRequest request,
         CancellationToken cancellationToken)
     {
-        return await db.AssetCategories
-            .Where(c => c.CompanyId == request.CompanyId && c.IsActive)
+        var query = db.AssetCategories
+            .Where(c => c.CompanyId == request.CompanyId);
+
+        if (!request.IncludeInactive)
+            query = query.Where(c => c.IsActive);
+
+        return await query
             .OrderBy(c => c.Name)
             .Select(c => new ListAssetCategoriesResponse(
                 c.Id, c.CompanyId, c.Name, c.Description,

@@ -1,5 +1,6 @@
 using HR.Web.Components.Controls;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Rendering;
 using Syncfusion.Blazor.Grids;
 using Syncfusion.Blazor.Navigations;
 
@@ -18,6 +19,11 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
     protected IReadOnlyList<TItem> Items { get; private set; } = [];
 
     protected HrGrid<TItem>? Grid { get; set; }
+
+    // Override to true for entities that have an IsActive property, to show the toggle below.
+    protected virtual bool SupportsActiveFilter => false;
+
+    protected bool ShowInactive { get; private set; }
 
     private bool _hasSelection;
 
@@ -58,15 +64,51 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
                     Disabled    = !_hasSelection,
                 });
 
+            if (SupportsActiveFilter)
+                items.Add(new ItemModel
+                {
+                    Id          = "hr-toggle-active",
+                    Text        = ShowInactive ? "Show Active" : "Show Inactive",
+                    PrefixIcon  = ShowInactive ? "fa-solid fa-eye" : "fa-solid fa-eye-slash",
+                    TooltipText = ShowInactive ? "Show active records only" : "Include inactive records",
+                });
+
             items.AddRange(new object[]
             {
-                new ItemModel { Id = "hr-print",   Text = "Print",   PrefixIcon = "fa-solid fa-print",         TooltipText = "Print" },
-                new ItemModel { Id = "hr-excel",   Text = "Excel",   PrefixIcon = "fa-solid fa-file-excel",    TooltipText = "Export to Excel" },
-                new ItemModel { Id = "hr-csv",     Text = "CSV",     PrefixIcon = "fa-solid fa-file-csv",      TooltipText = "Export to CSV" },
-                new ItemModel { Id = "hr-pdf",     Text = "PDF",     PrefixIcon = "fa-solid fa-file-pdf",      TooltipText = "Export to PDF" },
+                new ItemModel { Id = "hr-print",   Text = "Print",   PrefixIcon = "fa-solid fa-print", TooltipText = "Print" },
+                new ItemModel { Id = "hr-export",  Type = ItemType.Input, Template = ExportMenuTemplate, TooltipText = "Export" },
                 new ItemModel { Id = "hr-columns", Text = "Columns", PrefixIcon = "fa-solid fa-table-columns", TooltipText = "Show/hide columns" },
             });
             return items;
+        }
+    }
+
+    // Mounted into the toolbar via an ItemModel.Template slot; merges Excel/CSV/PDF into one dropdown.
+    // Print stays as its own native toolbar button (see "hr-print" in OnToolbarClick).
+    private RenderFragment ExportMenuTemplate => builder =>
+    {
+        builder.OpenComponent<ExportMenu>(0);
+        builder.AddAttribute(1, nameof(ExportMenu.OnItemSelected), EventCallback.Factory.Create<string>(this, HandleExportItemSelected));
+        builder.CloseComponent();
+    };
+
+    private async Task HandleExportItemSelected(string id)
+    {
+        if (Grid is null) return;
+
+        switch (id)
+        {
+            case "hr-excel":
+                await Grid.ExportToExcelAsync(new ExcelExportProperties());
+                break;
+
+            case "hr-csv":
+                await Grid.ExportToCsvAsync(new ExcelExportProperties());
+                break;
+
+            case "hr-pdf":
+                await Grid.ExportToPdfAsync(new PdfExportProperties());
+                break;
         }
     }
 
@@ -108,21 +150,15 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
                 if (Grid is not null) await Grid.PrintAsync();
                 break;
 
-            case "hr-excel":
-                if (Grid is not null) await Grid.ExportToExcelAsync(new ExcelExportProperties());
-                break;
-
-            case "hr-csv":
-                if (Grid is not null) await Grid.ExportToCsvAsync(new ExcelExportProperties());
-                break;
-
-            case "hr-pdf":
-                if (Grid is not null) await Grid.ExportToPdfAsync(new PdfExportProperties());
-                break;
-
             case "hr-columns":
                 if (Grid is not null) await Grid.OpenColumnChooserAsync(0, 0);
                 break;
+
+            case "hr-toggle-active":
+                ShowInactive = !ShowInactive;
+                await LoadAsync();
+                break;
+
             default:
                 var customAction = _customActions.FirstOrDefault(a => a.Id == args.Item.Id);
                 if (customAction is not null && _hasSelection && Grid is not null)

@@ -9,8 +9,13 @@ internal sealed class ListSicknessCategoriesHandler(SicknessDbContext db)
         ListSicknessCategoriesRequest request,
         CancellationToken cancellationToken)
     {
-        return await db.SicknessCategories
-            .Where(c => c.CompanyId == request.CompanyId)
+        var query = db.SicknessCategories
+            .Where(c => c.CompanyId == request.CompanyId);
+
+        if (!request.IncludeInactive)
+            query = query.Where(c => c.IsActive);
+
+        return await query
             .OrderBy(c => c.DisplayOrder)
             .Select(c => new ListSicknessCategoriesResponse(
                 c.Id, c.CompanyId, c.Name, c.IsActive, c.DisplayOrder, c.CreatedAt, c.UpdatedAt))

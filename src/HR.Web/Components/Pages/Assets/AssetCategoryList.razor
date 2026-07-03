@@ -64,6 +64,8 @@
 </div>
 
 @code {
+    protected override bool SupportsActiveFilter => true;
+
     protected override Task OnBeforeLoadAsync()
     {
         if (!Session.CanManageEmployees)
@@ -87,7 +89,7 @@
 
     protected override async Task<IReadOnlyList<AssetCategoryListItemModel>?> FetchItemsAsync(string? search)
     {
-        var result = await AssetCategoryService.ListAssetCategoriesAsync(CompanyId);
+        var result = await AssetCategoryService.ListAssetCategoriesAsync(CompanyId, ShowInactive);
         return result?.Items;
     }
 

@@ -121,10 +121,15 @@ public sealed class SicknessCategoryManagementTests(AppFixture fixture) : E2ETes
 
         await catList.DeleteAsync(catName);
 
-        // "Delete" is a soft-deactivate — the category stays in the list (both active and
-        // inactive categories are shown), it just flips to Inactive.
+        // "Delete" is a soft-deactivate. The list defaults to active-only, so the row
+        // disappears until "Show Inactive" is toggled — then it reappears as Inactive.
+        Assert.False(await catList.HasItemAsync(catName),
+            $"Expected '{catName}' to no longer appear in the default active-only view after deletion.");
+
+        await catList.ShowInactiveAsync();
+
         Assert.True(await catList.HasItemAsync(catName),
-            $"Expected '{catName}' to remain in the list after deletion (soft-deactivate).");
+            $"Expected '{catName}' to appear once inactive categories are shown.");
         Assert.False(await catList.IsActiveAsync(catName),
             $"Expected '{catName}' to be marked Inactive after deletion.");
     }

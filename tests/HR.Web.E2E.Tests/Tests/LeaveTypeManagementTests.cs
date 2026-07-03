@@ -63,8 +63,7 @@ public sealed class LeaveTypeManagementTests(AppFixture fixture) : E2ETestBase(f
         Assert.True(await typeList.IsActiveAsync(typeName), "Expected newly created type to be Active");
         await typeList.DeactivateAsync(typeName);
 
-        await _page.Locator("#showInactive").CheckAsync();
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 10_000 });
+        await typeList.ShowInactiveAsync();
 
         Assert.True(await typeList.HasItemAsync(typeName),
             "Expected deactivated type to appear when 'Show inactive' is enabled");

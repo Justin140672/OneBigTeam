@@ -6,12 +6,13 @@ public class AssetCategoryService(IHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
-    public async Task<ListAssetCategoriesResponse?> ListAssetCategoriesAsync(Guid companyId)
+    public async Task<ListAssetCategoriesResponse?> ListAssetCategoriesAsync(Guid companyId, bool includeInactive = false)
     {
         try
         {
-            var items = await Http.GetFromJsonAsync<List<AssetCategoryListItemModel>>(
-                $"api/companies/{companyId}/asset-categories");
+            var url = $"api/companies/{companyId}/asset-categories";
+            if (includeInactive) url += "?includeInactive=true";
+            var items = await Http.GetFromJsonAsync<List<AssetCategoryListItemModel>>(url);
             return items is null ? null : new ListAssetCategoriesResponse(items);
         }
         catch (HttpRequestException)

@@ -45,4 +45,12 @@ public sealed class EmploymentTypeListPage(IPage page, string baseUrl)
             .First;
         return await row.Locator(".badge.bg-success").IsVisibleAsync();
     }
+
+    public async Task ShowInactiveAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Show Inactive" }).ClickAsync();
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
 }

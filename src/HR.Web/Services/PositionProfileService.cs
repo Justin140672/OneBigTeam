@@ -6,12 +6,13 @@ public class PositionProfileService(IHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
-    public async Task<ListPositionProfilesResponse?> ListPositionProfilesAsync(Guid companyId)
+    public async Task<ListPositionProfilesResponse?> ListPositionProfilesAsync(Guid companyId, bool includeInactive = false)
     {
         try
         {
-            return await Http.GetFromJsonAsync<ListPositionProfilesResponse>(
-                $"api/companies/{companyId}/position-profiles", HrApiJsonOptions.Default);
+            var url = $"api/companies/{companyId}/position-profiles";
+            if (includeInactive) url += "?includeInactive=true";
+            return await Http.GetFromJsonAsync<ListPositionProfilesResponse>(url, HrApiJsonOptions.Default);
         }
         catch (HttpRequestException)
         {

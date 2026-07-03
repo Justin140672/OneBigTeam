@@ -9,12 +9,6 @@
 <div class="container-fluid py-4">
     <h1 class="mb-3">Document Types</h1>
 
-    <div class="form-check form-switch mb-3">
-        <input class="form-check-input" type="checkbox" id="showInactive"
-               @bind="_showInactive" @bind:after="LoadAsync" />
-        <label class="form-check-label" for="showInactive">Show inactive</label>
-    </div>
-
     @if (IsLoading)
     {
         <div class="d-flex align-items-center gap-2">
@@ -80,7 +74,7 @@
 </div>
 
 @code {
-    private bool _showInactive;
+    protected override bool SupportsActiveFilter => true;
 
     protected override Task OnBeforeLoadAsync()
     {
@@ -105,7 +99,7 @@
 
     protected override async Task<IReadOnlyList<DocumentTypeListItemModel>?> FetchItemsAsync(string? search)
     {
-        var result = await DocumentTypeService.ListDocumentTypesAsync(CompanyId, _showInactive);
+        var result = await DocumentTypeService.ListDocumentTypesAsync(CompanyId, ShowInactive);
         return result?.Items;
     }
 
