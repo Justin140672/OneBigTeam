@@ -239,6 +239,7 @@ catch (Exception exception)
 try
 {
 	await app.Services.MigrateSicknessAsync();
+	await app.Services.SeedSicknessAsync();
 	sicknessMigrationStatus = "succeeded";
 	sicknessMigrationCheckedAt = DateTimeOffset.UtcNow;
 }

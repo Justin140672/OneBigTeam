@@ -23,6 +23,7 @@ internal sealed class ListEmployeeSicknessRecordsHandler(SicknessDbContext db)
                 r.StartDayPart,
                 r.EndDate,
                 r.TotalDays,
+                r.EvidenceStatus,
                 r.CreatedAt,
                 r.UpdatedAt))
             .ToListAsync(cancellationToken);

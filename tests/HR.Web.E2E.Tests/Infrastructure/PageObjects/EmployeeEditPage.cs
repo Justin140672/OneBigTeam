@@ -170,4 +170,103 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
         return null;
     }
+
+    // ── Sickness Tab ────────────────────────────────────────────────────────────
+
+    public async Task OpenSicknessTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Sickness" }).ClickAsync();
+        await page.WaitForSelectorAsync(".card, .alert-secondary", new() { Timeout = 15_000 });
+    }
+
+    public async Task<bool> HasSicknessGridAsync() =>
+        await page.Locator(".e-grid").IsVisibleAsync();
+
+    public async Task OpenRecordSicknessDialogAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Record Sickness" }).ClickAsync();
+        await page.WaitForSelectorAsync(".record-sickness-dialog", new() { Timeout = 10_000 });
+    }
+
+    /// <summary>Selects a category in the (currently open) Record Sickness dialog.</summary>
+    public async Task SelectRecordSicknessCategoryAsync(string categoryName)
+    {
+        var group = page.Locator(".record-sickness-dialog .col-12")
+            .Filter(new() { HasText = "Category" })
+            .First;
+        await group.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = categoryName })
+            .First
+            .ClickAsync();
+    }
+
+    /// <summary>Fills the Start Date field in the (currently open) Record Sickness dialog.</summary>
+    public async Task FillRecordSicknessStartDateAsync(string ddMMyyyy)
+    {
+        var input = page.Locator(".record-sickness-dialog .e-date-wrapper input.e-input").First;
+        await input.ClickAsync();
+        await input.FillAsync(ddMMyyyy);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    public async Task SubmitRecordSicknessAsync()
+    {
+        await page.Locator(".record-sickness-dialog")
+            .GetByRole(AriaRole.Button, new() { Name = "Record", Exact = true })
+            .ClickAsync();
+        await page.Locator(".record-sickness-dialog")
+            .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
+
+    public async Task<bool> HasRecordSicknessErrorAsync() =>
+        await page.Locator(".record-sickness-dialog .alert-danger").IsVisibleAsync();
+
+    /// <summary>
+    /// Returns the status badge text for the sickness grid row whose Start Date column
+    /// contains <paramref name="startDateddMMMyyyy"/> (e.g. "05 Jul 2026", matching the
+    /// grid's "dd MMM yyyy" display format).
+    /// </summary>
+    public async Task<string?> GetSicknessStatusBadgeForStartDateAsync(string startDateddMMMyyyy)
+    {
+        await page.WaitForSelectorAsync(".e-grid .e-row", new() { Timeout = 10_000 });
+
+        var row = page.Locator(".e-grid .e-row")
+            .Filter(new() { HasText = startDateddMMMyyyy })
+            .First;
+
+        var badge = row.Locator(".badge").First;
+        return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
+    }
+
+    /// <summary>Clicks the "Close" action button on the grid row matching the given start date.</summary>
+    public async Task StartCloseSicknessRecordAsync(string startDateddMMMyyyy)
+    {
+        var row = page.Locator(".e-grid .e-row")
+            .Filter(new() { HasText = startDateddMMMyyyy })
+            .First;
+        // Button text is "Close" (the "Close record" title attribute is only a tooltip —
+        // accessible name computation prefers the visible text content).
+        await row.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+        await page.WaitForSelectorAsync(".close-sickness-record-dialog", new() { Timeout = 10_000 });
+    }
+
+    /// <summary>Fills the End Date field in the (currently open) Close Sickness Record dialog.</summary>
+    public async Task FillCloseSicknessEndDateAsync(string ddMMyyyy)
+    {
+        var input = page.Locator(".close-sickness-record-dialog .e-date-wrapper input.e-input").First;
+        await input.ClickAsync();
+        await input.FillAsync(ddMMyyyy);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    public async Task SubmitCloseSicknessRecordAsync()
+    {
+        await page.Locator(".close-sickness-record-dialog")
+            .GetByRole(AriaRole.Button, new() { Name = "Close Record" })
+            .ClickAsync();
+        await page.Locator(".close-sickness-record-dialog")
+            .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
 }

@@ -1,4 +1,5 @@
 using Hangfire;
+using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Features.CloseSicknessRecord;
 using HR.Modules.Sickness.Features.CompleteReturnToWorkReviewFromTask;
 using HR.Modules.Sickness.Features.FulfilEvidenceRequest;
@@ -68,5 +69,55 @@ public static class SicknessModule
         var db = scope.ServiceProvider.GetRequiredService<SicknessDbContext>();
         await db.Database.ExecuteSqlRawAsync("CREATE SCHEMA IF NOT EXISTS sickness");
         await db.Database.MigrateAsync();
+    }
+
+    public static async Task SeedSicknessAsync(this IServiceProvider services)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SicknessDbContext>();
+
+        if (await db.SicknessCategories.AnyAsync())
+            return;
+
+        var now    = DateTimeOffset.UtcNow;
+        var acmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+        var coldFluId  = Guid.Parse("70000000-0000-0000-0000-000000000001");
+        var backPainId = Guid.Parse("70000000-0000-0000-0000-000000000002");
+        var migraineId = Guid.Parse("70000000-0000-0000-0000-000000000003");
+
+        db.SicknessCategories.Add(SicknessCategory.Create(coldFluId,  acmeId, "Cold/Flu",  1, now));
+        db.SicknessCategories.Add(SicknessCategory.Create(backPainId, acmeId, "Back Pain", 2, now));
+        db.SicknessCategories.Add(SicknessCategory.Create(migraineId, acmeId, "Migraine",  3, now));
+
+        // Sarah Chen (CTO) — a closed record and a currently-open one, so both the
+        // Active/Closed status badge and the fit-note evidence badge can be seen
+        // in the UI without having to create data manually first.
+        var sarahId = Guid.Parse("30000000-0000-0000-0000-000000000001");
+
+        var closedRecord = SicknessRecord.Create(
+            Guid.Parse("71000000-0000-0000-0000-000000000001"),
+            acmeId, sarahId, coldFluId,
+            new DateOnly(2026, 5, 4), SicknessDayPart.FullDay,
+            new DateOnly(2026, 5, 6), SicknessDayPart.FullDay,
+            totalDays: 3m,
+            notes: "Seasonal cold, recovered quickly.",
+            evidenceStatus: SicknessEvidenceStatus.NotRequired,
+            now: now);
+        db.SicknessRecords.Add(closedRecord);
+
+        var openStartDate = DateOnly.FromDateTime(now.UtcDateTime.AddDays(-10));
+        var openRecord = SicknessRecord.Create(
+            Guid.Parse("71000000-0000-0000-0000-000000000002"),
+            acmeId, sarahId, backPainId,
+            openStartDate, SicknessDayPart.FullDay,
+            endDate: null, endDayPart: null,
+            totalDays: null,
+            notes: "Ongoing back pain, may need extended leave.",
+            evidenceStatus: SicknessEvidenceStatus.Pending,
+            now: now);
+        db.SicknessRecords.Add(openRecord);
+
+        await db.SaveChangesAsync();
     }
 }

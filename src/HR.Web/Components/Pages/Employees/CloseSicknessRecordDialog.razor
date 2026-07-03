@@ -1,0 +1,132 @@
+@inject SicknessService SicknessService
+
+<SfDialog @bind-Visible="_visible" IsModal="true" Width="480px" ShowCloseIcon="true" CssClass="close-sickness-record-dialog">
+    <DialogEvents Closed="OnDialogClosed" />
+    <DialogTemplates>
+        <Header>Close Sickness Record</Header>
+        <Content>
+            @if (_error is not null)
+            {
+                <div class="alert alert-danger alert-dismissible mb-3">
+                    @_error
+                    <button type="button" class="btn-close" @onclick="@(() => _error = null)"></button>
+                </div>
+            }
+            <div class="row g-3">
+                <div class="col-6">
+                    <label class="form-label">End Date <span class="text-danger">*</span></label>
+                    <SfDatePicker TValue="DateOnly?"
+                                  @bind-Value="_endDate"
+                                  Format="dd/MM/yyyy"
+                                  Placeholder="dd/mm/yyyy" />
+                </div>
+                <div class="col-6">
+                    <label class="form-label">End Day Part <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="string" TItem="DayPartChoice"
+                                    DataSource="@DayPartOptions"
+                                    @bind-Value="_endDayPart">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Return to Work Date</label>
+                    <SfDatePicker TValue="DateOnly?"
+                                  @bind-Value="_returnToWorkDate"
+                                  Format="dd/MM/yyyy"
+                                  Placeholder="dd/mm/yyyy"
+                                  ShowClearButton="true" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Notes</label>
+                    <textarea class="form-control" rows="3" maxlength="1000"
+                              @bind="_notes" placeholder="Optional notes…"></textarea>
+                </div>
+            </div>
+        </Content>
+        <FooterTemplate>
+            <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="_submitting">
+                @if (_submitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Close Record
+            </SfButton>
+            <SfButton OnClick="Cancel">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter]                 public Guid RecordId   { get; set; }
+    [Parameter]                 public bool IsOpen     { get; set; }
+    [Parameter]                 public EventCallback   OnClosed     { get; set; }
+    [Parameter]                 public EventCallback   OnCancelled  { get; set; }
+
+    private record DayPartChoice(string Value, string Label);
+
+    private static readonly DayPartChoice[] DayPartOptions =
+    [
+        new("FullDay", "Full Day"),
+        new("HalfDayAM", "Half Day (AM)"),
+        new("HalfDayPM", "Half Day (PM)"),
+    ];
+
+    private bool    _visible;
+    private bool    _submitting;
+    private string? _error;
+
+    private DateOnly? _endDate;
+    private string     _endDayPart = "FullDay";
+    private DateOnly? _returnToWorkDate;
+    private string?   _notes;
+
+    protected override void OnParametersSet() => _visible = IsOpen;
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+
+        if (_endDate is null)
+        {
+            _error = "Please enter an end date.";
+            return;
+        }
+
+        _submitting = true;
+        var (success, error) = await SicknessService.CloseSicknessRecordAsync(
+            CompanyId,
+            EmployeeId,
+            RecordId,
+            new CloseSicknessRecordRequest(_endDate.Value, _endDayPart, _returnToWorkDate, _notes));
+        _submitting = false;
+
+        if (!success)
+        {
+            _error = error;
+            return;
+        }
+
+        ResetForm();
+        await OnClosed.InvokeAsync();
+    }
+
+    private async Task Cancel()
+    {
+        ResetForm();
+        await OnCancelled.InvokeAsync();
+    }
+
+    private void OnDialogClosed() => OnCancelled.InvokeAsync();
+
+    private void ResetForm()
+    {
+        _endDate          = null;
+        _endDayPart       = "FullDay";
+        _returnToWorkDate = null;
+        _notes            = null;
+        _error            = null;
+        _visible          = false;
+    }
+}

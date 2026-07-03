@@ -487,6 +487,15 @@
                 </TabItem>
 
                 <TabItem>
+                    <ChildContent><TabHeader Text="Sickness" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <EmployeeSicknessTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
+                <TabItem>
                     <ChildContent><TabHeader Text="Tasks" /></ChildContent>
                     <ContentTemplate>
                         <div class="mt-4">

@@ -15,5 +15,6 @@ internal sealed record SicknessRecordSummary(
     SicknessDayPart StartDayPart,
     DateOnly? EndDate,
     decimal? TotalDays,
+    SicknessEvidenceStatus EvidenceStatus,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

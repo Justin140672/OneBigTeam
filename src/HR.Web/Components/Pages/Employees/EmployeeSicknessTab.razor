@@ -1,0 +1,164 @@
+@inject SicknessService SicknessService
+
+<RecordSicknessDialog CompanyId="CompanyId"
+                      EmployeeId="EmployeeId"
+                      IsOpen="_recordOpen"
+                      OnRecorded="OnSicknessRecorded"
+                      OnCancelled="@(() => _recordOpen = false)" />
+
+@if (_closeTargetId is not null)
+{
+    <CloseSicknessRecordDialog CompanyId="CompanyId"
+                               EmployeeId="EmployeeId"
+                               RecordId="_closeTargetId.Value"
+                               IsOpen="_closeOpen"
+                               OnClosed="OnSicknessClosed"
+                               OnCancelled="@(() => { _closeOpen = false; _closeTargetId = null; })" />
+}
+
+@if (_loading)
+{
+    <div class="d-flex align-items-center gap-2 py-3">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span class="text-muted">Loading…</span>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header d-flex align-items-center">
+            <i class="fa-solid fa-house-medical text-muted me-2"></i>
+            <h5 class="mb-0">Sickness</h5>
+            <div class="ms-auto d-flex gap-2">
+                <SfButton CssClass="e-primary e-small" OnClick="@(() => _recordOpen = true)">
+                    <i class="fa-solid fa-plus me-1"></i> Record Sickness
+                </SfButton>
+            </div>
+        </div>
+        <div class="card-body">
+            <HrGrid TValue="SicknessRecordListItemModel"
+                    DataSource="@_records"
+                    AllowPaging="false">
+                <GridColumns>
+                    <GridColumn Field="@nameof(SicknessRecordListItemModel.StartDate)"
+                                HeaderText="Start Date" Width="130">
+                        <Template>
+                            @{ var r = (context as SicknessRecordListItemModel)!; }
+                            <span class="text-muted small">@r.StartDate.ToString("dd MMM yyyy")</span>
+                        </Template>
+                    </GridColumn>
+                    <GridColumn Field="@nameof(SicknessRecordListItemModel.EndDate)"
+                                HeaderText="End Date" Width="130">
+                        <Template>
+                            @{ var r = (context as SicknessRecordListItemModel)!; }
+                            <span class="text-muted small">
+                                @(r.EndDate?.ToString("dd MMM yyyy") ?? "—")
+                            </span>
+                        </Template>
+                    </GridColumn>
+                    <GridColumn Field="@nameof(SicknessRecordListItemModel.TotalDays)"
+                                HeaderText="Total Days" Width="110">
+                        <Template>
+                            @{ var r = (context as SicknessRecordListItemModel)!; }
+                            <span class="text-muted small">@(r.TotalDays?.ToString("0.##") ?? "—")</span>
+                        </Template>
+                    </GridColumn>
+                    <GridColumn HeaderText="Status" Width="120" AllowSorting="false" AllowFiltering="false">
+                        <Template>
+                            @{ var r = (context as SicknessRecordListItemModel)!;
+                               var (css, label) = GetStatusBadge(r); }
+                            <span class="badge @css">@label</span>
+                        </Template>
+                    </GridColumn>
+                    <GridColumn HeaderText="Fit Note" Width="160" AllowSorting="false" AllowFiltering="false">
+                        <Template>
+                            @{ var r = (context as SicknessRecordListItemModel)!;
+                               var badge = GetEvidenceBadge(r); }
+                            @if (badge is null)
+                            {
+                                <span class="text-muted small">—</span>
+                            }
+                            else
+                            {
+                                <span class="badge @badge.Value.Css">@badge.Value.Label</span>
+                            }
+                        </Template>
+                    </GridColumn>
+                    <GridColumn HeaderText="" Width="120" AllowSorting="false" AllowFiltering="false"
+                                TextAlign="TextAlign.Right">
+                        <Template>
+                            @{ var r = (context as SicknessRecordListItemModel)!; }
+                            @if (r.Status == "Active")
+                            {
+                                <SfButton CssClass="e-outline e-small"
+                                          OnClick="() => StartClose(r.Id)"
+                                          title="Close record">
+                                    Close
+                                </SfButton>
+                            }
+                        </Template>
+                    </GridColumn>
+                </GridColumns>
+            </HrGrid>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private bool _loading = true;
+    private bool _recordOpen;
+    private bool _closeOpen;
+    private Guid? _closeTargetId;
+
+    private List<SicknessRecordListItemModel> _records = [];
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = _records.Count == 0;
+
+        var result = await SicknessService.ListEmployeeSicknessRecordsAsync(CompanyId, EmployeeId);
+        _records = result?.Records ?? [];
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private void StartClose(Guid recordId)
+    {
+        _closeTargetId = recordId;
+        _closeOpen = true;
+    }
+
+    private async Task OnSicknessRecorded()
+    {
+        _recordOpen = false;
+        await LoadAsync();
+    }
+
+    private async Task OnSicknessClosed()
+    {
+        _closeOpen = false;
+        _closeTargetId = null;
+        await LoadAsync();
+    }
+
+    private static (string Css, string Label) GetStatusBadge(SicknessRecordListItemModel r) => r.Status switch
+    {
+        "Active" => ("text-bg-primary", "Active"),
+        "Closed" => ("text-bg-secondary", "Closed"),
+        _        => ("text-bg-secondary", r.Status),
+    };
+
+    private static (string Css, string Label)? GetEvidenceBadge(SicknessRecordListItemModel r) => r.EvidenceStatus switch
+    {
+        "NotRequired" => null,
+        "Pending"     => ("text-bg-warning", "Fit Note Pending"),
+        "Received"    => ("text-bg-success", "Fit Note Received"),
+        "Waived"      => ("text-bg-info", "Fit Note Waived"),
+        _             => ("text-bg-secondary", r.EvidenceStatus),
+    };
+}
