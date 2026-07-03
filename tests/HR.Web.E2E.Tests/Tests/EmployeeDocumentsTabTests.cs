@@ -120,7 +120,8 @@ public sealed class EmployeeDocumentsTabTests(AppFixture fixture) : E2ETestBase(
         // ── Step 2: Navigate to Tom's admin profile ───────────────────────────
         await empAdmin.GoToAsync(AcmeId, TomId);
 
-        // ── Step 3: Enable the working pattern override ───────────────────────
+        // ── Step 3: Open the Employment tab and enable the working pattern override ──
+        await empAdmin.OpenEmploymentTabAsync();
         await empAdmin.EnableWorkingPatternOverrideAsync();
 
         // ── Step 4: Set hours per day ─────────────────────────────────────────

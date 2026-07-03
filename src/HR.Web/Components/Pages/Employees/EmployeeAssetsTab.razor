@@ -44,7 +44,14 @@ else
                         var item = (EmployeeAssetItem)context;
                     }
                     <div>
-                        <span class="fw-medium">@item.AssetNumber</span>
+                        @if (CompanyId != Guid.Empty)
+                        {
+                            <a href="/companies/@CompanyId/assets/@item.AssetId/view" class="fw-medium asset-title-link">@item.AssetNumber</a>
+                        }
+                        else
+                        {
+                            <span class="fw-medium">@item.AssetNumber</span>
+                        }
                         <span class="text-muted ms-2">@item.Name</span>
                     </div>
                 </Template>

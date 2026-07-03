@@ -1,5 +1,4 @@
 @inject TaskService TaskService
-@inject NavigationManager Navigation
 @inject AppSession Session
 
 @if (Session.EmployeeId.HasValue)
@@ -64,7 +63,7 @@
                     {
                         var t = task;
                         var (dueLabel, dueCss) = DueBadge(t.DueDate);
-                        <div class="task-widget-item" @onclick="() => NavigateToTask(t)">
+                        <div class="task-widget-item task-widget-item--static">
                             <span class="priority-pip priority-pip--@DuePip(t.DueDate)" title="@t.Priority priority"></span>
                             <div class="task-widget-content">
                                 <span class="task-widget-title">@t.Title</span>
@@ -140,6 +139,4 @@
         due.Value == _today.AddDays(1)        ? "medium" :
         "low";
 
-    private void NavigateToTask(TaskListItem task) =>
-        Navigation.NavigateTo($"/companies/{Session.CompanyId}/tasks/{task.Id}");
 }

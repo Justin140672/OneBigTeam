@@ -15,3 +15,7 @@ function setTheme(isDark) {
 function getTheme() {
     try { return localStorage.getItem('theme') ?? 'light'; } catch { return 'light'; }
 }
+
+function goBack() {
+    window.history.back();
+}

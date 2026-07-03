@@ -1,0 +1,9 @@
+.asset-title-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.asset-title-link:hover {
+    color: #6366f1;
+    text-decoration: underline;
+}

@@ -396,57 +396,6 @@
                                     </div>
                                 </div>
 
-                                <div class="card mb-4">
-                                    <div class="card-header">
-                                        <h5 class="mb-0">Working Pattern</h5>
-                                    </div>
-                                    <div class="card-body @(_isViewMode ? "view-mode" : "")">
-                                        <SfCheckBox TChecked="bool"
-                                                    Label="Override company defaults"
-                                                    Checked="@_model.OverrideWorkingPattern"
-                                                    CheckedChanged="@((bool v) => _model.OverrideWorkingPattern = v)" />
-                                        @if (_model.OverrideWorkingPattern)
-                                        {
-                                            <div class="row g-3 mt-2">
-                                                <div class="col-12">
-                                                    <label class="form-label fw-semibold">Working Days</label>
-                                                    <div class="d-flex flex-wrap gap-3 mt-1">
-                                                        @foreach (var day in _allDays)
-                                                        {
-                                                            <SfCheckBox TChecked="bool" Label="@day"
-                                                                        Checked="@_model.WorkingWeek.Contains(day)"
-                                                                        CheckedChanged="@(e => ToggleWorkingDay(day, e))" />
-                                                        }
-                                                    </div>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <SfNumericTextBox TValue="decimal" @bind-Value="_model.HoursPerDay"
-                                                                      Placeholder="Hours Per Day"
-                                                                      FloatLabelType="FloatLabelType.Auto"
-                                                                      Min="0.5m" Max="24m" Step="0.5m" />
-                                                </div>
-                                            </div>
-                                        }
-                                    </div>
-                                </div>
-
-                                <div class="d-flex gap-2 align-items-center mt-3">
-                                    @if (!_isViewMode)
-                                    {
-                                        @if (!string.IsNullOrEmpty(_successMsg))
-                                        {
-                                            <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
-                                        }
-                                        <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
-                                            @if (_saving)
-                                            {
-                                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                                            }
-                                            Save
-                                        </SfButton>
-                                    }
-                                    <SfButton OnClick="Cancel" Disabled="@_saving">@(_isViewMode ? "Close" : "Cancel")</SfButton>
-                                </div>
                             </div>
                         </div>
                     </ContentTemplate>
@@ -456,7 +405,7 @@
                     <ChildContent><TabHeader Text="Employment" /></ChildContent>
                     <ContentTemplate>
                         <div class="mt-4">
-                            <EmployeeEmploymentTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                            <EmployeeEmploymentTab @ref="_employmentTab" CompanyId="CompanyId" EmployeeId="Id!.Value" />
                         </div>
                     </ContentTemplate>
                 </TabItem>
@@ -545,6 +494,24 @@
 
             </TabItems>
         </SfTab>
+
+        <div class="d-flex gap-2 align-items-center mt-4">
+            @if (!_isViewMode)
+            {
+                @if (!string.IsNullOrEmpty(_successMsg))
+                {
+                    <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
+                }
+                <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
+                    @if (_saving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Save
+                </SfButton>
+            }
+            <SfButton OnClick="Cancel" Disabled="@_saving">@(_isViewMode ? "Close" : "Cancel")</SfButton>
+        </div>
     }
 </div>
 
@@ -569,12 +536,13 @@
     private string? _inviteError;
 
     private readonly EmployeeProfileEditModel _model = new();
-    private static readonly string[] _allDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
     private static readonly string[] _genderOptions = ["Male", "Female", "Non-binary", "Prefer not to say", "Other"];
 
     private List<DepartmentListItemModel> _departments = [];
     private List<PositionProfileListItemModel> _positionProfiles = [];
     private List<NationalityListItem> _nationalities = [];
+
+    private EmployeeEmploymentTab? _employmentTab;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -625,20 +593,6 @@
                 _model.DepartmentId = _employee.DepartmentId;
                 _model.PositionProfileId = _employee.PositionProfileId;
                 _model.HasSystemAccess = _employee.HasSystemAccess;
-
-                if (_employee.WorkingDaysOverride.HasValue || _employee.HoursPerDayOverride.HasValue)
-                {
-                    _model.OverrideWorkingPattern = true;
-                    if (_employee.WorkingDaysOverride.HasValue)
-                    {
-                        _model.WorkingWeek = _allDays
-                            .Where(d => Enum.TryParse<WorkingDays>(d, out var wd) &&
-                                        _employee.WorkingDaysOverride.Value.HasFlag(wd))
-                            .ToHashSet();
-                    }
-                    if (_employee.HoursPerDayOverride.HasValue)
-                        _model.HoursPerDay = _employee.HoursPerDayOverride.Value;
-                }
             }
 
             var uri = new Uri(Navigation.Uri);
@@ -708,13 +662,10 @@
         }
         else
         {
-            var workingDaysOverride = _model.OverrideWorkingPattern
-                ? _model.WorkingWeek.Aggregate(WorkingDays.None, (acc, day) =>
-                    Enum.TryParse<WorkingDays>(day, out var wd) ? acc | wd : acc)
-                : (WorkingDays?)null;
-            var hoursPerDayOverride = _model.OverrideWorkingPattern
-                ? _model.HoursPerDay
-                : (decimal?)null;
+            // Working pattern override is owned by the Employment tab's own save (below);
+            // pass through the value already on the employee so this call doesn't touch it.
+            var workingDaysOverride = _employee?.WorkingDaysOverride;
+            var hoursPerDayOverride = _employee?.HoursPerDayOverride;
 
             var request = new UpdateEmployeeProfileRequest(
                 CompanyId,
@@ -744,12 +695,29 @@
                 hoursPerDayOverride);
 
             var (success, conflictMessage) = await EmployeeService.UpdateEmployeeProfileAsync(CompanyId, Id!.Value, request);
-            _saving = false;
 
-            if (success)
-                Navigation.NavigateTo($"/companies/{CompanyId}/employees", forceLoad: true);
-            else
+            if (!success)
+            {
+                _saving = false;
                 _globalError = conflictMessage;
+                return;
+            }
+
+            // Save Employment tab's data (including any working pattern override change) second,
+            // so it has the final say over the shared working-pattern fields.
+            if (_employmentTab is not null)
+            {
+                var employmentError = await _employmentTab.SaveAsync();
+                if (employmentError is not null)
+                {
+                    _saving = false;
+                    _globalError = employmentError;
+                    return;
+                }
+            }
+
+            _saving = false;
+            Navigation.NavigateTo($"/companies/{CompanyId}/employees", forceLoad: true);
         }
     }
 
@@ -783,12 +751,6 @@
     private async Task CopyLink()
     {
         await Task.CompletedTask;
-    }
-
-    private void ToggleWorkingDay(string day, bool isChecked)
-    {
-        if (isChecked) _model.WorkingWeek.Add(day);
-        else _model.WorkingWeek.Remove(day);
     }
 
     private static string StatusBadgeClass(string status) => status switch

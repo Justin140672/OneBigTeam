@@ -205,6 +205,14 @@ h1:focus {
     background: #f9fafb;
 }
 
+.task-widget-item--static {
+    cursor: default;
+}
+
+.task-widget-item--static:hover {
+    background: transparent;
+}
+
 /* ── Priority dot ────────────────────────────────────── */
 
 .priority-pip {
@@ -421,6 +429,10 @@ html[data-theme="dark"] .task-widget-item {
 
 html[data-theme="dark"] .task-widget-item:hover {
     background: rgba(255,255,255,0.04);
+}
+
+html[data-theme="dark"] .task-widget-item--static:hover {
+    background: transparent;
 }
 
 html[data-theme="dark"] .task-widget-title {

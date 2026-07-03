@@ -17,7 +17,14 @@
                     var item = (TaskListItem)context;
                 }
                 <div class="task-cell">
-                    <span class="task-title">@item.Title</span>
+                    @if (CompanyId != Guid.Empty)
+                    {
+                        <a href="/companies/@CompanyId/tasks/@item.Id" class="task-title task-title-link">@item.Title</a>
+                    }
+                    else
+                    {
+                        <span class="task-title">@item.Title</span>
+                    }
                     @if (item.Description is not null)
                     {
                         <span class="task-description">@item.Description</span>

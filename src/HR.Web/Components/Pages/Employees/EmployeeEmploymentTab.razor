@@ -186,16 +186,6 @@ else
                 </div>
             </div>
 
-            <div class="d-flex gap-2 align-items-center mt-3">
-                <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAsync">
-                    @if (_saving)
-                    {
-                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                    }
-                    Save Changes
-                </SfButton>
-            </div>
-
         </div>
 
         @if (_probationRecord is not null)
@@ -233,7 +223,6 @@ else
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
 
     private bool _loading = true;
-    private bool _saving;
     private string? _error;
     private string? _successMsg;
 
@@ -323,11 +312,12 @@ else
         }
     }
 
-    private async Task SaveAsync()
+    /// <summary>Called by the parent EmployeeEdit page's single Save button. Returns null on success, or an error message.</summary>
+    public async Task<string?> SaveAsync()
     {
-        _saving = true;
         _error = null;
         _successMsg = null;
+        StateHasChanged();
 
         WorkingDays? workingDaysOverride = null;
         decimal? hoursPerDayOverride = null;
@@ -358,12 +348,15 @@ else
             string.IsNullOrWhiteSpace(_model.Notes) ? null : _model.Notes.Trim());
 
         var (success, error) = await EmployeeService.UpdateEmploymentDetailsAsync(CompanyId, EmployeeId, request);
-        _saving = false;
 
         if (success)
+        {
             _successMsg = "Employment details saved.";
-        else
-            _error = error ?? "Failed to save employment details.";
+            return null;
+        }
+
+        _error = error ?? "Failed to save employment details.";
+        return _error;
     }
 
     private void ToggleWorkingDay(string day, bool isChecked)

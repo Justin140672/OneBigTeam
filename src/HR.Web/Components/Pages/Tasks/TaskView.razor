@@ -3,6 +3,7 @@
 @inject TaskService TaskService
 @inject NavigationManager Navigation
 @inject AppSession Session
+@inject IJSRuntime JS
 
 <PageTitle>@(_task?.Title ?? "Task")</PageTitle>
 
@@ -124,12 +125,20 @@
         _task = await TaskService.GetTaskAsync(CompanyId, TaskId);
     }
 
-    private void GoBack()
+    private async Task GoBack()
     {
-        if (Session.EmployeeId.HasValue)
-            Navigation.NavigateTo($"/companies/{CompanyId}/employees/{Session.EmployeeId}/profile");
-        else
-            Navigation.NavigateTo($"/companies/{CompanyId}/employees");
+        try
+        {
+            await JS.InvokeVoidAsync("goBack");
+        }
+        catch
+        {
+            // Fallback if JS interop is unavailable for any reason.
+            if (Session.EmployeeId.HasValue)
+                Navigation.NavigateTo($"/companies/{CompanyId}/employees/{Session.EmployeeId}/profile");
+            else
+                Navigation.NavigateTo($"/companies/{CompanyId}/employees");
+        }
     }
 
     private static string StatusLabel(string status) => status switch

@@ -98,9 +98,13 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             .ClickAsync();
     }
 
+    /// <summary>
+    /// Clicks the single page-level Save button (persistent across all tabs, below the SfTab).
+    /// Saves both the Details and Employment tabs together and navigates to the employee list on success.
+    /// </summary>
     public async Task ClickSaveChangesAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Save Changes" }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });

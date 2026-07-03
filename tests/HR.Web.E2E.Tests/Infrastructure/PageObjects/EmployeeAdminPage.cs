@@ -220,20 +220,33 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
             .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
-    // ── Working Pattern section (Details tab) ─────────────────────────────────
+    // ── Employment tab ────────────────────────────────────────────────────────
 
-    /// <summary>Ensures the "Override company defaults" checkbox is checked.</summary>
+    public async Task OpenEmploymentTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Employment" }).ClickAsync();
+        // Wait for the Employment-tab-specific heading — the generic .card-header selector
+        // would resolve immediately against the Details tab's already-rendered card headers.
+        await page.WaitForSelectorAsync(".card-header:has-text('Employment Details')", new() { Timeout = 15_000 });
+    }
+
+    // ── Working Pattern section (Employment tab) ──────────────────────────────
+
+    /// <summary>
+    /// Ensures the working pattern override is active — i.e. unchecks "Use company working
+    /// pattern" so the Working Days / Hours Per Day fields render. Call <see cref="OpenEmploymentTabAsync"/> first.
+    /// </summary>
     public async Task EnableWorkingPatternOverrideAsync()
     {
         // Syncfusion puts class e-numerictextbox ON the <input> itself; the Hours Per Day
-        // field is only rendered while OverrideWorkingPattern is true. If a previous test
-        // run already saved the override, the input is already visible — don't click again
-        // or we would toggle it off.
+        // field is only rendered while the "Use company working pattern" checkbox is unchecked.
+        // If a previous test run already saved the override, the input is already visible —
+        // don't click again or we would toggle it back on.
         var numericInput = page.Locator("input.e-numerictextbox");
         if (!await numericInput.IsVisibleAsync())
         {
             var wrapper = page.Locator(".e-checkbox-wrapper")
-                .Filter(new() { HasText = "Override company defaults" });
+                .Filter(new() { HasText = "Use company working pattern" });
             await wrapper.Locator("label").ClickAsync();
             await numericInput.WaitForAsync(new() { Timeout = 10_000 });
         }

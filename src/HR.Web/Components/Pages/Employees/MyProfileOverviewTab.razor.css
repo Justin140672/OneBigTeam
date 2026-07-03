@@ -125,6 +125,7 @@
 .stat-icon--leave   { background: #dcfce7; color: #16a34a; }
 .stat-icon--pending { background: #f3f4f6; color: #9ca3af; }
 .stat-icon--pending-active { background: #fef3c7; color: #d97706; }
+.stat-icon--sickness { background: #fee2e2; color: #dc2626; }
 
 .stat-body {
     display: flex;

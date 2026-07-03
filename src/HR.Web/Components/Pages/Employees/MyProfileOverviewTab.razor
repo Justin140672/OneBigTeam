@@ -1,6 +1,7 @@
 @inject EmployeeService EmployeeService
 @inject LeaveService LeaveService
 @inject TaskService TaskService
+@inject SicknessService SicknessService
 @inject AppSession Session
 
 @if (!Session.EmployeeId.HasValue || Session.EmployeeId.Value != EmployeeId)
@@ -117,6 +118,16 @@ else
                 <span class="stat-label">Pending Requests</span>
             </div>
         </div>
+
+        <div class="stat-card">
+            <div class="stat-icon stat-icon--sickness">
+                <i class="fa-solid fa-house-medical"></i>
+            </div>
+            <div class="stat-body">
+                <span class="stat-value">@FormatDays(_sicknessDays)</span>
+                <span class="stat-label">Sickness Absence</span>
+            </div>
+        </div>
     </div>
 
     <!-- Upcoming Leave -->
@@ -176,6 +187,7 @@ else
     private int _openTaskCount;
     private decimal? _annualLeaveRemaining;
     private int _pendingLeaveCount;
+    private decimal? _sicknessDays;
     private List<LeaveRequestListItem> _upcomingLeave = [];
 
     protected override async Task OnParametersSetAsync()
@@ -192,8 +204,9 @@ else
         var balanceTask  = LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
         var requestsTask = LeaveService.ListLeaveRequestsAsync(CompanyId, EmployeeId);
         var tasksTask    = TaskService.GetMyTasksAsync(CompanyId);
+        var sicknessTask = SicknessService.GetMySicknessRecordsAsync(CompanyId, EmployeeId);
 
-        await Task.WhenAll(employeeTask, balanceTask, requestsTask, tasksTask);
+        await Task.WhenAll(employeeTask, balanceTask, requestsTask, tasksTask, sicknessTask);
 
         _employee = await employeeTask;
 
@@ -218,6 +231,16 @@ else
         var tasks = await tasksTask;
         if (tasks is not null)
             _openTaskCount = tasks.Items.Count(t => t.Status is "Open" or "InProgress");
+
+        var sickness = await sicknessTask;
+        if (sickness is not null)
+        {
+            // Open/ongoing records have no TotalDays yet, so only completed records are summed.
+            var completedDays = sickness.Records
+                .Where(r => r.TotalDays.HasValue)
+                .Sum(r => r.TotalDays!.Value);
+            _sicknessDays = sickness.Records.Count == 0 ? null : completedDays;
+        }
 
         _loading = false;
     }

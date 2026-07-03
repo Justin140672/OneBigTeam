@@ -90,7 +90,7 @@ else
 
         <main class="main-content">
             <div class="top-bar">
-                @if (Session.CanManageEmployees)
+                @if (Session.CanManageEmployees && !SidebarOpen)
                 {
                     <button class="mobile-menu-button" @onclick="ToggleSidebar">
                         <i class="fa-solid fa-bars"></i>
