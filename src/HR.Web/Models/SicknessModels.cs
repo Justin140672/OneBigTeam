@@ -39,3 +39,38 @@ public sealed record CloseSicknessRecordRequest(
     string EndDayPart,
     DateOnly? ReturnToWorkDate,
     string? Notes);
+
+public sealed record CurrentSicknessAbsenceItem(
+    Guid RecordId,
+    Guid EmployeeId,
+    Guid CategoryId,
+    DateOnly StartDate,
+    string EvidenceStatus);
+
+public sealed record GetCurrentSicknessAbsencesResponseModel(List<CurrentSicknessAbsenceItem> Items);
+
+public sealed record TeamSicknessTodayItem(
+    Guid RecordId,
+    Guid EmployeeId,
+    Guid CategoryId,
+    DateOnly StartDate,
+    string EvidenceStatus);
+
+public sealed record GetTeamSicknessTodayResponseModel(List<TeamSicknessTodayItem> Items);
+
+public sealed record OverdueReturnToWorkReviewItem(
+    Guid ReviewId,
+    Guid EmployeeId,
+    Guid SicknessRecordId,
+    DateOnly DueDate);
+
+public sealed record GetOverdueReturnToWorkReviewsResponseModel(List<OverdueReturnToWorkReviewItem> Items);
+
+public sealed record MissingFitNoteItem(
+    Guid RequestId,
+    Guid EmployeeId,
+    Guid SicknessRecordId,
+    DateOnly DueDate,
+    string Status);
+
+public sealed record GetMissingFitNotesResponseModel(List<MissingFitNoteItem> Items);

@@ -1,0 +1,117 @@
+@inject SicknessService SicknessService
+@inject SicknessCategoryService SicknessCategoryService
+@inject EmployeeService EmployeeService
+@inject NavigationManager Navigation
+@inject AppSession Session
+
+@if (Session.CanManageEmployees)
+{
+    @if (_loading)
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-house-medical widget-icon"></i>
+                <span class="widget-title">Current Sickness Absence</span>
+            </div>
+            <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
+                <div class="spinner-border spinner-border-sm" role="status"></div>
+                <span class="text-muted">Loading…</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-house-medical widget-icon"></i>
+                <span class="widget-title">Current Sickness Absence</span>
+                @if (_items.Count > 0)
+                {
+                    <span class="widget-count-badge">@_items.Count</span>
+                }
+            </div>
+
+            @if (_pendingEvidence > 0)
+            {
+                <div class="widget-stats">
+                    <div class="widget-stat widget-stat--danger">
+                        <i class="fa-solid fa-triangle-exclamation fa-xs"></i>
+                        <span class="widget-stat-value">@_pendingEvidence</span>
+                        <span class="widget-stat-label">fit note pending</span>
+                    </div>
+                </div>
+            }
+
+            <div class="widget-body">
+                @if (_items.Count == 0)
+                {
+                    <div class="widget-empty">
+                        <i class="fa-solid fa-circle-check fa-lg mb-2"></i>
+                        <p class="mb-0">Nobody is currently off sick</p>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var item in _items.Take(5))
+                    {
+                        var i = item;
+                        var url = $"/companies/{Session.CompanyId}/employees/{i.EmployeeId}";
+                        <div class="task-widget-item" @onclick="() => Navigation.NavigateTo(url)">
+                            <span class="priority-pip priority-pip--@(i.EvidenceStatus == "Pending" ? "high" : "low")"></span>
+                            <div class="task-widget-content">
+                                <span class="task-widget-title">@EmployeeName(i.EmployeeId)</span>
+                                <span class="task-widget-meta">@CategoryName(i.CategoryId)</span>
+                            </div>
+                            <span class="due-badge due-badge--normal">@DaysOff(i.StartDate) days</span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private List<CurrentSicknessAbsenceItem> _items = [];
+    private Dictionary<Guid, string> _employeeNames = [];
+    private Dictionary<Guid, string> _categoryNames = [];
+    private int _pendingEvidence;
+    private DateOnly _today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.CanManageEmployees)
+        {
+            _loading = false;
+            return;
+        }
+
+        _today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var absencesTask   = SicknessService.GetCurrentSicknessAbsencesAsync(Session.CompanyId);
+        var employeesTask  = EmployeeService.ListEmployeesAsync(Session.CompanyId, pageSize: 200);
+        var categoriesTask = SicknessCategoryService.ListSicknessCategoriesAsync(Session.CompanyId);
+
+        await Task.WhenAll(absencesTask, employeesTask, categoriesTask);
+
+        _items = (await absencesTask)?.Items ?? [];
+
+        var employees = (await employeesTask)?.Items ?? [];
+        _employeeNames = employees.ToDictionary(e => e.Id, e => $"{e.FirstName} {e.LastName}");
+
+        var categories = (await categoriesTask)?.Items ?? [];
+        _categoryNames = categories.ToDictionary(c => c.Id, c => c.Name);
+
+        _pendingEvidence = _items.Count(i => i.EvidenceStatus == "Pending");
+        _loading = false;
+    }
+
+    private string EmployeeName(Guid employeeId) =>
+        _employeeNames.TryGetValue(employeeId, out var name) ? name : "Employee";
+
+    private string CategoryName(Guid categoryId) =>
+        _categoryNames.TryGetValue(categoryId, out var name) ? name : "Sickness";
+
+    private int DaysOff(DateOnly startDate) => Math.Max(1, _today.DayNumber - startDate.DayNumber + 1);
+}

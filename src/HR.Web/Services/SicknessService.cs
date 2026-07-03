@@ -87,6 +87,67 @@ public sealed class SicknessService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<GetCurrentSicknessAbsencesResponseModel?> GetCurrentSicknessAbsencesAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetCurrentSicknessAbsencesResponseModel>(
+                $"api/companies/{companyId}/sickness-records/current", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<GetTeamSicknessTodayResponseModel?> GetTeamSicknessTodayAsync(
+        Guid companyId,
+        Guid managerId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetTeamSicknessTodayResponseModel>(
+                $"api/companies/{companyId}/employees/{managerId}/team-sickness-today", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<GetOverdueReturnToWorkReviewsResponseModel?> GetOverdueReturnToWorkReviewsAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetOverdueReturnToWorkReviewsResponseModel>(
+                $"api/companies/{companyId}/return-to-work-reviews/overdue", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<GetMissingFitNotesResponseModel?> GetMissingFitNotesAsync(
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetMissingFitNotesResponseModel>(
+                $"api/companies/{companyId}/sickness-evidence-requests/missing", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static async Task<string> ExtractErrorAsync(
         HttpResponseMessage response, string fallback, CancellationToken cancellationToken)
     {

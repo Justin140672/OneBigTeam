@@ -4,6 +4,7 @@
 @using HR.Web.Components.Pages.Notifications
 @using HR.Web.Components.Pages.Probation
 @using HR.Web.Components.Pages.Assets
+@using HR.Web.Components.Pages.Sickness
 @inject AppSession Session
 
 <PageTitle>Dashboard</PageTitle>
@@ -29,6 +30,18 @@
         </div>
         <div class="col-xl-5 col-lg-6">
             <MyAssetsWidget />
+        </div>
+        <div class="col-xl-5 col-lg-6">
+            <CurrentSicknessAbsenceWidget />
+        </div>
+        <div class="col-xl-5 col-lg-6">
+            <TeamSicknessTodayWidget />
+        </div>
+        <div class="col-xl-5 col-lg-6">
+            <OverdueReturnToWorkReviewsWidget />
+        </div>
+        <div class="col-xl-5 col-lg-6">
+            <MissingFitNotesWidget />
         </div>
     </div>
 </div>

@@ -1,0 +1,101 @@
+@inject SicknessService SicknessService
+@inject EmployeeService EmployeeService
+@inject NavigationManager Navigation
+@inject AppSession Session
+
+@if (Session.CanManageEmployees)
+{
+    @if (_loading)
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-person-walking-arrow-right widget-icon"></i>
+                <span class="widget-title">Overdue Return-to-Work Reviews</span>
+            </div>
+            <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
+                <div class="spinner-border spinner-border-sm" role="status"></div>
+                <span class="text-muted">Loading…</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-person-walking-arrow-right widget-icon"></i>
+                <span class="widget-title">Overdue Return-to-Work Reviews</span>
+                @if (_items.Count > 0)
+                {
+                    <span class="widget-count-badge">@_items.Count</span>
+                }
+            </div>
+
+            @if (_items.Count > 0)
+            {
+                <div class="widget-stats">
+                    <div class="widget-stat widget-stat--danger">
+                        <i class="fa-solid fa-triangle-exclamation fa-xs"></i>
+                        <span class="widget-stat-value">@_items.Count</span>
+                        <span class="widget-stat-label">overdue</span>
+                    </div>
+                </div>
+            }
+
+            <div class="widget-body">
+                @if (_items.Count == 0)
+                {
+                    <div class="widget-empty">
+                        <i class="fa-solid fa-circle-check fa-lg mb-2"></i>
+                        <p class="mb-0">No overdue return-to-work reviews</p>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var item in _items.Take(5))
+                    {
+                        var i = item;
+                        var url = $"/companies/{Session.CompanyId}/employees/{i.EmployeeId}";
+                        <div class="task-widget-item" @onclick="() => Navigation.NavigateTo(url)">
+                            <span class="priority-pip priority-pip--critical"></span>
+                            <div class="task-widget-content">
+                                <span class="task-widget-title">@EmployeeName(i.EmployeeId)</span>
+                                <span class="task-widget-meta">Return-to-work review</span>
+                            </div>
+                            <span class="due-badge due-badge--overdue">@i.DueDate.ToString("d MMM")</span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private List<OverdueReturnToWorkReviewItem> _items = [];
+    private Dictionary<Guid, string> _employeeNames = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.CanManageEmployees)
+        {
+            _loading = false;
+            return;
+        }
+
+        var reviewsTask   = SicknessService.GetOverdueReturnToWorkReviewsAsync(Session.CompanyId);
+        var employeesTask = EmployeeService.ListEmployeesAsync(Session.CompanyId, pageSize: 200);
+
+        await Task.WhenAll(reviewsTask, employeesTask);
+
+        _items = (await reviewsTask)?.Items ?? [];
+
+        var employees = (await employeesTask)?.Items ?? [];
+        _employeeNames = employees.ToDictionary(e => e.Id, e => $"{e.FirstName} {e.LastName}");
+
+        _loading = false;
+    }
+
+    private string EmployeeName(Guid employeeId) =>
+        _employeeNames.TryGetValue(employeeId, out var name) ? name : "Employee";
+}
