@@ -104,10 +104,10 @@ public class GetSicknessRecordEndpointTests : IClassFixture<ApiWebApplicationFac
         Guid CompanyId,
         Guid EmployeeId,
         Guid CategoryId,
-        int Status,
+        string Status,
         string StartDate,
-        int StartDayPart,
-        int EvidenceStatus,
+        string StartDayPart,
+        string EvidenceStatus,
         string? Notes,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt);

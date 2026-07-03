@@ -185,13 +185,13 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task OpenRecordSicknessDialogAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Record Sickness" }).ClickAsync();
-        await page.WaitForSelectorAsync(".record-sickness-dialog", new() { Timeout = 10_000 });
+        await page.WaitForSelectorAsync("[role='dialog'].record-sickness-dialog", new() { Timeout = 10_000 });
     }
 
     /// <summary>Selects a category in the (currently open) Record Sickness dialog.</summary>
     public async Task SelectRecordSicknessCategoryAsync(string categoryName)
     {
-        var group = page.Locator(".record-sickness-dialog .col-12")
+        var group = page.Locator("[role='dialog'].record-sickness-dialog .col-12")
             .Filter(new() { HasText = "Category" })
             .First;
         await group.Locator("span[role='combobox']").First.ClickAsync();
@@ -205,7 +205,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     /// <summary>Fills the Start Date field in the (currently open) Record Sickness dialog.</summary>
     public async Task FillRecordSicknessStartDateAsync(string ddMMyyyy)
     {
-        var input = page.Locator(".record-sickness-dialog .e-date-wrapper input.e-input").First;
+        var input = page.Locator("[role='dialog'].record-sickness-dialog .e-date-wrapper input.e-input").First;
         await input.ClickAsync();
         await input.FillAsync(ddMMyyyy);
         await page.Keyboard.PressAsync("Tab");
@@ -213,15 +213,15 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task SubmitRecordSicknessAsync()
     {
-        await page.Locator(".record-sickness-dialog")
+        await page.Locator("[role='dialog'].record-sickness-dialog")
             .GetByRole(AriaRole.Button, new() { Name = "Record", Exact = true })
             .ClickAsync();
-        await page.Locator(".record-sickness-dialog")
+        await page.Locator("[role='dialog'].record-sickness-dialog")
             .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
     public async Task<bool> HasRecordSicknessErrorAsync() =>
-        await page.Locator(".record-sickness-dialog .alert-danger").IsVisibleAsync();
+        await page.Locator("[role='dialog'].record-sickness-dialog .alert-danger").IsVisibleAsync();
 
     /// <summary>
     /// Returns the status badge text for the sickness grid row whose Start Date column
@@ -249,13 +249,13 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         // Button text is "Close" (the "Close record" title attribute is only a tooltip —
         // accessible name computation prefers the visible text content).
         await row.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
-        await page.WaitForSelectorAsync(".close-sickness-record-dialog", new() { Timeout = 10_000 });
+        await page.WaitForSelectorAsync("[role='dialog'].close-sickness-record-dialog", new() { Timeout = 10_000 });
     }
 
     /// <summary>Fills the End Date field in the (currently open) Close Sickness Record dialog.</summary>
     public async Task FillCloseSicknessEndDateAsync(string ddMMyyyy)
     {
-        var input = page.Locator(".close-sickness-record-dialog .e-date-wrapper input.e-input").First;
+        var input = page.Locator("[role='dialog'].close-sickness-record-dialog .e-date-wrapper input.e-input").First;
         await input.ClickAsync();
         await input.FillAsync(ddMMyyyy);
         await page.Keyboard.PressAsync("Tab");
@@ -263,10 +263,10 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task SubmitCloseSicknessRecordAsync()
     {
-        await page.Locator(".close-sickness-record-dialog")
+        await page.Locator("[role='dialog'].close-sickness-record-dialog")
             .GetByRole(AriaRole.Button, new() { Name = "Close Record" })
             .ClickAsync();
-        await page.Locator(".close-sickness-record-dialog")
+        await page.Locator("[role='dialog'].close-sickness-record-dialog")
             .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 }

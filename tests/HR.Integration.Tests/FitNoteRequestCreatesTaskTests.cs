@@ -31,8 +31,8 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
     [Fact]
     public async Task FitNoteRequestJob_Creates_Upload_Task_For_Employee()
     {
-        var companyId  = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        var (client, companyId) = await CreateAuthenticatedClientWithCompanyAsync();
+        using var _ = client;
 
         // 1. Create company settings with FitNoteRequiredAfterDays = 1
         await SetFitNoteThresholdAsync(client, companyId, fitNoteRequiredAfterDays: 1);
@@ -62,8 +62,8 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
     [Fact]
     public async Task FitNoteRequestJob_Does_Not_Duplicate_Task_On_Second_Run()
     {
-        var companyId  = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        var (client, companyId) = await CreateAuthenticatedClientWithCompanyAsync();
+        using var _ = client;
 
         await SetFitNoteThresholdAsync(client, companyId, fitNoteRequiredAfterDays: 1);
         var employeeId = await CreateEmployeeAsync(client, companyId);
@@ -83,8 +83,8 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
     [Fact]
     public async Task FitNoteRequestJob_Does_Not_Create_Task_When_TotalDays_Below_Threshold()
     {
-        var companyId  = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        var (client, companyId) = await CreateAuthenticatedClientWithCompanyAsync();
+        using var _ = client;
 
         // Threshold is 5 but TotalDays will be 1
         await SetFitNoteThresholdAsync(client, companyId, fitNoteRequiredAfterDays: 5);
@@ -102,8 +102,8 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
     [Fact]
     public async Task FitNoteRequestJob_Task_DueDate_Is_Seven_Days_From_Now()
     {
-        var companyId  = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        var (client, companyId) = await CreateAuthenticatedClientWithCompanyAsync();
+        using var _ = client;
 
         await SetFitNoteThresholdAsync(client, companyId, fitNoteRequiredAfterDays: 1);
         var employeeId = await CreateEmployeeAsync(client, companyId);
@@ -129,6 +129,32 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
         return client;
     }
 
+    /// <summary>
+    /// Creates a real Company row (UpdateCompanySettings requires one to exist) and returns
+    /// a client whose tenant header points at it. Uses AdminUser's own id as a placeholder
+    /// tenant header for the initial creation call, then swaps to the real company id.
+    /// </summary>
+    private async Task<(HttpClient Client, Guid CompanyId)> CreateAuthenticatedClientWithCompanyAsync()
+    {
+        var client = AdminClient(AdminUser);
+
+        var resp = await client.PostAsJsonAsync("/api/companies", new
+        {
+            name = $"FitNote Test {Guid.NewGuid():N}",
+            addresses = new[]
+            {
+                new { type = "RegisteredOffice", line1 = "1 Test Street", city = "London", countryCode = "GB" }
+            }
+        });
+        resp.EnsureSuccessStatusCode();
+        var company = await resp.Content.ReadFromJsonAsync<IdPayload>();
+
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, company!.Id.ToString());
+
+        return (client, company.Id);
+    }
+
     private async Task SetFitNoteThresholdAsync(HttpClient client, Guid companyId, int fitNoteRequiredAfterDays)
     {
         var resp = await client.PutAsJsonAsync(
@@ -138,7 +164,7 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
                 id                             = companyId,
                 timeZone                       = "Europe/London",
                 locale                         = "en-GB",
-                workingDays                    = new { monday = true, tuesday = true, wednesday = true, thursday = true, friday = true, saturday = false, sunday = false },
+                workingDays                    = 31, // Monday|Tuesday|Wednesday|Thursday|Friday
                 hoursPerDay                    = 8m,
                 leaveYearStartMonth            = 1,
                 defaultHolidayAllowance        = 25m,

@@ -78,8 +78,8 @@ public class RecordSicknessEndpointTests : IClassFixture<ApiWebApplicationFactor
         Assert.Equal(companyId, payload.CompanyId);
         Assert.Equal(employeeId, payload.EmployeeId);
         Assert.Equal(categoryId, payload.CategoryId);
-        Assert.Equal(0, payload.Status); // Active
-        Assert.Equal(0, payload.EvidenceStatus); // NotRequired
+        Assert.Equal("Active", payload.Status);
+        Assert.Equal("NotRequired", payload.EvidenceStatus);
         Assert.Equal("Feeling unwell", payload.Notes);
     }
 
@@ -185,10 +185,10 @@ public class RecordSicknessEndpointTests : IClassFixture<ApiWebApplicationFactor
         Guid CompanyId,
         Guid EmployeeId,
         Guid CategoryId,
-        int Status,
+        string Status,
         string StartDate,
-        int StartDayPart,
-        int EvidenceStatus,
+        string StartDayPart,
+        string EvidenceStatus,
         string? Notes,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt);

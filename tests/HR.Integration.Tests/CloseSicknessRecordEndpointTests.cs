@@ -90,7 +90,7 @@ public class CloseSicknessRecordEndpointTests : IClassFixture<ApiWebApplicationF
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<SicknessRecordPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(1, payload!.Status); // Closed
+        Assert.Equal("Closed", payload!.Status);
         Assert.Equal("2026-07-03", payload.EndDate);
         Assert.Equal(3m, payload.TotalDays);
     }
@@ -182,13 +182,13 @@ public class CloseSicknessRecordEndpointTests : IClassFixture<ApiWebApplicationF
         Guid CompanyId,
         Guid EmployeeId,
         Guid CategoryId,
-        int Status,
+        string Status,
         string StartDate,
-        int StartDayPart,
+        string StartDayPart,
         string? EndDate,
-        int? EndDayPart,
+        string? EndDayPart,
         string? ReturnToWorkDate,
-        int EvidenceStatus,
+        string EvidenceStatus,
         string? Notes,
         decimal? TotalDays,
         DateTimeOffset CreatedAt,

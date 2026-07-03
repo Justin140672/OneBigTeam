@@ -7,7 +7,9 @@ using HR.Modules.Sickness.Features.CreateSicknessCategory;
 using HR.Modules.Sickness.Features.DeactivateSicknessCategory;
 using HR.Modules.Sickness.Features.GetCurrentSicknessAbsences;
 using HR.Modules.Sickness.Features.GetMissingFitNotes;
+using HR.Modules.Sickness.Features.GetMySicknessRecords;
 using HR.Modules.Sickness.Features.GetOverdueReturnToWorkReviews;
+using HR.Modules.Sickness.Features.GetReturnToWorkReview;
 using HR.Modules.Sickness.Features.GetSicknessRecord;
 using HR.Modules.Sickness.Features.GetTeamSicknessToday;
 using HR.Modules.Sickness.Features.ListEmployeeSicknessRecords;
@@ -56,6 +58,8 @@ public static class SicknessModule
         services.AddScoped<GetTeamSicknessTodayHandler>();
         services.AddScoped<GetOverdueReturnToWorkReviewsHandler>();
         services.AddScoped<GetMissingFitNotesHandler>();
+        services.AddScoped<GetReturnToWorkReviewHandler>();
+        services.AddScoped<GetMySicknessRecordsHandler>();
         services.AddScoped<FitNoteRequestJob>();
         services.AddScoped<SicknessEvidenceReminderJob>();
         services.AddScoped<ReturnToWorkReminderJob>();

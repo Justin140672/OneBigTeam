@@ -31,6 +31,11 @@ internal sealed class Endpoint(RecordMySicknessHandler handler)
 
         if (result.IsFailure)
         {
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(new { error = result.Error.Message }));
+                return;
+            }
             await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
             return;
         }

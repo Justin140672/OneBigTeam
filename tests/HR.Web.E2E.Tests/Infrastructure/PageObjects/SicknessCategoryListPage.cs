@@ -31,6 +31,11 @@ public sealed class SicknessCategoryListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
     }
 
+    /// <summary>
+    /// "Delete" is actually a soft-deactivate (DeactivateSicknessCategory sets IsActive=false) —
+    /// the list shows both active and inactive categories, so the row never disappears; only its
+    /// Status badge changes. Waits for that badge to flip to Inactive after the reload cycle.
+    /// </summary>
     public async Task DeleteAsync(string nameFragment)
     {
         var row = page.Locator(".e-row")
@@ -40,11 +45,8 @@ public sealed class SicknessCategoryListPage(IPage page, string baseUrl)
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Delete" });
         await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await btn.ClickAsync();
-        // Wait for the row to disappear from the grid after the delete + reload cycle.
-        await page.Locator(".e-rowcell")
-            .Filter(new() { HasText = nameFragment })
-            .First
-            .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+        await row.Locator(".badge.bg-secondary")
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
     }
 
     public async Task<bool> IsActiveAsync(string nameFragment)

@@ -1,22 +1,34 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
 public class GetMySicknessRecordsEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
+    private static readonly Guid AdminUserId = new("cc000021-0000-0000-0000-000000000001");
 
     public GetMySicknessRecordsEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator))
+            .GetAwaiter().GetResult();
     }
 
     private HttpClient EmployeeClient(Guid companyId, Guid employeeId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        return client;
+    }
+
+    private HttpClient AdminClient(Guid companyId)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         return client;
     }
@@ -64,8 +76,10 @@ public class GetMySicknessRecordsEndpointTests : IClassFixture<ApiWebApplication
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
+        using var adminClient = AdminClient(companyId);
+        var categoryId = await CreateCategory(adminClient, companyId);
+
         using var client = EmployeeClient(companyId, employeeId);
-        var categoryId = await CreateCategory(client, companyId);
 
         var createResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/my",
@@ -112,9 +126,9 @@ public class GetMySicknessRecordsEndpointTests : IClassFixture<ApiWebApplication
         Guid CompanyId,
         Guid EmployeeId,
         Guid CategoryId,
-        int Status,
+        string Status,
         string StartDate,
-        int StartDayPart,
+        string StartDayPart,
         string? EndDate,
         decimal? TotalDays,
         DateTimeOffset CreatedAt,

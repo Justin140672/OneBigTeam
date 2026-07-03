@@ -68,74 +68,154 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>Returns the current value of the Time Zone text field.</summary>
-    public async Task<string> GetTimeZoneAsync() =>
-        await page.Locator("input.e-textbox[placeholder='Time Zone']").InputValueAsync();
+    /// <summary>
+    /// Locates a Syncfusion SfTextBox (FloatLabelType.Auto) by scoping to its containing
+    /// column and filtering by the floating label text — SfTextBox renders the Placeholder
+    /// prop as a floating label, not a native HTML placeholder attribute, so GetByPlaceholder
+    /// doesn't match it (unlike plain HTML inputs elsewhere in this app).
+    /// </summary>
+    private ILocator TextBoxByLabel(string labelText) =>
+        page.Locator(".col-md-6").Filter(new() { HasText = labelText }).First.Locator("input").First;
 
-    /// <summary>Sets the Time Zone text field.</summary>
-    public async Task SetTimeZoneAsync(string value)
+    /// <summary>Same rationale as <see cref="TextBoxByLabel"/>, for SfNumericTextBox fields.</summary>
+    private ILocator NumericBoxByLabel(string columnClass, string labelText) =>
+        page.Locator(columnClass).Filter(new() { HasText = labelText }).First.Locator("input").First;
+
+    /// <summary>
+    /// Fills a text input and confirms the value actually stuck before returning, retrying
+    /// if not. FillAsync + a bare Tab press can race with Blazor's server round-trip for the
+    /// two-way bound value, especially when another interaction follows immediately — a plain
+    /// "fire and forget" fill silently loses the update in that case (observed with
+    /// DefaultHolidayAllowance reverting to its seeded default after save+reload).
+    /// </summary>
+    private async Task FillTextAndVerifyAsync(ILocator input, string value, int maxAttempts = 3)
     {
-        var input = page.Locator("input.e-textbox[placeholder='Time Zone']");
-        await input.FillAsync(value);
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            await input.FillAsync(value);
+            await page.Keyboard.PressAsync("Tab");
+
+            if (await input.InputValueAsync() == value)
+                return;
+
+            if (attempt < maxAttempts)
+                await page.WaitForTimeoutAsync(200);
+        }
+
+        throw new PlaywrightException(
+            $"Input value did not stick after {maxAttempts} attempts: expected '{value}', got '{await input.InputValueAsync()}'.");
+    }
+
+    /// <summary>
+    /// Same rationale as <see cref="FillTextAndVerifyAsync"/>, but compares parsed decimal
+    /// values instead of raw strings — Syncfusion's SfNumericTextBox reformats the displayed
+    /// value (e.g. "28" becomes "28.00"), so a strict string comparison would always mismatch.
+    /// </summary>
+    private async Task FillNumericAndVerifyAsync(ILocator input, string value, decimal expected, int maxAttempts = 3)
+    {
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            await TypeIntoNumericInputAsync(input, value);
+
+            var actual = await input.InputValueAsync();
+            if (decimal.TryParse(actual, out var parsed) && parsed == expected)
+                return;
+
+            if (attempt < maxAttempts)
+                await page.WaitForTimeoutAsync(200);
+        }
+
+        throw new PlaywrightException(
+            $"Numeric input value did not stick after {maxAttempts} attempts: expected '{expected}', got '{await input.InputValueAsync()}'.");
+    }
+
+    /// <summary>Nullable-int variant of <see cref="FillNumericAndVerifyAsync"/> — null clears the field.</summary>
+    private async Task FillNullableNumericAndVerifyAsync(ILocator input, int? value, int maxAttempts = 3)
+    {
+        var text = value?.ToString() ?? "";
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            await TypeIntoNumericInputAsync(input, text);
+
+            var actual = await input.InputValueAsync();
+            var actualParsed = int.TryParse(actual, out var parsed) ? parsed : (int?)null;
+            if (actualParsed == value)
+                return;
+
+            if (attempt < maxAttempts)
+                await page.WaitForTimeoutAsync(200);
+        }
+
+        throw new PlaywrightException(
+            $"Nullable numeric input value did not stick after {maxAttempts} attempts: expected '{value?.ToString() ?? "(empty)"}', got '{await input.InputValueAsync()}'.");
+    }
+
+    /// <summary>
+    /// Types into a Syncfusion SfNumericTextBox via real keystrokes instead of FillAsync.
+    /// FillAsync sets the underlying DOM value through CDP directly, which bypasses the
+    /// component's own JS keyup/input listeners that sync the typed value back to the
+    /// Blazor-bound model — so a value that visually "fills" never actually round-trips
+    /// to the server. Click-to-focus, select-all, delete, then type each character.
+    /// </summary>
+    private async Task TypeIntoNumericInputAsync(ILocator input, string text)
+    {
+        await input.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        if (text.Length > 0)
+            await input.PressSequentiallyAsync(text);
         await page.Keyboard.PressAsync("Tab");
     }
+
+    /// <summary>Returns the current value of the Time Zone text field.</summary>
+    public async Task<string> GetTimeZoneAsync() =>
+        await TextBoxByLabel("Time Zone").InputValueAsync();
+
+    /// <summary>Sets the Time Zone text field.</summary>
+    public async Task SetTimeZoneAsync(string value) =>
+        await FillTextAndVerifyAsync(TextBoxByLabel("Time Zone"), value);
 
     /// <summary>Returns the current value of the Locale text field.</summary>
     public async Task<string> GetLocaleAsync() =>
-        await page.Locator("input.e-textbox[placeholder='Locale']").InputValueAsync();
+        await TextBoxByLabel("Locale").InputValueAsync();
 
     /// <summary>Sets the Locale text field.</summary>
-    public async Task SetLocaleAsync(string value)
-    {
-        var input = page.Locator("input.e-textbox[placeholder='Locale']");
-        await input.FillAsync(value);
-        await page.Keyboard.PressAsync("Tab");
-    }
+    public async Task SetLocaleAsync(string value) =>
+        await FillTextAndVerifyAsync(TextBoxByLabel("Locale"), value);
 
     /// <summary>Sets the "Hours Per Day" numeric field.</summary>
-    public async Task SetHoursPerDayAsync(decimal hours)
-    {
-        var input = page.Locator("input.e-numerictextbox[placeholder='Hours Per Day']");
-        await input.FillAsync(hours.ToString("0.#"));
-        await page.Keyboard.PressAsync("Tab");
-    }
+    public async Task SetHoursPerDayAsync(decimal hours) =>
+        await FillNumericAndVerifyAsync(NumericBoxByLabel(".col-md-3", "Hours Per Day"), hours.ToString("0.#"), hours);
 
     /// <summary>Returns the current value of the "Hours Per Day" numeric field.</summary>
     public async Task<decimal> GetHoursPerDayAsync()
     {
-        var input = page.Locator("input.e-numerictextbox[placeholder='Hours Per Day']");
+        var input = NumericBoxByLabel(".col-md-3", "Hours Per Day");
         var value = await input.InputValueAsync();
         return decimal.Parse(value);
     }
 
     /// <summary>Sets the "Default Holiday Allowance (days)" numeric field.</summary>
-    public async Task SetDefaultHolidayAllowanceAsync(decimal days)
-    {
-        var input = page.Locator("input.e-numerictextbox[placeholder='Default Holiday Allowance (days)']");
-        await input.FillAsync(days.ToString("0.#"));
-        await page.Keyboard.PressAsync("Tab");
-    }
+    public async Task SetDefaultHolidayAllowanceAsync(decimal days) =>
+        await FillNumericAndVerifyAsync(NumericBoxByLabel(".col-md-3", "Default Holiday Allowance (days)"), days.ToString("0.#"), days);
 
     /// <summary>Returns the current value of the "Default Holiday Allowance (days)" numeric field.</summary>
     public async Task<decimal> GetDefaultHolidayAllowanceAsync()
     {
-        var input = page.Locator("input.e-numerictextbox[placeholder='Default Holiday Allowance (days)']");
+        var input = NumericBoxByLabel(".col-md-3", "Default Holiday Allowance (days)");
         var value = await input.InputValueAsync();
         return decimal.Parse(value);
     }
 
     /// <summary>Sets the "Probation Months" numeric field.</summary>
-    public async Task SetProbationMonthsAsync(int months)
-    {
-        var input = page.Locator("input.e-numerictextbox[placeholder='Probation Months']");
-        await input.FillAsync(months.ToString());
-        await page.Keyboard.PressAsync("Tab");
-    }
+    public async Task SetProbationMonthsAsync(int months) =>
+        await FillNumericAndVerifyAsync(NumericBoxByLabel(".col-md-3", "Probation Months"), months.ToString(), months);
 
     /// <summary>Returns the current value of the "Probation Months" numeric field.</summary>
     public async Task<int> GetProbationMonthsAsync()
     {
-        var input = page.Locator("input.e-numerictextbox[placeholder='Probation Months']");
+        var input = NumericBoxByLabel(".col-md-3", "Probation Months");
         var value = await input.InputValueAsync();
         return int.Parse(value);
     }
@@ -213,33 +293,25 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     }
 
     /// <summary>Sets the "Fit Note Required After (Days)" numeric field. Pass null to clear it.</summary>
-    public async Task SetFitNoteRequiredAfterDaysAsync(int? days)
-    {
-        var input = page.Locator("input.e-numerictextbox[placeholder='Fit Note Required After (Days)']");
-        await input.FillAsync(days?.ToString() ?? "");
-        await page.Keyboard.PressAsync("Tab");
-    }
+    public async Task SetFitNoteRequiredAfterDaysAsync(int? days) =>
+        await FillNullableNumericAndVerifyAsync(NumericBoxByLabel(".col-md-4", "Fit Note Required After (Days)"), days);
 
     /// <summary>Returns the current value of the "Fit Note Required After (Days)" numeric field, or null if empty.</summary>
     public async Task<int?> GetFitNoteRequiredAfterDaysAsync()
     {
-        var input = page.Locator("input.e-numerictextbox[placeholder='Fit Note Required After (Days)']");
+        var input = NumericBoxByLabel(".col-md-4", "Fit Note Required After (Days)");
         var value = await input.InputValueAsync();
         return int.TryParse(value, out var parsed) ? parsed : null;
     }
 
     /// <summary>Sets the "Return-to-Work Review Required After (Days)" numeric field. Pass null to clear it.</summary>
-    public async Task SetReturnToWorkRequiredAfterDaysAsync(int? days)
-    {
-        var input = page.Locator("input.e-numerictextbox[placeholder='Return-to-Work Review Required After (Days)']");
-        await input.FillAsync(days?.ToString() ?? "");
-        await page.Keyboard.PressAsync("Tab");
-    }
+    public async Task SetReturnToWorkRequiredAfterDaysAsync(int? days) =>
+        await FillNullableNumericAndVerifyAsync(NumericBoxByLabel(".col-md-4", "Return-to-Work Review Required After (Days)"), days);
 
     /// <summary>Returns the current value of the "Return-to-Work Review Required After (Days)" numeric field, or null if empty.</summary>
     public async Task<int?> GetReturnToWorkRequiredAfterDaysAsync()
     {
-        var input = page.Locator("input.e-numerictextbox[placeholder='Return-to-Work Review Required After (Days)']");
+        var input = NumericBoxByLabel(".col-md-4", "Return-to-Work Review Required After (Days)");
         var value = await input.InputValueAsync();
         return int.TryParse(value, out var parsed) ? parsed : null;
     }

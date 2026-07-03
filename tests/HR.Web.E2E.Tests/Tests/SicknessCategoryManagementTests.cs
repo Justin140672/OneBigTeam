@@ -95,7 +95,7 @@ public sealed class SicknessCategoryManagementTests(AppFixture fixture) : E2ETes
     }
 
     [Fact]
-    public async Task DeleteSicknessCategory_RemovesFromList()
+    public async Task DeleteSicknessCategory_MarksAsInactive()
     {
         var suffix  = Guid.NewGuid().ToString("N")[..8];
         var catName = $"E2E Del {suffix}";
@@ -116,11 +116,17 @@ public sealed class SicknessCategoryManagementTests(AppFixture fixture) : E2ETes
 
         Assert.True(await catList.HasItemAsync(catName),
             $"Pre-condition: expected '{catName}' to appear in the list.");
+        Assert.True(await catList.IsActiveAsync(catName),
+            $"Pre-condition: expected '{catName}' to be Active.");
 
         await catList.DeleteAsync(catName);
 
-        Assert.False(await catList.HasItemAsync(catName),
-            $"Expected '{catName}' to be removed from the list after deletion.");
+        // "Delete" is a soft-deactivate — the category stays in the list (both active and
+        // inactive categories are shown), it just flips to Inactive.
+        Assert.True(await catList.HasItemAsync(catName),
+            $"Expected '{catName}' to remain in the list after deletion (soft-deactivate).");
+        Assert.False(await catList.IsActiveAsync(catName),
+            $"Expected '{catName}' to be marked Inactive after deletion.");
     }
 
     [Fact]

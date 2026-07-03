@@ -1,22 +1,34 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
 public class RecordMySicknessEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
+    private static readonly Guid AdminUserId = new("cc000020-0000-0000-0000-000000000001");
 
     public RecordMySicknessEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator))
+            .GetAwaiter().GetResult();
     }
 
     private HttpClient EmployeeClient(Guid companyId, Guid employeeId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        return client;
+    }
+
+    private HttpClient AdminClient(Guid companyId)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         return client;
     }
@@ -50,9 +62,8 @@ public class RecordMySicknessEndpointTests : IClassFixture<ApiWebApplicationFact
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        // Use an admin client to create the category, then the employee client to record sickness
-        var adminEmployeeId = Guid.NewGuid();
-        using var adminClient = EmployeeClient(companyId, adminEmployeeId);
+        // Use an HR admin client to create the category, then the employee client to record sickness
+        using var adminClient = AdminClient(companyId);
         var categoryId = await CreateCategory(adminClient, companyId);
 
         using var client = EmployeeClient(companyId, employeeId);
@@ -77,8 +88,8 @@ public class RecordMySicknessEndpointTests : IClassFixture<ApiWebApplicationFact
         Assert.Equal(companyId, payload.CompanyId);
         Assert.Equal(employeeId, payload.EmployeeId);
         Assert.Equal(categoryId, payload.CategoryId);
-        Assert.Equal(0, payload.Status); // Active
-        Assert.Equal(0, payload.EvidenceStatus); // NotRequired
+        Assert.Equal("Active", payload.Status);
+        Assert.Equal("NotRequired", payload.EvidenceStatus);
         Assert.Equal("Self-reported illness", payload.Notes);
     }
 
@@ -173,9 +184,10 @@ public class RecordMySicknessEndpointTests : IClassFixture<ApiWebApplicationFact
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        // Use the employee as both admin (for category creation) and employee
+        using var adminClient = AdminClient(companyId);
+        var categoryId = await CreateCategory(adminClient, companyId);
+
         using var client = EmployeeClient(companyId, employeeId);
-        var categoryId = await CreateCategory(client, companyId);
 
         // Create the first open record
         var firstResponse = await client.PostAsJsonAsync(
@@ -212,10 +224,10 @@ public class RecordMySicknessEndpointTests : IClassFixture<ApiWebApplicationFact
         Guid CompanyId,
         Guid EmployeeId,
         Guid CategoryId,
-        int Status,
+        string Status,
         string StartDate,
-        int StartDayPart,
-        int EvidenceStatus,
+        string StartDayPart,
+        string EvidenceStatus,
         string? Notes,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt);

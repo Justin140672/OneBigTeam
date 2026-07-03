@@ -17,6 +17,11 @@ internal sealed class Endpoint(RecordSicknessHandler handler)
         var result = await handler.HandleAsync(request, cancellationToken);
         if (result.IsFailure)
         {
+            if (result.Error.Code == "conflict")
+            {
+                await Send.ResultAsync(TypedResults.Conflict(new { error = result.Error.Message }));
+                return;
+            }
             await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
             return;
         }

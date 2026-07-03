@@ -73,6 +73,7 @@ public sealed class EmployeeSicknessTabTests(AppFixture fixture) : E2ETestBase(f
         // Create a category to select in the Record Sickness dialog.
         await catEdit.GoToNewAsync(AcmeId);
         await catEdit.FillNameAsync(catName);
+        await catEdit.FillDisplayOrderAsync(1);
         await catEdit.SaveAsync();
 
         await empEdit.GoToAsync(AcmeId, TomWilliams);
@@ -115,6 +116,7 @@ public sealed class EmployeeSicknessTabTests(AppFixture fixture) : E2ETestBase(f
 
         await catEdit.GoToNewAsync(AcmeId);
         await catEdit.FillNameAsync(catName);
+        await catEdit.FillDisplayOrderAsync(1);
         await catEdit.SaveAsync();
 
         await empEdit.GoToAsync(AcmeId, TomWilliams);
