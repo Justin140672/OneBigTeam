@@ -1,19 +1,19 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 
-namespace HR.Modules.Probation.Features.GetProbationReview;
+namespace HR.Modules.Sickness.Features.GetReturnToWorkReview;
 
 internal sealed class Endpoint(
-    GetProbationReviewHandler handler) : Endpoint<GetProbationReviewRequest, GetProbationReviewResponse>
+    GetReturnToWorkReviewHandler handler) : Endpoint<GetReturnToWorkReviewRequest, GetReturnToWorkReviewResponse>
 {
     public override void Configure()
     {
-        Get("/api/companies/{companyId:guid}/probation-reviews/{reviewId:guid}");
-        Policies("probation:review");
+        Get("/api/companies/{companyId:guid}/return-to-work-reviews/{reviewId:guid}");
+        Policies("sickness:review");
     }
 
     public override async Task HandleAsync(
-        GetProbationReviewRequest request,
+        GetReturnToWorkReviewRequest request,
         CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(request, cancellationToken);

@@ -1,0 +1,95 @@
+@using HR.Web.Models
+@inject SicknessService SicknessService
+@inject TaskService TaskService
+
+<div class="card" data-testid="return-to-work-review-panel">
+    <div class="card-header fw-medium">Complete Return-to-Work Review</div>
+    <div class="card-body">
+        @if (_justCompleted)
+        {
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <i class="fa-solid fa-circle-check text-success fs-5"></i>
+                <span class="fw-medium">Review completed.</span>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="DismissAsync">Done</button>
+        }
+        else
+        {
+            @if (_review is not null)
+            {
+                <dl class="row mb-3 small">
+                    <dt class="col-sm-4 text-muted fw-normal">Due Date</dt>
+                    <dd class="col-sm-8">@_review.DueDate.ToString("d MMM yyyy")</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Status</dt>
+                    <dd class="col-sm-8">@_review.Status</dd>
+                </dl>
+                <hr class="my-3" />
+            }
+            <div class="mb-3">
+                <label class="form-label fw-medium">
+                    Notes
+                    <span class="text-muted fw-normal"> (optional)</span>
+                </label>
+                <textarea class="form-control"
+                          rows="3"
+                          @bind="_notes"
+                          placeholder="Enter your review notes…" />
+            </div>
+            @if (_error is not null)
+            {
+                <div class="alert alert-danger mb-3">@_error</div>
+            }
+            <button class="btn btn-success"
+                    @onclick="CompleteReviewAsync"
+                    disabled="@_submitting">
+                @if (_submitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                <i class="fa-solid fa-check me-1"></i>Complete Review
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public TaskDetailModel Task { get; set; } = null!;
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private ReturnToWorkReviewDetailModel? _review;
+    private string? _notes;
+    private string? _error;
+    private bool _submitting;
+    private bool _justCompleted;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_justCompleted) return;
+
+        if (Task.SourceEntityId.HasValue)
+            _review = await SicknessService.GetReturnToWorkReviewAsync(CompanyId, Task.SourceEntityId.Value);
+    }
+
+    private async Task CompleteReviewAsync()
+    {
+        _submitting = true;
+        _error = null;
+
+        var success = await TaskService.CompleteTaskAsync(CompanyId, Task.Id, outcomeDecision: null, outcomeReason: _notes);
+
+        _submitting = false;
+
+        if (success)
+        {
+            _justCompleted = true;
+        }
+        else
+        {
+            _error = "Failed to complete the review. Please try again.";
+        }
+    }
+
+    private async Task DismissAsync() => await OnCompleted.InvokeAsync();
+}

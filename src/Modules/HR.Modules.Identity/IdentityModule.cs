@@ -76,6 +76,17 @@ public static class IdentityModule
             SystemRoles.HrAdministrator,
             SystemRoles.CompanyAdministrator));
 
+        builder.AddPolicy("probation:review", RolePolicy(
+            SystemRoles.Manager,
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
+        // Sickness domain — read access to a manager's assigned return-to-work review task
+        builder.AddPolicy("sickness:review", RolePolicy(
+            SystemRoles.Manager,
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
         // Asset domain policies
         builder.AddPolicy("asset:view", RolePolicy(
             SystemRoles.Employee,

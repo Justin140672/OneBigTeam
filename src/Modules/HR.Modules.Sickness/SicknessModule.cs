@@ -1,5 +1,6 @@
 using Hangfire;
 using HR.Modules.Sickness.Features.CloseSicknessRecord;
+using HR.Modules.Sickness.Features.CompleteReturnToWorkReviewFromTask;
 using HR.Modules.Sickness.Features.FulfilEvidenceRequest;
 using HR.Modules.Sickness.Features.CreateSicknessCategory;
 using HR.Modules.Sickness.Features.DeactivateSicknessCategory;
@@ -48,6 +49,7 @@ public static class SicknessModule
         services.AddScoped<CloseSicknessRecordHandler>();
         services.AddScoped<FitNoteRequestJob>();
         services.AddScoped<ITaskCompletionAction, SicknessEvidenceUploadCompletionAction>();
+        services.AddScoped<ITaskCompletionAction, CompleteReturnToWorkReviewFromTaskAction>();
     }
 
     public static WebApplication UseSicknessRecurringJobs(this WebApplication app)

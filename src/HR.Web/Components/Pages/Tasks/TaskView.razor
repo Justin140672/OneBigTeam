@@ -71,6 +71,10 @@
                     {
                         <ProbationReviewPanel CompanyId="CompanyId" Task="_task" OnCompleted="ReloadAsync" />
                     }
+                    else if (_task.ActionType == "Review" && _task.Source == "Sickness")
+                    {
+                        <ReturnToWorkReviewPanel CompanyId="CompanyId" Task="_task" OnCompleted="ReloadAsync" />
+                    }
                     else if (_task.ActionType == "Upload" && _task.Source == "Document")
                     {
                         <DocumentUploadTaskPanel CompanyId="CompanyId"

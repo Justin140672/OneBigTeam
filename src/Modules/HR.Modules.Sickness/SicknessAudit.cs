@@ -106,6 +106,28 @@ internal sealed record ReturnToWorkReviewRequiredAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
+internal sealed record ReturnToWorkReviewCompletedAuditEvent(
+    Guid ReviewId,
+    Guid SicknessRecordId,
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid ReviewedBy,
+    string? Notes,
+    DateTimeOffset CompletedAt,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "sickness.return_to_work_review_completed";
+    string IAuditEvent.EntityType => "ReturnToWorkReview";
+    Guid IAuditEvent.EntityId => ReviewId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ReviewedBy;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Return-to-work review completed";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { SicknessRecordId, CompletedAt, Notes };
+    object? IAuditEvent.Metadata => null;
+}
+
 internal sealed record SicknessRecordedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
