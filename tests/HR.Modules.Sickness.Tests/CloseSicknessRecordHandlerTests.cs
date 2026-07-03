@@ -52,13 +52,16 @@ public class CloseSicknessRecordHandlerTests
         bool excludePublicHolidays = false,
         IReadOnlyCollection<DateOnly>? publicHolidays = null,
         FakeAuditEventPublisher? auditPublisher = null,
-        int? fitNoteRequiredAfterDays = null) =>
+        int? fitNoteRequiredAfterDays = null,
+        int? returnToWorkRequiredAfterDays = null,
+        FakeIntegrationEventPublisher? eventPublisher = null) =>
         new(db,
             new FakeClock(FixedUtcNow),
             new FakeWorkingPatternProvider(pattern ?? DefaultPattern),
-            new FakeCompanySicknessSettingsReader(excludePublicHolidays, fitNoteRequiredAfterDays),
+            new FakeCompanySicknessSettingsReader(excludePublicHolidays, fitNoteRequiredAfterDays, returnToWorkRequiredAfterDays),
             new FakePublicHolidayReader(publicHolidays),
-            auditPublisher ?? new FakeAuditEventPublisher());
+            auditPublisher ?? new FakeAuditEventPublisher(),
+            eventPublisher ?? new FakeIntegrationEventPublisher());
 
     private static async Task<SicknessRecord> SeedOpenRecordWithEvidenceStatus(
         SicknessDbContext db, Guid companyId, Guid employeeId, Guid categoryId,
@@ -343,5 +346,167 @@ public class CloseSicknessRecordHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(SicknessEvidenceStatus.Waived, result.Value!.EvidenceStatus);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creates_ReturnToWorkReview_When_TotalDays_Meets_Threshold_On_Close()
+    {
+        // StartDate = 2026-07-01, EndDate = 2026-07-03 = 3 working days, threshold = 3 → review created
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var record = await SeedOpenRecord(db, companyId, employeeId, categoryId);
+        var returnToWorkDate = new DateOnly(2026, 7, 6);
+
+        var result = await BuildHandler(db, returnToWorkRequiredAfterDays: 3).HandleAsync(new CloseSicknessRecordRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            Id = record.Id,
+            EndDate = new DateOnly(2026, 7, 3),
+            EndDayPart = SicknessDayPart.FullDay,
+            ReturnToWorkDate = returnToWorkDate
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var review = await db.ReturnToWorkReviews.SingleAsync(r => r.SicknessRecordId == record.Id);
+        Assert.Equal(companyId, review.CompanyId);
+        Assert.Equal(employeeId, review.EmployeeId);
+        Assert.Equal(record.Id, review.SicknessRecordId);
+        Assert.Equal(returnToWorkDate, review.DueDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReturnToWorkReview_DueDate_Falls_Back_To_EndDate_When_No_ReturnToWorkDate()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var record = await SeedOpenRecord(db, companyId, employeeId, categoryId);
+        var endDate = new DateOnly(2026, 7, 3);
+
+        var result = await BuildHandler(db, returnToWorkRequiredAfterDays: 3).HandleAsync(new CloseSicknessRecordRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            Id = record.Id,
+            EndDate = endDate,
+            EndDayPart = SicknessDayPart.FullDay,
+            ReturnToWorkDate = null
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var review = await db.ReturnToWorkReviews.SingleAsync(r => r.SicknessRecordId == record.Id);
+        Assert.Equal(endDate, review.DueDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_ReturnToWorkReviewRequired_IntegrationEvent_When_Threshold_Met()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var record = await SeedOpenRecord(db, companyId, employeeId, categoryId);
+        var eventPublisher = new FakeIntegrationEventPublisher();
+        var returnToWorkDate = new DateOnly(2026, 7, 6);
+
+        var result = await BuildHandler(db, returnToWorkRequiredAfterDays: 3, eventPublisher: eventPublisher)
+            .HandleAsync(new CloseSicknessRecordRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                Id = record.Id,
+                EndDate = new DateOnly(2026, 7, 3),
+                EndDayPart = SicknessDayPart.FullDay,
+                ReturnToWorkDate = returnToWorkDate
+            }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(eventPublisher.PublishedEvents);
+        var integrationEvent = Assert.IsType<ReturnToWorkReviewRequiredIntegrationEvent>(eventPublisher.PublishedEvents[0]);
+        Assert.Equal(companyId, integrationEvent.CompanyId);
+        Assert.Equal(employeeId, integrationEvent.EmployeeId);
+        Assert.Equal(record.Id, integrationEvent.SicknessRecordId);
+        Assert.Equal(returnToWorkDate, integrationEvent.DueDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_ReturnToWorkReviewRequired_AuditEvent_When_Threshold_Met()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var record = await SeedOpenRecord(db, companyId, employeeId, categoryId);
+        var auditPublisher = new FakeAuditEventPublisher();
+
+        var result = await BuildHandler(db, returnToWorkRequiredAfterDays: 3, auditPublisher: auditPublisher)
+            .HandleAsync(new CloseSicknessRecordRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                Id = record.Id,
+                EndDate = new DateOnly(2026, 7, 3),
+                EndDayPart = SicknessDayPart.FullDay
+            }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains(auditPublisher.PublishedEvents, e => e is ReturnToWorkReviewRequiredAuditEvent);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Create_ReturnToWorkReview_When_TotalDays_Below_Threshold()
+    {
+        // StartDate = 2026-07-01, EndDate = 2026-07-03 = 3 working days, threshold = 7 → no review
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var record = await SeedOpenRecord(db, companyId, employeeId, categoryId);
+        var eventPublisher = new FakeIntegrationEventPublisher();
+
+        var result = await BuildHandler(db, returnToWorkRequiredAfterDays: 7, eventPublisher: eventPublisher)
+            .HandleAsync(new CloseSicknessRecordRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                Id = record.Id,
+                EndDate = new DateOnly(2026, 7, 3),
+                EndDayPart = SicknessDayPart.FullDay
+            }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(await db.ReturnToWorkReviews.AnyAsync(r => r.SicknessRecordId == record.Id));
+        Assert.Empty(eventPublisher.PublishedEvents);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Create_ReturnToWorkReview_When_Setting_Is_Null()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var categoryId = await SeedCategory(db, companyId);
+        var record = await SeedOpenRecord(db, companyId, employeeId, categoryId);
+        var eventPublisher = new FakeIntegrationEventPublisher();
+
+        var result = await BuildHandler(db, returnToWorkRequiredAfterDays: null, eventPublisher: eventPublisher)
+            .HandleAsync(new CloseSicknessRecordRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                Id = record.Id,
+                EndDate = new DateOnly(2026, 7, 3),
+                EndDayPart = SicknessDayPart.FullDay
+            }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(await db.ReturnToWorkReviews.AnyAsync(r => r.SicknessRecordId == record.Id));
+        Assert.Empty(eventPublisher.PublishedEvents);
     }
 }

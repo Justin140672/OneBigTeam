@@ -11,7 +11,8 @@ internal sealed class CloseSicknessRecordHandler(
     IWorkingPatternProvider workingPatternProvider,
     ICompanySicknessSettingsReader sicknessSettingsReader,
     IPublicHolidayReader publicHolidayReader,
-    IAuditEventPublisher auditPublisher)
+    IAuditEventPublisher auditPublisher,
+    IIntegrationEventPublisher eventPublisher)
 {
     public async Task<Result<CloseSicknessRecordResponse>> HandleAsync(
         CloseSicknessRecordRequest request,
@@ -58,6 +59,24 @@ internal sealed class CloseSicknessRecordHandler(
             totalDays);
 
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
+
+        ReturnToWorkReview? returnToWorkReview = null;
+        if (sicknessSettings.ReturnToWorkRequiredAfterDays is not null &&
+            totalDays >= sicknessSettings.ReturnToWorkRequiredAfterDays.Value)
+        {
+            var dueDate = request.ReturnToWorkDate ?? request.EndDate;
+
+            returnToWorkReview = ReturnToWorkReview.Create(
+                Guid.NewGuid(),
+                record.CompanyId,
+                record.Id,
+                record.EmployeeId,
+                dueDate,
+                now);
+
+            db.ReturnToWorkReviews.Add(returnToWorkReview);
+        }
+
         record.Close(
             request.EndDate,
             request.EndDayPart,
@@ -94,6 +113,25 @@ internal sealed class CloseSicknessRecordHandler(
             record.EndDate!.Value,
             record.TotalDays,
             now), cancellationToken);
+
+        if (returnToWorkReview is not null)
+        {
+            await eventPublisher.PublishAsync(new ReturnToWorkReviewRequiredIntegrationEvent(
+                returnToWorkReview.CompanyId,
+                returnToWorkReview.EmployeeId,
+                returnToWorkReview.SicknessRecordId,
+                returnToWorkReview.Id,
+                returnToWorkReview.DueDate,
+                now), cancellationToken);
+
+            await auditPublisher.PublishAsync(new ReturnToWorkReviewRequiredAuditEvent(
+                returnToWorkReview.Id,
+                returnToWorkReview.SicknessRecordId,
+                returnToWorkReview.CompanyId,
+                returnToWorkReview.EmployeeId,
+                returnToWorkReview.DueDate,
+                now), cancellationToken);
+        }
 
         return Result.Success(new CloseSicknessRecordResponse(
             record.Id,
