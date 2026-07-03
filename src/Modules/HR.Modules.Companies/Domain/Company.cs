@@ -8,7 +8,6 @@ internal sealed class Company
 
     public Guid Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
-    public string Slug { get; private set; } = string.Empty;
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -16,13 +15,12 @@ internal sealed class Company
     public CompanyBranding? Branding { get; private set; }
     public IReadOnlyCollection<CompanyAddress> Addresses => _addresses;
 
-    public static Company Create(Guid id, string name, string slug, DateTimeOffset now)
+    public static Company Create(Guid id, string name, DateTimeOffset now)
     {
         return new Company
         {
             Id = id,
             Name = name,
-            Slug = slug,
             IsActive = true,
             CreatedAt = now,
             UpdatedAt = now,

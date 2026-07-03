@@ -17,7 +17,7 @@ public class UpdateCompanySettingsHandlerTests
 	{
 		await using var context = BuildContext();
 		var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
-		var company = Company.Create(Guid.NewGuid(), "Acme", "acme", now);
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
 		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
 
 		context.Companies.Add(company);
@@ -108,7 +108,7 @@ public class UpdateCompanySettingsHandlerTests
 	{
 		await using var context = BuildContext();
 		var now = new DateTimeOffset(new DateTime(2026, 6, 12, 10, 0, 0, DateTimeKind.Utc));
-		var company = Company.Create(Guid.NewGuid(), "Acme", "acme", now);
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
 		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
 
 		context.Companies.Add(company);
@@ -147,7 +147,7 @@ public class UpdateCompanySettingsHandlerTests
 	{
 		await using var context = BuildContext();
 		var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
-		var company = Company.Create(Guid.NewGuid(), "Acme", "acme", now);
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
 		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
 
 		context.Companies.Add(company);

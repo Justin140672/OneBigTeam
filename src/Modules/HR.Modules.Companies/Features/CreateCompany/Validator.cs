@@ -11,11 +11,6 @@ internal sealed class CreateCompanyValidator : AbstractValidator<CreateCompanyRe
             .NotEmpty()
             .MaximumLength(200);
 
-        RuleFor(request => request.Slug)
-            .MaximumLength(100)
-            .Matches("^[a-z0-9]+(?:-[a-z0-9]+)*$")
-            .When(request => !string.IsNullOrWhiteSpace(request.Slug));
-
         RuleForEach(request => request.Addresses)
             .SetValidator(new CreateCompanyAddressValidator());
 

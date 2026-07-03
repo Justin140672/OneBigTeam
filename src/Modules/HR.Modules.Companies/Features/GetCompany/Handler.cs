@@ -32,7 +32,6 @@ internal sealed class GetCompanyHandler
         var response = new GetCompanyResponse(
             company.Id,
             company.Name,
-            company.Slug,
             company.IsActive,
             company.CreatedAt,
             company.Addresses
@@ -48,9 +47,6 @@ internal sealed class GetCompanyHandler
                 .OrderBy(address => address.Type)
                 .ToArray(),
             new GetCompanyBrandingResponse(
-                branding?.PrimaryColor ?? "#000000",
-                branding?.SecondaryColor ?? "#6B7280",
-                branding?.AccentColor ?? "#3B82F6",
                 branding?.PrimaryLogoUrl,
                 branding?.SmallLogoUrl,
                 branding?.EmailLogoUrl));

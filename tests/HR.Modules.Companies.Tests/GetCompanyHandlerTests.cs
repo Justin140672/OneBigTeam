@@ -12,7 +12,7 @@ public class GetCompanyHandlerTests
     {
         await using var context = BuildContext();
         var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
-        var company = Company.Create(Guid.NewGuid(), "Acme Corporation", "acme-corporation", now);
+        var company = Company.Create(Guid.NewGuid(), "Acme Corporation", now);
         var address = CompanyAddress.Create(
             Guid.NewGuid(),
             company.Id,
@@ -39,7 +39,6 @@ public class GetCompanyHandlerTests
         Assert.NotNull(result.Value);
         Assert.Equal(company.Id, result.Value!.Id);
         Assert.Equal("Acme Corporation", result.Value.Name);
-        Assert.Equal("acme-corporation", result.Value.Slug);
         Assert.True(result.Value.IsActive);
         Assert.Equal(now, result.Value.CreatedAt);
         Assert.Single(result.Value.Addresses);

@@ -29,7 +29,7 @@
                 @(_company.IsActive ? "Active" : "Inactive")
             </span>
         </div>
-        <p class="text-muted mb-4">Manage this company's profile, addresses, branding, and settings.</p>
+        <p class="text-muted mb-4">Manage this company's profile, addresses, and settings.</p>
 
         @if (!string.IsNullOrEmpty(_globalError))
         {
@@ -54,12 +54,6 @@
                     <ChildContent><TabHeader Text="Settings" /></ChildContent>
                     <ContentTemplate>
                         <div class="mt-4 @(_isViewMode ? "view-mode" : "")"><CompanySettingsTab Model="_settings" /></div>
-                    </ContentTemplate>
-                </TabItem>
-                <TabItem>
-                    <ChildContent><TabHeader Text="Branding" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4 @(_isViewMode ? "view-mode" : "")"><CompanyBrandingTab Model="_branding" /></div>
                     </ContentTemplate>
                 </TabItem>
             </TabItems>
@@ -92,7 +86,6 @@
     private readonly CompanyProfileEditModel _profile = new();
     private List<CompanyAddressEditModel> _addresses = [];
     private readonly CompanySettingsEditModel _settings = new();
-    private readonly CompanyBrandingEditModel _branding = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -153,8 +146,7 @@
         var profileReq = new UpdateCompanyRequest(
             Id, _profile.Name,
             _addresses.Select(a => new UpdateCompanyAddressRequest(
-                a.Type, a.Line1, a.Line2, a.City, a.Region, a.PostalCode, a.CountryCode)).ToList(),
-            new UpdateCompanyBrandingRequest(_branding.PrimaryColor, _branding.SecondaryColor, _branding.AccentColor));
+                a.Type, a.Line1, a.Line2, a.City, a.Region, a.PostalCode, a.CountryCode)).ToList());
 
         var workingDays = _settings.WorkingWeek
             .Aggregate(WorkingDays.None, (acc, day) =>

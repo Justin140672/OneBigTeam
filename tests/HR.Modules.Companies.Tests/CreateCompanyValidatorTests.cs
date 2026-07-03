@@ -18,21 +18,6 @@ public class CreateCompanyValidatorTests
     }
 
     [Fact]
-    public void Validate_Fails_When_Slug_Format_Is_Invalid()
-    {
-        var validator = new CreateCompanyValidator();
-
-        var result = validator.Validate(new CreateCompanyRequest
-        {
-            Name = "Acme Corp",
-            Slug = "ACME corp"
-        });
-
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, error => error.PropertyName == nameof(CreateCompanyRequest.Slug));
-    }
-
-    [Fact]
     public void Validate_Fails_When_Address_Types_Are_Duplicated()
     {
         var validator = new CreateCompanyValidator();

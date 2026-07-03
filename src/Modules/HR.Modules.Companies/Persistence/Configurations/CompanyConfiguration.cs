@@ -21,14 +21,6 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
             .HasMaxLength(200)
             .IsRequired();
 
-        builder.Property(c => c.Slug)
-            .HasColumnName("slug")
-            .HasMaxLength(100)
-            .IsRequired();
-
-        builder.HasIndex(c => c.Slug)
-            .IsUnique();
-
         builder.Property(c => c.IsActive)
             .HasColumnName("is_active")
             .IsRequired();

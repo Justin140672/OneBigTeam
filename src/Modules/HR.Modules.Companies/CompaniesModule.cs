@@ -54,7 +54,7 @@ public static class CompaniesModule
         var acmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         if (!await db.Companies.AnyAsync(c => c.Id == acmeId))
         {
-            var acme = Company.Create(acmeId, "Acme Corporation", "acme-corporation", now);
+            var acme = Company.Create(acmeId, "Acme Corporation", now);
             acme.SetAddress(
                 CompanyAddress.Create(Guid.NewGuid(), acmeId, CompanyAddressType.RegisteredOffice,
                     "123 Main Street", null, "London", null, "EC1A 1BB", "GB", now),
@@ -69,7 +69,7 @@ public static class CompaniesModule
         var betaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
         if (!await db.Companies.AnyAsync(c => c.Id == betaCorpId))
         {
-            var betaCorp = Company.Create(betaCorpId, "Beta Corp", "beta-corp", now);
+            var betaCorp = Company.Create(betaCorpId, "Beta Corp", now);
             betaCorp.SetAddress(
                 CompanyAddress.Create(Guid.NewGuid(), betaCorpId, CompanyAddressType.RegisteredOffice,
                     "10 Innovation Drive", null, "Bristol", null, "BS1 1AA", "GB", now),

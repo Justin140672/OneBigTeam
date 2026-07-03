@@ -8,18 +8,7 @@ internal sealed class CompanyBrandingConfiguration : IEntityTypeConfiguration<Co
 {
     public void Configure(EntityTypeBuilder<CompanyBranding> builder)
     {
-        builder.ToTable("company_branding", tableBuilder =>
-        {
-            tableBuilder.HasCheckConstraint(
-                "CK_company_branding_primary_color",
-                "primary_color ~ '^#[0-9A-Fa-f]{6}$'");
-            tableBuilder.HasCheckConstraint(
-                "CK_company_branding_secondary_color",
-                "secondary_color ~ '^#[0-9A-Fa-f]{6}$'");
-            tableBuilder.HasCheckConstraint(
-                "CK_company_branding_accent_color",
-                "accent_color ~ '^#[0-9A-Fa-f]{6}$'");
-        });
+        builder.ToTable("company_branding");
 
         builder.HasKey(b => b.CompanyId);
 
@@ -38,21 +27,6 @@ internal sealed class CompanyBrandingConfiguration : IEntityTypeConfiguration<Co
         builder.Property(b => b.EmailLogoUrl)
             .HasColumnName("email_logo_url")
             .HasMaxLength(2048);
-
-        builder.Property(b => b.PrimaryColor)
-            .HasColumnName("primary_color")
-            .HasMaxLength(7)
-            .IsRequired();
-
-        builder.Property(b => b.SecondaryColor)
-            .HasColumnName("secondary_color")
-            .HasMaxLength(7)
-            .IsRequired();
-
-        builder.Property(b => b.AccentColor)
-            .HasColumnName("accent_color")
-            .HasMaxLength(7)
-            .IsRequired();
 
         builder.Property(b => b.CreatedAt)
             .HasColumnName("created_at")

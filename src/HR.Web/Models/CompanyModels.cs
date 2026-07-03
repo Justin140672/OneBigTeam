@@ -8,16 +8,12 @@ namespace HR.Web.Models;
 public record GetCompanyResponse(
     Guid Id,
     string Name,
-    string Slug,
     bool IsActive,
     DateTime CreatedAt,
     List<GetCompanyAddressResponse> Addresses,
     GetCompanyBrandingResponse? Branding);
 
 public record GetCompanyBrandingResponse(
-    string PrimaryColor,
-    string SecondaryColor,
-    string AccentColor,
     string? PrimaryLogoUrl,
     string? SmallLogoUrl,
     string? EmailLogoUrl);
@@ -37,8 +33,7 @@ public record GetCompanyAddressResponse(
 public record UpdateCompanyRequest(
     Guid Id,
     string Name,
-    List<UpdateCompanyAddressRequest> Addresses,
-    UpdateCompanyBrandingRequest? Branding = null);
+    List<UpdateCompanyAddressRequest> Addresses);
 
 public record UpdateCompanyAddressRequest(
     string Type,
@@ -49,13 +44,8 @@ public record UpdateCompanyAddressRequest(
     string? PostalCode,
     string? CountryCode);
 
-public record UpdateCompanyBrandingRequest(
-    string? PrimaryColor,
-    string? SecondaryColor,
-    string? AccentColor);
-
 // Generic response envelope used for PUT /api/companies/{id}
-public record UpdateCompanyResponse(Guid Id, string Name, string Slug, bool IsActive);
+public record UpdateCompanyResponse(Guid Id, string Name, bool IsActive);
 
 // ── SETTINGS ──────────────────────────────────────────────────────────────────
 

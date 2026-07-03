@@ -63,7 +63,6 @@ public class CreateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
         var payload = await response.Content.ReadFromJsonAsync<CreateCompanyPayload>();
         Assert.NotNull(payload);
         Assert.Equal("New Corp", payload!.Name);
-        Assert.Equal("new-corp", payload.Slug);
         Assert.True(payload.IsActive);
         Assert.NotEqual(Guid.Empty, payload.Id);
         Assert.Equal(2, payload.Addresses.Count);
@@ -71,51 +70,9 @@ public class CreateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
         Assert.Contains(payload.Addresses, address => address.Type == "TradingAddress");
     }
 
-    [Fact]
-    public async Task Post_Companies_Returns_Conflict_For_Duplicate_Slug()
-    {
-        using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "user-2");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, "tenant-2");
-
-        var firstResponse = await client.PostAsJsonAsync("/api/companies", new
-        {
-            name = "Globex",
-            addresses = new[]
-            {
-                new
-                {
-                    type = "RegisteredOffice",
-                    line1 = "10 High Street",
-                    city = "London",
-                    countryCode = "GB"
-                }
-            }
-        });
-        firstResponse.EnsureSuccessStatusCode();
-
-        var secondResponse = await client.PostAsJsonAsync("/api/companies", new
-        {
-            name = "Globex",
-            addresses = new[]
-            {
-                new
-                {
-                    type = "RegisteredOffice",
-                    line1 = "10 High Street",
-                    city = "London",
-                    countryCode = "GB"
-                }
-            }
-        });
-
-        Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
-    }
-
     private sealed record CreateCompanyPayload(
         Guid Id,
         string Name,
-        string Slug,
         bool IsActive,
         DateTimeOffset CreatedAt,
         IReadOnlyCollection<CompanyAddressPayload> Addresses);

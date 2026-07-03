@@ -57,7 +57,6 @@ public class GetCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory>
         Assert.NotNull(payload);
         Assert.Equal(createdCompany.Id, payload!.Id);
         Assert.Equal(createdCompany.Name, payload.Name);
-        Assert.Equal(createdCompany.Slug, payload.Slug);
         Assert.Equal(createdCompany.IsActive, payload.IsActive);
         Assert.Equal(2, payload.Addresses.Count);
         Assert.Contains(payload.Addresses, address => address.Type == "RegisteredOffice");
@@ -79,7 +78,6 @@ public class GetCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory>
     private sealed record CreateCompanyPayload(
         Guid Id,
         string Name,
-        string Slug,
         bool IsActive,
         DateTimeOffset CreatedAt,
         IReadOnlyCollection<CompanyAddressPayload> Addresses);
@@ -87,7 +85,6 @@ public class GetCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory>
     private sealed record GetCompanyPayload(
         Guid Id,
         string Name,
-        string Slug,
         bool IsActive,
         DateTimeOffset CreatedAt,
         IReadOnlyCollection<CompanyAddressPayload> Addresses);

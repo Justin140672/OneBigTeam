@@ -5,12 +5,10 @@ namespace HR.Modules.Companies.Features.UpdateCompany;
 internal sealed record UpdateCompanyResponse(
     Guid Id,
     string Name,
-    string Slug,
     bool IsActive,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    IReadOnlyCollection<UpdateCompanyAddressResponse> Addresses,
-    UpdateCompanyBrandingResponse? Branding);
+    IReadOnlyCollection<UpdateCompanyAddressResponse> Addresses);
 
 internal sealed record UpdateCompanyAddressResponse(
     Guid Id,
@@ -21,8 +19,3 @@ internal sealed record UpdateCompanyAddressResponse(
     string? Region,
     string? PostalCode,
     string CountryCode);
-
-internal sealed record UpdateCompanyBrandingResponse(
-    string PrimaryColor,
-    string SecondaryColor,
-    string AccentColor);

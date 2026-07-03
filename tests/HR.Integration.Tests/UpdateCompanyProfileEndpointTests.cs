@@ -77,48 +77,6 @@ public class UpdateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
         Assert.Equal(2, payload.Addresses.Count);
         Assert.Contains(payload.Addresses, a => a.Type == "RegisteredOffice" && a.City == "London");
         Assert.Contains(payload.Addresses, a => a.Type == "TradingAddress" && a.City == "Manchester");
-        Assert.Null(payload.Branding);
-    }
-
-    [Fact]
-    public async Task Put_Company_Updates_Branding_Colors_When_Provided()
-    {
-        using var client = AuthenticatedClient();
-
-        var createResponse = await client.PostAsJsonAsync("/api/companies", new
-        {
-            name = $"Branding Test {Guid.NewGuid():N}",
-            addresses = new[]
-            {
-                new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", countryCode = "GB" }
-            }
-        });
-        createResponse.EnsureSuccessStatusCode();
-
-        var createdCompany = await createResponse.Content.ReadFromJsonAsync<CreateCompanyPayload>();
-        Assert.NotNull(createdCompany);
-
-        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, createdCompany!.Id.ToString());
-
-        var response = await client.PutAsJsonAsync($"/api/companies/{createdCompany.Id}", new
-        {
-            name = createdCompany.Name,
-            addresses = new[]
-            {
-                new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", countryCode = "GB" }
-            },
-            branding = new { primaryColor = "#FF5733", secondaryColor = "#C70039", accentColor = "#900C3F" }
-        });
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var payload = await response.Content.ReadFromJsonAsync<UpdateCompanyPayload>();
-        Assert.NotNull(payload);
-        Assert.NotNull(payload!.Branding);
-        Assert.Equal("#FF5733", payload.Branding!.PrimaryColor);
-        Assert.Equal("#C70039", payload.Branding.SecondaryColor);
-        Assert.Equal("#900C3F", payload.Branding.AccentColor);
     }
 
     [Fact]
@@ -143,12 +101,10 @@ public class UpdateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
     private sealed record UpdateCompanyPayload(
         Guid Id,
         string Name,
-        string Slug,
         bool IsActive,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,
-        IReadOnlyCollection<CompanyAddressPayload> Addresses,
-        BrandingPayload? Branding);
+        IReadOnlyCollection<CompanyAddressPayload> Addresses);
 
     private sealed record CompanyAddressPayload(
         Guid Id,
@@ -159,9 +115,4 @@ public class UpdateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
         string? Region,
         string? PostalCode,
         string CountryCode);
-
-    private sealed record BrandingPayload(
-        string PrimaryColor,
-        string SecondaryColor,
-        string AccentColor);
 }

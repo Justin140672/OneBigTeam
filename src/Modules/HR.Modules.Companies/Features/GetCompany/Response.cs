@@ -5,16 +5,12 @@ namespace HR.Modules.Companies.Features.GetCompany;
 internal sealed record GetCompanyResponse(
     Guid Id,
     string Name,
-    string Slug,
     bool IsActive,
     DateTimeOffset CreatedAt,
     IReadOnlyCollection<GetCompanyAddressResponse> Addresses,
     GetCompanyBrandingResponse Branding);
 
 internal sealed record GetCompanyBrandingResponse(
-    string PrimaryColor,
-    string SecondaryColor,
-    string AccentColor,
     string? PrimaryLogoUrl,
     string? SmallLogoUrl,
     string? EmailLogoUrl);

@@ -7,7 +7,6 @@ internal sealed record UpdateCompanyRequest
     public Guid Id { get; init; }
     public string Name { get; init; } = string.Empty;
     public List<UpdateCompanyAddressRequest> Addresses { get; init; } = [];
-    public UpdateCompanyBrandingRequest? Branding { get; init; }
 }
 
 internal sealed record UpdateCompanyAddressRequest
@@ -19,11 +18,4 @@ internal sealed record UpdateCompanyAddressRequest
     public string? Region { get; init; }
     public string? PostalCode { get; init; }
     public string CountryCode { get; init; } = string.Empty;
-}
-
-internal sealed record UpdateCompanyBrandingRequest
-{
-    public string PrimaryColor { get; init; } = string.Empty;
-    public string SecondaryColor { get; init; } = string.Empty;
-    public string AccentColor { get; init; } = string.Empty;
 }

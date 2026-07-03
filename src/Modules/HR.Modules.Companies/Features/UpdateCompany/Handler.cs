@@ -22,7 +22,6 @@ internal sealed class UpdateCompanyHandler
     {
         var company = await _dbContext.Companies
             .Include(c => c.Addresses)
-            .Include(c => c.Branding)
             .SingleOrDefaultAsync(c => c.Id == request.Id, cancellationToken);
 
         if (company is null)
@@ -70,35 +69,11 @@ internal sealed class UpdateCompanyHandler
                 now), now);
         }
 
-        // --- Branding colors (optional) ---
-        if (request.Branding is not null)
-        {
-            if (company.Branding is null)
-            {
-                var branding = CompanyBranding.CreateDefault(company.Id, now);
-                branding.SetColors(
-                    request.Branding.PrimaryColor.Trim().ToUpperInvariant(),
-                    request.Branding.SecondaryColor.Trim().ToUpperInvariant(),
-                    request.Branding.AccentColor.Trim().ToUpperInvariant(),
-                    now);
-                _dbContext.CompanyBranding.Add(branding);
-            }
-            else
-            {
-                company.Branding.SetColors(
-                    request.Branding.PrimaryColor.Trim().ToUpperInvariant(),
-                    request.Branding.SecondaryColor.Trim().ToUpperInvariant(),
-                    request.Branding.AccentColor.Trim().ToUpperInvariant(),
-                    now);
-            }
-        }
-
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new UpdateCompanyResponse(
             company.Id,
             company.Name,
-            company.Slug,
             company.IsActive,
             company.CreatedAt,
             company.UpdatedAt,
@@ -113,10 +88,6 @@ internal sealed class UpdateCompanyHandler
                     address.PostalCode,
                     address.CountryCode))
                 .OrderBy(address => address.Type)
-                .ToArray(),
-            company.Branding is null ? null : new UpdateCompanyBrandingResponse(
-                company.Branding.PrimaryColor,
-                company.Branding.SecondaryColor,
-                company.Branding.AccentColor)));
+                .ToArray()));
     }
 }

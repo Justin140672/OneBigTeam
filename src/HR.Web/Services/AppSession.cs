@@ -47,9 +47,6 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory)
     public string Locale { get; private set; } = "en-GB";
 
     // Company branding
-    public string PrimaryColor { get; private set; } = "#000000";
-    public string SecondaryColor { get; private set; } = "#6B7280";
-    public string AccentColor { get; private set; } = "#3B82F6";
     public string? PrimaryLogoUrl { get; private set; }
     public string? SmallLogoUrl { get; private set; }
 
@@ -79,9 +76,6 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory)
         if (company is not null)
         {
             CompanyName     = company.Name;
-            PrimaryColor    = company.Branding?.PrimaryColor   ?? "#000000";
-            SecondaryColor  = company.Branding?.SecondaryColor ?? "#6B7280";
-            AccentColor     = company.Branding?.AccentColor    ?? "#3B82F6";
             PrimaryLogoUrl  = company.Branding?.PrimaryLogoUrl;
             SmallLogoUrl    = company.Branding?.SmallLogoUrl;
         }

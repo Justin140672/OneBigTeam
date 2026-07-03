@@ -5,9 +5,6 @@ namespace HR.Modules.Companies.Features.UpdateCompany;
 
 internal sealed class UpdateCompanyValidator : AbstractValidator<UpdateCompanyRequest>
 {
-    private static readonly System.Text.RegularExpressions.Regex HexColorRegex =
-        new("^#[0-9A-Fa-f]{6}$", System.Text.RegularExpressions.RegexOptions.Compiled);
-
     public UpdateCompanyValidator()
     {
         RuleFor(request => request.Id)
@@ -27,24 +24,6 @@ internal sealed class UpdateCompanyValidator : AbstractValidator<UpdateCompanyRe
         RuleFor(request => request.Addresses)
             .Must(HaveRegisteredOffice)
             .WithMessage("Registered Office address is required.");
-
-        When(request => request.Branding is not null, () =>
-        {
-            RuleFor(request => request.Branding!.PrimaryColor)
-                .NotEmpty()
-                .Matches(HexColorRegex)
-                .WithMessage("Primary color must be a valid 6-digit hex color (e.g. #1A2B3C).");
-
-            RuleFor(request => request.Branding!.SecondaryColor)
-                .NotEmpty()
-                .Matches(HexColorRegex)
-                .WithMessage("Secondary color must be a valid 6-digit hex color (e.g. #1A2B3C).");
-
-            RuleFor(request => request.Branding!.AccentColor)
-                .NotEmpty()
-                .Matches(HexColorRegex)
-                .WithMessage("Accent color must be a valid 6-digit hex color (e.g. #1A2B3C).");
-        });
     }
 
     private static bool HaveUniqueAddressTypes(IReadOnlyCollection<UpdateCompanyAddressRequest> addresses)

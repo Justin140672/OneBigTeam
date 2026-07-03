@@ -11,7 +11,7 @@ namespace HR.Modules.Companies.Tests;
 public class CreateCompanyHandlerTests
 {
     [Fact]
-    public async Task HandleAsync_Creates_Company_With_Generated_Slug()
+    public async Task HandleAsync_Creates_Company()
     {
         await using var context = BuildContext();
         var handler = new CreateCompanyHandler(context, new FakeClock(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc)));
@@ -23,13 +23,11 @@ public class CreateCompanyHandlerTests
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value);
         Assert.Equal("Acme Corporation", result.Value!.Name);
-        Assert.Equal("acme-corporation", result.Value.Slug);
         Assert.Empty(result.Value.Addresses);
 
         var company = await context.Companies.SingleAsync();
         Assert.Equal(result.Value.Id, company.Id);
         Assert.Equal("Acme Corporation", company.Name);
-        Assert.Equal("acme-corporation", company.Slug);
         Assert.True(company.IsActive);
 
         var settings = await context.CompanySettings.SingleAsync();
@@ -84,26 +82,6 @@ public class CreateCompanyHandlerTests
 
         var settings = await context.CompanySettings.SingleAsync();
         Assert.Equal(result.Value.Id, settings.CompanyId);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Returns_Conflict_When_Slug_Already_Exists()
-    {
-        await using var context = BuildContext();
-        var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
-
-        context.Companies.Add(Company.Create(Guid.NewGuid(), "Existing Company", "existing-company", now));
-        await context.SaveChangesAsync();
-
-        var handler = new CreateCompanyHandler(context, new FakeClock(now.UtcDateTime));
-
-        var result = await handler.HandleAsync(
-            new CreateCompanyRequest { Name = "Existing Company" },
-            CancellationToken.None);
-
-        Assert.True(result.IsFailure);
-        Assert.Equal("conflict", result.Error.Code);
-        Assert.Contains("existing-company", result.Error.Message);
     }
 
     private static CompaniesDbContext BuildContext()

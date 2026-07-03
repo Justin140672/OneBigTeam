@@ -37,10 +37,3 @@ public sealed class CompanySettingsEditModel
     public int? FitNoteRequiredAfterDays { get; set; }
     public int? ReturnToWorkRequiredAfterDays { get; set; }
 }
-
-public sealed class CompanyBrandingEditModel
-{
-    public string PrimaryColor { get; set; } = "#000000";
-    public string SecondaryColor { get; set; } = "#000000";
-    public string AccentColor { get; set; } = "#000000";
-}

@@ -38,7 +38,7 @@ public class UploadCompanyLogoHandlerTests
     {
         await using var context = BuildContext();
         var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
-        var company = Company.Create(Guid.NewGuid(), "Acme", "acme", now);
+        var company = Company.Create(Guid.NewGuid(), "Acme", now);
         context.Companies.Add(company);
         await context.SaveChangesAsync();
 
@@ -76,7 +76,7 @@ public class UploadCompanyLogoHandlerTests
     {
         await using var context = BuildContext();
         var createdAt = new DateTimeOffset(new DateTime(2026, 6, 5, 9, 0, 0, DateTimeKind.Utc));
-        var company = Company.Create(Guid.NewGuid(), "Acme", "acme", createdAt);
+        var company = Company.Create(Guid.NewGuid(), "Acme", createdAt);
         context.Companies.Add(company);
 
         var branding = CompanyBranding.CreateDefault(company.Id, createdAt);
@@ -115,7 +115,7 @@ public class UploadCompanyLogoHandlerTests
     {
         await using var context = BuildContext();
         var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
-        var company = Company.Create(Guid.NewGuid(), "Acme", "acme", now);
+        var company = Company.Create(Guid.NewGuid(), "Acme", now);
         context.Companies.Add(company);
         await context.SaveChangesAsync();
 

@@ -18,207 +18,207 @@
 else
 {
 
-<div class="app-shell">
+    <div class="app-shell">
 
-    @if (Session.CanManageEmployees)
-    {
-    <SfSidebar Width="280px"
-               Type="SidebarType.Push"
-               @bind-IsOpen="SidebarOpen"
-               CssClass="app-sidebar">
+        @if (Session.CanManageEmployees)
+        {
+            <SfSidebar Width="280px"
+                       Type="SidebarType.Push"
+                       @bind-IsOpen="SidebarOpen"
+                       CssClass="app-sidebar">
 
-        <ChildContent>
-            <div class="sidebar-header">
-                <button class="sidebar-toggle" @onclick="ToggleSidebar">
-                    <i class="fa-solid fa-bars"></i>
-                </button>
-                @if (SidebarOpen)
-                {
-                    <span class="app-title">One Big Team</span>
-                }
-            </div>
-
-            <SfMenu TValue="MenuItem"
-                    Orientation="Orientation.Vertical"
-                    CssClass="app-nav-menu"
-                    ShowItemOnClick="true">
-                <MenuItems>
-                    <MenuItem Text="Dashboard" IconCss="fa-solid fa-house" Url="/" />
-                    <MenuItem Text="People" IconCss="fa-solid fa-users">
-                        <MenuItems>
-                            <MenuItem Text="Employees"         Url="@_menuItems["Employees"]" />
-                            <MenuItem Text="Departments"       Url="@_menuItems["Departments"]" />
-                            <MenuItem Text="Position Profiles" Url="@_menuItems["PositionProfiles"]" />
-                            <MenuItem Text="Employment Types"  Url="@_menuItems["EmploymentTypes"]" />
-                        </MenuItems>
-                    </MenuItem>
-                    <MenuItem Text="Assets" IconCss="fa-solid fa-box">
-                        <MenuItems>
-                            <MenuItem Text="Assets" Url="@_menuItems["Assets"]" />
-                            <MenuItem Text="Asset Categories" Url="@_menuItems["AssetCategories"]" />
-                        </MenuItems>
-                    </MenuItem>
-                    <MenuItem Text="Leave" IconCss="fa-solid fa-calendar-days">
-                        <MenuItems>
-                            <MenuItem Text="Leave Types" Url="@_menuItems["LeaveTypes"]" />
-                            <MenuItem Text="Leave Policies" Url="@_menuItems["LeavePolicies"]" />
-                            <MenuItem Text="Public Holidays" Url="@_menuItems["PublicHolidays"]" />
-                        </MenuItems>
-                    </MenuItem>
-                    <MenuItem Text="Sickness" IconCss="fa-solid fa-virus">
-                        <MenuItems>
-                            <MenuItem Text="Sickness Categories" Url="@_menuItems["SicknessCategories"]" />
-                        </MenuItems>
-                    </MenuItem>
-                    <MenuItem Text="HR" IconCss="fa-solid fa-inbox">
-                        <MenuItems>
-                            <MenuItem Text="HR Inbox" Url="@_menuItems["HrInbox"]" />
-                            <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
-                        </MenuItems>
-                    </MenuItem>
-                    @if (Session.CanManageCompany)
-                    {
-                        <MenuItem Text="Company" IconCss="fa-solid fa-building" Url="@_menuItems["Company"]" />
-                    }
-                </MenuItems>
-            </SfMenu>
-
-        </ChildContent>
-
-    </SfSidebar>
-    }
-
-    <main class="main-content">
-        <div class="top-bar">
-            @if (Session.CanManageEmployees)
-            {
-                <button class="mobile-menu-button" @onclick="ToggleSidebar">
-                    <i class="fa-solid fa-bars"></i>
-                </button>
-            }
-            <span class="page-title">Dashboard</span>
-            <div class="top-bar-actions">
-                @if (Session.IsLoaded && Session.EmployeeId.HasValue)
-                {
-                    <div class="notif-bell @(_notifOpen ? "notif-open" : "")">
-                        <button class="notif-btn" @onclick="ToggleNotifications" title="Notifications">
-                            <i class="fa-solid fa-bell"></i>
-                            @if (_unreadCount > 0)
-                            {
-                                <span class="notif-badge">@(_unreadCount > 99 ? "99+" : _unreadCount.ToString())</span>
-                            }
+                <ChildContent>
+                    <div class="sidebar-header">
+                        <button class="sidebar-toggle" @onclick="ToggleSidebar">
+                            <i class="fa-solid fa-bars"></i>
                         </button>
-                        @if (_notifOpen)
+                        @if (SidebarOpen)
                         {
-                            <div class="notif-dropdown">
-                                <div class="notif-header">
-                                    <span class="notif-header-title">Notifications</span>
-                                    @if (_unreadCount > 0)
-                                    {
-                                        <button class="notif-mark-all" @onclick="MarkAllRead">Mark all read</button>
-                                    }
-                                </div>
-                                <div class="notif-list">
-                                    @if (_notifications.Count == 0)
-                                    {
-                                        <div class="notif-empty">No notifications</div>
-                                    }
-                                    else
-                                    {
-                                        @foreach (var n in _notifications)
-                                        {
-                                            var notif = n;
-                                            var (typeIcon, typeLabel, typeCss) = NotifTypeInfo(notif.Type);
-                                            <div class="notif-item @(notif.IsRead ? "" : "notif-unread") notif-type--@notif.Type.ToLowerInvariant()"
-                                                 @onclick="() => OnNotificationClick(notif)">
-                                                <div class="notif-item-header">
-                                                    <i class="@typeIcon notif-type-icon"></i>
-                                                    <span class="notif-type-label @typeCss">@typeLabel</span>
-                                                    <span class="notif-item-time ms-auto">@FormatTime(notif.CreatedAt)</span>
-                                                </div>
-                                                <div class="notif-item-title">@notif.Title</div>
-                                                @if (notif.Body is not null)
-                                                {
-                                                    <div class="notif-item-body">@notif.Body</div>
-                                                }
-                                            </div>
-                                        }
-                                    }
-                                </div>
-                            </div>
+                            <span class="app-title">One Big Team</span>
                         }
                     </div>
-                }
-                @if (Session.IsLoaded && Session.EmployeeId.HasValue)
+
+                    <SfMenu TValue="MenuItem"
+                            Orientation="Orientation.Vertical"
+                            CssClass="app-nav-menu"
+                            ShowItemOnClick="true">
+                        <MenuItems>
+                            <MenuItem Text="Dashboard" IconCss="fa-solid fa-house" Url="/" />
+                            <MenuItem Text="People" IconCss="fa-solid fa-users">
+                                <MenuItems>
+                                    <MenuItem Text="Employees" Url="@_menuItems["Employees"]" />
+                                    <MenuItem Text="Departments" Url="@_menuItems["Departments"]" />
+                                    <MenuItem Text="Position Profiles" Url="@_menuItems["PositionProfiles"]" />
+                                    <MenuItem Text="Employment Types" Url="@_menuItems["EmploymentTypes"]" />
+                                </MenuItems>
+                            </MenuItem>
+                            <MenuItem Text="Assets" IconCss="fa-solid fa-box">
+                                <MenuItems>
+                                    <MenuItem Text="Assets" Url="@_menuItems["Assets"]" />
+                                    <MenuItem Text="Asset Categories" Url="@_menuItems["AssetCategories"]" />
+                                </MenuItems>
+                            </MenuItem>
+                            <MenuItem Text="Leave" IconCss="fa-solid fa-calendar-days">
+                                <MenuItems>
+                                    <MenuItem Text="Leave Types" Url="@_menuItems["LeaveTypes"]" />
+                                    <MenuItem Text="Leave Policies" Url="@_menuItems["LeavePolicies"]" />
+                                    <MenuItem Text="Public Holidays" Url="@_menuItems["PublicHolidays"]" />
+                                </MenuItems>
+                            </MenuItem>
+                            <MenuItem Text="Sickness" IconCss="fa-solid fa-virus">
+                                <MenuItems>
+                                    <MenuItem Text="Sickness Categories" Url="@_menuItems["SicknessCategories"]" />
+                                </MenuItems>
+                            </MenuItem>
+                            <MenuItem Text="HR" IconCss="fa-solid fa-inbox">
+                                <MenuItems>
+                                    <MenuItem Text="HR Inbox" Url="@_menuItems["HrInbox"]" />
+                                    <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
+                                </MenuItems>
+                            </MenuItem>
+                            @if (Session.CanManageCompany)
+                            {
+                                <MenuItem Text="Company" IconCss="fa-solid fa-building" Url="@_menuItems["Company"]" />
+                            }
+                        </MenuItems>
+                    </SfMenu>
+
+                </ChildContent>
+
+            </SfSidebar>
+        }
+
+        <main class="main-content">
+            <div class="top-bar">
+                @if (Session.CanManageEmployees)
                 {
-                    <a href="/companies/@Session.CompanyId/employees/@Session.EmployeeId/profile" class="top-bar-user">
-                        @if (Session.ProfileImageUrl is not null)
+                    <button class="mobile-menu-button" @onclick="ToggleSidebar">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                }
+                <span class="page-title">Dashboard</span>
+                <div class="top-bar-actions">
+                    <button class="theme-toggle" @onclick="ToggleTheme" title="@(IsDark ? "Switch to light mode" : "Switch to dark mode")">
+                        @if (IsDark)
                         {
-                            <img src="@Session.ProfileImageUrl" alt="@Session.DisplayName" class="top-bar-avatar" />
+                            <i class="fa-solid fa-sun"></i>
                         }
                         else
                         {
-                            <span class="top-bar-avatar top-bar-avatar--initials">@Session.Initials</span>
+                            <i class="fa-solid fa-moon"></i>
                         }
-                        <span class="top-bar-user-info">
-                            @Session.DisplayName
-                            @if (Session.JobTitle is not null)
-                            {
-                                <span class="top-bar-job-title">@Session.JobTitle</span>
-                            }
-                        </span>
-                    </a>
-                }
-                @if (Env.IsDevelopment())
-                {
-                    <div class="dev-persona-switcher">
-                        <select class="form-select form-select-sm dev-persona-select"
-                                @onchange="OnPersonaSwitchAsync"
-                                title="Switch dev persona">
-                            <option value="">Switch user…</option>
-                            @foreach (var p in _personas)
-                            {
-                                <option value="@p.UserId">@p.Name (@p.JobTitle)</option>
-                            }
-                        </select>
-                    </div>
-                }
-                <button class="theme-toggle" @onclick="ToggleTheme" title="@(IsDark ? "Switch to light mode" : "Switch to dark mode")">
-                    @if (IsDark)
+                    </button>
+                    @if (Session.IsLoaded && Session.EmployeeId.HasValue)
                     {
-                        <i class="fa-solid fa-sun"></i>
+                        <div class="notif-bell @(_notifOpen ? "notif-open" : "")">
+                            <button class="notif-btn" @onclick="ToggleNotifications" title="Notifications">
+                                <i class="fa-solid fa-bell"></i>
+                                @if (_unreadCount > 0)
+                                {
+                                    <span class="notif-badge">@(_unreadCount > 99 ? "99+" : _unreadCount.ToString())</span>
+                                }
+                            </button>
+                            @if (_notifOpen)
+                            {
+                                <div class="notif-dropdown">
+                                    <div class="notif-header">
+                                        <span class="notif-header-title">Notifications</span>
+                                        @if (_unreadCount > 0)
+                                        {
+                                            <button class="notif-mark-all" @onclick="MarkAllRead">Mark all read</button>
+                                        }
+                                    </div>
+                                    <div class="notif-list">
+                                        @if (_notifications.Count == 0)
+                                        {
+                                            <div class="notif-empty">No notifications</div>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var n in _notifications)
+                                            {
+                                                var notif = n;
+                                                var (typeIcon, typeLabel, typeCss) = NotifTypeInfo(notif.Type);
+                                                <div class="notif-item @(notif.IsRead ? "" : "notif-unread") notif-type--@notif.Type.ToLowerInvariant()"
+                                                     @onclick="() => OnNotificationClick(notif)">
+                                                    <div class="notif-item-header">
+                                                        <i class="@typeIcon notif-type-icon"></i>
+                                                        <span class="notif-type-label @typeCss">@typeLabel</span>
+                                                        <span class="notif-item-time ms-auto">@FormatTime(notif.CreatedAt)</span>
+                                                    </div>
+                                                    <div class="notif-item-title">@notif.Title</div>
+                                                    @if (notif.Body is not null)
+                                                    {
+                                                        <div class="notif-item-body">@notif.Body</div>
+                                                    }
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
                     }
-                    else
+                    @if (Session.IsLoaded && Session.EmployeeId.HasValue)
                     {
-                        <i class="fa-solid fa-moon"></i>
+                        <a href="/companies/@Session.CompanyId/employees/@Session.EmployeeId/profile" class="top-bar-user">
+                            @if (Session.ProfileImageUrl is not null)
+                            {
+                                <img src="@Session.ProfileImageUrl" alt="@Session.DisplayName" class="top-bar-avatar" />
+                            }
+                            else
+                            {
+                                <span class="top-bar-avatar top-bar-avatar--initials">@Session.Initials</span>
+                            }
+                            <span class="top-bar-user-info">
+                                @Session.DisplayName
+                                @if (Session.JobTitle is not null)
+                                {
+                                    <span class="top-bar-job-title">@Session.JobTitle</span>
+                                }
+                            </span>
+                        </a>
                     }
-                </button>
+                    @if (Env.IsDevelopment())
+                    {
+                        <div class="dev-persona-switcher">
+                            <select class="form-select form-select-sm dev-persona-select"
+                                    @onchange="OnPersonaSwitchAsync"
+                                    title="Switch dev persona">
+                                <option value="">Switch user…</option>
+                                @foreach (var p in _personas)
+                                {
+                                    <option value="@p.UserId">@p.Name (@p.JobTitle)</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                </div>
             </div>
-        </div>
 
-        <section class="content-area">
-            <ErrorBoundary @ref="_errorBoundary">
-                <ChildContent>
-                    @Body
-                </ChildContent>
-                <ErrorContent Context="ex">
-                    <div class="container py-4">
-                        <div class="alert alert-danger d-flex align-items-start gap-3">
-                            <i class="fa-solid fa-triangle-exclamation fa-lg mt-1"></i>
-                            <div>
-                                <h5 class="mb-1">Something went wrong</h5>
-                                <p class="mb-2">An unexpected error occurred. You can try refreshing the page or navigating away.</p>
-                                <a href="." class="btn btn-sm btn-outline-danger me-2">Refresh</a>
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="ClearError">Try again</button>
+            <section class="content-area">
+                <ErrorBoundary @ref="_errorBoundary">
+                    <ChildContent>
+                        @Body
+                    </ChildContent>
+                    <ErrorContent Context="ex">
+                        <div class="container py-4">
+                            <div class="alert alert-danger d-flex align-items-start gap-3">
+                                <i class="fa-solid fa-triangle-exclamation fa-lg mt-1"></i>
+                                <div>
+                                    <h5 class="mb-1">Something went wrong</h5>
+                                    <p class="mb-2">An unexpected error occurred. You can try refreshing the page or navigating away.</p>
+                                    <a href="." class="btn btn-sm btn-outline-danger me-2">Refresh</a>
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="ClearError">Try again</button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </ErrorContent>
-            </ErrorBoundary>
-        </section>
-    </main>
+                    </ErrorContent>
+                </ErrorBoundary>
+            </section>
+        </main>
 
-</div>
+    </div>
 
 }
 
@@ -236,19 +236,19 @@ else
 
     private readonly Dictionary<string, string> _menuItems = new()
     {
-        ["Employees"]        = "/",
-        ["Departments"]      = "/",
+        ["Employees"] = "/",
+        ["Departments"] = "/",
         ["PositionProfiles"] = "/",
-        ["EmploymentTypes"]  = "/",
-        ["Assets"]           = "/",
-        ["AssetCategories"]  = "/",
-        ["LeaveTypes"]       = "/",
-        ["LeavePolicies"]    = "/",
-        ["PublicHolidays"]   = "/",
-        ["HrInbox"]             = "/",
-        ["DocumentTypes"]       = "/",
-        ["SicknessCategories"]  = "/",
-        ["Company"]             = "/",
+        ["EmploymentTypes"] = "/",
+        ["Assets"] = "/",
+        ["AssetCategories"] = "/",
+        ["LeaveTypes"] = "/",
+        ["LeavePolicies"] = "/",
+        ["PublicHolidays"] = "/",
+        ["HrInbox"] = "/",
+        ["DocumentTypes"] = "/",
+        ["SicknessCategories"] = "/",
+        ["Company"] = "/",
     };
 
     protected override async Task OnInitializedAsync()
@@ -256,19 +256,19 @@ else
         await Session.InitialiseAsync();
 
         var companyId = Session.CompanyId;
-        _menuItems["Employees"]        = $"/companies/{companyId}/employees";
-        _menuItems["Departments"]      = $"/companies/{companyId}/departments";
+        _menuItems["Employees"] = $"/companies/{companyId}/employees";
+        _menuItems["Departments"] = $"/companies/{companyId}/departments";
         _menuItems["PositionProfiles"] = $"/companies/{companyId}/position-profiles";
-        _menuItems["EmploymentTypes"]  = $"/companies/{companyId}/employment-types";
-        _menuItems["Assets"]           = $"/companies/{companyId}/assets";
-        _menuItems["AssetCategories"]  = $"/companies/{companyId}/asset-categories";
-        _menuItems["LeaveTypes"]       = $"/companies/{companyId}/leave-types";
-        _menuItems["LeavePolicies"]    = $"/companies/{companyId}/leave-policies";
-        _menuItems["PublicHolidays"]   = $"/companies/{companyId}/public-holidays";
-        _menuItems["HrInbox"]             = $"/companies/{companyId}/hr/inbox";
-        _menuItems["DocumentTypes"]       = $"/companies/{companyId}/document-types";
-        _menuItems["SicknessCategories"]  = $"/companies/{companyId}/sickness-categories";
-        _menuItems["Company"]             = $"/companies/{companyId}/edit";
+        _menuItems["EmploymentTypes"] = $"/companies/{companyId}/employment-types";
+        _menuItems["Assets"] = $"/companies/{companyId}/assets";
+        _menuItems["AssetCategories"] = $"/companies/{companyId}/asset-categories";
+        _menuItems["LeaveTypes"] = $"/companies/{companyId}/leave-types";
+        _menuItems["LeavePolicies"] = $"/companies/{companyId}/leave-policies";
+        _menuItems["PublicHolidays"] = $"/companies/{companyId}/public-holidays";
+        _menuItems["HrInbox"] = $"/companies/{companyId}/hr/inbox";
+        _menuItems["DocumentTypes"] = $"/companies/{companyId}/document-types";
+        _menuItems["SicknessCategories"] = $"/companies/{companyId}/sickness-categories";
+        _menuItems["Company"] = $"/companies/{companyId}/edit";
 
         await LoadUnreadCountAsync();
 
@@ -323,9 +323,9 @@ else
 
     private static (string Icon, string Label, string Css) NotifTypeInfo(string type) => type switch
     {
-        "TaskDueSoon" => ("fa-solid fa-clock",              "Due Soon", "notif-type-label--due-soon"),
-        "TaskOverdue" => ("fa-solid fa-triangle-exclamation", "Overdue",  "notif-type-label--overdue"),
-        _             => ("fa-solid fa-bell",               "Assigned", "notif-type-label--assigned"),
+        "TaskDueSoon" => ("fa-solid fa-clock", "Due Soon", "notif-type-label--due-soon"),
+        "TaskOverdue" => ("fa-solid fa-triangle-exclamation", "Overdue", "notif-type-label--overdue"),
+        _ => ("fa-solid fa-bell", "Assigned", "notif-type-label--assigned"),
     };
 
     private static string FormatTime(DateTimeOffset dt)
