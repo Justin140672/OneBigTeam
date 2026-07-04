@@ -109,14 +109,23 @@ public sealed class EmployeeProfileEditModel
     [Required(ErrorMessage = "Gender is required.")]
     public string Gender { get; set; } = string.Empty;
     public string GenderOther { get; set; } = string.Empty;
+    [DynamicRegex(nameof(MobileRegexPattern), ErrorMessage = "Enter a valid mobile number.")]
     public string PhoneNumber { get; set; } = string.Empty;
+    [DynamicRegex(nameof(TelephoneRegexPattern), ErrorMessage = "Enter a valid phone number.")]
     public string HomePhone { get; set; } = string.Empty;
     public string AddressLine1 { get; set; } = string.Empty;
     public string AddressLine2 { get; set; } = string.Empty;
     public string City { get; set; } = string.Empty;
     public string County { get; set; } = string.Empty;
+    [DynamicRegex(nameof(PostcodeRegexPattern), ErrorMessage = "Enter a valid postcode.")]
     public string PostCode { get; set; } = string.Empty;
     public string Country { get; set; } = string.Empty;
+
+    // Populated from the company's settings after load; not bound to any input — used only as
+    // the pattern source for the [DynamicRegex] attributes above.
+    public string? PostcodeRegexPattern { get; set; }
+    public string? TelephoneRegexPattern { get; set; }
+    public string? MobileRegexPattern { get; set; }
     public Guid? DepartmentId { get; set; }
     public Guid? PositionProfileId { get; set; }
     public bool HasSystemAccess { get; set; } = true;

@@ -84,6 +84,61 @@ public class CreateCompanyHandlerTests
         Assert.Equal(result.Value.Id, settings.CompanyId);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_PostalCode_Does_Not_Match_Default_Uk_Regex()
+    {
+        await using var context = BuildContext();
+        var handler = new CreateCompanyHandler(context, new FakeClock(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc)));
+
+        var result = await handler.HandleAsync(
+            new CreateCompanyRequest
+            {
+                Name = "Acme Corporation",
+                Addresses =
+                [
+                    new CreateCompanyAddressRequest
+                    {
+                        Type = CompanyAddressType.RegisteredOffice,
+                        Line1 = "10 High Street",
+                        City = "London",
+                        PostalCode = "not a postcode",
+                        CountryCode = "GB"
+                    }
+                ]
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Empty(await context.Companies.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_Succeeds_When_PostalCode_Is_Omitted()
+    {
+        await using var context = BuildContext();
+        var handler = new CreateCompanyHandler(context, new FakeClock(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc)));
+
+        var result = await handler.HandleAsync(
+            new CreateCompanyRequest
+            {
+                Name = "Acme Corporation",
+                Addresses =
+                [
+                    new CreateCompanyAddressRequest
+                    {
+                        Type = CompanyAddressType.RegisteredOffice,
+                        Line1 = "10 High Street",
+                        City = "London",
+                        CountryCode = "GB"
+                    }
+                ]
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
     private static CompaniesDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<CompaniesDbContext>()

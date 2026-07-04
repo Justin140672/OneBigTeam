@@ -197,6 +197,22 @@ namespace HR.Modules.Companies.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("locale");
 
+                    b.Property<string>("MobileRegex")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasDefaultValue("^(?:\\+44\\s?|0)7\\d{3}(?:\\s?\\d{3}){2}$")
+                        .HasColumnName("mobile_regex");
+
+                    b.Property<string>("PostcodeRegex")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasDefaultValue("^[A-Za-z]{1,2}\\d[A-Za-z\\d]?\\s?\\d[A-Za-z]{2}$")
+                        .HasColumnName("postcode_regex");
+
                     b.Property<int>("ProbationMonths")
                         .HasColumnType("integer")
                         .HasColumnName("probation_months");
@@ -204,6 +220,14 @@ namespace HR.Modules.Companies.Migrations
                     b.Property<int?>("ReturnToWorkRequiredAfterDays")
                         .HasColumnType("integer")
                         .HasColumnName("return_to_work_required_after_days");
+
+                    b.Property<string>("TelephoneRegex")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasDefaultValue("^(?:\\+44\\s?|0)(?:\\d\\s?){9,10}$")
+                        .HasColumnName("telephone_regex");
 
                     b.Property<string>("TimeZone")
                         .IsRequired()

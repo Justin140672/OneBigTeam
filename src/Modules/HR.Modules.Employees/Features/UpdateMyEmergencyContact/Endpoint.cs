@@ -26,7 +26,15 @@ internal sealed class Endpoint(UpdateMyEmergencyContactHandler handler)
 
         if (result.IsFailure)
         {
-            await Send.ResultAsync(TypedResults.NotFound());
+            var businessError = new { error = result.Error.Message };
+
+            if (result.Error.Code == "not_found")
+            {
+                await Send.ResultAsync(TypedResults.NotFound(businessError));
+                return;
+            }
+
+            await Send.ResultAsync(TypedResults.BadRequest(businessError));
             return;
         }
 

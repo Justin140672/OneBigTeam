@@ -57,6 +57,12 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
             return (false, body?.Error ?? "A conflict occurred.");
         }
 
+        if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+            return (false, body?.Error ?? "Validation failed.");
+        }
+
         return (false, "Failed to save profile.");
     }
 
@@ -127,6 +133,12 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
                 return (false, first ?? "Validation failed.");
             }
 
+            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>(cancellationToken);
+                return (false, body?.Error ?? "Validation failed.");
+            }
+
             return (false, "Failed to save contact details.");
         }
         catch { return (false, "An unexpected error occurred."); }
@@ -167,6 +179,12 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
                 return (null, first ?? "Validation failed.");
             }
 
+            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>(cancellationToken);
+                return (null, body?.Error ?? "Validation failed.");
+            }
+
             return (null, "Failed to add emergency contact.");
         }
         catch { return (null, "An unexpected error occurred."); }
@@ -191,6 +209,12 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
                 var body = await response.Content.ReadFromJsonAsync<ValidationErrorEnvelope>(cancellationToken);
                 var first = body?.Errors?.Values.SelectMany(v => v).FirstOrDefault();
                 return (false, first ?? "Validation failed.");
+            }
+
+            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>(cancellationToken);
+                return (false, body?.Error ?? "Validation failed.");
             }
 
             return (false, "Failed to update emergency contact.");
@@ -279,6 +303,12 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         {
             var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
             return (null, body?.Error ?? "An employee with that email already exists.");
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+            return (null, body?.Error ?? "Validation failed.");
         }
 
         return (null, "Failed to create employee.");

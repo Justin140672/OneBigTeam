@@ -586,6 +586,10 @@
         var natResult = await EmployeeService.ListNationalitiesAsync();
         _nationalities = natResult?.Items.ToList() ?? [];
 
+        Model.PostcodeRegexPattern = Session.PostcodeRegex;
+        Model.TelephoneRegexPattern = Session.TelephoneRegex;
+        Model.MobileRegexPattern = Session.MobileRegex;
+
         if (!IsNew)
         {
             _employee = await EmployeeService.GetEmployeeAsync(CompanyId, Id!.Value);

@@ -69,6 +69,24 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .HasColumnName("return_to_work_required_after_days")
             .IsRequired(false);
 
+        builder.Property(settings => settings.PostcodeRegex)
+            .HasColumnName("postcode_regex")
+            .HasMaxLength(500)
+            .IsRequired()
+            .HasDefaultValue(UkContactRegexDefaults.Postcode);
+
+        builder.Property(settings => settings.TelephoneRegex)
+            .HasColumnName("telephone_regex")
+            .HasMaxLength(500)
+            .IsRequired()
+            .HasDefaultValue(UkContactRegexDefaults.Telephone);
+
+        builder.Property(settings => settings.MobileRegex)
+            .HasColumnName("mobile_regex")
+            .HasMaxLength(500)
+            .IsRequired()
+            .HasDefaultValue(UkContactRegexDefaults.Mobile);
+
         builder.Property(settings => settings.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

@@ -220,6 +220,8 @@ else
         _form.Relationship = string.Empty;
         _form.PhoneNumber = string.Empty;
         _form.Email = null;
+        _form.TelephoneRegexPattern = Session.TelephoneRegex;
+        _form.MobileRegexPattern = Session.MobileRegex;
         _editContext = new EditContext(_form);
     }
 
@@ -244,6 +246,8 @@ else
         _form.Relationship = c.Relationship;
         _form.PhoneNumber = c.PhoneNumber;
         _form.Email = c.Email;
+        _form.TelephoneRegexPattern = Session.TelephoneRegex;
+        _form.MobileRegexPattern = Session.MobileRegex;
         _editContext = new EditContext(_form);
         _error = null;
     }
@@ -334,8 +338,12 @@ else
         [Required(ErrorMessage = "Relationship is required.")]
         public string Relationship { get; set; } = string.Empty;
         [Required(ErrorMessage = "Phone number is required.")]
+        [DynamicRegex(nameof(MobileRegexPattern), nameof(TelephoneRegexPattern), ErrorMessage = "Enter a valid phone number.")]
         public string PhoneNumber { get; set; } = string.Empty;
         [EmailAddress(ErrorMessage = "Email must be a valid email address.")]
         public string? Email { get; set; }
+
+        public string? TelephoneRegexPattern { get; set; }
+        public string? MobileRegexPattern { get; set; }
     }
 }

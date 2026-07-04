@@ -46,6 +46,23 @@ public sealed class EmergencyContactsTab(IPage page)
         await page.WaitForSelectorAsync(".ec-success-banner", new() { Timeout = 15_000 });
     }
 
+    /// <summary>Clicks the add-contact form's save button without waiting for success — for asserting a validation error instead.</summary>
+    public async Task ClickSaveContactAsync()
+    {
+        var saveBtn = page.Locator("button.e-primary, button[type='submit']")
+            .Filter(new() { HasText = "Add Contact" })
+            .Last;
+        await saveBtn.ClickAsync();
+    }
+
+    /// <summary>
+    /// The add/edit form here has no GlobalError banner — SaveAddAsync/SaveEditAsync just return
+    /// early on a failed EditContext.Validate(), so the only signal is the rendered
+    /// &lt;ValidationMessage&gt; div (class "validation-message", styled in app.css).
+    /// </summary>
+    public async Task<bool> HasValidationMessageAsync() =>
+        await page.Locator(".validation-message").First.IsVisibleAsync();
+
     // ── Contact list ───────────────────────────────────────────────────────────
 
     public async Task<bool> HasContactAsync(string nameFragment) =>

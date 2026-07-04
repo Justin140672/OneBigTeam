@@ -74,11 +74,23 @@ public sealed class ContactDetailsTab(IPage page)
         await page.WaitForSelectorAsync(".cd-success-banner", new() { Timeout = 15_000 });
     }
 
+    /// <summary>Clicks Save without waiting for success — for asserting a validation error instead.</summary>
+    public async Task ClickSaveAsync() =>
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save Changes" }).ClickAsync();
+
     public async Task<bool> IsSuccessBannerVisibleAsync() =>
         await page.Locator(".cd-success-banner").IsVisibleAsync();
 
     public async Task<bool> HasValidationErrorAsync() =>
         await page.Locator(".is-invalid").First.IsVisibleAsync();
+
+    /// <summary>
+    /// This tab has no per-field ".is-invalid" styling (see <see cref="HasValidationErrorAsync"/>) —
+    /// a failed client-side Validate() instead surfaces as the GlobalError banner
+    /// (EditSectionBase sets it to "Please correct the highlighted fields above.").
+    /// </summary>
+    public async Task<bool> HasGlobalErrorAsync() =>
+        await page.Locator(".alert-danger").IsVisibleAsync();
 
     /// <summary>Returns the current value of the Work Email field (readonly).</summary>
     public async Task<string?> GetWorkEmailAsync()

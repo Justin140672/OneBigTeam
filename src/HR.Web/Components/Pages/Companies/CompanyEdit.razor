@@ -141,9 +141,9 @@
             Model.Addresses.Select(a => new UpdateCompanyAddressRequest(
                 a.Type, a.Line1, a.Line2, a.City, a.Region, a.PostalCode, a.CountryCode)).ToList());
 
-        var companyResult = await CompanyService.UpdateCompanyAsync(Id, profileReq);
+        var (companyResult, companyError) = await CompanyService.UpdateCompanyAsync(Id, profileReq);
         if (companyResult is null)
-            return "Failed to save company profile.";
+            return companyError ?? "Failed to save company profile.";
 
         if (_settingsTab is not null)
         {

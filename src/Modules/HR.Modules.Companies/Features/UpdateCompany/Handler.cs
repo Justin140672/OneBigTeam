@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Persistence;
 using HR.SharedKernel;
@@ -22,12 +23,25 @@ internal sealed class UpdateCompanyHandler
     {
         var company = await _dbContext.Companies
             .Include(c => c.Addresses)
+            .Include(c => c.Settings)
             .SingleOrDefaultAsync(c => c.Id == request.Id, cancellationToken);
 
         if (company is null)
         {
             return Result.Failure<UpdateCompanyResponse>(
                 Error.NotFound($"Company with id '{request.Id}' was not found."));
+        }
+
+        var postcodeRegex = company.Settings?.PostcodeRegex ?? UkContactRegexDefaults.Postcode;
+
+        foreach (var address in request.Addresses)
+        {
+            if (!string.IsNullOrWhiteSpace(address.PostalCode) &&
+                !Regex.IsMatch(address.PostalCode.Trim(), postcodeRegex, RegexOptions.IgnoreCase))
+            {
+                return Result.Failure<UpdateCompanyResponse>(
+                    Error.Validation($"'{address.PostalCode.Trim()}' is not a valid postcode."));
+            }
         }
 
         var now = _clock.UtcNowOffset();

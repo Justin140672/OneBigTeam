@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Persistence;
 using HR.SharedKernel;
@@ -23,6 +24,18 @@ internal sealed class CreateCompanyHandler
         var now = _clock.UtcNowOffset();
 
         var company = Company.Create(Guid.NewGuid(), name, now);
+        var settings = CompanySettings.CreateDefault(company.Id, now);
+
+        foreach (var address in request.Addresses)
+        {
+            if (!string.IsNullOrWhiteSpace(address.PostalCode) &&
+                !Regex.IsMatch(address.PostalCode.Trim(), settings.PostcodeRegex, RegexOptions.IgnoreCase))
+            {
+                return Result.Failure<CreateCompanyResponse>(
+                    Error.Validation($"'{address.PostalCode.Trim()}' is not a valid postcode."));
+            }
+        }
+
         var registeredOfficeRequest = request.Addresses
             .SingleOrDefault(address => address.Type == CompanyAddressType.RegisteredOffice);
         var tradingAddressRequest = request.Addresses
@@ -60,7 +73,7 @@ internal sealed class CreateCompanyHandler
             company.SetAddress(tradingAddress, now);
         }
 
-        company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+        company.SetSettings(settings, now);
 
         _dbContext.Companies.Add(company);
         await _dbContext.SaveChangesAsync(cancellationToken);

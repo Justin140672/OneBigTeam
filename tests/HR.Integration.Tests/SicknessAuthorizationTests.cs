@@ -44,15 +44,18 @@ public class SicknessAuthorizationTests : IClassFixture<ApiWebApplicationFactory
 
     // --- sickness:manage — plain Employee is denied on HR-only endpoints ---
 
+    // ListSicknessCategories is read-only reference data (category names) shared with employee
+    // self-service "notify sickness" — same pattern as ListDocumentTypes — so it's "authenticated"
+    // rather than "sickness:manage" and a plain employee is allowed to list it.
     [Fact]
-    public async Task PlainEmployee_Gets_Forbidden_Listing_Sickness_Categories()
+    public async Task PlainEmployee_Gets_Ok_Listing_Sickness_Categories()
     {
         var companyId = Guid.NewGuid();
         using var client = ClientFor(companyId, PlainEmployeeUser);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/sickness-categories");
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]

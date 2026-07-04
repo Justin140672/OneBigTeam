@@ -19,6 +19,9 @@ internal sealed class CompanySettings
     public bool ExcludePublicHolidaysFromSickness { get; private set; }
     public int? FitNoteRequiredAfterDays { get; private set; }
     public int? ReturnToWorkRequiredAfterDays { get; private set; }
+    public string PostcodeRegex { get; private set; } = UkContactRegexDefaults.Postcode;
+    public string TelephoneRegex { get; private set; } = UkContactRegexDefaults.Telephone;
+    public string MobileRegex { get; private set; } = UkContactRegexDefaults.Mobile;
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -39,6 +42,9 @@ internal sealed class CompanySettings
             ExcludePublicHolidaysFromSickness = false,
             FitNoteRequiredAfterDays = null,
             ReturnToWorkRequiredAfterDays = null,
+            PostcodeRegex = UkContactRegexDefaults.Postcode,
+            TelephoneRegex = UkContactRegexDefaults.Telephone,
+            MobileRegex = UkContactRegexDefaults.Mobile,
             CreatedAt = now,
             UpdatedAt = now,
         };

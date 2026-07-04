@@ -52,6 +52,9 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory)
     public bool ExcludePublicHolidaysFromLeave { get; private set; }
     public string TimeZone { get; private set; } = "UTC";
     public string Locale { get; private set; } = "en-GB";
+    public string? PostcodeRegex { get; private set; }
+    public string? TelephoneRegex { get; private set; }
+    public string? MobileRegex { get; private set; }
 
     // Company branding
     public string? PrimaryLogoUrl { get; private set; }
@@ -61,7 +64,16 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory)
     {
         if (IsLoaded) return;
 
-        var me = await Http.GetFromJsonAsync<MeResponse>("api/me", HrApiJsonOptions.Default);
+        MeResponse? me;
+        try
+        {
+            me = await Http.GetFromJsonAsync<MeResponse>("api/me", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return;
+        }
+
         if (me is null) return;
 
         UserId    = me.UserId;
@@ -97,6 +109,9 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory)
             ExcludePublicHolidaysFromLeave = settings.ExcludePublicHolidaysFromLeave;
             TimeZone                     = settings.TimeZone;
             Locale                       = settings.Locale;
+            PostcodeRegex                = settings.PostcodeRegex;
+            TelephoneRegex               = settings.TelephoneRegex;
+            MobileRegex                  = settings.MobileRegex;
         }
 
         if (employee is not null)

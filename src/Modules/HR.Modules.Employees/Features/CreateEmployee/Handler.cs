@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
@@ -12,23 +14,40 @@ internal sealed class CreateEmployeeHandler
     private readonly IClock _clock;
     private readonly IIntegrationEventPublisher _publisher;
     private readonly IProbationDateResolver _probationDateResolver;
+    private readonly ICompanyContactValidationReader _contactValidationReader;
 
     public CreateEmployeeHandler(
         EmployeesDbContext dbContext,
         IClock clock,
         IIntegrationEventPublisher publisher,
-        IProbationDateResolver probationDateResolver)
+        IProbationDateResolver probationDateResolver,
+        ICompanyContactValidationReader contactValidationReader)
     {
         _dbContext = dbContext;
         _clock = clock;
         _publisher = publisher;
         _probationDateResolver = probationDateResolver;
+        _contactValidationReader = contactValidationReader;
     }
 
     public async Task<Result<CreateEmployeeResponse>> HandleAsync(
         CreateEmployeeRequest request,
         CancellationToken cancellationToken)
     {
+        var contactRules = await _contactValidationReader.GetContactValidationRulesAsync(request.CompanyId, cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(request.PostCode) &&
+            !Regex.IsMatch(request.PostCode.Trim(), contactRules.PostcodeRegex, RegexOptions.IgnoreCase))
+            return Result.Failure<CreateEmployeeResponse>(Error.Validation($"'{request.PostCode.Trim()}' is not a valid postcode."));
+
+        if (!string.IsNullOrWhiteSpace(request.PhoneNumber) &&
+            !Regex.IsMatch(request.PhoneNumber.Trim(), contactRules.MobileRegex, RegexOptions.IgnoreCase))
+            return Result.Failure<CreateEmployeeResponse>(Error.Validation($"'{request.PhoneNumber.Trim()}' is not a valid mobile number."));
+
+        if (!string.IsNullOrWhiteSpace(request.HomePhone) &&
+            !Regex.IsMatch(request.HomePhone.Trim(), contactRules.TelephoneRegex, RegexOptions.IgnoreCase))
+            return Result.Failure<CreateEmployeeResponse>(Error.Validation($"'{request.HomePhone.Trim()}' is not a valid phone number."));
+
         var normalizedEmail = request.WorkEmail.Trim().ToLowerInvariant();
 
         var emailExists = await _dbContext.Employees

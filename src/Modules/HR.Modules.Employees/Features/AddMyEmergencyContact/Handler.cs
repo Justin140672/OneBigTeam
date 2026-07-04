@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
@@ -8,7 +10,8 @@ namespace HR.Modules.Employees.Features.AddMyEmergencyContact;
 internal sealed class AddMyEmergencyContactHandler(
     EmployeesDbContext dbContext,
     IClock clock,
-    IAuditEventPublisher auditEventPublisher)
+    IAuditEventPublisher auditEventPublisher,
+    ICompanyContactValidationReader contactValidationReader)
 {
     public async Task<Result<AddMyEmergencyContactResponse>> HandleAsync(
         AddMyEmergencyContactRequest request,
@@ -21,6 +24,13 @@ internal sealed class AddMyEmergencyContactHandler(
         if (!employeeExists)
             return Result.Failure<AddMyEmergencyContactResponse>(
                 Error.NotFound("No employee record is linked to this user."));
+
+        var contactRules = await contactValidationReader.GetContactValidationRulesAsync(request.CompanyId, cancellationToken);
+        var phone = request.PhoneNumber.Trim();
+
+        if (!Regex.IsMatch(phone, contactRules.MobileRegex, RegexOptions.IgnoreCase) &&
+            !Regex.IsMatch(phone, contactRules.TelephoneRegex, RegexOptions.IgnoreCase))
+            return Result.Failure<AddMyEmergencyContactResponse>(Error.Validation($"'{phone}' is not a valid phone number."));
 
         var now = clock.UtcNowOffset();
 

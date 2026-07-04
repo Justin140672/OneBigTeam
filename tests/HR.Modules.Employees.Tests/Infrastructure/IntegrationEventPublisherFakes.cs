@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Services;
 using HR.SharedKernel;
 
@@ -8,6 +9,15 @@ public sealed class FakeProbationDateResolver(int months = 6) : IProbationDateRe
     public Task<DateOnly> ResolveEndDateAsync(
         Guid companyId, int? positionMonthsOverride, DateOnly startDate, CancellationToken cancellationToken)
         => Task.FromResult(startDate.AddMonths(positionMonthsOverride ?? months));
+}
+
+// Matches anything by default, so tests that don't care about contact validation aren't affected.
+public sealed class FakeCompanyContactValidationReader(
+    string postcodeRegex = ".*", string telephoneRegex = ".*", string mobileRegex = ".*")
+    : ICompanyContactValidationReader
+{
+    public Task<CompanyContactValidationRules> GetContactValidationRulesAsync(Guid companyId, CancellationToken cancellationToken)
+        => Task.FromResult(new CompanyContactValidationRules(postcodeRegex, telephoneRegex, mobileRegex));
 }
 
 public sealed class NoOpIntegrationEventPublisher : IIntegrationEventPublisher

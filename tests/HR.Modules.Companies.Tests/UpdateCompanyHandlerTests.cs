@@ -81,6 +81,77 @@ public class UpdateCompanyHandlerTests
         Assert.Equal("not_found", result.Error.Code);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_PostalCode_Does_Not_Match_Company_Regex()
+    {
+        await using var context = BuildContext();
+        var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
+        var company = Company.Create(Guid.NewGuid(), "Acme", now);
+        company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+        context.Companies.Add(company);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateCompanyHandler(
+            context,
+            new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)));
+
+        var result = await handler.HandleAsync(new UpdateCompanyRequest
+        {
+            Id = company.Id,
+            Name = "Acme Corporation",
+            Addresses =
+            [
+                new UpdateCompanyAddressRequest
+                {
+                    Type = CompanyAddressType.RegisteredOffice,
+                    Line1 = "10 High Street",
+                    City = "London",
+                    PostalCode = "not a postcode",
+                    CountryCode = "GB",
+                }
+            ]
+        }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+
+        var saved = await context.Companies.SingleAsync(c => c.Id == company.Id);
+        Assert.Equal("Acme", saved.Name); // unchanged — validation ran before any updates were applied
+    }
+
+    [Fact]
+    public async Task HandleAsync_Falls_Back_To_Default_Uk_Regex_When_Company_Has_No_Settings()
+    {
+        await using var context = BuildContext();
+        var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
+        var company = Company.Create(Guid.NewGuid(), "Acme", now); // no SetSettings call
+        context.Companies.Add(company);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateCompanyHandler(
+            context,
+            new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)));
+
+        var result = await handler.HandleAsync(new UpdateCompanyRequest
+        {
+            Id = company.Id,
+            Name = "Acme Corporation",
+            Addresses =
+            [
+                new UpdateCompanyAddressRequest
+                {
+                    Type = CompanyAddressType.RegisteredOffice,
+                    Line1 = "10 High Street",
+                    City = "London",
+                    PostalCode = "SW1A 1AA",
+                    CountryCode = "GB",
+                }
+            ]
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
     private static CompaniesDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<CompaniesDbContext>()

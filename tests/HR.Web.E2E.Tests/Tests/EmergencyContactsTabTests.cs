@@ -79,4 +79,31 @@ public sealed class EmergencyContactsTabTests(AppFixture fixture) : E2ETestBase(
         Assert.True(isRendered,
             "Expected the Emergency Contacts tab to render a card for the employee's own profile");
     }
+
+    [Fact]
+    public async Task EmergencyContactsTab_InvalidPhoneNumber_ShowsValidationError()
+    {
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile   = new MyProfilePage(_page, _fixture.WebBaseUrl);
+        var emergency = new EmergencyContactsTab(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await profile.GoToAsync(AcmeId, TomId);
+        await profile.OpenEmergencyContactsTabAsync();
+        await emergency.WaitForLoadAsync();
+
+        await emergency.ClickAddContactAsync();
+        await emergency.FillContactNameAsync("Invalid Phone Test");
+        await emergency.FillContactRelationshipAsync("Friend");
+        await emergency.FillContactPhoneAsync("not-a-phone-number");
+
+        await emergency.ClickSaveContactAsync();
+
+        Assert.True(await emergency.HasValidationMessageAsync(),
+            "Expected a validation error for a phone number that matches neither mobile nor telephone format");
+        Assert.False(await emergency.HasContactAsync("Invalid Phone Test"),
+            "The contact should not have been saved with an invalid phone number");
+    }
 }

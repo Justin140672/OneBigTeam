@@ -62,6 +62,9 @@ public record GetCompanySettingsResponse(
     bool ExcludePublicHolidaysFromSickness,
     int? FitNoteRequiredAfterDays,
     int? ReturnToWorkRequiredAfterDays,
+    string PostcodeRegex,
+    string TelephoneRegex,
+    string MobileRegex,
     DateTime UpdatedAt);
 
 public record UpdateCompanySettingsRequest(

@@ -143,6 +143,10 @@ else
         if (!Session.EmployeeId.HasValue || Session.EmployeeId.Value != EmployeeId)
             return;
 
+        Model.PostcodeRegexPattern = Session.PostcodeRegex;
+        Model.TelephoneRegexPattern = Session.TelephoneRegex;
+        Model.MobileRegexPattern = Session.MobileRegex;
+
         var details = await EmployeeService.GetMyContactDetailsAsync(CompanyId);
         if (details is not null)
         {
@@ -191,7 +195,9 @@ else
     {
         [EmailAddress(ErrorMessage = "Enter a valid email address.")]
         public string? PersonalEmail { get; set; }
+        [DynamicRegex(nameof(MobileRegexPattern), ErrorMessage = "Enter a valid mobile number.")]
         public string? PhoneNumber { get; set; }
+        [DynamicRegex(nameof(TelephoneRegexPattern), ErrorMessage = "Enter a valid phone number.")]
         public string? HomePhone { get; set; }
         [Required(ErrorMessage = "Address line 1 is required.")]
         public string AddressLine1 { get; set; } = string.Empty;
@@ -200,8 +206,13 @@ else
         public string City { get; set; } = string.Empty;
         public string? County { get; set; }
         [Required(ErrorMessage = "Post code is required.")]
+        [DynamicRegex(nameof(PostcodeRegexPattern), ErrorMessage = "Enter a valid postcode.")]
         public string PostCode { get; set; } = string.Empty;
         [Required(ErrorMessage = "Country is required.")]
         public string Country { get; set; } = string.Empty;
+
+        public string? PostcodeRegexPattern { get; set; }
+        public string? TelephoneRegexPattern { get; set; }
+        public string? MobileRegexPattern { get; set; }
     }
 }

@@ -112,4 +112,87 @@ public sealed class ContactDetailsTabTests(AppFixture fixture) : E2ETestBase(fix
         var savedEmail = await contactDetails.GetPersonalEmailAsync();
         Assert.Equal(uniqueEmail, savedEmail, StringComparer.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task ContactDetailsTab_InvalidPostCode_ShowsValidationError()
+    {
+        var login          = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile        = new MyProfilePage(_page, _fixture.WebBaseUrl);
+        var contactDetails = new ContactDetailsTab(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await profile.GoToAsync(AcmeId, TomId);
+        await profile.OpenContactDetailsTabAsync();
+        await contactDetails.WaitForLoadAsync();
+
+        await contactDetails.FillAddressLine1Async("123 Test Street");
+        await contactDetails.FillCityAsync("London");
+        await contactDetails.FillPostCodeAsync("not a postcode");
+        await contactDetails.FillCountryAsync("United Kingdom");
+
+        await contactDetails.ClickSaveAsync();
+
+        Assert.True(await contactDetails.HasGlobalErrorAsync(),
+            "Expected a validation error for an invalid postcode");
+        Assert.False(await contactDetails.IsSuccessBannerVisibleAsync(),
+            "Save should not have succeeded with an invalid postcode");
+    }
+
+    [Fact]
+    public async Task ContactDetailsTab_InvalidMobilePhone_ShowsValidationError()
+    {
+        var login          = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile        = new MyProfilePage(_page, _fixture.WebBaseUrl);
+        var contactDetails = new ContactDetailsTab(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await profile.GoToAsync(AcmeId, TomId);
+        await profile.OpenContactDetailsTabAsync();
+        await contactDetails.WaitForLoadAsync();
+
+        await contactDetails.FillAddressLine1Async("123 Test Street");
+        await contactDetails.FillCityAsync("London");
+        await contactDetails.FillPostCodeAsync("EC1A 1BB");
+        await contactDetails.FillCountryAsync("United Kingdom");
+        await contactDetails.FillMobilePhoneAsync("12345");
+
+        await contactDetails.ClickSaveAsync();
+
+        Assert.True(await contactDetails.HasGlobalErrorAsync(),
+            "Expected a validation error for an invalid mobile number");
+        Assert.False(await contactDetails.IsSuccessBannerVisibleAsync(),
+            "Save should not have succeeded with an invalid mobile number");
+    }
+
+    [Fact]
+    public async Task ContactDetailsTab_InvalidHomePhone_ShowsValidationError()
+    {
+        var login          = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile        = new MyProfilePage(_page, _fixture.WebBaseUrl);
+        var contactDetails = new ContactDetailsTab(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await profile.GoToAsync(AcmeId, TomId);
+        await profile.OpenContactDetailsTabAsync();
+        await contactDetails.WaitForLoadAsync();
+
+        await contactDetails.FillAddressLine1Async("123 Test Street");
+        await contactDetails.FillCityAsync("London");
+        await contactDetails.FillPostCodeAsync("EC1A 1BB");
+        await contactDetails.FillCountryAsync("United Kingdom");
+        await contactDetails.FillHomePhoneAsync("abcdefg");
+
+        await contactDetails.ClickSaveAsync();
+
+        Assert.True(await contactDetails.HasGlobalErrorAsync(),
+            "Expected a validation error for an invalid home phone number");
+        Assert.False(await contactDetails.IsSuccessBannerVisibleAsync(),
+            "Save should not have succeeded with an invalid home phone number");
+    }
 }

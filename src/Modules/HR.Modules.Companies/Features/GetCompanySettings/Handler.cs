@@ -34,6 +34,9 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
                 defaults.ExcludePublicHolidaysFromLeave, defaults.ExcludePublicHolidaysFromSickness,
                 defaults.FitNoteRequiredAfterDays,
                 defaults.ReturnToWorkRequiredAfterDays,
+                defaults.PostcodeRegex,
+                defaults.TelephoneRegex,
+                defaults.MobileRegex,
                 defaults.UpdatedAt));
         }
 
@@ -44,6 +47,9 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
             settings.ExcludePublicHolidaysFromLeave, settings.ExcludePublicHolidaysFromSickness,
             settings.FitNoteRequiredAfterDays,
             settings.ReturnToWorkRequiredAfterDays,
+            settings.PostcodeRegex,
+            settings.TelephoneRegex,
+            settings.MobileRegex,
             settings.UpdatedAt));
     }
 }

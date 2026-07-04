@@ -30,12 +30,18 @@ public class CompanyService(IHttpClientFactory httpClientFactory)
         }
     }
 
-    public async Task<UpdateCompanyResponse?> UpdateCompanyAsync(Guid id, UpdateCompanyRequest request)
+    public async Task<(UpdateCompanyResponse? Response, string? Error)> UpdateCompanyAsync(Guid id, UpdateCompanyRequest request)
     {
         var response = await Http.PutAsJsonAsync($"api/companies/{id}", request);
-        if (!response.IsSuccessStatusCode) return null;
-        return await response.Content.ReadFromJsonAsync<UpdateCompanyResponse>();
+
+        if (response.IsSuccessStatusCode)
+            return (await response.Content.ReadFromJsonAsync<UpdateCompanyResponse>(), null);
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+        return (null, body?.Error ?? "Failed to save company profile.");
     }
+
+    private sealed record ErrorEnvelope(string? Error);
 
     public async Task<UpdateCompanySettingsResponse?> UpdateCompanySettingsAsync(Guid id, UpdateCompanySettingsRequest request)
     {

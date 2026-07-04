@@ -13,4 +13,7 @@ internal sealed record GetCompanySettingsResponse(
     bool ExcludePublicHolidaysFromSickness,
     int? FitNoteRequiredAfterDays,
     int? ReturnToWorkRequiredAfterDays,
+    string PostcodeRegex,
+    string TelephoneRegex,
+    string MobileRegex,
     DateTimeOffset UpdatedAt);

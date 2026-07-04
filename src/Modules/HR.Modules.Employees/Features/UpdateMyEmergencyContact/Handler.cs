@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +9,8 @@ namespace HR.Modules.Employees.Features.UpdateMyEmergencyContact;
 internal sealed class UpdateMyEmergencyContactHandler(
     EmployeesDbContext dbContext,
     IClock clock,
-    IAuditEventPublisher auditEventPublisher)
+    IAuditEventPublisher auditEventPublisher,
+    ICompanyContactValidationReader contactValidationReader)
 {
     public async Task<Result<UpdateMyEmergencyContactResponse>> HandleAsync(
         UpdateMyEmergencyContactRequest request,
@@ -24,6 +27,13 @@ internal sealed class UpdateMyEmergencyContactHandler(
         if (contact is null)
             return Result.Failure<UpdateMyEmergencyContactResponse>(
                 Error.NotFound("Emergency contact not found."));
+
+        var contactRules = await contactValidationReader.GetContactValidationRulesAsync(request.CompanyId, cancellationToken);
+        var phone = request.PhoneNumber.Trim();
+
+        if (!Regex.IsMatch(phone, contactRules.MobileRegex, RegexOptions.IgnoreCase) &&
+            !Regex.IsMatch(phone, contactRules.TelephoneRegex, RegexOptions.IgnoreCase))
+            return Result.Failure<UpdateMyEmergencyContactResponse>(Error.Validation($"'{phone}' is not a valid phone number."));
 
         var before = new EmergencyContactSnapshot(
             contact.Name, contact.Relationship, contact.PhoneNumber, contact.Email);
