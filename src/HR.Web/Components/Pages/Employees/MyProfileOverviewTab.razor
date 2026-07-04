@@ -30,147 +30,159 @@ else if (_employee is null)
 }
 else
 {
-    <div class="overview-grid">
+    <div class="overview-layout">
+        <div class="overview-main">
 
-        <!-- Employment Summary -->
-        <div class="overview-card">
-            <div class="overview-card-header">
-                <i class="fa-solid fa-briefcase overview-card-icon"></i>
-                <span class="overview-card-title">Employment</span>
+            <div class="overview-grid">
+
+                <!-- Employment Summary -->
+                <div class="overview-card">
+                    <div class="overview-card-header">
+                        <i class="fa-solid fa-briefcase overview-card-icon"></i>
+                        <span class="overview-card-title">Employment</span>
+                    </div>
+                    <dl class="overview-dl">
+                        <dt>Job Title</dt>
+                        <dd>@(_employee.PositionTitle ?? Session.JobTitle ?? "—")</dd>
+
+                        <dt>Department</dt>
+                        <dd>@(_employee.DepartmentName ?? "—")</dd>
+
+                        <dt>Manager</dt>
+                        <dd>@(_employee.ManagerFullName ?? "—")</dd>
+
+                        <dt>Start Date</dt>
+                        <dd>@_employee.StartDate.ToString("d MMMM yyyy")</dd>
+
+                        <dt>Length of Service</dt>
+                        <dd>@LengthOfService(_employee.StartDate)</dd>
+
+                        <dt>Employment Type</dt>
+                        <dd>@(_employee.EmploymentTypeName ?? "—")</dd>
+                    </dl>
+                </div>
+
+                <!-- Contact Information -->
+                <div class="overview-card">
+                    <div class="overview-card-header">
+                        <i class="fa-solid fa-envelope overview-card-icon"></i>
+                        <span class="overview-card-title">Contact Information</span>
+                    </div>
+                    <dl class="overview-dl">
+                        <dt>Work Email</dt>
+                        <dd>
+                            <a href="mailto:@_employee.WorkEmail" class="overview-link">@_employee.WorkEmail</a>
+                        </dd>
+
+                        <dt>Personal Email</dt>
+                        <dd>
+                            @if (_employee.PersonalEmail is not null)
+                            {
+                                <a href="mailto:@_employee.PersonalEmail" class="overview-link">@_employee.PersonalEmail</a>
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </dd>
+                    </dl>
+                </div>
+
             </div>
-            <dl class="overview-dl">
-                <dt>Job Title</dt>
-                <dd>@(_employee.PositionTitle ?? Session.JobTitle ?? "—")</dd>
 
-                <dt>Department</dt>
-                <dd>@(_employee.DepartmentName ?? "—")</dd>
+            <!-- Quick Statistics -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon stat-icon--tasks">
+                        <i class="fa-solid fa-list-check"></i>
+                    </div>
+                    <div class="stat-body">
+                        <span class="stat-value">@_openTaskCount</span>
+                        <span class="stat-label">Open Tasks</span>
+                    </div>
+                </div>
 
-                <dt>Manager</dt>
-                <dd>@(_employee.ManagerFullName ?? "—")</dd>
+                <div class="stat-card">
+                    <div class="stat-icon stat-icon--leave">
+                        <i class="fa-solid fa-umbrella-beach"></i>
+                    </div>
+                    <div class="stat-body">
+                        <span class="stat-value">@FormatDays(_annualLeaveRemaining)</span>
+                        <span class="stat-label">Leave Remaining</span>
+                    </div>
+                </div>
 
-                <dt>Start Date</dt>
-                <dd>@_employee.StartDate.ToString("d MMMM yyyy")</dd>
+                <div class="stat-card">
+                    <div class="stat-icon stat-icon--pending @(_pendingLeaveCount > 0 ? "stat-icon--pending-active" : "")">
+                        <i class="fa-solid fa-clock"></i>
+                    </div>
+                    <div class="stat-body">
+                        <span class="stat-value">@_pendingLeaveCount</span>
+                        <span class="stat-label">Pending Requests</span>
+                    </div>
+                </div>
 
-                <dt>Length of Service</dt>
-                <dd>@LengthOfService(_employee.StartDate)</dd>
-
-                <dt>Employment Type</dt>
-                <dd>@(_employee.EmploymentTypeName ?? "—")</dd>
-            </dl>
-        </div>
-
-        <!-- Contact Information -->
-        <div class="overview-card">
-            <div class="overview-card-header">
-                <i class="fa-solid fa-envelope overview-card-icon"></i>
-                <span class="overview-card-title">Contact Information</span>
+                <div class="stat-card">
+                    <div class="stat-icon stat-icon--sickness">
+                        <i class="fa-solid fa-house-medical"></i>
+                    </div>
+                    <div class="stat-body">
+                        <span class="stat-value">@FormatDays(_sicknessDays)</span>
+                        <span class="stat-label">Sickness Absence</span>
+                    </div>
+                </div>
             </div>
-            <dl class="overview-dl">
-                <dt>Work Email</dt>
-                <dd>
-                    <a href="mailto:@_employee.WorkEmail" class="overview-link">@_employee.WorkEmail</a>
-                </dd>
 
-                <dt>Personal Email</dt>
-                <dd>
-                    @if (_employee.PersonalEmail is not null)
-                    {
-                        <a href="mailto:@_employee.PersonalEmail" class="overview-link">@_employee.PersonalEmail</a>
-                    }
-                    else
-                    {
-                        <span class="text-muted">—</span>
-                    }
-                </dd>
-            </dl>
-        </div>
-
-    </div>
-
-    <!-- Quick Statistics -->
-    <div class="stats-row">
-        <div class="stat-card">
-            <div class="stat-icon stat-icon--tasks">
-                <i class="fa-solid fa-list-check"></i>
-            </div>
-            <div class="stat-body">
-                <span class="stat-value">@_openTaskCount</span>
-                <span class="stat-label">Open Tasks</span>
-            </div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon stat-icon--leave">
-                <i class="fa-solid fa-umbrella-beach"></i>
-            </div>
-            <div class="stat-body">
-                <span class="stat-value">@FormatDays(_annualLeaveRemaining)</span>
-                <span class="stat-label">Leave Remaining</span>
-            </div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon stat-icon--pending @(_pendingLeaveCount > 0 ? "stat-icon--pending-active" : "")">
-                <i class="fa-solid fa-clock"></i>
-            </div>
-            <div class="stat-body">
-                <span class="stat-value">@_pendingLeaveCount</span>
-                <span class="stat-label">Pending Requests</span>
-            </div>
-        </div>
-
-        <div class="stat-card">
-            <div class="stat-icon stat-icon--sickness">
-                <i class="fa-solid fa-house-medical"></i>
-            </div>
-            <div class="stat-body">
-                <span class="stat-value">@FormatDays(_sicknessDays)</span>
-                <span class="stat-label">Sickness Absence</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Upcoming Leave -->
-    <div class="overview-card mt-3">
-        <div class="overview-card-header">
-            <i class="fa-solid fa-calendar-days overview-card-icon"></i>
-            <span class="overview-card-title">Upcoming Leave</span>
-        </div>
-        @if (_upcomingLeave.Count == 0)
-        {
-            <p class="text-muted mb-0 px-1 py-2">No upcoming leave approved.</p>
-        }
-        else
-        {
-            <ul class="upcoming-leave-list">
-                @foreach (var req in _upcomingLeave)
+            <!-- Upcoming Leave -->
+            <div class="overview-card mt-3">
+                <div class="overview-card-header">
+                    <i class="fa-solid fa-calendar-days overview-card-icon"></i>
+                    <span class="overview-card-title">Upcoming Leave</span>
+                </div>
+                @if (_upcomingLeave.Count == 0)
                 {
-                    <li class="upcoming-leave-item">
-                        <span class="upcoming-leave-type">@req.LeaveTypeName</span>
-                        <span class="upcoming-leave-dates">
-                            @FormatDateRange(req.StartDate, req.StartPart, req.EndDate, req.EndPart)
-                        </span>
-                        <span class="upcoming-leave-days">@FormatDays(req.TotalDays)</span>
-                    </li>
+                    <p class="text-muted mb-0 px-1 py-2">No upcoming leave approved.</p>
                 }
-            </ul>
-        }
-    </div>
+                else
+                {
+                    <ul class="upcoming-leave-list">
+                        @foreach (var req in _upcomingLeave)
+                        {
+                            <li class="upcoming-leave-item">
+                                <span class="upcoming-leave-type">@req.LeaveTypeName</span>
+                                <span class="upcoming-leave-dates">
+                                    @FormatDateRange(req.StartDate, req.StartPart, req.EndDate, req.EndPart)
+                                </span>
+                                <span class="upcoming-leave-days">@FormatDays(req.TotalDays)</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
 
-    <!-- Actions -->
-    <div class="overview-actions mt-4">
-        <button class="action-btn" @onclick="@(() => OnNavigateToLeave.InvokeAsync())">
-            <i class="fa-solid fa-calendar-plus"></i>
-            Request Leave
-        </button>
-        <button class="action-btn" @onclick="@(() => OnNavigateToDocuments.InvokeAsync())">
-            <i class="fa-solid fa-file-lines"></i>
-            View Documents
-        </button>
-        <button class="action-btn" @onclick="@(() => OnNavigateToTasks.InvokeAsync())">
-            <i class="fa-solid fa-list-check"></i>
-            View Tasks
-        </button>
+        </div>
+
+        <!-- Actions -->
+        <div class="overview-sidebar">
+            <div class="overview-actions">
+                <button class="action-btn" @onclick="@(() => OnNavigateToLeave.InvokeAsync())">
+                    <i class="fa-solid fa-calendar-plus"></i>
+                    Request Leave
+                </button>
+                <button class="action-btn" @onclick="@(() => OnNavigateToSickness.InvokeAsync())">
+                    <i class="fa-solid fa-house-medical"></i>
+                    Notify Sickness
+                </button>
+                <button class="action-btn" @onclick="@(() => OnNavigateToDocuments.InvokeAsync())">
+                    <i class="fa-solid fa-file-lines"></i>
+                    View Documents
+                </button>
+                <button class="action-btn" @onclick="@(() => OnNavigateToTasks.InvokeAsync())">
+                    <i class="fa-solid fa-list-check"></i>
+                    View Tasks
+                </button>
+            </div>
+        </div>
     </div>
 }
 
@@ -179,6 +191,7 @@ else
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
 
     [Parameter] public EventCallback OnNavigateToLeave { get; set; }
+    [Parameter] public EventCallback OnNavigateToSickness { get; set; }
     [Parameter] public EventCallback OnNavigateToDocuments { get; set; }
     [Parameter] public EventCallback OnNavigateToTasks { get; set; }
 

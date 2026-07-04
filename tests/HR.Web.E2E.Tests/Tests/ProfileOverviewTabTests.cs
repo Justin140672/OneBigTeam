@@ -81,4 +81,30 @@ public sealed class ProfileOverviewTabTests(AppFixture fixture) : E2ETestBase(fi
         Assert.True(await _page.Locator(".e-dialog").IsVisibleAsync(),
             "Expected the leave request dialog to open after clicking 'Request Leave' from the Overview tab");
     }
+
+    [Fact]
+    public async Task OverviewTab_NotifySicknessButton_OpensSicknessDialog()
+    {
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile  = new MyProfilePage(_page, _fixture.WebBaseUrl);
+        var overview = new OverviewTab(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await profile.GoToAsync(AcmeId, TomId);
+
+        if (!await overview.IsVisibleAsync())
+            await profile.OpenOverviewTabAsync();
+
+        await overview.WaitForLoadAsync();
+
+        // ── Clicking "Notify Sickness" from the overview opens the self-service
+        // sickness dialog (RecordSicknessDialog in SelfService mode) ────────────
+        await overview.ClickNotifySicknessAsync();
+
+        Assert.True(await _page.Locator("[role='dialog'].record-sickness-dialog").IsVisibleAsync(),
+            "Expected the sickness notification dialog to open after clicking 'Notify Sickness' from the Overview tab");
+        Assert.Contains("Notify Sickness", await _page.ContentAsync());
+    }
 }

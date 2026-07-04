@@ -1,0 +1,132 @@
+@inject CompanyService CompanyService
+@using HR.Web.Models
+@using Microsoft.AspNetCore.Components.Forms
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Branding</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-4">
+            @foreach (var logo in _logos)
+            {
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">@logo.Label</label>
+                    <div class="border rounded p-3 text-center mb-2 d-flex align-items-center justify-content-center" style="height: 120px;">
+                        @if (!string.IsNullOrEmpty(logo.LogoUrl))
+                        {
+                            <img src="@logo.LogoUrl" alt="@logo.Label" style="max-height: 100px; max-width: 100%;" />
+                        }
+                        else
+                        {
+                            <span class="text-muted">No logo uploaded</span>
+                        }
+                    </div>
+
+                    @if (CanEdit)
+                    {
+                        <InputFile class="form-control form-control-sm" accept=".png,.svg"
+                                   OnChange="@(e => OnFileSelectedAsync(logo, e))" />
+                    }
+
+                    @if (logo.Uploading)
+                    {
+                        <div class="d-flex align-items-center gap-2 mt-2">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                            <span class="text-muted">Uploading…</span>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(logo.Error))
+                    {
+                        <div class="alert alert-danger py-1 px-2 mt-2 mb-0 small">@logo.Error</div>
+                    }
+                    @if (!string.IsNullOrEmpty(logo.SuccessMsg))
+                    {
+                        <div class="alert alert-success py-1 px-2 mt-2 mb-0 small">@logo.SuccessMsg</div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private const long MaxFileSizeBytes = 2 * 1024 * 1024;
+    private static readonly HashSet<string> AllowedContentTypes = ["image/png", "image/svg+xml"];
+
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public GetCompanyResponse Company { get; set; } = default!;
+    [Parameter] public bool CanEdit { get; set; }
+
+    private readonly List<LogoState> _logos = [];
+    private bool _initialised;
+
+    protected override void OnParametersSet()
+    {
+        if (_initialised)
+            return;
+
+        _initialised = true;
+        _logos.Add(new LogoState("PrimaryLogo", "Primary Logo", Company.Branding?.PrimaryLogoUrl));
+        _logos.Add(new LogoState("SmallLogo", "Small Logo", Company.Branding?.SmallLogoUrl));
+        _logos.Add(new LogoState("EmailLogo", "Email Logo", Company.Branding?.EmailLogoUrl));
+    }
+
+    private async Task OnFileSelectedAsync(LogoState logo, InputFileChangeEventArgs e)
+    {
+        logo.Error = null;
+        logo.SuccessMsg = null;
+
+        var file = e.File;
+
+        if (!AllowedContentTypes.Contains(file.ContentType))
+        {
+            logo.Error = "File must be a PNG or SVG image.";
+            return;
+        }
+
+        if (file.Size <= 0 || file.Size > MaxFileSizeBytes)
+        {
+            logo.Error = "File size must be greater than zero and not exceed 2 MB.";
+            return;
+        }
+
+        logo.Uploading = true;
+        StateHasChanged();
+
+        try
+        {
+            await using var stream = file.OpenReadStream(maxAllowedSize: MaxFileSizeBytes);
+            var result = await CompanyService.UploadCompanyLogoAsync(
+                CompanyId, logo.AssetType, stream, file.Name, file.ContentType);
+
+            if (result is null)
+            {
+                logo.Error = "Failed to upload logo.";
+            }
+            else
+            {
+                logo.LogoUrl = result.LogoUrl;
+                logo.SuccessMsg = "Logo uploaded successfully.";
+            }
+        }
+        catch (Exception)
+        {
+            logo.Error = "Failed to upload logo.";
+        }
+        finally
+        {
+            logo.Uploading = false;
+        }
+    }
+
+    private sealed class LogoState(string assetType, string label, string? logoUrl)
+    {
+        public string AssetType { get; } = assetType;
+        public string Label { get; } = label;
+        public string? LogoUrl { get; set; } = logoUrl;
+        public bool Uploading { get; set; }
+        public string? Error { get; set; }
+        public string? SuccessMsg { get; set; }
+    }
+}

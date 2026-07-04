@@ -74,7 +74,7 @@
     {
         if (!Session.CanManageEmployees)
         {
-            Navigation.NavigateTo("/", replace: true);
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
             return;
         }
         _canCreateEmployee = await UserService.HasPermissionAsync(SystemPermissions.EmployeeCreate);

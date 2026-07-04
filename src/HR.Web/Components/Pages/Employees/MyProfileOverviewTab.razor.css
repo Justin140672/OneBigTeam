@@ -1,3 +1,48 @@
+/* ── Overview layout (main content + right-hand actions rail) ────── */
+
+.overview-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.overview-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.overview-sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 16px;
+}
+
+.overview-sidebar .overview-actions {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.overview-sidebar .action-btn {
+    justify-content: flex-start;
+}
+
+@media (max-width: 900px) {
+    .overview-layout {
+        flex-direction: column;
+    }
+
+    .overview-sidebar {
+        width: 100%;
+        position: static;
+    }
+
+    .overview-sidebar .overview-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+}
+
 /* ── Grid layout ─────────────────────────────────────── */
 
 .overview-grid {

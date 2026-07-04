@@ -95,8 +95,12 @@ public sealed class UnauthorizedAccessTests(AppFixture fixture) : E2ETestBase(fi
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees");
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
+        // Tom is now redirected to his own profile (which itself lives under an "/employees/"
+        // path segment), not the dashboard — so check he's off the bare list route specifically,
+        // rather than asserting "/employees" doesn't appear anywhere in the URL.
         var finalUrl = _page.Url;
-        Assert.DoesNotContain("/employees", finalUrl);
+        Assert.False(finalUrl.TrimEnd('/').EndsWith($"/companies/{AcmeId}/employees", StringComparison.OrdinalIgnoreCase),
+            $"Expected Tom to be redirected away from the employee list page, but ended up at: {finalUrl}");
     }
 
     [Fact]

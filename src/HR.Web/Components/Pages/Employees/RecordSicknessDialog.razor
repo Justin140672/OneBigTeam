@@ -6,7 +6,7 @@
 <SfDialog @bind-Visible="Visible" IsModal="true" Width="480px" ShowCloseIcon="true" CssClass="record-sickness-dialog">
     <DialogEvents Closed="HandleDialogClosed" />
     <DialogTemplates>
-        <Header>Record Sickness</Header>
+        <Header>@(SelfService ? "Notify Sickness" : "Record Sickness")</Header>
         <Content>
             @if (GlobalError is not null)
             {
@@ -84,7 +84,7 @@
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                 }
-                Record
+                @(SelfService ? "Notify" : "Record")
             </SfButton>
             <SfButton OnClick="CancelAsync">Cancel</SfButton>
         </FooterTemplate>
@@ -94,6 +94,9 @@
 @code {
     [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    // When true, this is the employee reporting their own sickness (calls RecordMySicknessAsync)
+    // rather than an HR/manager recording it on someone's behalf (RecordSicknessAsync).
+    [Parameter] public bool SelfService { get; set; }
 
     public sealed record DayPartChoice(string Value, string Label);
 
@@ -117,16 +120,17 @@
 
     protected override async Task<string?> SaveCoreAsync()
     {
-        var (success, error) = await SicknessService.RecordSicknessAsync(
-            CompanyId,
-            EmployeeId,
-            new RecordSicknessRequest(
-                Model.CategoryId!.Value,
-                Model.StartDate!.Value,
-                Model.StartDayPart,
-                Model.AlreadyEnded ? Model.EndDate : null,
-                Model.AlreadyEnded ? Model.EndDayPart : null,
-                Model.Notes));
+        var request = new RecordSicknessRequest(
+            Model.CategoryId!.Value,
+            Model.StartDate!.Value,
+            Model.StartDayPart,
+            Model.AlreadyEnded ? Model.EndDate : null,
+            Model.AlreadyEnded ? Model.EndDayPart : null,
+            Model.Notes);
+
+        var (success, error) = SelfService
+            ? await SicknessService.RecordMySicknessAsync(CompanyId, EmployeeId, request)
+            : await SicknessService.RecordSicknessAsync(CompanyId, EmployeeId, request);
 
         return success ? null : error;
     }

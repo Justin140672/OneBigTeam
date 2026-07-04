@@ -68,6 +68,14 @@
                         </div>
                     </ContentTemplate>
                 </TabItem>
+                <TabItem>
+                    <ChildContent><TabHeader Text="Branding" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4 @(IsViewMode ? "view-mode" : "")">
+                            <CompanyBrandingTab CompanyId="Id" Company="_company" CanEdit="!IsViewMode" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
             </TabItems>
         </SfTab>
 
@@ -105,7 +113,7 @@
         await Session.InitialiseAsync();
         if (!IsViewMode && !Session.CanManageCompany)
         {
-            Navigation.NavigateTo("/", replace: true);
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
             return;
         }
 

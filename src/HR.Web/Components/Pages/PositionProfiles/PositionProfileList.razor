@@ -77,7 +77,7 @@
     protected override Task OnBeforeLoadAsync()
     {
         if (!Session.CanManageEmployees)
-            Navigation.NavigateTo("/", replace: true);
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
         return Task.CompletedTask;
     }
 

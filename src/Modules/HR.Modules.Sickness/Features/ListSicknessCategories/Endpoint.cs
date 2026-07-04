@@ -9,7 +9,9 @@ internal sealed class Endpoint(ListSicknessCategoriesHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/sickness-categories");
-        Policies("sickness:manage");
+        // Read-only reference data (category names) used both by HR/manager sickness recording
+        // and by employee self-service "notify sickness" — same pattern as ListDocumentTypes.
+        Policies("authenticated");
     }
 
     public override async Task HandleAsync(ListSicknessCategoriesRequest request, CancellationToken cancellationToken)

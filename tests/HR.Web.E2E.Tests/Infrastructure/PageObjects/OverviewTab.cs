@@ -33,6 +33,12 @@ public sealed class OverviewTab(IPage page)
         await page.WaitForSelectorAsync(".e-dialog", new() { Timeout = 10_000 });
     }
 
+    public async Task ClickNotifySicknessAsync()
+    {
+        await page.Locator(".action-btn").Filter(new() { HasText = "Notify Sickness" }).ClickAsync();
+        await page.WaitForSelectorAsync("[role='dialog'].record-sickness-dialog", new() { Timeout = 10_000 });
+    }
+
     public async Task ClickViewDocumentsAsync() =>
         await page.Locator(".action-btn").Filter(new() { HasText = "View Documents" }).ClickAsync();
 

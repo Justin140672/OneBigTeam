@@ -79,6 +79,29 @@ public sealed class SicknessService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<(bool Success, string? Error)> RecordMySicknessAsync(
+        Guid companyId,
+        Guid employeeId,
+        RecordSicknessRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                $"api/companies/{companyId}/employees/{employeeId}/sickness-records/my",
+                request, HrApiJsonOptions.Default, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return (true, null);
+
+            return (false, await ExtractErrorAsync(response, "Failed to record sickness.", cancellationToken));
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message);
+        }
+    }
+
     public async Task<(bool Success, string? Error)> CloseSicknessRecordAsync(
         Guid companyId,
         Guid employeeId,

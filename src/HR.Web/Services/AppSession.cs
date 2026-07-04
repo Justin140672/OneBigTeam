@@ -19,6 +19,13 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory)
     public bool CanManageEmployees => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000004"));
     public bool CanManageCompany { get; private set; }
 
+    // Where a plain employee (no manage permissions) should land when they're denied access to
+    // an admin-only page, instead of the manager/HR-oriented dashboard. Falls back to the
+    // dashboard for the rare case of a signed-in user with no linked employee record.
+    public string MyProfileUrl => EmployeeId.HasValue
+        ? $"/companies/{CompanyId}/employees/{EmployeeId}/profile"
+        : "/";
+
     // Employee (null if user has no linked employee record)
     public Guid? EmployeeId { get; private set; }
     public string? FirstName { get; private set; }

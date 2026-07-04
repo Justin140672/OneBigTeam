@@ -19,6 +19,7 @@
                         <MyProfileOverviewTab CompanyId="CompanyId"
                                              EmployeeId="EmployeeId"
                                              OnNavigateToLeave="NavigateToLeaveAndOpen"
+                                             OnNavigateToSickness="NavigateToSicknessAndOpen"
                                              OnNavigateToDocuments="() => _activeTabIndex = 6"
                                              OnNavigateToTasks="() => _activeTabIndex = 7" />
                     </div>
@@ -52,7 +53,8 @@
             <TabItem>
                 <ChildContent><TabHeader Text="Sickness" /></ChildContent>
                 <ContentTemplate>
-                    <div class="mt-4"><MyProfileSicknessTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
+                    <div class="mt-4"><MyProfileSicknessTab CompanyId="CompanyId" EmployeeId="EmployeeId"
+                                                            AutoOpenToken="_sicknessAutoOpenToken" /></div>
                 </ContentTemplate>
             </TabItem>
             <TabItem>
@@ -83,6 +85,7 @@
 
     private int _activeTabIndex;
     private int _leaveAutoOpenToken;
+    private int _sicknessAutoOpenToken;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -112,5 +115,11 @@
     {
         _activeTabIndex = 4;
         _leaveAutoOpenToken++;
+    }
+
+    private void NavigateToSicknessAndOpen()
+    {
+        _activeTabIndex = 5;
+        _sicknessAutoOpenToken++;
     }
 }
