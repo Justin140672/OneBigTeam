@@ -1,5 +1,6 @@
 @page "/invite/{Token}"
 @rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
 @inject InviteService InviteService
 @inject NavigationManager Navigation
 
@@ -22,57 +23,63 @@
             <div class="alert alert-danger">@_error</div>
         }
 
-        <div class="mb-3">
-            <label class="form-label">Password <span class="text-danger">*</span></label>
-            <input type="password" class="form-control" @bind="_password" placeholder="Choose a password" />
-        </div>
-        <div class="mb-4">
-            <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
-            <input type="password" class="form-control" @bind="_confirm" placeholder="Repeat password" />
-        </div>
+        <EditForm EditContext="_editContext" OnValidSubmit="Submit">
+            <DataAnnotationsValidator />
+            <div class="mb-3">
+                <label class="form-label">Password <span class="text-danger">*</span></label>
+                <input type="password" class="form-control" @bind="_model.Password" placeholder="Choose a password" />
+                <ValidationMessage For="@(() => _model.Password)" />
+            </div>
+            <div class="mb-4">
+                <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
+                <input type="password" class="form-control" @bind="_model.Confirm" placeholder="Repeat password" />
+                <ValidationMessage For="@(() => _model.Confirm)" />
+            </div>
 
-        <button class="btn btn-primary w-100" @onclick="Submit" disabled="@_saving">
-            @if (_saving)
-            {
-                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-            }
-            Activate Account
-        </button>
+            <button type="submit" class="btn btn-primary w-100" disabled="@_saving">
+                @if (_saving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Activate Account
+            </button>
+        </EditForm>
     }
 </div>
 
 @code {
     [Parameter] public string Token { get; set; } = string.Empty;
 
-    private string _password = string.Empty;
-    private string _confirm = string.Empty;
+    private readonly AcceptInviteFormModel _model = new();
+    private EditContext _editContext = default!;
+
     private bool _saving;
     private bool _success;
     private string? _error;
+
+    protected override void OnInitialized() => _editContext = new EditContext(_model);
 
     private async Task Submit()
     {
         _error = null;
 
-        if (string.IsNullOrWhiteSpace(_password) || _password.Length < 8)
-        {
-            _error = "Password must be at least 8 characters.";
-            return;
-        }
-
-        if (_password != _confirm)
-        {
-            _error = "Passwords do not match.";
-            return;
-        }
-
         _saving = true;
-        var (success, error) = await InviteService.AcceptInviteAsync(Token, _password);
+        var (success, error) = await InviteService.AcceptInviteAsync(Token, _model.Password);
         _saving = false;
 
         if (success)
             _success = true;
         else
             _error = error;
+    }
+
+    public sealed class AcceptInviteFormModel
+    {
+        [Required(ErrorMessage = "Password is required.")]
+        [MinLength(8, ErrorMessage = "Password must be at least 8 characters.")]
+        public string Password { get; set; } = string.Empty;
+        [Required(ErrorMessage = "Please confirm your password.")]
+        [Compare(nameof(Password), ErrorMessage = "Passwords do not match.")]
+        public string Confirm { get; set; } = string.Empty;
     }
 }

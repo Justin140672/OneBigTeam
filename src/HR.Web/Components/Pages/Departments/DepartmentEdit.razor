@@ -3,7 +3,7 @@
 @page "/companies/{CompanyId:guid}/departments/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject DepartmentService DepartmentService
-@inject NavigationManager Navigation
+@inherits EditPageBase<DepartmentEditModel>
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -15,7 +15,7 @@
         </BreadcrumbItems>
     </SfBreadcrumb>
 
-    @if (_loading)
+    @if (IsLoading)
     {
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm" role="status"></div>
@@ -27,87 +27,80 @@
         <h1 class="mb-1">@PageTitle</h1>
         <p class="text-muted mb-4">Set the department's name and where it sits in your reporting structure.</p>
 
-        @if (!string.IsNullOrEmpty(_globalError))
+        @if (!string.IsNullOrEmpty(GlobalError))
         {
-            <div class="alert alert-danger">@_globalError</div>
+            <div class="alert alert-danger">@GlobalError</div>
         }
 
-        <div class="row">
-            <div class="col-lg-7">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Department Details</h5>
+        <EditForm EditContext="EditContext">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-lg-7">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Department Details</h5>
+                        </div>
+                        <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                            <div class="mb-3">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <HrTextBox @bind-Value="Model.Name" Placeholder="Department name" />
+                                <ValidationMessage For="@(() => Model.Name)" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <HrTextBox @bind-Value="Model.Description" Placeholder="Optional description" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Parent Department</label>
+                                <SfDropDownList TValue="Guid?"
+                                                TItem="DepartmentListItemModel"
+                                                DataSource="@_otherDepts"
+                                                @bind-Value="Model.ParentDepartmentId"
+                                                Placeholder="None"
+                                                AllowFiltering="true">
+                                    <DropDownListFieldSettings Value="Id" Text="Name" />
+                                </SfDropDownList>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body @(_isViewMode ? "view-mode" : "")">
-                        <div class="mb-3">
-                            <label class="form-label">Name <span class="text-danger">*</span></label>
-                            <HrTextBox @bind-Value="_model.Name" Placeholder="Department name" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Description</label>
-                            <HrTextBox @bind-Value="_model.Description" Placeholder="Optional description" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Parent Department</label>
-                            <SfDropDownList TValue="Guid?"
-                                            TItem="DepartmentListItemModel"
-                                            DataSource="@_otherDepts"
-                                            @bind-Value="_model.ParentDepartmentId"
-                                            Placeholder="None"
-                                            AllowFiltering="true">
-                                <DropDownListFieldSettings Value="Id" Text="Name" />
-                            </SfDropDownList>
-                        </div>
-                    </div>
-                </div>
 
-                <div class="d-flex gap-2 mt-3">
-                    @if (!_isViewMode)
-                    {
-                        @if (!string.IsNullOrEmpty(_successMsg))
+                    <div class="d-flex gap-2 mt-3">
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                        @if (!IsViewMode)
                         {
-                            <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
+                            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                                @if (Saving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                Save
+                            </SfButton>
                         }
-                        <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
-                            @if (_saving)
-                            {
-                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                            }
-                            Save
-                        </SfButton>
-                    }
-                    <SfButton OnClick="Cancel" Disabled="@_saving">@(_isViewMode ? "Close" : "Cancel")</SfButton>
+                    </div>
                 </div>
             </div>
-        </div>
+        </EditForm>
     }
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
 </div>
 
 @code {
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool _isViewMode;
     private bool IsNew => Id is null || Id == Guid.Empty;
     private string PageTitle => IsNew ? "Add Department"
-        : _model.Name.Trim().Length > 0 ? _model.Name
-        : _isViewMode ? "View Department" : "Edit Department";
+        : Model.Name.Trim().Length > 0 ? Model.Name
+        : IsViewMode ? "View Department" : "Edit Department";
 
-    private bool _loading = true;
-    private bool _saving;
-    private string? _globalError;
-    private string? _successMsg;
-
-    private readonly DepartmentEditModel _model = new();
     private List<DepartmentListItemModel> _otherDepts = [];
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task LoadAsync()
     {
-        _isViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
-        _loading = true;
-        _globalError = null;
-        _successMsg = null;
-
         // Load all active departments for the parent picker
         var list = await DepartmentService.ListDepartmentsAsync(CompanyId);
         var all = list?.Items ?? [];
@@ -117,9 +110,9 @@
             var existing = all.FirstOrDefault(d => d.Id == Id);
             if (existing is not null)
             {
-                _model.Name = existing.Name;
-                _model.ParentDepartmentId = existing.ParentDepartmentId;
-                _model.ManagerEmployeeId = existing.ManagerEmployeeId;
+                Model.Name = existing.Name;
+                Model.ParentDepartmentId = existing.ParentDepartmentId;
+                Model.ManagerEmployeeId = existing.ManagerEmployeeId;
             }
 
             // Exclude self from parent candidates
@@ -129,51 +122,35 @@
         {
             _otherDepts = all;
         }
-
-        _loading = false;
     }
 
-    private async Task Save()
+    protected override async Task<string?> SaveCoreAsync()
     {
-        _saving = true;
-        _globalError = null;
-        _successMsg = null;
-
         if (IsNew)
         {
             var request = new CreateDepartmentRequest(
                 CompanyId,
-                _model.Name.Trim(),
-                string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim(),
-                _model.ParentDepartmentId);
+                Model.Name.Trim(),
+                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
+                Model.ParentDepartmentId);
 
             var (created, error) = await DepartmentService.CreateDepartmentAsync(CompanyId, request);
-            _saving = false;
-
-            if (created is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/departments", forceLoad: true);
-            else
-                _globalError = error ?? "Failed to create department.";
+            return created is not null ? null : error ?? "Failed to create department.";
         }
         else
         {
             var request = new UpdateDepartmentRequest(
                 CompanyId,
                 Id!.Value,
-                _model.Name.Trim(),
-                string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim(),
-                _model.ParentDepartmentId,
-                _model.ManagerEmployeeId);
+                Model.Name.Trim(),
+                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
+                Model.ParentDepartmentId,
+                Model.ManagerEmployeeId);
 
             var (updated, error) = await DepartmentService.UpdateDepartmentAsync(CompanyId, Id!.Value, request);
-            _saving = false;
-
-            if (updated is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/departments", forceLoad: true);
-            else
-                _globalError = error ?? "Failed to save department.";
+            return updated is not null ? null : error ?? "Failed to save department.";
         }
     }
 
-    private void Cancel() => Navigation.NavigateTo($"/companies/{CompanyId}/departments");
+    protected override string? ListUrl => $"/companies/{CompanyId}/departments";
 }

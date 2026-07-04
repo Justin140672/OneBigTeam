@@ -73,13 +73,13 @@
                           EmployeeId="EmployeeId"
                           IsOpen="_uploadOpen"
                           EmployeeSelfUpload="false"
-                          OnUploaded="OnDocumentUploaded"
+                          OnSaved="OnDocumentUploaded"
                           OnCancelled="@(() => _uploadOpen = false)" />
 
     <RequestDocumentDialog CompanyId="CompanyId"
                            EmployeeId="EmployeeId"
                            IsOpen="_requestOpen"
-                           OnRequested="OnDocumentRequested"
+                           OnSaved="OnDocumentRequested"
                            OnCancelled="@(() => _requestOpen = false)" />
 }
 

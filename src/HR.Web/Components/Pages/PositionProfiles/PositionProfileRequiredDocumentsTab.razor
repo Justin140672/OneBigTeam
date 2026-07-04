@@ -3,7 +3,7 @@
 <AddRequiredDocumentDialog CompanyId="CompanyId"
                            PositionProfileId="PositionProfileId"
                            IsOpen="_addOpen"
-                           OnAdded="OnDocumentAdded"
+                           OnSaved="OnDocumentAdded"
                            OnCancelled="@(() => _addOpen = false)" />
 
 @if (_loading)

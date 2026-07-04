@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace HR.Web.Models;
 
 // ── LIST ──────────────────────────────────────────────────────────────────────
@@ -52,7 +54,10 @@ public record UpdatePublicHolidayResponse(
 
 public sealed class PublicHolidayEditModel
 {
+    [Required(ErrorMessage = "Please select a date.")]
     public DateTime? Date { get; set; }
+    [Required(ErrorMessage = "Name is required.")]
     public string Name { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Country code is required.")]
     public string CountryCode { get; set; } = string.Empty;
 }

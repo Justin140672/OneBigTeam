@@ -6,8 +6,8 @@
 @inject DepartmentService DepartmentService
 @inject PositionProfileService PositionProfileService
 @inject InviteService InviteService
-@inject NavigationManager Navigation
 @inject AppSession Session
+@inherits EditPageBase<EmployeeProfileEditModel>
 @using HR.Infrastructure.Abstractions
 @using HR.SharedKernel
 
@@ -21,7 +21,7 @@
         </BreadcrumbItems>
     </SfBreadcrumb>
 
-    @if (_loading)
+    @if (IsLoading)
     {
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm" role="status"></div>
@@ -33,175 +33,181 @@
         <h1 class="mb-1">Add Employee</h1>
         <p class="text-muted mb-4">Add a new employee and set up their employment, contact, and system access details.</p>
 
-        @if (!string.IsNullOrEmpty(_globalError))
+        @if (!string.IsNullOrEmpty(GlobalError))
         {
-            <div class="alert alert-danger">@_globalError</div>
+            <div class="alert alert-danger">@GlobalError</div>
         }
 
-        <div class="row">
-            <div class="col-lg-8">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Personal Information</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label">First Name <span class="text-danger">*</span></label>
-                                <HrTextBox @bind-Value="_model.FirstName" Placeholder="First name" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Last Name <span class="text-danger">*</span></label>
-                                <HrTextBox @bind-Value="_model.LastName" Placeholder="Last name" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Preferred Name</label>
-                                <HrTextBox @bind-Value="_model.PreferredName" Placeholder="Defaults to first name" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
-                                <SfDatePicker TValue="DateOnly?" @bind-Value="_model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Nationality <span class="text-danger">*</span></label>
-                                <SfDropDownList TValue="string"
-                                                TItem="NationalityListItem"
-                                                DataSource="@_nationalities"
-                                                @bind-Value="_model.Nationality"
-                                                Placeholder="Select nationality"
-                                                AllowFiltering="true">
-                                    <DropDownListFieldSettings Value="Name" Text="Name" />
-                                </SfDropDownList>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Gender <span class="text-danger">*</span></label>
-                                <SfDropDownList TValue="string"
-                                                TItem="string"
-                                                DataSource="@_genderOptions"
-                                                @bind-Value="_model.Gender"
-                                                Placeholder="Select gender">
-                                </SfDropDownList>
-                                @if (_model.Gender == "Other")
-                                {
-                                    <div class="mt-2">
-                                        <HrTextBox @bind-Value="_model.GenderOther" Placeholder="Please specify" />
-                                    </div>
-                                }
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Work Email <span class="text-danger">*</span></label>
-                                <HrTextBox @bind-Value="_model.WorkEmail" Placeholder="work@company.com" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Personal Email</label>
-                                <HrTextBox @bind-Value="_model.PersonalEmail" Placeholder="personal@example.com" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Start Date <span class="text-danger">*</span></label>
-                                <SfDatePicker TValue="DateOnly" @bind-Value="_model.StartDate" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Department</label>
-                                <SfDropDownList TValue="Guid?"
-                                                TItem="DepartmentListItemModel"
-                                                DataSource="@_departments"
-                                                @bind-Value="_model.DepartmentId"
-                                                Placeholder="None"
-                                                AllowFiltering="true">
-                                    <DropDownListFieldSettings Value="Id" Text="Name" />
-                                </SfDropDownList>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Position Profile</label>
-                                <SfDropDownList TValue="Guid?"
-                                                TItem="PositionProfileListItemModel"
-                                                DataSource="@_positionProfiles"
-                                                @bind-Value="_model.PositionProfileId"
-                                                Placeholder="None"
-                                                AllowFiltering="true">
-                                    <DropDownListFieldSettings Value="Id" Text="Title" />
-                                </SfDropDownList>
+        <EditForm EditContext="EditContext">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Personal Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">First Name <span class="text-danger">*</span></label>
+                                    <HrTextBox @bind-Value="Model.FirstName" Placeholder="First name" />
+                                    <ValidationMessage For="@(() => Model.FirstName)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Last Name <span class="text-danger">*</span></label>
+                                    <HrTextBox @bind-Value="Model.LastName" Placeholder="Last name" />
+                                    <ValidationMessage For="@(() => Model.LastName)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Preferred Name</label>
+                                    <HrTextBox @bind-Value="Model.PreferredName" Placeholder="Defaults to first name" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
+                                    <SfDatePicker TValue="DateOnly?" @bind-Value="Model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" />
+                                    <ValidationMessage For="@(() => Model.DateOfBirth)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Nationality <span class="text-danger">*</span></label>
+                                    <SfDropDownList TValue="string"
+                                                    TItem="NationalityListItem"
+                                                    DataSource="@_nationalities"
+                                                    @bind-Value="Model.Nationality"
+                                                    Placeholder="Select nationality"
+                                                    AllowFiltering="true">
+                                        <DropDownListFieldSettings Value="Name" Text="Name" />
+                                    </SfDropDownList>
+                                    <ValidationMessage For="@(() => Model.Nationality)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Gender <span class="text-danger">*</span></label>
+                                    <SfDropDownList TValue="string"
+                                                    TItem="string"
+                                                    DataSource="@_genderOptions"
+                                                    @bind-Value="Model.Gender"
+                                                    Placeholder="Select gender">
+                                    </SfDropDownList>
+                                    <ValidationMessage For="@(() => Model.Gender)" />
+                                    @if (Model.Gender == "Other")
+                                    {
+                                        <div class="mt-2">
+                                            <HrTextBox @bind-Value="Model.GenderOther" Placeholder="Please specify" />
+                                        </div>
+                                    }
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Work Email <span class="text-danger">*</span></label>
+                                    <HrTextBox @bind-Value="Model.WorkEmail" Placeholder="work@company.com" />
+                                    <ValidationMessage For="@(() => Model.WorkEmail)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Personal Email</label>
+                                    <HrTextBox @bind-Value="Model.PersonalEmail" Placeholder="personal@example.com" />
+                                    <ValidationMessage For="@(() => Model.PersonalEmail)" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                                    <SfDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Department</label>
+                                    <SfDropDownList TValue="Guid?"
+                                                    TItem="DepartmentListItemModel"
+                                                    DataSource="@_departments"
+                                                    @bind-Value="Model.DepartmentId"
+                                                    Placeholder="None"
+                                                    AllowFiltering="true">
+                                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                                    </SfDropDownList>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Position Profile</label>
+                                    <SfDropDownList TValue="Guid?"
+                                                    TItem="PositionProfileListItemModel"
+                                                    DataSource="@_positionProfiles"
+                                                    @bind-Value="Model.PositionProfileId"
+                                                    Placeholder="None"
+                                                    AllowFiltering="true">
+                                        <DropDownListFieldSettings Value="Id" Text="Title" />
+                                    </SfDropDownList>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Contact Details</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Mobile / Work Phone</label>
-                                <HrTextBox @bind-Value="_model.PhoneNumber" Placeholder="e.g. 07700 900000" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Home Phone</label>
-                                <HrTextBox @bind-Value="_model.HomePhone" Placeholder="e.g. 01234 567890" />
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label">Address Line 1</label>
-                                <HrTextBox @bind-Value="_model.AddressLine1" Placeholder="Street address" />
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label">Address Line 2</label>
-                                <HrTextBox @bind-Value="_model.AddressLine2" Placeholder="Apartment, suite, etc." />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">City</label>
-                                <HrTextBox @bind-Value="_model.City" Placeholder="e.g. London" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">County / State</label>
-                                <HrTextBox @bind-Value="_model.County" Placeholder="e.g. Greater London" />
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label">Post Code</label>
-                                <HrTextBox @bind-Value="_model.PostCode" Placeholder="e.g. SW1A 1AA" />
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label">Country</label>
-                                <HrTextBox @bind-Value="_model.Country" Placeholder="e.g. United Kingdom" />
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Contact Details</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Mobile / Work Phone</label>
+                                    <HrTextBox @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Home Phone</label>
+                                    <HrTextBox @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Address Line 1</label>
+                                    <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Address Line 2</label>
+                                    <HrTextBox @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">City</label>
+                                    <HrTextBox @bind-Value="Model.City" Placeholder="e.g. London" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">County / State</label>
+                                    <HrTextBox @bind-Value="Model.County" Placeholder="e.g. Greater London" />
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Post Code</label>
+                                    <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" />
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Country</label>
+                                    <HrTextBox @bind-Value="Model.Country" Placeholder="e.g. United Kingdom" />
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">System Access</h5>
-                    </div>
-                    <div class="card-body">
-                        <SfCheckBox TChecked="bool"
-                                    Label="Employee needs system access (can log in)"
-                                    @bind-Checked="_model.HasSystemAccess" />
-                        @if (_model.HasSystemAccess)
-                        {
-                            <hr class="my-3" />
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">System Access</h5>
+                        </div>
+                        <div class="card-body">
                             <SfCheckBox TChecked="bool"
-                                        Label="Send invite link after creating employee"
-                                        @bind-Checked="_sendInviteOnCreate" />
-                        }
+                                        Label="Employee needs system access (can log in)"
+                                        @bind-Checked="Model.HasSystemAccess" />
+                            @if (Model.HasSystemAccess)
+                            {
+                                <hr class="my-3" />
+                                <SfCheckBox TChecked="bool"
+                                            Label="Send invite link after creating employee"
+                                            @bind-Checked="_sendInviteOnCreate" />
+                            }
+                        </div>
                     </div>
-                </div>
 
-                <div class="d-flex gap-2 align-items-center mt-3">
-                    @if (!string.IsNullOrEmpty(_successMsg))
-                    {
-                        <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
-                    }
-                    <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
-                        @if (_saving)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                        }
-                        Save
-                    </SfButton>
-                    <SfButton OnClick="Cancel" Disabled="@_saving">Cancel</SfButton>
+                    <div class="d-flex gap-2 align-items-center mt-3">
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                        <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                            @if (Saving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            Save
+                        </SfButton>
+                    </div>
                 </div>
             </div>
-        </div>
+        </EditForm>
     }
     else
     {
@@ -214,9 +220,9 @@
         </div>
         <p class="text-muted mb-3">View and manage this employee's profile, employment, leave, and documents.</p>
 
-        @if (!string.IsNullOrEmpty(_globalError))
+        @if (!string.IsNullOrEmpty(GlobalError))
         {
-            <div class="alert alert-danger mb-3">@_globalError</div>
+            <div class="alert alert-danger mb-3">@GlobalError</div>
         }
 
         <SfTab>
@@ -225,179 +231,189 @@
                 <TabItem>
                     <ChildContent><TabHeader Text="Details" /></ChildContent>
                     <ContentTemplate>
-                        <div class="mt-4 row">
-                            <div class="col-lg-8">
-                                <div class="card mb-4">
-                                    <div class="card-header">
-                                        <h5 class="mb-0">Personal Information</h5>
+                        <EditForm EditContext="EditContext">
+                            <DataAnnotationsValidator />
+                            <div class="mt-4 row">
+                                <div class="col-lg-8">
+                                    <div class="card mb-4">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">Personal Information</h5>
+                                        </div>
+                                        <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                                            <div class="row g-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label">First Name <span class="text-danger">*</span></label>
+                                                    <HrTextBox @bind-Value="Model.FirstName" Placeholder="First name" />
+                                                    <ValidationMessage For="@(() => Model.FirstName)" />
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Last Name <span class="text-danger">*</span></label>
+                                                    <HrTextBox @bind-Value="Model.LastName" Placeholder="Last name" />
+                                                    <ValidationMessage For="@(() => Model.LastName)" />
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Preferred Name</label>
+                                                    <HrTextBox @bind-Value="Model.PreferredName" Placeholder="Defaults to first name" />
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
+                                                    <SfDatePicker TValue="DateOnly?" @bind-Value="Model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" />
+                                                    <ValidationMessage For="@(() => Model.DateOfBirth)" />
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Nationality <span class="text-danger">*</span></label>
+                                                    <SfDropDownList TValue="string"
+                                                                    TItem="NationalityListItem"
+                                                                    DataSource="@_nationalities"
+                                                                    @bind-Value="Model.Nationality"
+                                                                    Placeholder="Select nationality"
+                                                                    AllowFiltering="true">
+                                                        <DropDownListFieldSettings Value="Name" Text="Name" />
+                                                    </SfDropDownList>
+                                                    <ValidationMessage For="@(() => Model.Nationality)" />
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Gender <span class="text-danger">*</span></label>
+                                                    <SfDropDownList TValue="string"
+                                                                    TItem="string"
+                                                                    DataSource="@_genderOptions"
+                                                                    @bind-Value="Model.Gender"
+                                                                    Placeholder="Select gender">
+                                                    </SfDropDownList>
+                                                    <ValidationMessage For="@(() => Model.Gender)" />
+                                                    @if (Model.Gender == "Other")
+                                                    {
+                                                        <div class="mt-2">
+                                                            <HrTextBox @bind-Value="Model.GenderOther" Placeholder="Please specify" />
+                                                        </div>
+                                                    }
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Work Email <span class="text-danger">*</span></label>
+                                                    <HrTextBox @bind-Value="Model.WorkEmail" Placeholder="work@company.com" />
+                                                    <ValidationMessage For="@(() => Model.WorkEmail)" />
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Personal Email</label>
+                                                    <HrTextBox @bind-Value="Model.PersonalEmail" Placeholder="personal@example.com" />
+                                                    <ValidationMessage For="@(() => Model.PersonalEmail)" />
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                                                    <SfDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" />
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label">Department</label>
+                                                    <SfDropDownList TValue="Guid?"
+                                                                    TItem="DepartmentListItemModel"
+                                                                    DataSource="@_departments"
+                                                                    @bind-Value="Model.DepartmentId"
+                                                                    Placeholder="None"
+                                                                    AllowFiltering="true">
+                                                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                                                    </SfDropDownList>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label">Position Profile</label>
+                                                    <SfDropDownList TValue="Guid?"
+                                                                    TItem="PositionProfileListItemModel"
+                                                                    DataSource="@_positionProfiles"
+                                                                    @bind-Value="Model.PositionProfileId"
+                                                                    Placeholder="None"
+                                                                    AllowFiltering="true">
+                                                        <DropDownListFieldSettings Value="Id" Text="Title" />
+                                                    </SfDropDownList>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="card-body @(_isViewMode ? "view-mode" : "")">
-                                        <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label class="form-label">First Name <span class="text-danger">*</span></label>
-                                                <HrTextBox @bind-Value="_model.FirstName" Placeholder="First name" />
+
+                                    <div class="card mb-4">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">Contact Details</h5>
+                                        </div>
+                                        <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                                            <div class="row g-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Mobile / Work Phone</label>
+                                                    <HrTextBox @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" />
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">Home Phone</label>
+                                                    <HrTextBox @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" />
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label">Address Line 1</label>
+                                                    <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" />
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label">Address Line 2</label>
+                                                    <HrTextBox @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." />
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label">City</label>
+                                                    <HrTextBox @bind-Value="Model.City" Placeholder="e.g. London" />
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label">County / State</label>
+                                                    <HrTextBox @bind-Value="Model.County" Placeholder="e.g. Greater London" />
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label">Post Code</label>
+                                                    <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" />
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label">Country</label>
+                                                    <HrTextBox @bind-Value="Model.Country" Placeholder="e.g. United Kingdom" />
+                                                </div>
                                             </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Last Name <span class="text-danger">*</span></label>
-                                                <HrTextBox @bind-Value="_model.LastName" Placeholder="Last name" />
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Preferred Name</label>
-                                                <HrTextBox @bind-Value="_model.PreferredName" Placeholder="Defaults to first name" />
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Date of Birth</label>
-                                                <SfDatePicker TValue="DateOnly?" @bind-Value="_model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" />
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Nationality</label>
-                                                <SfDropDownList TValue="string"
-                                                                TItem="NationalityListItem"
-                                                                DataSource="@_nationalities"
-                                                                @bind-Value="_model.Nationality"
-                                                                Placeholder="Select nationality"
-                                                                AllowFiltering="true">
-                                                    <DropDownListFieldSettings Value="Name" Text="Name" />
-                                                </SfDropDownList>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Gender</label>
-                                                <SfDropDownList TValue="string"
-                                                                TItem="string"
-                                                                DataSource="@_genderOptions"
-                                                                @bind-Value="_model.Gender"
-                                                                Placeholder="Select gender">
-                                                </SfDropDownList>
-                                                @if (_model.Gender == "Other")
+                                        </div>
+                                    </div>
+
+                                    <div class="card mb-4">
+                                        <div class="card-header">
+                                            <h5 class="mb-0">System Access</h5>
+                                        </div>
+                                        <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                                            <SfCheckBox TChecked="bool"
+                                                        Label="Employee needs system access (can log in)"
+                                                        @bind-Checked="Model.HasSystemAccess" />
+                                            @if (Model.HasSystemAccess)
+                                            {
+                                                <hr class="my-3" />
+                                                @if (!string.IsNullOrEmpty(_inviteError))
                                                 {
-                                                    <div class="mt-2">
-                                                        <HrTextBox @bind-Value="_model.GenderOther" Placeholder="Please specify" />
+                                                    <div class="alert alert-danger py-2">@_inviteError</div>
+                                                }
+                                                @if (_inviteLink is not null)
+                                                {
+                                                    <div class="alert alert-success py-2">
+                                                        <div class="mb-1"><strong>Invite link generated</strong> — expires @_inviteExpiresAt.ToString("MMM d, yyyy")</div>
+                                                        <div class="input-group">
+                                                            <input class="form-control form-control-sm font-monospace" readonly value="@_inviteLink" />
+                                                            <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="CopyLink">Copy</button>
+                                                        </div>
+                                                        <small class="text-muted">Share this link with the employee to let them set their password.</small>
                                                     </div>
                                                 }
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Work Email <span class="text-danger">*</span></label>
-                                                <HrTextBox @bind-Value="_model.WorkEmail" Placeholder="work@company.com" />
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Personal Email</label>
-                                                <HrTextBox @bind-Value="_model.PersonalEmail" Placeholder="personal@example.com" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Start Date <span class="text-danger">*</span></label>
-                                                <SfDatePicker TValue="DateOnly" @bind-Value="_model.StartDate" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Department</label>
-                                                <SfDropDownList TValue="Guid?"
-                                                                TItem="DepartmentListItemModel"
-                                                                DataSource="@_departments"
-                                                                @bind-Value="_model.DepartmentId"
-                                                                Placeholder="None"
-                                                                AllowFiltering="true">
-                                                    <DropDownListFieldSettings Value="Id" Text="Name" />
-                                                </SfDropDownList>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Position Profile</label>
-                                                <SfDropDownList TValue="Guid?"
-                                                                TItem="PositionProfileListItemModel"
-                                                                DataSource="@_positionProfiles"
-                                                                @bind-Value="_model.PositionProfileId"
-                                                                Placeholder="None"
-                                                                AllowFiltering="true">
-                                                    <DropDownListFieldSettings Value="Id" Text="Title" />
-                                                </SfDropDownList>
-                                            </div>
+                                                else
+                                                {
+                                                    <p class="text-muted small mb-2">Generate an invite link to send to the employee so they can set their password and access the system.</p>
+                                                    <SfButton OnClick="SendInvite" Disabled="@_sendingInvite">
+                                                        @if (_sendingInvite)
+                                                        {
+                                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                                        }
+                                                        Generate Invite Link
+                                                    </SfButton>
+                                                }
+                                            }
                                         </div>
                                     </div>
-                                </div>
 
-                                <div class="card mb-4">
-                                    <div class="card-header">
-                                        <h5 class="mb-0">Contact Details</h5>
-                                    </div>
-                                    <div class="card-body @(_isViewMode ? "view-mode" : "")">
-                                        <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label class="form-label">Mobile / Work Phone</label>
-                                                <HrTextBox @bind-Value="_model.PhoneNumber" Placeholder="e.g. 07700 900000" />
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">Home Phone</label>
-                                                <HrTextBox @bind-Value="_model.HomePhone" Placeholder="e.g. 01234 567890" />
-                                            </div>
-                                            <div class="col-12">
-                                                <label class="form-label">Address Line 1</label>
-                                                <HrTextBox @bind-Value="_model.AddressLine1" Placeholder="Street address" />
-                                            </div>
-                                            <div class="col-12">
-                                                <label class="form-label">Address Line 2</label>
-                                                <HrTextBox @bind-Value="_model.AddressLine2" Placeholder="Apartment, suite, etc." />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">City</label>
-                                                <HrTextBox @bind-Value="_model.City" Placeholder="e.g. London" />
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">County / State</label>
-                                                <HrTextBox @bind-Value="_model.County" Placeholder="e.g. Greater London" />
-                                            </div>
-                                            <div class="col-md-2">
-                                                <label class="form-label">Post Code</label>
-                                                <HrTextBox @bind-Value="_model.PostCode" Placeholder="e.g. SW1A 1AA" />
-                                            </div>
-                                            <div class="col-md-2">
-                                                <label class="form-label">Country</label>
-                                                <HrTextBox @bind-Value="_model.Country" Placeholder="e.g. United Kingdom" />
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
-
-                                <div class="card mb-4">
-                                    <div class="card-header">
-                                        <h5 class="mb-0">System Access</h5>
-                                    </div>
-                                    <div class="card-body @(_isViewMode ? "view-mode" : "")">
-                                        <SfCheckBox TChecked="bool"
-                                                    Label="Employee needs system access (can log in)"
-                                                    @bind-Checked="_model.HasSystemAccess" />
-                                        @if (_model.HasSystemAccess)
-                                        {
-                                            <hr class="my-3" />
-                                            @if (!string.IsNullOrEmpty(_inviteError))
-                                            {
-                                                <div class="alert alert-danger py-2">@_inviteError</div>
-                                            }
-                                            @if (_inviteLink is not null)
-                                            {
-                                                <div class="alert alert-success py-2">
-                                                    <div class="mb-1"><strong>Invite link generated</strong> — expires @_inviteExpiresAt.ToString("MMM d, yyyy")</div>
-                                                    <div class="input-group">
-                                                        <input class="form-control form-control-sm font-monospace" readonly value="@_inviteLink" />
-                                                        <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="CopyLink">Copy</button>
-                                                    </div>
-                                                    <small class="text-muted">Share this link with the employee to let them set their password.</small>
-                                                </div>
-                                            }
-                                            else
-                                            {
-                                                <p class="text-muted small mb-2">Generate an invite link to send to the employee so they can set their password and access the system.</p>
-                                                <SfButton OnClick="SendInvite" Disabled="@_sendingInvite">
-                                                    @if (_sendingInvite)
-                                                    {
-                                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                                                    }
-                                                    Generate Invite Link
-                                                </SfButton>
-                                            }
-                                        }
-                                    </div>
-                                </div>
-
                             </div>
-                        </div>
+                        </EditForm>
                     </ContentTemplate>
                 </TabItem>
 
@@ -496,46 +512,42 @@
         </SfTab>
 
         <div class="d-flex gap-2 align-items-center mt-4">
-            @if (!_isViewMode)
+            <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+            @if (!IsViewMode)
             {
-                @if (!string.IsNullOrEmpty(_successMsg))
-                {
-                    <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
-                }
-                <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
-                    @if (_saving)
+                <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                    @if (Saving)
                     {
                         <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                     }
                     Save
                 </SfButton>
             }
-            <SfButton OnClick="Cancel" Disabled="@_saving">@(_isViewMode ? "Close" : "Cancel")</SfButton>
         </div>
     }
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
 </div>
 
 @code {
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool _isViewMode;
     private bool IsNew => Id is null || Id == Guid.Empty;
-    private string PageTitle => IsNew ? "Add Employee" : $"{_model.FirstName} {_model.LastName}".Trim();
+    private string PageTitle => IsNew ? "Add Employee" : $"{Model.FirstName} {Model.LastName}".Trim();
 
     private GetEmployeeResponse? _employee;
-    private bool _loading = true;
-    private string? _globalError;
-    private string? _successMsg;
-    private bool _saving;
 
     private bool _sendInviteOnCreate;
     private bool _sendingInvite;
     private string? _inviteLink;
     private DateOnly _inviteExpiresAt;
     private string? _inviteError;
+    private string? _redirectUrl;
 
-    private readonly EmployeeProfileEditModel _model = new();
     private static readonly string[] _genderOptions = ["Male", "Female", "Non-binary", "Prefer not to say", "Other"];
 
     private List<DepartmentListItemModel> _departments = [];
@@ -544,7 +556,7 @@
 
     private EmployeeEmploymentTab? _employmentTab;
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task LoadAsync()
     {
         await Session.InitialiseAsync();
         if (!Session.CanManageEmployees)
@@ -552,11 +564,6 @@
             Navigation.NavigateTo("/", replace: true);
             return;
         }
-
-        _isViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
-        _loading = true;
-        _globalError = null;
-        _successMsg = null;
 
         var deptResult = await DepartmentService.ListDepartmentsAsync(CompanyId);
         _departments = deptResult?.Items ?? [];
@@ -572,27 +579,27 @@
             _employee = await EmployeeService.GetEmployeeAsync(CompanyId, Id!.Value);
             if (_employee is not null)
             {
-                _model.FirstName = _employee.FirstName;
-                _model.LastName = _employee.LastName;
-                _model.PreferredName = _employee.PreferredName ?? string.Empty;
-                _model.WorkEmail = _employee.WorkEmail;
-                _model.PersonalEmail = _employee.PersonalEmail;
-                _model.StartDate = _employee.StartDate;
-                _model.DateOfBirth = _employee.DateOfBirth;
-                _model.Nationality = _employee.Nationality ?? string.Empty;
-                _model.Gender = _employee.Gender ?? string.Empty;
-                _model.GenderOther    = _employee.GenderOther    ?? string.Empty;
-                _model.PhoneNumber    = _employee.PhoneNumber    ?? string.Empty;
-                _model.HomePhone      = _employee.HomePhone      ?? string.Empty;
-                _model.AddressLine1   = _employee.AddressLine1   ?? string.Empty;
-                _model.AddressLine2   = _employee.AddressLine2   ?? string.Empty;
-                _model.City           = _employee.City           ?? string.Empty;
-                _model.County         = _employee.County         ?? string.Empty;
-                _model.PostCode       = _employee.PostCode       ?? string.Empty;
-                _model.Country        = _employee.Country        ?? string.Empty;
-                _model.DepartmentId = _employee.DepartmentId;
-                _model.PositionProfileId = _employee.PositionProfileId;
-                _model.HasSystemAccess = _employee.HasSystemAccess;
+                Model.FirstName = _employee.FirstName;
+                Model.LastName = _employee.LastName;
+                Model.PreferredName = _employee.PreferredName ?? string.Empty;
+                Model.WorkEmail = _employee.WorkEmail;
+                Model.PersonalEmail = _employee.PersonalEmail;
+                Model.StartDate = _employee.StartDate;
+                Model.DateOfBirth = _employee.DateOfBirth;
+                Model.Nationality = _employee.Nationality ?? string.Empty;
+                Model.Gender = _employee.Gender ?? string.Empty;
+                Model.GenderOther    = _employee.GenderOther    ?? string.Empty;
+                Model.PhoneNumber    = _employee.PhoneNumber    ?? string.Empty;
+                Model.HomePhone      = _employee.HomePhone      ?? string.Empty;
+                Model.AddressLine1   = _employee.AddressLine1   ?? string.Empty;
+                Model.AddressLine2   = _employee.AddressLine2   ?? string.Empty;
+                Model.City           = _employee.City           ?? string.Empty;
+                Model.County         = _employee.County         ?? string.Empty;
+                Model.PostCode       = _employee.PostCode       ?? string.Empty;
+                Model.Country        = _employee.Country        ?? string.Empty;
+                Model.DepartmentId = _employee.DepartmentId;
+                Model.PositionProfileId = _employee.PositionProfileId;
+                Model.HasSystemAccess = _employee.HasSystemAccess;
             }
 
             var uri = new Uri(Navigation.Uri);
@@ -601,64 +608,56 @@
         }
         else
         {
-            _model.StartDate = DateOnly.FromDateTime(DateTime.Today);
+            Model.StartDate = DateOnly.FromDateTime(DateTime.Today);
         }
-
-        _loading = false;
     }
 
-    private async Task Save()
+    protected override async Task<string?> SaveCoreAsync()
     {
-        _saving = true;
-        _globalError = null;
-        _successMsg = null;
-
         if (IsNew)
         {
             var request = new CreateEmployeeRequest(
                 CompanyId,
-                _model.DepartmentId,
-                _model.PositionProfileId,
-                _model.FirstName.Trim(),
-                _model.LastName.Trim(),
-                string.IsNullOrWhiteSpace(_model.PreferredName)  ? null : _model.PreferredName.Trim(),
-                _model.WorkEmail.Trim(),
-                string.IsNullOrWhiteSpace(_model.PersonalEmail)  ? null : _model.PersonalEmail.Trim(),
-                _model.StartDate,
-                _model.DateOfBirth ?? default,
-                _model.Nationality.Trim(),
-                _model.Gender.Trim(),
-                string.IsNullOrWhiteSpace(_model.GenderOther)    ? null : _model.GenderOther.Trim(),
-                string.IsNullOrWhiteSpace(_model.PhoneNumber)    ? null : _model.PhoneNumber.Trim(),
-                string.IsNullOrWhiteSpace(_model.HomePhone)      ? null : _model.HomePhone.Trim(),
-                string.IsNullOrWhiteSpace(_model.AddressLine1)   ? null : _model.AddressLine1.Trim(),
-                string.IsNullOrWhiteSpace(_model.AddressLine2)   ? null : _model.AddressLine2.Trim(),
-                string.IsNullOrWhiteSpace(_model.City)           ? null : _model.City.Trim(),
-                string.IsNullOrWhiteSpace(_model.County)         ? null : _model.County.Trim(),
-                string.IsNullOrWhiteSpace(_model.PostCode)       ? null : _model.PostCode.Trim(),
-                string.IsNullOrWhiteSpace(_model.Country)        ? null : _model.Country.Trim(),
-                _model.HasSystemAccess);
+                Model.DepartmentId,
+                Model.PositionProfileId,
+                Model.FirstName.Trim(),
+                Model.LastName.Trim(),
+                string.IsNullOrWhiteSpace(Model.PreferredName)  ? null : Model.PreferredName.Trim(),
+                Model.WorkEmail.Trim(),
+                string.IsNullOrWhiteSpace(Model.PersonalEmail)  ? null : Model.PersonalEmail.Trim(),
+                Model.StartDate,
+                Model.DateOfBirth ?? default,
+                Model.Nationality.Trim(),
+                Model.Gender.Trim(),
+                string.IsNullOrWhiteSpace(Model.GenderOther)    ? null : Model.GenderOther.Trim(),
+                string.IsNullOrWhiteSpace(Model.PhoneNumber)    ? null : Model.PhoneNumber.Trim(),
+                string.IsNullOrWhiteSpace(Model.HomePhone)      ? null : Model.HomePhone.Trim(),
+                string.IsNullOrWhiteSpace(Model.AddressLine1)   ? null : Model.AddressLine1.Trim(),
+                string.IsNullOrWhiteSpace(Model.AddressLine2)   ? null : Model.AddressLine2.Trim(),
+                string.IsNullOrWhiteSpace(Model.City)           ? null : Model.City.Trim(),
+                string.IsNullOrWhiteSpace(Model.County)         ? null : Model.County.Trim(),
+                string.IsNullOrWhiteSpace(Model.PostCode)       ? null : Model.PostCode.Trim(),
+                string.IsNullOrWhiteSpace(Model.Country)        ? null : Model.Country.Trim(),
+                Model.HasSystemAccess);
 
             var (created, error) = await EmployeeService.CreateEmployeeAsync(CompanyId, request);
-            _saving = false;
 
-            if (created is not null)
+            if (created is null)
+                return error ?? "Failed to create employee.";
+
+            if (_sendInviteOnCreate)
             {
-                if (_sendInviteOnCreate)
+                var email = Model.WorkEmail.Trim();
+                var (token, expiresAt, _) = await InviteService.SendInviteAsync(CompanyId, created.Id, email);
+                if (token is not null)
                 {
-                    var email = _model.WorkEmail.Trim();
-                    var (token, expiresAt, _) = await InviteService.SendInviteAsync(CompanyId, created.Id, email);
-                    if (token is not null)
-                    {
-                        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{created.Id}?invited=true", forceLoad: true);
-                        return;
-                    }
+                    _redirectUrl = $"/companies/{CompanyId}/employees/{created.Id}?invited=true";
+                    return null;
                 }
-                Navigation.NavigateTo($"/companies/{CompanyId}/employees", forceLoad: true);
-                return;
             }
 
-            _globalError = error ?? "Failed to create employee.";
+            _redirectUrl = $"/companies/{CompanyId}/employees";
+            return null;
         }
         else
         {
@@ -670,38 +669,34 @@
             var request = new UpdateEmployeeProfileRequest(
                 CompanyId,
                 Id!.Value,
-                _model.DepartmentId,
-                _model.PositionProfileId,
-                _model.FirstName,
-                _model.LastName,
-                string.IsNullOrWhiteSpace(_model.PreferredName)  ? null : _model.PreferredName.Trim(),
-                _model.WorkEmail,
-                _model.PersonalEmail,
-                _model.StartDate,
-                _model.DateOfBirth,
-                string.IsNullOrWhiteSpace(_model.Nationality)    ? null : _model.Nationality.Trim(),
-                string.IsNullOrWhiteSpace(_model.Gender)         ? null : _model.Gender.Trim(),
-                string.IsNullOrWhiteSpace(_model.GenderOther)    ? null : _model.GenderOther.Trim(),
-                string.IsNullOrWhiteSpace(_model.PhoneNumber)    ? null : _model.PhoneNumber.Trim(),
-                string.IsNullOrWhiteSpace(_model.HomePhone)      ? null : _model.HomePhone.Trim(),
-                string.IsNullOrWhiteSpace(_model.AddressLine1)   ? null : _model.AddressLine1.Trim(),
-                string.IsNullOrWhiteSpace(_model.AddressLine2)   ? null : _model.AddressLine2.Trim(),
-                string.IsNullOrWhiteSpace(_model.City)           ? null : _model.City.Trim(),
-                string.IsNullOrWhiteSpace(_model.County)         ? null : _model.County.Trim(),
-                string.IsNullOrWhiteSpace(_model.PostCode)       ? null : _model.PostCode.Trim(),
-                string.IsNullOrWhiteSpace(_model.Country)        ? null : _model.Country.Trim(),
-                _model.HasSystemAccess,
+                Model.DepartmentId,
+                Model.PositionProfileId,
+                Model.FirstName,
+                Model.LastName,
+                string.IsNullOrWhiteSpace(Model.PreferredName)  ? null : Model.PreferredName.Trim(),
+                Model.WorkEmail,
+                Model.PersonalEmail,
+                Model.StartDate,
+                Model.DateOfBirth,
+                string.IsNullOrWhiteSpace(Model.Nationality)    ? null : Model.Nationality.Trim(),
+                string.IsNullOrWhiteSpace(Model.Gender)         ? null : Model.Gender.Trim(),
+                string.IsNullOrWhiteSpace(Model.GenderOther)    ? null : Model.GenderOther.Trim(),
+                string.IsNullOrWhiteSpace(Model.PhoneNumber)    ? null : Model.PhoneNumber.Trim(),
+                string.IsNullOrWhiteSpace(Model.HomePhone)      ? null : Model.HomePhone.Trim(),
+                string.IsNullOrWhiteSpace(Model.AddressLine1)   ? null : Model.AddressLine1.Trim(),
+                string.IsNullOrWhiteSpace(Model.AddressLine2)   ? null : Model.AddressLine2.Trim(),
+                string.IsNullOrWhiteSpace(Model.City)           ? null : Model.City.Trim(),
+                string.IsNullOrWhiteSpace(Model.County)         ? null : Model.County.Trim(),
+                string.IsNullOrWhiteSpace(Model.PostCode)       ? null : Model.PostCode.Trim(),
+                string.IsNullOrWhiteSpace(Model.Country)        ? null : Model.Country.Trim(),
+                Model.HasSystemAccess,
                 workingDaysOverride,
                 hoursPerDayOverride);
 
             var (success, conflictMessage) = await EmployeeService.UpdateEmployeeProfileAsync(CompanyId, Id!.Value, request);
 
             if (!success)
-            {
-                _saving = false;
-                _globalError = conflictMessage;
-                return;
-            }
+                return conflictMessage;
 
             // Save Employment tab's data (including any working pattern override change) second,
             // so it has the final say over the shared working-pattern fields.
@@ -709,20 +704,24 @@
             {
                 var employmentError = await _employmentTab.SaveAsync();
                 if (employmentError is not null)
-                {
-                    _saving = false;
-                    _globalError = employmentError;
-                    return;
-                }
+                    return employmentError;
             }
 
-            _saving = false;
-            Navigation.NavigateTo($"/companies/{CompanyId}/employees", forceLoad: true);
+            _redirectUrl = $"/companies/{CompanyId}/employees";
+            return null;
         }
     }
 
-    private void Cancel() =>
-        Navigation.NavigateTo($"/companies/{CompanyId}/employees");
+    protected override Task OnSavedAsync()
+    {
+        Navigation.NavigateTo(_redirectUrl ?? ListUrl!, forceLoad: true);
+        return Task.CompletedTask;
+    }
+
+    protected override string? ListUrl => $"/companies/{CompanyId}/employees";
+
+    protected override bool HasUnsavedChanges =>
+        base.HasUnsavedChanges || (_employmentTab?.HasUnsavedChanges ?? false);
 
     private async Task SendInvite()
     {

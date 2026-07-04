@@ -285,5 +285,50 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     }
 
     public async Task<bool> HasErrorAsync() =>
-        await page.Locator(".alert-danger").First.IsVisibleAsync();
+        await page.Locator(".alert-danger, .validation-message").First.IsVisibleAsync();
+
+    /// <summary>Fills the company Name field on the Profile tab.</summary>
+    public Task FillCompanyNameInputAsync(string value) =>
+        page.GetByPlaceholder("Company name").FillAsync(value);
+
+    public async Task<string> GetCompanyNameInputValueAsync() =>
+        await page.GetByPlaceholder("Company name").InputValueAsync();
+
+    // ── Close / unsaved-changes prompt (EditPageBase) ──────────────────────────
+
+    private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
+
+    public Task ClickCloseAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+
+    public Task<bool> IsUnsavedChangesDialogVisibleAsync() =>
+        UnsavedChangesDialog.IsVisibleAsync();
+
+    /// <summary>
+    /// Close navigates to the dashboard ("/") — CompanyEdit has no dedicated list page.
+    /// </summary>
+    public async Task CloseAndWaitForDashboardAsync(string baseUrl)
+    {
+        await ClickCloseAsync();
+        await page.WaitForURLAsync($"{baseUrl}/", new() { Timeout = 15_000 });
+    }
+
+    public async Task ConfirmDiscardChangesAsync(string baseUrl)
+    {
+        await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
+        await page.WaitForURLAsync($"{baseUrl}/", new() { Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// Choosing "Save" from the unsaved-changes prompt always navigates away on success — unlike
+    /// the page's own Save button, which stays put and shows an inline success banner instead.
+    /// </summary>
+    public async Task ConfirmSaveFromUnsavedChangesDialogAsync(string baseUrl)
+    {
+        await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await page.WaitForURLAsync($"{baseUrl}/", new() { Timeout = 15_000 });
+    }
+
+    public Task CancelUnsavedChangesDialogAsync() =>
+        UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
 }

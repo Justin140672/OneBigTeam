@@ -1,85 +1,92 @@
+@using System.ComponentModel.DataAnnotations
 @inject SicknessCategoryService SicknessCategoryService
 @inject SicknessService SicknessService
+@inherits EditDialogBase<RecordSicknessDialog.RecordSicknessFormModel>
 
-<SfDialog @bind-Visible="_visible" IsModal="true" Width="480px" ShowCloseIcon="true" CssClass="record-sickness-dialog">
-    <DialogEvents Closed="OnDialogClosed" />
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="480px" ShowCloseIcon="true" CssClass="record-sickness-dialog">
+    <DialogEvents Closed="HandleDialogClosed" />
     <DialogTemplates>
         <Header>Record Sickness</Header>
         <Content>
-            @if (_error is not null)
+            @if (GlobalError is not null)
             {
                 <div class="alert alert-danger alert-dismissible mb-3">
-                    @_error
-                    <button type="button" class="btn-close" @onclick="@(() => _error = null)"></button>
+                    @GlobalError
+                    <button type="button" class="btn-close" @onclick="@(() => GlobalError = null)"></button>
                 </div>
             }
-            <div class="row g-3">
-                <div class="col-12">
-                    <label class="form-label">Category <span class="text-danger">*</span></label>
-                    <SfDropDownList TValue="Guid?" TItem="SicknessCategoryListItemModel"
-                                    DataSource="_categories"
-                                    @bind-Value="_categoryId"
-                                    Placeholder="Select a sickness category"
-                                    PopupHeight="200px">
-                        <DropDownListFieldSettings Value="Id" Text="Name" />
-                    </SfDropDownList>
-                </div>
-                <div class="col-6">
-                    <label class="form-label">Start Date <span class="text-danger">*</span></label>
-                    <SfDatePicker TValue="DateOnly?"
-                                  @bind-Value="_startDate"
-                                  Format="dd/MM/yyyy"
-                                  Placeholder="dd/mm/yyyy" />
-                </div>
-                <div class="col-6">
-                    <label class="form-label">Start Day Part <span class="text-danger">*</span></label>
-                    <SfDropDownList TValue="string" TItem="DayPartChoice"
-                                    DataSource="@DayPartOptions"
-                                    @bind-Value="_startDayPart">
-                        <DropDownListFieldSettings Value="Value" Text="Label" />
-                    </SfDropDownList>
-                </div>
-                <div class="col-12">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="alreadyEnded"
-                               @bind="_alreadyEnded" />
-                        <label class="form-check-label" for="alreadyEnded">This absence has already ended</label>
+            <EditForm EditContext="EditContext">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Category <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="Guid?" TItem="SicknessCategoryListItemModel"
+                                        DataSource="_categories"
+                                        @bind-Value="Model.CategoryId"
+                                        Placeholder="Select a sickness category"
+                                        PopupHeight="200px">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => Model.CategoryId)" />
                     </div>
-                </div>
-                @if (_alreadyEnded)
-                {
                     <div class="col-6">
-                        <label class="form-label">End Date</label>
+                        <label class="form-label">Start Date <span class="text-danger">*</span></label>
                         <SfDatePicker TValue="DateOnly?"
-                                      @bind-Value="_endDate"
+                                      @bind-Value="Model.StartDate"
                                       Format="dd/MM/yyyy"
                                       Placeholder="dd/mm/yyyy" />
+                        <ValidationMessage For="@(() => Model.StartDate)" />
                     </div>
                     <div class="col-6">
-                        <label class="form-label">End Day Part</label>
+                        <label class="form-label">Start Day Part <span class="text-danger">*</span></label>
                         <SfDropDownList TValue="string" TItem="DayPartChoice"
                                         DataSource="@DayPartOptions"
-                                        @bind-Value="_endDayPart">
+                                        @bind-Value="Model.StartDayPart">
                             <DropDownListFieldSettings Value="Value" Text="Label" />
                         </SfDropDownList>
                     </div>
-                }
-                <div class="col-12">
-                    <label class="form-label">Notes</label>
-                    <textarea class="form-control" rows="3" maxlength="1000"
-                              @bind="_notes" placeholder="Optional notes…"></textarea>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="alreadyEnded"
+                                   @bind="Model.AlreadyEnded" />
+                            <label class="form-check-label" for="alreadyEnded">This absence has already ended</label>
+                        </div>
+                    </div>
+                    @if (Model.AlreadyEnded)
+                    {
+                        <div class="col-6">
+                            <label class="form-label">End Date</label>
+                            <SfDatePicker TValue="DateOnly?"
+                                          @bind-Value="Model.EndDate"
+                                          Format="dd/MM/yyyy"
+                                          Placeholder="dd/mm/yyyy" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">End Day Part</label>
+                            <SfDropDownList TValue="string" TItem="DayPartChoice"
+                                            DataSource="@DayPartOptions"
+                                            @bind-Value="Model.EndDayPart">
+                                <DropDownListFieldSettings Value="Value" Text="Label" />
+                            </SfDropDownList>
+                        </div>
+                    }
+                    <div class="col-12">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" rows="3" maxlength="1000"
+                                  @bind="Model.Notes" placeholder="Optional notes…"></textarea>
+                    </div>
                 </div>
-            </div>
+            </EditForm>
         </Content>
         <FooterTemplate>
-            <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="_submitting">
-                @if (_submitting)
+            <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="Saving">
+                @if (Saving)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                 }
                 Record
             </SfButton>
-            <SfButton OnClick="Cancel">Cancel</SfButton>
+            <SfButton OnClick="CancelAsync">Cancel</SfButton>
         </FooterTemplate>
     </DialogTemplates>
 </SfDialog>
@@ -87,103 +94,64 @@
 @code {
     [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
-    [Parameter]                 public bool IsOpen     { get; set; }
-    [Parameter]                 public EventCallback   OnRecorded   { get; set; }
-    [Parameter]                 public EventCallback   OnCancelled  { get; set; }
 
-    private record DayPartChoice(string Value, string Label);
+    public sealed record DayPartChoice(string Value, string Label);
 
-    private static readonly DayPartChoice[] DayPartOptions =
+    public static readonly DayPartChoice[] DayPartOptions =
     [
         new("FullDay", "Full Day"),
         new("HalfDayAM", "Half Day (AM)"),
         new("HalfDayPM", "Half Day (PM)"),
     ];
 
-    private bool    _visible;
-    private bool    _submitting;
-    private string? _error;
-
-    private Guid?     _categoryId;
-    private DateOnly? _startDate;
-    private string     _startDayPart = "FullDay";
-    private bool       _alreadyEnded;
-    private DateOnly? _endDate;
-    private string     _endDayPart = "FullDay";
-    private string?   _notes;
-
     private List<SicknessCategoryListItemModel> _categories = [];
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task OnOpenedAsync()
     {
-        _visible = IsOpen;
-        if (IsOpen && _categories.Count == 0)
-            await LoadCategoriesAsync();
+        if (_categories.Count == 0)
+        {
+            var result = await SicknessCategoryService.ListSicknessCategoriesAsync(CompanyId);
+            _categories = result?.Items.Where(c => c.IsActive).ToList() ?? [];
+        }
     }
 
-    private async Task LoadCategoriesAsync()
+    protected override async Task<string?> SaveCoreAsync()
     {
-        var result = await SicknessCategoryService.ListSicknessCategoriesAsync(CompanyId);
-        _categories = result?.Items.Where(c => c.IsActive).ToList() ?? [];
-    }
-
-    private async Task SubmitAsync()
-    {
-        _error = null;
-
-        if (_categoryId is null)
-        {
-            _error = "Please select a sickness category.";
-            return;
-        }
-
-        if (_startDate is null)
-        {
-            _error = "Please enter a start date.";
-            return;
-        }
-
-        _submitting = true;
         var (success, error) = await SicknessService.RecordSicknessAsync(
             CompanyId,
             EmployeeId,
             new RecordSicknessRequest(
-                _categoryId.Value,
-                _startDate.Value,
-                _startDayPart,
-                _alreadyEnded ? _endDate : null,
-                _alreadyEnded ? _endDayPart : null,
-                _notes));
-        _submitting = false;
+                Model.CategoryId!.Value,
+                Model.StartDate!.Value,
+                Model.StartDayPart,
+                Model.AlreadyEnded ? Model.EndDate : null,
+                Model.AlreadyEnded ? Model.EndDayPart : null,
+                Model.Notes));
 
-        if (!success)
-        {
-            _error = error;
-            return;
-        }
-
-        ResetForm();
-        await OnRecorded.InvokeAsync();
+        return success ? null : error;
     }
 
-    private async Task Cancel()
+    protected override void ResetForm()
     {
-        ResetForm();
-        await OnCancelled.InvokeAsync();
+        Model.CategoryId = null;
+        Model.StartDate = null;
+        Model.StartDayPart = "FullDay";
+        Model.AlreadyEnded = false;
+        Model.EndDate = null;
+        Model.EndDayPart = "FullDay";
+        Model.Notes = null;
     }
 
-    private void OnDialogClosed() => OnCancelled.InvokeAsync();
-
-    private void ResetForm()
+    public sealed class RecordSicknessFormModel
     {
-        _categoryId    = null;
-        _startDate     = null;
-        _startDayPart  = "FullDay";
-        _alreadyEnded  = false;
-        _endDate       = null;
-        _endDayPart    = "FullDay";
-        _notes         = null;
-        _error         = null;
-        _visible       = false;
+        [Required(ErrorMessage = "Please select a sickness category.")]
+        public Guid? CategoryId { get; set; }
+        [Required(ErrorMessage = "Please enter a start date.")]
+        public DateOnly? StartDate { get; set; }
+        public string StartDayPart { get; set; } = "FullDay";
+        public bool AlreadyEnded { get; set; }
+        public DateOnly? EndDate { get; set; }
+        public string EndDayPart { get; set; } = "FullDay";
+        public string? Notes { get; set; }
     }
 }

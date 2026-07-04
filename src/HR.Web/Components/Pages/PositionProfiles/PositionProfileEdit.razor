@@ -4,7 +4,7 @@
 @rendermode InteractiveServer
 @inject PositionProfileService PositionProfileService
 @inject DepartmentService DepartmentService
-@inject NavigationManager Navigation
+@inherits EditPageBase<PositionProfileEditModel>
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -16,7 +16,7 @@
         </BreadcrumbItems>
     </SfBreadcrumb>
 
-    @if (_loading)
+    @if (IsLoading)
     {
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm" role="status"></div>
@@ -28,22 +28,58 @@
         <h1 class="mb-1">@PageTitle</h1>
         <p class="text-muted mb-4">Set the job title, department, and required documents for this position.</p>
 
-        @if (!string.IsNullOrEmpty(_globalError))
+        @if (!string.IsNullOrEmpty(GlobalError))
         {
-            <div class="alert alert-danger">@_globalError</div>
+            <div class="alert alert-danger">@GlobalError</div>
         }
 
         @if (IsNew)
         {
             <div class="row">
                 <div class="col-lg-7">
-                    <div class="card mb-4">
-                        <div class="card-header"><h5 class="mb-0">Position Profile Details</h5></div>
-                        <div class="card-body">
-                            @DetailsFormFields
+                    <EditForm EditContext="EditContext">
+                        <DataAnnotationsValidator />
+                        <div class="card mb-4">
+                            <div class="card-header"><h5 class="mb-0">Position Profile Details</h5></div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Title <span class="text-danger">*</span></label>
+                                    <HrTextBox @bind-Value="Model.Title" Placeholder="e.g. Senior Software Engineer" />
+                                    <ValidationMessage For="@(() => Model.Title)" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Description</label>
+                                    <HrTextBox @bind-Value="Model.Description" Placeholder="Optional description" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Department</label>
+                                    <SfDropDownList TValue="Guid?"
+                                                    TItem="DepartmentListItemModel"
+                                                    DataSource="@_departments"
+                                                    @bind-Value="Model.DepartmentId"
+                                                    Placeholder="None"
+                                                    AllowFiltering="true">
+                                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                                    </SfDropDownList>
+                                </div>
+                                <div class="mb-3">
+                                    <SfCheckBox TChecked="bool"
+                                                Label="Managerial role"
+                                                @bind-Checked="Model.IsManagerial" />
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    @FormButtons
+                        <div class="d-flex gap-2 align-items-center mt-3">
+                            <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                                @if (Saving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                Save
+                            </SfButton>
+                        </div>
+                    </EditForm>
                 </div>
             </div>
         }
@@ -57,13 +93,52 @@
                             <div class="mt-4">
                                 <div class="row">
                                     <div class="col-lg-7">
-                                        <div class="card mb-4">
-                                            <div class="card-header"><h5 class="mb-0">Position Profile Details</h5></div>
-                                            <div class="card-body @(_isViewMode ? "view-mode" : "")">
-                                                @DetailsFormFields
+                                        <EditForm EditContext="EditContext">
+                                            <DataAnnotationsValidator />
+                                            <div class="card mb-4">
+                                                <div class="card-header"><h5 class="mb-0">Position Profile Details</h5></div>
+                                                <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Title <span class="text-danger">*</span></label>
+                                                        <HrTextBox @bind-Value="Model.Title" Placeholder="e.g. Senior Software Engineer" />
+                                                        <ValidationMessage For="@(() => Model.Title)" />
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Description</label>
+                                                        <HrTextBox @bind-Value="Model.Description" Placeholder="Optional description" />
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Department</label>
+                                                        <SfDropDownList TValue="Guid?"
+                                                                        TItem="DepartmentListItemModel"
+                                                                        DataSource="@_departments"
+                                                                        @bind-Value="Model.DepartmentId"
+                                                                        Placeholder="None"
+                                                                        AllowFiltering="true">
+                                                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                                                        </SfDropDownList>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <SfCheckBox TChecked="bool"
+                                                                    Label="Managerial role"
+                                                                    @bind-Checked="Model.IsManagerial" />
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                        @FormButtons
+                                            <div class="d-flex gap-2 align-items-center mt-3">
+                                                <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                                                @if (!IsViewMode)
+                                                {
+                                                    <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                                                        @if (Saving)
+                                                        {
+                                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                                        }
+                                                        Save
+                                                    </SfButton>
+                                                }
+                                            </div>
+                                        </EditForm>
                                     </div>
                                 </div>
                             </div>
@@ -76,7 +151,7 @@
                                 <PositionProfileRequiredDocumentsTab
                                     CompanyId="CompanyId"
                                     PositionProfileId="Id!.Value"
-                                    CanEdit="!_isViewMode" />
+                                    CanEdit="!IsViewMode" />
                             </div>
                         </ContentTemplate>
                     </TabItem>
@@ -84,31 +159,26 @@
             </SfTab>
         }
     }
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
 </div>
 
 @code {
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool _isViewMode;
     private bool IsNew => Id is null || Id == Guid.Empty;
     private string PageTitle => IsNew ? "Add Position Profile"
-        : _model.Title.Trim().Length > 0 ? _model.Title.Trim()
-        : _isViewMode ? "View Position Profile" : "Edit Position Profile";
+        : Model.Title.Trim().Length > 0 ? Model.Title.Trim()
+        : IsViewMode ? "View Position Profile" : "Edit Position Profile";
 
-    private bool _loading = true;
-    private string? _globalError;
-    private bool _saving;
-
-    private readonly PositionProfileEditModel _model = new();
     private List<DepartmentListItemModel> _departments = [];
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task LoadAsync()
     {
-        _isViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
-        _loading = true;
-        _globalError = null;
-
         var deptResult = await DepartmentService.ListDepartmentsAsync(CompanyId);
         _departments = deptResult?.Items ?? [];
 
@@ -117,109 +187,42 @@
             var profile = await PositionProfileService.GetPositionProfileAsync(CompanyId, Id!.Value);
             if (profile is not null)
             {
-                _model.Title = profile.Title;
-                _model.Description = profile.Description;
-                _model.DepartmentId = profile.DepartmentId;
-                _model.IsManagerial = profile.IsManagerial;
+                Model.Title = profile.Title;
+                Model.Description = profile.Description;
+                Model.DepartmentId = profile.DepartmentId;
+                Model.IsManagerial = profile.IsManagerial;
             }
         }
-
-        _loading = false;
     }
 
-    private async Task Save()
+    protected override async Task<string?> SaveCoreAsync()
     {
-        _saving = true;
-        _globalError = null;
-
         if (IsNew)
         {
             var request = new CreatePositionProfileRequest(
                 CompanyId,
-                _model.DepartmentId,
-                _model.Title.Trim(),
-                string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim(),
-                _model.IsManagerial);
+                Model.DepartmentId,
+                Model.Title.Trim(),
+                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
+                Model.IsManagerial);
 
             var (created, error) = await PositionProfileService.CreatePositionProfileAsync(CompanyId, request);
-            _saving = false;
-
-            if (created is not null)
-            {
-                Navigation.NavigateTo($"/companies/{CompanyId}/position-profiles", forceLoad: true);
-                return;
-            }
-
-            _globalError = error ?? "Failed to create position profile.";
+            return created is not null ? null : error ?? "Failed to create position profile.";
         }
         else
         {
             var request = new UpdatePositionProfileRequest(
                 CompanyId,
                 Id!.Value,
-                _model.DepartmentId,
-                _model.Title.Trim(),
-                string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim(),
-                _model.IsManagerial);
+                Model.DepartmentId,
+                Model.Title.Trim(),
+                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
+                Model.IsManagerial);
 
             var (success, error) = await PositionProfileService.UpdatePositionProfileAsync(CompanyId, Id!.Value, request);
-            _saving = false;
-
-            if (success)
-            {
-                Navigation.NavigateTo($"/companies/{CompanyId}/position-profiles", forceLoad: true);
-                return;
-            }
-
-            _globalError = error;
+            return success ? null : error;
         }
     }
 
-    private void Cancel() =>
-        Navigation.NavigateTo($"/companies/{CompanyId}/position-profiles");
-
-    private RenderFragment DetailsFormFields => __builder =>
-    {
-        <div class="mb-3">
-            <label class="form-label">Title <span class="text-danger">*</span></label>
-            <HrTextBox @bind-Value="_model.Title" Placeholder="e.g. Senior Software Engineer" />
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Description</label>
-            <HrTextBox @bind-Value="_model.Description" Placeholder="Optional description" />
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Department</label>
-            <SfDropDownList TValue="Guid?"
-                            TItem="DepartmentListItemModel"
-                            DataSource="@_departments"
-                            @bind-Value="_model.DepartmentId"
-                            Placeholder="None"
-                            AllowFiltering="true">
-                <DropDownListFieldSettings Value="Id" Text="Name" />
-            </SfDropDownList>
-        </div>
-        <div class="mb-3">
-            <SfCheckBox TChecked="bool"
-                        Label="Managerial role"
-                        @bind-Checked="_model.IsManagerial" />
-        </div>
-    };
-
-    private RenderFragment FormButtons => __builder =>
-    {
-        <div class="d-flex gap-2 align-items-center mt-3">
-            @if (!_isViewMode)
-            {
-                <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
-                    @if (_saving)
-                    {
-                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                    }
-                    Save
-                </SfButton>
-            }
-            <SfButton OnClick="Cancel" Disabled="@_saving">@(_isViewMode ? "Close" : "Cancel")</SfButton>
-        </div>
-    };
+    protected override string? ListUrl => $"/companies/{CompanyId}/position-profiles";
 }

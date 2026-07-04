@@ -2,10 +2,13 @@ using System.ComponentModel.DataAnnotations;
 
 namespace HR.Web.Models;
 
-public sealed class CompanyProfileEditModel
+// Name and Addresses are saved together via a single UpdateCompanyRequest, so they share one
+// model/EditContext (owned by CompanyEdit) even though they're shown on separate tabs.
+public sealed class CompanyDetailsEditModel
 {
     [Required, MaxLength(200)]
     public string Name { get; set; } = string.Empty;
+    public List<CompanyAddressEditModel> Addresses { get; set; } = [];
 }
 
 public sealed class CompanyAddressEditModel

@@ -39,4 +39,42 @@ public sealed class DepartmentEditPage(IPage page, string baseUrl)
 
     public async Task<bool> HasErrorAsync() =>
         await page.Locator(".alert-danger, .validation-message").First.IsVisibleAsync();
+
+    public async Task<string> GetNameAsync() =>
+        await page.GetByPlaceholder("Department name").InputValueAsync();
+
+    // The shared "Unsaved Changes" confirmation dialog rendered by EditPageBase's Close action
+    // (see UnsavedChangesDialog.razor). Scoped by header text since Syncfusion dialogs share
+    // the generic role="dialog"/.e-dialog markup.
+    private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
+
+    public Task ClickCloseAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+
+    public Task<bool> IsUnsavedChangesDialogVisibleAsync() =>
+        UnsavedChangesDialog.IsVisibleAsync();
+
+    public async Task ConfirmDiscardChangesAsync()
+    {
+        await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
+        await page.WaitForURLAsync("**/departments", new() { Timeout = 15_000 });
+        await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
+    }
+
+    public async Task ConfirmSaveFromUnsavedChangesDialogAsync()
+    {
+        await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await page.WaitForURLAsync("**/departments", new() { Timeout = 15_000 });
+        await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
+    }
+
+    public Task CancelUnsavedChangesDialogAsync() =>
+        UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
+
+    public async Task CloseAndWaitForListAsync()
+    {
+        await ClickCloseAsync();
+        await page.WaitForURLAsync("**/departments", new() { Timeout = 15_000 });
+        await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
+    }
 }

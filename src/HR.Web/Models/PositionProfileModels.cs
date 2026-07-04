@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace HR.Web.Models;
 
 // ── LIST ──────────────────────────────────────────────────────────────────────
@@ -38,6 +40,7 @@ public record PositionProfileRequiredDocumentModel(
 
 public sealed class PositionProfileEditModel
 {
+    [Required(ErrorMessage = "Title is required.")]
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public Guid? DepartmentId { get; set; }

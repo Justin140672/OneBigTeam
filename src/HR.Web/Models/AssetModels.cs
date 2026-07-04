@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace HR.Web.Models;
 
 // --- Asset list / CRUD models ---
@@ -74,8 +76,11 @@ public record UpdateAssetResponse(
 
 public sealed class AssetEditModel
 {
+    [Required(ErrorMessage = "Asset number is required.")]
     public string AssetNumber { get; set; } = string.Empty;
-    public Guid CategoryId { get; set; }
+    [Required(ErrorMessage = "Category is required.")]
+    public Guid? CategoryId { get; set; }
+    [Required(ErrorMessage = "Name is required.")]
     public string Name { get; set; } = string.Empty;
     public string? Manufacturer { get; set; }
     public string? Model { get; set; }

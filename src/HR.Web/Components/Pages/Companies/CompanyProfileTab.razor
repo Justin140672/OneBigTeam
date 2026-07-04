@@ -6,6 +6,7 @@
         <div class="mb-4">
             <label class="form-label fw-semibold">Name</label>
             <SfTextBox @bind-Value="Model.Name" Placeholder="Company name" FloatLabelType="FloatLabelType.Auto" />
+            <ValidationMessage For="@(() => Model.Name)" />
         </div>
         <div class="mb-3">
             <label class="form-label fw-semibold">Status</label>
@@ -20,5 +21,5 @@
 
 @code {
     [Parameter, EditorRequired] public GetCompanyResponse? Company { get; set; }
-    [Parameter, EditorRequired] public CompanyProfileEditModel Model { get; set; } = default!;
+    [Parameter, EditorRequired] public CompanyDetailsEditModel Model { get; set; } = default!;
 }

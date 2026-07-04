@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace HR.Web.Models;
 
 public record ListAssetCategoriesResponse(List<AssetCategoryListItemModel> Items);
@@ -35,6 +37,7 @@ public record UpdateAssetCategoryResponse(
 
 public sealed class AssetCategoryEditModel
 {
+    [Required(ErrorMessage = "Name is required.")]
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
 }

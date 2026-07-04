@@ -127,6 +127,37 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task<bool> HasErrorAsync() =>
         await page.Locator(".alert-danger, .validation-message").First.IsVisibleAsync();
 
+    /// <summary>Fills the Employee Number field on the Employment tab.</summary>
+    public async Task FillEmployeeNumberAsync(string value) =>
+        await page.GetByPlaceholder("e.g. EMP-001").FillAsync(value);
+
+    // ── Close / unsaved-changes prompt (EditPageBase) ──────────────────────────
+
+    private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
+
+    public Task ClickCloseAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+
+    public Task<bool> IsUnsavedChangesDialogVisibleAsync() =>
+        UnsavedChangesDialog.IsVisibleAsync();
+
+    public async Task ConfirmDiscardChangesAsync()
+    {
+        await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
+        await page.WaitForURLAsync("**/employees", new() { Timeout = 15_000 });
+        await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
+    }
+
+    public async Task ConfirmSaveFromUnsavedChangesDialogAsync()
+    {
+        await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await page.WaitForURLAsync("**/employees", new() { Timeout = 15_000 });
+        await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
+    }
+
+    public Task CancelUnsavedChangesDialogAsync() =>
+        UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
+
     // ── Probation Tab ──────────────────────────────────────────────────────────
 
     public async Task OpenProbationTabAsync()

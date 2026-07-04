@@ -3,7 +3,7 @@
 @page "/companies/{CompanyId:guid}/leave-policies/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject LeavePolicyService LeavePolicyService
-@inject NavigationManager Navigation
+@inherits EditPageBase<LeavePolicyEditModel>
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -15,7 +15,7 @@
         </BreadcrumbItems>
     </SfBreadcrumb>
 
-    @if (_loading)
+    @if (IsLoading)
     {
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm" role="status"></div>
@@ -27,145 +27,122 @@
         <h1 class="mb-1">@PageTitle</h1>
         <p class="text-muted mb-4">Set the entitlement, carry-over, and balance rules this policy applies.</p>
 
-        @if (!string.IsNullOrEmpty(_globalError))
+        @if (!string.IsNullOrEmpty(GlobalError))
         {
-            <div class="alert alert-danger">@_globalError</div>
+            <div class="alert alert-danger">@GlobalError</div>
         }
 
-        <div class="row">
-            <div class="col-lg-7">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Leave Policy Details</h5>
-                    </div>
-                    <div class="card-body @(_isViewMode ? "view-mode" : "")">
-                        <div class="mb-3">
-                            <label class="form-label">Name <span class="text-danger">*</span></label>
-                            <HrTextBox @bind-Value="_model.Name" Placeholder="e.g. Standard Policy" />
+        <EditForm EditContext="EditContext">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-lg-7">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Leave Policy Details</h5>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Description</label>
-                            <HrTextBox @bind-Value="_model.Description" Placeholder="Optional description" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Carry Over Days <span class="text-danger">*</span></label>
-                            <SfNumericTextBox TValue="int" @bind-Value="_model.CarryOverDays"
-                                             Min="0" Step="1" />
-                        </div>
-                        <div class="mb-3">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="allowNegativeBalance"
-                                       @bind="_model.AllowNegativeBalance" />
-                                <label class="form-check-label" for="allowNegativeBalance">Allow negative balance</label>
+                        <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                            <div class="mb-3">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <HrTextBox @bind-Value="Model.Name" Placeholder="e.g. Standard Policy" />
+                                <ValidationMessage For="@(() => Model.Name)" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <HrTextBox @bind-Value="Model.Description" Placeholder="Optional description" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Carry Over Days <span class="text-danger">*</span></label>
+                                <SfNumericTextBox TValue="int" @bind-Value="Model.CarryOverDays"
+                                                 Min="0" Step="1" ShowSpinButton="false" />
+                                <ValidationMessage For="@(() => Model.CarryOverDays)" />
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="allowNegativeBalance"
+                                           @bind="Model.AllowNegativeBalance" />
+                                    <label class="form-check-label" for="allowNegativeBalance">Allow negative balance</label>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="d-flex gap-2 mt-3">
-                    @if (!_isViewMode)
-                    {
-                        @if (!string.IsNullOrEmpty(_successMsg))
+                    <div class="d-flex gap-2 mt-3">
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                        @if (!IsViewMode)
                         {
-                            <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
+                            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                                @if (Saving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                Save
+                            </SfButton>
                         }
-                        <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
-                            @if (_saving)
-                            {
-                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                            }
-                            Save
-                        </SfButton>
-                    }
-                    <SfButton OnClick="Cancel" Disabled="@_saving">@(_isViewMode ? "Close" : "Cancel")</SfButton>
+                    </div>
                 </div>
             </div>
-        </div>
+        </EditForm>
     }
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
 </div>
 
 @code {
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool _isViewMode;
     private bool IsNew => Id is null || Id == Guid.Empty;
     private string PageTitle => IsNew ? "Add Leave Policy"
-        : _model.Name.Trim().Length > 0 ? _model.Name
-        : _isViewMode ? "View Leave Policy" : "Edit Leave Policy";
+        : Model.Name.Trim().Length > 0 ? Model.Name
+        : IsViewMode ? "View Leave Policy" : "Edit Leave Policy";
 
-    private bool _loading = true;
-    private bool _saving;
-    private string? _globalError;
-    private string? _successMsg;
-
-    private readonly LeavePolicyEditModel _model = new();
-
-    protected override async Task OnParametersSetAsync()
+    protected override async Task LoadAsync()
     {
-        _isViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
-        _loading = true;
-        _globalError = null;
-        _successMsg = null;
-
         if (!IsNew)
         {
             var list = await LeavePolicyService.ListLeavePoliciesAsync(CompanyId);
             var existing = list?.Items.FirstOrDefault(p => p.Id == Id);
             if (existing is not null)
             {
-                _model.Name = existing.Name;
-                _model.Description = existing.Description;
-                _model.CarryOverDays = existing.CarryOverDays;
-                _model.AllowNegativeBalance = existing.AllowNegativeBalance;
+                Model.Name = existing.Name;
+                Model.Description = existing.Description;
+                Model.CarryOverDays = existing.CarryOverDays;
+                Model.AllowNegativeBalance = existing.AllowNegativeBalance;
             }
         }
-
-        _loading = false;
     }
 
-    private async Task Save()
+    protected override async Task<string?> SaveCoreAsync()
     {
-        _saving = true;
-        _globalError = null;
-        _successMsg = null;
-
         if (IsNew)
         {
             var request = new CreateLeavePolicyRequest(
                 CompanyId,
-                _model.Name.Trim(),
-                string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim(),
-                _model.CarryOverDays,
-                _model.AllowNegativeBalance);
+                Model.Name.Trim(),
+                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
+                Model.CarryOverDays,
+                Model.AllowNegativeBalance);
 
             var (created, error) = await LeavePolicyService.CreateAsync(CompanyId, request);
-            _saving = false;
-
-            if (created is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/leave-policies", forceLoad: true);
-            else
-                _globalError = error ?? "Failed to create leave policy.";
+            return created is not null ? null : error ?? "Failed to create leave policy.";
         }
         else
         {
             var request = new UpdateLeavePolicyRequest(
                 CompanyId,
                 Id!.Value,
-                _model.Name.Trim(),
-                string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim(),
-                _model.CarryOverDays,
-                _model.AllowNegativeBalance);
+                Model.Name.Trim(),
+                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
+                Model.CarryOverDays,
+                Model.AllowNegativeBalance);
 
             var (updated, error) = await LeavePolicyService.UpdateAsync(CompanyId, Id!.Value, request);
-            _saving = false;
-
-            if (updated is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/leave-policies", forceLoad: true);
-            else
-                _globalError = error ?? "Failed to save leave policy.";
+            return updated is not null ? null : error ?? "Failed to save leave policy.";
         }
     }
 
-    private void Cancel() => Navigation.NavigateTo($"/companies/{CompanyId}/leave-policies");
+    protected override string? ListUrl => $"/companies/{CompanyId}/leave-policies";
 }

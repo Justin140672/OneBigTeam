@@ -3,7 +3,7 @@
 @rendermode InteractiveServer
 @inject AssetService AssetService
 @inject AssetCategoryService AssetCategoryService
-@inject NavigationManager Navigation
+@inherits EditPageBase<AssetEditModel>
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -15,7 +15,7 @@
         </BreadcrumbItems>
     </SfBreadcrumb>
 
-    @if (_loading)
+    @if (IsLoading)
     {
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm" role="status"></div>
@@ -27,108 +27,103 @@
         <h1 class="mb-1">@PageTitle</h1>
         <p class="text-muted mb-4">Record the details, category, and assignment for this asset.</p>
 
-        @if (!string.IsNullOrEmpty(_globalError))
+        @if (!string.IsNullOrEmpty(GlobalError))
         {
-            <div class="alert alert-danger">@_globalError</div>
+            <div class="alert alert-danger">@GlobalError</div>
         }
 
-        <div class="row">
-            <div class="col-lg-8">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Asset Details</h5>
-                    </div>
-                    <div class="card-body @(_isViewMode ? "view-mode" : "")">
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <label class="form-label">Asset Number <span class="text-danger">*</span></label>
-                                <HrTextBox @bind-Value="_model.AssetNumber" Placeholder="e.g. ASSET-001" />
-                            </div>
-                            <div class="col-md-8">
-                                <label class="form-label">Name <span class="text-danger">*</span></label>
-                                <HrTextBox @bind-Value="_model.Name" Placeholder="e.g. Dell Laptop" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Category <span class="text-danger">*</span></label>
-                                <SfDropDownList TValue="Guid" TItem="AssetCategoryListItemModel"
-                                               DataSource="@_categories"
-                                               @bind-Value="_model.CategoryId"
-                                               Placeholder="Select category">
-                                    <DropDownListFieldSettings Value="Id" Text="Name" />
-                                </SfDropDownList>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Manufacturer</label>
-                                <HrTextBox @bind-Value="_model.Manufacturer" Placeholder="e.g. Dell" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Model</label>
-                                <HrTextBox @bind-Value="_model.Model" Placeholder="e.g. XPS 15" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Serial Number</label>
-                                <HrTextBox @bind-Value="_model.SerialNumber" Placeholder="e.g. SN123456" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Purchase Date</label>
-                                <SfDatePicker TValue="DateOnly?" @bind-Value="_model.PurchaseDate" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Purchase Price</label>
-                                <SfNumericTextBox TValue="decimal?" @bind-Value="_model.PurchasePrice"
-                                                  Format="N2" Placeholder="0.00" />
+        <EditForm EditContext="EditContext">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Asset Details</h5>
+                        </div>
+                        <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Asset Number <span class="text-danger">*</span></label>
+                                    <HrTextBox @bind-Value="Model.AssetNumber" Placeholder="e.g. ASSET-001" />
+                                    <ValidationMessage For="@(() => Model.AssetNumber)" />
+                                </div>
+                                <div class="col-md-8">
+                                    <label class="form-label">Name <span class="text-danger">*</span></label>
+                                    <HrTextBox @bind-Value="Model.Name" Placeholder="e.g. Dell Laptop" />
+                                    <ValidationMessage For="@(() => Model.Name)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Category <span class="text-danger">*</span></label>
+                                    <SfDropDownList TValue="Guid?" TItem="AssetCategoryListItemModel"
+                                                   DataSource="@_categories"
+                                                   @bind-Value="Model.CategoryId"
+                                                   Placeholder="Select category">
+                                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                                    </SfDropDownList>
+                                    <ValidationMessage For="@(() => Model.CategoryId)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Manufacturer</label>
+                                    <HrTextBox @bind-Value="Model.Manufacturer" Placeholder="e.g. Dell" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Model</label>
+                                    <HrTextBox @bind-Value="Model.Model" Placeholder="e.g. XPS 15" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Serial Number</label>
+                                    <HrTextBox @bind-Value="Model.SerialNumber" Placeholder="e.g. SN123456" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Purchase Date</label>
+                                    <SfDatePicker TValue="DateOnly?" @bind-Value="Model.PurchaseDate" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Purchase Price</label>
+                                    <SfNumericTextBox TValue="decimal?" @bind-Value="Model.PurchasePrice"
+                                                      Format="N2" Placeholder="0.00" ShowSpinButton="false" />
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="d-flex gap-2 mt-3">
-                    @if (!_isViewMode)
-                    {
-                        @if (!string.IsNullOrEmpty(_successMsg))
+                    <div class="d-flex gap-2 mt-3">
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                        @if (!IsViewMode)
                         {
-                            <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
+                            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                                @if (Saving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                Save
+                            </SfButton>
                         }
-                        <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
-                            @if (_saving)
-                            {
-                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                            }
-                            Save
-                        </SfButton>
-                    }
-                    <SfButton OnClick="Cancel" Disabled="@_saving">@(_isViewMode ? "Close" : "Cancel")</SfButton>
+                    </div>
                 </div>
             </div>
-        </div>
+        </EditForm>
     }
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
 </div>
 
 @code {
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool _isViewMode;
     private bool IsNew => Id is null || Id == Guid.Empty;
     private string PageTitle => IsNew ? "Add Asset"
-        : _model.Name.Trim().Length > 0 ? _model.Name
-        : _isViewMode ? "View Asset" : "Edit Asset";
+        : Model.Name.Trim().Length > 0 ? Model.Name
+        : IsViewMode ? "View Asset" : "Edit Asset";
 
-    private bool _loading = true;
-    private bool _saving;
-    private string? _globalError;
-    private string? _successMsg;
-
-    private readonly AssetEditModel _model = new();
     private List<AssetCategoryListItemModel> _categories = [];
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task LoadAsync()
     {
-        _isViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
-        _loading = true;
-        _globalError = null;
-        _successMsg = null;
-
         var categoriesResult = await AssetCategoryService.ListAssetCategoriesAsync(CompanyId);
         _categories = categoriesResult?.Items ?? [];
 
@@ -138,70 +133,54 @@
             var existing = list?.Items.FirstOrDefault(e => e.Id == Id);
             if (existing is not null)
             {
-                _model.AssetNumber = existing.AssetNumber;
-                _model.CategoryId = existing.CategoryId;
-                _model.Name = existing.Name;
-                _model.Manufacturer = existing.Manufacturer;
-                _model.Model = existing.Model;
-                _model.SerialNumber = existing.SerialNumber;
-                _model.PurchaseDate = existing.PurchaseDate;
-                _model.PurchasePrice = existing.PurchasePrice;
+                Model.AssetNumber = existing.AssetNumber;
+                Model.CategoryId = existing.CategoryId;
+                Model.Name = existing.Name;
+                Model.Manufacturer = existing.Manufacturer;
+                Model.Model = existing.Model;
+                Model.SerialNumber = existing.SerialNumber;
+                Model.PurchaseDate = existing.PurchaseDate;
+                Model.PurchasePrice = existing.PurchasePrice;
             }
         }
-
-        _loading = false;
     }
 
-    private async Task Save()
+    protected override async Task<string?> SaveCoreAsync()
     {
-        _saving = true;
-        _globalError = null;
-        _successMsg = null;
-
         if (IsNew)
         {
             var request = new CreateAssetRequest(
                 CompanyId,
-                _model.AssetNumber.Trim(),
-                _model.CategoryId,
-                _model.Name.Trim(),
-                string.IsNullOrWhiteSpace(_model.Manufacturer) ? null : _model.Manufacturer.Trim(),
-                string.IsNullOrWhiteSpace(_model.Model) ? null : _model.Model.Trim(),
-                string.IsNullOrWhiteSpace(_model.SerialNumber) ? null : _model.SerialNumber.Trim(),
-                _model.PurchaseDate,
-                _model.PurchasePrice);
+                Model.AssetNumber.Trim(),
+                Model.CategoryId!.Value,
+                Model.Name.Trim(),
+                string.IsNullOrWhiteSpace(Model.Manufacturer) ? null : Model.Manufacturer.Trim(),
+                string.IsNullOrWhiteSpace(Model.Model) ? null : Model.Model.Trim(),
+                string.IsNullOrWhiteSpace(Model.SerialNumber) ? null : Model.SerialNumber.Trim(),
+                Model.PurchaseDate,
+                Model.PurchasePrice);
 
             var (created, error) = await AssetService.CreateAssetAsync(CompanyId, request);
-            _saving = false;
-
-            if (created is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/assets", forceLoad: true);
-            else
-                _globalError = error ?? "Failed to create asset.";
+            return created is not null ? null : error ?? "Failed to create asset.";
         }
         else
         {
             var request = new UpdateAssetRequest(
                 CompanyId,
                 Id!.Value,
-                _model.AssetNumber.Trim(),
-                _model.CategoryId,
-                _model.Name.Trim(),
-                string.IsNullOrWhiteSpace(_model.Manufacturer) ? null : _model.Manufacturer.Trim(),
-                string.IsNullOrWhiteSpace(_model.Model) ? null : _model.Model.Trim(),
-                string.IsNullOrWhiteSpace(_model.SerialNumber) ? null : _model.SerialNumber.Trim(),
-                _model.PurchaseDate,
-                _model.PurchasePrice);
+                Model.AssetNumber.Trim(),
+                Model.CategoryId!.Value,
+                Model.Name.Trim(),
+                string.IsNullOrWhiteSpace(Model.Manufacturer) ? null : Model.Manufacturer.Trim(),
+                string.IsNullOrWhiteSpace(Model.Model) ? null : Model.Model.Trim(),
+                string.IsNullOrWhiteSpace(Model.SerialNumber) ? null : Model.SerialNumber.Trim(),
+                Model.PurchaseDate,
+                Model.PurchasePrice);
 
             var (updated, error) = await AssetService.UpdateAssetAsync(CompanyId, Id!.Value, request);
-            _saving = false;
-
-            if (updated is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/assets", forceLoad: true);
-            else
-                _globalError = error ?? "Failed to save asset.";
+            return updated is not null ? null : error ?? "Failed to save asset.";
         }
     }
 
-    private void Cancel() => Navigation.NavigateTo($"/companies/{CompanyId}/assets");
+    protected override string? ListUrl => $"/companies/{CompanyId}/assets";
 }

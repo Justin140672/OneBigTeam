@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace HR.Web.Models;
 
 public sealed record LeaveBalanceResponse(
@@ -104,8 +106,10 @@ public record UpdateLeavePolicyResponse(
 
 public sealed class LeavePolicyEditModel
 {
+    [Required(ErrorMessage = "Name is required.")]
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+    [Range(0, int.MaxValue, ErrorMessage = "Carry over days cannot be negative.")]
     public int CarryOverDays { get; set; }
     public bool AllowNegativeBalance { get; set; }
 }

@@ -215,9 +215,9 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
     /// <summary>Dismisses the Assign Asset dialog by clicking Cancel.</summary>
     public async Task CloseAssignAssetDialogAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
-        await page.GetByRole(AriaRole.Dialog, new() { Name = "Assign Asset" })
-            .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = "Assign Asset" });
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
+        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
     // ── Employment tab ────────────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 
@@ -90,14 +91,22 @@ public sealed record RequestPersonalDetailsChangeResponse(Guid TaskId);
 
 public sealed class EmployeeProfileEditModel
 {
+    [Required(ErrorMessage = "First name is required.")]
     public string FirstName { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Last name is required.")]
     public string LastName { get; set; } = string.Empty;
     public string PreferredName { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Work email is required.")]
+    [EmailAddress(ErrorMessage = "Enter a valid email address.")]
     public string WorkEmail { get; set; } = string.Empty;
+    [EmailAddress(ErrorMessage = "Enter a valid email address.")]
     public string? PersonalEmail { get; set; }
     public DateOnly StartDate { get; set; }
+    [Required(ErrorMessage = "Date of birth is required.")]
     public DateOnly? DateOfBirth { get; set; }
+    [Required(ErrorMessage = "Nationality is required.")]
     public string Nationality { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Gender is required.")]
     public string Gender { get; set; } = string.Empty;
     public string GenderOther { get; set; } = string.Empty;
     public string PhoneNumber { get; set; } = string.Empty;

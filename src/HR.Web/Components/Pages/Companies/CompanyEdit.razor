@@ -2,15 +2,15 @@
 @page "/companies/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject CompanyService CompanyService
-@inject NavigationManager Navigation
 @inject AppSession Session
+@inherits EditPageBase<CompanyDetailsEditModel>
 @using HR.Infrastructure.Abstractions
 @using HR.SharedKernel
 
 <PageTitle>Edit Company</PageTitle>
 
 <div class="container py-4">
-    @if (_loading)
+    @if (IsLoading)
     {
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm" role="status"></div>
@@ -31,9 +31,9 @@
         </div>
         <p class="text-muted mb-4">Manage this company's profile, addresses, and settings.</p>
 
-        @if (!string.IsNullOrEmpty(_globalError))
+        @if (!string.IsNullOrEmpty(GlobalError))
         {
-            <div class="alert alert-danger">@_globalError</div>
+            <div class="alert alert-danger">@GlobalError</div>
         }
 
         <SfTab>
@@ -41,60 +41,69 @@
                 <TabItem>
                     <ChildContent><TabHeader Text="Profile" /></ChildContent>
                     <ContentTemplate>
-                        <div class="mt-4 @(_isViewMode ? "view-mode" : "")"><CompanyProfileTab Company="_company" Model="_profile" /></div>
+                        <div class="mt-4 @(IsViewMode ? "view-mode" : "")">
+                            <EditForm EditContext="EditContext">
+                                <DataAnnotationsValidator />
+                                <CompanyProfileTab Company="_company" Model="Model" />
+                            </EditForm>
+                        </div>
                     </ContentTemplate>
                 </TabItem>
                 <TabItem>
                     <ChildContent><TabHeader Text="Addresses" /></ChildContent>
                     <ContentTemplate>
-                        <div class="mt-4 @(_isViewMode ? "view-mode" : "")"><CompanyAddressesTab Addresses="_addresses" /></div>
+                        <div class="mt-4 @(IsViewMode ? "view-mode" : "")">
+                            <EditForm EditContext="EditContext">
+                                <DataAnnotationsValidator />
+                                <CompanyAddressesTab Model="Model" />
+                            </EditForm>
+                        </div>
                     </ContentTemplate>
                 </TabItem>
                 <TabItem>
                     <ChildContent><TabHeader Text="Settings" /></ChildContent>
                     <ContentTemplate>
-                        <div class="mt-4 @(_isViewMode ? "view-mode" : "")"><CompanySettingsTab Model="_settings" /></div>
+                        <div class="mt-4 @(IsViewMode ? "view-mode" : "")">
+                            <CompanySettingsTab @ref="_settingsTab" CompanyId="Id" />
+                        </div>
                     </ContentTemplate>
                 </TabItem>
             </TabItems>
         </SfTab>
 
         <div class="mt-4 d-flex gap-2 align-items-center">
-            @if (!_isViewMode)
+            @if (!string.IsNullOrEmpty(SuccessMsg))
             {
-                @if (!string.IsNullOrEmpty(_successMsg))
-                {
-                    <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
-                }
-                <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAll">
-                    @(_saving ? "Saving…" : "Save")
+                <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@SuccessMsg</div>
+            }
+            <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+            @if (!IsViewMode)
+            {
+                <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                    @(Saving ? "Saving…" : "Save")
                 </SfButton>
             }
         </div>
     }
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
 </div>
 
 @code {
     [Parameter] public Guid Id { get; set; }
 
-    private bool _isViewMode;
     private GetCompanyResponse? _company;
-    private bool _loading = true;
-    private string? _globalError;
-    private string? _successMsg;
-    private bool _saving;
-    private readonly CompanyProfileEditModel _profile = new();
-    private List<CompanyAddressEditModel> _addresses = [];
-    private readonly CompanySettingsEditModel _settings = new();
+    private CompanySettingsTab? _settingsTab;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task LoadAsync()
     {
-        _isViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
-
         // Editing (not just viewing) company settings/profile/branding is admin-only,
         // matching the "company:manage" policy that guards the underlying save endpoints.
         await Session.InitialiseAsync();
-        if (!_isViewMode && !Session.CanManageCompany)
+        if (!IsViewMode && !Session.CanManageCompany)
         {
             Navigation.NavigateTo("/", replace: true);
             return;
@@ -103,8 +112,8 @@
         _company = await CompanyService.GetCompanyAsync(Id);
         if (_company is not null)
         {
-            _profile.Name = _company.Name;
-            _addresses = _company.Addresses.Select(a => new CompanyAddressEditModel
+            Model.Name = _company.Name;
+            Model.Addresses = _company.Addresses.Select(a => new CompanyAddressEditModel
             {
                 Type = a.Type,
                 Line1 = a.Line1,
@@ -114,60 +123,40 @@
                 PostalCode = a.PostalCode,
                 CountryCode = a.CountryCode
             }).ToList();
-
-            var settings = await CompanyService.GetCompanySettingsAsync(Id);
-            if (settings is not null)
-            {
-                _settings.TimeZone = settings.TimeZone;
-                _settings.Locale = settings.Locale;
-                _settings.WorkingWeek = Enum.GetValues<WorkingDays>()
-                    .Where(day => day != WorkingDays.None && ((WorkingDays)settings.WorkingDays).HasFlag(day))
-                    .Select(day => day.ToString())
-                    .ToHashSet();
-                _settings.HoursPerDay = settings.HoursPerDay;
-                _settings.LeaveYearStartMonth = settings.LeaveYearStartMonth;
-                _settings.DefaultHolidayAllowance = settings.DefaultHolidayAllowance;
-                _settings.ProbationMonths = settings.ProbationMonths;
-                _settings.ExcludePublicHolidaysFromLeave = settings.ExcludePublicHolidaysFromLeave;
-                _settings.ExcludePublicHolidaysFromSickness = settings.ExcludePublicHolidaysFromSickness;
-                _settings.FitNoteRequiredAfterDays = settings.FitNoteRequiredAfterDays;
-                _settings.ReturnToWorkRequiredAfterDays = settings.ReturnToWorkRequiredAfterDays;
-            }
         }
-        _loading = false;
     }
 
-    private async Task SaveAll()
+    protected override async Task<string?> SaveCoreAsync()
     {
-        _saving = true;
-        _globalError = null;
-        _successMsg = null;
-
         var profileReq = new UpdateCompanyRequest(
-            Id, _profile.Name,
-            _addresses.Select(a => new UpdateCompanyAddressRequest(
+            Id, Model.Name,
+            Model.Addresses.Select(a => new UpdateCompanyAddressRequest(
                 a.Type, a.Line1, a.Line2, a.City, a.Region, a.PostalCode, a.CountryCode)).ToList());
 
-        var workingDays = _settings.WorkingWeek
-            .Aggregate(WorkingDays.None, (acc, day) =>
-                Enum.TryParse<WorkingDays>(day, out var wd) ? acc | wd : acc);
-
-        var settingsReq = new UpdateCompanySettingsRequest(
-            Id, _settings.TimeZone, _settings.Locale,
-            workingDays, _settings.HoursPerDay,
-            _settings.LeaveYearStartMonth, _settings.DefaultHolidayAllowance,
-            _settings.ProbationMonths, _settings.ExcludePublicHolidaysFromLeave,
-            _settings.ExcludePublicHolidaysFromSickness, _settings.FitNoteRequiredAfterDays,
-            _settings.ReturnToWorkRequiredAfterDays);
-
         var companyResult = await CompanyService.UpdateCompanyAsync(Id, profileReq);
-        var settingsResult = await CompanyService.UpdateCompanySettingsAsync(Id, settingsReq);
+        if (companyResult is null)
+            return "Failed to save company profile.";
 
-        if (companyResult is null || settingsResult is null)
-            _globalError = "One or more sections failed to save.";
-        else
-            _successMsg = "Company saved successfully.";
+        if (_settingsTab is not null)
+        {
+            var settingsError = await _settingsTab.SaveAsync();
+            if (settingsError is not null)
+                return settingsError;
+        }
 
-        _saving = false;
+        return null;
     }
+
+    // No list page to navigate to on save — this page shows an inline success banner instead.
+    protected override Task OnSavedAsync()
+    {
+        SuccessMsg = "Company saved successfully.";
+        return Task.CompletedTask;
+    }
+
+    // Close navigates to the dashboard — there's no dedicated "company list" page.
+    protected override string? ListUrl => "/";
+
+    protected override bool HasUnsavedChanges =>
+        base.HasUnsavedChanges || (_settingsTab?.HasUnsavedChanges ?? false);
 }

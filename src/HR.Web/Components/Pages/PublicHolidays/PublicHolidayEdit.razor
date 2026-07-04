@@ -3,7 +3,7 @@
 @page "/companies/{CompanyId:guid}/public-holidays/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject PublicHolidayService PublicHolidayService
-@inject NavigationManager Navigation
+@inherits EditPageBase<PublicHolidayEditModel>
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -15,7 +15,7 @@
         </BreadcrumbItems>
     </SfBreadcrumb>
 
-    @if (_loading)
+    @if (IsLoading)
     {
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm" role="status"></div>
@@ -27,78 +27,72 @@
         <h1 class="mb-1">@PageTitle</h1>
         <p class="text-muted mb-4">Set the date and name of this public holiday.</p>
 
-        @if (!string.IsNullOrEmpty(_globalError))
+        @if (!string.IsNullOrEmpty(GlobalError))
         {
-            <div class="alert alert-danger">@_globalError</div>
+            <div class="alert alert-danger">@GlobalError</div>
         }
 
-        <div class="row">
-            <div class="col-lg-7">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Public Holiday Details</h5>
+        <EditForm EditContext="EditContext">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-lg-7">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Public Holiday Details</h5>
+                        </div>
+                        <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                            <div class="mb-3">
+                                <label class="form-label">Date <span class="text-danger">*</span></label>
+                                <SfDatePicker TValue="DateTime?" @bind-Value="Model.Date" Placeholder="Select date" Format="dd/MM/yyyy" />
+                                <ValidationMessage For="@(() => Model.Date)" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <HrTextBox @bind-Value="Model.Name" Placeholder="e.g. Christmas Day" />
+                                <ValidationMessage For="@(() => Model.Name)" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Country Code <span class="text-danger">*</span></label>
+                                <HrTextBox @bind-Value="Model.CountryCode" Placeholder="e.g. GB" />
+                                <ValidationMessage For="@(() => Model.CountryCode)" />
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body @(_isViewMode ? "view-mode" : "")">
-                        <div class="mb-3">
-                            <label class="form-label">Date <span class="text-danger">*</span></label>
-                            <SfDatePicker TValue="DateTime?" @bind-Value="_model.Date" Placeholder="Select date" Format="dd/MM/yyyy" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Name <span class="text-danger">*</span></label>
-                            <HrTextBox @bind-Value="_model.Name" Placeholder="e.g. Christmas Day" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Country Code <span class="text-danger">*</span></label>
-                            <HrTextBox @bind-Value="_model.CountryCode" Placeholder="e.g. GB" />
-                        </div>
-                    </div>
-                </div>
 
-                <div class="d-flex gap-2 mt-3">
-                    @if (!_isViewMode)
-                    {
-                        @if (!string.IsNullOrEmpty(_successMsg))
+                    <div class="d-flex gap-2 mt-3">
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                        @if (!IsViewMode)
                         {
-                            <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
+                            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                                @if (Saving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                Save
+                            </SfButton>
                         }
-                        <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
-                            @if (_saving)
-                            {
-                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                            }
-                            Save
-                        </SfButton>
-                    }
-                    <SfButton OnClick="Cancel" Disabled="@_saving">@(_isViewMode ? "Close" : "Cancel")</SfButton>
+                    </div>
                 </div>
             </div>
-        </div>
+        </EditForm>
     }
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
 </div>
 
 @code {
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool _isViewMode;
     private bool IsNew => Id is null || Id == Guid.Empty;
     private string PageTitle => IsNew ? "Add Public Holiday"
-        : _isViewMode ? "View Public Holiday" : "Edit Public Holiday";
+        : IsViewMode ? "View Public Holiday" : "Edit Public Holiday";
 
-    private bool _loading = true;
-    private bool _saving;
-    private string? _globalError;
-    private string? _successMsg;
-
-    private readonly PublicHolidayEditModel _model = new();
-
-    protected override async Task OnParametersSetAsync()
+    protected override async Task LoadAsync()
     {
-        _isViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
-        _loading = true;
-        _globalError = null;
-        _successMsg = null;
-
         if (!IsNew)
         {
             var list = await PublicHolidayService.ListAsync(CompanyId);
@@ -106,43 +100,18 @@
 
             if (existing is not null)
             {
-                _model.Date = existing.Date.ToDateTime(TimeOnly.MinValue);
-                _model.Name = existing.Name;
-                _model.CountryCode = existing.CountryCode;
+                Model.Date = existing.Date.ToDateTime(TimeOnly.MinValue);
+                Model.Name = existing.Name;
+                Model.CountryCode = existing.CountryCode;
             }
         }
-
-        _loading = false;
     }
 
-    private async Task Save()
+    protected override async Task<string?> SaveCoreAsync()
     {
-        _globalError = null;
-        _successMsg = null;
-
-        if (_model.Date is null)
-        {
-            _globalError = "Please select a date.";
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(_model.Name))
-        {
-            _globalError = "Name is required.";
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(_model.CountryCode))
-        {
-            _globalError = "Country code is required.";
-            return;
-        }
-
-        _saving = true;
-
-        var date = DateOnly.FromDateTime(_model.Date.Value);
-        var name = _model.Name.Trim();
-        var countryCode = _model.CountryCode.Trim().ToUpperInvariant();
+        var date = DateOnly.FromDateTime(Model.Date!.Value);
+        var name = Model.Name.Trim();
+        var countryCode = Model.CountryCode.Trim().ToUpperInvariant();
 
         if (IsNew)
         {
@@ -150,12 +119,7 @@
                 CompanyId,
                 new CreatePublicHolidayRequest(CompanyId, date, name, countryCode));
 
-            _saving = false;
-
-            if (created is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/public-holidays", forceLoad: true);
-            else
-                _globalError = error ?? "Failed to create public holiday.";
+            return created is not null ? null : error ?? "Failed to create public holiday.";
         }
         else
         {
@@ -164,14 +128,9 @@
                 Id!.Value,
                 new UpdatePublicHolidayRequest(CompanyId, Id!.Value, date, name, countryCode));
 
-            _saving = false;
-
-            if (updated is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/public-holidays", forceLoad: true);
-            else
-                _globalError = error ?? "Failed to update public holiday.";
+            return updated is not null ? null : error ?? "Failed to update public holiday.";
         }
     }
 
-    private void Cancel() => Navigation.NavigateTo($"/companies/{CompanyId}/public-holidays");
+    protected override string? ListUrl => $"/companies/{CompanyId}/public-holidays";
 }

@@ -1,51 +1,58 @@
+@using System.ComponentModel.DataAnnotations
 @inject DocumentService DocumentService
 @inject PositionProfileService PositionProfileService
+@inherits EditDialogBase<AddRequiredDocumentDialog.AddRequiredDocumentFormModel>
 
-<SfDialog @bind-Visible="_visible" IsModal="true" Width="520px" ShowCloseIcon="true">
-    <DialogEvents Closed="OnDialogClosed" />
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="520px" ShowCloseIcon="true">
+    <DialogEvents Closed="HandleDialogClosed" />
     <DialogTemplates>
         <Header>Add Required Document</Header>
         <Content>
-            @if (!string.IsNullOrEmpty(_error))
+            @if (!string.IsNullOrEmpty(GlobalError))
             {
                 <div class="alert alert-danger alert-dismissible mb-3">
-                    @_error
-                    <button type="button" class="btn-close" @onclick="@(() => _error = null)"></button>
+                    @GlobalError
+                    <button type="button" class="btn-close" @onclick="@(() => GlobalError = null)"></button>
                 </div>
             }
-            <div class="row g-3">
-                <div class="col-12">
-                    <label class="form-label">Document Type <span class="text-danger">*</span></label>
-                    <SfDropDownList TValue="Guid"
-                                    TItem="DocumentTypeItem"
-                                    DataSource="@_documentTypes"
-                                    @bind-Value="_documentTypeId"
-                                    Placeholder="Select document type…"
-                                    AllowFiltering="true">
-                        <DropDownListFieldSettings Value="Id" Text="Name" />
-                    </SfDropDownList>
+            <EditForm EditContext="EditContext">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Document Type <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="Guid?"
+                                        TItem="DocumentTypeItem"
+                                        DataSource="@_documentTypes"
+                                        @bind-Value="Model.DocumentTypeId"
+                                        Placeholder="Select document type…"
+                                        AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => Model.DocumentTypeId)" />
+                    </div>
+                    <div class="col-12">
+                        <SfCheckBox TChecked="bool" Label="Mandatory" @bind-Checked="Model.IsMandatory" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Due Days After Start</label>
+                        <SfNumericTextBox TValue="int?" @bind-Value="Model.DueDaysAfterStart" Min="0" Placeholder="e.g. 30"
+                                          FloatLabelType="FloatLabelType.Auto" ShowSpinButton="false" />
+                    </div>
+                    <div class="col-12">
+                        <SfCheckBox TChecked="bool" Label="Requires Expiry Date" @bind-Checked="Model.RequiresExpiryDate" />
+                    </div>
                 </div>
-                <div class="col-12">
-                    <SfCheckBox TChecked="bool" Label="Mandatory" @bind-Checked="_isMandatory" />
-                </div>
-                <div class="col-12">
-                    <label class="form-label">Due Days After Start</label>
-                    <HrNumericTextBox TValue="int?" @bind-Value="_dueDaysAfterStart" Min="0" Placeholder="e.g. 30" />
-                </div>
-                <div class="col-12">
-                    <SfCheckBox TChecked="bool" Label="Requires Expiry Date" @bind-Checked="_requiresExpiryDate" />
-                </div>
-            </div>
+            </EditForm>
         </Content>
         <FooterTemplate>
-            <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="_saving">
-                @if (_saving)
+            <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="Saving">
+                @if (Saving)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                 }
                 Add
             </SfButton>
-            <SfButton OnClick="Cancel">Cancel</SfButton>
+            <SfButton OnClick="CancelAsync">Cancel</SfButton>
         </FooterTemplate>
     </DialogTemplates>
 </SfDialog>
@@ -53,76 +60,39 @@
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid PositionProfileId { get; set; }
-    [Parameter]                 public bool IsOpen { get; set; }
-    [Parameter] public EventCallback OnAdded { get; set; }
-    [Parameter] public EventCallback OnCancelled { get; set; }
 
-    private bool _visible;
     private List<DocumentTypeItem> _documentTypes = [];
 
-    private Guid    _documentTypeId;
-    private bool    _isMandatory    = true;
-    private int?    _dueDaysAfterStart;
-    private bool    _requiresExpiryDate;
-    private bool    _saving;
-    private string? _error;
-
-    protected override async Task OnParametersSetAsync()
+    protected override async Task OnOpenedAsync()
     {
-        if (IsOpen && !_visible)
-        {
-            Reset();
-            _documentTypes = (await DocumentService.ListDocumentTypesAsync(CompanyId))?.Items.ToList() ?? [];
-            _visible = true;
-        }
-        else if (!IsOpen && _visible)
-        {
-            _visible = false;
-        }
+        _documentTypes = (await DocumentService.ListDocumentTypesAsync(CompanyId))?.Items.ToList() ?? [];
     }
 
-    private void Reset()
+    protected override async Task<string?> SaveCoreAsync()
     {
-        _documentTypeId     = Guid.Empty;
-        _isMandatory        = true;
-        _dueDaysAfterStart  = null;
-        _requiresExpiryDate = false;
-        _error              = null;
-    }
-
-    private async Task SubmitAsync()
-    {
-        _error = null;
-
-        if (_documentTypeId == Guid.Empty)
-        {
-            _error = "Please select a document type.";
-            return;
-        }
-
-        _saving = true;
         var request = new AddRequiredDocumentToProfileRequest(
-            CompanyId, PositionProfileId, _documentTypeId,
-            _isMandatory, _dueDaysAfterStart, _requiresExpiryDate);
+            CompanyId, PositionProfileId, Model.DocumentTypeId!.Value,
+            Model.IsMandatory, Model.DueDaysAfterStart, Model.RequiresExpiryDate);
         var (success, error) = await PositionProfileService.AddRequiredDocumentAsync(
             CompanyId, PositionProfileId, request);
-        _saving = false;
 
-        if (!success)
-        {
-            _error = error ?? "Failed to add required document.";
-            return;
-        }
-
-        _visible = false;
-        await OnAdded.InvokeAsync();
+        return success ? null : error ?? "Failed to add required document.";
     }
 
-    private async Task Cancel()
+    protected override void ResetForm()
     {
-        _visible = false;
-        await OnCancelled.InvokeAsync();
+        Model.DocumentTypeId = null;
+        Model.IsMandatory = true;
+        Model.DueDaysAfterStart = null;
+        Model.RequiresExpiryDate = false;
     }
 
-    private async Task OnDialogClosed() => await OnCancelled.InvokeAsync();
+    public sealed class AddRequiredDocumentFormModel
+    {
+        [Required(ErrorMessage = "Please select a document type.")]
+        public Guid? DocumentTypeId { get; set; }
+        public bool IsMandatory { get; set; } = true;
+        public int? DueDaysAfterStart { get; set; }
+        public bool RequiresExpiryDate { get; set; }
+    }
 }

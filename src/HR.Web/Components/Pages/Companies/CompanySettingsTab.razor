@@ -1,84 +1,155 @@
-<div class="card">
-    <div class="card-header">
-        <h5 class="mb-0">Company Settings</h5>
+@inject CompanyService CompanyService
+@inherits EditSectionBase<CompanySettingsEditModel>
+@using HR.Infrastructure.Abstractions
+@using HR.SharedKernel
+
+@if (IsLoading)
+{
+    <div class="d-flex align-items-center gap-2 py-3">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span class="text-muted">Loading…</span>
     </div>
-    <div class="card-body">
-        <div class="row g-4">
-            <div class="col-12">
-                <label class="form-label fw-semibold">Working Week</label>
-                <div class="d-flex flex-wrap gap-3 mt-1">
-                    @foreach (var day in AllDays)
-                    {
-                        <SfCheckBox TChecked="bool" Label="@day"
-                                    Checked="@Model.WorkingWeek.Contains(day)"
-                                    CheckedChanged="@(e => ToggleDay(day, e))" />
-                    }
+}
+else
+{
+    @if (!string.IsNullOrEmpty(GlobalError))
+    {
+        <div class="alert alert-danger mb-3">@GlobalError</div>
+    }
+
+    <EditForm EditContext="EditContext">
+        <DataAnnotationsValidator />
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Company Settings</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Working Week</label>
+                        <div class="d-flex flex-wrap gap-3 mt-1">
+                            @foreach (var day in AllDays)
+                            {
+                                <SfCheckBox TChecked="bool" Label="@day"
+                                            Checked="@Model.WorkingWeek.Contains(day)"
+                                            CheckedChanged="@(e => ToggleDay(day, e))" />
+                            }
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <SfNumericTextBox TValue="decimal" @bind-Value="Model.HoursPerDay"
+                                          Placeholder="Hours Per Day"
+                                          FloatLabelType="FloatLabelType.Auto"
+                                          ShowSpinButton="false"
+                                          Min="0.5m" Max="24m" Step="0.5m" />
+                        <ValidationMessage For="@(() => Model.HoursPerDay)" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Leave Year Start Month</label>
+                        <SfDropDownList TValue="int" TItem="MonthItem"
+                                        @bind-Value="Model.LeaveYearStartMonth"
+                                        DataSource="@Months"
+                                        Placeholder="Select month">
+                            <DropDownListFieldSettings Value="Number" Text="Name" />
+                        </SfDropDownList>
+                    </div>
+                    <div class="col-md-3">
+                        <SfNumericTextBox TValue="decimal" @bind-Value="Model.DefaultHolidayAllowance"
+                                          Placeholder="Default Holiday Allowance (days)"
+                                          FloatLabelType="FloatLabelType.Auto"
+                                          ShowSpinButton="false"
+                                          Min="0" Max="365" />
+                        <ValidationMessage For="@(() => Model.DefaultHolidayAllowance)" />
+                    </div>
+                    <div class="col-md-3">
+                        <SfNumericTextBox TValue="int" @bind-Value="Model.ProbationMonths"
+                                          Placeholder="Probation Months"
+                                          FloatLabelType="FloatLabelType.Auto"
+                                          ShowSpinButton="false"
+                                          Min="0" Max="24" />
+                        <ValidationMessage For="@(() => Model.ProbationMonths)" />
+                    </div>
+                    <div class="col-12">
+                        <SfCheckBox TChecked="bool" Label="Exclude public holidays from leave"
+                                    Checked="@Model.ExcludePublicHolidaysFromLeave"
+                                    CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromLeave = v)" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Sickness</label>
+                    </div>
+                    <div class="col-12">
+                        <SfCheckBox TChecked="bool" Label="Exclude public holidays from sickness"
+                                    Checked="@Model.ExcludePublicHolidaysFromSickness"
+                                    CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromSickness = v)" />
+                    </div>
+                    <div class="col-md-4">
+                        <SfNumericTextBox TValue="int?" @bind-Value="Model.FitNoteRequiredAfterDays"
+                                          Placeholder="Fit Note Required After (Days)"
+                                          FloatLabelType="FloatLabelType.Auto"
+                                          ShowSpinButton="false"
+                                          Min="0" />
+                    </div>
+                    <div class="col-md-4">
+                        <SfNumericTextBox TValue="int?" @bind-Value="Model.ReturnToWorkRequiredAfterDays"
+                                          Placeholder="Return-to-Work Review Required After (Days)"
+                                          FloatLabelType="FloatLabelType.Auto"
+                                          ShowSpinButton="false"
+                                          Min="0" />
+                    </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <SfNumericTextBox TValue="decimal" @bind-Value="Model.HoursPerDay"
-                                  Placeholder="Hours Per Day"
-                                  FloatLabelType="FloatLabelType.Auto"
-                                  Min="0.5m" Max="24m" Step="0.5m" />
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-semibold">Leave Year Start Month</label>
-                <SfDropDownList TValue="int" TItem="MonthItem"
-                                @bind-Value="Model.LeaveYearStartMonth"
-                                DataSource="@Months"
-                                Placeholder="Select month">
-                    <DropDownListFieldSettings Value="Number" Text="Name" />
-                </SfDropDownList>
-            </div>
-            <div class="col-md-3">
-                <SfNumericTextBox TValue="decimal" @bind-Value="Model.DefaultHolidayAllowance"
-                                  Placeholder="Default Holiday Allowance (days)"
-                                  FloatLabelType="FloatLabelType.Auto"
-                                  Min="0" Max="365" />
-            </div>
-            <div class="col-md-3">
-                <SfNumericTextBox TValue="int" @bind-Value="Model.ProbationMonths"
-                                  Placeholder="Probation Months"
-                                  FloatLabelType="FloatLabelType.Auto"
-                                  Min="0" Max="24" />
-            </div>
-            <div class="col-12">
-                <SfCheckBox TChecked="bool" Label="Exclude public holidays from leave"
-                            Checked="@Model.ExcludePublicHolidaysFromLeave"
-                            CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromLeave = v)" />
-            </div>
-            <div class="col-12">
-                <label class="form-label fw-semibold">Sickness</label>
-            </div>
-            <div class="col-12">
-                <SfCheckBox TChecked="bool" Label="Exclude public holidays from sickness"
-                            Checked="@Model.ExcludePublicHolidaysFromSickness"
-                            CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromSickness = v)" />
-            </div>
-            <div class="col-md-4">
-                <SfNumericTextBox TValue="int?" @bind-Value="Model.FitNoteRequiredAfterDays"
-                                  Placeholder="Fit Note Required After (Days)"
-                                  FloatLabelType="FloatLabelType.Auto"
-                                  Min="0" />
-            </div>
-            <div class="col-md-4">
-                <SfNumericTextBox TValue="int?" @bind-Value="Model.ReturnToWorkRequiredAfterDays"
-                                  Placeholder="Return-to-Work Review Required After (Days)"
-                                  FloatLabelType="FloatLabelType.Auto"
-                                  Min="0" />
-            </div>
         </div>
-    </div>
-</div>
+    </EditForm>
+}
 
 @code {
-    [Parameter, EditorRequired] public CompanySettingsEditModel Model { get; set; } = default!;
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
 
     private static readonly string[] AllDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
     private static readonly List<MonthItem> Months = Enumerable.Range(1, 12)
         .Select(m => new MonthItem(m, System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)))
         .ToList();
+
+    protected override async Task LoadAsync()
+    {
+        var settings = await CompanyService.GetCompanySettingsAsync(CompanyId);
+        if (settings is not null)
+        {
+            Model.TimeZone = settings.TimeZone;
+            Model.Locale = settings.Locale;
+            Model.WorkingWeek = Enum.GetValues<WorkingDays>()
+                .Where(day => day != WorkingDays.None && ((WorkingDays)settings.WorkingDays).HasFlag(day))
+                .Select(day => day.ToString())
+                .ToHashSet();
+            Model.HoursPerDay = settings.HoursPerDay;
+            Model.LeaveYearStartMonth = settings.LeaveYearStartMonth;
+            Model.DefaultHolidayAllowance = settings.DefaultHolidayAllowance;
+            Model.ProbationMonths = settings.ProbationMonths;
+            Model.ExcludePublicHolidaysFromLeave = settings.ExcludePublicHolidaysFromLeave;
+            Model.ExcludePublicHolidaysFromSickness = settings.ExcludePublicHolidaysFromSickness;
+            Model.FitNoteRequiredAfterDays = settings.FitNoteRequiredAfterDays;
+            Model.ReturnToWorkRequiredAfterDays = settings.ReturnToWorkRequiredAfterDays;
+        }
+    }
+
+    protected override async Task<string?> SaveCoreAsync()
+    {
+        var workingDays = Model.WorkingWeek
+            .Aggregate(WorkingDays.None, (acc, day) =>
+                Enum.TryParse<WorkingDays>(day, out var wd) ? acc | wd : acc);
+
+        var request = new UpdateCompanySettingsRequest(
+            CompanyId, Model.TimeZone, Model.Locale,
+            workingDays, Model.HoursPerDay,
+            Model.LeaveYearStartMonth, Model.DefaultHolidayAllowance,
+            Model.ProbationMonths, Model.ExcludePublicHolidaysFromLeave,
+            Model.ExcludePublicHolidaysFromSickness, Model.FitNoteRequiredAfterDays,
+            Model.ReturnToWorkRequiredAfterDays);
+
+        var result = await CompanyService.UpdateCompanySettingsAsync(CompanyId, request);
+        return result is not null ? null : "Failed to save company settings.";
+    }
 
     private void ToggleDay(string day, bool isChecked)
     {

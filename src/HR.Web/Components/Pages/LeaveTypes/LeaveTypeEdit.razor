@@ -3,7 +3,7 @@
 @page "/companies/{CompanyId:guid}/leave-types/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject LeaveTypeService LeaveTypeService
-@inject NavigationManager Navigation
+@inherits EditPageBase<LeaveTypeEditModel>
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -15,7 +15,7 @@
         </BreadcrumbItems>
     </SfBreadcrumb>
 
-    @if (_loading)
+    @if (IsLoading)
     {
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm" role="status"></div>
@@ -27,92 +27,91 @@
         <h1 class="mb-1">@PageTitle</h1>
         <p class="text-muted mb-4">Set the code, default entitlement, and behaviour for this leave type.</p>
 
-        @if (!string.IsNullOrEmpty(_globalError))
+        @if (!string.IsNullOrEmpty(GlobalError))
         {
-            <div class="alert alert-danger">@_globalError</div>
+            <div class="alert alert-danger">@GlobalError</div>
         }
 
-        <div class="row">
-            <div class="col-lg-7">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Leave Type Details</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-8">
-                                <label class="form-label">Name <span class="text-danger">*</span></label>
-                                <HrTextBox @bind-Value="_model.Name" Placeholder="e.g. Annual Leave" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Code <span class="text-danger">*</span></label>
-                                <HrTextBox @bind-Value="_model.Code" Placeholder="e.g. ANNUAL" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Default Days <span class="text-danger">*</span></label>
-                                <SfNumericTextBox TValue="int" @bind-Value="_model.DefaultEntitlementDays"
-                                                  Min="0" Step="1" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Accrual Method <span class="text-danger">*</span></label>
-                                <SfDropDownList TValue="string" TItem="Option"
-                                               DataSource="@_accrualOptions"
-                                               @bind-Value="_model.AccrualMethod"
-                                               Placeholder="Select method">
-                                    <DropDownListFieldSettings Value="Value" Text="Label" />
-                                </SfDropDownList>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Behaviour <span class="text-danger">*</span></label>
-                                <SfDropDownList TValue="string" TItem="Option"
-                                               DataSource="@_behaviourOptions"
-                                               @bind-Value="_model.Behaviour"
-                                               Placeholder="Select behaviour">
-                                    <DropDownListFieldSettings Value="Value" Text="Label" />
-                                </SfDropDownList>
+        <EditForm EditContext="EditContext">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-lg-7">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Leave Type Details</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-8">
+                                    <label class="form-label">Name <span class="text-danger">*</span></label>
+                                    <HrTextBox @bind-Value="Model.Name" Placeholder="e.g. Annual Leave" />
+                                    <ValidationMessage For="@(() => Model.Name)" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Code <span class="text-danger">*</span></label>
+                                    <HrTextBox @bind-Value="Model.Code" Placeholder="e.g. ANNUAL" />
+                                    <ValidationMessage For="@(() => Model.Code)" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Default Days <span class="text-danger">*</span></label>
+                                    <SfNumericTextBox TValue="int" @bind-Value="Model.DefaultEntitlementDays"
+                                                      Min="0" Step="1" ShowSpinButton="false" />
+                                    <ValidationMessage For="@(() => Model.DefaultEntitlementDays)" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Accrual Method <span class="text-danger">*</span></label>
+                                    <SfDropDownList TValue="string" TItem="Option"
+                                                   DataSource="@_accrualOptions"
+                                                   @bind-Value="Model.AccrualMethod"
+                                                   Placeholder="Select method">
+                                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                                    </SfDropDownList>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Behaviour <span class="text-danger">*</span></label>
+                                    <SfDropDownList TValue="string" TItem="Option"
+                                                   DataSource="@_behaviourOptions"
+                                                   @bind-Value="Model.Behaviour"
+                                                   Placeholder="Select behaviour">
+                                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                                    </SfDropDownList>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="d-flex gap-2 mt-3">
-                    @if (!_isViewMode)
-                    {
-                        @if (!string.IsNullOrEmpty(_successMsg))
+                    <div class="d-flex gap-2 mt-3">
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                        @if (!IsViewMode)
                         {
-                            <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
+                            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                                @if (Saving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                Save
+                            </SfButton>
                         }
-                        <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
-                            @if (_saving)
-                            {
-                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                            }
-                            Save
-                        </SfButton>
-                    }
-                    <SfButton OnClick="Cancel" Disabled="@_saving">@(_isViewMode ? "Close" : "Cancel")</SfButton>
+                    </div>
                 </div>
             </div>
-        </div>
+        </EditForm>
     }
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
 </div>
 
 @code {
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool _isViewMode;
     private bool IsNew => Id is null || Id == Guid.Empty;
     private string PageTitle => IsNew ? "Add Leave Type"
-        : _model.Name.Trim().Length > 0 ? _model.Name
-        : _isViewMode ? "View Leave Type" : "Edit Leave Type";
-
-    private bool _loading = true;
-    private bool _saving;
-    private string? _globalError;
-    private string? _successMsg;
-
-    private readonly LeaveTypeEditModel _model = new();
+        : Model.Name.Trim().Length > 0 ? Model.Name
+        : IsViewMode ? "View Leave Type" : "Edit Leave Type";
 
     private static readonly Option[] _accrualOptions =
     [
@@ -133,76 +132,55 @@
         new("Toil",      "Time Off in Lieu"),
     ];
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task LoadAsync()
     {
-        _isViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
-        _loading = true;
-        _globalError = null;
-        _successMsg = null;
-
         if (!IsNew)
         {
             var list = await LeaveTypeService.ListLeaveTypesAsync(CompanyId, includeInactive: true);
             var existing = list?.Items.FirstOrDefault(t => t.Id == Id);
             if (existing is not null)
             {
-                _model.Name = existing.Name;
-                _model.Code = existing.Code;
-                _model.DefaultEntitlementDays = existing.DefaultEntitlementDays;
-                _model.AccrualMethod = existing.AccrualMethod;
-                _model.Behaviour = existing.Behaviour;
+                Model.Name = existing.Name;
+                Model.Code = existing.Code;
+                Model.DefaultEntitlementDays = existing.DefaultEntitlementDays;
+                Model.AccrualMethod = existing.AccrualMethod;
+                Model.Behaviour = existing.Behaviour;
             }
         }
-
-        _loading = false;
     }
 
-    private async Task Save()
+    protected override async Task<string?> SaveCoreAsync()
     {
-        _saving = true;
-        _globalError = null;
-        _successMsg = null;
-
         if (IsNew)
         {
             var request = new CreateLeaveTypeRequest(
                 CompanyId,
-                _model.Name.Trim(),
-                _model.Code.Trim().ToUpperInvariant(),
-                _model.DefaultEntitlementDays,
-                _model.AccrualMethod,
-                _model.Behaviour);
+                Model.Name.Trim(),
+                Model.Code.Trim().ToUpperInvariant(),
+                Model.DefaultEntitlementDays,
+                Model.AccrualMethod,
+                Model.Behaviour);
 
             var (created, error) = await LeaveTypeService.CreateAsync(CompanyId, request);
-            _saving = false;
-
-            if (created is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/leave-types", forceLoad: true);
-            else
-                _globalError = error ?? "Failed to create leave type.";
+            return created is not null ? null : error ?? "Failed to create leave type.";
         }
         else
         {
             var request = new UpdateLeaveTypeRequest(
                 CompanyId,
                 Id!.Value,
-                _model.Name.Trim(),
-                _model.Code.Trim().ToUpperInvariant(),
-                _model.DefaultEntitlementDays,
-                _model.AccrualMethod,
-                _model.Behaviour);
+                Model.Name.Trim(),
+                Model.Code.Trim().ToUpperInvariant(),
+                Model.DefaultEntitlementDays,
+                Model.AccrualMethod,
+                Model.Behaviour);
 
             var (updated, error) = await LeaveTypeService.UpdateAsync(CompanyId, Id!.Value, request);
-            _saving = false;
-
-            if (updated is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/leave-types", forceLoad: true);
-            else
-                _globalError = error ?? "Failed to save leave type.";
+            return updated is not null ? null : error ?? "Failed to save leave type.";
         }
     }
 
-    private void Cancel() => Navigation.NavigateTo($"/companies/{CompanyId}/leave-types");
+    protected override string? ListUrl => $"/companies/{CompanyId}/leave-types";
 
     private sealed record Option(string Value, string Label);
 }

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace HR.Web.Models;
 
 public record ListSicknessCategoriesResponse(List<SicknessCategoryListItemModel> Items);
@@ -35,6 +37,8 @@ public record UpdateSicknessCategoryResponse(
 
 public sealed class SicknessCategoryEditModel
 {
+    [Required(ErrorMessage = "Name is required.")]
     public string Name { get; set; } = string.Empty;
+    [Range(0, int.MaxValue, ErrorMessage = "Display order cannot be negative.")]
     public int DisplayOrder { get; set; }
 }

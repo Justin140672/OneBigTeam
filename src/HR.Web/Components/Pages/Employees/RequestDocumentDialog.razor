@@ -1,59 +1,65 @@
+@using System.ComponentModel.DataAnnotations
 @inject DocumentService DocumentService
+@inherits EditDialogBase<RequestDocumentDialog.RequestDocumentFormModel>
 
-<SfDialog @bind-Visible="_visible" IsModal="true" Width="480px" ShowCloseIcon="true" CssClass="request-document-dialog">
-    <DialogEvents Closed="OnDialogClosed" />
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="480px" ShowCloseIcon="true" CssClass="request-document-dialog">
+    <DialogEvents Closed="HandleDialogClosed" />
     <DialogTemplates>
         <Header>Request Document</Header>
         <Content>
-            @if (_error is not null)
+            @if (GlobalError is not null)
             {
                 <div class="alert alert-danger alert-dismissible mb-3">
-                    @_error
-                    <button type="button" class="btn-close" @onclick="@(() => _error = null)"></button>
+                    @GlobalError
+                    <button type="button" class="btn-close" @onclick="@(() => GlobalError = null)"></button>
                 </div>
             }
-            <div class="row g-3">
-                <div class="col-12">
-                    <label class="form-label">Document Type <span class="text-danger">*</span></label>
-                    <SfDropDownList TValue="Guid?" TItem="DocumentTypeItem"
-                                    DataSource="_documentTypes"
-                                    @bind-Value="_documentTypeId"
-                                    Placeholder="Select a document type"
-                                    PopupHeight="200px">
-                        <DropDownListFieldSettings Value="Id" Text="Name" />
-                    </SfDropDownList>
-                </div>
-                <div class="col-12">
-                    <label class="form-label">Due Date</label>
-                    <SfDatePicker TValue="DateOnly?"
-                                  @bind-Value="_dueDate"
-                                  Format="dd/MM/yyyy"
-                                  Placeholder="dd/mm/yyyy"
-                                  ShowClearButton="true" />
-                </div>
-                <div class="col-12">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="isMandatory"
-                               @bind="_isMandatory" />
-                        <label class="form-check-label" for="isMandatory">Mandatory</label>
+            <EditForm EditContext="EditContext">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Document Type <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="Guid?" TItem="DocumentTypeItem"
+                                        DataSource="_documentTypes"
+                                        @bind-Value="Model.DocumentTypeId"
+                                        Placeholder="Select a document type"
+                                        PopupHeight="200px">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => Model.DocumentTypeId)" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Due Date</label>
+                        <SfDatePicker TValue="DateOnly?"
+                                      @bind-Value="Model.DueDate"
+                                      Format="dd/MM/yyyy"
+                                      Placeholder="dd/mm/yyyy"
+                                      ShowClearButton="true" />
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="isMandatory"
+                                   @bind="Model.IsMandatory" />
+                            <label class="form-check-label" for="isMandatory">Mandatory</label>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" rows="3" maxlength="1000"
+                                  @bind="Model.Notes" placeholder="Optional notes for the employee…"></textarea>
                     </div>
                 </div>
-                <div class="col-12">
-                    <label class="form-label">Notes</label>
-                    <textarea class="form-control" rows="3" maxlength="1000"
-                              @bind="_notes" placeholder="Optional notes for the employee…"></textarea>
-                </div>
-            </div>
+            </EditForm>
         </Content>
         <FooterTemplate>
-            <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="_submitting">
-                @if (_submitting)
+            <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="Saving">
+                @if (Saving)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                 }
                 Request
             </SfButton>
-            <SfButton OnClick="Cancel">Cancel</SfButton>
+            <SfButton OnClick="CancelAsync">Cancel</SfButton>
         </FooterTemplate>
     </DialogTemplates>
 </SfDialog>
@@ -61,74 +67,33 @@
 @code {
     [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
-    [Parameter]                 public bool IsOpen     { get; set; }
-    [Parameter]                 public EventCallback   OnRequested  { get; set; }
-    [Parameter]                 public EventCallback   OnCancelled  { get; set; }
-
-    private bool    _visible;
-    private bool    _submitting;
-    private string? _error;
-
-    private Guid?     _documentTypeId;
-    private DateOnly? _dueDate;
-    private bool      _isMandatory;
-    private string?   _notes;
 
     private List<DocumentTypeItem> _documentTypes = [];
 
-    protected override async Task OnParametersSetAsync()
-    {
-        _visible = IsOpen;
-        if (IsOpen && _documentTypes.Count == 0)
-            await LoadTypesAsync();
-    }
-
-    private async Task LoadTypesAsync()
+    protected override async Task OnOpenedAsync()
     {
         var result = await DocumentService.ListDocumentTypesAsync(CompanyId);
         _documentTypes = result?.Items.Where(t => t.IsActive).ToList() ?? [];
     }
 
-    private async Task SubmitAsync()
+    protected override async Task<string?> SaveCoreAsync() =>
+        await DocumentService.RequestDocumentAsync(
+            CompanyId, EmployeeId, Model.DocumentTypeId!.Value, Model.DueDate, Model.IsMandatory, Model.Notes);
+
+    protected override void ResetForm()
     {
-        _error = null;
-
-        if (_documentTypeId is null)
-        {
-            _error = "Please select a document type.";
-            return;
-        }
-
-        _submitting = true;
-        var error = await DocumentService.RequestDocumentAsync(
-            CompanyId, EmployeeId, _documentTypeId.Value, _dueDate, _isMandatory, _notes);
-        _submitting = false;
-
-        if (error is not null)
-        {
-            _error = error;
-            return;
-        }
-
-        ResetForm();
-        await OnRequested.InvokeAsync();
+        Model.DocumentTypeId = null;
+        Model.DueDate = null;
+        Model.IsMandatory = false;
+        Model.Notes = null;
     }
 
-    private async Task Cancel()
+    public sealed class RequestDocumentFormModel
     {
-        ResetForm();
-        await OnCancelled.InvokeAsync();
-    }
-
-    private void OnDialogClosed() => OnCancelled.InvokeAsync();
-
-    private void ResetForm()
-    {
-        _documentTypeId = null;
-        _dueDate        = null;
-        _isMandatory    = false;
-        _notes          = null;
-        _error          = null;
-        _visible        = false;
+        [Required(ErrorMessage = "Please select a document type.")]
+        public Guid? DocumentTypeId { get; set; }
+        public DateOnly? DueDate { get; set; }
+        public bool IsMandatory { get; set; }
+        public string? Notes { get; set; }
     }
 }

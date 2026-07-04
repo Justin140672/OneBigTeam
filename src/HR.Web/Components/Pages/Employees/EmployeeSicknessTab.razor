@@ -3,7 +3,7 @@
 <RecordSicknessDialog CompanyId="CompanyId"
                       EmployeeId="EmployeeId"
                       IsOpen="_recordOpen"
-                      OnRecorded="OnSicknessRecorded"
+                      OnSaved="OnSicknessRecorded"
                       OnCancelled="@(() => _recordOpen = false)" />
 
 @if (_closeTargetId is not null)
@@ -12,7 +12,7 @@
                                EmployeeId="EmployeeId"
                                RecordId="_closeTargetId.Value"
                                IsOpen="_closeOpen"
-                               OnClosed="OnSicknessClosed"
+                               OnSaved="OnSicknessClosed"
                                OnCancelled="@(() => { _closeOpen = false; _closeTargetId = null; })" />
 }
 

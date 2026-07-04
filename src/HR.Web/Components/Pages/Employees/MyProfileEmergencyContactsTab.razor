@@ -1,3 +1,4 @@
+@using System.ComponentModel.DataAnnotations
 @inject EmployeeService EmployeeService
 @inject AppSession Session
 
@@ -65,44 +66,43 @@ else
                 var c = contact;
                 @if (_editingId == c.Id)
                 {
-                    <div class="ec-contact-form">
-                        <div class="ec-section-label">Edit Contact</div>
-                        <div class="ec-field-row">
-                            <div class="ec-field-group">
-                                <label class="ec-label">Name <span class="ec-required">*</span></label>
-                                <input class="form-control @(HasError("name") ? "is-invalid" : "")"
-                                       @bind="_editName" placeholder="Full name" maxlength="200" />
-                                @if (HasError("name")) { <div class="invalid-feedback">@_validationErrors["name"]</div> }
+                    <EditForm EditContext="_editContext">
+                        <DataAnnotationsValidator />
+                        <div class="ec-contact-form">
+                            <div class="ec-section-label">Edit Contact</div>
+                            <div class="ec-field-row">
+                                <div class="ec-field-group">
+                                    <label class="ec-label">Name <span class="ec-required">*</span></label>
+                                    <input class="form-control" @bind="_form.Name" placeholder="Full name" maxlength="200" />
+                                    <ValidationMessage For="@(() => _form.Name)" />
+                                </div>
+                                <div class="ec-field-group">
+                                    <label class="ec-label">Relationship <span class="ec-required">*</span></label>
+                                    <input class="form-control" @bind="_form.Relationship" placeholder="e.g. Spouse, Parent, Sibling" maxlength="100" />
+                                    <ValidationMessage For="@(() => _form.Relationship)" />
+                                </div>
                             </div>
-                            <div class="ec-field-group">
-                                <label class="ec-label">Relationship <span class="ec-required">*</span></label>
-                                <input class="form-control @(HasError("relationship") ? "is-invalid" : "")"
-                                       @bind="_editRelationship" placeholder="e.g. Spouse, Parent, Sibling" maxlength="100" />
-                                @if (HasError("relationship")) { <div class="invalid-feedback">@_validationErrors["relationship"]</div> }
+                            <div class="ec-field-row">
+                                <div class="ec-field-group">
+                                    <label class="ec-label">Phone Number <span class="ec-required">*</span></label>
+                                    <input class="form-control" type="tel" @bind="_form.PhoneNumber" placeholder="e.g. 07700 900000" maxlength="30" />
+                                    <ValidationMessage For="@(() => _form.PhoneNumber)" />
+                                </div>
+                                <div class="ec-field-group">
+                                    <label class="ec-label">Email</label>
+                                    <input class="form-control" type="email" @bind="_form.Email" placeholder="e.g. name@example.com" maxlength="320" />
+                                    <ValidationMessage For="@(() => _form.Email)" />
+                                </div>
+                            </div>
+                            <div class="ec-form-actions">
+                                <SfButton IsPrimary="true" Disabled="@_saving" OnClick="@(() => SaveEditAsync(c.Id))">
+                                    @if (_saving) { <span class="spinner-border spinner-border-sm me-1" role="status"></span> }
+                                    Save
+                                </SfButton>
+                                <SfButton OnClick="CancelEdit" Disabled="@_saving">Cancel</SfButton>
                             </div>
                         </div>
-                        <div class="ec-field-row">
-                            <div class="ec-field-group">
-                                <label class="ec-label">Phone Number <span class="ec-required">*</span></label>
-                                <input class="form-control @(HasError("phone") ? "is-invalid" : "")"
-                                       type="tel" @bind="_editPhone" placeholder="e.g. 07700 900000" maxlength="30" />
-                                @if (HasError("phone")) { <div class="invalid-feedback">@_validationErrors["phone"]</div> }
-                            </div>
-                            <div class="ec-field-group">
-                                <label class="ec-label">Email</label>
-                                <input class="form-control @(HasError("email") ? "is-invalid" : "")"
-                                       type="email" @bind="_editEmail" placeholder="e.g. name@example.com" maxlength="320" />
-                                @if (HasError("email")) { <div class="invalid-feedback">@_validationErrors["email"]</div> }
-                            </div>
-                        </div>
-                        <div class="ec-form-actions">
-                            <SfButton IsPrimary="true" Disabled="@_saving" OnClick="@(() => SaveEditAsync(c.Id))">
-                                @if (_saving) { <span class="spinner-border spinner-border-sm me-1" role="status"></span> }
-                                Save
-                            </SfButton>
-                            <SfButton OnClick="CancelEdit" Disabled="@_saving">Cancel</SfButton>
-                        </div>
-                    </div>
+                    </EditForm>
                 }
                 else
                 {
@@ -132,44 +132,43 @@ else
 
             @if (_showAddForm)
             {
-                <div class="ec-contact-form">
-                    <div class="ec-section-label">New Contact</div>
-                    <div class="ec-field-row">
-                        <div class="ec-field-group">
-                            <label class="ec-label">Name <span class="ec-required">*</span></label>
-                            <input class="form-control @(HasError("name") ? "is-invalid" : "")"
-                                   @bind="_addName" placeholder="Full name" maxlength="200" />
-                            @if (HasError("name")) { <div class="invalid-feedback">@_validationErrors["name"]</div> }
+                <EditForm EditContext="_editContext">
+                    <DataAnnotationsValidator />
+                    <div class="ec-contact-form">
+                        <div class="ec-section-label">New Contact</div>
+                        <div class="ec-field-row">
+                            <div class="ec-field-group">
+                                <label class="ec-label">Name <span class="ec-required">*</span></label>
+                                <input class="form-control" @bind="_form.Name" placeholder="Full name" maxlength="200" />
+                                <ValidationMessage For="@(() => _form.Name)" />
+                            </div>
+                            <div class="ec-field-group">
+                                <label class="ec-label">Relationship <span class="ec-required">*</span></label>
+                                <input class="form-control" @bind="_form.Relationship" placeholder="e.g. Spouse, Parent, Sibling" maxlength="100" />
+                                <ValidationMessage For="@(() => _form.Relationship)" />
+                            </div>
                         </div>
-                        <div class="ec-field-group">
-                            <label class="ec-label">Relationship <span class="ec-required">*</span></label>
-                            <input class="form-control @(HasError("relationship") ? "is-invalid" : "")"
-                                   @bind="_addRelationship" placeholder="e.g. Spouse, Parent, Sibling" maxlength="100" />
-                            @if (HasError("relationship")) { <div class="invalid-feedback">@_validationErrors["relationship"]</div> }
+                        <div class="ec-field-row">
+                            <div class="ec-field-group">
+                                <label class="ec-label">Phone Number <span class="ec-required">*</span></label>
+                                <input class="form-control" type="tel" @bind="_form.PhoneNumber" placeholder="e.g. 07700 900000" maxlength="30" />
+                                <ValidationMessage For="@(() => _form.PhoneNumber)" />
+                            </div>
+                            <div class="ec-field-group">
+                                <label class="ec-label">Email</label>
+                                <input class="form-control" type="email" @bind="_form.Email" placeholder="e.g. name@example.com" maxlength="320" />
+                                <ValidationMessage For="@(() => _form.Email)" />
+                            </div>
+                        </div>
+                        <div class="ec-form-actions">
+                            <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAddAsync">
+                                @if (_saving) { <span class="spinner-border spinner-border-sm me-1" role="status"></span> }
+                                Add Contact
+                            </SfButton>
+                            <SfButton OnClick="CancelAdd" Disabled="@_saving">Cancel</SfButton>
                         </div>
                     </div>
-                    <div class="ec-field-row">
-                        <div class="ec-field-group">
-                            <label class="ec-label">Phone Number <span class="ec-required">*</span></label>
-                            <input class="form-control @(HasError("phone") ? "is-invalid" : "")"
-                                   type="tel" @bind="_addPhone" placeholder="e.g. 07700 900000" maxlength="30" />
-                            @if (HasError("phone")) { <div class="invalid-feedback">@_validationErrors["phone"]</div> }
-                        </div>
-                        <div class="ec-field-group">
-                            <label class="ec-label">Email</label>
-                            <input class="form-control @(HasError("email") ? "is-invalid" : "")"
-                                   type="email" @bind="_addEmail" placeholder="e.g. name@example.com" maxlength="320" />
-                            @if (HasError("email")) { <div class="invalid-feedback">@_validationErrors["email"]</div> }
-                        </div>
-                    </div>
-                    <div class="ec-form-actions">
-                        <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAddAsync">
-                            @if (_saving) { <span class="spinner-border spinner-border-sm me-1" role="status"></span> }
-                            Add Contact
-                        </SfButton>
-                        <SfButton OnClick="CancelAdd" Disabled="@_saving">Cancel</SfButton>
-                    </div>
-                </div>
+                </EditForm>
             }
         </div>
     </div>
@@ -183,21 +182,15 @@ else
     private bool _saving;
     private bool _saved;
     private string? _error;
-    private Dictionary<string, string> _validationErrors = new();
 
     private List<EmergencyContactItem> _contacts = [];
 
     private bool _showAddForm;
-    private string _addName = string.Empty;
-    private string _addRelationship = string.Empty;
-    private string _addPhone = string.Empty;
-    private string? _addEmail;
-
     private Guid? _editingId;
-    private string _editName = string.Empty;
-    private string _editRelationship = string.Empty;
-    private string _editPhone = string.Empty;
-    private string? _editEmail;
+
+    // Shared by both the inline "add" and "edit" forms — only one is ever visible at a time.
+    private readonly EmergencyContactFormModel _form = new();
+    private EditContext _editContext = default!;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -218,56 +211,58 @@ else
         _loading = false;
     }
 
+    private void ResetForm()
+    {
+        _form.Name = string.Empty;
+        _form.Relationship = string.Empty;
+        _form.PhoneNumber = string.Empty;
+        _form.Email = null;
+        _editContext = new EditContext(_form);
+    }
+
     private void StartAdd()
     {
-        _showAddForm     = true;
-        _editingId       = null;
-        _addName         = string.Empty;
-        _addRelationship = string.Empty;
-        _addPhone        = string.Empty;
-        _addEmail        = null;
-        _validationErrors.Clear();
+        _showAddForm = true;
+        _editingId = null;
+        ResetForm();
         _error = null;
     }
 
     private void CancelAdd()
     {
         _showAddForm = false;
-        _validationErrors.Clear();
     }
 
     private void StartEdit(EmergencyContactItem c)
     {
-        _editingId        = c.Id;
-        _showAddForm      = false;
-        _editName         = c.Name;
-        _editRelationship = c.Relationship;
-        _editPhone        = c.PhoneNumber;
-        _editEmail        = c.Email;
-        _validationErrors.Clear();
+        _editingId = c.Id;
+        _showAddForm = false;
+        _form.Name = c.Name;
+        _form.Relationship = c.Relationship;
+        _form.PhoneNumber = c.PhoneNumber;
+        _form.Email = c.Email;
+        _editContext = new EditContext(_form);
         _error = null;
     }
 
     private void CancelEdit()
     {
         _editingId = null;
-        _validationErrors.Clear();
     }
 
     private async Task SaveAddAsync()
     {
-        _validationErrors = Validate(_addName, _addRelationship, _addPhone, _addEmail);
-        if (_validationErrors.Count > 0) return;
+        if (!_editContext.Validate()) return;
 
         _saving = true;
         _error  = null;
 
         var request = new AddEmergencyContactRequest(
             CompanyId,
-            _addName.Trim(),
-            _addRelationship.Trim(),
-            _addPhone.Trim(),
-            string.IsNullOrWhiteSpace(_addEmail) ? null : _addEmail.Trim());
+            _form.Name.Trim(),
+            _form.Relationship.Trim(),
+            _form.PhoneNumber.Trim(),
+            string.IsNullOrWhiteSpace(_form.Email) ? null : _form.Email.Trim());
 
         var (contact, error) = await EmployeeService.AddMyEmergencyContactAsync(CompanyId, request);
         _saving = false;
@@ -285,8 +280,7 @@ else
 
     private async Task SaveEditAsync(Guid contactId)
     {
-        _validationErrors = Validate(_editName, _editRelationship, _editPhone, _editEmail);
-        if (_validationErrors.Count > 0) return;
+        if (!_editContext.Validate()) return;
 
         _saving = true;
         _error  = null;
@@ -294,10 +288,10 @@ else
         var request = new UpdateEmergencyContactRequest(
             CompanyId,
             contactId,
-            _editName.Trim(),
-            _editRelationship.Trim(),
-            _editPhone.Trim(),
-            string.IsNullOrWhiteSpace(_editEmail) ? null : _editEmail.Trim());
+            _form.Name.Trim(),
+            _form.Relationship.Trim(),
+            _form.PhoneNumber.Trim(),
+            string.IsNullOrWhiteSpace(_form.Email) ? null : _form.Email.Trim());
 
         var (success, error) = await EmployeeService.UpdateMyEmergencyContactAsync(CompanyId, request);
         _saving = false;
@@ -330,17 +324,15 @@ else
         _contacts.RemoveAll(c => c.Id == contactId);
     }
 
-    private bool HasError(string field) => _validationErrors.ContainsKey(field);
-
-    private static Dictionary<string, string> Validate(
-        string name, string relationship, string phone, string? email)
+    public sealed class EmergencyContactFormModel
     {
-        var errors = new Dictionary<string, string>();
-        if (string.IsNullOrWhiteSpace(name))         errors["name"]         = "Name is required.";
-        if (string.IsNullOrWhiteSpace(relationship)) errors["relationship"] = "Relationship is required.";
-        if (string.IsNullOrWhiteSpace(phone))        errors["phone"]        = "Phone number is required.";
-        if (!string.IsNullOrWhiteSpace(email) && !email.Contains('@'))
-            errors["email"] = "Email must be a valid email address.";
-        return errors;
+        [Required(ErrorMessage = "Name is required.")]
+        public string Name { get; set; } = string.Empty;
+        [Required(ErrorMessage = "Relationship is required.")]
+        public string Relationship { get; set; } = string.Empty;
+        [Required(ErrorMessage = "Phone number is required.")]
+        public string PhoneNumber { get; set; } = string.Empty;
+        [EmailAddress(ErrorMessage = "Email must be a valid email address.")]
+        public string? Email { get; set; }
     }
 }

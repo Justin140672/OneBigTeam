@@ -1,0 +1,18 @@
+<SfDialog Visible="Visible" IsModal="true" Width="420px" ShowCloseIcon="false">
+    <DialogTemplates>
+        <Header>Unsaved Changes</Header>
+        <Content>You have unsaved changes. Do you want to save them before leaving?</Content>
+        <FooterTemplate>
+            <SfButton IsPrimary="true" OnClick="OnSaveAndClose">Save</SfButton>
+            <SfButton CssClass="e-danger e-outline" OnClick="OnDiscard">Discard Changes</SfButton>
+            <SfButton OnClick="OnCancel">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback OnSaveAndClose { get; set; }
+    [Parameter] public EventCallback OnDiscard { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+}

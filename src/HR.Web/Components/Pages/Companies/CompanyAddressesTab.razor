@@ -1,12 +1,12 @@
 <div class="card">
     <div class="card-body">
-        @if (Addresses.Count == 0)
+        @if (Model.Addresses.Count == 0)
         {
             <p class="text-muted">No addresses found.</p>
         }
 
         <div class="row g-3">
-            @foreach (var (addr, i) in Addresses.Select((a, i) => (a, i)))
+            @foreach (var (addr, i) in Model.Addresses.Select((a, i) => (a, i)))
             {
                 <div class="col-md-6">
                     <div class="border rounded p-3 h-100">
@@ -39,5 +39,5 @@
 </div>
 
 @code {
-    [Parameter, EditorRequired] public List<CompanyAddressEditModel> Addresses { get; set; } = default!;
+    [Parameter, EditorRequired] public CompanyDetailsEditModel Model { get; set; } = default!;
 }

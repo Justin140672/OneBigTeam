@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace HR.Web.Models;
 
 public sealed record EmployeeDocumentListResponse(IReadOnlyList<EmployeeDocumentListItem> Items);
@@ -53,6 +55,7 @@ public record UpdateDocumentTypeResponse(
 
 public sealed class DocumentTypeEditModel
 {
+    [Required(ErrorMessage = "Name is required.")]
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public bool AllowEmployeeUpload { get; set; }

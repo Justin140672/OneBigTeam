@@ -3,7 +3,7 @@
 @page "/companies/{CompanyId:guid}/employment-types/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject EmploymentTypeService EmploymentTypeService
-@inject NavigationManager Navigation
+@inherits EditPageBase<EmploymentTypeEditModel>
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -15,7 +15,7 @@
         </BreadcrumbItems>
     </SfBreadcrumb>
 
-    @if (_loading)
+    @if (IsLoading)
     {
         <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm" role="status"></div>
@@ -27,127 +27,103 @@
         <h1 class="mb-1">@PageTitle</h1>
         <p class="text-muted mb-4">Set the name and description employees will see for this employment type.</p>
 
-        @if (!string.IsNullOrEmpty(_globalError))
+        @if (!string.IsNullOrEmpty(GlobalError))
         {
-            <div class="alert alert-danger">@_globalError</div>
+            <div class="alert alert-danger">@GlobalError</div>
         }
 
-        <div class="row">
-            <div class="col-lg-7">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Employment Type Details</h5>
-                    </div>
-                    <div class="card-body @(_isViewMode ? "view-mode" : "")">
-                        <div class="mb-3">
-                            <label class="form-label">Name <span class="text-danger">*</span></label>
-                            <HrTextBox @bind-Value="_model.Name" Placeholder="e.g. Permanent, Contractor" />
+        <EditForm EditContext="EditContext">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-lg-7">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Employment Type Details</h5>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Description</label>
-                            <HrTextBox @bind-Value="_model.Description" Placeholder="Optional description" />
+                        <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                            <div class="mb-3">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <HrTextBox @bind-Value="Model.Name" Placeholder="e.g. Permanent, Contractor" />
+                                <ValidationMessage For="@(() => Model.Name)" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <HrTextBox @bind-Value="Model.Description" Placeholder="Optional description" />
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="d-flex gap-2 mt-3">
-                    @if (!_isViewMode)
-                    {
-                        @if (!string.IsNullOrEmpty(_successMsg))
+                    <div class="d-flex gap-2 mt-3">
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                        @if (!IsViewMode)
                         {
-                            <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@_successMsg</div>
+                            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                                @if (Saving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                Save
+                            </SfButton>
                         }
-                        <SfButton IsPrimary="true" Disabled="@_saving" OnClick="Save">
-                            @if (_saving)
-                            {
-                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                            }
-                            Save
-                        </SfButton>
-                    }
-                    <SfButton OnClick="Cancel" Disabled="@_saving">@(_isViewMode ? "Close" : "Cancel")</SfButton>
+                    </div>
                 </div>
             </div>
-        </div>
+        </EditForm>
     }
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
 </div>
 
 @code {
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool _isViewMode;
     private bool IsNew => Id is null || Id == Guid.Empty;
     private string PageTitle => IsNew ? "Add Employment Type"
-        : _model.Name.Trim().Length > 0 ? _model.Name
-        : _isViewMode ? "View Employment Type" : "Edit Employment Type";
+        : Model.Name.Trim().Length > 0 ? Model.Name
+        : IsViewMode ? "View Employment Type" : "Edit Employment Type";
 
-    private bool _loading = true;
-    private bool _saving;
-    private string? _globalError;
-    private string? _successMsg;
-
-    private readonly EmploymentTypeEditModel _model = new();
-
-    protected override async Task OnParametersSetAsync()
+    protected override async Task LoadAsync()
     {
-        _isViewMode = Navigation.Uri.Contains("/view", StringComparison.OrdinalIgnoreCase);
-        _loading = true;
-        _globalError = null;
-        _successMsg = null;
-
         if (!IsNew)
         {
             var list = await EmploymentTypeService.ListEmploymentTypesAsync(CompanyId, includeInactive: true);
             var existing = list?.Items.FirstOrDefault(e => e.Id == Id);
             if (existing is not null)
             {
-                _model.Name = existing.Name;
-                _model.Description = existing.Description;
+                Model.Name = existing.Name;
+                Model.Description = existing.Description;
             }
         }
-
-        _loading = false;
     }
 
-    private async Task Save()
+    protected override async Task<string?> SaveCoreAsync()
     {
-        _saving = true;
-        _globalError = null;
-        _successMsg = null;
-
         if (IsNew)
         {
             var request = new CreateEmploymentTypeRequest(
                 CompanyId,
-                _model.Name.Trim(),
-                string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim());
+                Model.Name.Trim(),
+                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim());
 
             var (created, error) = await EmploymentTypeService.CreateAsync(CompanyId, request);
-            _saving = false;
-
-            if (created is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/employment-types", forceLoad: true);
-            else
-                _globalError = error ?? "Failed to create employment type.";
+            return created is not null ? null : error ?? "Failed to create employment type.";
         }
         else
         {
             var request = new UpdateEmploymentTypeRequest(
                 CompanyId,
                 Id!.Value,
-                _model.Name.Trim(),
-                string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description.Trim());
+                Model.Name.Trim(),
+                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim());
 
             var (updated, error) = await EmploymentTypeService.UpdateAsync(CompanyId, Id!.Value, request);
-            _saving = false;
-
-            if (updated is not null)
-                Navigation.NavigateTo($"/companies/{CompanyId}/employment-types", forceLoad: true);
-            else
-                _globalError = error ?? "Failed to save employment type.";
+            return updated is not null ? null : error ?? "Failed to save employment type.";
         }
     }
 
-    private void Cancel() => Navigation.NavigateTo($"/companies/{CompanyId}/employment-types");
+    protected override string? ListUrl => $"/companies/{CompanyId}/employment-types";
 }

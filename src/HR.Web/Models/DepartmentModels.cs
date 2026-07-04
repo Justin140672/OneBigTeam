@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace HR.Web.Models;
 
 // ── LIST ──────────────────────────────────────────────────────────────────────
@@ -52,6 +54,7 @@ public record UpdateDepartmentResponse(
 
 public sealed class DepartmentEditModel
 {
+    [Required(ErrorMessage = "Name is required.")]
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public Guid? ParentDepartmentId { get; set; }
