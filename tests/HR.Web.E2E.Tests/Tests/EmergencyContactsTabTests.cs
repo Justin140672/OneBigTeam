@@ -39,6 +39,11 @@ public sealed class EmergencyContactsTabTests(AppFixture fixture) : E2ETestBase(
 
         // ── Step 3: Add a new contact ────────────────────────────────────────
         await emergency.ClickAddContactAsync();
+
+        // The add form now opens in a modal dialog rather than inline in the page.
+        Assert.True(await _page.Locator(".e-dialog").IsVisibleAsync(),
+            "Expected the 'Add Contact' form to appear in a dialog");
+
         await emergency.FillContactNameAsync(contactName);
         await emergency.FillContactRelationshipAsync("Friend");
         await emergency.FillContactPhoneAsync(contactPhone);

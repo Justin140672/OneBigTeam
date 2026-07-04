@@ -10,14 +10,22 @@
 }
 else
 {
-    <TaskList Tasks="@_tasks" CompanyId="@CompanyId" ShowAssignedTo="false" />
+    <TaskList Tasks="@_tasks" CompanyId="@CompanyId" ShowAssignedTo="false" OnViewTask="OpenTaskDialog" />
 }
+
+<TaskViewDialog CompanyId="CompanyId"
+                TaskId="_selectedTaskId"
+                IsOpen="_dialogOpen"
+                OnClosed="CloseTaskDialogAsync" />
 
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
 
     private IReadOnlyList<TaskListItem> _tasks = [];
     private bool _loading = true;
+
+    private Guid? _selectedTaskId;
+    private bool _dialogOpen;
 
     protected override async Task OnParametersSetAsync() => await LoadTasksAsync();
 
@@ -28,5 +36,18 @@ else
         _tasks = result?.Items ?? [];
         _loading = false;
         StateHasChanged();
+    }
+
+    private void OpenTaskDialog(Guid taskId)
+    {
+        _selectedTaskId = taskId;
+        _dialogOpen = true;
+    }
+
+    private async Task CloseTaskDialogAsync()
+    {
+        _dialogOpen = false;
+        // Refresh in case the task was actioned (completed/approved/etc.) while the dialog was open.
+        await LoadTasksAsync();
     }
 }

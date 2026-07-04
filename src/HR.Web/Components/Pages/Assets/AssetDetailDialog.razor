@@ -1,0 +1,119 @@
+@inject AssetService AssetService
+
+<SfDialog Visible="Visible" IsModal="true" Width="560px" ShowCloseIcon="true" CssClass="asset-detail-dialog">
+    <DialogEvents Closed="HandleDialogClosed" />
+    <DialogTemplates>
+        <Header>@(_asset is null ? "Asset" : $"{_asset.AssetNumber} — {_asset.Name}")</Header>
+        <Content>
+            @if (_loading)
+            {
+                <div class="d-flex align-items-center gap-2">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                    <span>Loading…</span>
+                </div>
+            }
+            else if (_asset is null)
+            {
+                <div class="alert alert-danger mb-0">Asset not found.</div>
+            }
+            else
+            {
+                <div class="mb-3">
+                    <span class="@StatusBadgeClass">@_asset.Status</span>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header"><h6 class="mb-0">Details</h6></div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">Asset Number</dt>
+                            <dd class="col-sm-7">@_asset.AssetNumber</dd>
+
+                            <dt class="col-sm-5">Name</dt>
+                            <dd class="col-sm-7">@_asset.Name</dd>
+
+                            <dt class="col-sm-5">Category</dt>
+                            <dd class="col-sm-7">@(_asset.CategoryName ?? "—")</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header"><h6 class="mb-0">Specifications</h6></div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">Manufacturer</dt>
+                            <dd class="col-sm-7">@(_asset.Manufacturer ?? "—")</dd>
+
+                            <dt class="col-sm-5">Model</dt>
+                            <dd class="col-sm-7">@(_asset.Model ?? "—")</dd>
+
+                            <dt class="col-sm-5">Serial Number</dt>
+                            <dd class="col-sm-7">@(_asset.SerialNumber ?? "—")</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><h6 class="mb-0">Purchase Information</h6></div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-5">Purchase Date</dt>
+                            <dd class="col-sm-7">
+                                @(_asset.PurchaseDate.HasValue ? _asset.PurchaseDate.Value.ToString("d MMM yyyy") : "—")
+                            </dd>
+
+                            <dt class="col-sm-5">Purchase Price</dt>
+                            <dd class="col-sm-7">
+                                @(_asset.PurchasePrice.HasValue ? _asset.PurchasePrice.Value.ToString("C") : "—")
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton OnClick="HandleDialogClosed">Close</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter] public Guid? AssetId { get; set; }
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+
+    private bool Visible;
+    private bool _loading;
+    private AssetDetailModel? _asset;
+    private Guid? _loadedAssetId;
+
+    private string StatusBadgeClass => _asset?.Status switch
+    {
+        "Available"        => "badge text-bg-success",
+        "Assigned"         => "badge text-bg-primary",
+        "Retired"          => "badge text-bg-secondary",
+        "UnderMaintenance" => "badge text-bg-warning",
+        _                  => "badge text-bg-light"
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Visible = IsOpen;
+
+        if (IsOpen && AssetId.HasValue && AssetId != _loadedAssetId)
+        {
+            _loadedAssetId = AssetId;
+            _loading = true;
+            _asset = await AssetService.GetAssetAsync(CompanyId, AssetId.Value);
+            _loading = false;
+        }
+    }
+
+    private async Task HandleDialogClosed()
+    {
+        _loadedAssetId = null;
+        await OnClosed.InvokeAsync();
+    }
+}

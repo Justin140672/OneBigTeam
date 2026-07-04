@@ -95,6 +95,34 @@ public sealed class ProfileAssetsTabTests(AppFixture fixture) : E2ETestBase(fixt
     }
 
     [Fact]
+    public async Task AssetsTab_ClickingViewAsset_OpensDialog_WithoutNavigatingAway()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(SarahEmail);
+
+        await profile.GoToAsync(AcmeId, SarahId);
+        await profile.OpenAssetsTabAsync();
+
+        var profileUrlBeforeClick = _page.Url;
+
+        // Select the row, then click the "View" toolbar action once it's enabled.
+        await _page.Locator(".e-grid .e-row").First.ClickAsync();
+        await _page.WaitForFunctionAsync(
+            "!document.querySelector('[id=\"hr-view\"]')?.classList?.contains('e-overlay')",
+            null, new PageWaitForFunctionOptions { Timeout = 10_000 });
+        await _page.Locator("[id='hr-view']").ClickAsync();
+
+        // Should open the asset in a dialog (AssetDetailDialog), not navigate to /assets/{id}/view.
+        await _page.WaitForSelectorAsync(".asset-detail-dialog", new() { Timeout = 15_000 });
+        Assert.True(await _page.Locator(".asset-detail-dialog").IsVisibleAsync(),
+            "Expected clicking View on My Profile's Assets tab to open the asset in a dialog");
+        Assert.Equal(profileUrlBeforeClick, _page.Url);
+    }
+
+    [Fact]
     public async Task AssetsTab_IsVisible_And_Shows_Empty_State_For_Employee_Without_Assets()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);

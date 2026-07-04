@@ -46,4 +46,28 @@ public sealed class UpcomingProbationReviewsWidgetTests(AppFixture fixture) : E2
             $"Expected 'Carlos Rivera' to appear in the upcoming probation reviews widget. " +
             $"Names found: [{string.Join(", ", names)}]");
     }
+
+    [Fact]
+    public async Task ClickingReviewItem_NavigatesToEmployeeProfile_WithProbationTabActive()
+    {
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new DashboardPage(_page, _fixture.WebBaseUrl);
+        var employee  = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await dashboard.GoToAsync();
+
+        await dashboard.GetUpcomingProbationEmployeeNamesAsync();
+        await _page.Locator(".widget-card")
+            .Filter(new() { HasText = "Upcoming Probation Reviews" })
+            .Locator(".task-widget-item")
+            .First
+            .ClickAsync();
+
+        await _page.WaitForURLAsync(new System.Text.RegularExpressions.Regex(@"/employees/[0-9a-f-]{36}\?tab=probation"),
+            new() { Timeout = 15_000 });
+
+        Assert.Equal("Probation", await employee.GetActiveTabNameAsync());
+    }
 }

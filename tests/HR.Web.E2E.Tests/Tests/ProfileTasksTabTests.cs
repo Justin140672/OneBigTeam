@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 using Microsoft.Playwright;
@@ -45,7 +44,7 @@ public sealed class ProfileTasksTabTests(AppFixture fixture) : E2ETestBase(fixtu
     }
 
     [Fact]
-    public async Task TasksTab_ClickingTask_NavigatesToTaskViewPage()
+    public async Task TasksTab_ClickingTask_OpensTaskDialog_WithoutNavigatingAway()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
@@ -65,10 +64,13 @@ public sealed class ProfileTasksTabTests(AppFixture fixture) : E2ETestBase(fixtu
             "!document.querySelector('[id=\"hr-view\"]')?.classList?.contains('e-overlay')",
             null, new PageWaitForFunctionOptions { Timeout = 10_000 });
 
+        var profileUrlBeforeClick = _page.Url;
         await _page.Locator("[id='hr-view']").ClickAsync();
 
-        // Should navigate to /tasks/{id}
-        await _page.WaitForURLAsync(new Regex("/tasks/"), new() { Timeout = 15_000 });
-        Assert.Matches(new Regex("/tasks/[0-9a-f-]{36}"), _page.Url);
+        // Should open the task in a dialog (TaskViewDialog), not navigate to /tasks/{id}.
+        await _page.WaitForSelectorAsync(".task-view-dialog", new() { Timeout = 15_000 });
+        Assert.True(await _page.Locator(".task-view-dialog").IsVisibleAsync(),
+            "Expected clicking View on My Profile's Tasks tab to open the task in a dialog");
+        Assert.Equal(profileUrlBeforeClick, _page.Url);
     }
 }

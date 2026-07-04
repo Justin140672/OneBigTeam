@@ -10,6 +10,7 @@
 @inherits EditPageBase<EmployeeProfileEditModel>
 @using HR.Infrastructure.Abstractions
 @using HR.SharedKernel
+@using Microsoft.AspNetCore.WebUtilities
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -225,7 +226,7 @@
             <div class="alert alert-danger mb-3">@GlobalError</div>
         }
 
-        <SfTab>
+        <SfTab @bind-SelectedItem="_activeTabIndex">
             <TabItems>
 
                 <TabItem>
@@ -555,6 +556,7 @@
     private List<NationalityListItem> _nationalities = [];
 
     private EmployeeEmploymentTab? _employmentTab;
+    private int _activeTabIndex;
 
     protected override async Task LoadAsync()
     {
@@ -563,6 +565,16 @@
         {
             Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
             return;
+        }
+
+        var query = QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
+        if (query.TryGetValue("tab", out var tab))
+        {
+            _activeTabIndex = tab.ToString() switch
+            {
+                "probation" => 2,
+                _ => 0
+            };
         }
 
         var deptResult = await DepartmentService.ListDepartmentsAsync(CompanyId);

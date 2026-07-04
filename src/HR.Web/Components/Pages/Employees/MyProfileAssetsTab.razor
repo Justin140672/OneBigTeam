@@ -1,5 +1,5 @@
 @inject AssetService AssetService
-@inject NavigationManager Navigation
+@using HR.Web.Components.Pages.Assets
 
 @if (_loading)
 {
@@ -54,6 +54,11 @@ else
     </HrGrid>
 }
 
+<AssetDetailDialog CompanyId="CompanyId"
+                   AssetId="_selectedAssetId"
+                   IsOpen="_dialogOpen"
+                   OnClosed="@(() => _dialogOpen = false)" />
+
 @code {
     [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
@@ -61,6 +66,9 @@ else
     private List<EmployeeAssetItem> _assets = [];
     private bool _loading = true;
     private EmployeeAssetItem? _selected;
+
+    private Guid? _selectedAssetId;
+    private bool _dialogOpen;
 
     private IEnumerable<object> _toolbar => new List<object>
     {
@@ -91,7 +99,10 @@ else
     private Task OnToolbarClickAsync(ClickEventArgs args)
     {
         if (args.Item.Id == "hr-view" && _selected is not null)
-            Navigation.NavigateTo($"/companies/{CompanyId}/assets/{_selected.AssetId}/view");
+        {
+            _selectedAssetId = _selected.AssetId;
+            _dialogOpen = true;
+        }
         return Task.CompletedTask;
     }
 }

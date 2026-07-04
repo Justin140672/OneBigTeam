@@ -68,6 +68,28 @@ public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(f
     }
 
     [Fact]
+    public async Task SelfServiceDocumentsTab_HasNoDeleteButtonsAnywhere()
+    {
+        // Deleting a document is HR/manager-only (server-enforced by the "employee:manage"
+        // policy) — the button shouldn't even appear on the self-service view.
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await profile.GoToAsync(AcmeId, TomId);
+        await profile.OpenDocumentsTabAsync();
+
+        await _page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+
+        var deleteBtns = _page.Locator("[title='Delete']");
+        Assert.Equal(0, await deleteBtns.CountAsync());
+    }
+
+    [Fact]
     public async Task SelfServiceDocumentsTab_ShowsRequestedDocumentsSection()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
@@ -83,9 +105,12 @@ public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(f
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
 
-        var requestedSection = _page.Locator("[data-testid='requested-docs-section']");
+        // "Requested Documents" (the self-service-only duplicate section) was removed — the
+        // "Document Requests" section (shared with the admin employee profile view) is now the
+        // only place this shows, so assert against that instead.
+        var requestedSection = _page.Locator("[data-testid='admin-document-requests-section']");
         Assert.True(await requestedSection.IsVisibleAsync(),
-            "Expected the 'Requested Documents' section to be visible for Tom, who has a Passport request");
+            "Expected the 'Document Requests' section to be visible for Tom, who has a Passport request");
 
         var content = await requestedSection.TextContentAsync();
         Assert.Contains("Passport", content, StringComparison.OrdinalIgnoreCase);

@@ -17,7 +17,11 @@
                     var item = (TaskListItem)context;
                 }
                 <div class="task-cell">
-                    @if (CompanyId != Guid.Empty)
+                    @if (OnViewTask.HasDelegate)
+                    {
+                        <span class="task-title task-title-link" role="button" @onclick="() => OnViewTask.InvokeAsync(item.Id)">@item.Title</span>
+                    }
+                    else if (CompanyId != Guid.Empty)
                     {
                         <a href="/companies/@CompanyId/tasks/@item.Id" class="task-title task-title-link">@item.Title</a>
                     }
@@ -61,6 +65,10 @@
     [Parameter]
     public bool ShowAssignedTo { get; set; } = true;
 
+    // When set, "View" opens the task in a dialog instead of navigating to the full task page.
+    [Parameter]
+    public EventCallback<Guid> OnViewTask { get; set; }
+
     private TaskListItem? _selected;
 
     private IEnumerable<object> _toolbar => CompanyId != Guid.Empty
@@ -82,11 +90,15 @@
         StateHasChanged();
     }
 
-    private Task OnToolbarClickAsync(ClickEventArgs args)
+    private async Task OnToolbarClickAsync(ClickEventArgs args)
     {
-        if (args.Item.Id == "hr-view" && _selected is not null)
+        if (args.Item.Id != "hr-view" || _selected is null)
+            return;
+
+        if (OnViewTask.HasDelegate)
+            await OnViewTask.InvokeAsync(_selected.Id);
+        else
             Navigation.NavigateTo($"/companies/{CompanyId}/tasks/{_selected.Id}");
-        return Task.CompletedTask;
     }
 
     private static string StatusLabel(string status) => status switch

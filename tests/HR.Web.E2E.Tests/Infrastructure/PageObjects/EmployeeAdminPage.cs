@@ -17,6 +17,13 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
     }
 
+    public async Task<string> GetActiveTabNameAsync()
+    {
+        var active = page.Locator("[role='tab'][aria-selected='true']").First;
+        await active.WaitForAsync(new() { Timeout = 10_000 });
+        return (await active.TextContentAsync())?.Trim() ?? "";
+    }
+
     // ── Documents tab ─────────────────────────────────────────────────────────
 
     public async Task OpenDocumentsTabAsync()

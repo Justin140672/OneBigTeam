@@ -130,48 +130,51 @@ else
                 }
             }
 
-            @if (_showAddForm)
-            {
+        </div>
+    </div>
+
+    <SfDialog @bind-Visible="_showAddForm" IsModal="true" Width="480px" ShowCloseIcon="true">
+        <DialogEvents Closed="CancelAdd" />
+        <DialogTemplates>
+            <Header>New Contact</Header>
+            <Content>
                 <EditForm EditContext="_editContext">
                     <DataAnnotationsValidator />
-                    <div class="ec-contact-form">
-                        <div class="ec-section-label">New Contact</div>
-                        <div class="ec-field-row">
-                            <div class="ec-field-group">
-                                <label class="ec-label">Name <span class="ec-required">*</span></label>
-                                <input class="form-control" @bind="_form.Name" placeholder="Full name" maxlength="200" />
-                                <ValidationMessage For="@(() => _form.Name)" />
-                            </div>
-                            <div class="ec-field-group">
-                                <label class="ec-label">Relationship <span class="ec-required">*</span></label>
-                                <input class="form-control" @bind="_form.Relationship" placeholder="e.g. Spouse, Parent, Sibling" maxlength="100" />
-                                <ValidationMessage For="@(() => _form.Relationship)" />
-                            </div>
+                    <div class="ec-field-row">
+                        <div class="ec-field-group">
+                            <label class="ec-label">Name <span class="ec-required">*</span></label>
+                            <input class="form-control" @bind="_form.Name" placeholder="Full name" maxlength="200" />
+                            <ValidationMessage For="@(() => _form.Name)" />
                         </div>
-                        <div class="ec-field-row">
-                            <div class="ec-field-group">
-                                <label class="ec-label">Phone Number <span class="ec-required">*</span></label>
-                                <input class="form-control" type="tel" @bind="_form.PhoneNumber" placeholder="e.g. 07700 900000" maxlength="30" />
-                                <ValidationMessage For="@(() => _form.PhoneNumber)" />
-                            </div>
-                            <div class="ec-field-group">
-                                <label class="ec-label">Email</label>
-                                <input class="form-control" type="email" @bind="_form.Email" placeholder="e.g. name@example.com" maxlength="320" />
-                                <ValidationMessage For="@(() => _form.Email)" />
-                            </div>
+                        <div class="ec-field-group">
+                            <label class="ec-label">Relationship <span class="ec-required">*</span></label>
+                            <input class="form-control" @bind="_form.Relationship" placeholder="e.g. Spouse, Parent, Sibling" maxlength="100" />
+                            <ValidationMessage For="@(() => _form.Relationship)" />
                         </div>
-                        <div class="ec-form-actions">
-                            <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAddAsync">
-                                @if (_saving) { <span class="spinner-border spinner-border-sm me-1" role="status"></span> }
-                                Add Contact
-                            </SfButton>
-                            <SfButton OnClick="CancelAdd" Disabled="@_saving">Cancel</SfButton>
+                    </div>
+                    <div class="ec-field-row">
+                        <div class="ec-field-group">
+                            <label class="ec-label">Phone Number <span class="ec-required">*</span></label>
+                            <input class="form-control" type="tel" @bind="_form.PhoneNumber" placeholder="e.g. 07700 900000" maxlength="30" />
+                            <ValidationMessage For="@(() => _form.PhoneNumber)" />
+                        </div>
+                        <div class="ec-field-group">
+                            <label class="ec-label">Email</label>
+                            <input class="form-control" type="email" @bind="_form.Email" placeholder="e.g. name@example.com" maxlength="320" />
+                            <ValidationMessage For="@(() => _form.Email)" />
                         </div>
                     </div>
                 </EditForm>
-            }
-        </div>
-    </div>
+            </Content>
+            <FooterTemplate>
+                <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAddAsync">
+                    @if (_saving) { <span class="spinner-border spinner-border-sm me-1" role="status"></span> }
+                    Add Contact
+                </SfButton>
+                <SfButton OnClick="CancelAdd" Disabled="@_saving">Cancel</SfButton>
+            </FooterTemplate>
+        </DialogTemplates>
+    </SfDialog>
 }
 
 @code {

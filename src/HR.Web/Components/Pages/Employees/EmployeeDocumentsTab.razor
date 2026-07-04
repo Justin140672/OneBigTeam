@@ -146,7 +146,7 @@ else
                                 TextAlign="TextAlign.Right">
                         <Template>
                             @{ var r = (context as EmployeeDocumentListItem)!; }
-                            @if (_deleteTargetId == r.EmployeeDocumentId)
+                            @if (!EmployeeSelfUpload && _deleteTargetId == r.EmployeeDocumentId)
                             {
                                 <span class="me-2 text-muted small">Delete?</span>
                                 <SfButton CssClass="e-danger e-small me-1"
@@ -162,11 +162,14 @@ else
                                           title="Download">
                                     <i class="fa-solid fa-download"></i>
                                 </SfButton>
-                                <SfButton CssClass="e-danger e-outline e-small"
-                                          OnClick="() => StartDelete(r.EmployeeDocumentId)"
-                                          title="Delete">
-                                    <i class="fa-solid fa-trash"></i>
-                                </SfButton>
+                                @if (!EmployeeSelfUpload)
+                                {
+                                    <SfButton CssClass="e-danger e-outline e-small"
+                                              OnClick="() => StartDelete(r.EmployeeDocumentId)"
+                                              title="Delete">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </SfButton>
+                                }
                             }
                         </Template>
                     </GridColumn>
