@@ -2,7 +2,7 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class LeavePolicyService(IHttpClientFactory httpClientFactory)
+public class LeavePolicyService(IHttpClientFactory httpClientFactory) : IEditService<LeavePolicyEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -19,6 +19,53 @@ public class LeavePolicyService(IHttpClientFactory httpClientFactory)
         {
             return null;
         }
+    }
+
+    public async Task<GetLeavePolicyResponse?> GetLeavePolicyAsync(Guid companyId, Guid id)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetLeavePolicyResponse>(
+                $"api/companies/{companyId}/leave-policies/{id}", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    async Task<LeavePolicyEditModel?> IEditService<LeavePolicyEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
+    {
+        var response = await GetLeavePolicyAsync(companyId, id);
+        return response is null ? null : new LeavePolicyEditModel
+        {
+            Name = response.Name,
+            Description = response.Description,
+            CarryOverDays = response.CarryOverDays,
+            AllowNegativeBalance = response.AllowNegativeBalance,
+        };
+    }
+
+    async Task<(LeavePolicyEditModel? Result, string? Error)> IEditService<LeavePolicyEditModel, Guid>.CreateAsync(
+        Guid companyId, LeavePolicyEditModel model)
+    {
+        var request = new CreateLeavePolicyRequest(
+            companyId, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            model.CarryOverDays, model.AllowNegativeBalance);
+
+        var (created, error) = await CreateAsync(companyId, request);
+        return (created is null ? null : model, error);
+    }
+
+    async Task<(LeavePolicyEditModel? Result, string? Error)> IEditService<LeavePolicyEditModel, Guid>.UpdateAsync(
+        Guid companyId, Guid id, LeavePolicyEditModel model)
+    {
+        var request = new UpdateLeavePolicyRequest(
+            companyId, id, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            model.CarryOverDays, model.AllowNegativeBalance);
+
+        var (updated, error) = await UpdateAsync(companyId, id, request);
+        return (updated is null ? null : model, error);
     }
 
     public async Task<(CreateLeavePolicyResponse? Result, string? Error)> CreateAsync(

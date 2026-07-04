@@ -3,7 +3,7 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class AssetService(IHttpClientFactory httpClientFactory)
+public sealed class AssetService(IHttpClientFactory httpClientFactory) : IEditService<AssetEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -153,6 +153,50 @@ public sealed class AssetService(IHttpClientFactory httpClientFactory)
 
         var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
         return body?.Error ?? "Failed to retire asset.";
+    }
+
+    async Task<AssetEditModel?> IEditService<AssetEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
+    {
+        var response = await GetAssetAsync(companyId, id);
+        return response is null ? null : new AssetEditModel
+        {
+            AssetNumber = response.AssetNumber,
+            CategoryId = response.CategoryId,
+            Name = response.Name,
+            Manufacturer = response.Manufacturer,
+            Model = response.Model,
+            SerialNumber = response.SerialNumber,
+            PurchaseDate = response.PurchaseDate,
+            PurchasePrice = response.PurchasePrice,
+        };
+    }
+
+    async Task<(AssetEditModel? Result, string? Error)> IEditService<AssetEditModel, Guid>.CreateAsync(
+        Guid companyId, AssetEditModel model)
+    {
+        var request = new CreateAssetRequest(
+            companyId, model.AssetNumber.Trim(), model.CategoryId!.Value, model.Name.Trim(),
+            string.IsNullOrWhiteSpace(model.Manufacturer) ? null : model.Manufacturer.Trim(),
+            string.IsNullOrWhiteSpace(model.Model) ? null : model.Model.Trim(),
+            string.IsNullOrWhiteSpace(model.SerialNumber) ? null : model.SerialNumber.Trim(),
+            model.PurchaseDate, model.PurchasePrice);
+
+        var (created, error) = await CreateAssetAsync(companyId, request);
+        return (created is null ? null : model, error);
+    }
+
+    async Task<(AssetEditModel? Result, string? Error)> IEditService<AssetEditModel, Guid>.UpdateAsync(
+        Guid companyId, Guid id, AssetEditModel model)
+    {
+        var request = new UpdateAssetRequest(
+            companyId, id, model.AssetNumber.Trim(), model.CategoryId!.Value, model.Name.Trim(),
+            string.IsNullOrWhiteSpace(model.Manufacturer) ? null : model.Manufacturer.Trim(),
+            string.IsNullOrWhiteSpace(model.Model) ? null : model.Model.Trim(),
+            string.IsNullOrWhiteSpace(model.SerialNumber) ? null : model.SerialNumber.Trim(),
+            model.PurchaseDate, model.PurchasePrice);
+
+        var (updated, error) = await UpdateAssetAsync(companyId, id, request);
+        return (updated is null ? null : model, error);
     }
 
     private sealed record ErrorEnvelope(string? Error);

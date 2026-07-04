@@ -32,6 +32,18 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         catch { return null; }
     }
 
+    public async Task<GetDocumentRequestResponse?> GetDocumentRequestAsync(
+        Guid companyId, Guid employeeId, Guid documentRequestId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetDocumentRequestResponse>(
+                $"api/companies/{companyId}/employees/{employeeId}/document-requests/{documentRequestId}",
+                HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch { return null; }
+    }
+
     public async Task<DocumentTypeListResponse?> ListDocumentTypesAsync(
         Guid companyId, bool employeeUploadOnly = false, CancellationToken cancellationToken = default)
     {

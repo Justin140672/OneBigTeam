@@ -11,6 +11,7 @@ using HR.Modules.Documents.Features.DownloadEmployeeDocument;
 using HR.Modules.Documents.Features.GetEmployeeDocument;
 using HR.Modules.Documents.Features.GetExpiringDocuments;
 using HR.Modules.Documents.Features.ProcessDocumentExpiryNotifications;
+using HR.Modules.Documents.Features.GetDocumentRequest;
 using HR.Modules.Documents.Features.ListDocumentRequests;
 using HR.Modules.Documents.Features.CancelDocumentRequest;
 using HR.Modules.Documents.Features.RequestAdditionalEmployeeDocument;
@@ -85,6 +86,7 @@ public static class DocumentsModule
         services.AddScoped<IValidator<ListEmployeeDocumentsRequest>, ListEmployeeDocumentsValidator>();
 
         services.AddScoped<ListDocumentRequestsHandler>();
+        services.AddScoped<GetDocumentRequestHandler>();
         services.AddScoped<RequestAdditionalEmployeeDocumentHandler>();
         services.AddScoped<CancelDocumentRequestHandler>();
 

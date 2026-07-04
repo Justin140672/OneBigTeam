@@ -9,6 +9,7 @@ using HR.Modules.Leave.Features.UpdateLeavePolicy;
 using HR.Modules.Leave.Features.GetEmployeeLeaveBalance;
 using HR.Modules.Leave.Features.GetLeavePolicy;
 using HR.Modules.Leave.Features.ListLeavePolicies;
+using HR.Modules.Leave.Features.GetLeaveRequest;
 using HR.Modules.Leave.Features.ListLeaveRequests;
 using HR.Modules.Leave.Features.SubmitLeaveRequest;
 using HR.Modules.Leave.Features.PreviewLeaveRequest;
@@ -55,6 +56,7 @@ public static class LeaveModule
         services.AddScoped<GetEmployeeLeaveBalanceHandler>();
         services.AddScoped<IValidator<GetEmployeeLeaveBalanceRequest>, GetEmployeeLeaveBalanceValidator>();
         services.AddScoped<ListLeaveRequestsHandler>();
+        services.AddScoped<GetLeaveRequestHandler>();
         services.AddScoped<SubmitLeaveRequestHandler>();
         services.AddScoped<IValidator<SubmitLeaveRequestRequest>, SubmitLeaveRequestValidator>();
         services.AddScoped<PreviewLeaveRequestHandler>();

@@ -3,7 +3,7 @@
 @page "/companies/{CompanyId:guid}/employment-types/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject EmploymentTypeService EmploymentTypeService
-@inherits EditPageBase<EmploymentTypeEditModel>
+@inherits EditPageBase<EmploymentTypeEditModel, Guid>
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -81,49 +81,13 @@
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool IsNew => Id is null || Id == Guid.Empty;
     private string PageTitle => IsNew ? "Add Employment Type"
         : Model.Name.Trim().Length > 0 ? Model.Name
         : IsViewMode ? "View Employment Type" : "Edit Employment Type";
 
-    protected override async Task LoadAsync()
-    {
-        if (!IsNew)
-        {
-            var list = await EmploymentTypeService.ListEmploymentTypesAsync(CompanyId, includeInactive: true);
-            var existing = list?.Items.FirstOrDefault(e => e.Id == Id);
-            if (existing is not null)
-            {
-                Model.Name = existing.Name;
-                Model.Description = existing.Description;
-            }
-        }
-    }
-
-    protected override async Task<string?> SaveCoreAsync()
-    {
-        if (IsNew)
-        {
-            var request = new CreateEmploymentTypeRequest(
-                CompanyId,
-                Model.Name.Trim(),
-                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim());
-
-            var (created, error) = await EmploymentTypeService.CreateAsync(CompanyId, request);
-            return created is not null ? null : error ?? "Failed to create employment type.";
-        }
-        else
-        {
-            var request = new UpdateEmploymentTypeRequest(
-                CompanyId,
-                Id!.Value,
-                Model.Name.Trim(),
-                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim());
-
-            var (updated, error) = await EmploymentTypeService.UpdateAsync(CompanyId, Id!.Value, request);
-            return updated is not null ? null : error ?? "Failed to save employment type.";
-        }
-    }
+    protected override IEditService<EmploymentTypeEditModel, Guid> Service => EmploymentTypeService;
+    protected override Guid GetCompanyId() => CompanyId;
+    protected override Guid? GetId() => Id;
 
     protected override string? ListUrl => $"/companies/{CompanyId}/employment-types";
 }

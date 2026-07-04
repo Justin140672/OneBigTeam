@@ -3,7 +3,7 @@
 @page "/companies/{CompanyId:guid}/leave-policies/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject LeavePolicyService LeavePolicyService
-@inherits EditPageBase<LeavePolicyEditModel>
+@inherits EditPageBase<LeavePolicyEditModel, Guid>
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -94,55 +94,13 @@
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool IsNew => Id is null || Id == Guid.Empty;
     private string PageTitle => IsNew ? "Add Leave Policy"
         : Model.Name.Trim().Length > 0 ? Model.Name
         : IsViewMode ? "View Leave Policy" : "Edit Leave Policy";
 
-    protected override async Task LoadAsync()
-    {
-        if (!IsNew)
-        {
-            var list = await LeavePolicyService.ListLeavePoliciesAsync(CompanyId);
-            var existing = list?.Items.FirstOrDefault(p => p.Id == Id);
-            if (existing is not null)
-            {
-                Model.Name = existing.Name;
-                Model.Description = existing.Description;
-                Model.CarryOverDays = existing.CarryOverDays;
-                Model.AllowNegativeBalance = existing.AllowNegativeBalance;
-            }
-        }
-    }
-
-    protected override async Task<string?> SaveCoreAsync()
-    {
-        if (IsNew)
-        {
-            var request = new CreateLeavePolicyRequest(
-                CompanyId,
-                Model.Name.Trim(),
-                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
-                Model.CarryOverDays,
-                Model.AllowNegativeBalance);
-
-            var (created, error) = await LeavePolicyService.CreateAsync(CompanyId, request);
-            return created is not null ? null : error ?? "Failed to create leave policy.";
-        }
-        else
-        {
-            var request = new UpdateLeavePolicyRequest(
-                CompanyId,
-                Id!.Value,
-                Model.Name.Trim(),
-                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
-                Model.CarryOverDays,
-                Model.AllowNegativeBalance);
-
-            var (updated, error) = await LeavePolicyService.UpdateAsync(CompanyId, Id!.Value, request);
-            return updated is not null ? null : error ?? "Failed to save leave policy.";
-        }
-    }
+    protected override IEditService<LeavePolicyEditModel, Guid> Service => LeavePolicyService;
+    protected override Guid GetCompanyId() => CompanyId;
+    protected override Guid? GetId() => Id;
 
     protected override string? ListUrl => $"/companies/{CompanyId}/leave-policies";
 }

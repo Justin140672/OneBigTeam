@@ -13,6 +13,7 @@ using HR.Modules.Employees.Features.CreateDepartment;
 using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Modules.Employees.Features.CreatePositionProfile;
 using HR.Modules.Employees.Features.DeactivateDepartment;
+using HR.Modules.Employees.Features.GetDepartment;
 using HR.Modules.Employees.Features.GetEmployee;
 using HR.Modules.Employees.Features.GetMyEmployee;
 using HR.Modules.Employees.Features.GetMyPersonalDetails;
@@ -95,6 +96,7 @@ public static class EmployeesModule
         services.AddScoped<IValidator<RequestPersonalDetailsChangeRequest>, RequestPersonalDetailsChangeValidator>();
 
         services.AddScoped<ListDepartmentsHandler>();
+        services.AddScoped<GetDepartmentHandler>();
         services.AddScoped<IValidator<ListDepartmentsRequest>, ListDepartmentsValidator>();
 
         services.AddScoped<ListEmployeesHandler>();

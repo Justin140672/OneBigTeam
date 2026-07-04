@@ -2,7 +2,7 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class LeaveTypeService(IHttpClientFactory httpClientFactory)
+public class LeaveTypeService(IHttpClientFactory httpClientFactory) : IEditService<LeaveTypeEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -18,6 +18,43 @@ public class LeaveTypeService(IHttpClientFactory httpClientFactory)
         {
             return null;
         }
+    }
+
+    // No dedicated backend GetById endpoint — the list already returns full item detail.
+    async Task<LeaveTypeEditModel?> IEditService<LeaveTypeEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
+    {
+        var list = await ListLeaveTypesAsync(companyId, includeInactive: true);
+        var existing = list?.Items.FirstOrDefault(t => t.Id == id);
+        return existing is null ? null : new LeaveTypeEditModel
+        {
+            Name = existing.Name,
+            Code = existing.Code,
+            DefaultEntitlementDays = existing.DefaultEntitlementDays,
+            AccrualMethod = existing.AccrualMethod,
+            Behaviour = existing.Behaviour,
+        };
+    }
+
+    async Task<(LeaveTypeEditModel? Result, string? Error)> IEditService<LeaveTypeEditModel, Guid>.CreateAsync(
+        Guid companyId, LeaveTypeEditModel model)
+    {
+        var request = new CreateLeaveTypeRequest(
+            companyId, model.Name.Trim(), model.Code.Trim().ToUpperInvariant(),
+            model.DefaultEntitlementDays, model.AccrualMethod, model.Behaviour);
+
+        var (created, error) = await CreateAsync(companyId, request);
+        return (created is null ? null : model, error);
+    }
+
+    async Task<(LeaveTypeEditModel? Result, string? Error)> IEditService<LeaveTypeEditModel, Guid>.UpdateAsync(
+        Guid companyId, Guid id, LeaveTypeEditModel model)
+    {
+        var request = new UpdateLeaveTypeRequest(
+            companyId, id, model.Name.Trim(), model.Code.Trim().ToUpperInvariant(),
+            model.DefaultEntitlementDays, model.AccrualMethod, model.Behaviour);
+
+        var (updated, error) = await UpdateAsync(companyId, id, request);
+        return (updated is null ? null : model, error);
     }
 
     public async Task<(CreateLeaveTypeResponse? Result, string? Error)> CreateAsync(

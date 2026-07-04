@@ -3,7 +3,7 @@
 @page "/companies/{CompanyId:guid}/departments/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject DepartmentService DepartmentService
-@inherits EditPageBase<DepartmentEditModel>
+@inherits EditPageBase<DepartmentEditModel, Guid>
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -92,64 +92,22 @@
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool IsNew => Id is null || Id == Guid.Empty;
     private string PageTitle => IsNew ? "Add Department"
         : Model.Name.Trim().Length > 0 ? Model.Name
         : IsViewMode ? "View Department" : "Edit Department";
 
     private List<DepartmentListItemModel> _otherDepts = [];
 
-    protected override async Task LoadAsync()
+    protected override IEditService<DepartmentEditModel, Guid> Service => DepartmentService;
+    protected override Guid GetCompanyId() => CompanyId;
+    protected override Guid? GetId() => Id;
+
+    protected override async Task OnLoadedAsync()
     {
-        // Load all active departments for the parent picker
+        // Load all active departments for the parent picker, excluding self.
         var list = await DepartmentService.ListDepartmentsAsync(CompanyId);
         var all = list?.Items ?? [];
-
-        if (!IsNew)
-        {
-            var existing = all.FirstOrDefault(d => d.Id == Id);
-            if (existing is not null)
-            {
-                Model.Name = existing.Name;
-                Model.ParentDepartmentId = existing.ParentDepartmentId;
-                Model.ManagerEmployeeId = existing.ManagerEmployeeId;
-            }
-
-            // Exclude self from parent candidates
-            _otherDepts = all.Where(d => d.Id != Id).ToList();
-        }
-        else
-        {
-            _otherDepts = all;
-        }
-    }
-
-    protected override async Task<string?> SaveCoreAsync()
-    {
-        if (IsNew)
-        {
-            var request = new CreateDepartmentRequest(
-                CompanyId,
-                Model.Name.Trim(),
-                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
-                Model.ParentDepartmentId);
-
-            var (created, error) = await DepartmentService.CreateDepartmentAsync(CompanyId, request);
-            return created is not null ? null : error ?? "Failed to create department.";
-        }
-        else
-        {
-            var request = new UpdateDepartmentRequest(
-                CompanyId,
-                Id!.Value,
-                Model.Name.Trim(),
-                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
-                Model.ParentDepartmentId,
-                Model.ManagerEmployeeId);
-
-            var (updated, error) = await DepartmentService.UpdateDepartmentAsync(CompanyId, Id!.Value, request);
-            return updated is not null ? null : error ?? "Failed to save department.";
-        }
+        _otherDepts = IsNew ? all : all.Where(d => d.Id != Id).ToList();
     }
 
     protected override string? ListUrl => $"/companies/{CompanyId}/departments";

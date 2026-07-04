@@ -1,5 +1,7 @@
+using System.Reflection;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using HR.Web.Services;
 
 namespace HR.Web.Components.Pages;
 
@@ -157,4 +159,55 @@ public abstract class EditPageBase<TModel> : EditPageBase where TModel : class, 
 
     protected override bool HasUnsavedChanges =>
         _baselineSnapshot is not null && _baselineSnapshot != System.Text.Json.JsonSerializer.Serialize(Model);
+}
+
+/// <summary>
+/// <see cref="EditPageBase{TModel}"/> for the common "simple" shape: one entity, loaded/created/
+/// updated through an <see cref="IEditService{TModel, TKey}"/>. Pushes the load/save boilerplate
+/// that every such page (Department, EmploymentType, LeaveType, ...) otherwise duplicates.
+/// Pages with extra needs (e.g. a dropdown's candidate list) override <see cref="OnLoadedAsync"/>.
+/// </summary>
+public abstract class EditPageBase<TModel, TKey> : EditPageBase<TModel>
+    where TModel : class, new()
+    where TKey : struct
+{
+    protected abstract IEditService<TModel, TKey> Service { get; }
+    protected abstract Guid GetCompanyId();
+    protected abstract TKey? GetId();
+
+    protected virtual bool IsNew => GetId() is null;
+
+    protected override async Task LoadAsync()
+    {
+        if (!IsNew)
+        {
+            var loaded = await Service.GetByIdAsync(GetCompanyId(), GetId()!.Value);
+            if (loaded is not null) CopyProperties(loaded, Model);
+        }
+
+        await OnLoadedAsync();
+    }
+
+    // Hook for whatever a page needs beyond its own entity (e.g. a parent-picker dropdown list).
+    protected virtual Task OnLoadedAsync() => Task.CompletedTask;
+
+    protected override async Task<string?> SaveCoreAsync()
+    {
+        var (result, error) = IsNew
+            ? await Service.CreateAsync(GetCompanyId(), Model)
+            : await Service.UpdateAsync(GetCompanyId(), GetId()!.Value, Model);
+
+        return result is not null ? null : error ?? "Failed to save.";
+    }
+
+    // Model must stay the same instance for the whole page lifetime (EditContext is bound to it
+    // once) so a freshly-loaded entity is copied in place rather than replacing Model outright.
+    private static void CopyProperties(TModel source, TModel target)
+    {
+        foreach (var prop in typeof(TModel).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (prop.CanRead && prop.CanWrite)
+                prop.SetValue(target, prop.GetValue(source));
+        }
+    }
 }

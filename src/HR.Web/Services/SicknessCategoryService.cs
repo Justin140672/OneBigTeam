@@ -2,7 +2,7 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class SicknessCategoryService(IHttpClientFactory httpClientFactory)
+public class SicknessCategoryService(IHttpClientFactory httpClientFactory) : IEditService<SicknessCategoryEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -78,6 +78,34 @@ public class SicknessCategoryService(IHttpClientFactory httpClientFactory)
 
         var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
         return body?.Error ?? "Failed to delete sickness category.";
+    }
+
+    // No dedicated backend GetById endpoint — the list already returns full item detail.
+    async Task<SicknessCategoryEditModel?> IEditService<SicknessCategoryEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
+    {
+        var list = await ListSicknessCategoriesAsync(companyId);
+        var existing = list?.Items.FirstOrDefault(e => e.Id == id);
+        return existing is null ? null : new SicknessCategoryEditModel
+        {
+            Name = existing.Name,
+            DisplayOrder = existing.DisplayOrder,
+        };
+    }
+
+    async Task<(SicknessCategoryEditModel? Result, string? Error)> IEditService<SicknessCategoryEditModel, Guid>.CreateAsync(
+        Guid companyId, SicknessCategoryEditModel model)
+    {
+        var request = new CreateSicknessCategoryRequest(companyId, model.Name.Trim(), model.DisplayOrder);
+        var (created, error) = await CreateAsync(companyId, request);
+        return (created is null ? null : model, error);
+    }
+
+    async Task<(SicknessCategoryEditModel? Result, string? Error)> IEditService<SicknessCategoryEditModel, Guid>.UpdateAsync(
+        Guid companyId, Guid id, SicknessCategoryEditModel model)
+    {
+        var request = new UpdateSicknessCategoryRequest(companyId, id, model.Name.Trim(), model.DisplayOrder);
+        var (updated, error) = await UpdateAsync(companyId, id, request);
+        return (updated is null ? null : model, error);
     }
 
     private sealed record ErrorEnvelope(string? Error);

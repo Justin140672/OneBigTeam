@@ -69,6 +69,16 @@ public sealed record LeavePolicyListItemModel(
     bool IsActive,
     DateTimeOffset CreatedAt);
 
+public sealed record GetLeavePolicyResponse(
+    Guid Id,
+    Guid CompanyId,
+    string Name,
+    string? Description,
+    int CarryOverDays,
+    bool AllowNegativeBalance,
+    bool IsActive,
+    DateTimeOffset CreatedAt);
+
 public record CreateLeavePolicyRequest(
     Guid CompanyId,
     string Name,
@@ -119,6 +129,20 @@ public sealed class LeavePolicyEditModel
 public sealed record LeaveRequestListResponse(IReadOnlyList<LeaveRequestListItem> Items);
 
 public sealed record LeaveRequestListItem(
+    Guid Id,
+    Guid LeaveTypeId,
+    string LeaveTypeName,
+    string Status,
+    DateOnly StartDate,
+    string StartPart,
+    DateOnly EndDate,
+    string EndPart,
+    decimal TotalDays,
+    string? Reason,
+    string? RejectionReason,
+    DateTimeOffset CreatedAt);
+
+public sealed record GetLeaveRequestResponse(
     Guid Id,
     Guid LeaveTypeId,
     string LeaveTypeName,

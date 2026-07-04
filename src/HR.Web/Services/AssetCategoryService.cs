@@ -2,7 +2,7 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class AssetCategoryService(IHttpClientFactory httpClientFactory)
+public class AssetCategoryService(IHttpClientFactory httpClientFactory) : IEditService<AssetCategoryEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -70,6 +70,38 @@ public class AssetCategoryService(IHttpClientFactory httpClientFactory)
 
         var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
         return body?.Error ?? "Failed to deactivate asset category.";
+    }
+
+    // No dedicated backend GetById endpoint — the list already returns full item detail.
+    async Task<AssetCategoryEditModel?> IEditService<AssetCategoryEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
+    {
+        var list = await ListAssetCategoriesAsync(companyId, includeInactive: true);
+        var existing = list?.Items.FirstOrDefault(e => e.Id == id);
+        return existing is null ? null : new AssetCategoryEditModel
+        {
+            Name = existing.Name,
+            Description = existing.Description,
+        };
+    }
+
+    async Task<(AssetCategoryEditModel? Result, string? Error)> IEditService<AssetCategoryEditModel, Guid>.CreateAsync(
+        Guid companyId, AssetCategoryEditModel model)
+    {
+        var request = new CreateAssetCategoryRequest(
+            companyId, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim());
+
+        var (created, error) = await CreateAsync(companyId, request);
+        return (created is null ? null : model, error);
+    }
+
+    async Task<(AssetCategoryEditModel? Result, string? Error)> IEditService<AssetCategoryEditModel, Guid>.UpdateAsync(
+        Guid companyId, Guid id, AssetCategoryEditModel model)
+    {
+        var request = new UpdateAssetCategoryRequest(
+            companyId, id, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim());
+
+        var (updated, error) = await UpdateAsync(companyId, id, request);
+        return (updated is null ? null : model, error);
     }
 
     private sealed record ErrorEnvelope(string? Error);

@@ -71,3 +71,12 @@ public sealed record DocumentRequestListItem(
     Guid?     RequestedByEmployeeId,
     string?   RequestedByName,
     DateTimeOffset CreatedAt);
+
+public sealed record GetDocumentRequestResponse(
+    Guid      Id,
+    string    DocumentTypeName,
+    DateOnly? DueDate,
+    string    Status,
+    Guid?     RequestedByEmployeeId,
+    string?   RequestedByName,
+    DateTimeOffset CreatedAt);

@@ -13,6 +13,17 @@ public record DepartmentListItemModel(
     Guid? ManagerEmployeeId,
     bool IsActive);
 
+// ── GET ───────────────────────────────────────────────────────────────────────
+
+public record GetDepartmentResponse(
+    Guid Id,
+    Guid CompanyId,
+    string Name,
+    string? Description,
+    Guid? ParentDepartmentId,
+    Guid? ManagerEmployeeId,
+    bool IsActive);
+
 // ── CREATE ────────────────────────────────────────────────────────────────────
 
 public record CreateDepartmentRequest(

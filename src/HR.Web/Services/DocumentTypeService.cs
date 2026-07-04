@@ -2,7 +2,7 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class DocumentTypeService(IHttpClientFactory httpClientFactory)
+public class DocumentTypeService(IHttpClientFactory httpClientFactory) : IEditService<DocumentTypeEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -19,6 +19,41 @@ public class DocumentTypeService(IHttpClientFactory httpClientFactory)
         {
             return null;
         }
+    }
+
+    // No dedicated backend GetById endpoint — the list already returns full item detail.
+    async Task<DocumentTypeEditModel?> IEditService<DocumentTypeEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
+    {
+        var list = await ListDocumentTypesAsync(companyId, includeInactive: true);
+        var existing = list?.Items.FirstOrDefault(e => e.Id == id);
+        return existing is null ? null : new DocumentTypeEditModel
+        {
+            Name = existing.Name,
+            Description = existing.Description,
+            AllowEmployeeUpload = existing.AllowEmployeeUpload,
+        };
+    }
+
+    async Task<(DocumentTypeEditModel? Result, string? Error)> IEditService<DocumentTypeEditModel, Guid>.CreateAsync(
+        Guid companyId, DocumentTypeEditModel model)
+    {
+        var request = new CreateDocumentTypeRequest(
+            companyId, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            model.AllowEmployeeUpload);
+
+        var (created, error) = await CreateAsync(companyId, request);
+        return (created is null ? null : model, error);
+    }
+
+    async Task<(DocumentTypeEditModel? Result, string? Error)> IEditService<DocumentTypeEditModel, Guid>.UpdateAsync(
+        Guid companyId, Guid id, DocumentTypeEditModel model)
+    {
+        var request = new UpdateDocumentTypeRequest(
+            companyId, id, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            model.AllowEmployeeUpload);
+
+        var (updated, error) = await UpdateAsync(companyId, id, request);
+        return (updated is null ? null : model, error);
     }
 
     public async Task<(CreateDocumentTypeResponse? Result, string? Error)> CreateAsync(

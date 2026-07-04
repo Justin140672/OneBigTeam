@@ -3,7 +3,7 @@
 @page "/companies/{CompanyId:guid}/public-holidays/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject PublicHolidayService PublicHolidayService
-@inherits EditPageBase<PublicHolidayEditModel>
+@inherits EditPageBase<PublicHolidayEditModel, Guid>
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -87,50 +87,12 @@
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool IsNew => Id is null || Id == Guid.Empty;
     private string PageTitle => IsNew ? "Add Public Holiday"
         : IsViewMode ? "View Public Holiday" : "Edit Public Holiday";
 
-    protected override async Task LoadAsync()
-    {
-        if (!IsNew)
-        {
-            var list = await PublicHolidayService.ListAsync(CompanyId);
-            var existing = list?.Items.FirstOrDefault(h => h.Id == Id);
-
-            if (existing is not null)
-            {
-                Model.Date = existing.Date.ToDateTime(TimeOnly.MinValue);
-                Model.Name = existing.Name;
-                Model.CountryCode = existing.CountryCode;
-            }
-        }
-    }
-
-    protected override async Task<string?> SaveCoreAsync()
-    {
-        var date = DateOnly.FromDateTime(Model.Date!.Value);
-        var name = Model.Name.Trim();
-        var countryCode = Model.CountryCode.Trim().ToUpperInvariant();
-
-        if (IsNew)
-        {
-            var (created, error) = await PublicHolidayService.CreateAsync(
-                CompanyId,
-                new CreatePublicHolidayRequest(CompanyId, date, name, countryCode));
-
-            return created is not null ? null : error ?? "Failed to create public holiday.";
-        }
-        else
-        {
-            var (updated, error) = await PublicHolidayService.UpdateAsync(
-                CompanyId,
-                Id!.Value,
-                new UpdatePublicHolidayRequest(CompanyId, Id!.Value, date, name, countryCode));
-
-            return updated is not null ? null : error ?? "Failed to update public holiday.";
-        }
-    }
+    protected override IEditService<PublicHolidayEditModel, Guid> Service => PublicHolidayService;
+    protected override Guid GetCompanyId() => CompanyId;
+    protected override Guid? GetId() => Id;
 
     protected override string? ListUrl => $"/companies/{CompanyId}/public-holidays";
 }

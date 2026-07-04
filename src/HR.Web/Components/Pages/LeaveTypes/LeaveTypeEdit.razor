@@ -3,7 +3,7 @@
 @page "/companies/{CompanyId:guid}/leave-types/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject LeaveTypeService LeaveTypeService
-@inherits EditPageBase<LeaveTypeEditModel>
+@inherits EditPageBase<LeaveTypeEditModel, Guid>
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -108,7 +108,6 @@
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool IsNew => Id is null || Id == Guid.Empty;
     private string PageTitle => IsNew ? "Add Leave Type"
         : Model.Name.Trim().Length > 0 ? Model.Name
         : IsViewMode ? "View Leave Type" : "Edit Leave Type";
@@ -132,53 +131,9 @@
         new("Toil",      "Time Off in Lieu"),
     ];
 
-    protected override async Task LoadAsync()
-    {
-        if (!IsNew)
-        {
-            var list = await LeaveTypeService.ListLeaveTypesAsync(CompanyId, includeInactive: true);
-            var existing = list?.Items.FirstOrDefault(t => t.Id == Id);
-            if (existing is not null)
-            {
-                Model.Name = existing.Name;
-                Model.Code = existing.Code;
-                Model.DefaultEntitlementDays = existing.DefaultEntitlementDays;
-                Model.AccrualMethod = existing.AccrualMethod;
-                Model.Behaviour = existing.Behaviour;
-            }
-        }
-    }
-
-    protected override async Task<string?> SaveCoreAsync()
-    {
-        if (IsNew)
-        {
-            var request = new CreateLeaveTypeRequest(
-                CompanyId,
-                Model.Name.Trim(),
-                Model.Code.Trim().ToUpperInvariant(),
-                Model.DefaultEntitlementDays,
-                Model.AccrualMethod,
-                Model.Behaviour);
-
-            var (created, error) = await LeaveTypeService.CreateAsync(CompanyId, request);
-            return created is not null ? null : error ?? "Failed to create leave type.";
-        }
-        else
-        {
-            var request = new UpdateLeaveTypeRequest(
-                CompanyId,
-                Id!.Value,
-                Model.Name.Trim(),
-                Model.Code.Trim().ToUpperInvariant(),
-                Model.DefaultEntitlementDays,
-                Model.AccrualMethod,
-                Model.Behaviour);
-
-            var (updated, error) = await LeaveTypeService.UpdateAsync(CompanyId, Id!.Value, request);
-            return updated is not null ? null : error ?? "Failed to save leave type.";
-        }
-    }
+    protected override IEditService<LeaveTypeEditModel, Guid> Service => LeaveTypeService;
+    protected override Guid GetCompanyId() => CompanyId;
+    protected override Guid? GetId() => Id;
 
     protected override string? ListUrl => $"/companies/{CompanyId}/leave-types";
 

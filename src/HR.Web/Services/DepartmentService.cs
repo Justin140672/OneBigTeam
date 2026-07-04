@@ -2,7 +2,7 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public class DepartmentService(IHttpClientFactory httpClientFactory)
+public class DepartmentService(IHttpClientFactory httpClientFactory) : IEditService<DepartmentEditModel, Guid>
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -18,6 +18,61 @@ public class DepartmentService(IHttpClientFactory httpClientFactory)
         {
             return null;
         }
+    }
+
+    public async Task<GetDepartmentResponse?> GetDepartmentAsync(Guid companyId, Guid id)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetDepartmentResponse>(
+                $"api/companies/{companyId}/departments/{id}", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    // ── IEditService<DepartmentEditModel, Guid> ─────────────────────────────────
+
+    async Task<DepartmentEditModel?> IEditService<DepartmentEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
+    {
+        var response = await GetDepartmentAsync(companyId, id);
+        return response is null ? null : new DepartmentEditModel
+        {
+            Name = response.Name,
+            Description = response.Description,
+            ParentDepartmentId = response.ParentDepartmentId,
+            ManagerEmployeeId = response.ManagerEmployeeId,
+        };
+    }
+
+    async Task<(DepartmentEditModel? Result, string? Error)> IEditService<DepartmentEditModel, Guid>.CreateAsync(
+        Guid companyId, DepartmentEditModel model)
+    {
+        var request = new CreateDepartmentRequest(
+            companyId,
+            model.Name.Trim(),
+            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            model.ParentDepartmentId);
+
+        var (created, error) = await CreateDepartmentAsync(companyId, request);
+        return (created is null ? null : model, error);
+    }
+
+    async Task<(DepartmentEditModel? Result, string? Error)> IEditService<DepartmentEditModel, Guid>.UpdateAsync(
+        Guid companyId, Guid id, DepartmentEditModel model)
+    {
+        var request = new UpdateDepartmentRequest(
+            companyId,
+            id,
+            model.Name.Trim(),
+            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
+            model.ParentDepartmentId,
+            model.ManagerEmployeeId);
+
+        var (updated, error) = await UpdateDepartmentAsync(companyId, id, request);
+        return (updated is null ? null : model, error);
     }
 
     public async Task<(CreateDepartmentResponse? Department, string? Error)> CreateDepartmentAsync(

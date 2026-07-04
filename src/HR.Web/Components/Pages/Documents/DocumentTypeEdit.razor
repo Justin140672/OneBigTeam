@@ -3,7 +3,7 @@
 @page "/companies/{CompanyId:guid}/document-types/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject DocumentTypeService DocumentTypeService
-@inherits EditPageBase<DocumentTypeEditModel>
+@inherits EditPageBase<DocumentTypeEditModel, Guid>
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -88,52 +88,13 @@
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool IsNew => Id is null || Id == Guid.Empty;
     private string PageTitle => IsNew ? "Add Document Type"
         : Model.Name.Trim().Length > 0 ? Model.Name
         : IsViewMode ? "View Document Type" : "Edit Document Type";
 
-    protected override async Task LoadAsync()
-    {
-        if (!IsNew)
-        {
-            var list = await DocumentTypeService.ListDocumentTypesAsync(CompanyId, includeInactive: true);
-            var existing = list?.Items.FirstOrDefault(e => e.Id == Id);
-            if (existing is not null)
-            {
-                Model.Name = existing.Name;
-                Model.Description = existing.Description;
-                Model.AllowEmployeeUpload = existing.AllowEmployeeUpload;
-            }
-        }
-    }
-
-    protected override async Task<string?> SaveCoreAsync()
-    {
-        if (IsNew)
-        {
-            var request = new CreateDocumentTypeRequest(
-                CompanyId,
-                Model.Name.Trim(),
-                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
-                Model.AllowEmployeeUpload);
-
-            var (created, error) = await DocumentTypeService.CreateAsync(CompanyId, request);
-            return created is not null ? null : error ?? "Failed to create document type.";
-        }
-        else
-        {
-            var request = new UpdateDocumentTypeRequest(
-                CompanyId,
-                Id!.Value,
-                Model.Name.Trim(),
-                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
-                Model.AllowEmployeeUpload);
-
-            var (updated, error) = await DocumentTypeService.UpdateAsync(CompanyId, Id!.Value, request);
-            return updated is not null ? null : error ?? "Failed to save document type.";
-        }
-    }
+    protected override IEditService<DocumentTypeEditModel, Guid> Service => DocumentTypeService;
+    protected override Guid GetCompanyId() => CompanyId;
+    protected override Guid? GetId() => Id;
 
     protected override string? ListUrl => $"/companies/{CompanyId}/document-types";
 }

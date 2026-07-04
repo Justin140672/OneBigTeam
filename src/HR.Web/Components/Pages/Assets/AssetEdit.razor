@@ -3,7 +3,7 @@
 @rendermode InteractiveServer
 @inject AssetService AssetService
 @inject AssetCategoryService AssetCategoryService
-@inherits EditPageBase<AssetEditModel>
+@inherits EditPageBase<AssetEditModel, Guid>
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -115,71 +115,20 @@
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    private bool IsNew => Id is null || Id == Guid.Empty;
     private string PageTitle => IsNew ? "Add Asset"
         : Model.Name.Trim().Length > 0 ? Model.Name
         : IsViewMode ? "View Asset" : "Edit Asset";
 
     private List<AssetCategoryListItemModel> _categories = [];
 
-    protected override async Task LoadAsync()
+    protected override IEditService<AssetEditModel, Guid> Service => AssetService;
+    protected override Guid GetCompanyId() => CompanyId;
+    protected override Guid? GetId() => Id;
+
+    protected override async Task OnLoadedAsync()
     {
         var categoriesResult = await AssetCategoryService.ListAssetCategoriesAsync(CompanyId);
         _categories = categoriesResult?.Items ?? [];
-
-        if (!IsNew)
-        {
-            var list = await AssetService.ListAssetsAsync(CompanyId);
-            var existing = list?.Items.FirstOrDefault(e => e.Id == Id);
-            if (existing is not null)
-            {
-                Model.AssetNumber = existing.AssetNumber;
-                Model.CategoryId = existing.CategoryId;
-                Model.Name = existing.Name;
-                Model.Manufacturer = existing.Manufacturer;
-                Model.Model = existing.Model;
-                Model.SerialNumber = existing.SerialNumber;
-                Model.PurchaseDate = existing.PurchaseDate;
-                Model.PurchasePrice = existing.PurchasePrice;
-            }
-        }
-    }
-
-    protected override async Task<string?> SaveCoreAsync()
-    {
-        if (IsNew)
-        {
-            var request = new CreateAssetRequest(
-                CompanyId,
-                Model.AssetNumber.Trim(),
-                Model.CategoryId!.Value,
-                Model.Name.Trim(),
-                string.IsNullOrWhiteSpace(Model.Manufacturer) ? null : Model.Manufacturer.Trim(),
-                string.IsNullOrWhiteSpace(Model.Model) ? null : Model.Model.Trim(),
-                string.IsNullOrWhiteSpace(Model.SerialNumber) ? null : Model.SerialNumber.Trim(),
-                Model.PurchaseDate,
-                Model.PurchasePrice);
-
-            var (created, error) = await AssetService.CreateAssetAsync(CompanyId, request);
-            return created is not null ? null : error ?? "Failed to create asset.";
-        }
-        else
-        {
-            var request = new UpdateAssetRequest(
-                CompanyId,
-                Id!.Value,
-                Model.AssetNumber.Trim(),
-                Model.CategoryId!.Value,
-                Model.Name.Trim(),
-                string.IsNullOrWhiteSpace(Model.Manufacturer) ? null : Model.Manufacturer.Trim(),
-                string.IsNullOrWhiteSpace(Model.Model) ? null : Model.Model.Trim(),
-                string.IsNullOrWhiteSpace(Model.SerialNumber) ? null : Model.SerialNumber.Trim(),
-                Model.PurchaseDate,
-                Model.PurchasePrice);
-
-            var (updated, error) = await AssetService.UpdateAssetAsync(CompanyId, Id!.Value, request);
-            return updated is not null ? null : error ?? "Failed to save asset.";
-        }
     }
 
     protected override string? ListUrl => $"/companies/{CompanyId}/assets";
