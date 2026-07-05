@@ -1,6 +1,6 @@
-namespace HR.Modules.Employees.Features.GetCurrentCompensation;
+namespace HR.Web.Models;
 
-internal sealed record GetCurrentCompensationResponse(
+public sealed record CurrentCompensationModel(
     Guid Id,
     Guid CompanyId,
     Guid EmployeeId,

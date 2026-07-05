@@ -39,6 +39,7 @@ internal sealed class GetCurrentCompensationHandler(EmployeesDbContext dbContext
             current.EffectiveTo,
             current.SalaryType.ToString(),
             current.Salary,
+            current.CalculateAnnualisedSalary(),
             current.Currency,
             current.HoursPerWeek,
             current.FTE,

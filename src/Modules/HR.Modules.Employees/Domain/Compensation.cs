@@ -77,4 +77,16 @@ internal sealed class Compensation
         Notes = notes;
         UpdatedAt = now;
     }
+
+    // Standard 5-day working week * 52 weeks; Hourly needs HoursPerWeek to annualise and returns
+    // null without it rather than guessing a working pattern.
+    private const int WorkingDaysPerYear = 260;
+
+    public decimal? CalculateAnnualisedSalary() => SalaryType switch
+    {
+        SalaryType.Annual => Salary,
+        SalaryType.Hourly => HoursPerWeek.HasValue ? Salary * HoursPerWeek.Value * 52 : null,
+        SalaryType.Daily => Salary * WorkingDaysPerYear,
+        _ => null
+    };
 }

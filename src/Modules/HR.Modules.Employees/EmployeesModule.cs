@@ -291,6 +291,13 @@ public static class EmployeesModule
                 MakeAcme(empAe2Id,      "Carlos", "Rivera",   "carlos.rivera@acme.example",  new DateOnly(2024, 1, 8),  deptSalesId,   posAeId,         empSalesMgrId, new DateOnly(2000, 1, 25), "Spanish",   "Male",   "carlos.rivera@gmail.com",    "07700 900010", "5 Western Road",       null,       "Brighton",    "East Sussex",        "BN1 2DA",   "ACME-010", etContractId));
 
             await db.SaveChangesAsync();
+
+            db.Compensations.Add(Compensation.Create(
+                Guid.Parse("50000000-0000-0000-0000-000000000001"), acmeId, empCtoId,
+                new DateOnly(2020, 1, 6), SalaryType.Annual, 145000m, "GBP", 37.5m, 1m,
+                "Starting salary", now));
+
+            await db.SaveChangesAsync();
         }
 
         // ── Beta Corp ─────────────────────────────────────────────────────────

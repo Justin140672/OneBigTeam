@@ -62,6 +62,7 @@ public class GetCurrentCompensationHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(current.Id, result.Value!.Id);
         Assert.Equal(45000m, result.Value.Salary);
+        Assert.Equal(45000m, result.Value.AnnualisedSalary);
         Assert.Equal("Annual", result.Value.SalaryType);
         Assert.Equal("Annual review", result.Value.Notes);
     }

@@ -172,6 +172,25 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public Task CancelUnsavedChangesDialogAsync() =>
         UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
 
+    // ── Compensation Tab ────────────────────────────────────────────────────────
+
+    public async Task OpenCompensationTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Compensation" }).ClickAsync();
+        await page.WaitForSelectorAsync(
+            "[data-testid='current-compensation-panel'], .alert-secondary",
+            new() { Timeout = 15_000 });
+    }
+
+    public Task<bool> HasCurrentCompensationPanelAsync() =>
+        page.Locator("[data-testid='current-compensation-panel']").IsVisibleAsync();
+
+    public async Task<string?> GetCompensationFieldTextAsync(string testId)
+    {
+        var locator = page.Locator($"[data-testid='{testId}']");
+        return await locator.IsVisibleAsync() ? (await locator.TextContentAsync())?.Trim() : null;
+    }
+
     // ── Probation Tab ──────────────────────────────────────────────────────────
 
     public async Task OpenProbationTabAsync()
