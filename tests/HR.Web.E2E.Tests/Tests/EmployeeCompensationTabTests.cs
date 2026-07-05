@@ -7,8 +7,9 @@ namespace HR.Web.E2E.Tests.Tests;
 /// <summary>
 /// Verifies the Compensation tab on the employee edit page.
 ///
-/// Uses the seeded "Sarah Chen" employee (ID: 30000000-0000-0000-0000-000000000001) who has a
-/// seeded Annual compensation record: 145,000 GBP effective 6 Jan 2020, 37.5 hrs/week, 1.0 FTE.
+/// Uses the seeded "Sarah Chen" employee (ID: 30000000-0000-0000-0000-000000000001) who has two
+/// seeded Annual compensation records: a closed starting salary of 120,000 GBP (6 Jan 2020 to
+/// 31 Dec 2022) and the current, open-ended 145,000 GBP record effective 1 Jan 2023.
 /// </summary>
 [Collection("E2E")]
 public sealed class EmployeeCompensationTabTests(AppFixture fixture) : E2ETestBase(fixture)
@@ -64,7 +65,28 @@ public sealed class EmployeeCompensationTabTests(AppFixture fixture) : E2ETestBa
         Assert.Contains("100", fte);
 
         var effectiveFrom = await empEdit.GetCompensationFieldTextAsync("compensation-effective-from");
-        Assert.Contains("2020", effectiveFrom);
+        Assert.Contains("2023", effectiveFrom);
+    }
+
+    [Fact]
+    public async Task CompensationTab_ShowsHistoryGrid_WithBothRecords()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empEdit.GoToAsync(AcmeId, SarahChen);
+        await empEdit.OpenCompensationTabAsync();
+
+        var grid = _page.Locator("[data-testid='compensation-history-grid']");
+        Assert.True(await grid.IsVisibleAsync(), "Expected the Compensation History grid to be visible");
+
+        var gridText = await grid.TextContentAsync();
+        Assert.Contains("145,000.00", gridText);
+        Assert.Contains("120,000.00", gridText);
+        Assert.Contains("Annual", gridText);
     }
 
     [Fact]

@@ -1,0 +1,48 @@
+@using HR.Web.Models
+@using Syncfusion.Blazor.Grids
+
+<HrGrid TValue="CompensationHistoryItemModel"
+        DataSource="@Items"
+        AllowFiltering="false"
+        AllowPaging="false"
+        data-testid="compensation-history-grid">
+    <GridColumns>
+        <GridColumn Field="@nameof(CompensationHistoryItemModel.EffectiveFrom)"
+                    HeaderText="Effective From" Width="150">
+            <Template>
+                @{ var item = (context as CompensationHistoryItemModel)!; }
+                @item.EffectiveFrom.ToString("d MMM yyyy")
+            </Template>
+        </GridColumn>
+
+        <GridColumn HeaderText="Salary" Width="160" AllowSorting="false" AllowFiltering="false">
+            <Template>
+                @{ var item = (context as CompensationHistoryItemModel)!; }
+                @($"{item.Currency} {item.Salary:N2}")
+            </Template>
+        </GridColumn>
+
+        <GridColumn Field="@nameof(CompensationHistoryItemModel.SalaryType)"
+                    HeaderText="Salary Type" Width="130" />
+
+        <GridColumn HeaderText="Hours" Width="120" AllowSorting="false" AllowFiltering="false">
+            <Template>
+                @{ var item = (context as CompensationHistoryItemModel)!; }
+                <span class="text-muted small">
+                    @(item.HoursPerWeek.HasValue ? $"{item.HoursPerWeek.Value:0.##} hrs/week" : "—")
+                </span>
+            </Template>
+        </GridColumn>
+
+        <GridColumn HeaderText="FTE" Width="100" AllowSorting="false" AllowFiltering="false">
+            <Template>
+                @{ var item = (context as CompensationHistoryItemModel)!; }
+                <span class="text-muted small">@(item.FTE.HasValue ? $"{item.FTE.Value:P0}" : "—")</span>
+            </Template>
+        </GridColumn>
+    </GridColumns>
+</HrGrid>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<CompensationHistoryItemModel> Items { get; set; } = [];
+}

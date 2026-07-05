@@ -26,4 +26,22 @@ public sealed class CompensationService(IHttpClientFactory httpClientFactory)
             return null;
         }
     }
+
+    public async Task<IReadOnlyList<CompensationHistoryItemModel>> GetCompensationHistoryAsync(
+        Guid companyId,
+        Guid employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<GetCompensationHistoryResponse>(
+                $"api/companies/{companyId}/employees/{employeeId}/compensation/history",
+                HrApiJsonOptions.Default, cancellationToken);
+            return response?.Items ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
 }

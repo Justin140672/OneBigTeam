@@ -60,6 +60,40 @@ public class CompensationServiceTests
         Assert.Null(result);
     }
 
+    [Fact]
+    public async Task GetCompensationHistoryAsync_Returns_Items_When_Api_Returns_Ok()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var response = new GetCompensationHistoryResponse(
+        [
+            new CompensationHistoryItemModel(Guid.NewGuid(), new DateOnly(2023, 1, 1), null, "Annual", 145000m, "GBP", 37.5m, 1m, "Promoted to CTO", DateTimeOffset.UtcNow),
+            new CompensationHistoryItemModel(Guid.NewGuid(), new DateOnly(2020, 1, 6), new DateOnly(2022, 12, 31), "Annual", 120000m, "GBP", 37.5m, 1m, "Starting salary", DateTimeOffset.UtcNow)
+        ]);
+
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
+        var service = new CompensationService(factory);
+
+        var result = await service.GetCompensationHistoryAsync(companyId, employeeId);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(145000m, result[0].Salary);
+        Assert.Null(result[0].EffectiveTo);
+        Assert.Equal(new DateOnly(2022, 12, 31), result[1].EffectiveTo);
+    }
+
+    [Fact]
+    public async Task GetCompensationHistoryAsync_Returns_Empty_List_On_Network_Failure()
+    {
+        var factory = BuildFactory(new ThrowingHandler());
+        var service = new CompensationService(factory);
+
+        var result = await service.GetCompensationHistoryAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Empty(result);
+    }
+
     // ── Fake handlers ────────────────────────────────────────────────────────────
 
     private sealed class JsonResponseHandler(HttpStatusCode statusCode, object payload) : HttpMessageHandler

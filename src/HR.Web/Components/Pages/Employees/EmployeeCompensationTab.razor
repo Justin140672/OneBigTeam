@@ -8,35 +8,56 @@
         <span class="text-muted">Loading…</span>
     </div>
 }
-else if (_current is null)
-{
-    <div class="alert alert-secondary">No current compensation record found for this employee.</div>
-}
 else
 {
-    <div class="row">
+    <div class="row g-4">
         <div class="col-lg-5">
-            <div class="card" data-testid="current-compensation-panel">
-                <div class="card-header">
-                    <h5 class="mb-0">Current Compensation</h5>
+            @if (_current is null)
+            {
+                <div class="alert alert-secondary">No current compensation record found for this employee.</div>
+            }
+            else
+            {
+                <div class="card" data-testid="current-compensation-panel">
+                    <div class="card-header">
+                        <h5 class="mb-0">Current Compensation</h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0 small">
+                            <dt class="col-sm-5 text-muted fw-normal">Salary</dt>
+                            <dd class="col-sm-7" data-testid="compensation-salary">@SalarySummary(_current)</dd>
+
+                            <dt class="col-sm-5 text-muted fw-normal">Annual Salary</dt>
+                            <dd class="col-sm-7" data-testid="compensation-annualised-salary">@AnnualisedSalarySummary(_current)</dd>
+
+                            <dt class="col-sm-5 text-muted fw-normal">Hours</dt>
+                            <dd class="col-sm-7" data-testid="compensation-hours">@(_current.HoursPerWeek.HasValue ? $"{_current.HoursPerWeek.Value:0.##} hrs/week" : "—")</dd>
+
+                            <dt class="col-sm-5 text-muted fw-normal">FTE</dt>
+                            <dd class="col-sm-7" data-testid="compensation-fte">@(_current.FTE.HasValue ? $"{_current.FTE.Value:P0}" : "—")</dd>
+
+                            <dt class="col-sm-5 text-muted fw-normal">Effective From</dt>
+                            <dd class="col-sm-7" data-testid="compensation-effective-from">@_current.EffectiveFrom.ToString("d MMM yyyy")</dd>
+                        </dl>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <dl class="row mb-0 small">
-                        <dt class="col-sm-5 text-muted fw-normal">Salary</dt>
-                        <dd class="col-sm-7" data-testid="compensation-salary">@SalarySummary(_current)</dd>
+            }
+        </div>
 
-                        <dt class="col-sm-5 text-muted fw-normal">Annual Salary</dt>
-                        <dd class="col-sm-7" data-testid="compensation-annualised-salary">@AnnualisedSalarySummary(_current)</dd>
-
-                        <dt class="col-sm-5 text-muted fw-normal">Hours</dt>
-                        <dd class="col-sm-7" data-testid="compensation-hours">@(_current.HoursPerWeek.HasValue ? $"{_current.HoursPerWeek.Value:0.##} hrs/week" : "—")</dd>
-
-                        <dt class="col-sm-5 text-muted fw-normal">FTE</dt>
-                        <dd class="col-sm-7" data-testid="compensation-fte">@(_current.FTE.HasValue ? $"{_current.FTE.Value:P0}" : "—")</dd>
-
-                        <dt class="col-sm-5 text-muted fw-normal">Effective From</dt>
-                        <dd class="col-sm-7" data-testid="compensation-effective-from">@_current.EffectiveFrom.ToString("d MMM yyyy")</dd>
-                    </dl>
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Compensation History</h5>
+                </div>
+                <div class="card-body p-0">
+                    @if (_history.Count == 0)
+                    {
+                        <p class="text-muted small p-3 mb-0">No compensation history recorded.</p>
+                    }
+                    else
+                    {
+                        <CompensationHistoryGrid Items="_history" />
+                    }
                 </div>
             </div>
         </div>
@@ -49,11 +70,18 @@ else
 
     private bool _loading = true;
     private CurrentCompensationModel? _current;
+    private IReadOnlyList<CompensationHistoryItemModel> _history = [];
 
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
-        _current = await CompensationService.GetCurrentCompensationAsync(CompanyId, EmployeeId);
+
+        var currentTask = CompensationService.GetCurrentCompensationAsync(CompanyId, EmployeeId);
+        var historyTask = CompensationService.GetCompensationHistoryAsync(CompanyId, EmployeeId);
+        await Task.WhenAll(currentTask, historyTask);
+
+        _current = await currentTask;
+        _history = await historyTask;
         _loading = false;
     }
 

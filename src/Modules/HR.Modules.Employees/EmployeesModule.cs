@@ -292,10 +292,18 @@ public static class EmployeesModule
 
             await db.SaveChangesAsync();
 
-            db.Compensations.Add(Compensation.Create(
+            var ctoStartingSalary = Compensation.Create(
+                Guid.Parse("50000000-0000-0000-0000-000000000002"), acmeId, empCtoId,
+                new DateOnly(2020, 1, 6), SalaryType.Annual, 120000m, "GBP", 37.5m, 1m,
+                "Starting salary", now);
+            ctoStartingSalary.Close(new DateOnly(2022, 12, 31), now);
+
+            var ctoCurrentSalary = Compensation.Create(
                 Guid.Parse("50000000-0000-0000-0000-000000000001"), acmeId, empCtoId,
-                new DateOnly(2020, 1, 6), SalaryType.Annual, 145000m, "GBP", 37.5m, 1m,
-                "Starting salary", now));
+                new DateOnly(2023, 1, 1), SalaryType.Annual, 145000m, "GBP", 37.5m, 1m,
+                "Promoted to CTO", now);
+
+            db.Compensations.AddRange(ctoStartingSalary, ctoCurrentSalary);
 
             await db.SaveChangesAsync();
         }
