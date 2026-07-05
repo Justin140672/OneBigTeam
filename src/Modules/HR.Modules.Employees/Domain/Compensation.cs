@@ -53,4 +53,28 @@ internal sealed class Compensation
         EffectiveTo = effectiveTo;
         UpdatedAt = now;
     }
+
+    public void Reopen(DateTimeOffset now)
+    {
+        EffectiveTo = null;
+        UpdatedAt = now;
+    }
+
+    public void Update(
+        SalaryType salaryType,
+        decimal salary,
+        string currency,
+        decimal? hoursPerWeek,
+        decimal? fte,
+        string? notes,
+        DateTimeOffset now)
+    {
+        SalaryType = salaryType;
+        Salary = salary;
+        Currency = currency;
+        HoursPerWeek = hoursPerWeek;
+        FTE = fte;
+        Notes = notes;
+        UpdatedAt = now;
+    }
 }
