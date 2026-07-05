@@ -5,6 +5,8 @@ using HR.Modules.Employees.Features.AssignManager;
 using HR.Modules.Employees.Features.GetMyContactDetails;
 using HR.Modules.Employees.Features.GetMyEmergencyContacts;
 using HR.Modules.Employees.Features.GetEmployeeEmergencyContacts;
+using HR.Modules.Employees.Features.GetCurrentCompensation;
+using HR.Modules.Employees.Features.GetCompensationHistory;
 using HR.Modules.Employees.Features.ListNationalities;
 using HR.Modules.Employees.Features.RemoveMyEmergencyContact;
 using HR.Modules.Employees.Features.UpdateMyContactDetails;
@@ -127,6 +129,9 @@ public static class EmployeesModule
         services.AddScoped<IValidator<UpdateMyEmergencyContactRequest>, UpdateMyEmergencyContactValidator>();
         services.AddScoped<RemoveMyEmergencyContactHandler>();
         services.AddScoped<GetEmployeeEmergencyContactsHandler>();
+
+        services.AddScoped<GetCurrentCompensationHandler>();
+        services.AddScoped<GetCompensationHistoryHandler>();
 
         services.AddScoped<ListEmploymentTypesHandler>();
         services.AddScoped<IValidator<ListEmploymentTypesRequest>, ListEmploymentTypesValidator>();
