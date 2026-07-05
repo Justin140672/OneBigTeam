@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.UpdatePositionProfile;
 
 namespace HR.Modules.Employees.Tests;
@@ -133,8 +134,26 @@ public class UpdatePositionProfileValidatorTests
             HoursPerDayOverride = 8m,
             SalaryMin = 40000,
             SalaryMax = 60000,
+            SalaryType = SalaryType.Annual,
             DefaultLeavePolicyId = Guid.NewGuid()
         });
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_SalaryType_Is_Null()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { SalaryType = null });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_SalaryType_Is_Invalid_Enum_Value()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { SalaryType = (SalaryType)999 });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdatePositionProfileRequest.SalaryType));
     }
 }

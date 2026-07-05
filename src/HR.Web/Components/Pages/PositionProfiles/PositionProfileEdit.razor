@@ -7,6 +7,7 @@
 @inject LeavePolicyService LeavePolicyService
 @inherits EditPageBase<PositionProfileEditModel>
 @using HR.Infrastructure.Abstractions
+@using HR.Web.Components.Pages.Employees
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -211,6 +212,7 @@
                 Model.ProbationMonthsOverride = profile.ProbationMonthsOverride;
                 Model.SalaryMin = profile.SalaryMin;
                 Model.SalaryMax = profile.SalaryMax;
+                Model.SalaryType = profile.SalaryType ?? "Annual";
                 Model.DefaultLeavePolicyId = profile.DefaultLeavePolicyId;
 
                 if (profile.WorkingDaysOverride.HasValue && profile.HoursPerDayOverride.HasValue)
@@ -254,6 +256,7 @@
                 hoursPerDayOverride,
                 Model.SalaryMin,
                 Model.SalaryMax,
+                Model.SalaryType,
                 Model.DefaultLeavePolicyId);
 
             var (created, error) = await PositionProfileService.CreatePositionProfileAsync(CompanyId, request);
@@ -273,6 +276,7 @@
                 hoursPerDayOverride,
                 Model.SalaryMin,
                 Model.SalaryMax,
+                Model.SalaryType,
                 Model.DefaultLeavePolicyId);
 
             var (success, error) = await PositionProfileService.UpdatePositionProfileAsync(CompanyId, Id!.Value, request);
@@ -299,11 +303,19 @@
             <div class="mb-3">
                 <label class="form-label">Salary Range <span class="text-muted small">(guidance only)</span></label>
                 <div class="row g-2">
-                    <div class="col-6">
+                    <div class="col-4">
                         <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMin" Placeholder="Min" ShowSpinButton="false" />
                     </div>
-                    <div class="col-6">
+                    <div class="col-4">
                         <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMax" Placeholder="Max" ShowSpinButton="false" />
+                    </div>
+                    <div class="col-4">
+                        <SfDropDownList TValue="string" TItem="AddCompensationDialog.SalaryTypeChoice"
+                                        DataSource="@AddCompensationDialog.SalaryTypeOptions"
+                                        @bind-Value="Model.SalaryType"
+                                        Placeholder="Type">
+                            <DropDownListFieldSettings Value="Value" Text="Label" />
+                        </SfDropDownList>
                     </div>
                 </div>
                 <ValidationMessage For="@(() => Model.SalaryMax)" />

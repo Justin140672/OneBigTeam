@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Domain;
 
 namespace HR.Modules.Employees.Features.CreatePositionProfile;
 
@@ -14,5 +15,6 @@ internal sealed record CreatePositionProfileRequest
     public decimal? HoursPerDayOverride { get; init; }
     public decimal? SalaryMin { get; init; }
     public decimal? SalaryMax { get; init; }
+    public SalaryType? SalaryType { get; init; }
     public Guid? DefaultLeavePolicyId { get; init; }
 }

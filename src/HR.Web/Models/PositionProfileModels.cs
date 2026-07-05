@@ -14,7 +14,10 @@ public record PositionProfileListItemModel(
     string Title,
     string? Description,
     bool IsManagerial,
-    bool IsActive);
+    bool IsActive,
+    decimal? SalaryMin,
+    decimal? SalaryMax,
+    string? SalaryType);
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 
@@ -30,6 +33,7 @@ public record GetPositionProfileResponse(
     decimal? HoursPerDayOverride,
     decimal? SalaryMin,
     decimal? SalaryMax,
+    string? SalaryType,
     Guid? DefaultLeavePolicyId,
     bool IsActive,
     DateTimeOffset CreatedAt,
@@ -60,6 +64,7 @@ public sealed class PositionProfileEditModel
     public decimal HoursPerDay { get; set; } = 7.5m;
     public decimal? SalaryMin { get; set; }
     public decimal? SalaryMax { get; set; }
+    public string? SalaryType { get; set; } = "Annual";
     public Guid? DefaultLeavePolicyId { get; set; }
 }
 
@@ -76,6 +81,7 @@ public record CreatePositionProfileRequest(
     decimal? HoursPerDayOverride,
     decimal? SalaryMin,
     decimal? SalaryMax,
+    string? SalaryType,
     Guid? DefaultLeavePolicyId);
 
 public record CreatePositionProfileResponse(
@@ -126,6 +132,7 @@ public record UpdatePositionProfileRequest(
     decimal? HoursPerDayOverride,
     decimal? SalaryMin,
     decimal? SalaryMax,
+    string? SalaryType,
     Guid? DefaultLeavePolicyId);
 
 public record UpdatePositionProfileResponse(

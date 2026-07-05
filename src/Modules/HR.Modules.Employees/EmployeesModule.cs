@@ -241,14 +241,14 @@ public static class EmployeesModule
             var posAeId         = Guid.Parse("20000000-0000-0000-0000-000000000008");
 
             db.PositionProfiles.AddRange(
-                PositionProfile.Create(posCtoId,        acmeId, deptEngId,     "Chief Technology Officer", null, isManagerial: true, null, null, null, null, null, null, now),
-                PositionProfile.Create(posSenDevId,     acmeId, deptEngId,     "Senior Software Engineer", null, isManagerial: false, null, null, null, null, null, null, now),
-                PositionProfile.Create(posDevId,        acmeId, deptEngId,     "Software Engineer",        null, isManagerial: false, null, null, null, null, null, null, now),
-                PositionProfile.Create(posHrMgrId,      acmeId, deptHrId,      "HR Manager",               null, isManagerial: true, null, null, null, null, null, null, now),
-                PositionProfile.Create(posHrAdvisorId,  acmeId, deptHrId,      "HR Advisor",               null, isManagerial: false, null, null, null, null, null, null, now),
-                PositionProfile.Create(posFinanceMgrId, acmeId, deptFinanceId, "Finance Manager",          null, isManagerial: true, null, null, null, null, null, null, now),
-                PositionProfile.Create(posSalesMgrId,   acmeId, deptSalesId,   "Sales Manager",            null, isManagerial: true, null, null, null, null, null, null, now),
-                PositionProfile.Create(posAeId,         acmeId, deptSalesId,   "Account Executive",        null, isManagerial: false, null, null, null, null, null, null, now));
+                PositionProfile.Create(posCtoId,        acmeId, deptEngId,     "Chief Technology Officer", null, isManagerial: true, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posSenDevId,     acmeId, deptEngId,     "Senior Software Engineer", null, isManagerial: false, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posDevId,        acmeId, deptEngId,     "Software Engineer",        null, isManagerial: false, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posHrMgrId,      acmeId, deptHrId,      "HR Manager",               null, isManagerial: true, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posHrAdvisorId,  acmeId, deptHrId,      "HR Advisor",               null, isManagerial: false, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posFinanceMgrId, acmeId, deptFinanceId, "Finance Manager",          null, isManagerial: true, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posSalesMgrId,   acmeId, deptSalesId,   "Sales Manager",            null, isManagerial: true, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posAeId,         acmeId, deptSalesId,   "Account Executive",        null, isManagerial: false, null, null, null, null, null, null, null, now));
 
             var empCtoId      = Guid.Parse("30000000-0000-0000-0000-000000000001");
             var empSenDev1Id  = Guid.Parse("30000000-0000-0000-0000-000000000002");
@@ -325,8 +325,8 @@ public static class EmployeesModule
                 Department.Create(betaDeptEngId, betaCorpId, "Engineering", "Software engineering", now));
 
             db.PositionProfiles.AddRange(
-                PositionProfile.Create(betaPosEngMgrId, betaCorpId, betaDeptEngId, "Engineering Manager", null, isManagerial: true, null, null, null, null, null, null, now),
-                PositionProfile.Create(betaPosDevId,    betaCorpId, betaDeptEngId, "Software Developer",  null, isManagerial: false, null, null, null, null, null, null, now));
+                PositionProfile.Create(betaPosEngMgrId, betaCorpId, betaDeptEngId, "Engineering Manager", null, isManagerial: true, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(betaPosDevId,    betaCorpId, betaDeptEngId, "Software Developer",  null, isManagerial: false, null, null, null, null, null, null, null, now));
 
             Employee MakeBeta(Guid id, string first, string last, string email, DateOnly start,
                               Guid? posId, Guid? managerId, DateOnly dob, string nationality, string gender,

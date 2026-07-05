@@ -78,6 +78,7 @@ internal sealed class CreatePositionProfileHandler
             request.HoursPerDayOverride,
             request.SalaryMin,
             request.SalaryMax,
+            request.SalaryType,
             request.DefaultLeavePolicyId,
             now);
 
@@ -96,6 +97,7 @@ internal sealed class CreatePositionProfileHandler
             profile.HoursPerDayOverride,
             profile.SalaryMin,
             profile.SalaryMax,
+            profile.SalaryType,
             profile.DefaultLeavePolicyId,
             profile.IsActive,
             profile.CreatedAt));

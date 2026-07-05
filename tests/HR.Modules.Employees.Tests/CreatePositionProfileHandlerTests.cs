@@ -75,7 +75,7 @@ public class CreatePositionProfileHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         context.PositionProfiles.Add(
-            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Software Developer", null, false, null, null, null, null, null, null, now));
+            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Software Developer", null, false, null, null, null, null, null, null, null, now));
         await context.SaveChangesAsync();
 
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
@@ -143,7 +143,7 @@ public class CreatePositionProfileHandlerTests
         var companyB = Guid.NewGuid();
 
         context.PositionProfiles.Add(
-            PositionProfile.Create(Guid.NewGuid(), companyA, null, "Software Developer", null, false, null, null, null, null, null, null, now));
+            PositionProfile.Create(Guid.NewGuid(), companyA, null, "Software Developer", null, false, null, null, null, null, null, null, null, now));
         await context.SaveChangesAsync();
 
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
@@ -217,6 +217,48 @@ public class CreatePositionProfileHandlerTests
         Assert.Equal(8m, result.Value.HoursPerDayOverride);
         Assert.Equal(40000, result.Value.SalaryMin);
         Assert.Equal(60000, result.Value.SalaryMax);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creates_PositionProfile_With_SalaryType()
+    {
+        await using var context = BuildContext();
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+
+        var result = await handler.HandleAsync(
+            new CreatePositionProfileRequest
+            {
+                CompanyId = Guid.NewGuid(),
+                Title = "Software Developer",
+                SalaryMin = 40000,
+                SalaryMax = 60000,
+                SalaryType = SalaryType.Annual
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SalaryType.Annual, result.Value!.SalaryType);
+
+        var saved = await context.PositionProfiles.SingleAsync();
+        Assert.Equal(SalaryType.Annual, saved.SalaryType);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creates_PositionProfile_With_Null_SalaryType()
+    {
+        await using var context = BuildContext();
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+
+        var result = await handler.HandleAsync(
+            new CreatePositionProfileRequest
+            {
+                CompanyId = Guid.NewGuid(),
+                Title = "Software Developer"
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.SalaryType);
     }
 
     private static EmployeesDbContext BuildContext()

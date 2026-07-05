@@ -16,7 +16,7 @@ public class GetPositionProfileHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Software Engineer", "Builds stuff", false, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Software Engineer", "Builds stuff", false, null, null, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -55,7 +55,7 @@ public class GetPositionProfileHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, "Software Engineer", null, false, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, "Software Engineer", null, false, null, null, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -67,6 +67,48 @@ public class GetPositionProfileHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_SalaryType_When_Set()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Software Engineer", null, false, null, null, null, 40000, 60000, SalaryType.Daily, null, now);
+        context.PositionProfiles.Add(profile);
+        await context.SaveChangesAsync();
+
+        var handler = new GetPositionProfileHandler(context);
+
+        var result = await handler.HandleAsync(
+            new GetPositionProfileRequest { CompanyId = companyId, Id = profile.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SalaryType.Daily, result.Value!.SalaryType);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Null_SalaryType_When_Not_Set()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Software Engineer", null, false, null, null, null, null, null, null, null, now);
+        context.PositionProfiles.Add(profile);
+        await context.SaveChangesAsync();
+
+        var handler = new GetPositionProfileHandler(context);
+
+        var result = await handler.HandleAsync(
+            new GetPositionProfileRequest { CompanyId = companyId, Id = profile.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.SalaryType);
     }
 
     private static EmployeesDbContext BuildContext()

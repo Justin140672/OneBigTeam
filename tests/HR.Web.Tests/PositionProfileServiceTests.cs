@@ -31,6 +31,7 @@ public class PositionProfileServiceTests
             HoursPerDayOverride: 6m,
             SalaryMin: 40000m,
             SalaryMax: 60000m,
+            SalaryType: "Annual",
             DefaultLeavePolicyId: leavePolicyId,
             IsActive: true,
             CreatedAt: DateTimeOffset.UtcNow,
@@ -48,6 +49,7 @@ public class PositionProfileServiceTests
         Assert.Equal(6m, result.HoursPerDayOverride);
         Assert.Equal(40000m, result.SalaryMin);
         Assert.Equal(60000m, result.SalaryMax);
+        Assert.Equal("Annual", result.SalaryType);
         Assert.Equal(leavePolicyId, result.DefaultLeavePolicyId);
     }
 
@@ -83,6 +85,7 @@ public class PositionProfileServiceTests
             HoursPerDayOverride: 6m,
             SalaryMin: 40000m,
             SalaryMax: 60000m,
+            SalaryType: "Annual",
             DefaultLeavePolicyId: leavePolicyId);
 
         var (created, error) = await service.CreatePositionProfileAsync(companyId, request);
@@ -95,6 +98,7 @@ public class PositionProfileServiceTests
         Assert.Equal(3, sentBody!.ProbationMonthsOverride);
         Assert.Equal(leavePolicyId, sentBody.DefaultLeavePolicyId);
         Assert.Equal(60000m, sentBody.SalaryMax);
+        Assert.Equal("Annual", sentBody.SalaryType);
     }
 
     [Fact]
@@ -104,7 +108,7 @@ public class PositionProfileServiceTests
         var service = new PositionProfileService(factory);
 
         var (created, error) = await service.CreatePositionProfileAsync(
-            Guid.NewGuid(), new CreatePositionProfileRequest(Guid.NewGuid(), null, "Duplicate", null, false, null, null, null, null, null, null));
+            Guid.NewGuid(), new CreatePositionProfileRequest(Guid.NewGuid(), null, "Duplicate", null, false, null, null, null, null, null, null, null));
 
         Assert.Null(created);
         Assert.Equal("A position profile with that title already exists.", error);
@@ -129,6 +133,7 @@ public class PositionProfileServiceTests
             HoursPerDayOverride: 8m,
             SalaryMin: 50000m,
             SalaryMax: 70000m,
+            SalaryType: "Annual",
             DefaultLeavePolicyId: leavePolicyId);
 
         var (success, error) = await service.UpdatePositionProfileAsync(companyId, profileId, request);
@@ -141,6 +146,31 @@ public class PositionProfileServiceTests
         Assert.Equal(4, sentBody!.ProbationMonthsOverride);
         Assert.Equal(leavePolicyId, sentBody.DefaultLeavePolicyId);
         Assert.Equal(70000m, sentBody.SalaryMax);
+        Assert.Equal("Annual", sentBody.SalaryType);
+    }
+
+    [Fact]
+    public async Task ListPositionProfilesAsync_Maps_SalaryFields()
+    {
+        var companyId = Guid.NewGuid();
+
+        var response = new ListPositionProfilesResponse(
+        [
+            new PositionProfileListItemModel(
+                Guid.NewGuid(), "Engineering", "Senior Developer", null, false, true,
+                SalaryMin: 40000m, SalaryMax: 60000m, SalaryType: "Annual")
+        ]);
+
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
+        var service = new PositionProfileService(factory);
+
+        var result = await service.ListPositionProfilesAsync(companyId);
+
+        Assert.NotNull(result);
+        var item = Assert.Single(result.Items);
+        Assert.Equal(40000m, item.SalaryMin);
+        Assert.Equal(60000m, item.SalaryMax);
+        Assert.Equal("Annual", item.SalaryType);
     }
 
     // ── Fake handlers ────────────────────────────────────────────────────────────

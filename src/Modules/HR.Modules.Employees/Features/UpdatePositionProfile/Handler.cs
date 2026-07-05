@@ -92,6 +92,7 @@ internal sealed class UpdatePositionProfileHandler
             request.HoursPerDayOverride,
             request.SalaryMin,
             request.SalaryMax,
+            request.SalaryType,
             request.DefaultLeavePolicyId,
             now);
 
@@ -109,6 +110,7 @@ internal sealed class UpdatePositionProfileHandler
             profile.HoursPerDayOverride,
             profile.SalaryMin,
             profile.SalaryMax,
+            profile.SalaryType,
             profile.DefaultLeavePolicyId,
             profile.IsActive,
             profile.UpdatedAt));

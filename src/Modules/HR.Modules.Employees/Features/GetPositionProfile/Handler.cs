@@ -47,6 +47,7 @@ internal sealed class GetPositionProfileHandler
             profile.HoursPerDayOverride,
             profile.SalaryMin,
             profile.SalaryMax,
+            profile.SalaryType,
             profile.DefaultLeavePolicyId,
             profile.IsActive,
             profile.CreatedAt,

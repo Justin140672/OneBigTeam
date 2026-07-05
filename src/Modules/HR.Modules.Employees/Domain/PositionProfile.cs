@@ -19,6 +19,7 @@ internal sealed class PositionProfile
     public decimal? HoursPerDayOverride { get; private set; }
     public decimal? SalaryMin { get; private set; }
     public decimal? SalaryMax { get; private set; }
+    public SalaryType? SalaryType { get; private set; }
     public Guid? DefaultLeavePolicyId { get; private set; }
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -38,6 +39,7 @@ internal sealed class PositionProfile
         decimal? hoursPerDayOverride,
         decimal? salaryMin,
         decimal? salaryMax,
+        SalaryType? salaryType,
         Guid? defaultLeavePolicyId,
         DateTimeOffset now)
     {
@@ -54,6 +56,7 @@ internal sealed class PositionProfile
             HoursPerDayOverride = hoursPerDayOverride,
             SalaryMin = salaryMin,
             SalaryMax = salaryMax,
+            SalaryType = salaryType,
             DefaultLeavePolicyId = defaultLeavePolicyId,
             IsActive = true,
             CreatedAt = now,
@@ -71,6 +74,7 @@ internal sealed class PositionProfile
         decimal? hoursPerDayOverride,
         decimal? salaryMin,
         decimal? salaryMax,
+        SalaryType? salaryType,
         Guid? defaultLeavePolicyId,
         DateTimeOffset now)
     {
@@ -83,6 +87,7 @@ internal sealed class PositionProfile
         HoursPerDayOverride = hoursPerDayOverride;
         SalaryMin = salaryMin;
         SalaryMax = salaryMax;
+        SalaryType = salaryType;
         DefaultLeavePolicyId = defaultLeavePolicyId;
         UpdatedAt = now;
     }

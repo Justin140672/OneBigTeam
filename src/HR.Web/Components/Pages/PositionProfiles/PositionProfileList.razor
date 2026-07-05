@@ -56,6 +56,14 @@
                         }
                     </Template>
                 </GridColumn>
+                <GridColumn HeaderText="Salary Range" Width="200">
+                    <Template>
+                        @{
+                            var row = (context as PositionProfileListItemModel)!;
+                            <span>@FormatSalaryRange(row)</span>
+                        }
+                    </Template>
+                </GridColumn>
                 <GridColumn Field="@nameof(PositionProfileListItemModel.IsActive)" HeaderText="Status" Width="110">
                     <Template>
                         @{
@@ -96,4 +104,20 @@
 
     protected override string? GetViewUrl(PositionProfileListItemModel item) =>
         $"/companies/{CompanyId}/position-profiles/{item.Id}/view";
+
+    private static string FormatSalaryRange(PositionProfileListItemModel item)
+    {
+        if (item.SalaryMin is null && item.SalaryMax is null)
+            return "—";
+
+        var suffix = string.IsNullOrEmpty(item.SalaryType) ? string.Empty : $" ({item.SalaryType})";
+
+        if (item.SalaryMin is not null && item.SalaryMax is not null)
+            return $"£{item.SalaryMin.Value:N0} - £{item.SalaryMax.Value:N0}{suffix}";
+
+        if (item.SalaryMin is not null)
+            return $"£{item.SalaryMin.Value:N0}+{suffix}";
+
+        return $"Up to £{item.SalaryMax!.Value:N0}{suffix}";
+    }
 }

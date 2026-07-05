@@ -54,6 +54,11 @@ internal sealed class PositionProfileConfiguration : IEntityTypeConfiguration<Po
             .HasColumnName("salary_max")
             .HasPrecision(12, 2);
 
+        builder.Property(p => p.SalaryType)
+            .HasColumnName("salary_type")
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
         builder.Property(p => p.DefaultLeavePolicyId)
             .HasColumnName("default_leave_policy_id");
 

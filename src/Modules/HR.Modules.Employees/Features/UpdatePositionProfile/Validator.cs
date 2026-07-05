@@ -48,5 +48,9 @@ internal sealed class UpdatePositionProfileValidator : AbstractValidator<UpdateP
             .GreaterThanOrEqualTo(r => r.SalaryMin ?? 0)
             .When(r => r.SalaryMax.HasValue)
             .WithMessage("SalaryMax must be greater than or equal to SalaryMin.");
+
+        RuleFor(r => r.SalaryType)
+            .IsInEnum()
+            .When(r => r.SalaryType.HasValue);
     }
 }

@@ -8,4 +8,7 @@ internal sealed record PositionProfileListItem(
     string Title,
     string? Description,
     bool IsManagerial,
-    bool IsActive);
+    bool IsActive,
+    decimal? SalaryMin,
+    decimal? SalaryMax,
+    string? SalaryType);

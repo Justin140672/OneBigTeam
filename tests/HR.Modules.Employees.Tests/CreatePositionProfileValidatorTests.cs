@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.CreatePositionProfile;
 
 namespace HR.Modules.Employees.Tests;
@@ -149,9 +150,41 @@ public class CreatePositionProfileValidatorTests
             HoursPerDayOverride = 8m,
             SalaryMin = 40000,
             SalaryMax = 60000,
+            SalaryType = SalaryType.Annual,
             DefaultLeavePolicyId = Guid.NewGuid()
         });
 
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_SalaryType_Is_Null()
+    {
+        var validator = new CreatePositionProfileValidator();
+
+        var result = validator.Validate(new CreatePositionProfileRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            Title = "Software Developer",
+            SalaryType = null
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_SalaryType_Is_Invalid_Enum_Value()
+    {
+        var validator = new CreatePositionProfileValidator();
+
+        var result = validator.Validate(new CreatePositionProfileRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            Title = "Software Developer",
+            SalaryType = (SalaryType)999
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreatePositionProfileRequest.SalaryType));
     }
 }
