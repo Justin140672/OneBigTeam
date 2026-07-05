@@ -51,6 +51,35 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     public async Task<string> GetTitleAsync() =>
         await page.GetByPlaceholder("e.g. Senior Software Engineer").InputValueAsync();
 
+    public async Task FillProbationMonthsOverrideAsync(int months) =>
+        await page.GetByPlaceholder("Use company default").FillAsync(months.ToString());
+
+    public async Task FillSalaryRangeAsync(decimal min, decimal max)
+    {
+        await page.GetByPlaceholder("Min").FillAsync(min.ToString());
+        await page.GetByPlaceholder("Max").FillAsync(max.ToString());
+    }
+
+    public async Task SetUseCompanyWorkingPatternAsync(bool useCompanyDefault)
+    {
+        var checkbox = page.GetByLabel("Use company working pattern");
+        var isChecked = await checkbox.IsCheckedAsync();
+        if (useCompanyDefault && !isChecked) await checkbox.CheckAsync();
+        if (!useCompanyDefault && isChecked) await checkbox.UncheckAsync();
+    }
+
+    public async Task SelectDefaultLeavePolicyAsync(string leavePolicyName)
+    {
+        // The Defaults card's leave-policy SfDropDownList is the only combobox labelled by this section;
+        // scope to the "Defaults" card so this doesn't collide with the Department dropdown above it.
+        var card = page.Locator(".card", new PageLocatorOptions { HasText = "Defaults" });
+        await card.Locator("span[role='combobox']").First.ClickAsync();
+        await page.Locator(".e-popup-open .e-list-item")
+            .Filter(new() { HasText = leavePolicyName })
+            .First
+            .ClickAsync(new() { Timeout = 10_000 });
+    }
+
     private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
 
     public Task ClickCloseAsync() =>

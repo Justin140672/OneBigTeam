@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using HR.Infrastructure.Abstractions;
 
 namespace HR.Web.Models;
 
@@ -24,6 +25,12 @@ public record GetPositionProfileResponse(
     string Title,
     string? Description,
     bool IsManagerial,
+    int? ProbationMonthsOverride,
+    WorkingDays? WorkingDaysOverride,
+    decimal? HoursPerDayOverride,
+    decimal? SalaryMin,
+    decimal? SalaryMax,
+    Guid? DefaultLeavePolicyId,
     bool IsActive,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
@@ -45,6 +52,15 @@ public sealed class PositionProfileEditModel
     public string? Description { get; set; }
     public Guid? DepartmentId { get; set; }
     public bool IsManagerial { get; set; }
+    [Range(1, 24, ErrorMessage = "Probation months override must be between 1 and 24.")]
+    public int? ProbationMonthsOverride { get; set; }
+    public bool UseCompanyWorkingPattern { get; set; } = true;
+    public HashSet<string> WorkingWeek { get; set; } = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+    [Range(0.5, 24, ErrorMessage = "Hours per day must be between 0.5 and 24.")]
+    public decimal HoursPerDay { get; set; } = 7.5m;
+    public decimal? SalaryMin { get; set; }
+    public decimal? SalaryMax { get; set; }
+    public Guid? DefaultLeavePolicyId { get; set; }
 }
 
 // ── CREATE ────────────────────────────────────────────────────────────────────
@@ -54,7 +70,13 @@ public record CreatePositionProfileRequest(
     Guid? DepartmentId,
     string Title,
     string? Description,
-    bool IsManagerial);
+    bool IsManagerial,
+    int? ProbationMonthsOverride,
+    WorkingDays? WorkingDaysOverride,
+    decimal? HoursPerDayOverride,
+    decimal? SalaryMin,
+    decimal? SalaryMax,
+    Guid? DefaultLeavePolicyId);
 
 public record CreatePositionProfileResponse(
     Guid Id,
@@ -98,7 +120,13 @@ public record UpdatePositionProfileRequest(
     Guid? DepartmentId,
     string Title,
     string? Description,
-    bool IsManagerial);
+    bool IsManagerial,
+    int? ProbationMonthsOverride,
+    WorkingDays? WorkingDaysOverride,
+    decimal? HoursPerDayOverride,
+    decimal? SalaryMin,
+    decimal? SalaryMax,
+    Guid? DefaultLeavePolicyId);
 
 public record UpdatePositionProfileResponse(
     Guid Id,

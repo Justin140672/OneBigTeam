@@ -37,4 +37,10 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
             titles.Add((await cell.TextContentAsync())?.Trim() ?? "");
         return titles;
     }
+
+    public async Task OpenPositionProfileAsync(string title)
+    {
+        await page.Locator(".e-rowcell a").Filter(new() { HasText = title }).First.ClickAsync();
+        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+    }
 }

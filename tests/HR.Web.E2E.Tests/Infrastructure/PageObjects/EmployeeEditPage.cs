@@ -124,6 +124,20 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task<bool> HasProbationSummaryAsync() =>
         await page.Locator("[data-testid='probation-summary']").IsVisibleAsync();
 
+    /// <summary>
+    /// Returns true if the "From Position Profile" read-only defaults summary card is visible
+    /// on the new-employee form (shown after a Position Profile is selected).
+    /// </summary>
+    public async Task<bool> HasPositionProfileDefaultsSummaryAsync() =>
+        await page.Locator("[data-testid='position-profile-defaults-summary']").IsVisibleAsync();
+
+    /// <summary>Reads the current value of the Department dropdown's visible text on the new-employee form.</summary>
+    public async Task<string?> GetSelectedDepartmentTextAsync()
+    {
+        var group = page.Locator(".col-md-4").Filter(new() { HasText = "Department" }).First;
+        return await group.Locator(".e-input-group input").First.InputValueAsync();
+    }
+
     public async Task<bool> HasErrorAsync() =>
         await page.Locator(".alert-danger, .validation-message").First.IsVisibleAsync();
 

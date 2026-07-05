@@ -5,4 +5,5 @@ public sealed record EmployeeCreatedIntegrationEvent(
     DateOnly StartDate,
     Guid? ManagerId,
     DateOnly ProbationEndDate,
-    Guid? PositionProfileId = null) : IIntegrationEvent;
+    Guid? PositionProfileId = null,
+    Guid? DefaultLeavePolicyId = null) : IIntegrationEvent;

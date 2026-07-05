@@ -16,7 +16,7 @@ public class GetPositionProfileHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Software Engineer", "Builds stuff", false, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Software Engineer", "Builds stuff", false, null, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -55,7 +55,7 @@ public class GetPositionProfileHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, "Software Engineer", null, false, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, "Software Engineer", null, false, null, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 

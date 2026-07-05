@@ -88,6 +88,63 @@ public class EmployeeCreatedHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Auto_Assigns_DefaultLeavePolicy_When_No_Prior_Assignment_Exists()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var defaultPolicyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var startDate = new DateOnly(2026, 6, 1);
+
+        var activeType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+        context.LeaveTypes.Add(activeType);
+        await context.SaveChangesAsync();
+
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        await handler.HandleAsync(
+            new EmployeeCreatedIntegrationEvent(companyId, employeeId, startDate, null, new DateOnly(2026, 12, 1), null, defaultPolicyId),
+            CancellationToken.None);
+
+        var assignment = await context.EmployeeLeavePolicyAssignments.SingleAsync();
+        Assert.Equal(employeeId, assignment.EmployeeId);
+        Assert.Equal(defaultPolicyId, assignment.LeavePolicyId);
+        Assert.Equal(startDate, assignment.EffectiveFrom);
+
+        var balances = await context.LeaveBalances.ToListAsync();
+        Assert.Single(balances);
+        Assert.Equal(defaultPolicyId, balances[0].LeavePolicyId);
+        Assert.Equal(25, balances[0].EntitlementDays);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Override_Existing_Assignment_With_DefaultLeavePolicy()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var existingPolicyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var activeType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
+            AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
+        context.LeaveTypes.Add(activeType);
+        context.EmployeeLeavePolicyAssignments.Add(
+            EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, existingPolicyId,
+                DateOnly.FromDateTime(FixedUtcNow), now));
+        await context.SaveChangesAsync();
+
+        var handler = new EmployeeCreatedHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader());
+        await handler.HandleAsync(
+            new EmployeeCreatedIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 1), null, new DateOnly(2026, 12, 1), null, Guid.NewGuid()),
+            CancellationToken.None);
+
+        var assignment = await context.EmployeeLeavePolicyAssignments.SingleAsync();
+        Assert.Equal(existingPolicyId, assignment.LeavePolicyId);
+    }
+
+    [Fact]
     public async Task HandleAsync_Initialises_TOIL_Balance_At_Zero_Regardless_Of_DefaultEntitlementDays()
     {
         await using var context = BuildContext();

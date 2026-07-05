@@ -1,3 +1,5 @@
+using HR.Infrastructure.Abstractions;
+
 namespace HR.Modules.Employees.Features.GetPositionProfile;
 
 internal sealed record GetPositionProfileResponse(
@@ -7,6 +9,12 @@ internal sealed record GetPositionProfileResponse(
     string Title,
     string? Description,
     bool IsManagerial,
+    int? ProbationMonthsOverride,
+    WorkingDays? WorkingDaysOverride,
+    decimal? HoursPerDayOverride,
+    decimal? SalaryMin,
+    decimal? SalaryMax,
+    Guid? DefaultLeavePolicyId,
     bool IsActive,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,

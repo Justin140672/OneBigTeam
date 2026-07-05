@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.CreatePositionProfile;
 using HR.Modules.Employees.Persistence;
@@ -14,7 +15,7 @@ public class CreatePositionProfileHandlerTests
     public async Task HandleAsync_Creates_PositionProfile()
     {
         await using var context = BuildContext();
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
         var companyId = Guid.NewGuid();
 
         var result = await handler.HandleAsync(
@@ -49,7 +50,7 @@ public class CreatePositionProfileHandlerTests
         context.Departments.Add(department);
         await context.SaveChangesAsync();
 
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -74,10 +75,10 @@ public class CreatePositionProfileHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         context.PositionProfiles.Add(
-            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Software Developer", null, false, null, now));
+            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Software Developer", null, false, null, null, null, null, null, null, now));
         await context.SaveChangesAsync();
 
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest { CompanyId = companyId, Title = "Software Developer" },
@@ -91,7 +92,7 @@ public class CreatePositionProfileHandlerTests
     public async Task HandleAsync_Returns_Not_Found_When_Department_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -117,7 +118,7 @@ public class CreatePositionProfileHandlerTests
         context.Departments.Add(department);
         await context.SaveChangesAsync();
 
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -142,16 +143,80 @@ public class CreatePositionProfileHandlerTests
         var companyB = Guid.NewGuid();
 
         context.PositionProfiles.Add(
-            PositionProfile.Create(Guid.NewGuid(), companyA, null, "Software Developer", null, false, null, now));
+            PositionProfile.Create(Guid.NewGuid(), companyA, null, "Software Developer", null, false, null, null, null, null, null, null, now));
         await context.SaveChangesAsync();
 
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest { CompanyId = companyB, Title = "Software Developer" },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creates_PositionProfile_With_Valid_DefaultLeavePolicyId()
+    {
+        await using var context = BuildContext();
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(exists: true));
+        var leavePolicyId = Guid.NewGuid();
+
+        var result = await handler.HandleAsync(
+            new CreatePositionProfileRequest
+            {
+                CompanyId = Guid.NewGuid(),
+                Title = "Software Developer",
+                DefaultLeavePolicyId = leavePolicyId
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(leavePolicyId, result.Value!.DefaultLeavePolicyId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Not_Found_When_DefaultLeavePolicyId_Does_Not_Exist()
+    {
+        await using var context = BuildContext();
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(exists: false));
+
+        var result = await handler.HandleAsync(
+            new CreatePositionProfileRequest
+            {
+                CompanyId = Guid.NewGuid(),
+                Title = "Software Developer",
+                DefaultLeavePolicyId = Guid.NewGuid()
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creates_PositionProfile_With_WorkingPattern_And_SalaryRange()
+    {
+        await using var context = BuildContext();
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+
+        var result = await handler.HandleAsync(
+            new CreatePositionProfileRequest
+            {
+                CompanyId = Guid.NewGuid(),
+                Title = "Software Developer",
+                WorkingDaysOverride = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday | WorkingDays.Thursday,
+                HoursPerDayOverride = 8m,
+                SalaryMin = 40000,
+                SalaryMax = 60000
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday | WorkingDays.Thursday, result.Value!.WorkingDaysOverride);
+        Assert.Equal(8m, result.Value.HoursPerDayOverride);
+        Assert.Equal(40000, result.Value.SalaryMin);
+        Assert.Equal(60000, result.Value.SalaryMax);
     }
 
     private static EmployeesDbContext BuildContext()

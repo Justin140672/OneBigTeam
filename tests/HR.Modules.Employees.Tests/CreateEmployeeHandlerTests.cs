@@ -76,7 +76,7 @@ public class CreateEmployeeHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
-        var positionProfile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, "Developer", null, false, null, now);
+        var positionProfile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, "Developer", null, false, null, null, null, null, null, null, now);
         var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane.manager@example.com", StartDate, hasSystemAccess: true, now);
         context.Departments.Add(department);
         context.PositionProfiles.Add(positionProfile);
@@ -237,7 +237,7 @@ public class CreateEmployeeHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, "Developer", null, false, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, "Developer", null, false, null, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -499,7 +499,7 @@ public class CreateEmployeeHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Senior Dev", null, false, 3, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Senior Dev", null, false, 3, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -546,6 +546,62 @@ public class CreateEmployeeHandlerTests
         Assert.True(result.IsSuccess);
         var evt = Assert.IsType<EmployeeCreatedIntegrationEvent>(Assert.Single(publisher.Published));
         Assert.Equal(StartDate.AddMonths(9), evt.ProbationEndDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Published_Event_Includes_PositionProfile_DefaultLeavePolicyId()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var leavePolicyId = Guid.NewGuid();
+
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Senior Dev", null, false, null, null, null, null, null, leavePolicyId, now);
+        context.PositionProfiles.Add(profile);
+        await context.SaveChangesAsync();
+
+        var publisher = new CapturingIntegrationEventPublisher();
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
+
+        var result = await handler.HandleAsync(
+            new CreateEmployeeRequest
+            {
+                CompanyId = companyId,
+                PositionProfileId = profile.Id,
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<EmployeeCreatedIntegrationEvent>(Assert.Single(publisher.Published));
+        Assert.Equal(leavePolicyId, evt.DefaultLeavePolicyId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Published_Event_Has_Null_DefaultLeavePolicyId_When_No_PositionProfile()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var publisher = new CapturingIntegrationEventPublisher();
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
+
+        var result = await handler.HandleAsync(
+            new CreateEmployeeRequest
+            {
+                CompanyId = companyId,
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<EmployeeCreatedIntegrationEvent>(Assert.Single(publisher.Published));
+        Assert.Null(evt.DefaultLeavePolicyId);
     }
 
     private static FakeCompanyContactValidationReader UkContactRules() => new(

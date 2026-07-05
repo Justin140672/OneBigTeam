@@ -5,6 +5,7 @@
 @inject EmployeeService EmployeeService
 @inject DepartmentService DepartmentService
 @inject PositionProfileService PositionProfileService
+@inject LeavePolicyService LeavePolicyService
 @inject InviteService InviteService
 @inject AppSession Session
 @inherits EditPageBase<EmployeeProfileEditModel>
@@ -130,11 +131,39 @@
                                                     Placeholder="None"
                                                     AllowFiltering="true">
                                         <DropDownListFieldSettings Value="Id" Text="Title" />
+                                        <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?" ValueChange="OnPositionProfileChanged" />
                                     </SfDropDownList>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    @if (_selectedProfileDefaults is not null)
+                    {
+                        <div class="card mb-4" data-testid="position-profile-defaults-summary">
+                            <div class="card-header">
+                                <h5 class="mb-0">From Position Profile</h5>
+                            </div>
+                            <div class="card-body">
+                                <dl class="row mb-0 small">
+                                    <dt class="col-5 text-muted fw-normal">Working Pattern</dt>
+                                    <dd class="col-7">@ProfileWorkingPatternSummary(_selectedProfileDefaults)</dd>
+                                    @if (_selectedProfileDefaults.SalaryMin is not null || _selectedProfileDefaults.SalaryMax is not null)
+                                    {
+                                        <dt class="col-5 text-muted fw-normal">Salary Range</dt>
+                                        <dd class="col-7">@ProfileSalaryRangeSummary(_selectedProfileDefaults)</dd>
+                                    }
+                                    @if (_selectedProfileLeavePolicyName is not null)
+                                    {
+                                        <dt class="col-5 text-muted fw-normal">Default Leave Policy</dt>
+                                        <dd class="col-7">@_selectedProfileLeavePolicyName</dd>
+                                    }
+                                    <dt class="col-5 text-muted fw-normal">Required Documents</dt>
+                                    <dd class="col-7">@_selectedProfileDefaults.RequiredDocuments.Count</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    }
 
                     <div class="card mb-4">
                         <div class="card-header">
@@ -555,6 +584,9 @@
     private List<PositionProfileListItemModel> _positionProfiles = [];
     private List<NationalityListItem> _nationalities = [];
 
+    private GetPositionProfileResponse? _selectedProfileDefaults;
+    private string? _selectedProfileLeavePolicyName;
+
     private EmployeeEmploymentTab? _employmentTab;
     private int _activeTabIndex;
 
@@ -627,6 +659,50 @@
             Model.StartDate = DateOnly.FromDateTime(DateTime.Today);
         }
     }
+
+    private async Task OnPositionProfileChanged(ChangeEventArgs<Guid?, PositionProfileListItemModel> args)
+    {
+        Model.PositionProfileId = args.Value;
+        _selectedProfileDefaults = null;
+        _selectedProfileLeavePolicyName = null;
+
+        if (args.Value is Guid profileId)
+        {
+            _selectedProfileDefaults = await PositionProfileService.GetPositionProfileAsync(CompanyId, profileId);
+
+            if (_selectedProfileDefaults is not null)
+            {
+                if (Model.DepartmentId is null)
+                    Model.DepartmentId = _selectedProfileDefaults.DepartmentId;
+
+                if (_selectedProfileDefaults.DefaultLeavePolicyId is Guid leavePolicyId)
+                {
+                    var policies = await LeavePolicyService.ListLeavePoliciesAsync(CompanyId, activeOnly: true);
+                    _selectedProfileLeavePolicyName = policies?.Items.FirstOrDefault(p => p.Id == leavePolicyId)?.Name;
+                }
+            }
+        }
+    }
+
+    private static string ProfileWorkingPatternSummary(GetPositionProfileResponse profile)
+    {
+        if (profile.WorkingDaysOverride is null || profile.HoursPerDayOverride is null)
+            return "Company default";
+
+        var days = string.Join(", ", Enum.GetValues<WorkingDays>()
+            .Where(d => d != WorkingDays.None && profile.WorkingDaysOverride.Value.HasFlag(d))
+            .Select(d => d.ToString()));
+
+        return $"{days} ({profile.HoursPerDayOverride} hrs/day)";
+    }
+
+    private static string ProfileSalaryRangeSummary(GetPositionProfileResponse profile) => (profile.SalaryMin, profile.SalaryMax) switch
+    {
+        (not null, not null) => $"{profile.SalaryMin:N0} - {profile.SalaryMax:N0}",
+        (not null, null) => $"From {profile.SalaryMin:N0}",
+        (null, not null) => $"Up to {profile.SalaryMax:N0}",
+        _ => string.Empty
+    };
 
     protected override async Task<string?> SaveCoreAsync()
     {

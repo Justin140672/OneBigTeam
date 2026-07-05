@@ -39,6 +39,24 @@ internal sealed class PositionProfileConfiguration : IEntityTypeConfiguration<Po
         builder.Property(p => p.ProbationMonthsOverride)
             .HasColumnName("probation_months_override");
 
+        builder.Property(p => p.WorkingDaysOverride)
+            .HasColumnName("working_days_override");
+
+        builder.Property(p => p.HoursPerDayOverride)
+            .HasColumnName("hours_per_day_override")
+            .HasPrecision(4, 2);
+
+        builder.Property(p => p.SalaryMin)
+            .HasColumnName("salary_min")
+            .HasPrecision(12, 2);
+
+        builder.Property(p => p.SalaryMax)
+            .HasColumnName("salary_max")
+            .HasPrecision(12, 2);
+
+        builder.Property(p => p.DefaultLeavePolicyId)
+            .HasColumnName("default_leave_policy_id");
+
         builder.Property(p => p.IsActive)
             .HasColumnName("is_active")
             .IsRequired();

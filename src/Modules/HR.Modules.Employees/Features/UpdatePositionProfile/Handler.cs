@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -8,11 +9,13 @@ internal sealed class UpdatePositionProfileHandler
 {
     private readonly EmployeesDbContext _dbContext;
     private readonly IClock _clock;
+    private readonly ILeavePolicyReader _leavePolicyReader;
 
-    public UpdatePositionProfileHandler(EmployeesDbContext dbContext, IClock clock)
+    public UpdatePositionProfileHandler(EmployeesDbContext dbContext, IClock clock, ILeavePolicyReader leavePolicyReader)
     {
         _dbContext = dbContext;
         _clock = clock;
+        _leavePolicyReader = leavePolicyReader;
     }
 
     public async Task<Result<UpdatePositionProfileResponse>> HandleAsync(
@@ -65,6 +68,18 @@ internal sealed class UpdatePositionProfileHandler
             }
         }
 
+        if (request.DefaultLeavePolicyId is not null)
+        {
+            var leavePolicyExists = await _leavePolicyReader.ExistsAsync(
+                request.CompanyId, request.DefaultLeavePolicyId.Value, cancellationToken);
+
+            if (!leavePolicyExists)
+            {
+                return Result.Failure<UpdatePositionProfileResponse>(
+                    Error.NotFound($"Leave policy '{request.DefaultLeavePolicyId}' was not found."));
+            }
+        }
+
         var now = _clock.UtcNowOffset();
 
         profile.Update(
@@ -73,6 +88,11 @@ internal sealed class UpdatePositionProfileHandler
             string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             request.IsManagerial,
             request.ProbationMonthsOverride,
+            request.WorkingDaysOverride,
+            request.HoursPerDayOverride,
+            request.SalaryMin,
+            request.SalaryMax,
+            request.DefaultLeavePolicyId,
             now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -85,6 +105,11 @@ internal sealed class UpdatePositionProfileHandler
             profile.Description,
             profile.IsManagerial,
             profile.ProbationMonthsOverride,
+            profile.WorkingDaysOverride,
+            profile.HoursPerDayOverride,
+            profile.SalaryMin,
+            profile.SalaryMax,
+            profile.DefaultLeavePolicyId,
             profile.IsActive,
             profile.UpdatedAt));
     }

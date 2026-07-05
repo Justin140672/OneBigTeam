@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Features.UpdatePositionProfile;
 
 namespace HR.Modules.Employees.Tests;
@@ -88,6 +89,51 @@ public class UpdatePositionProfileValidatorTests
             DepartmentId = Guid.NewGuid(),
             Description = "Builds and maintains the core platform.",
             IsManagerial = true
+        });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_WorkingDaysOverride_Is_None()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { WorkingDaysOverride = WorkingDays.None, HoursPerDayOverride = 7.5m });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.ErrorMessage == "Working days override must include at least one day.");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(24.5)]
+    public void Validate_Fails_When_HoursPerDayOverride_Out_Of_Range(decimal hours)
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { HoursPerDayOverride = hours });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName.Contains("HoursPerDayOverride"));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_SalaryMax_Less_Than_SalaryMin()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { SalaryMin = 50000, SalaryMax = 40000 });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdatePositionProfileRequest.SalaryMax));
+    }
+
+    [Fact]
+    public void Validate_Passes_With_Full_Set_Of_New_Fields()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with
+        {
+            ProbationMonthsOverride = 3,
+            WorkingDaysOverride = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday | WorkingDays.Thursday,
+            HoursPerDayOverride = 8m,
+            SalaryMin = 40000,
+            SalaryMax = 60000,
+            DefaultLeavePolicyId = Guid.NewGuid()
         });
         Assert.True(result.IsValid);
     }

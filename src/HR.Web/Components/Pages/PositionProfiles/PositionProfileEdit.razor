@@ -4,7 +4,9 @@
 @rendermode InteractiveServer
 @inject PositionProfileService PositionProfileService
 @inject DepartmentService DepartmentService
+@inject LeavePolicyService LeavePolicyService
 @inherits EditPageBase<PositionProfileEditModel>
+@using HR.Infrastructure.Abstractions
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -69,6 +71,9 @@
                                 </div>
                             </div>
                         </div>
+
+                        @DefaultsCard()
+
                         <div class="d-flex gap-2 align-items-center mt-3">
                             <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
                                 @if (Saving)
@@ -125,6 +130,9 @@
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            @DefaultsCard()
+
                                             <div class="d-flex gap-2 align-items-center mt-3">
                                                 @if (!IsViewMode)
                                                 {
@@ -176,11 +184,20 @@
         : IsViewMode ? "View Position Profile" : "Edit Position Profile";
 
     private List<DepartmentListItemModel> _departments = [];
+    private List<LeavePolicyListItemModel> _leavePolicies = [];
+
+    private static readonly string[] _allDays =
+        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
     protected override async Task LoadAsync()
     {
-        var deptResult = await DepartmentService.ListDepartmentsAsync(CompanyId);
-        _departments = deptResult?.Items ?? [];
+        var deptTask = DepartmentService.ListDepartmentsAsync(CompanyId);
+        var leavePolicyTask = LeavePolicyService.ListLeavePoliciesAsync(CompanyId, activeOnly: true);
+
+        await Task.WhenAll(deptTask, leavePolicyTask);
+
+        _departments = (await deptTask)?.Items ?? [];
+        _leavePolicies = (await leavePolicyTask)?.Items ?? [];
 
         if (!IsNew)
         {
@@ -191,12 +208,39 @@
                 Model.Description = profile.Description;
                 Model.DepartmentId = profile.DepartmentId;
                 Model.IsManagerial = profile.IsManagerial;
+                Model.ProbationMonthsOverride = profile.ProbationMonthsOverride;
+                Model.SalaryMin = profile.SalaryMin;
+                Model.SalaryMax = profile.SalaryMax;
+                Model.DefaultLeavePolicyId = profile.DefaultLeavePolicyId;
+
+                if (profile.WorkingDaysOverride.HasValue && profile.HoursPerDayOverride.HasValue)
+                {
+                    Model.UseCompanyWorkingPattern = false;
+                    Model.WorkingWeek = _allDays
+                        .Where(d => Enum.TryParse<WorkingDays>(d, out var wd) && profile.WorkingDaysOverride.Value.HasFlag(wd))
+                        .ToHashSet();
+                    Model.HoursPerDay = profile.HoursPerDayOverride.Value;
+                }
+                else
+                {
+                    Model.UseCompanyWorkingPattern = true;
+                }
             }
         }
     }
 
     protected override async Task<string?> SaveCoreAsync()
     {
+        WorkingDays? workingDaysOverride = null;
+        decimal? hoursPerDayOverride = null;
+
+        if (!Model.UseCompanyWorkingPattern)
+        {
+            workingDaysOverride = Model.WorkingWeek
+                .Aggregate(WorkingDays.None, (acc, day) => Enum.TryParse<WorkingDays>(day, out var wd) ? acc | wd : acc);
+            hoursPerDayOverride = Model.HoursPerDay;
+        }
+
         if (IsNew)
         {
             var request = new CreatePositionProfileRequest(
@@ -204,7 +248,13 @@
                 Model.DepartmentId,
                 Model.Title.Trim(),
                 string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
-                Model.IsManagerial);
+                Model.IsManagerial,
+                Model.ProbationMonthsOverride,
+                workingDaysOverride,
+                hoursPerDayOverride,
+                Model.SalaryMin,
+                Model.SalaryMax,
+                Model.DefaultLeavePolicyId);
 
             var (created, error) = await PositionProfileService.CreatePositionProfileAsync(CompanyId, request);
             return created is not null ? null : error ?? "Failed to create position profile.";
@@ -217,12 +267,91 @@
                 Model.DepartmentId,
                 Model.Title.Trim(),
                 string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
-                Model.IsManagerial);
+                Model.IsManagerial,
+                Model.ProbationMonthsOverride,
+                workingDaysOverride,
+                hoursPerDayOverride,
+                Model.SalaryMin,
+                Model.SalaryMax,
+                Model.DefaultLeavePolicyId);
 
             var (success, error) = await PositionProfileService.UpdatePositionProfileAsync(CompanyId, Id!.Value, request);
             return success ? null : error;
         }
     }
+
+    private void ToggleWorkingDay(string day, bool isChecked)
+    {
+        if (isChecked) Model.WorkingWeek.Add(day);
+        else Model.WorkingWeek.Remove(day);
+    }
+
+    private RenderFragment DefaultsCard() => @<div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Defaults</h5>
+        </div>
+        <div class="card-body @(IsViewMode ? "view-mode" : "")">
+            <div class="mb-3">
+                <label class="form-label">Probation Months Override</label>
+                <SfNumericTextBox TValue="int?" @bind-Value="Model.ProbationMonthsOverride" Min="1" Max="24" ShowSpinButton="false" Placeholder="Use company default" />
+                <ValidationMessage For="@(() => Model.ProbationMonthsOverride)" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Salary Range <span class="text-muted small">(guidance only)</span></label>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMin" Placeholder="Min" ShowSpinButton="false" />
+                    </div>
+                    <div class="col-6">
+                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMax" Placeholder="Max" ShowSpinButton="false" />
+                    </div>
+                </div>
+                <ValidationMessage For="@(() => Model.SalaryMax)" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Default Leave Policy</label>
+                <SfDropDownList TValue="Guid?"
+                                TItem="LeavePolicyListItemModel"
+                                DataSource="@_leavePolicies"
+                                @bind-Value="Model.DefaultLeavePolicyId"
+                                Placeholder="None"
+                                AllowFiltering="true"
+                                ShowClearButton="true">
+                    <DropDownListFieldSettings Value="Id" Text="Name" />
+                </SfDropDownList>
+            </div>
+            <div>
+                <SfCheckBox TChecked="bool"
+                            Label="Use company working pattern"
+                            Checked="@Model.UseCompanyWorkingPattern"
+                            CheckedChanged="@((bool v) => Model.UseCompanyWorkingPattern = v)" />
+                @if (!Model.UseCompanyWorkingPattern)
+                {
+                    <div class="row g-3 mt-2">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Working Days</label>
+                            <div class="d-flex flex-wrap gap-3 mt-1">
+                                @foreach (var day in _allDays)
+                                {
+                                    <SfCheckBox TChecked="bool" Label="@day"
+                                                Checked="@Model.WorkingWeek.Contains(day)"
+                                                CheckedChanged="@(e => ToggleWorkingDay(day, e))" />
+                                }
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <SfNumericTextBox TValue="decimal" @bind-Value="Model.HoursPerDay"
+                                              Placeholder="Hours Per Day"
+                                              FloatLabelType="FloatLabelType.Auto"
+                                              ShowSpinButton="false"
+                                              Min="0.5m" Max="24m" Step="0.5m" />
+                            <ValidationMessage For="@(() => Model.HoursPerDay)" />
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>;
 
     protected override string? ListUrl => $"/companies/{CompanyId}/position-profiles";
 }

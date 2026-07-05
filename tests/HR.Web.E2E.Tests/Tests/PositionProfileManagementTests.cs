@@ -91,6 +91,42 @@ public sealed class PositionProfileManagementTests(AppFixture fixture) : E2ETest
     }
 
     [Fact]
+    public async Task CreatePositionProfile_PersistsTemplateDefaults()
+    {
+        var profileTitle = $"E2E Template {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login  = new LoginPage(_page, _fixture.WebBaseUrl);
+        var ppList = new PositionProfileListPage(_page, _fixture.WebBaseUrl);
+        var ppEdit = new PositionProfileEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await ppList.GoToAsync(AcmeId);
+        await ppList.ClickNewPositionProfileAsync();
+
+        await ppEdit.FillTitleAsync(profileTitle);
+        await ppEdit.FillProbationMonthsOverrideAsync(3);
+        await ppEdit.FillSalaryRangeAsync(40000, 60000);
+        await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
+        await ppEdit.SetUseCompanyWorkingPatternAsync(false);
+        await ppEdit.SaveAsync();
+
+        Assert.True(await ppList.HasPositionProfileAsync(profileTitle),
+            $"Expected the new position profile '{profileTitle}' to appear in the list");
+
+        // Reopen and confirm the template defaults round-tripped through Create -> Get.
+        await ppList.OpenPositionProfileAsync(profileTitle);
+
+        Assert.Equal("3", await _page.GetByPlaceholder("Use company default").InputValueAsync());
+        Assert.Equal("40000", await _page.GetByPlaceholder("Min").InputValueAsync());
+        Assert.Equal("60000", await _page.GetByPlaceholder("Max").InputValueAsync());
+
+        var useCompanyWorkingPattern = await _page.GetByLabel("Use company working pattern").IsCheckedAsync();
+        Assert.False(useCompanyWorkingPattern, "Expected the working pattern override to persist across reload");
+    }
+
+    [Fact]
     public async Task CreatePositionProfile_WithEmptyTitle_ShowsValidationError()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);

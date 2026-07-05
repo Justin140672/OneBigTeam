@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
@@ -9,11 +10,13 @@ internal sealed class CreatePositionProfileHandler
 {
     private readonly EmployeesDbContext _dbContext;
     private readonly IClock _clock;
+    private readonly ILeavePolicyReader _leavePolicyReader;
 
-    public CreatePositionProfileHandler(EmployeesDbContext dbContext, IClock clock)
+    public CreatePositionProfileHandler(EmployeesDbContext dbContext, IClock clock, ILeavePolicyReader leavePolicyReader)
     {
         _dbContext = dbContext;
         _clock = clock;
+        _leavePolicyReader = leavePolicyReader;
     }
 
     public async Task<Result<CreatePositionProfileResponse>> HandleAsync(
@@ -49,6 +52,18 @@ internal sealed class CreatePositionProfileHandler
                 Error.Conflict($"An active position profile titled '{request.Title.Trim()}' already exists in this company."));
         }
 
+        if (request.DefaultLeavePolicyId is not null)
+        {
+            var leavePolicyExists = await _leavePolicyReader.ExistsAsync(
+                request.CompanyId, request.DefaultLeavePolicyId.Value, cancellationToken);
+
+            if (!leavePolicyExists)
+            {
+                return Result.Failure<CreatePositionProfileResponse>(
+                    Error.NotFound($"Leave policy '{request.DefaultLeavePolicyId}' was not found."));
+            }
+        }
+
         var now = _clock.UtcNowOffset();
 
         var profile = PositionProfile.Create(
@@ -59,6 +74,11 @@ internal sealed class CreatePositionProfileHandler
             string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             request.IsManagerial,
             request.ProbationMonthsOverride,
+            request.WorkingDaysOverride,
+            request.HoursPerDayOverride,
+            request.SalaryMin,
+            request.SalaryMax,
+            request.DefaultLeavePolicyId,
             now);
 
         _dbContext.PositionProfiles.Add(profile);
@@ -72,6 +92,11 @@ internal sealed class CreatePositionProfileHandler
             profile.Description,
             profile.IsManagerial,
             profile.ProbationMonthsOverride,
+            profile.WorkingDaysOverride,
+            profile.HoursPerDayOverride,
+            profile.SalaryMin,
+            profile.SalaryMax,
+            profile.DefaultLeavePolicyId,
             profile.IsActive,
             profile.CreatedAt));
     }

@@ -34,7 +34,20 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
                 cancellationToken);
 
         if (assignment is null)
-            return;
+        {
+            if (integrationEvent.DefaultLeavePolicyId is null)
+                return;
+
+            assignment = EmployeeLeavePolicyAssignment.Create(
+                Guid.NewGuid(),
+                integrationEvent.CompanyId,
+                integrationEvent.EmployeeId,
+                integrationEvent.DefaultLeavePolicyId.Value,
+                integrationEvent.StartDate,
+                _clock.UtcNowOffset());
+
+            _dbContext.EmployeeLeavePolicyAssignments.Add(assignment);
+        }
 
         var leaveSettings = await _leaveSettingsReader.GetLeaveSettingsAsync(integrationEvent.CompanyId, cancellationToken);
         var now = _clock.UtcNowOffset();

@@ -67,6 +67,31 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
     }
 
     [Fact]
+    public async Task CreateEmployee_SelectingPositionProfile_PrepopulatesDepartmentAndShowsDefaultsSummary()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+
+        // Department starts unset; selecting a profile with a Department attached should
+        // pre-populate it and reveal the read-only "From Position Profile" summary card.
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+
+        Assert.True(await empEdit.HasPositionProfileDefaultsSummaryAsync(),
+            "Expected the 'From Position Profile' defaults summary card to appear after selecting a profile");
+
+        var departmentText = await empEdit.GetSelectedDepartmentTextAsync();
+        Assert.False(string.IsNullOrWhiteSpace(departmentText),
+            "Expected the Department dropdown to be pre-populated from the selected position profile");
+    }
+
+    [Fact]
     public async Task Employee_WithManager_HasProbationSummaryOnEmploymentTab()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);

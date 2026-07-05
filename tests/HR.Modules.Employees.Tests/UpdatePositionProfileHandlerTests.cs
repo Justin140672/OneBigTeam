@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.UpdatePositionProfile;
 using HR.Modules.Employees.Persistence;
@@ -17,11 +18,11 @@ public class UpdatePositionProfileHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Old Title", null, false, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Old Title", null, false, null, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -47,7 +48,7 @@ public class UpdatePositionProfileHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Profile_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -68,11 +69,11 @@ public class UpdatePositionProfileHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, "Engineer", null, false, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, "Engineer", null, false, null, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -94,12 +95,12 @@ public class UpdatePositionProfileHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile1 = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, now);
-        var profile2 = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Manager", null, true, null, now);
+        var profile1 = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, null, null, null, null, null, now);
+        var profile2 = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Manager", null, true, null, null, null, null, null, null, now);
         context.PositionProfiles.AddRange(profile1, profile2);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         // Try to rename profile1 to the same title as profile2
         var result = await handler.HandleAsync(
@@ -122,11 +123,11 @@ public class UpdatePositionProfileHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -149,11 +150,11 @@ public class UpdatePositionProfileHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -179,11 +180,11 @@ public class UpdatePositionProfileHandlerTests
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
         context.Departments.Add(department);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
-        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
@@ -197,6 +198,69 @@ public class UpdatePositionProfileHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(department.Id, result.Value!.DepartmentId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_DefaultLeavePolicyId_Does_Not_Exist()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, null, null, null, null, null, now);
+        context.PositionProfiles.Add(profile);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(exists: false));
+
+        var result = await handler.HandleAsync(
+            new UpdatePositionProfileRequest
+            {
+                CompanyId = companyId,
+                Id = profile.Id,
+                Title = "Engineer",
+                DefaultLeavePolicyId = Guid.NewGuid()
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Updates_WorkingPattern_SalaryRange_And_DefaultLeavePolicy()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var leavePolicyId = Guid.NewGuid();
+
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, null, null, null, null, null, now);
+        context.PositionProfiles.Add(profile);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(exists: true));
+
+        var result = await handler.HandleAsync(
+            new UpdatePositionProfileRequest
+            {
+                CompanyId = companyId,
+                Id = profile.Id,
+                Title = "Engineer",
+                WorkingDaysOverride = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday,
+                HoursPerDayOverride = 6m,
+                SalaryMin = 45000,
+                SalaryMax = 55000,
+                DefaultLeavePolicyId = leavePolicyId
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday, result.Value!.WorkingDaysOverride);
+        Assert.Equal(6m, result.Value.HoursPerDayOverride);
+        Assert.Equal(45000, result.Value.SalaryMin);
+        Assert.Equal(55000, result.Value.SalaryMax);
+        Assert.Equal(leavePolicyId, result.Value.DefaultLeavePolicyId);
     }
 
     private static EmployeesDbContext BuildContext()
