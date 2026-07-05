@@ -28,6 +28,9 @@ internal sealed class CompensationConfiguration : IEntityTypeConfiguration<Compe
             .HasColumnName("effective_from")
             .IsRequired();
 
+        builder.Property(c => c.EffectiveTo)
+            .HasColumnName("effective_to");
+
         builder.Property(c => c.SalaryType)
             .HasColumnName("salary_type")
             .HasConversion<string>()

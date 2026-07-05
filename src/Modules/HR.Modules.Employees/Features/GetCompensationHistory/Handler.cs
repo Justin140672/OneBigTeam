@@ -25,6 +25,7 @@ internal sealed class GetCompensationHistoryHandler(EmployeesDbContext dbContext
             .Select(c => new CompensationHistoryItem(
                 c.Id,
                 c.EffectiveFrom,
+                c.EffectiveTo,
                 c.SalaryType.ToString(),
                 c.Salary,
                 c.Currency,

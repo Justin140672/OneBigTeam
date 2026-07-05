@@ -47,7 +47,9 @@ public class GetCompensationHistoryHandlerTests
         context.Employees.Add(employee);
 
         var oldest = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2024, 1, 1), SalaryType.Annual, 35000m, "GBP", 37.5m, 1m, "Starting salary", Now);
+        oldest.Close(new DateOnly(2024, 12, 31), Now);
         var middle = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2025, 1, 1), SalaryType.Annual, 40000m, "GBP", 37.5m, 1m, null, Now);
+        middle.Close(new DateOnly(2025, 12, 31), Now);
         var newest = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2026, 1, 1), SalaryType.Annual, 45000m, "GBP", 37.5m, 1m, null, Now);
         context.Compensations.AddRange(middle, oldest, newest);
         await context.SaveChangesAsync();
@@ -60,6 +62,9 @@ public class GetCompensationHistoryHandlerTests
         Assert.Equal(3, result.Value!.Items.Count);
         Assert.Equal([newest.Id, middle.Id, oldest.Id], result.Value.Items.Select(i => i.Id));
         Assert.Equal("Starting salary", result.Value.Items.Last().Notes);
+        Assert.Null(result.Value.Items[0].EffectiveTo);
+        Assert.Equal(new DateOnly(2025, 12, 31), result.Value.Items[1].EffectiveTo);
+        Assert.Equal(new DateOnly(2024, 12, 31), result.Value.Items[2].EffectiveTo);
     }
 
     [Fact]

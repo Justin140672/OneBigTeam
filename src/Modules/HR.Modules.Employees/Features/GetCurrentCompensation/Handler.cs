@@ -21,7 +21,8 @@ internal sealed class GetCurrentCompensationHandler(EmployeesDbContext dbContext
         var today = DateOnly.FromDateTime(clock.UtcNow);
 
         var current = await dbContext.Compensations
-            .Where(c => c.CompanyId == companyId && c.EmployeeId == employeeId && c.EffectiveFrom <= today)
+            .Where(c => c.CompanyId == companyId && c.EmployeeId == employeeId &&
+                        c.EffectiveFrom <= today && (c.EffectiveTo == null || c.EffectiveTo >= today))
             .OrderByDescending(c => c.EffectiveFrom)
             .ThenByDescending(c => c.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
@@ -35,6 +36,7 @@ internal sealed class GetCurrentCompensationHandler(EmployeesDbContext dbContext
             current.CompanyId,
             current.EmployeeId,
             current.EffectiveFrom,
+            current.EffectiveTo,
             current.SalaryType.ToString(),
             current.Salary,
             current.Currency,

@@ -1,6 +1,6 @@
-namespace HR.Modules.Employees.Features.GetCurrentCompensation;
+namespace HR.Modules.Employees.Features.CreateCompensationRecord;
 
-internal sealed record GetCurrentCompensationResponse(
+internal sealed record CreateCompensationRecordResponse(
     Guid Id,
     Guid CompanyId,
     Guid EmployeeId,

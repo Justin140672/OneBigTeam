@@ -8,6 +8,7 @@ internal sealed class Compensation
     public Guid CompanyId { get; private set; }
     public Guid EmployeeId { get; private set; }
     public DateOnly EffectiveFrom { get; private set; }
+    public DateOnly? EffectiveTo { get; private set; }
     public SalaryType SalaryType { get; private set; }
     public decimal Salary { get; private set; }
     public string Currency { get; private set; } = string.Empty;
@@ -45,5 +46,11 @@ internal sealed class Compensation
             CreatedAt = now,
             UpdatedAt = now
         };
+    }
+
+    public void Close(DateOnly effectiveTo, DateTimeOffset now)
+    {
+        EffectiveTo = effectiveTo;
+        UpdatedAt = now;
     }
 }

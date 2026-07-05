@@ -88,6 +88,52 @@ public class GetCurrentCompensationHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Ignores_Closed_Record_And_Returns_Open_Successor()
+    {
+        await using var context = BuildContext();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var companyId = Guid.NewGuid();
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2024, 1, 1), true, now);
+        context.Employees.Add(employee);
+
+        var closed = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2025, 1, 1), SalaryType.Annual, 40000m, "GBP", null, null, null, now);
+        closed.Close(new DateOnly(2025, 12, 31), now);
+        var open = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2026, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, now);
+        context.Compensations.AddRange(closed, open);
+        await context.SaveChangesAsync();
+
+        var handler = new GetCurrentCompensationHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(companyId, employee.Id, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(open.Id, result.Value!.Id);
+        Assert.Null(result.Value.EffectiveTo);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_Only_Closed_Record_Predates_Today()
+    {
+        await using var context = BuildContext();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var companyId = Guid.NewGuid();
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2020, 1, 1), true, now);
+        context.Employees.Add(employee);
+
+        var closed = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2020, 1, 1), SalaryType.Annual, 30000m, "GBP", null, null, null, now);
+        closed.Close(new DateOnly(2021, 1, 1), now);
+        context.Compensations.Add(closed);
+        await context.SaveChangesAsync();
+
+        var handler = new GetCurrentCompensationHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(companyId, employee.Id, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
     public async Task HandleAsync_Does_Not_Return_Record_From_Different_Company()
     {
         await using var context = BuildContext();

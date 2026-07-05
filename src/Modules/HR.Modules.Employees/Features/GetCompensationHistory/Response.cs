@@ -3,6 +3,7 @@ namespace HR.Modules.Employees.Features.GetCompensationHistory;
 internal sealed record CompensationHistoryItem(
     Guid Id,
     DateOnly EffectiveFrom,
+    DateOnly? EffectiveTo,
     string SalaryType,
     decimal Salary,
     string Currency,
