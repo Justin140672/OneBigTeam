@@ -92,6 +92,41 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
     }
 
     [Fact]
+    public async Task EmployeeTasksTab_ClickingTask_OpensTaskDialog_WithoutNavigatingAway()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        // Tom Williams has a seeded "Schedule probation review" task assigned to him
+        // (mirrors ProfileTasksTabTests, which verifies the same dialog behavior on
+        // My Profile's own Tasks tab).
+        var tomId = Guid.Parse("30000000-0000-0000-0000-000000000004");
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empEdit.GoToAsync(AcmeId, tomId);
+        await empEdit.OpenTasksTabAsync();
+
+        await _page.WaitForSelectorAsync(".e-grid, .task-cell", new() { Timeout = 15_000 });
+
+        // The View toolbar button starts disabled (e-overlay) until a row is selected.
+        await _page.Locator(".e-row").First.ClickAsync();
+        await _page.WaitForFunctionAsync(
+            "!document.querySelector('[id=\"hr-view\"]')?.classList?.contains('e-overlay')",
+            null, new PageWaitForFunctionOptions { Timeout = 10_000 });
+
+        var urlBeforeClick = _page.Url;
+        await _page.Locator("[id='hr-view']").ClickAsync();
+
+        // Should open the task in a dialog (TaskViewDialog), not navigate to /tasks/{id}.
+        await _page.WaitForSelectorAsync(".task-view-dialog", new() { Timeout = 15_000 });
+        Assert.True(await _page.Locator(".task-view-dialog").IsVisibleAsync(),
+            "Expected clicking View on an employee's Tasks tab to open the task in a dialog");
+        Assert.Equal(urlBeforeClick, _page.Url);
+    }
+
+    [Fact]
     public async Task Employee_WithManager_HasProbationSummaryOnEmploymentTab()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);

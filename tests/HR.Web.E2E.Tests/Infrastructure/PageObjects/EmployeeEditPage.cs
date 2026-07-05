@@ -220,6 +220,14 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return null;
     }
 
+    // ── Tasks Tab ───────────────────────────────────────────────────────────────
+
+    public async Task OpenTasksTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Tasks" }).ClickAsync();
+        await page.WaitForSelectorAsync(".e-grid, .task-cell, p", new() { Timeout = 15_000 });
+    }
+
     // ── Sickness Tab ────────────────────────────────────────────────────────────
 
     public async Task OpenSicknessTabAsync()
