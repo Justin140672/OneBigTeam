@@ -68,6 +68,36 @@ public class ApproveLeaveRequestHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_With_EmployeeId_Set_To_Requester_Not_Reviewer()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var reviewerId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leaveRequest = CreatePendingRequest(companyId, employeeId, now);
+        context.LeaveRequests.Add(leaveRequest);
+        await context.SaveChangesAsync();
+
+        var auditPublisher = new CapturingAuditEventPublisher();
+        var handler = new ApproveLeaveRequestHandler(context, new NoOpNotificationWriter(), new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), auditPublisher);
+
+        var result = await handler.HandleAsync(
+            ApproveRequest(companyId, employeeId, leaveRequest.Id, reviewerId),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var auditEvent = Assert.IsType<LeaveApprovedAuditEvent>(Assert.Single(auditPublisher.Published));
+        var auditEventAsInterface = (HR.SharedKernel.IAuditEvent)auditEvent;
+
+        // ActorEmployeeId is deliberately the approving manager, but IAuditEvent.EmployeeId must
+        // remain the leave requester — this is exactly the distinction the audit history feature relies on.
+        Assert.Equal(reviewerId, auditEventAsInterface.ActorEmployeeId);
+        Assert.Equal(employeeId, auditEventAsInterface.EmployeeId);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Request_Does_Not_Exist()
     {
         await using var context = BuildContext();

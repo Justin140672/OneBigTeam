@@ -427,6 +427,10 @@ public class RecordSicknessHandlerTests
         Assert.Equal(categoryId, auditEvent.CategoryId);
         Assert.Equal(StartDate, auditEvent.StartDate);
         Assert.Equal(new DateTimeOffset(FixedUtcNow, TimeSpan.Zero), auditEvent.OccurredAt);
+
+        // The IAuditEvent.EmployeeId interface member must round-trip to the subject employee's ID —
+        // this is what lets the audit history reader find "all events belonging to employee X".
+        Assert.Equal(employeeId, ((HR.SharedKernel.IAuditEvent)auditEvent).EmployeeId);
     }
 
     [Fact]

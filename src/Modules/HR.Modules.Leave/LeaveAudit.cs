@@ -16,6 +16,7 @@ internal sealed record LeaveSubmittedAuditEvent(
     string IAuditEvent.EventType => "leave.submitted";
     string IAuditEvent.EntityType => "LeaveRequest";
     Guid IAuditEvent.EntityId => LeaveRequestId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
@@ -39,6 +40,7 @@ internal sealed record LeaveApprovedAuditEvent(
     string IAuditEvent.EventType => "leave.approved";
     string IAuditEvent.EntityType => "LeaveRequest";
     Guid IAuditEvent.EntityId => LeaveRequestId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => ReviewedByEmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
@@ -63,6 +65,7 @@ internal sealed record LeaveRejectedAuditEvent(
     string IAuditEvent.EventType => "leave.rejected";
     string IAuditEvent.EntityType => "LeaveRequest";
     Guid IAuditEvent.EntityId => LeaveRequestId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => ReviewedByEmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
@@ -86,6 +89,7 @@ internal sealed record LeaveCancelledAuditEvent(
     string IAuditEvent.EventType => "leave.cancelled";
     string IAuditEvent.EntityType => "LeaveRequest";
     Guid IAuditEvent.EntityId => LeaveRequestId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
@@ -109,6 +113,7 @@ internal sealed record LeaveBalanceAdjustedAuditEvent(
     string IAuditEvent.EventType => "leave-balance.adjusted";
     string IAuditEvent.EntityType => "LeaveBalance";
     Guid IAuditEvent.EntityId => LeaveBalanceId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => AdjustedByEmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
@@ -132,6 +137,7 @@ internal sealed record ToilAwardedAuditEvent(
     string IAuditEvent.EventType => "toil.awarded";
     string IAuditEvent.EntityType => "ToilTransaction";
     Guid IAuditEvent.EntityId => TransactionId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => AwardedByEmployeeId;
     Guid? IAuditEvent.CorrelationId => null;

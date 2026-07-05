@@ -1,0 +1,44 @@
+@using HR.Web.Models
+@inject AuditHistoryService AuditHistoryService
+
+@if (_loading)
+{
+    <div class="d-flex align-items-center gap-2 py-3">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+        <span class="text-muted">Loading…</span>
+    </div>
+}
+else if (_items.Count == 0)
+{
+    <div class="alert alert-secondary">No audit history recorded for this employee.</div>
+}
+else
+{
+    <EmployeeAuditHistoryGrid Items="_items" OnView="HandleView" />
+}
+
+<AuditHistoryDetailDialog Record="_selectedItem" IsOpen="_detailOpen" OnClosed="@(() => _detailOpen = false)" />
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private bool _loading = true;
+    private IReadOnlyList<AuditHistoryItemModel> _items = [];
+    private AuditHistoryItemModel? _selectedItem;
+    private bool _detailOpen;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = _items.Count == 0;
+
+        _items = await AuditHistoryService.GetEmployeeAuditHistoryAsync(CompanyId, EmployeeId);
+        _loading = false;
+    }
+
+    private void HandleView(AuditHistoryItemModel item)
+    {
+        _selectedItem = item;
+        _detailOpen = true;
+    }
+}

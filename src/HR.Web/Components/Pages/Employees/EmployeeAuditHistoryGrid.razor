@@ -1,0 +1,91 @@
+@using HR.Web.Components.Controls
+@using HR.Web.Models
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Navigations
+
+<HrGrid @ref="_grid"
+        TValue="AuditHistoryItemModel"
+        DataSource="@Items"
+        Toolbar="@_toolbar"
+        data-testid="audit-history-grid">
+    <GridEvents TValue="AuditHistoryItemModel" OnToolbarClick="OnToolbarClickAsync" />
+    <GridColumns>
+        <GridColumn Field="@nameof(AuditHistoryItemModel.OccurredAt)"
+                    HeaderText="Date" Width="180">
+            <Template>
+                @{ var item = (context as AuditHistoryItemModel)!; }
+                @item.OccurredAt.ToString("d MMM yyyy HH:mm")
+            </Template>
+        </GridColumn>
+
+        <GridColumn Field="@nameof(AuditHistoryItemModel.User)"
+                    HeaderText="User" Width="150" />
+
+        <GridColumn Field="@nameof(AuditHistoryItemModel.Action)"
+                    HeaderText="Action" />
+
+        <GridColumn Field="@nameof(AuditHistoryItemModel.Module)"
+                    HeaderText="Module" Width="130" />
+
+        <GridColumn HeaderText="" Width="100" AllowSorting="false" AllowFiltering="false" TextAlign="TextAlign.Right">
+            <Template>
+                @{ var item = (context as AuditHistoryItemModel)!; }
+                <SfButton CssClass="e-outline e-small" title="View" OnClick="() => OnView.InvokeAsync(item)">
+                    <i class="fa-solid fa-eye"></i>
+                </SfButton>
+            </Template>
+        </GridColumn>
+    </GridColumns>
+</HrGrid>
+
+@code {
+    [Parameter] public IReadOnlyList<AuditHistoryItemModel> Items { get; set; } = [];
+    [Parameter] public EventCallback<AuditHistoryItemModel> OnView { get; set; }
+
+    private HrGrid<AuditHistoryItemModel>? _grid;
+
+    private IEnumerable<object> _toolbar => new List<object>
+    {
+        new ItemModel { Id = "hr-print",   Text = "Print",   PrefixIcon = "fa-solid fa-print", TooltipText = "Print" },
+        new ItemModel { Id = "hr-export",  Type = ItemType.Input, Template = ExportMenuTemplate, TooltipText = "Export" },
+        new ItemModel { Id = "hr-columns", Text = "Columns", PrefixIcon = "fa-solid fa-table-columns", TooltipText = "Show/hide columns" },
+    };
+
+    private RenderFragment ExportMenuTemplate => @<ExportMenu OnItemSelected="HandleExportItemSelected" />;
+
+    private async Task OnToolbarClickAsync(ClickEventArgs args)
+    {
+        if (_grid is null) return;
+
+        switch (args.Item.Id)
+        {
+            case "hr-print":
+                await _grid.PrintAsync();
+                break;
+
+            case "hr-columns":
+                await _grid.OpenColumnChooserAsync(0, 0);
+                break;
+        }
+    }
+
+    private async Task HandleExportItemSelected(string id)
+    {
+        if (_grid is null) return;
+
+        switch (id)
+        {
+            case "hr-excel":
+                await _grid.ExportToExcelAsync(new ExcelExportProperties());
+                break;
+
+            case "hr-csv":
+                await _grid.ExportToCsvAsync(new ExcelExportProperties());
+                break;
+
+            case "hr-pdf":
+                await _grid.ExportToPdfAsync(new PdfExportProperties());
+                break;
+        }
+    }
+}

@@ -52,6 +52,7 @@ internal sealed class CompleteProbationReviewFromTaskAction(
             review.CompanyId,
             review.Id,
             review.ProbationRecordId,
+            record.EmployeeId,
             context.CompletedBy,
             review.ReviewType.ToString(),
             review.Outcome?.ToString(),

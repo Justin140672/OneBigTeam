@@ -1,7 +1,5 @@
 using HR.Modules.Notifications.Persistence;
-using HR.Modules.Notifications.Tests.Infrastructure;
 using HR.Infrastructure.Abstractions;
-using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Notifications.Tests;
@@ -14,8 +12,7 @@ public class NotificationWriterTests
     public async Task WriteAsync_Persists_Notification()
     {
         await using var ctx  = BuildContext();
-        var audit            = new FakeAuditPublisher();
-        var writer           = new NotificationWriter(ctx, audit);
+        var writer           = new NotificationWriter(ctx);
         var companyId        = Guid.NewGuid();
         var employeeId       = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
@@ -36,39 +33,10 @@ public class NotificationWriterTests
     }
 
     [Fact]
-    public async Task WriteAsync_Publishes_NotificationCreated_Audit_Event()
-    {
-        await using var ctx  = BuildContext();
-        var audit            = new FakeAuditPublisher();
-        var writer           = new NotificationWriter(ctx, audit);
-        var companyId        = Guid.NewGuid();
-        var employeeId       = Guid.NewGuid();
-        var sourceEntityId   = Guid.NewGuid();
-        var id               = Guid.NewGuid();
-
-        await writer.WriteAsync(
-            id, companyId, employeeId,
-            "Task assigned", null,
-            sourceEntityId, NotificationType.TaskAssigned, NotificationPriority.High,
-            Now);
-
-        var evt     = Assert.Single(audit.Published);
-        var created = Assert.IsType<NotificationCreatedAuditEvent>(evt);
-        Assert.Equal(companyId,       created.CompanyId);
-        Assert.Equal(id,              created.NotificationId);
-        Assert.Equal(employeeId,      created.EmployeeId);
-        Assert.Equal("Task assigned", created.Title);
-        Assert.Equal("TaskAssigned",  created.Type);
-        Assert.Equal("High",          created.Priority);
-        Assert.Equal(sourceEntityId,  created.SourceEntityId);
-        Assert.Equal(Now,             created.OccurredAt);
-    }
-
-    [Fact]
     public async Task ExistsAsync_Returns_True_When_Notification_Exists()
     {
         await using var ctx  = BuildContext();
-        var writer           = new NotificationWriter(ctx, new FakeAuditPublisher());
+        var writer           = new NotificationWriter(ctx);
         var employeeId       = Guid.NewGuid();
         var sourceEntityId   = Guid.NewGuid();
 
@@ -85,7 +53,7 @@ public class NotificationWriterTests
     public async Task ExistsAsync_Returns_False_When_Notification_Does_Not_Exist()
     {
         await using var ctx = BuildContext();
-        var writer          = new NotificationWriter(ctx, new FakeAuditPublisher());
+        var writer          = new NotificationWriter(ctx);
 
         var exists = await writer.ExistsAsync(Guid.NewGuid(), Guid.NewGuid(), NotificationType.TaskDueSoon);
         Assert.False(exists);

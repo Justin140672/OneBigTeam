@@ -217,6 +217,30 @@ public class CompleteTaskHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_With_EmployeeId_From_Assignment()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var assignedEmployeeId = Guid.NewGuid();
+        var audit = new FakeAuditPublisher();
+
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(),
+            "Task", null, TaskPriority.Medium, TaskSource.Manual, TaskActionType.Complete,
+            null, assignedEmployeeId, null, DateTimeOffset.UtcNow);
+        task.Start(DateTimeOffset.UtcNow);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        await BuildHandler(context, audit).HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = Guid.NewGuid() },
+            CancellationToken.None);
+
+        var evt = Assert.Single(audit.Published);
+        Assert.Equal(assignedEmployeeId, evt.EmployeeId);
+    }
+
+    [Fact]
     public async Task HandleAsync_Does_Not_Publish_Audit_Event_When_Task_Not_Found()
     {
         await using var context = BuildContext();

@@ -22,12 +22,12 @@ internal sealed class CreateProbationReviewHandler
         CreateProbationReviewRequest request,
         CancellationToken cancellationToken)
     {
-        var recordExists = await _dbContext.ProbationRecords
-            .AnyAsync(
+        var record = await _dbContext.ProbationRecords
+            .FirstOrDefaultAsync(
                 r => r.CompanyId == request.CompanyId && r.Id == request.ProbationRecordId,
                 cancellationToken);
 
-        if (!recordExists)
+        if (record is null)
             return Result.Failure<CreateProbationReviewResponse>(
                 Error.NotFound("Probation record not found."));
 
@@ -59,6 +59,7 @@ internal sealed class CreateProbationReviewHandler
             review.CompanyId,
             review.Id,
             review.ProbationRecordId,
+            record.EmployeeId,
             review.ReviewType.ToString(),
             review.DueDate,
             review.CreatedAt), cancellationToken);

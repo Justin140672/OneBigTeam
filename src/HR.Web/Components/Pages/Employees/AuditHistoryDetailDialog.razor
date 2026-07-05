@@ -1,0 +1,60 @@
+@using HR.Web.Models
+
+<SfDialog Visible="IsOpen" IsModal="true" Width="600px" ShowCloseIcon="true" CssClass="audit-history-detail-dialog">
+    <DialogEvents Closed="HandleClosed" />
+    <DialogTemplates>
+        <Header>Audit Event Detail</Header>
+        <Content>
+            @if (Record is not null)
+            {
+                <dl class="row mb-3">
+                    <dt class="col-sm-3 text-muted fw-normal">Date</dt>
+                    <dd class="col-sm-9">@Record.OccurredAt.ToString("d MMM yyyy HH:mm")</dd>
+
+                    <dt class="col-sm-3 text-muted fw-normal">User</dt>
+                    <dd class="col-sm-9">@Record.User</dd>
+
+                    <dt class="col-sm-3 text-muted fw-normal">Action</dt>
+                    <dd class="col-sm-9">@Record.Action</dd>
+
+                    <dt class="col-sm-3 text-muted fw-normal">Module</dt>
+                    <dd class="col-sm-9">@Record.Module</dd>
+                </dl>
+
+                @if (Record.Changes.Count == 0)
+                {
+                    <p class="text-muted mb-0">No further details were recorded for this event.</p>
+                }
+                else
+                {
+                    <table class="table table-sm" data-testid="audit-detail-changes-table">
+                        <thead>
+                            <tr><th>Field</th><th>Before</th><th>After</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var change in Record.Changes)
+                            {
+                                <tr>
+                                    <td>@change.Field</td>
+                                    <td>@change.Before</td>
+                                    <td>@change.After</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton OnClick="HandleClosed">Close</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter] public AuditHistoryItemModel? Record { get; set; }
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+
+    private async Task HandleClosed() => await OnClosed.InvokeAsync();
+}

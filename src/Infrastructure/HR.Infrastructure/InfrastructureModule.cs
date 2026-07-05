@@ -21,6 +21,7 @@ public static class InfrastructureModule
         services.AddSingleton<IEmailSender, LoggingEmailSender>();
         services.AddSingleton<IInviteLinkBuilder, ConfiguredInviteLinkBuilder>();
         services.AddScoped<IAuditEventPublisher, DbAuditEventPublisher>();
+        services.AddScoped<IAuditHistoryReader, AuditHistoryReader>();
         services.AddDbContext<AuditDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
             {

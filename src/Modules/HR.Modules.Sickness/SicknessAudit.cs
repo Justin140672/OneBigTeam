@@ -13,6 +13,7 @@ internal sealed record SicknessEvidenceRequestedAuditEvent(
     string IAuditEvent.EventType => "sickness.evidence_requested";
     string IAuditEvent.EntityType => "SicknessEvidenceRequest";
     Guid IAuditEvent.EntityId => EvidenceRequestId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
@@ -33,6 +34,7 @@ internal sealed record SicknessEvidenceFulfilledAuditEvent(
     string IAuditEvent.EventType => "sickness.evidence_fulfilled";
     string IAuditEvent.EntityType => "SicknessEvidenceRequest";
     Guid IAuditEvent.EntityId => EvidenceRequestId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
@@ -55,6 +57,7 @@ internal sealed record SicknessUpdatedAuditEvent(
     string IAuditEvent.EventType => "sickness.updated";
     string IAuditEvent.EntityType => "SicknessRecord";
     Guid IAuditEvent.EntityId => SicknessRecordId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
@@ -77,6 +80,7 @@ internal sealed record SicknessClosedAuditEvent(
     string IAuditEvent.EventType => "sickness.closed";
     string IAuditEvent.EntityType => "SicknessRecord";
     Guid IAuditEvent.EntityId => SicknessRecordId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
@@ -97,6 +101,7 @@ internal sealed record ReturnToWorkReviewRequiredAuditEvent(
     string IAuditEvent.EventType => "sickness.return_to_work_review_required";
     string IAuditEvent.EntityType => "ReturnToWorkReview";
     Guid IAuditEvent.EntityId => ReviewId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
@@ -119,6 +124,7 @@ internal sealed record ReturnToWorkReviewCompletedAuditEvent(
     string IAuditEvent.EventType => "sickness.return_to_work_review_completed";
     string IAuditEvent.EntityType => "ReturnToWorkReview";
     Guid IAuditEvent.EntityId => ReviewId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => ReviewedBy;
     Guid? IAuditEvent.CorrelationId => null;
@@ -141,6 +147,7 @@ internal sealed record SicknessRecordedAuditEvent(
     string IAuditEvent.EventType => "sickness.recorded";
     string IAuditEvent.EntityType => "SicknessRecord";
     Guid IAuditEvent.EntityId => SicknessRecordId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
     Guid? IAuditEvent.CorrelationId => null;

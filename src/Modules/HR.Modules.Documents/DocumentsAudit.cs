@@ -15,6 +15,7 @@ internal sealed record DocumentExpiringSoonAuditEvent(
     string  IAuditEvent.EventType       => "document.expiring_soon";
     string  IAuditEvent.EntityType      => "EmployeeDocument";
     Guid    IAuditEvent.EntityId        => EmployeeDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => EmployeeId;
     Guid?   IAuditEvent.ActorUserId     => null;
     Guid?   IAuditEvent.ActorEmployeeId => null;
     Guid?   IAuditEvent.CorrelationId   => null;
@@ -36,6 +37,7 @@ internal sealed record DocumentExpiredAuditEvent(
     string  IAuditEvent.EventType       => "document.expired";
     string  IAuditEvent.EntityType      => "EmployeeDocument";
     Guid    IAuditEvent.EntityId        => EmployeeDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => EmployeeId;
     Guid?   IAuditEvent.ActorUserId     => null;
     Guid?   IAuditEvent.ActorEmployeeId => null;
     Guid?   IAuditEvent.CorrelationId   => null;
@@ -61,6 +63,7 @@ internal sealed record DocumentDeletedAuditEvent(
     string IAuditEvent.EventType       => "document.deleted";
     string IAuditEvent.EntityType      => "EmployeeDocument";
     Guid   IAuditEvent.EntityId        => EmployeeDocumentId;
+    Guid?  IAuditEvent.EmployeeId      => EmployeeId;
     Guid?  IAuditEvent.ActorUserId     => DeletedBy;
     Guid?  IAuditEvent.ActorEmployeeId => null;
     Guid?  IAuditEvent.CorrelationId   => null;
@@ -83,6 +86,7 @@ internal sealed record DocumentDownloadedAuditEvent(
     string IAuditEvent.EventType       => "document.downloaded";
     string IAuditEvent.EntityType      => "EmployeeDocument";
     Guid   IAuditEvent.EntityId        => EmployeeDocumentId;
+    Guid?  IAuditEvent.EmployeeId      => EmployeeId;
     Guid?  IAuditEvent.ActorUserId     => DownloadedBy;
     Guid?  IAuditEvent.ActorEmployeeId => null;
     Guid?  IAuditEvent.CorrelationId   => null;
@@ -104,6 +108,7 @@ internal sealed record DocumentRequestFulfilledAuditEvent(
     string IAuditEvent.EventType       => "document_request.fulfilled";
     string IAuditEvent.EntityType      => "DocumentRequest";
     Guid   IAuditEvent.EntityId        => DocumentRequestId;
+    Guid?  IAuditEvent.EmployeeId      => EmployeeId;
     Guid?  IAuditEvent.ActorUserId     => FulfilledBy;
     Guid?  IAuditEvent.ActorEmployeeId => EmployeeId;
     Guid?  IAuditEvent.CorrelationId   => null;
@@ -124,6 +129,7 @@ internal sealed record DocumentRequestCancelledAuditEvent(
     string IAuditEvent.EventType       => "document_request.cancelled";
     string IAuditEvent.EntityType      => "DocumentRequest";
     Guid   IAuditEvent.EntityId        => DocumentRequestId;
+    Guid?  IAuditEvent.EmployeeId      => EmployeeId;
     Guid?  IAuditEvent.ActorUserId     => CancelledBy;
     Guid?  IAuditEvent.ActorEmployeeId => null;
     Guid?  IAuditEvent.CorrelationId   => null;
@@ -150,6 +156,7 @@ internal sealed record DocumentUploadedAuditEvent(
     string IAuditEvent.EventType    => "document.uploaded";
     string IAuditEvent.EntityType   => "EmployeeDocument";
     Guid   IAuditEvent.EntityId     => EmployeeDocumentId;
+    Guid?  IAuditEvent.EmployeeId   => EmployeeId;
     Guid?  IAuditEvent.ActorUserId  => UploadedBy;
     Guid?  IAuditEvent.ActorEmployeeId => IsManagerUpload ? null : EmployeeId;
     Guid?  IAuditEvent.CorrelationId   => null;

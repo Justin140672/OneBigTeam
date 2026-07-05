@@ -206,6 +206,7 @@ public class ReassignTaskHandlerTests
         Assert.Equal("task.updated", evt.EventType);
         Assert.Equal(task.Id, evt.EntityId);
         Assert.Equal(actorUserId, evt.ActorUserId);
+        Assert.Equal(newEmployee, evt.EmployeeId);
     }
 
     [Fact]

@@ -15,6 +15,7 @@ internal sealed record ProbationRecordCreatedAuditEvent(
     string IAuditEvent.EventType        => "probation-record.created";
     string IAuditEvent.EntityType       => "ProbationRecord";
     Guid   IAuditEvent.EntityId         => ProbationRecordId;
+    Guid?  IAuditEvent.EmployeeId       => EmployeeId;
     Guid?  IAuditEvent.ActorUserId      => null;
     Guid?  IAuditEvent.ActorEmployeeId  => null;
     Guid?  IAuditEvent.CorrelationId    => null;
@@ -28,6 +29,7 @@ internal sealed record ProbationReviewCreatedAuditEvent(
     Guid CompanyId,
     Guid ProbationReviewId,
     Guid ProbationRecordId,
+    Guid EmployeeId,
     string ReviewType,
     DateOnly DueDate,
     DateTimeOffset OccurredAt) : IAuditEvent
@@ -35,6 +37,7 @@ internal sealed record ProbationReviewCreatedAuditEvent(
     string IAuditEvent.EventType        => "probation-review.created";
     string IAuditEvent.EntityType       => "ProbationReview";
     Guid   IAuditEvent.EntityId         => ProbationReviewId;
+    Guid?  IAuditEvent.EmployeeId       => EmployeeId;
     Guid?  IAuditEvent.ActorUserId      => null;
     Guid?  IAuditEvent.ActorEmployeeId  => null;
     Guid?  IAuditEvent.CorrelationId    => null;
@@ -48,6 +51,7 @@ internal sealed record ProbationReviewCompletedAuditEvent(
     Guid CompanyId,
     Guid ProbationReviewId,
     Guid ProbationRecordId,
+    Guid EmployeeId,
     Guid CompletedByEmployeeId,
     string ReviewType,
     string? Outcome,
@@ -57,6 +61,7 @@ internal sealed record ProbationReviewCompletedAuditEvent(
     string IAuditEvent.EventType        => "probation-review.completed";
     string IAuditEvent.EntityType       => "ProbationReview";
     Guid   IAuditEvent.EntityId         => ProbationReviewId;
+    Guid?  IAuditEvent.EmployeeId       => EmployeeId;
     Guid?  IAuditEvent.ActorUserId      => null;
     Guid?  IAuditEvent.ActorEmployeeId  => CompletedByEmployeeId;
     Guid?  IAuditEvent.CorrelationId    => null;

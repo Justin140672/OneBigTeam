@@ -2,6 +2,7 @@ using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Features.CompleteProbationReview;
 using HR.Modules.Probation.Persistence;
 using HR.Modules.Probation.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Probation.Tests;
@@ -404,6 +405,28 @@ public class CompleteProbationReviewHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_With_EmployeeId_From_Record()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.ManagerCheckIn);
+
+        var publisher = new FakeAuditPublisher();
+        await new CompleteProbationReviewHandler(context, new FakeClock(FixedUtcNow), publisher)
+            .HandleAsync(new CompleteProbationReviewRequest
+            {
+                CompanyId = companyId,
+                ProbationRecordId = record.Id,
+                ReviewId = review.Id,
+                CompletedByEmployeeId = Guid.NewGuid()
+            }, CancellationToken.None);
+
+        var published = (IAuditEvent)Assert.Single(publisher.Published);
+        Assert.Equal(record.EmployeeId, published.EmployeeId);
     }
 
     private static async Task<(ProbationRecord record, ProbationReview review)> SeedRecordAndReview(

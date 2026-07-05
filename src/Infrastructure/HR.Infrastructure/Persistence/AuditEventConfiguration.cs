@@ -33,6 +33,9 @@ internal sealed class AuditEventConfiguration : IEntityTypeConfiguration<AuditEv
             .HasColumnName("entity_id")
             .IsRequired();
 
+        builder.Property(e => e.EmployeeId)
+            .HasColumnName("employee_id");
+
         builder.Property(e => e.ActorUserId)
             .HasColumnName("actor_user_id");
 
@@ -65,5 +68,6 @@ internal sealed class AuditEventConfiguration : IEntityTypeConfiguration<AuditEv
         builder.HasIndex(e => e.CompanyId);
         builder.HasIndex(e => new { e.CompanyId, e.OccurredAt });
         builder.HasIndex(e => new { e.EntityType, e.EntityId });
+        builder.HasIndex(e => new { e.CompanyId, e.EmployeeId, e.OccurredAt });
     }
 }

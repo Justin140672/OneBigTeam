@@ -32,6 +32,7 @@ internal sealed record AssetAssignedAuditEvent(
     string IAuditEvent.EventType => "asset.assigned";
     string IAuditEvent.EntityType => "AssetAssignment";
     Guid IAuditEvent.EntityId => AssignmentId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => AssignedBy;
     Guid? IAuditEvent.ActorEmployeeId => null;
     Guid? IAuditEvent.CorrelationId => null;
@@ -51,6 +52,7 @@ internal sealed record AssetReturnRequestedAuditEvent(
     string IAuditEvent.EventType => "asset.return_requested";
     string IAuditEvent.EntityType => "AssetAssignment";
     Guid IAuditEvent.EntityId => AssignmentId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => RequestedBy;
     Guid? IAuditEvent.ActorEmployeeId => null;
     Guid? IAuditEvent.CorrelationId => null;
@@ -71,6 +73,7 @@ internal sealed record AssetAssignmentAcknowledgedAuditEvent(
     string IAuditEvent.EventType => "asset.assignment.acknowledged";
     string IAuditEvent.EntityType => "AssetAssignment";
     Guid IAuditEvent.EntityId => AssignmentId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => AcknowledgedBy;
     Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
@@ -91,6 +94,7 @@ internal sealed record AssetAssignmentReturnedAuditEvent(
     string IAuditEvent.EventType => "asset.assignment.returned";
     string IAuditEvent.EntityType => "AssetAssignment";
     Guid IAuditEvent.EntityId => AssignmentId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => ReturnedBy;
     Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
     Guid? IAuditEvent.CorrelationId => null;

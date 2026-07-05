@@ -2,6 +2,7 @@ using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Features.CreateProbationReview;
 using HR.Modules.Probation.Persistence;
 using HR.Modules.Probation.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Probation.Tests;
@@ -43,6 +44,35 @@ public class CreateProbationReviewHandlerTests
         Assert.Equal(now, result.Value.CreatedAt);
 
         Assert.Equal(1, await context.ProbationReviews.CountAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_With_EmployeeId_From_Record()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var record = ProbationRecord.Create(
+            Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(),
+            new DateOnly(2026, 6, 1), new DateOnly(2026, 9, 1), null, now);
+        context.ProbationRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        var publisher = new FakeAuditPublisher();
+        var handler = new CreateProbationReviewHandler(context, new FakeClock(FixedUtcNow), publisher);
+
+        await handler.HandleAsync(new CreateProbationReviewRequest
+        {
+            CompanyId = companyId,
+            ProbationRecordId = record.Id,
+            ReviewType = "ManagerCheckIn",
+            DueDate = new DateOnly(2026, 7, 1)
+        }, CancellationToken.None);
+
+        var published = (IAuditEvent)Assert.Single(publisher.Published);
+        Assert.Equal(employeeId, published.EmployeeId);
     }
 
     [Fact]

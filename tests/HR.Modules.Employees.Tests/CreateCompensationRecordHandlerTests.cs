@@ -75,6 +75,10 @@ public class CreateCompensationRecordHandlerTests
         Assert.Equal(companyId, createdEvent.CompanyId);
         Assert.Equal(employee.Id, createdEvent.EmployeeId);
         Assert.Equal(saved.Id, createdEvent.CompensationRecordId);
+
+        // The IAuditEvent.EmployeeId interface member must round-trip to the subject employee's ID —
+        // this is what lets the audit history reader find "all events belonging to employee X".
+        Assert.Equal(employee.Id, ((HR.SharedKernel.IAuditEvent)createdEvent).EmployeeId);
     }
 
     [Fact]

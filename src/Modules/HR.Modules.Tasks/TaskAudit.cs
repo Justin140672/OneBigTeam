@@ -16,6 +16,7 @@ internal sealed record TaskCreatedAuditEvent(
     string IAuditEvent.EventType => "task.created";
     string IAuditEvent.EntityType => "TaskItem";
     Guid IAuditEvent.EntityId => TaskId;
+    Guid? IAuditEvent.EmployeeId => AssignedEmployeeId;
     Guid? IAuditEvent.ActorUserId => CreatedBy;
     Guid? IAuditEvent.ActorEmployeeId => null;
     Guid? IAuditEvent.CorrelationId => null;
@@ -38,6 +39,7 @@ internal sealed record TaskReassignedAuditEvent(
     string IAuditEvent.EventType => "task.updated";
     string IAuditEvent.EntityType => "TaskItem";
     Guid IAuditEvent.EntityId => TaskId;
+    Guid? IAuditEvent.EmployeeId => NewEmployeeId;
     Guid? IAuditEvent.ActorUserId => ActorUserId;
     Guid? IAuditEvent.ActorEmployeeId => null;
     Guid? IAuditEvent.CorrelationId => null;
@@ -52,11 +54,13 @@ internal sealed record TaskCompletedAuditEvent(
     Guid TaskId,
     Guid CompletedBy,
     string PreviousStatus,
+    Guid? AssignedEmployeeId,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
     string IAuditEvent.EventType => "task.completed";
     string IAuditEvent.EntityType => "TaskItem";
     Guid IAuditEvent.EntityId => TaskId;
+    Guid? IAuditEvent.EmployeeId => AssignedEmployeeId;
     Guid? IAuditEvent.ActorUserId => CompletedBy;
     Guid? IAuditEvent.ActorEmployeeId => null;
     Guid? IAuditEvent.CorrelationId => null;

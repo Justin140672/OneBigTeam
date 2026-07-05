@@ -12,6 +12,7 @@ internal sealed class AuditEvent
     public string EventType { get; private set; } = string.Empty;
     public string EntityType { get; private set; } = string.Empty;
     public Guid EntityId { get; private set; }
+    public Guid? EmployeeId { get; private set; }
     public Guid? ActorUserId { get; private set; }
     public Guid? ActorEmployeeId { get; private set; }
     public DateTimeOffset OccurredAt { get; private set; }
@@ -28,6 +29,7 @@ internal sealed class AuditEvent
         EventType = evt.EventType,
         EntityType = evt.EntityType,
         EntityId = evt.EntityId,
+        EmployeeId = evt.EmployeeId,
         ActorUserId = evt.ActorUserId,
         ActorEmployeeId = evt.ActorEmployeeId,
         OccurredAt = evt.OccurredAt,

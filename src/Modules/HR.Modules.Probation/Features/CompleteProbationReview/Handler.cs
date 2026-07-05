@@ -78,6 +78,7 @@ internal sealed class CompleteProbationReviewHandler
             review.CompanyId,
             review.Id,
             review.ProbationRecordId,
+            record.EmployeeId,
             request.CompletedByEmployeeId,
             review.ReviewType.ToString(),
             review.Outcome?.ToString(),

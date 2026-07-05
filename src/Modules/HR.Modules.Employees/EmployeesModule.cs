@@ -7,6 +7,7 @@ using HR.Modules.Employees.Features.GetMyEmergencyContacts;
 using HR.Modules.Employees.Features.GetEmployeeEmergencyContacts;
 using HR.Modules.Employees.Features.GetCurrentCompensation;
 using HR.Modules.Employees.Features.GetCompensationHistory;
+using HR.Modules.Employees.Features.GetEmployeeAuditHistory;
 using HR.Modules.Employees.Features.CreateCompensationRecord;
 using HR.Modules.Employees.Features.UpdateFutureCompensationRecord;
 using HR.Modules.Employees.Features.DeleteFutureCompensationRecord;
@@ -135,6 +136,7 @@ public static class EmployeesModule
 
         services.AddScoped<GetCurrentCompensationHandler>();
         services.AddScoped<GetCompensationHistoryHandler>();
+        services.AddScoped<GetEmployeeAuditHistoryHandler>();
         services.AddScoped<CreateCompensationRecordHandler>();
         services.AddScoped<IValidator<CreateCompensationRecordRequest>, CreateCompensationRecordValidator>();
         services.AddScoped<UpdateFutureCompensationRecordHandler>();

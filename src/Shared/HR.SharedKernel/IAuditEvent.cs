@@ -6,6 +6,7 @@ public interface IAuditEvent
     string EventType { get; }
     string EntityType { get; }
     Guid EntityId { get; }
+    Guid? EmployeeId => null;
     Guid? ActorUserId { get; }
     Guid? ActorEmployeeId { get; }
     DateTimeOffset OccurredAt { get; }

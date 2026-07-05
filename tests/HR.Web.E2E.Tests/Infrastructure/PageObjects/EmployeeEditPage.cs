@@ -258,6 +258,35 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
+    // ── Audit Tab ───────────────────────────────────────────────────────────────
+
+    public async Task OpenAuditTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Audit" }).ClickAsync();
+        await page.WaitForSelectorAsync(
+            "[data-testid='audit-history-grid'], .alert-secondary",
+            new() { Timeout = 15_000 });
+    }
+
+    public ILocator AuditHistoryRow(string actionFragment) =>
+        page.Locator("[data-testid='audit-history-grid'] .e-row").Filter(new() { HasText = actionFragment });
+
+    public Task ClickViewAuditRowAsync(string actionFragment) =>
+        AuditHistoryRow(actionFragment).First.GetByTitle("View").ClickAsync();
+
+    public async Task<bool> HasAuditDetailDialogAsync() =>
+        await page.Locator(".audit-history-detail-dialog").IsVisibleAsync();
+
+    public async Task<string?> GetAuditDetailDialogTextAsync() =>
+        await page.Locator(".audit-history-detail-dialog").TextContentAsync();
+
+    public async Task CloseAuditDetailDialogAsync()
+    {
+        await page.Locator(".audit-history-detail-dialog .e-footer-content button:has-text('Close')").ClickAsync();
+        await page.Locator(".audit-history-detail-dialog").WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
     // ── Probation Tab ──────────────────────────────────────────────────────────
 
     public async Task OpenProbationTabAsync()

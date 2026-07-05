@@ -55,6 +55,7 @@ internal sealed class CompleteTaskHandler(
             task.Id,
             task.CompletedBy!.Value,
             previousStatus,
+            task.AssignedEmployeeId,
             task.CompletedAt!.Value), cancellationToken);
 
         await dispatcher.DispatchAsync(new TaskCompletionContext(
