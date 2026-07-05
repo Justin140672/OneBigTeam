@@ -94,6 +94,105 @@ public class CompensationServiceTests
         Assert.Empty(result);
     }
 
+    [Fact]
+    public async Task CreateCompensationRecordAsync_Returns_Result_When_Api_Returns_Ok()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var response = new CreateCompensationRecordResponse(
+            Guid.NewGuid(), companyId, employeeId, new DateOnly(2027, 1, 1), null,
+            "Annual", 50000m, "GBP", null, null, null,
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
+        var service = new CompensationService(factory);
+
+        var (result, error) = await service.CreateCompensationRecordAsync(
+            companyId, employeeId,
+            new CreateCompensationRecordRequest(companyId, employeeId, new DateOnly(2027, 1, 1), "Annual", 50000m, "GBP", null, null, null));
+
+        Assert.NotNull(result);
+        Assert.Null(error);
+        Assert.Equal(50000m, result.Salary);
+    }
+
+    [Fact]
+    public async Task CreateCompensationRecordAsync_Returns_Error_On_Conflict()
+    {
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Conflict, new { Error = "Effective date overlaps with an existing compensation record." }));
+        var service = new CompensationService(factory);
+
+        var (result, error) = await service.CreateCompensationRecordAsync(
+            Guid.NewGuid(), Guid.NewGuid(),
+            new CreateCompensationRecordRequest(Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2027, 1, 1), "Annual", 50000m, "GBP", null, null, null));
+
+        Assert.Null(result);
+        Assert.Equal("Effective date overlaps with an existing compensation record.", error);
+    }
+
+    [Fact]
+    public async Task UpdateFutureCompensationRecordAsync_Returns_Result_When_Api_Returns_Ok()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var recordId = Guid.NewGuid();
+
+        var response = new UpdateFutureCompensationRecordResponse(
+            recordId, companyId, employeeId, new DateOnly(2027, 1, 1), null,
+            "Hourly", 25m, "GBP", 20m, 0.5m, "Adjusted",
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
+        var service = new CompensationService(factory);
+
+        var (result, error) = await service.UpdateFutureCompensationRecordAsync(
+            companyId, employeeId, recordId,
+            new UpdateFutureCompensationRecordRequest(companyId, employeeId, recordId, "Hourly", 25m, "GBP", 20m, 0.5m, "Adjusted"));
+
+        Assert.NotNull(result);
+        Assert.Null(error);
+        Assert.Equal("Hourly", result.SalaryType);
+    }
+
+    [Fact]
+    public async Task UpdateFutureCompensationRecordAsync_Returns_Error_On_Conflict()
+    {
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Conflict, new { Error = "Only future-dated compensation records can be edited." }));
+        var service = new CompensationService(factory);
+
+        var (result, error) = await service.UpdateFutureCompensationRecordAsync(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            new UpdateFutureCompensationRecordRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Annual", 45000m, "GBP", null, null, null));
+
+        Assert.Null(result);
+        Assert.Equal("Only future-dated compensation records can be edited.", error);
+    }
+
+    [Fact]
+    public async Task DeleteFutureCompensationRecordAsync_Returns_Success_When_Api_Returns_NoContent()
+    {
+        var factory = BuildFactory(new StaticResponseHandler(HttpStatusCode.NoContent));
+        var service = new CompensationService(factory);
+
+        var (success, error) = await service.DeleteFutureCompensationRecordAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.True(success);
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public async Task DeleteFutureCompensationRecordAsync_Returns_Error_On_Conflict()
+    {
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Conflict, new { Error = "A later compensation record exists for this employee; delete it first." }));
+        var service = new CompensationService(factory);
+
+        var (success, error) = await service.DeleteFutureCompensationRecordAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.False(success);
+        Assert.Equal("A later compensation record exists for this employee; delete it first.", error);
+    }
+
     // ── Fake handlers ────────────────────────────────────────────────────────────
 
     private sealed class JsonResponseHandler(HttpStatusCode statusCode, object payload) : HttpMessageHandler

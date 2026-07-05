@@ -191,6 +191,73 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return await locator.IsVisibleAsync() ? (await locator.TextContentAsync())?.Trim() : null;
     }
 
+    public async Task ClickAddCompensationAsync()
+    {
+        await page.Locator("[data-testid='add-compensation-btn']").ClickAsync();
+        await page.Locator(".add-compensation-dialog").WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+    }
+
+    public async Task FillAddCompensationEffectiveFromAsync(string ddMMyyyy)
+    {
+        var input = page.Locator(".add-compensation-dialog .e-date-wrapper input.e-input").First;
+        await input.ClickAsync();
+        await input.FillAsync(ddMMyyyy);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    public async Task SelectAddCompensationSalaryTypeAsync(string salaryType)
+    {
+        await page.Locator(".add-compensation-dialog span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = salaryType })
+            .First
+            .ClickAsync();
+    }
+
+    public Task FillAddCompensationSalaryAsync(string value) =>
+        page.Locator(".add-compensation-dialog").GetByPlaceholder("e.g. 45000").FillAsync(value);
+
+    public Task FillAddCompensationCurrencyAsync(string value) =>
+        page.Locator(".add-compensation-dialog").GetByPlaceholder("e.g. GBP").FillAsync(value);
+
+    public async Task SubmitAddCompensationDialogAsync()
+    {
+        await page.Locator(".add-compensation-dialog .e-footer-content button:has-text('Add')").ClickAsync();
+        await page.Locator(".add-compensation-dialog").WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    public Task<bool> HasAddCompensationDialogErrorAsync() =>
+        page.Locator(".add-compensation-dialog .alert-danger").IsVisibleAsync();
+
+    public ILocator CompensationHistoryRow(string effectiveFromFragment) =>
+        page.Locator("[data-testid='compensation-history-grid'] .e-row").Filter(new() { HasText = effectiveFromFragment });
+
+    public Task ClickEditCompensationRowAsync(string effectiveFromFragment) =>
+        CompensationHistoryRow(effectiveFromFragment).First.GetByTitle("Edit").ClickAsync();
+
+    public Task ClickDeleteCompensationRowAsync(string effectiveFromFragment) =>
+        CompensationHistoryRow(effectiveFromFragment).First.GetByTitle("Delete").ClickAsync();
+
+    public Task ConfirmDeleteCompensationAsync() =>
+        page.Locator("[data-testid='compensation-history-grid']").GetByRole(AriaRole.Button, new() { Name = "Yes" }).ClickAsync();
+
+    public async Task FillEditCompensationSalaryAsync(string value)
+    {
+        await page.Locator(".edit-future-compensation-dialog").WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await page.Locator(".edit-future-compensation-dialog").GetByPlaceholder("e.g. 45000").FillAsync(value);
+    }
+
+    public async Task SubmitEditCompensationDialogAsync()
+    {
+        await page.Locator(".edit-future-compensation-dialog .e-footer-content button:has-text('Save')").ClickAsync();
+        await page.Locator(".edit-future-compensation-dialog").WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
     // ── Probation Tab ──────────────────────────────────────────────────────────
 
     public async Task OpenProbationTabAsync()

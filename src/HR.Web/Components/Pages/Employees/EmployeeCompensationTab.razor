@@ -1,6 +1,19 @@
 @using HR.Web.Models
 @inject CompensationService CompensationService
 
+<AddCompensationDialog CompanyId="CompanyId"
+                       EmployeeId="EmployeeId"
+                       IsOpen="_addOpen"
+                       OnSaved="OnCompensationAdded"
+                       OnCancelled="@(() => _addOpen = false)" />
+
+<EditFutureCompensationDialog CompanyId="CompanyId"
+                              EmployeeId="EmployeeId"
+                              Record="_editTarget"
+                              IsOpen="_editOpen"
+                              OnSaved="OnCompensationEdited"
+                              OnCancelled="@(() => _editOpen = false)" />
+
 @if (_loading)
 {
     <div class="d-flex align-items-center gap-2 py-3">
@@ -10,6 +23,12 @@
 }
 else
 {
+    <div class="d-flex justify-content-end mb-3">
+        <SfButton CssClass="e-primary e-small" OnClick="@(() => _addOpen = true)" data-testid="add-compensation-btn">
+            <i class="fa-solid fa-plus me-1"></i> Add Compensation
+        </SfButton>
+    </div>
+
     <div class="row g-4">
         <div class="col-lg-5">
             @if (_current is null)
@@ -56,7 +75,11 @@ else
                     }
                     else
                     {
-                        <CompensationHistoryGrid Items="_history" />
+                        <CompensationHistoryGrid CompanyId="CompanyId"
+                                                  EmployeeId="EmployeeId"
+                                                  Items="_history"
+                                                  OnEdit="StartEdit"
+                                                  OnDeleted="ReloadAsync" />
                     }
                 </div>
             </div>
@@ -69,12 +92,17 @@ else
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
 
     private bool _loading = true;
+    private bool _addOpen;
+    private bool _editOpen;
+    private CompensationHistoryItemModel? _editTarget;
     private CurrentCompensationModel? _current;
     private IReadOnlyList<CompensationHistoryItemModel> _history = [];
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task OnParametersSetAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
     {
-        _loading = true;
+        _loading = _current is null && _history.Count == 0;
 
         var currentTask = CompensationService.GetCurrentCompensationAsync(CompanyId, EmployeeId);
         var historyTask = CompensationService.GetCompensationHistoryAsync(CompanyId, EmployeeId);
@@ -83,6 +111,25 @@ else
         _current = await currentTask;
         _history = await historyTask;
         _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task OnCompensationAdded()
+    {
+        _addOpen = false;
+        await ReloadAsync();
+    }
+
+    private void StartEdit(CompensationHistoryItemModel item)
+    {
+        _editTarget = item;
+        _editOpen = true;
+    }
+
+    private async Task OnCompensationEdited()
+    {
+        _editOpen = false;
+        await ReloadAsync();
     }
 
     private static string SalarySummary(CurrentCompensationModel c) =>

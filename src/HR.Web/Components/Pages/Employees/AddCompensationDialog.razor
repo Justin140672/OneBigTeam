@@ -1,0 +1,135 @@
+@using System.ComponentModel.DataAnnotations
+@inject CompensationService CompensationService
+@inherits EditDialogBase<AddCompensationDialog.AddCompensationFormModel>
+
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="520px" ShowCloseIcon="true" CssClass="add-compensation-dialog">
+    <DialogEvents Closed="HandleDialogClosed" />
+    <DialogTemplates>
+        <Header>Add Compensation</Header>
+        <Content>
+            @if (!string.IsNullOrEmpty(GlobalError))
+            {
+                <div class="alert alert-danger alert-dismissible mb-3">
+                    @GlobalError
+                    <button type="button" class="btn-close" @onclick="@(() => GlobalError = null)"></button>
+                </div>
+            }
+            <EditForm EditContext="EditContext">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-6">
+                        <label class="form-label">Effective From <span class="text-danger">*</span></label>
+                        <SfDatePicker TValue="DateOnly?"
+                                      @bind-Value="Model.EffectiveFrom"
+                                      Format="dd/MM/yyyy"
+                                      Placeholder="dd/mm/yyyy" />
+                        <ValidationMessage For="@(() => Model.EffectiveFrom)" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Salary Type <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="string" TItem="SalaryTypeChoice"
+                                        DataSource="@SalaryTypeOptions"
+                                        @bind-Value="Model.SalaryType">
+                            <DropDownListFieldSettings Value="Value" Text="Label" />
+                        </SfDropDownList>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Salary <span class="text-danger">*</span></label>
+                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.Salary" Min="0" ShowSpinButton="false"
+                                          FloatLabelType="FloatLabelType.Auto" Placeholder="e.g. 45000" />
+                        <ValidationMessage For="@(() => Model.Salary)" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Currency <span class="text-danger">*</span></label>
+                        <HrTextBox @bind-Value="Model.Currency" Placeholder="e.g. GBP" />
+                        <ValidationMessage For="@(() => Model.Currency)" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Hours Per Week</label>
+                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.HoursPerWeek" Min="0" Max="168" ShowSpinButton="false"
+                                          FloatLabelType="FloatLabelType.Auto" Placeholder="e.g. 37.5" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">FTE</label>
+                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.FTE" Min="0" Max="1" Step="0.05m" ShowSpinButton="false"
+                                          FloatLabelType="FloatLabelType.Auto" Placeholder="e.g. 1.0" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" rows="3" maxlength="4000"
+                                  @bind="Model.Notes" placeholder="Optional notes…"></textarea>
+                    </div>
+                </div>
+            </EditForm>
+        </Content>
+        <FooterTemplate>
+            <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="Saving">
+                @if (Saving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Add
+            </SfButton>
+            <SfButton OnClick="CancelAsync">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    public static readonly SalaryTypeChoice[] SalaryTypeOptions =
+    [
+        new("Annual", "Annual"),
+        new("Hourly", "Hourly"),
+        new("Daily", "Daily")
+    ];
+
+    protected override async Task<string?> SaveCoreAsync()
+    {
+        var request = new CreateCompensationRecordRequest(
+            CompanyId,
+            EmployeeId,
+            Model.EffectiveFrom!.Value,
+            Model.SalaryType,
+            Model.Salary!.Value,
+            Model.Currency.Trim().ToUpperInvariant(),
+            Model.HoursPerWeek,
+            Model.FTE,
+            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim());
+
+        var (created, error) = await CompensationService.CreateCompensationRecordAsync(CompanyId, EmployeeId, request);
+
+        return created is not null ? null : error ?? "Failed to create compensation record.";
+    }
+
+    protected override void ResetForm()
+    {
+        Model.EffectiveFrom = null;
+        Model.SalaryType = "Annual";
+        Model.Salary = null;
+        Model.Currency = "GBP";
+        Model.HoursPerWeek = null;
+        Model.FTE = null;
+        Model.Notes = null;
+    }
+
+    public sealed record SalaryTypeChoice(string Value, string Label);
+
+    public sealed class AddCompensationFormModel
+    {
+        [Required(ErrorMessage = "Please enter an effective date.")]
+        public DateOnly? EffectiveFrom { get; set; }
+        public string SalaryType { get; set; } = "Annual";
+        [Required(ErrorMessage = "Please enter a salary.")]
+        [Range(0.01, double.MaxValue, ErrorMessage = "Salary must be greater than 0.")]
+        public decimal? Salary { get; set; }
+        [Required(ErrorMessage = "Please enter a currency code.")]
+        [StringLength(3, MinimumLength = 3, ErrorMessage = "Currency must be a 3-letter code (e.g. GBP).")]
+        public string Currency { get; set; } = "GBP";
+        public decimal? HoursPerWeek { get; set; }
+        public decimal? FTE { get; set; }
+        public string? Notes { get; set; }
+    }
+}

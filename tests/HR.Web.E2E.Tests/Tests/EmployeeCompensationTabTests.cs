@@ -108,4 +108,88 @@ public sealed class EmployeeCompensationTabTests(AppFixture fixture) : E2ETestBa
         Assert.True(await _page.Locator(".alert-secondary").IsVisibleAsync(),
             "Expected an empty-state message when no compensation record exists");
     }
+
+    [Fact]
+    public async Task AddCompensation_WithFutureEffectiveDate_AppearsInHistoryWithEditAndDeleteActions()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Tom Williams has no existing records, so a future-dated add here can't collide with
+        // any auto-close/overlap logic exercised by other tests.
+        await empEdit.GoToAsync(AcmeId, TomWilliams);
+        await empEdit.OpenCompensationTabAsync();
+
+        await empEdit.ClickAddCompensationAsync();
+        await empEdit.FillAddCompensationEffectiveFromAsync("01/01/2030");
+        await empEdit.SelectAddCompensationSalaryTypeAsync("Annual");
+        await empEdit.FillAddCompensationSalaryAsync("38000");
+        await empEdit.FillAddCompensationCurrencyAsync("GBP");
+        await empEdit.SubmitAddCompensationDialogAsync();
+
+        var row = empEdit.CompensationHistoryRow("1 Jan 2030");
+        Assert.True(await row.First.IsVisibleAsync(),
+            "Expected the newly added future-dated record to appear in the history grid");
+
+        // Future-dated rows show Edit/Delete; past/current ones don't.
+        Assert.True(await row.GetByTitle("Edit").IsVisibleAsync(), "Expected an Edit action on the future-dated row");
+        Assert.True(await row.GetByTitle("Delete").IsVisibleAsync(), "Expected a Delete action on the future-dated row");
+    }
+
+    [Fact]
+    public async Task EditFutureCompensation_UpdatesSalary_WithoutChangingEffectiveDate()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empEdit.GoToAsync(AcmeId, TomWilliams);
+        await empEdit.OpenCompensationTabAsync();
+
+        await empEdit.ClickAddCompensationAsync();
+        await empEdit.FillAddCompensationEffectiveFromAsync("01/06/2030");
+        await empEdit.SelectAddCompensationSalaryTypeAsync("Annual");
+        await empEdit.FillAddCompensationSalaryAsync("40000");
+        await empEdit.FillAddCompensationCurrencyAsync("GBP");
+        await empEdit.SubmitAddCompensationDialogAsync();
+
+        await empEdit.ClickEditCompensationRowAsync("1 Jun 2030");
+        await empEdit.FillEditCompensationSalaryAsync("42000");
+        await empEdit.SubmitEditCompensationDialogAsync();
+
+        var row = empEdit.CompensationHistoryRow("1 Jun 2030");
+        var rowText = await row.First.TextContentAsync();
+        Assert.Contains("42,000.00", rowText);
+    }
+
+    [Fact]
+    public async Task DeleteFutureCompensation_RemovesRecordFromHistory()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empEdit.GoToAsync(AcmeId, TomWilliams);
+        await empEdit.OpenCompensationTabAsync();
+
+        await empEdit.ClickAddCompensationAsync();
+        await empEdit.FillAddCompensationEffectiveFromAsync("01/12/2030");
+        await empEdit.SelectAddCompensationSalaryTypeAsync("Annual");
+        await empEdit.FillAddCompensationSalaryAsync("41000");
+        await empEdit.FillAddCompensationCurrencyAsync("GBP");
+        await empEdit.SubmitAddCompensationDialogAsync();
+
+        await empEdit.ClickDeleteCompensationRowAsync("1 Dec 2030");
+        await empEdit.ConfirmDeleteCompensationAsync();
+
+        Assert.False(await empEdit.CompensationHistoryRow("1 Dec 2030").First.IsVisibleAsync(),
+            "Expected the deleted future-dated record to no longer appear in the history grid");
+    }
 }

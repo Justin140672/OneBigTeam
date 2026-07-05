@@ -47,10 +47,20 @@ internal sealed class DeleteFutureCompensationRecordHandler(
                 cancellationToken);
 
         var now = clock.UtcNowOffset();
+        var reopenedPredecessorEffectiveTo = predecessor?.EffectiveTo;
         predecessor?.Reopen(now);
 
         dbContext.Compensations.Remove(record);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (predecessor is not null && reopenedPredecessorEffectiveTo is not null)
+        {
+            await auditEventPublisher.PublishAsync(
+                new CompensationRecordReopenedAuditEvent(
+                    companyId, employeeId, predecessor.Id, predecessor.EffectiveFrom,
+                    reopenedPredecessorEffectiveTo.Value, now),
+                cancellationToken);
+        }
 
         await auditEventPublisher.PublishAsync(
             new CompensationRecordDeletedAuditEvent(companyId, employeeId, record.Id, record.EffectiveFrom, now),

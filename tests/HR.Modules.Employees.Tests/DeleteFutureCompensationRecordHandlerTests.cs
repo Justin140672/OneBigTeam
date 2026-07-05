@@ -102,6 +102,27 @@ public class DeleteFutureCompensationRecordHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Does_Not_Publish_Reopened_Event_When_There_Is_No_Predecessor()
+    {
+        await using var context = BuildContext();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var companyId = Guid.NewGuid();
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2020, 1, 1), true, now);
+        context.Employees.Add(employee);
+
+        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, now);
+        context.Compensations.Add(record);
+        await context.SaveChangesAsync();
+
+        var publisher = new FakeAuditPublisher();
+        var handler = new DeleteFutureCompensationRecordHandler(context, new FakeClock(FixedUtcNow), publisher);
+
+        await handler.HandleAsync(companyId, employee.Id, record.Id, CancellationToken.None);
+
+        Assert.DoesNotContain(publisher.Published, e => e is CompensationRecordReopenedAuditEvent);
+    }
+
+    [Fact]
     public async Task HandleAsync_Reopens_Predecessor_When_Deleting_The_Record_That_Closed_It()
     {
         await using var context = BuildContext();
@@ -128,6 +149,13 @@ public class DeleteFutureCompensationRecordHandlerTests
         var remaining = await context.Compensations.SingleAsync();
         Assert.Equal(predecessor.Id, remaining.Id);
         Assert.Null(remaining.EffectiveTo);
+
+        var reopenedEvent = Assert.IsType<CompensationRecordReopenedAuditEvent>(
+            Assert.Single(publisher.Published, e => e is CompensationRecordReopenedAuditEvent));
+        Assert.Equal(predecessor.Id, reopenedEvent.CompensationRecordId);
+        Assert.Equal(new DateOnly(2026, 12, 31), reopenedEvent.PreviousEffectiveTo);
+
+        Assert.Contains(publisher.Published, e => e is CompensationRecordDeletedAuditEvent);
     }
 
     [Fact]

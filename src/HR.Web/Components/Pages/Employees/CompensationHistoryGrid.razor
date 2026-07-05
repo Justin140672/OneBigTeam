@@ -1,5 +1,14 @@
 @using HR.Web.Models
 @using Syncfusion.Blazor.Grids
+@inject CompensationService CompensationService
+
+@if (!string.IsNullOrEmpty(_deleteError))
+{
+    <div class="alert alert-danger alert-dismissible m-3">
+        @_deleteError
+        <button type="button" class="btn-close" @onclick="@(() => _deleteError = null)"></button>
+    </div>
+}
 
 <HrGrid TValue="CompensationHistoryItemModel"
         DataSource="@Items"
@@ -40,9 +49,66 @@
                 <span class="text-muted small">@(item.FTE.HasValue ? $"{item.FTE.Value:P0}" : "—")</span>
             </Template>
         </GridColumn>
+
+        <GridColumn HeaderText="" Width="180" AllowSorting="false" AllowFiltering="false" TextAlign="TextAlign.Right">
+            <Template>
+                @{ var item = (context as CompensationHistoryItemModel)!; }
+                @if (IsFutureDated(item))
+                {
+                    @if (_deleteTargetId == item.Id)
+                    {
+                        <span class="me-2 text-muted small">Delete?</span>
+                        <SfButton CssClass="e-danger e-small me-1" OnClick="() => ConfirmDeleteAsync(item.Id)">Yes</SfButton>
+                        <SfButton CssClass="e-small" OnClick="CancelDelete">No</SfButton>
+                    }
+                    else
+                    {
+                        <SfButton CssClass="e-outline e-small me-1" title="Edit" OnClick="() => OnEdit.InvokeAsync(item)">
+                            <i class="fa-solid fa-pen"></i>
+                        </SfButton>
+                        <SfButton CssClass="e-danger e-outline e-small" title="Delete" OnClick="() => StartDelete(item.Id)">
+                            <i class="fa-solid fa-trash"></i>
+                        </SfButton>
+                    }
+                }
+            </Template>
+        </GridColumn>
     </GridColumns>
 </HrGrid>
 
 @code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
     [Parameter, EditorRequired] public IReadOnlyList<CompensationHistoryItemModel> Items { get; set; } = [];
+    [Parameter] public EventCallback<CompensationHistoryItemModel> OnEdit { get; set; }
+    [Parameter] public EventCallback OnDeleted { get; set; }
+
+    private Guid? _deleteTargetId;
+    private string? _deleteError;
+
+    private static bool IsFutureDated(CompensationHistoryItemModel item) =>
+        item.EffectiveFrom > DateOnly.FromDateTime(DateTime.Today);
+
+    private void StartDelete(Guid id)
+    {
+        _deleteError = null;
+        _deleteTargetId = id;
+    }
+
+    private void CancelDelete() => _deleteTargetId = null;
+
+    private async Task ConfirmDeleteAsync(Guid id)
+    {
+        _deleteTargetId = null;
+
+        var (success, error) = await CompensationService.DeleteFutureCompensationRecordAsync(CompanyId, EmployeeId, id);
+
+        if (!success)
+        {
+            _deleteError = error ?? "Failed to delete compensation record.";
+            return;
+        }
+
+        await OnDeleted.InvokeAsync();
+    }
 }
