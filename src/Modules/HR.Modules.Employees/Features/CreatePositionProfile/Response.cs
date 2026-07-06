@@ -17,5 +17,6 @@ internal sealed record CreatePositionProfileResponse(
     decimal? SalaryMax,
     SalaryType? SalaryType,
     Guid? DefaultLeavePolicyId,
+    Guid? OnboardingTemplateId,
     bool IsActive,
     DateTimeOffset CreatedAt);

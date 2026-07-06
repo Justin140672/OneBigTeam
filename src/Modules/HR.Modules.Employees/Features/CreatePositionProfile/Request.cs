@@ -17,4 +17,5 @@ internal sealed record CreatePositionProfileRequest
     public decimal? SalaryMax { get; init; }
     public SalaryType? SalaryType { get; init; }
     public Guid? DefaultLeavePolicyId { get; init; }
+    public Guid? OnboardingTemplateId { get; init; }
 }

@@ -62,6 +62,9 @@ internal sealed class PositionProfileConfiguration : IEntityTypeConfiguration<Po
         builder.Property(p => p.DefaultLeavePolicyId)
             .HasColumnName("default_leave_policy_id");
 
+        builder.Property(p => p.OnboardingTemplateId)
+            .HasColumnName("onboarding_template_id");
+
         builder.Property(p => p.IsActive)
             .HasColumnName("is_active")
             .IsRequired();
@@ -83,6 +86,14 @@ internal sealed class PositionProfileConfiguration : IEntityTypeConfiguration<Po
             .IsRequired();
 
         builder.Navigation(p => p.RequiredDocuments)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.HasMany(p => p.RequiredAssets)
+            .WithOne()
+            .HasForeignKey(a => a.PositionProfileId)
+            .IsRequired();
+
+        builder.Navigation(p => p.RequiredAssets)
             .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

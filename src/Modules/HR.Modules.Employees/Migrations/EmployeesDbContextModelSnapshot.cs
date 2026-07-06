@@ -452,6 +452,107 @@ namespace HR.Modules.Employees.Migrations
                     b.ToTable("nationalities", "employees");
                 });
 
+            modelBuilder.Entity("HR.Modules.Employees.Domain.OnboardingTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("CompanyId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("onboarding_templates", "employees");
+                });
+
+            modelBuilder.Entity("HR.Modules.Employees.Domain.OnboardingTemplateTask", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssignTo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("assign_to");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<int>("DueDaysAfterStart")
+                        .HasColumnType("integer")
+                        .HasColumnName("due_days_after_start");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<Guid>("OnboardingTemplateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("onboarding_template_id");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("priority");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("OnboardingTemplateId");
+
+                    b.ToTable("onboarding_template_tasks", "employees");
+                });
+
             modelBuilder.Entity("HR.Modules.Employees.Domain.PositionProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -491,6 +592,10 @@ namespace HR.Modules.Employees.Migrations
                     b.Property<bool>("IsManagerial")
                         .HasColumnType("boolean")
                         .HasColumnName("is_managerial");
+
+                    b.Property<Guid?>("OnboardingTemplateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("onboarding_template_id");
 
                     b.Property<int?>("ProbationMonthsOverride")
                         .HasColumnType("integer")
@@ -532,6 +637,55 @@ namespace HR.Modules.Employees.Migrations
                     b.HasIndex("DepartmentId");
 
                     b.ToTable("position_profiles", "employees");
+                });
+
+            modelBuilder.Entity("HR.Modules.Employees.Domain.PositionProfileRequiredAsset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AssetCategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("asset_category_id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsMandatory")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_mandatory");
+
+                    b.Property<Guid>("PositionProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("position_profile_id");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetCategoryId");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("PositionProfileId");
+
+                    b.ToTable("position_profile_required_assets", "employees");
                 });
 
             modelBuilder.Entity("HR.Modules.Employees.Domain.PositionProfileRequiredDocument", b =>
@@ -595,6 +749,24 @@ namespace HR.Modules.Employees.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 
+            modelBuilder.Entity("HR.Modules.Employees.Domain.OnboardingTemplateTask", b =>
+                {
+                    b.HasOne("HR.Modules.Employees.Domain.OnboardingTemplate", null)
+                        .WithMany("Tasks")
+                        .HasForeignKey("OnboardingTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HR.Modules.Employees.Domain.PositionProfileRequiredAsset", b =>
+                {
+                    b.HasOne("HR.Modules.Employees.Domain.PositionProfile", null)
+                        .WithMany("RequiredAssets")
+                        .HasForeignKey("PositionProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("HR.Modules.Employees.Domain.PositionProfileRequiredDocument", b =>
                 {
                     b.HasOne("HR.Modules.Employees.Domain.PositionProfile", null)
@@ -604,8 +776,15 @@ namespace HR.Modules.Employees.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("HR.Modules.Employees.Domain.OnboardingTemplate", b =>
+                {
+                    b.Navigation("Tasks");
+                });
+
             modelBuilder.Entity("HR.Modules.Employees.Domain.PositionProfile", b =>
                 {
+                    b.Navigation("RequiredAssets");
+
                     b.Navigation("RequiredDocuments");
                 });
 #pragma warning restore 612, 618

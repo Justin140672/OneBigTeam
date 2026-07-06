@@ -5,6 +5,7 @@
 @inject PositionProfileService PositionProfileService
 @inject DepartmentService DepartmentService
 @inject LeavePolicyService LeavePolicyService
+@inject OnboardingTemplateService OnboardingTemplateService
 @inherits EditPageBase<PositionProfileEditModel>
 @using HR.Infrastructure.Abstractions
 @using HR.Web.Components.Pages.Employees
@@ -161,6 +162,17 @@
                             </div>
                         </ContentTemplate>
                     </TabItem>
+                    <TabItem>
+                        <ChildContent><TabHeader Text="Required Assets" /></ChildContent>
+                        <ContentTemplate>
+                            <div class="mt-4">
+                                <PositionProfileRequiredAssetsTab
+                                    CompanyId="CompanyId"
+                                    PositionProfileId="Id!.Value"
+                                    CanEdit="!IsViewMode" />
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
                 </TabItems>
             </SfTab>
         }
@@ -183,6 +195,7 @@
 
     private List<DepartmentListItemModel> _departments = [];
     private List<LeavePolicyListItemModel> _leavePolicies = [];
+    private List<OnboardingTemplateListItemModel> _onboardingTemplates = [];
 
     private static readonly string[] _allDays =
         ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -191,11 +204,13 @@
     {
         var deptTask = DepartmentService.ListDepartmentsAsync(CompanyId);
         var leavePolicyTask = LeavePolicyService.ListLeavePoliciesAsync(CompanyId, activeOnly: true);
+        var onboardingTemplateTask = OnboardingTemplateService.ListOnboardingTemplatesAsync(CompanyId);
 
-        await Task.WhenAll(deptTask, leavePolicyTask);
+        await Task.WhenAll(deptTask, leavePolicyTask, onboardingTemplateTask);
 
         _departments = (await deptTask)?.Items ?? [];
         _leavePolicies = (await leavePolicyTask)?.Items ?? [];
+        _onboardingTemplates = (await onboardingTemplateTask)?.Items.ToList() ?? [];
 
         if (!IsNew)
         {
@@ -211,6 +226,7 @@
                 Model.SalaryMax = profile.SalaryMax;
                 Model.SalaryType = profile.SalaryType ?? "Annual";
                 Model.DefaultLeavePolicyId = profile.DefaultLeavePolicyId;
+                Model.OnboardingTemplateId = profile.OnboardingTemplateId;
 
                 if (profile.WorkingDaysOverride.HasValue && profile.HoursPerDayOverride.HasValue)
                 {
@@ -254,7 +270,8 @@
                 Model.SalaryMin,
                 Model.SalaryMax,
                 Model.SalaryType,
-                Model.DefaultLeavePolicyId);
+                Model.DefaultLeavePolicyId,
+                Model.OnboardingTemplateId);
 
             var (created, error) = await PositionProfileService.CreatePositionProfileAsync(CompanyId, request);
             return created is not null ? null : error ?? "Failed to create position profile.";
@@ -274,7 +291,8 @@
                 Model.SalaryMin,
                 Model.SalaryMax,
                 Model.SalaryType,
-                Model.DefaultLeavePolicyId);
+                Model.DefaultLeavePolicyId,
+                Model.OnboardingTemplateId);
 
             var (success, error) = await PositionProfileService.UpdatePositionProfileAsync(CompanyId, Id!.Value, request);
             return success ? null : error;
@@ -323,6 +341,18 @@
                                 TItem="LeavePolicyListItemModel"
                                 DataSource="@_leavePolicies"
                                 @bind-Value="Model.DefaultLeavePolicyId"
+                                Placeholder="None"
+                                AllowFiltering="true"
+                                ShowClearButton="true">
+                    <DropDownListFieldSettings Value="Id" Text="Name" />
+                </SfDropDownList>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Onboarding Template</label>
+                <SfDropDownList TValue="Guid?"
+                                TItem="OnboardingTemplateListItemModel"
+                                DataSource="@_onboardingTemplates"
+                                @bind-Value="Model.OnboardingTemplateId"
                                 Placeholder="None"
                                 AllowFiltering="true"
                                 ShowClearButton="true">

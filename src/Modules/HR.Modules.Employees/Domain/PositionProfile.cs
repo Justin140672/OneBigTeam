@@ -5,6 +5,7 @@ namespace HR.Modules.Employees.Domain;
 internal sealed class PositionProfile
 {
     private readonly List<PositionProfileRequiredDocument> _requiredDocuments = [];
+    private readonly List<PositionProfileRequiredAsset> _requiredAssets = [];
 
     private PositionProfile() { }
 
@@ -21,11 +22,13 @@ internal sealed class PositionProfile
     public decimal? SalaryMax { get; private set; }
     public SalaryType? SalaryType { get; private set; }
     public Guid? DefaultLeavePolicyId { get; private set; }
+    public Guid? OnboardingTemplateId { get; private set; }
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
     public IReadOnlyList<PositionProfileRequiredDocument> RequiredDocuments => _requiredDocuments.AsReadOnly();
+    public IReadOnlyList<PositionProfileRequiredAsset> RequiredAssets => _requiredAssets.AsReadOnly();
 
     public static PositionProfile Create(
         Guid id,
@@ -41,7 +44,8 @@ internal sealed class PositionProfile
         decimal? salaryMax,
         SalaryType? salaryType,
         Guid? defaultLeavePolicyId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? onboardingTemplateId = null)
     {
         return new PositionProfile
         {
@@ -58,6 +62,7 @@ internal sealed class PositionProfile
             SalaryMax = salaryMax,
             SalaryType = salaryType,
             DefaultLeavePolicyId = defaultLeavePolicyId,
+            OnboardingTemplateId = onboardingTemplateId,
             IsActive = true,
             CreatedAt = now,
             UpdatedAt = now,
@@ -76,7 +81,8 @@ internal sealed class PositionProfile
         decimal? salaryMax,
         SalaryType? salaryType,
         Guid? defaultLeavePolicyId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? onboardingTemplateId = null)
     {
         DepartmentId = departmentId;
         Title = title;
@@ -89,6 +95,7 @@ internal sealed class PositionProfile
         SalaryMax = salaryMax;
         SalaryType = salaryType;
         DefaultLeavePolicyId = defaultLeavePolicyId;
+        OnboardingTemplateId = onboardingTemplateId;
         UpdatedAt = now;
     }
 

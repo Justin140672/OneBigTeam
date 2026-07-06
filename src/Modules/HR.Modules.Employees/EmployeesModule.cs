@@ -35,11 +35,19 @@ using HR.Modules.Employees.Features.UpdateEmploymentDetails;
 using HR.Modules.Employees.Features.AddRequiredDocumentToPositionProfile;
 using HR.Modules.Employees.Features.ListRequiredDocumentsForPositionProfile;
 using HR.Modules.Employees.Features.RemoveRequiredDocumentFromPositionProfile;
+using HR.Modules.Employees.Features.AddRequiredAssetToPositionProfile;
+using HR.Modules.Employees.Features.ListRequiredAssetsForPositionProfile;
+using HR.Modules.Employees.Features.RemoveRequiredAssetFromPositionProfile;
 using HR.Modules.Employees.Features.UpdatePositionProfile;
 using HR.Modules.Employees.Features.ListEmploymentTypes;
 using HR.Modules.Employees.Features.CreateEmploymentType;
 using HR.Modules.Employees.Features.UpdateEmploymentType;
 using HR.Modules.Employees.Features.DeactivateEmploymentType;
+using HR.Modules.Employees.Features.CreateOnboardingTemplate;
+using HR.Modules.Employees.Features.GetOnboardingTemplate;
+using HR.Modules.Employees.Features.ListOnboardingTemplates;
+using HR.Modules.Employees.Features.UpdateOnboardingTemplate;
+using HR.Modules.Employees.Features.DeactivateOnboardingTemplate;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
 using HR.SharedKernel;
@@ -91,6 +99,13 @@ public static class EmployeesModule
         services.AddScoped<RemoveRequiredDocumentHandler>();
 
         services.AddScoped<ListRequiredDocumentsHandler>();
+
+        services.AddScoped<AddRequiredAssetHandler>();
+        services.AddScoped<IValidator<AddRequiredAssetRequest>, AddRequiredAssetValidator>();
+
+        services.AddScoped<RemoveRequiredAssetHandler>();
+
+        services.AddScoped<ListRequiredAssetsHandler>();
 
         services.AddScoped<CreateEmployeeHandler>();
         services.AddScoped<IValidator<CreateEmployeeRequest>, CreateEmployeeValidator>();
@@ -155,12 +170,27 @@ public static class EmployeesModule
         services.AddScoped<DeactivateEmploymentTypeHandler>();
         services.AddScoped<IValidator<DeactivateEmploymentTypeRequest>, DeactivateEmploymentTypeValidator>();
 
+        services.AddScoped<CreateOnboardingTemplateHandler>();
+        services.AddScoped<IValidator<CreateOnboardingTemplateRequest>, CreateOnboardingTemplateValidator>();
+
+        services.AddScoped<GetOnboardingTemplateHandler>();
+
+        services.AddScoped<ListOnboardingTemplatesHandler>();
+        services.AddScoped<IValidator<ListOnboardingTemplatesRequest>, ListOnboardingTemplatesValidator>();
+
+        services.AddScoped<UpdateOnboardingTemplateHandler>();
+        services.AddScoped<IValidator<UpdateOnboardingTemplateRequest>, UpdateOnboardingTemplateValidator>();
+
+        services.AddScoped<DeactivateOnboardingTemplateHandler>();
+
         services.AddScoped<IProbationDateResolver, ProbationDateResolver>();
         services.AddScoped<IWorkingPatternProvider, WorkingPatternProvider>();
         services.AddScoped<IDirectReportsReader, DirectReportsReader>();
         services.AddScoped<IEmployeeNameReader, EmployeeNameReader>();
         services.AddScoped<IManagerReader, ManagerReader>();
         services.AddScoped<IPositionProfileDocumentsReader, PositionProfileDocumentsReader>();
+        services.AddScoped<IPositionProfileAssetsReader, PositionProfileAssetsReader>();
+        services.AddScoped<IOnboardingTemplateReader, OnboardingTemplateReader>();
         services.AddScoped<IEmployeeProvisioningService, EmployeeProvisioningService>();
     }
 

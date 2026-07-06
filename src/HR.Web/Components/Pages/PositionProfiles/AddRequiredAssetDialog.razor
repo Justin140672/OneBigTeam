@@ -1,0 +1,88 @@
+@using System.ComponentModel.DataAnnotations
+@inject AssetCategoryService AssetCategoryService
+@inject PositionProfileService PositionProfileService
+@inherits EditDialogBase<AddRequiredAssetDialog.AddRequiredAssetFormModel>
+
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="520px" ShowCloseIcon="true">
+    <DialogEvents Closed="HandleDialogClosed" />
+    <DialogTemplates>
+        <Header>Add Required Asset</Header>
+        <Content>
+            @if (!string.IsNullOrEmpty(GlobalError))
+            {
+                <div class="alert alert-danger alert-dismissible mb-3">
+                    @GlobalError
+                    <button type="button" class="btn-close" @onclick="@(() => GlobalError = null)"></button>
+                </div>
+            }
+            <EditForm EditContext="EditContext">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Asset Category <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="Guid?"
+                                        TItem="AssetCategoryListItemModel"
+                                        DataSource="@_assetCategories"
+                                        @bind-Value="Model.AssetCategoryId"
+                                        Placeholder="Select asset category…"
+                                        AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => Model.AssetCategoryId)" />
+                    </div>
+                    <div class="col-12">
+                        <SfCheckBox TChecked="bool" Label="Mandatory" @bind-Checked="Model.IsMandatory" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Quantity</label>
+                        <SfNumericTextBox TValue="int" @bind-Value="Model.Quantity" Min="1" Placeholder="1"
+                                          FloatLabelType="FloatLabelType.Auto" ShowSpinButton="false" />
+                        <ValidationMessage For="@(() => Model.Quantity)" />
+                    </div>
+                </div>
+            </EditForm>
+        </Content>
+        <FooterTemplate>
+            <HrDialogButtonBar SaveLabel="Add" Saving="Saving" OnSave="SubmitAsync" OnCancel="CancelAsync" />
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid PositionProfileId { get; set; }
+
+    private List<AssetCategoryListItemModel> _assetCategories = [];
+
+    protected override async Task OnOpenedAsync()
+    {
+        _assetCategories = (await AssetCategoryService.ListAssetCategoriesAsync(CompanyId))?.Items.ToList() ?? [];
+    }
+
+    protected override async Task<string?> SaveCoreAsync()
+    {
+        var request = new AddRequiredAssetToProfileRequest(
+            CompanyId, PositionProfileId, Model.AssetCategoryId!.Value,
+            Model.IsMandatory, Model.Quantity);
+        var (success, error) = await PositionProfileService.AddRequiredAssetAsync(
+            CompanyId, PositionProfileId, request);
+
+        return success ? null : error ?? "Failed to add required asset.";
+    }
+
+    protected override void ResetForm()
+    {
+        Model.AssetCategoryId = null;
+        Model.IsMandatory = true;
+        Model.Quantity = 1;
+    }
+
+    public sealed class AddRequiredAssetFormModel
+    {
+        [Required(ErrorMessage = "Please select an asset category.")]
+        public Guid? AssetCategoryId { get; set; }
+        public bool IsMandatory { get; set; } = true;
+        [Range(1, int.MaxValue, ErrorMessage = "Quantity must be 1 or greater.")]
+        public int Quantity { get; set; } = 1;
+    }
+}

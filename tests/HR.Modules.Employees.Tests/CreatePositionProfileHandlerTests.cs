@@ -261,6 +261,51 @@ public class CreatePositionProfileHandlerTests
         Assert.Null(result.Value!.SalaryType);
     }
 
+    [Fact]
+    public async Task HandleAsync_Creates_PositionProfile_With_Valid_OnboardingTemplateId()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var template = OnboardingTemplate.Create(Guid.NewGuid(), companyId, "Standard Onboarding", null, now);
+        context.OnboardingTemplates.Add(template);
+        await context.SaveChangesAsync();
+
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+
+        var result = await handler.HandleAsync(
+            new CreatePositionProfileRequest
+            {
+                CompanyId = companyId,
+                Title = "Software Developer",
+                OnboardingTemplateId = template.Id,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(template.Id, result.Value!.OnboardingTemplateId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Not_Found_When_OnboardingTemplateId_Does_Not_Exist()
+    {
+        await using var context = BuildContext();
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+
+        var result = await handler.HandleAsync(
+            new CreatePositionProfileRequest
+            {
+                CompanyId = Guid.NewGuid(),
+                Title = "Software Developer",
+                OnboardingTemplateId = Guid.NewGuid(),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
     private static EmployeesDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<EmployeesDbContext>()

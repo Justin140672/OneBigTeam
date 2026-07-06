@@ -33,10 +33,12 @@ public class PositionProfileServiceTests
             SalaryMax: 60000m,
             SalaryType: "Annual",
             DefaultLeavePolicyId: leavePolicyId,
+            OnboardingTemplateId: null,
             IsActive: true,
             CreatedAt: DateTimeOffset.UtcNow,
             UpdatedAt: DateTimeOffset.UtcNow,
-            RequiredDocuments: []);
+            RequiredDocuments: [],
+            RequiredAssets: []);
 
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
         var service = new PositionProfileService(factory);
@@ -86,7 +88,8 @@ public class PositionProfileServiceTests
             SalaryMin: 40000m,
             SalaryMax: 60000m,
             SalaryType: "Annual",
-            DefaultLeavePolicyId: leavePolicyId);
+            DefaultLeavePolicyId: leavePolicyId,
+            OnboardingTemplateId: null);
 
         var (created, error) = await service.CreatePositionProfileAsync(companyId, request);
 
@@ -108,7 +111,7 @@ public class PositionProfileServiceTests
         var service = new PositionProfileService(factory);
 
         var (created, error) = await service.CreatePositionProfileAsync(
-            Guid.NewGuid(), new CreatePositionProfileRequest(Guid.NewGuid(), null, "Duplicate", null, false, null, null, null, null, null, null, null));
+            Guid.NewGuid(), new CreatePositionProfileRequest(Guid.NewGuid(), null, "Duplicate", null, false, null, null, null, null, null, null, null, null));
 
         Assert.Null(created);
         Assert.Equal("A position profile with that title already exists.", error);
@@ -134,7 +137,8 @@ public class PositionProfileServiceTests
             SalaryMin: 50000m,
             SalaryMax: 70000m,
             SalaryType: "Annual",
-            DefaultLeavePolicyId: leavePolicyId);
+            DefaultLeavePolicyId: leavePolicyId,
+            OnboardingTemplateId: null);
 
         var (success, error) = await service.UpdatePositionProfileAsync(companyId, profileId, request);
 

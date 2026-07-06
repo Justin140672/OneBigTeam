@@ -35,10 +35,12 @@ public record GetPositionProfileResponse(
     decimal? SalaryMax,
     string? SalaryType,
     Guid? DefaultLeavePolicyId,
+    Guid? OnboardingTemplateId,
     bool IsActive,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    IReadOnlyList<PositionProfileRequiredDocumentModel> RequiredDocuments);
+    IReadOnlyList<PositionProfileRequiredDocumentModel> RequiredDocuments,
+    IReadOnlyList<PositionProfileRequiredAssetModel> RequiredAssets);
 
 public record PositionProfileRequiredDocumentModel(
     Guid Id,
@@ -46,6 +48,12 @@ public record PositionProfileRequiredDocumentModel(
     bool IsMandatory,
     int? DueDaysAfterStart,
     bool RequiresExpiryDate);
+
+public record PositionProfileRequiredAssetModel(
+    Guid Id,
+    Guid AssetCategoryId,
+    bool IsMandatory,
+    int Quantity);
 
 // ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
@@ -66,6 +74,7 @@ public sealed class PositionProfileEditModel
     public decimal? SalaryMax { get; set; }
     public string? SalaryType { get; set; } = "Annual";
     public Guid? DefaultLeavePolicyId { get; set; }
+    public Guid? OnboardingTemplateId { get; set; }
 }
 
 // ── CREATE ────────────────────────────────────────────────────────────────────
@@ -82,7 +91,8 @@ public record CreatePositionProfileRequest(
     decimal? SalaryMin,
     decimal? SalaryMax,
     string? SalaryType,
-    Guid? DefaultLeavePolicyId);
+    Guid? DefaultLeavePolicyId,
+    Guid? OnboardingTemplateId);
 
 public record CreatePositionProfileResponse(
     Guid Id,
@@ -118,6 +128,28 @@ public record AddRequiredDocumentToProfileRequest(
 
 public record AddRequiredDocumentToProfileResponse(Guid Id);
 
+// ── LIST REQUIRED ASSETS ──────────────────────────────────────────────────────
+
+public record ListRequiredAssetsResponse(IReadOnlyList<RequiredAssetListItemModel> Items);
+
+public record RequiredAssetListItemModel(
+    Guid Id,
+    Guid AssetCategoryId,
+    string AssetCategoryName,
+    bool IsMandatory,
+    int Quantity);
+
+// ── ADD / REMOVE REQUIRED ASSET ───────────────────────────────────────────────
+
+public record AddRequiredAssetToProfileRequest(
+    Guid CompanyId,
+    Guid PositionProfileId,
+    Guid AssetCategoryId,
+    bool IsMandatory,
+    int Quantity);
+
+public record AddRequiredAssetToProfileResponse(Guid Id);
+
 // ── UPDATE ────────────────────────────────────────────────────────────────────
 
 public record UpdatePositionProfileRequest(
@@ -133,7 +165,8 @@ public record UpdatePositionProfileRequest(
     decimal? SalaryMin,
     decimal? SalaryMax,
     string? SalaryType,
-    Guid? DefaultLeavePolicyId);
+    Guid? DefaultLeavePolicyId,
+    Guid? OnboardingTemplateId);
 
 public record UpdatePositionProfileResponse(
     Guid Id,

@@ -1,0 +1,104 @@
+@page "/companies/{CompanyId:guid}/onboarding-templates"
+@rendermode InteractiveServer
+@inherits SearchPageBase<OnboardingTemplateListItemModel>
+@inject OnboardingTemplateService OnboardingTemplateService
+@inject AppSession Session
+
+<PageTitle>Onboarding Templates</PageTitle>
+
+<div class="container-fluid py-4">
+    <h1 class="mb-1">Onboarding Templates</h1>
+    <p class="text-muted mb-3">Create reusable onboarding checklists that can be linked to position profiles.</p>
+
+    @if (IsLoading)
+    {
+        <HrLoadingIndicator Label="Loading onboarding templates…" />
+    }
+    else if (Error is not null)
+    {
+        <div class="alert alert-danger">@Error</div>
+    }
+    else
+    {
+        @if (ActionError is not null)
+        {
+            <div class="alert alert-danger alert-dismissible">
+                @ActionError
+                <button type="button" class="btn-close" @onclick="ClearActionError"></button>
+            </div>
+        }
+
+        <HrGrid @ref="Grid"
+                TValue="OnboardingTemplateListItemModel"
+                DataSource="@Items"
+                Toolbar="@GridToolbar"
+                AllowFiltering="true">
+            <GridEvents TValue="OnboardingTemplateListItemModel" OnToolbarClick="OnToolbarClick"
+                        RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
+            <GridPageSettings PageSize="20" />
+            <GridColumns>
+                <GridColumn Field="@nameof(OnboardingTemplateListItemModel.Name)" HeaderText="Name" Width="220">
+                    <Template>
+                        @{
+                            var row = (context as OnboardingTemplateListItemModel)!;
+                            <a href="/companies/@CompanyId/onboarding-templates/@row.Id">@row.Name</a>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(OnboardingTemplateListItemModel.Description)" HeaderText="Description" />
+                <GridColumn Field="@nameof(OnboardingTemplateListItemModel.TaskCount)" HeaderText="Tasks" Width="100" />
+                <GridColumn Field="@nameof(OnboardingTemplateListItemModel.IsActive)" HeaderText="Status" Width="110">
+                    <Template>
+                        @{
+                            var row = (context as OnboardingTemplateListItemModel)!;
+                            <ActiveStatusBadge IsActive="row.IsActive" />
+                        }
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </HrGrid>
+    }
+</div>
+
+@code {
+    protected override bool SupportsActiveFilter => true;
+
+    protected override Task OnBeforeLoadAsync()
+    {
+        if (!Session.CanManageEmployees)
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+        return Task.CompletedTask;
+    }
+
+    protected override void ConfigureToolbar()
+    {
+        AddToolbarAction(
+            id:      "hr-delete",
+            text:    "Delete",
+            icon:    "fa-solid fa-trash",
+            onClick: async item => await Delete(item),
+            tooltip: "Deactivate selected onboarding template");
+    }
+
+    protected override async Task<IReadOnlyList<OnboardingTemplateListItemModel>?> FetchItemsAsync(string? search)
+    {
+        var result = await OnboardingTemplateService.ListOnboardingTemplatesAsync(CompanyId, includeInactive: ShowInactive);
+        return result?.Items;
+    }
+
+    protected override string LoadErrorMessage => "Failed to load onboarding templates.";
+
+    protected override string? GetAddUrl()  => $"/companies/{CompanyId}/onboarding-templates/new";
+    protected override string? GetEditUrl(OnboardingTemplateListItemModel item) => $"/companies/{CompanyId}/onboarding-templates/{item.Id}";
+    protected override string? GetViewUrl(OnboardingTemplateListItemModel item) => $"/companies/{CompanyId}/onboarding-templates/{item.Id}/view";
+
+    private async Task Delete(OnboardingTemplateListItemModel item)
+    {
+        ClearActionError();
+        var error = await OnboardingTemplateService.DeactivateAsync(CompanyId, item.Id);
+        if (error is not null)
+            SetActionError(error);
+        else
+            await LoadAsync();
+    }
+}

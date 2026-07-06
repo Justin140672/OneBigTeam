@@ -104,6 +104,56 @@ public class PositionProfileService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<ListRequiredAssetsResponse?> ListRequiredAssetsAsync(
+        Guid companyId, Guid positionProfileId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<ListRequiredAssetsResponse>(
+                $"api/companies/{companyId}/position-profiles/{positionProfileId}/required-assets", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<(bool Success, string? Error)> AddRequiredAssetAsync(
+        Guid companyId, Guid positionProfileId, AddRequiredAssetToProfileRequest request)
+    {
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/position-profiles/{positionProfileId}/required-assets", request);
+
+        if (response.IsSuccessStatusCode)
+            return (true, null);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+            return (false, body?.Error ?? "This asset category is already required.");
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return (false, "Position profile or asset category not found.");
+
+        return (false, "Failed to add required asset.");
+    }
+
+    public async Task<bool> RemoveRequiredAssetAsync(
+        Guid companyId, Guid positionProfileId, Guid requiredAssetId)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync(
+                $"api/companies/{companyId}/position-profiles/{positionProfileId}/required-assets/{requiredAssetId}");
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public async Task<(bool Success, string? Error)> UpdatePositionProfileAsync(
         Guid companyId, Guid id, UpdatePositionProfileRequest request)
     {

@@ -4,6 +4,7 @@ using HR.Modules.Assets.Features.AcknowledgeAssetAssignment;
 using HR.Modules.Assets.Features.CreateAsset;
 using HR.Modules.Assets.Features.CreateAssetAssignment;
 using HR.Modules.Assets.Features.CreateAssetCategory;
+using HR.Modules.Assets.Features.CreateAssetProvisioningTasksOnEmployeeCreated;
 using HR.Modules.Assets.Features.DeactivateAssetCategory;
 using HR.Modules.Assets.Features.ListAssetCategories;
 using HR.Modules.Assets.Features.GetAsset;
@@ -19,7 +20,9 @@ using HR.Modules.Assets.Features.UpdateAssetCategory;
 using HR.Modules.Assets.Domain;
 using HR.Modules.Assets.Jobs;
 using HR.Modules.Assets.Persistence;
+using HR.Modules.Assets.Services;
 using HR.Infrastructure.Abstractions;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -64,6 +67,8 @@ public static class AssetsModule
         services.AddScoped<RequestAssetReturnHandler>();
         services.AddScoped<IValidator<UpdateAssetRequest>, UpdateAssetValidator>();
         services.AddScoped<AssetReminderJob>();
+        services.AddScoped<IAssetCategoryReader, AssetCategoryReader>();
+        services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
     }
 
     public static WebApplication UseAssetsRecurringJobs(this WebApplication app)

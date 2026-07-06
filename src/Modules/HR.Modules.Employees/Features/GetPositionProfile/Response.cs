@@ -17,10 +17,12 @@ internal sealed record GetPositionProfileResponse(
     decimal? SalaryMax,
     SalaryType? SalaryType,
     Guid? DefaultLeavePolicyId,
+    Guid? OnboardingTemplateId,
     bool IsActive,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    IReadOnlyList<RequiredDocumentItem> RequiredDocuments);
+    IReadOnlyList<RequiredDocumentItem> RequiredDocuments,
+    IReadOnlyList<RequiredAssetItem> RequiredAssets);
 
 internal sealed record RequiredDocumentItem(
     Guid Id,
@@ -28,3 +30,9 @@ internal sealed record RequiredDocumentItem(
     bool IsMandatory,
     int? DueDaysAfterStart,
     bool RequiresExpiryDate);
+
+internal sealed record RequiredAssetItem(
+    Guid Id,
+    Guid AssetCategoryId,
+    bool IsMandatory,
+    int Quantity);

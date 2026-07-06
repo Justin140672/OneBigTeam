@@ -64,6 +64,22 @@ internal sealed class CreatePositionProfileHandler
             }
         }
 
+        if (request.OnboardingTemplateId is not null)
+        {
+            var onboardingTemplateExists = await _dbContext.OnboardingTemplates
+                .AnyAsync(
+                    t => t.Id == request.OnboardingTemplateId &&
+                         t.CompanyId == request.CompanyId &&
+                         t.IsActive,
+                    cancellationToken);
+
+            if (!onboardingTemplateExists)
+            {
+                return Result.Failure<CreatePositionProfileResponse>(
+                    Error.NotFound($"Onboarding template '{request.OnboardingTemplateId}' was not found."));
+            }
+        }
+
         var now = _clock.UtcNowOffset();
 
         var profile = PositionProfile.Create(
@@ -80,7 +96,8 @@ internal sealed class CreatePositionProfileHandler
             request.SalaryMax,
             request.SalaryType,
             request.DefaultLeavePolicyId,
-            now);
+            now,
+            request.OnboardingTemplateId);
 
         _dbContext.PositionProfiles.Add(profile);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -99,6 +116,7 @@ internal sealed class CreatePositionProfileHandler
             profile.SalaryMax,
             profile.SalaryType,
             profile.DefaultLeavePolicyId,
+            profile.OnboardingTemplateId,
             profile.IsActive,
             profile.CreatedAt));
     }

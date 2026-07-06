@@ -20,6 +20,7 @@ internal sealed class GetPositionProfileHandler
         var profile = await _dbContext.PositionProfiles
             .AsNoTracking()
             .Include(p => p.RequiredDocuments)
+            .Include(p => p.RequiredAssets)
             .SingleOrDefaultAsync(
                 p => p.Id == request.Id && p.CompanyId == request.CompanyId,
                 cancellationToken);
@@ -33,6 +34,11 @@ internal sealed class GetPositionProfileHandler
         var requiredDocuments = profile.RequiredDocuments
             .Where(d => d.IsActive)
             .Select(d => new RequiredDocumentItem(d.Id, d.DocumentTypeId, d.IsMandatory, d.DueDaysAfterStart, d.RequiresExpiryDate))
+            .ToList();
+
+        var requiredAssets = profile.RequiredAssets
+            .Where(a => a.IsActive)
+            .Select(a => new RequiredAssetItem(a.Id, a.AssetCategoryId, a.IsMandatory, a.Quantity))
             .ToList();
 
         return Result.Success(new GetPositionProfileResponse(
@@ -49,9 +55,11 @@ internal sealed class GetPositionProfileHandler
             profile.SalaryMax,
             profile.SalaryType,
             profile.DefaultLeavePolicyId,
+            profile.OnboardingTemplateId,
             profile.IsActive,
             profile.CreatedAt,
             profile.UpdatedAt,
-            requiredDocuments));
+            requiredDocuments,
+            requiredAssets));
     }
 }

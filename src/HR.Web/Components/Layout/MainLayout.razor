@@ -50,6 +50,7 @@ else
                                     <MenuItem Text="Employees" Url="@_menuItems["Employees"]" />
                                     <MenuItem Text="Departments" Url="@_menuItems["Departments"]" />
                                     <MenuItem Text="Position Profiles" Url="@_menuItems["PositionProfiles"]" />
+                                    <MenuItem Text="Onboarding Templates" Url="@_menuItems["OnboardingTemplates"]" />
                                     <MenuItem Text="Employment Types" Url="@_menuItems["EmploymentTypes"]" />
                                     <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
                                 </MenuItems>
@@ -242,6 +243,7 @@ else
         ["Employees"] = "/",
         ["Departments"] = "/",
         ["PositionProfiles"] = "/",
+        ["OnboardingTemplates"] = "/",
         ["EmploymentTypes"] = "/",
         ["Assets"] = "/",
         ["AssetCategories"] = "/",
@@ -264,6 +266,7 @@ else
         _menuItems["Employees"] = $"/companies/{companyId}/employees";
         _menuItems["Departments"] = $"/companies/{companyId}/departments";
         _menuItems["PositionProfiles"] = $"/companies/{companyId}/position-profiles";
+        _menuItems["OnboardingTemplates"] = $"/companies/{companyId}/onboarding-templates";
         _menuItems["EmploymentTypes"] = $"/companies/{companyId}/employment-types";
         _menuItems["Assets"] = $"/companies/{companyId}/assets";
         _menuItems["AssetCategories"] = $"/companies/{companyId}/asset-categories";

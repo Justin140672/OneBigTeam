@@ -27,6 +27,7 @@ builder.Services.AddScoped<EmployeeService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<InviteService>();
 builder.Services.AddScoped<PositionProfileService>();
+builder.Services.AddScoped<OnboardingTemplateService>();
 builder.Services.AddScoped<PublicHolidayService>();
 builder.Services.AddScoped<LeaveService>();
 builder.Services.AddScoped<TaskService>();

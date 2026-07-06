@@ -322,6 +322,63 @@ public class UpdatePositionProfileHandlerTests
         Assert.Null(result.Value!.SalaryType);
     }
 
+    [Fact]
+    public async Task HandleAsync_Updates_With_Valid_OnboardingTemplateId()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var template = OnboardingTemplate.Create(Guid.NewGuid(), companyId, "Standard Onboarding", null, now);
+        context.OnboardingTemplates.Add(template);
+
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, null, null, null, null, null, null, now);
+        context.PositionProfiles.Add(profile);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+
+        var result = await handler.HandleAsync(
+            new UpdatePositionProfileRequest
+            {
+                CompanyId = companyId,
+                Id = profile.Id,
+                Title = "Engineer",
+                OnboardingTemplateId = template.Id,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(template.Id, result.Value!.OnboardingTemplateId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_OnboardingTemplateId_Does_Not_Exist()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, null, null, null, null, null, null, now);
+        context.PositionProfiles.Add(profile);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+
+        var result = await handler.HandleAsync(
+            new UpdatePositionProfileRequest
+            {
+                CompanyId = companyId,
+                Id = profile.Id,
+                Title = "Engineer",
+                OnboardingTemplateId = Guid.NewGuid(),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
     private static EmployeesDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<EmployeesDbContext>()

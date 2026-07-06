@@ -1,0 +1,296 @@
+@page "/companies/{CompanyId:guid}/onboarding-templates/new"
+@page "/companies/{CompanyId:guid}/onboarding-templates/{Id:guid}"
+@page "/companies/{CompanyId:guid}/onboarding-templates/{Id:guid}/view"
+@rendermode InteractiveServer
+@inject OnboardingTemplateService OnboardingTemplateService
+@inherits EditPageBase<OnboardingTemplateEditModel>
+
+<PageTitle>@PageTitle</PageTitle>
+
+<div class="container py-4">
+    <SfBreadcrumb Class="mb-3">
+        <BreadcrumbItems>
+            <BreadcrumbItem Text="Onboarding Templates" Url="@($"/companies/{CompanyId}/onboarding-templates")" />
+            <BreadcrumbItem Text="@PageTitle" />
+        </BreadcrumbItems>
+    </SfBreadcrumb>
+
+    @if (IsLoading)
+    {
+        <HrLoadingIndicator />
+    }
+    else
+    {
+        <h1 class="mb-1">@PageTitle</h1>
+        <p class="text-muted mb-4">Define the name and the onboarding checklist tasks for this template.</p>
+
+        @if (!string.IsNullOrEmpty(GlobalError))
+        {
+            <div class="alert alert-danger">@GlobalError</div>
+        }
+
+        <EditForm EditContext="EditContext">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Template Details</h5>
+                        </div>
+                        <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                            <div class="mb-3">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <HrTextBox @bind-Value="Model.Name" Placeholder="e.g. Standard Engineering Onboarding" />
+                                <ValidationMessage For="@(() => Model.Name)" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <HrTextBox @bind-Value="Model.Description" Placeholder="Optional description" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header d-flex align-items-center">
+                            <i class="fa-solid fa-list-check text-muted me-2"></i>
+                            <h5 class="mb-0">Checklist Tasks</h5>
+                            @if (!IsViewMode)
+                            {
+                                <div class="ms-auto">
+                                    <SfButton CssClass="e-primary e-small" OnClick="AddTask">
+                                        <i class="fa-solid fa-plus me-1"></i> Add Task
+                                    </SfButton>
+                                </div>
+                            }
+                        </div>
+                        <div class="card-body">
+                            @if (Model.Tasks.Count == 0)
+                            {
+                                <p class="text-muted small mb-0">No tasks configured for this template yet.</p>
+                            }
+                            else
+                            {
+                                @for (var i = 0; i < Model.Tasks.Count; i++)
+                                {
+                                    var index = i;
+                                    var task = Model.Tasks[index];
+                                    <div class="border rounded p-3 mb-3">
+                                        <div class="d-flex align-items-start gap-2">
+                                            <div class="flex-grow-1">
+                                                <div class="row g-2">
+                                                    <div class="col-md-8">
+                                                        <label class="form-label small">Title <span class="text-danger">*</span></label>
+                                                        <HrTextBox @bind-Value="task.Title" Placeholder="Task title" />
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label class="form-label small">Due Days After Start</label>
+                                                        <SfNumericTextBox TValue="int" @bind-Value="task.DueDaysAfterStart" Min="0" ShowSpinButton="false" />
+                                                    </div>
+                                                </div>
+                                                <div class="row g-2 mt-1">
+                                                    <div class="col-md-8">
+                                                        <label class="form-label small">Description</label>
+                                                        <HrTextBox @bind-Value="task.Description" Placeholder="Optional description" />
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <label class="form-label small">Priority</label>
+                                                        <SfDropDownList TValue="string" TItem="OptionChoice"
+                                                                        DataSource="@PriorityOptions"
+                                                                        @bind-Value="task.Priority">
+                                                            <DropDownListFieldSettings Value="Value" Text="Label" />
+                                                        </SfDropDownList>
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <label class="form-label small">Assign To</label>
+                                                        <SfDropDownList TValue="string" TItem="OptionChoice"
+                                                                        DataSource="@AssignToOptions"
+                                                                        @bind-Value="task.AssignTo">
+                                                            <DropDownListFieldSettings Value="Value" Text="Label" />
+                                                        </SfDropDownList>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            @if (!IsViewMode)
+                                            {
+                                                <div class="d-flex flex-column gap-1">
+                                                    <SfButton CssClass="e-small e-outline" Disabled="@(index == 0)" OnClick="@(() => MoveUp(index))" title="Move up">
+                                                        <i class="fa-solid fa-arrow-up"></i>
+                                                    </SfButton>
+                                                    <SfButton CssClass="e-small e-outline" Disabled="@(index == Model.Tasks.Count - 1)" OnClick="@(() => MoveDown(index))" title="Move down">
+                                                        <i class="fa-solid fa-arrow-down"></i>
+                                                    </SfButton>
+                                                    <SfButton CssClass="e-small e-danger e-outline" OnClick="@(() => RemoveTask(index))" title="Remove">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                    </SfButton>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 align-items-center mt-3">
+                        @if (!IsViewMode)
+                        {
+                            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                                @if (Saving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                Save
+                            </SfButton>
+                        }
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+    }
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+
+    private bool IsNew => Id is null || Id == Guid.Empty;
+    private string PageTitle => IsNew ? "Add Onboarding Template"
+        : Model.Name.Trim().Length > 0 ? Model.Name
+        : IsViewMode ? "View Onboarding Template" : "Edit Onboarding Template";
+
+    public sealed record OptionChoice(string Value, string Label);
+
+    private static readonly OptionChoice[] PriorityOptions =
+    [
+        new("Low", "Low"),
+        new("Medium", "Medium"),
+        new("High", "High"),
+        new("Critical", "Critical"),
+    ];
+
+    private static readonly OptionChoice[] AssignToOptions =
+    [
+        new("Unassigned", "Unassigned"),
+        new("NewHire", "New Hire"),
+        new("Manager", "Manager"),
+    ];
+
+    protected override async Task LoadAsync()
+    {
+        if (!IsNew)
+        {
+            var template = await OnboardingTemplateService.GetOnboardingTemplateAsync(CompanyId, Id!.Value);
+            if (template is not null)
+            {
+                Model.Name = template.Name;
+                Model.Description = template.Description;
+                Model.Tasks = template.Tasks
+                    .OrderBy(t => t.DisplayOrder)
+                    .Select(t => new OnboardingTemplateTaskEditModel
+                    {
+                        Id = t.Id,
+                        Title = t.Title,
+                        Description = t.Description,
+                        Priority = t.Priority,
+                        AssignTo = t.AssignTo,
+                        DueDaysAfterStart = t.DueDaysAfterStart,
+                        DisplayOrder = t.DisplayOrder,
+                    })
+                    .ToList();
+            }
+        }
+    }
+
+    private void AddTask()
+    {
+        Model.Tasks.Add(new OnboardingTemplateTaskEditModel
+        {
+            DisplayOrder = Model.Tasks.Count,
+        });
+    }
+
+    private void RemoveTask(int index)
+    {
+        Model.Tasks.RemoveAt(index);
+        RenumberTasks();
+    }
+
+    private void MoveUp(int index)
+    {
+        if (index <= 0) return;
+        (Model.Tasks[index - 1], Model.Tasks[index]) = (Model.Tasks[index], Model.Tasks[index - 1]);
+        RenumberTasks();
+    }
+
+    private void MoveDown(int index)
+    {
+        if (index >= Model.Tasks.Count - 1) return;
+        (Model.Tasks[index + 1], Model.Tasks[index]) = (Model.Tasks[index], Model.Tasks[index + 1]);
+        RenumberTasks();
+    }
+
+    private void RenumberTasks()
+    {
+        for (var i = 0; i < Model.Tasks.Count; i++)
+            Model.Tasks[i].DisplayOrder = i;
+    }
+
+    protected override async Task<string?> SaveCoreAsync()
+    {
+        var taskItems = Model.Tasks
+            .Select(t => new UpdateOnboardingTemplateTaskItem(
+                t.Id,
+                t.Title.Trim(),
+                string.IsNullOrWhiteSpace(t.Description) ? null : t.Description.Trim(),
+                t.Priority,
+                t.AssignTo,
+                t.DueDaysAfterStart,
+                t.DisplayOrder))
+            .ToList();
+
+        if (IsNew)
+        {
+            var createRequest = new CreateOnboardingTemplateRequest(
+                CompanyId,
+                Model.Name.Trim(),
+                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim());
+
+            var (created, createError) = await OnboardingTemplateService.CreateAsync(CompanyId, createRequest);
+            if (created is null)
+                return createError ?? "Failed to create onboarding template.";
+
+            if (taskItems.Count == 0)
+                return null;
+
+            var updateRequest = new UpdateOnboardingTemplateRequest(
+                CompanyId,
+                created.Id,
+                created.Name,
+                created.Description,
+                taskItems);
+
+            var (_, updateError) = await OnboardingTemplateService.UpdateAsync(CompanyId, created.Id, updateRequest);
+            return updateError;
+        }
+        else
+        {
+            var request = new UpdateOnboardingTemplateRequest(
+                CompanyId,
+                Id!.Value,
+                Model.Name.Trim(),
+                string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
+                taskItems);
+
+            var (updated, error) = await OnboardingTemplateService.UpdateAsync(CompanyId, Id!.Value, request);
+            return updated is not null ? null : error ?? "Failed to save onboarding template.";
+        }
+    }
+
+    protected override string? ListUrl => $"/companies/{CompanyId}/onboarding-templates";
+}
