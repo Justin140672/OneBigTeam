@@ -14,6 +14,7 @@ internal class RecruitmentDbContext : DbContext
     public DbSet<Candidate> Candidates => Set<Candidate>();
     public DbSet<Application> Applications => Set<Application>();
     public DbSet<Interview> Interviews => Set<Interview>();
+    public DbSet<CandidateDocument> CandidateDocuments => Set<CandidateDocument>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

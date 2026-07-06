@@ -31,7 +31,7 @@ builder.Services.AddLeaveModule(connectionString);
 builder.Services.AddNotificationsModule(connectionString);
 builder.Services.AddTasksModule(connectionString);
 builder.Services.AddProbationModule(connectionString);
-builder.Services.AddRecruitmentModule(connectionString);
+builder.Services.AddRecruitmentModule(connectionString, builder.Configuration);
 builder.Services.AddAssetsModule(connectionString);
 builder.Services.AddSicknessModule(connectionString);
 builder.Services.AddInfrastructure(connectionString);

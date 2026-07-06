@@ -4,10 +4,13 @@ using HR.Modules.Recruitment.Features.CloseVacancy;
 using HR.Modules.Recruitment.Features.CreateApplication;
 using HR.Modules.Recruitment.Features.CreateCandidate;
 using HR.Modules.Recruitment.Features.CreateVacancy;
+using HR.Modules.Recruitment.Features.DeleteCandidateDocument;
+using HR.Modules.Recruitment.Features.DownloadCandidateDocument;
 using HR.Modules.Recruitment.Features.GetApplication;
 using HR.Modules.Recruitment.Features.GetCandidate;
 using HR.Modules.Recruitment.Features.GetVacancy;
 using HR.Modules.Recruitment.Features.ListApplicationsForVacancy;
+using HR.Modules.Recruitment.Features.ListCandidateDocuments;
 using HR.Modules.Recruitment.Features.ListCandidates;
 using HR.Modules.Recruitment.Features.ListVacancies;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
@@ -15,9 +18,12 @@ using HR.Modules.Recruitment.Features.ScheduleInterview;
 using HR.Modules.Recruitment.Features.UpdateCandidate;
 using HR.Modules.Recruitment.Features.UpdateInterview;
 using HR.Modules.Recruitment.Features.UpdateVacancy;
+using HR.Modules.Recruitment.Features.UploadCandidateDocument;
 using HR.Modules.Recruitment.Features.WithdrawApplication;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Modules.Recruitment;
@@ -26,15 +32,23 @@ public static class RecruitmentModule
 {
     public static IServiceCollection AddRecruitmentModule(
         this IServiceCollection services,
-        string connectionString)
+        string connectionString,
+        IConfiguration configuration)
     {
         AddFeatureServices(services);
+        AddCandidateDocumentStorage(services, configuration);
 
         services.AddDbContext<RecruitmentDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "recruitment")));
 
         return services;
+    }
+
+    private static void AddCandidateDocumentStorage(IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<CandidateDocumentUploadOptions>(configuration.GetSection("Recruitment:CandidateDocuments"));
+        services.AddScoped<ICandidateDocumentStorageService, LocalCandidateDocumentStorageService>();
     }
 
     private static void AddFeatureServices(IServiceCollection services)
@@ -83,6 +97,16 @@ public static class RecruitmentModule
 
         services.AddScoped<RecordInterviewOutcomeHandler>();
         services.AddScoped<IValidator<RecordInterviewOutcomeRequest>, RecordInterviewOutcomeValidator>();
+
+        services.AddScoped<UploadCandidateDocumentHandler>();
+        services.AddScoped<IValidator<UploadCandidateDocumentRequest>, UploadCandidateDocumentValidator>();
+
+        services.AddScoped<ListCandidateDocumentsHandler>();
+        services.AddScoped<IValidator<ListCandidateDocumentsRequest>, ListCandidateDocumentsValidator>();
+
+        services.AddScoped<DownloadCandidateDocumentHandler>();
+
+        services.AddScoped<DeleteCandidateDocumentHandler>();
     }
 
     public static async Task MigrateRecruitmentAsync(this IServiceProvider services)
