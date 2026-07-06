@@ -161,6 +161,7 @@ public static class EmployeesModule
         services.AddScoped<IEmployeeNameReader, EmployeeNameReader>();
         services.AddScoped<IManagerReader, ManagerReader>();
         services.AddScoped<IPositionProfileDocumentsReader, PositionProfileDocumentsReader>();
+        services.AddScoped<IEmployeeProvisioningService, EmployeeProvisioningService>();
     }
 
     public static async Task MigrateEmployeesAsync(this IServiceProvider services)

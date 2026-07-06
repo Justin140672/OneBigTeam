@@ -43,6 +43,9 @@ internal sealed class CandidateConfiguration : IEntityTypeConfiguration<Candidat
             .HasColumnName("resume_url")
             .HasMaxLength(500);
 
+        builder.Property(c => c.EmployeeId)
+            .HasColumnName("employee_id");
+
         builder.Property(c => c.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

@@ -6,6 +6,7 @@ internal sealed record HireCandidateResponse(
     Guid Id,
     Guid VacancyId,
     Guid CandidateId,
+    Guid EmployeeId,
     ApplicationStatus Status,
     InterviewOutcome? InterviewOutcome,
     string? Notes,

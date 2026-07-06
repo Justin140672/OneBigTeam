@@ -11,6 +11,7 @@ internal sealed class Candidate
     public string Email { get; private set; } = string.Empty;
     public string? Phone { get; private set; }
     public string? ResumeUrl { get; private set; }
+    public Guid? EmployeeId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -49,5 +50,14 @@ internal sealed class Candidate
         Phone     = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
         ResumeUrl = string.IsNullOrWhiteSpace(resumeUrl) ? null : resumeUrl.Trim();
         UpdatedAt = now;
+    }
+
+    public void LinkToEmployee(Guid employeeId, DateTimeOffset now)
+    {
+        if (EmployeeId is not null)
+            throw new InvalidOperationException("Candidate is already linked to an employee.");
+
+        EmployeeId = employeeId;
+        UpdatedAt  = now;
     }
 }

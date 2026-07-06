@@ -32,4 +32,24 @@ public class CandidateTests
         Assert.Equal("https://example.com/resume.pdf", candidate.ResumeUrl);
         Assert.Equal(later, candidate.UpdatedAt);
     }
+
+    [Fact]
+    public void LinkToEmployee_Sets_EmployeeId()
+    {
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var employeeId = Guid.NewGuid();
+
+        candidate.LinkToEmployee(employeeId, Now);
+
+        Assert.Equal(employeeId, candidate.EmployeeId);
+    }
+
+    [Fact]
+    public void LinkToEmployee_When_Already_Linked_Throws()
+    {
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        candidate.LinkToEmployee(Guid.NewGuid(), Now);
+
+        Assert.Throws<InvalidOperationException>(() => candidate.LinkToEmployee(Guid.NewGuid(), Now));
+    }
 }
