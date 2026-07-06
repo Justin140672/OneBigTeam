@@ -43,6 +43,10 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
             .HasColumnName("notes")
             .HasMaxLength(2000);
 
+        builder.Property(a => a.RejectionReason)
+            .HasColumnName("rejection_reason")
+            .HasMaxLength(2000);
+
         builder.Property(a => a.AppliedAt)
             .HasColumnName("applied_at")
             .IsRequired();

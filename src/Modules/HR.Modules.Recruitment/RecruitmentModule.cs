@@ -9,11 +9,14 @@ using HR.Modules.Recruitment.Features.DownloadCandidateDocument;
 using HR.Modules.Recruitment.Features.GetApplication;
 using HR.Modules.Recruitment.Features.GetCandidate;
 using HR.Modules.Recruitment.Features.GetVacancy;
+using HR.Modules.Recruitment.Features.HireCandidate;
 using HR.Modules.Recruitment.Features.ListApplicationsForVacancy;
 using HR.Modules.Recruitment.Features.ListCandidateDocuments;
 using HR.Modules.Recruitment.Features.ListCandidates;
 using HR.Modules.Recruitment.Features.ListVacancies;
+using HR.Modules.Recruitment.Features.OfferCandidate;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
+using HR.Modules.Recruitment.Features.RejectCandidate;
 using HR.Modules.Recruitment.Features.ScheduleInterview;
 using HR.Modules.Recruitment.Features.UpdateCandidate;
 using HR.Modules.Recruitment.Features.UpdateInterview;
@@ -22,6 +25,7 @@ using HR.Modules.Recruitment.Features.UploadCandidateDocument;
 using HR.Modules.Recruitment.Features.WithdrawApplication;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,6 +41,7 @@ public static class RecruitmentModule
     {
         AddFeatureServices(services);
         AddCandidateDocumentStorage(services, configuration);
+        services.AddScoped<IInterviewFeedbackService, InterviewFeedbackService>();
 
         services.AddDbContext<RecruitmentDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
@@ -88,6 +93,15 @@ public static class RecruitmentModule
 
         services.AddScoped<WithdrawApplicationHandler>();
         services.AddScoped<IValidator<WithdrawApplicationRequest>, WithdrawApplicationValidator>();
+
+        services.AddScoped<OfferCandidateHandler>();
+        services.AddScoped<IValidator<OfferCandidateRequest>, OfferCandidateValidator>();
+
+        services.AddScoped<RejectCandidateHandler>();
+        services.AddScoped<IValidator<RejectCandidateRequest>, RejectCandidateValidator>();
+
+        services.AddScoped<HireCandidateHandler>();
+        services.AddScoped<IValidator<HireCandidateRequest>, HireCandidateValidator>();
 
         services.AddScoped<ScheduleInterviewHandler>();
         services.AddScoped<IValidator<ScheduleInterviewRequest>, ScheduleInterviewValidator>();

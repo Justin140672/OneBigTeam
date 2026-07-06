@@ -11,6 +11,7 @@ internal sealed class Application
     public ApplicationStatus Status { get; private set; }
     public InterviewOutcome? InterviewOutcome { get; private set; }
     public string? Notes { get; private set; }
+    public string? RejectionReason { get; private set; }
     public DateTimeOffset AppliedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -81,13 +82,14 @@ internal sealed class Application
         UpdatedAt = now;
     }
 
-    public void Reject(DateTimeOffset now)
+    public void Reject(DateTimeOffset now, string? rejectionReason = null)
     {
         if (Status is ApplicationStatus.Hired or ApplicationStatus.Rejected or ApplicationStatus.Withdrawn)
             throw new InvalidOperationException($"Cannot reject an application with status '{Status}'.");
 
-        Status    = ApplicationStatus.Rejected;
-        UpdatedAt = now;
+        Status          = ApplicationStatus.Rejected;
+        RejectionReason = string.IsNullOrWhiteSpace(rejectionReason) ? null : rejectionReason.Trim();
+        UpdatedAt       = now;
     }
 
     public void Withdraw(DateTimeOffset now)
