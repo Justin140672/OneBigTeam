@@ -1,0 +1,101 @@
+namespace HR.Modules.Recruitment.Domain;
+
+internal sealed class Application
+{
+    private Application() { }
+
+    public Guid Id { get; private set; }
+    public Guid CompanyId { get; private set; }
+    public Guid VacancyId { get; private set; }
+    public Guid CandidateId { get; private set; }
+    public ApplicationStatus Status { get; private set; }
+    public InterviewOutcome? InterviewOutcome { get; private set; }
+    public string? Notes { get; private set; }
+    public DateTimeOffset AppliedAt { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset UpdatedAt { get; private set; }
+
+    public static Application Create(
+        Guid id,
+        Guid companyId,
+        Guid vacancyId,
+        Guid candidateId,
+        string? notes,
+        DateTimeOffset now) => new()
+    {
+        Id          = id,
+        CompanyId   = companyId,
+        VacancyId   = vacancyId,
+        CandidateId = candidateId,
+        Status      = ApplicationStatus.Applied,
+        Notes       = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
+        AppliedAt   = now,
+        CreatedAt   = now,
+        UpdatedAt   = now,
+    };
+
+    public void MoveToScreening(DateTimeOffset now)
+    {
+        if (Status != ApplicationStatus.Applied)
+            throw new InvalidOperationException($"Cannot move an application with status '{Status}' to screening.");
+
+        Status    = ApplicationStatus.Screening;
+        UpdatedAt = now;
+    }
+
+    public void ScheduleInterview(DateTimeOffset now)
+    {
+        if (Status is not (ApplicationStatus.Screening or ApplicationStatus.Applied))
+            throw new InvalidOperationException($"Cannot schedule an interview for an application with status '{Status}'.");
+
+        Status            = ApplicationStatus.InterviewScheduled;
+        InterviewOutcome ??= Domain.InterviewOutcome.Pending;
+        UpdatedAt          = now;
+    }
+
+    public void RecordInterviewOutcome(InterviewOutcome outcome, DateTimeOffset now)
+    {
+        if (Status != ApplicationStatus.InterviewScheduled)
+            throw new InvalidOperationException($"Cannot record an interview outcome for an application with status '{Status}'.");
+
+        InterviewOutcome = outcome;
+        Status           = ApplicationStatus.Interviewed;
+        UpdatedAt         = now;
+    }
+
+    public void Offer(DateTimeOffset now)
+    {
+        if (Status != ApplicationStatus.Interviewed)
+            throw new InvalidOperationException($"Cannot make an offer for an application with status '{Status}'.");
+
+        Status    = ApplicationStatus.Offered;
+        UpdatedAt = now;
+    }
+
+    public void Hire(DateTimeOffset now)
+    {
+        if (Status != ApplicationStatus.Offered)
+            throw new InvalidOperationException($"Cannot hire an application with status '{Status}'.");
+
+        Status    = ApplicationStatus.Hired;
+        UpdatedAt = now;
+    }
+
+    public void Reject(DateTimeOffset now)
+    {
+        if (Status is ApplicationStatus.Hired or ApplicationStatus.Rejected or ApplicationStatus.Withdrawn)
+            throw new InvalidOperationException($"Cannot reject an application with status '{Status}'.");
+
+        Status    = ApplicationStatus.Rejected;
+        UpdatedAt = now;
+    }
+
+    public void Withdraw(DateTimeOffset now)
+    {
+        if (Status is ApplicationStatus.Hired or ApplicationStatus.Rejected or ApplicationStatus.Withdrawn)
+            throw new InvalidOperationException($"Cannot withdraw an application with status '{Status}'.");
+
+        Status    = ApplicationStatus.Withdrawn;
+        UpdatedAt = now;
+    }
+}
