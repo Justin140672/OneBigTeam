@@ -1,13 +1,15 @@
 using HR.Modules.Recruitment.Persistence;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 
-internal sealed class RecordInterviewOutcomeHandler(RecruitmentDbContext db, IClock clock)
+internal sealed class RecordInterviewOutcomeHandler(RecruitmentDbContext db, ITaskCompleter taskCompleter, IClock clock)
 {
     public async Task<Result<RecordInterviewOutcomeResponse>> HandleAsync(
         RecordInterviewOutcomeRequest request,
+        Guid recordedBy,
         CancellationToken cancellationToken)
     {
         var applicationExists = await db.Applications
@@ -40,6 +42,14 @@ internal sealed class RecordInterviewOutcomeHandler(RecruitmentDbContext db, ICl
 
         interview.RecordOutcome(request.Outcome, request.Notes, now);
         await db.SaveChangesAsync(cancellationToken);
+
+        await taskCompleter.CompleteBySourceEntityAsync(
+            request.CompanyId,
+            interview.Id,
+            TaskSource.Recruitment,
+            TaskActionType.Complete,
+            recordedBy,
+            cancellationToken);
 
         return Result.Success(new RecordInterviewOutcomeResponse(
             interview.Id,

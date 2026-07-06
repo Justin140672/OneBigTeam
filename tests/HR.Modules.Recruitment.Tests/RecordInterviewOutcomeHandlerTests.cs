@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 using HR.Modules.Recruitment.Persistence;
@@ -36,6 +37,7 @@ public class RecordInterviewOutcomeHandlerTests
                 Outcome       = InterviewOutcome.Passed,
                 Notes         = "Strong technical skills.",
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -62,6 +64,7 @@ public class RecordInterviewOutcomeHandlerTests
                 InterviewId   = Guid.NewGuid(),
                 Outcome       = InterviewOutcome.Passed,
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -90,6 +93,7 @@ public class RecordInterviewOutcomeHandlerTests
                 InterviewId   = Guid.NewGuid(),
                 Outcome       = InterviewOutcome.Passed,
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -121,14 +125,82 @@ public class RecordInterviewOutcomeHandlerTests
                 InterviewId   = interview.Id,
                 Outcome       = InterviewOutcome.Passed,
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
     }
 
-    private static RecordInterviewOutcomeHandler handler(RecruitmentDbContext db) =>
-        new(db, new FakeClock(FixedUtcNow));
+    [Fact]
+    public async Task HandleAsync_Completes_Feedback_Task_Via_TaskCompleter()
+    {
+        await using var db = BuildContext();
+        var taskCompleter = new FakeTaskCompleter();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Senior Software Engineer", null, null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(2), 30, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        db.Interviews.Add(interview);
+        await db.SaveChangesAsync();
+
+        var recordedBy = Guid.NewGuid();
+
+        await handler(db, taskCompleter).HandleAsync(
+            new RecordInterviewOutcomeRequest
+            {
+                CompanyId     = companyId,
+                VacancyId     = vacancy.Id,
+                ApplicationId = application.Id,
+                InterviewId   = interview.Id,
+                Outcome       = InterviewOutcome.Passed,
+            },
+            recordedBy,
+            CancellationToken.None);
+
+        var call = Assert.Single(taskCompleter.Calls);
+        Assert.Equal(companyId, call.CompanyId);
+        Assert.Equal(interview.Id, call.SourceEntityId);
+        Assert.Equal(TaskSource.Recruitment, call.Source);
+        Assert.Equal(TaskActionType.Complete, call.ActionType);
+        Assert.Equal(recordedBy, call.CompletedBy);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Complete_Task_When_Interview_Missing()
+    {
+        await using var db = BuildContext();
+        var taskCompleter = new FakeTaskCompleter();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Backend Engineer", null, null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        await handler(db, taskCompleter).HandleAsync(
+            new RecordInterviewOutcomeRequest
+            {
+                CompanyId     = companyId,
+                VacancyId     = vacancy.Id,
+                ApplicationId = application.Id,
+                InterviewId   = Guid.NewGuid(),
+                Outcome       = InterviewOutcome.Passed,
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.Empty(taskCompleter.Calls);
+    }
+
+    private static RecordInterviewOutcomeHandler handler(RecruitmentDbContext db, FakeTaskCompleter? taskCompleter = null) =>
+        new(db, taskCompleter ?? new FakeTaskCompleter(), new FakeClock(FixedUtcNow));
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()
