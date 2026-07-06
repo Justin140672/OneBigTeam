@@ -2,6 +2,7 @@ using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.CloseVacancy;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Tests;
@@ -21,13 +22,22 @@ public class CloseVacancyHandlerTests
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
 
-        var result = await handler(db).HandleAsync(
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, auditPublisher).HandleAsync(
             new CloseVacancyRequest { CompanyId = companyId, VacancyId = vacancy.Id },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(VacancyStatus.Closed, result.Value!.Status);
         Assert.Equal(DateOnly.FromDateTime(FixedUtcNow), result.Value.ClosedAt);
+
+        var published = Assert.Single(auditPublisher.Published);
+        var auditEvent = Assert.IsType<VacancyClosedAuditEvent>(published);
+        Assert.Equal("vacancy.closed", ((IAuditEvent)auditEvent).EventType);
+        Assert.Equal("Vacancy", ((IAuditEvent)auditEvent).EntityType);
+        Assert.Equal(vacancy.Id, ((IAuditEvent)auditEvent).EntityId);
+        Assert.Equal(VacancyStatus.Open, auditEvent.PreviousStatus);
     }
 
     [Fact]
@@ -54,13 +64,15 @@ public class CloseVacancyHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Vacancy_Missing()
     {
         await using var db = BuildContext();
+        var auditPublisher = new FakeAuditPublisher();
 
-        var result = await handler(db).HandleAsync(
+        var result = await handler(db, auditPublisher).HandleAsync(
             new CloseVacancyRequest { CompanyId = Guid.NewGuid(), VacancyId = Guid.NewGuid() },
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+        Assert.Empty(auditPublisher.Published);
     }
 
     [Fact]
@@ -73,13 +85,15 @@ public class CloseVacancyHandlerTests
         vacancy.Close(Now, DateOnly.FromDateTime(Now.UtcDateTime));
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
+        var auditPublisher = new FakeAuditPublisher();
 
-        var result = await handler(db).HandleAsync(
+        var result = await handler(db, auditPublisher).HandleAsync(
             new CloseVacancyRequest { CompanyId = companyId, VacancyId = vacancy.Id },
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
+        Assert.Empty(auditPublisher.Published);
     }
 
     [Fact]
@@ -91,17 +105,19 @@ public class CloseVacancyHandlerTests
         vacancy.Cancel(Now);
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
+        var auditPublisher = new FakeAuditPublisher();
 
-        var result = await handler(db).HandleAsync(
+        var result = await handler(db, auditPublisher).HandleAsync(
             new CloseVacancyRequest { CompanyId = companyId, VacancyId = vacancy.Id },
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
+        Assert.Empty(auditPublisher.Published);
     }
 
-    private static CloseVacancyHandler handler(RecruitmentDbContext db) =>
-        new(db, new FakeClock(FixedUtcNow));
+    private static CloseVacancyHandler handler(RecruitmentDbContext db, FakeAuditPublisher? auditPublisher = null) =>
+        new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

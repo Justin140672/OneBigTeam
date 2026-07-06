@@ -114,6 +114,7 @@ public static class RecruitmentModule
         services.AddScoped<UpdateInterviewHandler>();
         services.AddScoped<IValidator<UpdateInterviewRequest>, UpdateInterviewValidator>();
 
+        services.AddScoped<InterviewOutcomeRecorder>();
         services.AddScoped<RecordInterviewOutcomeHandler>();
         services.AddScoped<IValidator<RecordInterviewOutcomeRequest>, RecordInterviewOutcomeValidator>();
 

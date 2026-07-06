@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.UpdateVacancy;
 
-internal sealed class UpdateVacancyHandler(RecruitmentDbContext db, IClock clock)
+internal sealed class UpdateVacancyHandler(RecruitmentDbContext db, IClock clock, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<UpdateVacancyResponse>> HandleAsync(
         UpdateVacancyRequest request,
@@ -21,6 +21,14 @@ internal sealed class UpdateVacancyHandler(RecruitmentDbContext db, IClock clock
 
         var now = clock.UtcNowOffset();
 
+        var before = new VacancyAuditSnapshot(
+            vacancy.DepartmentId,
+            vacancy.Title,
+            vacancy.Description,
+            vacancy.Location,
+            vacancy.HiringManagerId,
+            vacancy.Status);
+
         vacancy.UpdateDetails(
             request.DepartmentId,
             request.Title,
@@ -30,6 +38,18 @@ internal sealed class UpdateVacancyHandler(RecruitmentDbContext db, IClock clock
             now);
 
         await db.SaveChangesAsync(cancellationToken);
+
+        var after = new VacancyAuditSnapshot(
+            vacancy.DepartmentId,
+            vacancy.Title,
+            vacancy.Description,
+            vacancy.Location,
+            vacancy.HiringManagerId,
+            vacancy.Status);
+
+        await auditPublisher.PublishAsync(
+            new VacancyUpdatedAuditEvent(vacancy.CompanyId, vacancy.Id, before, after, now),
+            cancellationToken);
 
         return Result.Success(new UpdateVacancyResponse(
             vacancy.Id,

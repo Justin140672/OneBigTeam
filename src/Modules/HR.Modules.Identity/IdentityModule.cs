@@ -111,6 +111,23 @@ public static class IdentityModule
             SystemRoles.HrAdministrator,
             SystemRoles.CompanyAdministrator));
 
+        // Recruitment domain — vacancy-only reads (internal job board visibility).
+        // Broad by design: seeing what roles are open is general visibility, not sensitive.
+        builder.AddPolicy("recruitment:view", RolePolicy(
+            SystemRoles.Employee,
+            SystemRoles.Manager,
+            SystemRoles.Recruiter,
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
+        // Recruitment domain — candidate/application/interview/document reads.
+        // Restricted to the same role set as recruitment:manage: candidate PII, resumes,
+        // and interview notes must not be visible to plain Employees/Managers.
+        builder.AddPolicy("candidate:view", RolePolicy(
+            SystemRoles.Recruiter,
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
         return builder;
     }
 

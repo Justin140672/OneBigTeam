@@ -2,6 +2,7 @@ using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.UpdateVacancy;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Tests;
@@ -22,8 +23,9 @@ public class UpdateVacancyHandlerTests
 
         var newHiringManagerId = Guid.NewGuid();
         var newDepartmentId = Guid.NewGuid();
+        var auditPublisher = new FakeAuditPublisher();
 
-        var result = await handler(db).HandleAsync(
+        var result = await handler(db, auditPublisher).HandleAsync(
             new UpdateVacancyRequest
             {
                 CompanyId       = companyId,
@@ -42,14 +44,23 @@ public class UpdateVacancyHandlerTests
         Assert.Equal("Remote", result.Value.Location);
         Assert.Equal(newDepartmentId, result.Value.DepartmentId);
         Assert.Equal(newHiringManagerId, result.Value.HiringManagerId);
+
+        var published = Assert.Single(auditPublisher.Published);
+        var auditEvent = Assert.IsType<VacancyUpdatedAuditEvent>(published);
+        Assert.Equal("vacancy.updated", ((IAuditEvent)auditEvent).EventType);
+        Assert.Equal("Vacancy", ((IAuditEvent)auditEvent).EntityType);
+        Assert.Equal(vacancy.Id, ((IAuditEvent)auditEvent).EntityId);
+        Assert.Equal("Old Title", auditEvent.Before.Title);
+        Assert.Equal("New Title", auditEvent.After.Title);
     }
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Vacancy_Missing()
     {
         await using var db = BuildContext();
+        var auditPublisher = new FakeAuditPublisher();
 
-        var result = await handler(db).HandleAsync(
+        var result = await handler(db, auditPublisher).HandleAsync(
             new UpdateVacancyRequest
             {
                 CompanyId       = Guid.NewGuid(),
@@ -61,10 +72,11 @@ public class UpdateVacancyHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+        Assert.Empty(auditPublisher.Published);
     }
 
-    private static UpdateVacancyHandler handler(RecruitmentDbContext db) =>
-        new(db, new FakeClock(FixedUtcNow));
+    private static UpdateVacancyHandler handler(RecruitmentDbContext db, FakeAuditPublisher? auditPublisher = null) =>
+        new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

@@ -9,7 +9,7 @@ internal sealed class Endpoint(ListCandidatesHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/candidates");
-        Policies("authenticated");
+        Policies("candidate:view");
     }
 
     public override async Task HandleAsync(

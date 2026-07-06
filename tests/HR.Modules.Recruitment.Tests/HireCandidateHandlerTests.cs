@@ -42,7 +42,9 @@ public class HireCandidateHandlerTests
         db.Applications.Add(application);
         await db.SaveChangesAsync();
 
-        var result = await handler(db, provisioning).HandleAsync(
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, provisioning, auditPublisher: auditPublisher).HandleAsync(
             BuildRequest(companyId, vacancy.Id, application.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -57,6 +59,16 @@ public class HireCandidateHandlerTests
         Assert.Equal("Clarke", request.LastName);
         Assert.Equal("emma.clarke@example.com", request.WorkEmail);
         Assert.Equal("+44 7700 900001", request.PhoneNumber);
+
+        var published = Assert.Single(auditPublisher.Published);
+        var auditEvent = Assert.IsType<CandidateHiredAuditEvent>(published);
+        Assert.Equal("candidate.hired", ((IAuditEvent)auditEvent).EventType);
+        Assert.Equal("Candidate", ((IAuditEvent)auditEvent).EntityType);
+        Assert.Equal(candidate.Id, ((IAuditEvent)auditEvent).EntityId);
+        Assert.Equal(result.Value.EmployeeId, ((IAuditEvent)auditEvent).EmployeeId);
+        Assert.Equal(application.Id, auditEvent.ApplicationId);
+        Assert.Equal(vacancy.Id, auditEvent.VacancyId);
+        Assert.Equal(result.Value.EmployeeId, auditEvent.EmployeeId);
     }
 
     [Fact]
@@ -106,11 +118,14 @@ public class HireCandidateHandlerTests
         db.Applications.Add(application);
         await db.SaveChangesAsync();
 
-        var result = await handler(db, eventPublisher: eventPublisher).HandleAsync(
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, eventPublisher: eventPublisher, auditPublisher: auditPublisher).HandleAsync(
             BuildRequest(companyId, vacancy.Id, application.Id), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Empty(eventPublisher.PublishedEvents);
+        Assert.Empty(auditPublisher.Published);
     }
 
     [Fact]
@@ -204,8 +219,9 @@ public class HireCandidateHandlerTests
     private static HireCandidateHandler handler(
         RecruitmentDbContext db,
         FakeEmployeeProvisioningService? provisioning = null,
-        FakeIntegrationEventPublisher? eventPublisher = null) =>
-        new(db, provisioning ?? new FakeEmployeeProvisioningService(), new FakeClock(FixedUtcNow), eventPublisher ?? new FakeIntegrationEventPublisher());
+        FakeIntegrationEventPublisher? eventPublisher = null,
+        FakeAuditPublisher? auditPublisher = null) =>
+        new(db, provisioning ?? new FakeEmployeeProvisioningService(), new FakeClock(FixedUtcNow), eventPublisher ?? new FakeIntegrationEventPublisher(), auditPublisher ?? new FakeAuditPublisher());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

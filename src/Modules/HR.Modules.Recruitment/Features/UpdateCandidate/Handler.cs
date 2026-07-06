@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.UpdateCandidate;
 
-internal sealed class UpdateCandidateHandler(RecruitmentDbContext db, IClock clock)
+internal sealed class UpdateCandidateHandler(RecruitmentDbContext db, IClock clock, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<UpdateCandidateResponse>> HandleAsync(
         UpdateCandidateRequest request,
@@ -38,6 +38,13 @@ internal sealed class UpdateCandidateHandler(RecruitmentDbContext db, IClock clo
 
         var now = clock.UtcNowOffset();
 
+        var before = new CandidateAuditSnapshot(
+            candidate.FirstName,
+            candidate.LastName,
+            candidate.Email,
+            candidate.Phone,
+            candidate.ResumeUrl);
+
         candidate.UpdateDetails(
             request.FirstName,
             request.LastName,
@@ -47,6 +54,17 @@ internal sealed class UpdateCandidateHandler(RecruitmentDbContext db, IClock clo
             now);
 
         await db.SaveChangesAsync(cancellationToken);
+
+        var after = new CandidateAuditSnapshot(
+            candidate.FirstName,
+            candidate.LastName,
+            candidate.Email,
+            candidate.Phone,
+            candidate.ResumeUrl);
+
+        await auditPublisher.PublishAsync(
+            new CandidateUpdatedAuditEvent(candidate.CompanyId, candidate.Id, before, after, now),
+            cancellationToken);
 
         return Result.Success(new UpdateCandidateResponse(
             candidate.Id,

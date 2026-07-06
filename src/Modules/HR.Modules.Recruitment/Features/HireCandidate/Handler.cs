@@ -10,7 +10,8 @@ internal sealed class HireCandidateHandler(
     RecruitmentDbContext db,
     IEmployeeProvisioningService employeeProvisioningService,
     IClock clock,
-    IIntegrationEventPublisher eventPublisher)
+    IIntegrationEventPublisher eventPublisher,
+    IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<HireCandidateResponse>> HandleAsync(
         HireCandidateRequest request,
@@ -76,6 +77,16 @@ internal sealed class HireCandidateHandler(
             provisioningResult.Value!,
             application.VacancyId,
             now), cancellationToken);
+
+        await auditPublisher.PublishAsync(
+            new CandidateHiredAuditEvent(
+                application.CompanyId,
+                candidate.Id,
+                application.Id,
+                application.VacancyId,
+                provisioningResult.Value!,
+                now),
+            cancellationToken);
 
         return Result.Success(new HireCandidateResponse(
             application.Id,

@@ -73,6 +73,7 @@ public class GetEmployeeAuditHistoryHandlerTests
     [InlineData("ProbationRecord", "Probation")]
     [InlineData("EmployeeDocument", "Documents")]
     [InlineData("AssetAssignment", "Assets")]
+    [InlineData("Candidate", "Recruitment")]
     public async Task HandleAsync_Maps_EntityType_To_Expected_Module(string entityType, string expectedModule)
     {
         var companyId = Guid.NewGuid();

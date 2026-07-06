@@ -9,7 +9,7 @@ internal sealed class Endpoint(DownloadCandidateDocumentHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/candidates/{candidateId:guid}/documents/{documentId:guid}/download");
-        Policies("authenticated");
+        Policies("candidate:view");
     }
 
     public override async Task HandleAsync(

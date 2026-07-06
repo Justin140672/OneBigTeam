@@ -2,6 +2,7 @@ using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.UpdateCandidate;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Tests;
@@ -20,7 +21,9 @@ public class UpdateCandidateHandlerTests
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
 
-        var result = await handler(db).HandleAsync(
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, auditPublisher).HandleAsync(
             new UpdateCandidateRequest
             {
                 CompanyId   = companyId,
@@ -38,14 +41,23 @@ public class UpdateCandidateHandlerTests
         Assert.Equal("emma.clarke-smith@example.com", result.Value.Email);
         Assert.Equal("+44 7700 900001", result.Value.Phone);
         Assert.Equal("https://example.com/resume.pdf", result.Value.ResumeUrl);
+
+        var published = Assert.Single(auditPublisher.Published);
+        var auditEvent = Assert.IsType<CandidateUpdatedAuditEvent>(published);
+        Assert.Equal("candidate.updated", ((IAuditEvent)auditEvent).EventType);
+        Assert.Equal("Candidate", ((IAuditEvent)auditEvent).EntityType);
+        Assert.Equal(candidate.Id, ((IAuditEvent)auditEvent).EntityId);
+        Assert.Equal("Clarke", auditEvent.Before.LastName);
+        Assert.Equal("Clarke-Smith", auditEvent.After.LastName);
     }
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Candidate_Missing()
     {
         await using var db = BuildContext();
+        var auditPublisher = new FakeAuditPublisher();
 
-        var result = await handler(db).HandleAsync(
+        var result = await handler(db, auditPublisher).HandleAsync(
             new UpdateCandidateRequest
             {
                 CompanyId   = Guid.NewGuid(),
@@ -58,6 +70,7 @@ public class UpdateCandidateHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+        Assert.Empty(auditPublisher.Published);
     }
 
     [Fact]
@@ -111,8 +124,8 @@ public class UpdateCandidateHandlerTests
         Assert.Equal("+44 7700 900001", result.Value!.Phone);
     }
 
-    private static UpdateCandidateHandler handler(RecruitmentDbContext db) =>
-        new(db, new FakeClock(FixedUtcNow));
+    private static UpdateCandidateHandler handler(RecruitmentDbContext db, FakeAuditPublisher? auditPublisher = null) =>
+        new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

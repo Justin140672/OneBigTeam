@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.CloseVacancy;
 
-internal sealed class CloseVacancyHandler(RecruitmentDbContext db, IClock clock)
+internal sealed class CloseVacancyHandler(RecruitmentDbContext db, IClock clock, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<CloseVacancyResponse>> HandleAsync(
         CloseVacancyRequest request,
@@ -24,11 +24,16 @@ internal sealed class CloseVacancyHandler(RecruitmentDbContext db, IClock clock)
             return Result.Failure<CloseVacancyResponse>(
                 Error.Validation($"Cannot close a vacancy with status '{vacancy.Status}'."));
 
+        var previousStatus = vacancy.Status;
         var now = clock.UtcNowOffset();
         var closedAt = request.ClosedAt ?? DateOnly.FromDateTime(now.UtcDateTime);
 
         vacancy.Close(now, closedAt);
         await db.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(
+            new VacancyClosedAuditEvent(vacancy.CompanyId, vacancy.Id, vacancy.Title, previousStatus, closedAt, now),
+            cancellationToken);
 
         return Result.Success(new CloseVacancyResponse(
             vacancy.Id,

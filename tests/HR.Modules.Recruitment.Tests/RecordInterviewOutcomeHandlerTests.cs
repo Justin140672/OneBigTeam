@@ -3,6 +3,7 @@ using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Tests;
@@ -27,7 +28,10 @@ public class RecordInterviewOutcomeHandlerTests
         db.Interviews.Add(interview);
         await db.SaveChangesAsync();
 
-        var result = await handler(db).HandleAsync(
+        var auditPublisher = new FakeAuditPublisher();
+        var recordedBy = Guid.NewGuid();
+
+        var result = await handler(db, auditPublisher: auditPublisher).HandleAsync(
             new RecordInterviewOutcomeRequest
             {
                 CompanyId     = companyId,
@@ -37,7 +41,7 @@ public class RecordInterviewOutcomeHandlerTests
                 Outcome       = InterviewOutcome.Passed,
                 Notes         = "Strong technical skills.",
             },
-            Guid.NewGuid(),
+            recordedBy,
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -48,14 +52,27 @@ public class RecordInterviewOutcomeHandlerTests
         var savedApplication = await db.Applications.SingleAsync();
         Assert.Equal(ApplicationStatus.Applied, savedApplication.Status);
         Assert.Null(savedApplication.InterviewOutcome);
+
+        var published = Assert.Single(auditPublisher.Published);
+        var auditEvent = Assert.IsType<InterviewOutcomeRecordedAuditEvent>(published);
+        Assert.Equal("interview.outcome_recorded", ((IAuditEvent)auditEvent).EventType);
+        Assert.Equal("Interview", ((IAuditEvent)auditEvent).EntityType);
+        Assert.Equal(interview.Id, ((IAuditEvent)auditEvent).EntityId);
+        Assert.Equal(application.Id, auditEvent.ApplicationId);
+        Assert.Equal(vacancy.Id, auditEvent.VacancyId);
+        Assert.Equal(candidate.Id, auditEvent.CandidateId);
+        Assert.Equal(InterviewOutcome.Passed, auditEvent.Outcome);
+        Assert.Equal("Strong technical skills.", auditEvent.Notes);
+        Assert.Equal(recordedBy, auditEvent.RecordedBy);
     }
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Application_Missing()
     {
         await using var db = BuildContext();
+        var auditPublisher = new FakeAuditPublisher();
 
-        var result = await handler(db).HandleAsync(
+        var result = await handler(db, auditPublisher: auditPublisher).HandleAsync(
             new RecordInterviewOutcomeRequest
             {
                 CompanyId     = Guid.NewGuid(),
@@ -69,6 +86,7 @@ public class RecordInterviewOutcomeHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+        Assert.Empty(auditPublisher.Published);
     }
 
     [Fact]
@@ -83,8 +101,9 @@ public class RecordInterviewOutcomeHandlerTests
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
         await db.SaveChangesAsync();
+        var auditPublisher = new FakeAuditPublisher();
 
-        var result = await handler(db).HandleAsync(
+        var result = await handler(db, auditPublisher: auditPublisher).HandleAsync(
             new RecordInterviewOutcomeRequest
             {
                 CompanyId     = companyId,
@@ -98,6 +117,7 @@ public class RecordInterviewOutcomeHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+        Assert.Empty(auditPublisher.Published);
     }
 
     [Fact]
@@ -115,8 +135,9 @@ public class RecordInterviewOutcomeHandlerTests
         db.Applications.Add(application);
         db.Interviews.Add(interview);
         await db.SaveChangesAsync();
+        var auditPublisher = new FakeAuditPublisher();
 
-        var result = await handler(db).HandleAsync(
+        var result = await handler(db, auditPublisher: auditPublisher).HandleAsync(
             new RecordInterviewOutcomeRequest
             {
                 CompanyId     = companyId,
@@ -130,6 +151,7 @@ public class RecordInterviewOutcomeHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
+        Assert.Empty(auditPublisher.Published);
     }
 
     [Fact]
@@ -199,8 +221,13 @@ public class RecordInterviewOutcomeHandlerTests
         Assert.Empty(taskCompleter.Calls);
     }
 
-    private static RecordInterviewOutcomeHandler handler(RecruitmentDbContext db, FakeTaskCompleter? taskCompleter = null) =>
-        new(db, taskCompleter ?? new FakeTaskCompleter(), new FakeClock(FixedUtcNow));
+    private static RecordInterviewOutcomeHandler handler(
+        RecruitmentDbContext db,
+        FakeTaskCompleter? taskCompleter = null,
+        FakeAuditPublisher? auditPublisher = null) =>
+        new(
+            new InterviewOutcomeRecorder(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher()),
+            taskCompleter ?? new FakeTaskCompleter());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

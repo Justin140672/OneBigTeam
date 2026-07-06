@@ -23,6 +23,7 @@ internal sealed class GetEmployeeAuditHistoryHandler(
         ["EmployeeDocument"] = "Documents",
         ["DocumentRequest"] = "Documents",
         ["AssetAssignment"] = "Assets",
+        ["Candidate"] = "Recruitment",
     };
 
     public async Task<Result<GetEmployeeAuditHistoryResponse>> HandleAsync(

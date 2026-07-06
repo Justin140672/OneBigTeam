@@ -7,9 +7,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Services;
 
+// Depends on InterviewOutcomeRecorder (not RecordInterviewOutcomeHandler) deliberately:
+// RecordInterviewOutcomeHandler depends on ITaskCompleter, whose implementation graph
+// (TaskCompleter -> TaskCompletionDispatcher -> InterviewFeedbackTaskCompletionAction ->
+// IInterviewFeedbackService) would loop back here and create a DI constructor cycle.
+// InterviewOutcomeRecorder contains the same recording logic without that dependency, and
+// this service never needs the completion side-effect anyway: it is only invoked from
+// InterviewFeedbackTaskCompletionAction, which runs after TaskCompleter has already marked
+// the originating task Completed.
 internal sealed class InterviewFeedbackService(
     RecruitmentDbContext db,
-    RecordInterviewOutcomeHandler recordOutcomeHandler) : IInterviewFeedbackService
+    InterviewOutcomeRecorder recorder) : IInterviewFeedbackService
 {
     public async Task<Result> RecordFeedbackAsync(
         Guid companyId,
@@ -32,7 +40,7 @@ internal sealed class InterviewFeedbackService(
         if (location is null)
             return Result.Failure(Error.NotFound($"Interview '{interviewId}' was not found."));
 
-        var result = await recordOutcomeHandler.HandleAsync(
+        var result = await recorder.RecordAsync(
             new RecordInterviewOutcomeRequest
             {
                 CompanyId     = companyId,
