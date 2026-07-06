@@ -1,0 +1,72 @@
+@using HR.Infrastructure.Abstractions
+@inject VacancyService VacancyService
+@inject InterviewService InterviewService
+@inject TaskService TaskService
+@inject NavigationManager Navigation
+@inject AppSession Session
+
+@if (_loading)
+{
+    <div class="widget-card">
+        <div class="widget-header">
+            <i class="fa-solid fa-user-tie widget-icon"></i>
+            <span class="widget-title">Recruitment</span>
+        </div>
+        <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
+            <HrLoadingIndicator />
+        </div>
+    </div>
+}
+else
+{
+    <div class="widget-card">
+        <div class="widget-header">
+            <i class="fa-solid fa-user-tie widget-icon"></i>
+            <span class="widget-title">Recruitment</span>
+            <a href="/companies/@Session.CompanyId/vacancies" class="widget-view-all ms-auto">
+                View all <i class="fa-solid fa-arrow-right fa-xs"></i>
+            </a>
+        </div>
+
+        <div class="widget-kpi-row">
+            <div class="widget-kpi widget-kpi--link" @onclick="NavigateToVacancies">
+                <span class="widget-kpi-value">@_openVacancies</span>
+                <span class="widget-kpi-label">Open Vacancies</span>
+            </div>
+            <div class="widget-kpi">
+                <span class="widget-kpi-value">@_interviewsToday</span>
+                <span class="widget-kpi-label">Interviews Today</span>
+            </div>
+            <div class="widget-kpi @(_outstandingFeedbackTasks > 0 ? "widget-kpi--danger" : "")">
+                <span class="widget-kpi-value">@_outstandingFeedbackTasks</span>
+                <span class="widget-kpi-label">Outstanding Feedback Tasks</span>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private int _openVacancies;
+    private int _interviewsToday;
+    private int _outstandingFeedbackTasks;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var vacanciesTask = VacancyService.ListVacanciesAsync(Session.CompanyId, status: "Open");
+        var interviewsTask = InterviewService.GetInterviewsTodayCountAsync(Session.CompanyId);
+        var feedbackTasksTask = TaskService.GetOutstandingTaskCountAsync(
+            Session.CompanyId, TaskSource.Recruitment, TaskActionType.Complete);
+
+        await Task.WhenAll(vacanciesTask, interviewsTask, feedbackTasksTask);
+
+        _openVacancies = (await vacanciesTask)?.Items.Count ?? 0;
+        _interviewsToday = (await interviewsTask)?.Count ?? 0;
+        _outstandingFeedbackTasks = (await feedbackTasksTask)?.Count ?? 0;
+
+        _loading = false;
+    }
+
+    private void NavigateToVacancies() =>
+        Navigation.NavigateTo($"/companies/{Session.CompanyId}/vacancies");
+}

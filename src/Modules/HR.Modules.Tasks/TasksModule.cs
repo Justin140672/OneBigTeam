@@ -1,4 +1,5 @@
 using HR.Modules.Tasks.Domain;
+using HR.Modules.Tasks.Features.CandidateHired;
 using HR.Modules.Tasks.Features.CompleteTask;
 using HR.Modules.Tasks.Features.CompleteTask.Actions;
 using HR.Modules.Tasks.Features.CreateOnboardingTasksOnEmployeeCreated;
@@ -6,6 +7,7 @@ using HR.Modules.Tasks.Features.GetEmployeeTasks;
 using HR.Modules.Tasks.Features.GetMyTasks;
 using HR.Modules.Tasks.Features.GetTeamTasks;
 using HR.Modules.Tasks.Features.GetTask;
+using HR.Modules.Tasks.Features.GetOutstandingTaskCount;
 using HR.Modules.Tasks.Features.GetUnassignedTasks;
 using HR.Modules.Tasks.Features.LeaveRequested;
 using HR.Modules.Tasks.Features.ReturnToWorkReviewRequired;
@@ -53,9 +55,11 @@ public static class TasksModule
         services.AddScoped<IIntegrationEventHandler<SicknessEvidenceRequestedIntegrationEvent>, NotifyHrOfFitNoteThresholdHandler>();
         services.AddScoped<IIntegrationEventHandler<SicknessEvidenceOverdueIntegrationEvent>, NotifyHrOfOverdueFitNoteHandler>();
         services.AddScoped<IIntegrationEventHandler<ReturnToWorkReviewRequiredIntegrationEvent>, ReturnToWorkReviewRequiredHandler>();
+        services.AddScoped<IIntegrationEventHandler<CandidateHiredIntegrationEvent>, NotifyHrOfCandidateHiredHandler>();
 
         services.AddScoped<GetTaskHandler>();
         services.AddScoped<GetUnassignedTasksHandler>();
+        services.AddScoped<GetOutstandingTaskCountHandler>();
         services.AddScoped<GetMyTasksHandler>();
         services.AddScoped<GetTeamTasksHandler>();
         services.AddScoped<GetEmployeeTasksHandler>();

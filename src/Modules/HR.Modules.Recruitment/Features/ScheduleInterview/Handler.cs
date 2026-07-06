@@ -6,7 +6,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.ScheduleInterview;
 
-internal sealed class ScheduleInterviewHandler(RecruitmentDbContext db, ITaskCreator taskCreator, IClock clock)
+internal sealed class ScheduleInterviewHandler(
+    RecruitmentDbContext db,
+    ITaskCreator taskCreator,
+    INotificationWriter notificationWriter,
+    IClock clock)
 {
     public async Task<Result<ScheduleInterviewResponse>> HandleAsync(
         ScheduleInterviewRequest request,
@@ -90,6 +94,18 @@ internal sealed class ScheduleInterviewHandler(RecruitmentDbContext db, ITaskCre
             assignedEmployeeId: request.InterviewerEmployeeId,
             assignedUserId:     request.InterviewerEmployeeId,
             sourceEntityId:     interview.Id,
+            cancellationToken);
+
+        await notificationWriter.WriteAsync(
+            Guid.NewGuid(),
+            request.CompanyId,
+            request.InterviewerEmployeeId,
+            "Interview scheduled",
+            $"You have been scheduled to interview {candidateName} for the {vacancyTitle} vacancy on {request.ScheduledAt:d MMM yyyy 'at' HH:mm}.",
+            interview.Id,
+            NotificationType.InterviewScheduled,
+            NotificationPriority.Normal,
+            now,
             cancellationToken);
 
         return Result.Success(new ScheduleInterviewResponse(

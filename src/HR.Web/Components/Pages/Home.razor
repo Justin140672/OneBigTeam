@@ -4,6 +4,7 @@
 @using HR.Web.Components.Pages.Probation
 @using HR.Web.Components.Pages.Assets
 @using HR.Web.Components.Pages.Sickness
+@using HR.Web.Components.Pages.Recruitment
 @inject AppSession Session
 
 <PageTitle>Dashboard</PageTitle>
@@ -30,6 +31,12 @@
         <div class="col-xl-5 col-lg-6">
             <UpcomingProbationReviewsWidget />
         </div>
+        @if (Session.CanManageEmployees)
+        {
+            <div class="col-xl-5 col-lg-6">
+                <RecruitmentSummaryWidget />
+            </div>
+        }
         <div class="col-xl-5 col-lg-6">
             <MyAssetsWidget />
         </div>

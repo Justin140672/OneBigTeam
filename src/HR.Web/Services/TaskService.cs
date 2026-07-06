@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -66,6 +67,25 @@ public sealed class TaskService(IHttpClientFactory httpClientFactory)
                 $"api/companies/{companyId}/tasks/unassigned", HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }
+    }
+
+    public async Task<GetOutstandingTaskCountResponse?> GetOutstandingTaskCountAsync(
+        Guid companyId, TaskSource? source = null, TaskActionType? actionType = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var query = new List<string>();
+            if (source is not null) query.Add($"source={source}");
+            if (actionType is not null) query.Add($"actionType={actionType}");
+            var url = $"api/companies/{companyId}/tasks/outstanding-count";
+            if (query.Count > 0) url += "?" + string.Join("&", query);
+
+            return await Http.GetFromJsonAsync<GetOutstandingTaskCountResponse>(url, HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public async Task<bool> SelfAssignTaskAsync(Guid companyId, Guid taskId, Guid employeeId, Guid userId, CancellationToken cancellationToken = default)

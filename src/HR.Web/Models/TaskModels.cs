@@ -1,5 +1,7 @@
 namespace HR.Web.Models;
 
+public sealed record GetOutstandingTaskCountResponse(int Count);
+
 public sealed record TaskListResponse(IReadOnlyList<TaskListItem> Items);
 
 public sealed record UnassignedTaskListResponse(IReadOnlyList<UnassignedTaskItem> Items);

@@ -7,6 +7,19 @@ public sealed class InterviewService(IHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
+    public async Task<GetInterviewsTodayCountResponse?> GetInterviewsTodayCountAsync(Guid companyId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetInterviewsTodayCountResponse>(
+                $"api/companies/{companyId}/interviews/today-count", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
     public async Task<ListInterviewsForVacancyResponse?> ListInterviewsForVacancyAsync(Guid companyId, Guid vacancyId)
     {
         try

@@ -209,8 +209,71 @@ public class ScheduleInterviewHandlerTests
         Assert.Empty(taskCreator.Created);
     }
 
-    private static ScheduleInterviewHandler handler(RecruitmentDbContext db, FakeTaskCreator? taskCreator = null) =>
-        new(db, taskCreator ?? new FakeTaskCreator(), new FakeClock(FixedUtcNow));
+    [Fact]
+    public async Task HandleAsync_Writes_Notification_To_Interviewer()
+    {
+        await using var db = BuildContext();
+        var notificationWriter = new FakeNotificationWriter();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Senior Software Engineer", null, null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var interviewerId = Guid.NewGuid();
+        var scheduledAt = Now.AddDays(3);
+
+        var result = await handler(db, notificationWriter: notificationWriter).HandleAsync(
+            new ScheduleInterviewRequest
+            {
+                CompanyId             = companyId,
+                VacancyId             = vacancy.Id,
+                ApplicationId         = application.Id,
+                InterviewerEmployeeId = interviewerId,
+                ScheduledAt           = scheduledAt,
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var notification = Assert.Single(notificationWriter.Written);
+        Assert.Equal(interviewerId, notification.EmployeeId);
+        Assert.Equal(companyId, notification.CompanyId);
+        Assert.Equal(NotificationType.InterviewScheduled, notification.Type);
+        Assert.Equal(result.Value!.Id, notification.SourceEntityId);
+        Assert.Contains("Emma Clarke", notification.Body);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Write_Notification_When_Application_Missing()
+    {
+        await using var db = BuildContext();
+        var notificationWriter = new FakeNotificationWriter();
+
+        await handler(db, notificationWriter: notificationWriter).HandleAsync(
+            new ScheduleInterviewRequest
+            {
+                CompanyId             = Guid.NewGuid(),
+                VacancyId             = Guid.NewGuid(),
+                ApplicationId         = Guid.NewGuid(),
+                InterviewerEmployeeId = Guid.NewGuid(),
+                ScheduledAt           = Now.AddDays(3),
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.Empty(notificationWriter.Written);
+    }
+
+    private static ScheduleInterviewHandler handler(
+        RecruitmentDbContext db,
+        FakeTaskCreator? taskCreator = null,
+        FakeNotificationWriter? notificationWriter = null) =>
+        new(db, taskCreator ?? new FakeTaskCreator(), notificationWriter ?? new FakeNotificationWriter(), new FakeClock(FixedUtcNow));
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

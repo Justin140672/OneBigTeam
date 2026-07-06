@@ -1,5 +1,9 @@
 namespace HR.Web.Models;
 
+// ── TODAY COUNT ───────────────────────────────────────────────────────────────
+
+public record GetInterviewsTodayCountResponse(int Count);
+
 // ── LIST ──────────────────────────────────────────────────────────────────────
 
 public record ListInterviewsForVacancyResponse(List<InterviewListItemModel> Items);

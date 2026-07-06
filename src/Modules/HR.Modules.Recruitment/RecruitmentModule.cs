@@ -8,6 +8,7 @@ using HR.Modules.Recruitment.Features.DeleteCandidateDocument;
 using HR.Modules.Recruitment.Features.DownloadCandidateDocument;
 using HR.Modules.Recruitment.Features.GetApplication;
 using HR.Modules.Recruitment.Features.GetCandidate;
+using HR.Modules.Recruitment.Features.GetInterviewsTodayCount;
 using HR.Modules.Recruitment.Features.GetVacancy;
 using HR.Modules.Recruitment.Features.HireCandidate;
 using HR.Modules.Recruitment.Features.ListApplicationsForVacancy;
@@ -43,6 +44,7 @@ public static class RecruitmentModule
         AddFeatureServices(services);
         AddCandidateDocumentStorage(services, configuration);
         services.AddScoped<IInterviewFeedbackService, InterviewFeedbackService>();
+        services.AddScoped<IVacancyHiringManagerReader, VacancyHiringManagerReader>();
 
         services.AddDbContext<RecruitmentDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
@@ -115,6 +117,9 @@ public static class RecruitmentModule
 
         services.AddScoped<ListInterviewsForVacancyHandler>();
         services.AddScoped<IValidator<ListInterviewsForVacancyRequest>, ListInterviewsForVacancyValidator>();
+
+        services.AddScoped<GetInterviewsTodayCountHandler>();
+        services.AddScoped<IValidator<GetInterviewsTodayCountRequest>, GetInterviewsTodayCountValidator>();
 
         services.AddScoped<UploadCandidateDocumentHandler>();
         services.AddScoped<IValidator<UploadCandidateDocumentRequest>, UploadCandidateDocumentValidator>();

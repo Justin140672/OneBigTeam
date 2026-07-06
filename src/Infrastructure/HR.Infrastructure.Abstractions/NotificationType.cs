@@ -22,4 +22,6 @@ public enum NotificationType
     SicknessEvidenceOverdue      = 18,
     ReturnToWorkReviewReminder   = 19,
     ReturnToWorkReviewOverdue    = 20,
+    InterviewScheduled           = 21,
+    InterviewFeedbackOverdue     = 22,
 }

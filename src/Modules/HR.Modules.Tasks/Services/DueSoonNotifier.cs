@@ -36,12 +36,13 @@ internal sealed class DueSoonNotifier(IServiceScopeFactory scopeFactory) : Backg
         }
     }
 
-    private async Task CheckTaskAlertsAsync(CancellationToken ct)
+    internal async Task CheckTaskAlertsAsync(CancellationToken ct)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
-        var dbContext          = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
-        var notificationWriter = scope.ServiceProvider.GetRequiredService<INotificationWriter>();
-        var clock              = scope.ServiceProvider.GetRequiredService<IClock>();
+        var dbContext              = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
+        var notificationWriter     = scope.ServiceProvider.GetRequiredService<INotificationWriter>();
+        var clock                  = scope.ServiceProvider.GetRequiredService<IClock>();
+        var hiringManagerReader    = scope.ServiceProvider.GetRequiredService<IVacancyHiringManagerReader>();
 
         var now    = clock.UtcNowOffset();
         var today  = DateOnly.FromDateTime(now.UtcDateTime);
@@ -67,6 +68,10 @@ internal sealed class DueSoonNotifier(IServiceScopeFactory scopeFactory) : Backg
                     $"Overdue: {task.Title}",
                     $"This task was due on {task.DueDate.Value:d MMM yyyy} and has not been completed.",
                     ct);
+
+                if (IsOverdueInterviewFeedbackTask(task))
+                    await NotifyHiringManagerOfOverdueFeedbackAsync(
+                        hiringManagerReader, notificationWriter, task, now, ct);
             }
             else if (isDueSoon)
             {
@@ -81,6 +86,44 @@ internal sealed class DueSoonNotifier(IServiceScopeFactory scopeFactory) : Backg
                     ct);
             }
         }
+    }
+
+    private static bool IsOverdueInterviewFeedbackTask(TaskItem task) =>
+        task.Source == TaskSource.Recruitment
+        && task.ActionType == TaskActionType.Complete
+        && task.SourceEntityId.HasValue;
+
+    /// <summary>
+    /// Interview-feedback tasks are assigned to the interviewer, who already receives the
+    /// generic overdue notification above. The hiring manager for the underlying vacancy has no
+    /// task of their own, so this raises a separate, deduplicated notification for them —
+    /// resolved via IVacancyHiringManagerReader (implemented by the Recruitment module) since
+    /// "hiring manager" is a Recruitment-only concept that Tasks cannot otherwise resolve.
+    /// </summary>
+    private static async Task NotifyHiringManagerOfOverdueFeedbackAsync(
+        IVacancyHiringManagerReader hiringManagerReader,
+        INotificationWriter notificationWriter,
+        TaskItem task,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var hiringManagerId = await hiringManagerReader.GetHiringManagerIdForInterviewAsync(
+            task.CompanyId, task.SourceEntityId!.Value, ct);
+
+        if (hiringManagerId is null)
+            return;
+
+        var exists = await notificationWriter.ExistsAsync(
+            hiringManagerId.Value, task.Id, NotificationType.InterviewFeedbackOverdue, ct);
+
+        if (exists)
+            return;
+
+        await notificationWriter.WriteAsync(
+            Guid.NewGuid(), task.CompanyId, hiringManagerId.Value,
+            $"Interview feedback overdue: {task.Title}",
+            $"Feedback for this interview was due on {task.DueDate!.Value:d MMM yyyy} and has not yet been recorded.",
+            task.Id, NotificationType.InterviewFeedbackOverdue, NotificationPriority.High, now, ct);
     }
 
     private static async Task MaybeCreateAsync(

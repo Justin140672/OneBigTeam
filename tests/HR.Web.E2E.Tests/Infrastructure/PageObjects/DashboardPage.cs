@@ -154,6 +154,44 @@ public sealed class DashboardPage(IPage page, string baseUrl)
         await page.WaitForURLAsync(new System.Text.RegularExpressions.Regex("/assets/"), new() { Timeout = 15_000 });
     }
 
+    // ── Recruitment Summary Widget ────────────────────────────────────────────
+
+    private ILocator RecruitmentWidget =>
+        page.Locator(".widget-card").Filter(new() { HasText = "Recruitment" }).First;
+
+    /// <summary>Waits for the Recruitment summary widget's KPI row to render (spinner gone).</summary>
+    public async Task WaitForRecruitmentWidgetLoadedAsync() =>
+        await RecruitmentWidget.Locator(".widget-kpi-row").WaitForAsync(new() { Timeout = 15_000 });
+
+    /// <summary>
+    /// Returns the numeric value shown under the given KPI label ("Open Vacancies",
+    /// "Interviews Today", "Outstanding Feedback Tasks") in the Recruitment widget.
+    /// </summary>
+    public async Task<int> GetRecruitmentKpiValueAsync(string label)
+    {
+        await WaitForRecruitmentWidgetLoadedAsync();
+
+        var kpi = RecruitmentWidget.Locator(".widget-kpi")
+            .Filter(new() { HasText = label })
+            .First;
+
+        var text = (await kpi.Locator(".widget-kpi-value").TextContentAsync())?.Trim() ?? "0";
+        return int.Parse(text);
+    }
+
+    /// <summary>Clicks the "Open Vacancies" KPI and waits for navigation to the vacancies list.</summary>
+    public async Task ClickOpenVacanciesKpiAsync()
+    {
+        await WaitForRecruitmentWidgetLoadedAsync();
+
+        await RecruitmentWidget.Locator(".widget-kpi")
+            .Filter(new() { HasText = "Open Vacancies" })
+            .First
+            .ClickAsync();
+
+        await page.WaitForURLAsync(new Regex("/vacancies"), new() { Timeout = 15_000 });
+    }
+
     // ── Sickness Dashboard Widgets ────────────────────────────────────────────
 
     /// <summary>

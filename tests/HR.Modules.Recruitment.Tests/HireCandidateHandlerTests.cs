@@ -60,6 +60,60 @@ public class HireCandidateHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Publishes_CandidateHiredIntegrationEvent()
+    {
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var eventPublisher = new FakeIntegrationEventPublisher();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Senior Software Engineer", null, null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", "+44 7700 900001", null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        application.MoveToScreening(Now);
+        application.ScheduleInterview(Now);
+        application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
+        application.Offer(Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, provisioning, eventPublisher).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var publishedEvent = Assert.Single(eventPublisher.PublishedEvents);
+        var candidateHired = Assert.IsType<CandidateHiredIntegrationEvent>(publishedEvent);
+        Assert.Equal(companyId, candidateHired.CompanyId);
+        Assert.Equal(application.Id, candidateHired.ApplicationId);
+        Assert.Equal(candidate.Id, candidateHired.CandidateId);
+        Assert.Equal(result.Value!.EmployeeId, candidateHired.EmployeeId);
+        Assert.Equal(vacancy.Id, candidateHired.VacancyId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_Event_When_Application_Not_Offered()
+    {
+        await using var db = BuildContext();
+        var eventPublisher = new FakeIntegrationEventPublisher();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Backend Engineer", null, null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, eventPublisher: eventPublisher).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Empty(eventPublisher.PublishedEvents);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Application_Missing()
     {
         await using var db = BuildContext();
@@ -147,8 +201,11 @@ public class HireCandidateHandlerTests
         Assert.Null(savedCandidate.EmployeeId);
     }
 
-    private static HireCandidateHandler handler(RecruitmentDbContext db, FakeEmployeeProvisioningService? provisioning = null) =>
-        new(db, provisioning ?? new FakeEmployeeProvisioningService(), new FakeClock(FixedUtcNow));
+    private static HireCandidateHandler handler(
+        RecruitmentDbContext db,
+        FakeEmployeeProvisioningService? provisioning = null,
+        FakeIntegrationEventPublisher? eventPublisher = null) =>
+        new(db, provisioning ?? new FakeEmployeeProvisioningService(), new FakeClock(FixedUtcNow), eventPublisher ?? new FakeIntegrationEventPublisher());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

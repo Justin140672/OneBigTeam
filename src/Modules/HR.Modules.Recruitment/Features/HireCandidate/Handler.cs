@@ -9,7 +9,8 @@ namespace HR.Modules.Recruitment.Features.HireCandidate;
 internal sealed class HireCandidateHandler(
     RecruitmentDbContext db,
     IEmployeeProvisioningService employeeProvisioningService,
-    IClock clock)
+    IClock clock,
+    IIntegrationEventPublisher eventPublisher)
 {
     public async Task<Result<HireCandidateResponse>> HandleAsync(
         HireCandidateRequest request,
@@ -67,6 +68,14 @@ internal sealed class HireCandidateHandler(
         application.Hire(now);
         candidate.LinkToEmployee(provisioningResult.Value!, now);
         await db.SaveChangesAsync(cancellationToken);
+
+        await eventPublisher.PublishAsync(new CandidateHiredIntegrationEvent(
+            application.CompanyId,
+            application.Id,
+            candidate.Id,
+            provisioningResult.Value!,
+            application.VacancyId,
+            now), cancellationToken);
 
         return Result.Success(new HireCandidateResponse(
             application.Id,
