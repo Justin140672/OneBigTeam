@@ -23,9 +23,7 @@ public class DueSoonNotifierTests
         public void Dispose() => Provider.Dispose();
     }
 
-    private static Harness BuildHarness(
-        string dbName,
-        FakeVacancyHiringManagerReader? hiringManagerReader = null)
+    private static Harness BuildHarness(string dbName)
     {
         var services = new ServiceCollection();
 
@@ -34,7 +32,6 @@ public class DueSoonNotifierTests
         var notificationWriter = new FakeNotificationWriter();
         services.AddSingleton<INotificationWriter>(notificationWriter);
         services.AddSingleton<IClock>(new FakeClock(FixedUtcNow));
-        services.AddSingleton<IVacancyHiringManagerReader>(hiringManagerReader ?? new FakeVacancyHiringManagerReader());
 
         var provider = services.BuildServiceProvider();
         var notifier = new DueSoonNotifier(provider.GetRequiredService<IServiceScopeFactory>());
@@ -60,20 +57,17 @@ public class DueSoonNotifierTests
             sourceEntityId);
 
     [Fact]
-    public async Task CheckTaskAlertsAsync_Notifies_HiringManager_When_Interview_Feedback_Task_Overdue()
+    public async Task CheckTaskAlertsAsync_Notifies_Assigned_Employee_Of_Overdue_Task()
     {
         var companyId = Guid.NewGuid();
-        var interviewId = Guid.NewGuid();
-        var hiringManagerId = Guid.NewGuid();
+        var assignedEmployeeId = Guid.NewGuid();
 
-        using var harness = BuildHarness(
-            Guid.NewGuid().ToString("N"),
-            new FakeVacancyHiringManagerReader(new Dictionary<Guid, Guid> { [interviewId] = hiringManagerId }));
+        using var harness = BuildHarness(Guid.NewGuid().ToString("N"));
 
         var task = CreateTask(
             companyId, Today.AddDays(-1),
             TaskSource.Recruitment, TaskActionType.Complete,
-            sourceEntityId: interviewId);
+            assignedEmployeeId: assignedEmployeeId);
 
         await using (var scope = harness.Provider.CreateAsyncScope())
         {
@@ -85,28 +79,49 @@ public class DueSoonNotifierTests
         await harness.Notifier.CheckTaskAlertsAsync(CancellationToken.None);
 
         Assert.Contains(harness.NotificationWriter.Written, w =>
-            w.EmployeeId == hiringManagerId &&
-            w.Type == NotificationType.InterviewFeedbackOverdue &&
+            w.EmployeeId == assignedEmployeeId &&
+            w.Type == NotificationType.TaskOverdue &&
             w.SourceEntityId == task.Id);
     }
 
     [Fact]
-    public async Task CheckTaskAlertsAsync_Still_Notifies_Assigned_Interviewer_Of_Generic_Overdue()
+    public async Task CheckTaskAlertsAsync_Does_Not_Duplicate_Overdue_Notification_When_Already_Sent()
     {
         var companyId = Guid.NewGuid();
-        var interviewId = Guid.NewGuid();
-        var interviewerId = Guid.NewGuid();
-        var hiringManagerId = Guid.NewGuid();
+        var assignedEmployeeId = Guid.NewGuid();
 
-        using var harness = BuildHarness(
-            Guid.NewGuid().ToString("N"),
-            new FakeVacancyHiringManagerReader(new Dictionary<Guid, Guid> { [interviewId] = hiringManagerId }));
+        using var harness = BuildHarness(Guid.NewGuid().ToString("N"));
 
         var task = CreateTask(
             companyId, Today.AddDays(-1),
-            TaskSource.Recruitment, TaskActionType.Complete,
-            assignedEmployeeId: interviewerId,
-            sourceEntityId: interviewId);
+            TaskSource.Asset, TaskActionType.Acknowledge,
+            assignedEmployeeId: assignedEmployeeId);
+
+        await using (var scope = harness.Provider.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
+            db.TaskItems.Add(task);
+            await db.SaveChangesAsync();
+        }
+
+        await harness.Notifier.CheckTaskAlertsAsync(CancellationToken.None);
+        await harness.Notifier.CheckTaskAlertsAsync(CancellationToken.None);
+
+        Assert.Single(harness.NotificationWriter.Written, w => w.Type == NotificationType.TaskOverdue);
+    }
+
+    [Fact]
+    public async Task CheckTaskAlertsAsync_Notifies_Assigned_Employee_When_Task_Due_Soon()
+    {
+        var companyId = Guid.NewGuid();
+        var assignedEmployeeId = Guid.NewGuid();
+
+        using var harness = BuildHarness(Guid.NewGuid().ToString("N"));
+
+        var task = CreateTask(
+            companyId, Today.AddDays(1),
+            TaskSource.Leave, TaskActionType.Approve,
+            assignedEmployeeId: assignedEmployeeId);
 
         await using (var scope = harness.Provider.CreateAsyncScope())
         {
@@ -118,48 +133,21 @@ public class DueSoonNotifierTests
         await harness.Notifier.CheckTaskAlertsAsync(CancellationToken.None);
 
         Assert.Contains(harness.NotificationWriter.Written, w =>
-            w.EmployeeId == interviewerId &&
-            w.Type == NotificationType.TaskOverdue);
+            w.EmployeeId == assignedEmployeeId &&
+            w.Type == NotificationType.TaskDueSoon &&
+            w.SourceEntityId == task.Id);
     }
 
     [Fact]
-    public async Task CheckTaskAlertsAsync_Does_Not_Notify_HiringManager_When_Not_Overdue()
-    {
-        var companyId = Guid.NewGuid();
-        var interviewId = Guid.NewGuid();
-        var hiringManagerId = Guid.NewGuid();
-
-        using var harness = BuildHarness(
-            Guid.NewGuid().ToString("N"),
-            new FakeVacancyHiringManagerReader(new Dictionary<Guid, Guid> { [interviewId] = hiringManagerId }));
-
-        var task = CreateTask(
-            companyId, Today.AddDays(1),
-            TaskSource.Recruitment, TaskActionType.Complete,
-            sourceEntityId: interviewId);
-
-        await using (var scope = harness.Provider.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
-            db.TaskItems.Add(task);
-            await db.SaveChangesAsync();
-        }
-
-        await harness.Notifier.CheckTaskAlertsAsync(CancellationToken.None);
-
-        Assert.DoesNotContain(harness.NotificationWriter.Written, w => w.Type == NotificationType.InterviewFeedbackOverdue);
-    }
-
-    [Fact]
-    public async Task CheckTaskAlertsAsync_Does_Not_Notify_HiringManager_When_Task_Is_Not_Interview_Feedback()
+    public async Task CheckTaskAlertsAsync_Does_Not_Notify_When_Task_Not_Yet_Due_Soon()
     {
         var companyId = Guid.NewGuid();
 
         using var harness = BuildHarness(Guid.NewGuid().ToString("N"));
 
         var task = CreateTask(
-            companyId, Today.AddDays(-1),
-            TaskSource.Asset, TaskActionType.Acknowledge);
+            companyId, Today.AddDays(10),
+            TaskSource.Recruitment, TaskActionType.Complete);
 
         await using (var scope = harness.Provider.CreateAsyncScope())
         {
@@ -170,32 +158,6 @@ public class DueSoonNotifierTests
 
         await harness.Notifier.CheckTaskAlertsAsync(CancellationToken.None);
 
-        Assert.DoesNotContain(harness.NotificationWriter.Written, w => w.Type == NotificationType.InterviewFeedbackOverdue);
-    }
-
-    [Fact]
-    public async Task CheckTaskAlertsAsync_Does_Not_Notify_HiringManager_When_Vacancy_Has_No_Resolvable_HiringManager()
-    {
-        var companyId = Guid.NewGuid();
-        var interviewId = Guid.NewGuid();
-
-        // No entry seeded in FakeVacancyHiringManagerReader for this interviewId.
-        using var harness = BuildHarness(Guid.NewGuid().ToString("N"));
-
-        var task = CreateTask(
-            companyId, Today.AddDays(-1),
-            TaskSource.Recruitment, TaskActionType.Complete,
-            sourceEntityId: interviewId);
-
-        await using (var scope = harness.Provider.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
-            db.TaskItems.Add(task);
-            await db.SaveChangesAsync();
-        }
-
-        await harness.Notifier.CheckTaskAlertsAsync(CancellationToken.None);
-
-        Assert.DoesNotContain(harness.NotificationWriter.Written, w => w.Type == NotificationType.InterviewFeedbackOverdue);
+        Assert.Empty(harness.NotificationWriter.Written);
     }
 }

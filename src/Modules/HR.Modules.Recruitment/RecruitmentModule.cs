@@ -1,4 +1,5 @@
 using FluentValidation;
+using Hangfire;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.CloseVacancy;
 using HR.Modules.Recruitment.Features.CreateApplication;
@@ -25,9 +26,11 @@ using HR.Modules.Recruitment.Features.UpdateInterview;
 using HR.Modules.Recruitment.Features.UpdateVacancy;
 using HR.Modules.Recruitment.Features.UploadCandidateDocument;
 using HR.Modules.Recruitment.Features.WithdrawApplication;
+using HR.Modules.Recruitment.Jobs;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -44,7 +47,6 @@ public static class RecruitmentModule
         AddFeatureServices(services);
         AddCandidateDocumentStorage(services, configuration);
         services.AddScoped<IInterviewFeedbackService, InterviewFeedbackService>();
-        services.AddScoped<IVacancyHiringManagerReader, VacancyHiringManagerReader>();
 
         services.AddDbContext<RecruitmentDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
@@ -130,6 +132,23 @@ public static class RecruitmentModule
         services.AddScoped<DownloadCandidateDocumentHandler>();
 
         services.AddScoped<DeleteCandidateDocumentHandler>();
+
+        services.AddScoped<InterviewReminderJob>();
+        services.AddScoped<OutstandingInterviewFeedbackReminderJob>();
+    }
+
+    public static WebApplication UseRecruitmentRecurringJobs(this WebApplication app)
+    {
+        var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+        jobManager.AddOrUpdate<InterviewReminderJob>(
+            "interview-reminders",
+            job => job.ExecuteAsync(),
+            Cron.Hourly());
+        jobManager.AddOrUpdate<OutstandingInterviewFeedbackReminderJob>(
+            "outstanding-interview-feedback-reminders",
+            job => job.ExecuteAsync(),
+            Cron.Daily(6));
+        return app;
     }
 
     public static async Task MigrateRecruitmentAsync(this IServiceProvider services)

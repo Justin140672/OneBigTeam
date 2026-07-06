@@ -365,6 +365,7 @@ app.UseHangfireBackgroundJobs();
 app.UseProbationRecurringJobs();
 app.UseAssetsRecurringJobs();
 app.UseSicknessRecurringJobs();
+app.UseRecruitmentRecurringJobs();
 app.UseLoggingMiddleware();
 app.UseRouting();
 app.UseAuthentication();

@@ -27,5 +27,8 @@ internal sealed class FakeNotificationWriter : INotificationWriter
     public Task<bool> ExistsAsync(
         Guid employeeId, Guid sourceEntityId, NotificationType type,
         CancellationToken cancellationToken = default)
-        => Task.FromResult(false);
+        => Task.FromResult(Written.Any(n =>
+            n.EmployeeId == employeeId &&
+            n.SourceEntityId == sourceEntityId &&
+            n.Type == type));
 }
