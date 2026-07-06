@@ -12,10 +12,7 @@
 <div class="container py-4">
     @if (IsLoading)
     {
-        <div class="d-flex align-items-center gap-2">
-            <div class="spinner-border spinner-border-sm" role="status"></div>
-            <span>Loading…</span>
-        </div>
+        <HrLoadingIndicator />
     }
     else if (_company is null)
     {
@@ -25,9 +22,7 @@
     {
         <div class="d-flex align-items-center gap-3 mb-1">
             <h1 class="mb-0">@_company.Name</h1>
-            <span class="badge @(_company.IsActive ? "bg-success" : "bg-secondary")">
-                @(_company.IsActive ? "Active" : "Inactive")
-            </span>
+            <ActiveStatusBadge IsActive="_company.IsActive" />
         </div>
         <p class="text-muted mb-4">Manage this company's profile, addresses, and settings.</p>
 

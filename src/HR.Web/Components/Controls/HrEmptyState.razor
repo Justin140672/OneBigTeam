@@ -1,0 +1,9 @@
+<div class="alert alert-secondary hr-empty-state">
+    <i class="@Icon hr-empty-state-icon"></i>
+    <span class="hr-empty-state-message">@Message</span>
+</div>
+
+@code {
+    [Parameter] public string Message { get; set; } = "No items found.";
+    [Parameter] public string Icon { get; set; } = "fa-solid fa-inbox";
+}

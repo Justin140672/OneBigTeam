@@ -7,10 +7,7 @@
     <div class="card-body">
         @if (_loading)
         {
-            <div class="d-flex align-items-center gap-2">
-                <div class="spinner-border spinner-border-sm" role="status"></div>
-                <span>Loading asset details…</span>
-            </div>
+            <HrLoadingIndicator Label="Loading asset details…" />
         }
         else if (_asset is null)
         {

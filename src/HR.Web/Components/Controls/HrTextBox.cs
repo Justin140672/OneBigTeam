@@ -17,6 +17,10 @@ public class HrTextBox : SfTextBox
             FloatLabelType = FloatLabelType.Never;
         }
 
+        CssClass = parameters.TryGetValue<string>(nameof(CssClass), out var cssClass) && !string.IsNullOrWhiteSpace(cssClass)
+            ? $"hr-textbox {cssClass}"
+            : "hr-textbox";
+
         return base.SetParametersAsync(parameters);
     }
 }

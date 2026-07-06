@@ -50,14 +50,7 @@
             </EditForm>
         </Content>
         <FooterTemplate>
-            <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="Saving">
-                @if (Saving)
-                {
-                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                }
-                Close Record
-            </SfButton>
-            <SfButton OnClick="CancelAsync">Cancel</SfButton>
+            <HrDialogButtonBar SaveLabel="Close Record" Saving="Saving" OnSave="SubmitAsync" OnCancel="CancelAsync" />
         </FooterTemplate>
     </DialogTemplates>
 </SfDialog>

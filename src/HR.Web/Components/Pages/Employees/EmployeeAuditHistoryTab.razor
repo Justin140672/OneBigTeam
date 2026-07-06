@@ -3,14 +3,11 @@
 
 @if (_loading)
 {
-    <div class="d-flex align-items-center gap-2 py-3">
-        <div class="spinner-border spinner-border-sm" role="status"></div>
-        <span class="text-muted">Loading…</span>
-    </div>
+    <HrLoadingIndicator />
 }
 else if (_items.Count == 0)
 {
-    <div class="alert alert-secondary">No audit history recorded for this employee.</div>
+    <HrEmptyState Message="No audit history recorded for this employee." Icon="fa-solid fa-clock-rotate-left" />
 }
 else
 {

@@ -1,0 +1,15 @@
+<SfButton IsPrimary="true" OnClick="OnSave" Disabled="Saving">
+    @if (Saving)
+    {
+        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+    }
+    @SaveLabel
+</SfButton>
+<SfButton OnClick="OnCancel">Cancel</SfButton>
+
+@code {
+    [Parameter] public string SaveLabel { get; set; } = "Save";
+    [Parameter] public bool Saving { get; set; }
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+}

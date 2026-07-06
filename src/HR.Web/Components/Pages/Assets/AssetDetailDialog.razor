@@ -7,10 +7,7 @@
         <Content>
             @if (_loading)
             {
-                <div class="d-flex align-items-center gap-2">
-                    <div class="spinner-border spinner-border-sm" role="status"></div>
-                    <span>Loading…</span>
-                </div>
+                <HrLoadingIndicator />
             }
             else if (_asset is null)
             {

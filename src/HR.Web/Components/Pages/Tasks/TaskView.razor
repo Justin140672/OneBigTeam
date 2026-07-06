@@ -10,10 +10,7 @@
 <div class="container-fluid py-4">
     @if (_loading)
     {
-        <div class="d-flex align-items-center gap-2">
-            <div class="spinner-border spinner-border-sm" role="status"></div>
-            <span>Loading task…</span>
-        </div>
+        <HrLoadingIndicator Label="Loading task…" />
     }
     else if (_task is null)
     {

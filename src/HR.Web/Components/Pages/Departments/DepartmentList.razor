@@ -12,10 +12,7 @@
 
     @if (IsLoading)
     {
-        <div class="d-flex align-items-center gap-2">
-            <div class="spinner-border spinner-border-sm" role="status"></div>
-            <span>Loading departments…</span>
-        </div>
+        <HrLoadingIndicator Label="Loading departments…" />
     }
     else if (Error is not null)
     {
@@ -63,9 +60,7 @@
                     <Template>
                         @{
                             var row = (context as DepartmentListItemModel)!;
-                            <span class="badge @(row.IsActive ? "bg-success" : "bg-secondary")">
-                                @(row.IsActive ? "Active" : "Inactive")
-                            </span>
+                            <ActiveStatusBadge IsActive="row.IsActive" />
                         }
                     </Template>
                 </GridColumn>

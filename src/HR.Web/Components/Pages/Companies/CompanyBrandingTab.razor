@@ -31,10 +31,7 @@
 
                     @if (logo.Uploading)
                     {
-                        <div class="d-flex align-items-center gap-2 mt-2">
-                            <div class="spinner-border spinner-border-sm" role="status"></div>
-                            <span class="text-muted">Uploading…</span>
-                        </div>
+                        <HrLoadingIndicator Label="Uploading…" />
                     }
                     @if (!string.IsNullOrEmpty(logo.Error))
                     {

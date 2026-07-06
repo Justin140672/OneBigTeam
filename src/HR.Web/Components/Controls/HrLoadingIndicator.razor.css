@@ -1,0 +1,11 @@
+.hr-loading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 0;
+    color: var(--hr-gray-500);
+}
+
+.hr-loading-label {
+    font-size: 0.9rem;
+}

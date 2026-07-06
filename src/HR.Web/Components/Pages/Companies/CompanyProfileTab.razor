@@ -11,9 +11,7 @@
         <div class="mb-3">
             <label class="form-label fw-semibold">Status</label>
             <p class="mb-0">
-                <span class="badge @(Company.IsActive ? "bg-success" : "bg-secondary")">
-                    @(Company.IsActive ? "Active" : "Inactive")
-                </span>
+                <ActiveStatusBadge IsActive="Company.IsActive" />
             </p>
         </div>
     </div>

@@ -1,5 +1,154 @@
+/* ── Design tokens ──────────────────────────────────────────────────
+   Single source of truth for color/spacing/radius/shadow. Change the
+   primary color (or any other token) here and it flows through every
+   page, every Bootstrap-driven element (buttons, badges, links, focus
+   rings — via the --bs-* overrides below), and the handful of
+   Syncfusion controls re-themed further down.
+   ──────────────────────────────────────────────────────────────────── */
+:root {
+    /* Brand / primary accent */
+    --hr-color-primary: #6366f1;
+    --hr-color-primary-rgb: 99, 102, 241;
+    --hr-color-primary-hover: #4f46e5;
+    --hr-color-primary-active: #4338ca;
+    --hr-color-primary-subtle: rgba(99, 102, 241, 0.12);
+
+    /* Neutral gray scale */
+    --hr-gray-900: #111827;
+    --hr-gray-800: #1f2937;
+    --hr-gray-700: #374151;
+    --hr-gray-500: #6b7280;
+    --hr-gray-400: #9ca3af;
+    --hr-gray-300: #d1d5db;
+    --hr-gray-200: #e5e7eb;
+    --hr-gray-100: #f3f4f6;
+    --hr-gray-50: #f9fafb;
+
+    /* Semantic status colors */
+    --hr-color-danger: #dc2626;
+    --hr-color-warning: #f97316;
+    --hr-color-warning-alt: #eab308;
+    --hr-color-success: #16a34a;
+
+    /* Radius / shadow scale */
+    --hr-radius-sm: 4px;
+    --hr-radius-md: 8px;
+    --hr-radius-lg: 12px;
+    --hr-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.06);
+
+    /* Typography */
+    --hr-font-sans: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+
+    /* Flow the brand color and font into Bootstrap's own variable system,
+       so every raw Bootstrap-class element (btn-primary, bg-primary,
+       links, form focus rings) picks it up automatically. */
+    --bs-primary: var(--hr-color-primary);
+    --bs-primary-rgb: var(--hr-color-primary-rgb);
+    --bs-primary-text-emphasis: var(--hr-color-primary-active);
+    --bs-link-color: var(--hr-color-primary);
+    --bs-link-color-rgb: var(--hr-color-primary-rgb);
+    --bs-link-hover-color: var(--hr-color-primary-hover);
+    --bs-link-hover-color-rgb: 79, 70, 229;
+    --bs-font-sans-serif: var(--hr-font-sans);
+}
+
+html[data-theme="dark"] {
+    /* Slightly brighter in dark mode for contrast against dark surfaces. */
+    --hr-color-primary: #818cf8;
+    --hr-color-primary-hover: #6366f1;
+    --hr-color-primary-active: #4f46e5;
+    --hr-color-primary-rgb: 129, 140, 248;
+    --hr-color-primary-subtle: rgba(129, 140, 248, 0.16);
+    --hr-color-danger: #f87171;
+    --hr-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
 html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: var(--hr-font-sans);
+}
+
+/* ── Targeted Syncfusion re-skin ──────────────────────────────────────
+   Syncfusion's Bootstrap5 theme (Syncfusion.Blazor.Themes) ships almost
+   entirely as pre-baked hex colors rather than CSS variables, so a
+   variable-only re-theme isn't possible. These are the highest-traffic
+   controls in this app (primary buttons, checkboxes) re-pointed at the
+   same primary token used everywhere else, instead of Bootstrap's
+   default blue (#0d6efd).
+   ──────────────────────────────────────────────────────────────────── */
+.e-btn.e-primary,
+.e-css.e-btn.e-primary {
+    background: var(--hr-color-primary);
+    border-color: var(--hr-color-primary);
+}
+
+.e-btn.e-primary:hover,
+.e-css.e-btn.e-primary:hover {
+    background: var(--hr-color-primary-hover);
+    border-color: var(--hr-color-primary-hover);
+}
+
+.e-btn.e-primary:focus,
+.e-css.e-btn.e-primary:focus {
+    background: var(--hr-color-primary-hover);
+    border-color: var(--hr-color-primary);
+    box-shadow: 0 0 0 4px var(--hr-color-primary-subtle);
+}
+
+.e-btn.e-primary:active,
+.e-css.e-btn.e-primary:active,
+.e-btn.e-primary.e-active,
+.e-css.e-btn.e-primary.e-active {
+    background: var(--hr-color-primary-active);
+    border-color: var(--hr-color-primary-active);
+}
+
+.e-frame.e-check,
+.e-css.e-checkbox-wrapper .e-frame.e-check {
+    background-color: var(--hr-color-primary);
+    border-color: var(--hr-color-primary);
+}
+
+.e-checkbox-wrapper:focus .e-frame,
+.e-checkbox-wrapper.e-focus .e-frame,
+.e-css.e-checkbox-wrapper:focus .e-frame,
+.e-css.e-checkbox-wrapper.e-focus .e-frame {
+    box-shadow: 0 0 0 4px var(--hr-color-primary-subtle);
+}
+
+/* ── HrGrid / HrTextBox styling hooks ─────────────────────────────────
+   HrGrid and HrTextBox (Components/Controls) stamp a stable "hr-grid" /
+   "hr-textbox" marker class onto every instance in the app, so every
+   grid header, row hover, and text-input focus ring is themed from here.
+   ──────────────────────────────────────────────────────────────────── */
+.hr-grid .e-gridheader {
+    background-color: var(--hr-gray-50);
+}
+
+.hr-grid .e-headertext {
+    font-weight: 600;
+    color: var(--hr-gray-700);
+}
+
+.hr-grid .e-row:hover .e-rowcell:not(.e-active) {
+    background: var(--hr-gray-50) !important;
+}
+
+html[data-theme="dark"] .hr-grid .e-gridheader {
+    background-color: var(--hr-gray-800);
+}
+
+html[data-theme="dark"] .hr-grid .e-headertext {
+    color: var(--hr-gray-200);
+}
+
+html[data-theme="dark"] .hr-grid .e-row:hover .e-rowcell:not(.e-active) {
+    background: var(--hr-gray-700) !important;
+}
+
+.hr-textbox.e-input-focus:not(.e-success):not(.e-warning):not(.e-error),
+.hr-textbox.e-input-group.e-control-wrapper.e-input-focus:not(.e-success):not(.e-warning):not(.e-error) {
+    border-color: var(--hr-color-primary);
+    box-shadow: 0 0 0 4px var(--hr-color-primary-subtle);
 }
 
 /* ── SfMenu sidebar overrides ────────────────────────────── */
@@ -87,10 +236,10 @@ h1:focus {
 
 .widget-card {
     background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
+    border: 1px solid var(--hr-gray-200);
+    border-radius: var(--hr-radius-lg);
     overflow: hidden;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    box-shadow: var(--hr-shadow-sm);
 }
 
 /* ── Header ──────────────────────────────────────────── */
@@ -100,24 +249,24 @@ h1:focus {
     align-items: center;
     gap: 8px;
     padding: 14px 16px;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid var(--hr-gray-100);
 }
 
 .widget-icon {
-    color: #6366f1;
+    color: var(--hr-color-primary);
     font-size: 1rem;
 }
 
 .widget-title {
     font-size: 0.95rem;
     font-weight: 600;
-    color: #111827;
+    color: var(--hr-gray-900);
 }
 
 .widget-count-badge {
     font-size: 0.7rem;
     font-weight: 700;
-    background: #6366f1;
+    background: var(--hr-color-primary);
     color: #fff;
     border-radius: 10px;
     padding: 1px 7px;
@@ -127,7 +276,7 @@ h1:focus {
 
 .widget-view-all {
     font-size: 0.8rem;
-    color: #6366f1;
+    color: var(--hr-color-primary);
     text-decoration: none;
 }
 
@@ -142,7 +291,7 @@ h1:focus {
     gap: 20px;
     padding: 8px 16px;
     background: #fafafa;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid var(--hr-gray-100);
 }
 
 .widget-stat {
@@ -150,24 +299,24 @@ h1:focus {
     align-items: center;
     gap: 4px;
     font-size: 0.8rem;
-    color: #6b7280;
+    color: var(--hr-gray-500);
 }
 
 .widget-stat--danger {
-    color: #dc2626;
+    color: var(--hr-color-danger);
 }
 
 .widget-stat-value {
     font-weight: 700;
-    color: #111827;
+    color: var(--hr-gray-900);
 }
 
 .widget-stat--danger .widget-stat-value {
-    color: #dc2626;
+    color: var(--hr-color-danger);
 }
 
 .widget-stat-label {
-    color: #9ca3af;
+    color: var(--hr-gray-400);
 }
 
 /* ── Body / list ─────────────────────────────────────── */
@@ -181,7 +330,7 @@ h1:focus {
     flex-direction: column;
     align-items: center;
     padding: 32px 16px;
-    color: #9ca3af;
+    color: var(--hr-gray-400);
     font-size: 0.875rem;
 }
 
@@ -193,7 +342,7 @@ h1:focus {
     gap: 10px;
     padding: 10px 16px;
     cursor: pointer;
-    border-bottom: 1px solid #f9fafb;
+    border-bottom: 1px solid var(--hr-gray-50);
     transition: background 0.1s;
 }
 
@@ -202,7 +351,7 @@ h1:focus {
 }
 
 .task-widget-item:hover {
-    background: #f9fafb;
+    background: var(--hr-gray-50);
 }
 
 .task-widget-item--static {
@@ -222,10 +371,10 @@ h1:focus {
     flex-shrink: 0;
 }
 
-.priority-pip--critical { background: #dc2626; }
-.priority-pip--high     { background: #f97316; }
-.priority-pip--medium   { background: #eab308; }
-.priority-pip--low      { background: #d1d5db; }
+.priority-pip--critical { background: var(--hr-color-danger); }
+.priority-pip--high     { background: var(--hr-color-warning); }
+.priority-pip--medium   { background: var(--hr-color-warning-alt); }
+.priority-pip--low      { background: var(--hr-gray-300); }
 
 /* ── Item text ───────────────────────────────────────── */
 
@@ -238,7 +387,7 @@ h1:focus {
     display: block;
     font-size: 0.875rem;
     font-weight: 500;
-    color: #111827;
+    color: var(--hr-gray-900);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -247,7 +396,7 @@ h1:focus {
 .task-widget-meta {
     display: block;
     font-size: 0.75rem;
-    color: #9ca3af;
+    color: var(--hr-gray-400);
     margin-top: 1px;
 }
 
@@ -257,15 +406,15 @@ h1:focus {
     font-size: 0.7rem;
     font-weight: 600;
     padding: 2px 7px;
-    border-radius: 4px;
+    border-radius: var(--hr-radius-sm);
     white-space: nowrap;
     flex-shrink: 0;
 }
 
-.due-badge--overdue { background: #fee2e2; color: #dc2626; }
+.due-badge--overdue { background: #fee2e2; color: var(--hr-color-danger); }
 .due-badge--today   { background: #ffedd5; color: #ea580c; }
 .due-badge--soon    { background: #fef3c7; color: #ca8a04; }
-.due-badge--normal  { background: #f3f4f6; color: #6b7280; }
+.due-badge--normal  { background: var(--hr-gray-100); color: var(--hr-gray-500); }
 
 /* ── Dark mode ───────────────────────────────────────────────────
    Uses html[data-theme="dark"] so specificity (0,2,1) beats every
@@ -276,67 +425,67 @@ h1:focus {
 
 /* Body */
 html[data-theme="dark"] body {
-    background-color: #111827;
-    color: #f9fafb;
+    background-color: var(--hr-gray-900);
+    color: var(--hr-gray-50);
 }
 
 /* ── Layout shell ────────────────────────────────────── */
 
 html[data-theme="dark"] .top-bar {
-    background: #1f2937;
-    border-bottom-color: #374151;
-    color: #f9fafb;
+    background: var(--hr-gray-800);
+    border-bottom-color: var(--hr-gray-700);
+    color: var(--hr-gray-50);
 }
 
 html[data-theme="dark"] .page-title {
-    color: #f9fafb;
+    color: var(--hr-gray-50);
 }
 
 html[data-theme="dark"] .top-bar-user:hover {
-    background: #374151;
+    background: var(--hr-gray-700);
 }
 
 html[data-theme="dark"] .top-bar-job-title {
-    color: #9ca3af;
+    color: var(--hr-gray-400);
 }
 
 html[data-theme="dark"] .theme-toggle {
-    color: #9ca3af;
+    color: var(--hr-gray-400);
 }
 
 html[data-theme="dark"] .theme-toggle:hover {
-    background: #374151;
-    color: #f9fafb;
+    background: var(--hr-gray-700);
+    color: var(--hr-gray-50);
 }
 
 /* ── Notification bell ───────────────────────────────── */
 
 html[data-theme="dark"] .notif-btn {
-    color: #9ca3af;
+    color: var(--hr-gray-400);
 }
 
 html[data-theme="dark"] .notif-btn:hover,
 html[data-theme="dark"] .notif-open .notif-btn {
-    background: #374151;
-    color: #f9fafb;
+    background: var(--hr-gray-700);
+    color: var(--hr-gray-50);
 }
 
 html[data-theme="dark"] .notif-dropdown {
-    background: #1f2937;
-    border-color: #374151;
+    background: var(--hr-gray-800);
+    border-color: var(--hr-gray-700);
     box-shadow: 0 8px 24px rgba(0,0,0,0.5);
 }
 
 html[data-theme="dark"] .notif-header {
-    border-bottom-color: #374151;
+    border-bottom-color: var(--hr-gray-700);
 }
 
 html[data-theme="dark"] .notif-header-title {
-    color: #f9fafb;
+    color: var(--hr-gray-50);
 }
 
 html[data-theme="dark"] .notif-item {
-    border-bottom-color: #374151;
+    border-bottom-color: var(--hr-gray-700);
 }
 
 html[data-theme="dark"] .notif-item:hover {
@@ -344,23 +493,23 @@ html[data-theme="dark"] .notif-item:hover {
 }
 
 html[data-theme="dark"] .notif-unread {
-    background: rgba(99,102,241,0.12);
+    background: var(--hr-color-primary-subtle);
 }
 
 html[data-theme="dark"] .notif-item-title {
-    color: #f9fafb;
+    color: var(--hr-gray-50);
 }
 
 html[data-theme="dark"] .notif-item-body {
-    color: #9ca3af;
+    color: var(--hr-gray-400);
 }
 
 html[data-theme="dark"] .notif-empty {
-    color: #6b7280;
+    color: var(--hr-gray-500);
 }
 
 html[data-theme="dark"] .notif-item-time {
-    color: #6b7280;
+    color: var(--hr-gray-500);
 }
 
 html[data-theme="dark"] .notif-type-label--assigned {
@@ -381,50 +530,50 @@ html[data-theme="dark"] .notif-type-label--overdue {
 /* ── Dashboard widgets ───────────────────────────────── */
 
 html[data-theme="dark"] .widget-card {
-    background: #1f2937;
-    border-color: #374151;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    background: var(--hr-gray-800);
+    border-color: var(--hr-gray-700);
+    box-shadow: var(--hr-shadow-sm);
 }
 
 html[data-theme="dark"] .widget-header {
-    border-bottom-color: #374151;
+    border-bottom-color: var(--hr-gray-700);
 }
 
 html[data-theme="dark"] .widget-title {
-    color: #f9fafb;
+    color: var(--hr-gray-50);
 }
 
 html[data-theme="dark"] .widget-stats {
-    background: #111827;
-    border-bottom-color: #374151;
+    background: var(--hr-gray-900);
+    border-bottom-color: var(--hr-gray-700);
 }
 
 html[data-theme="dark"] .widget-stat {
-    color: #9ca3af;
+    color: var(--hr-gray-400);
 }
 
 html[data-theme="dark"] .widget-stat-value {
-    color: #f9fafb;
+    color: var(--hr-gray-50);
 }
 
 html[data-theme="dark"] .widget-stat--danger {
-    color: #f87171;
+    color: var(--hr-color-danger);
 }
 
 html[data-theme="dark"] .widget-stat--danger .widget-stat-value {
-    color: #f87171;
+    color: var(--hr-color-danger);
 }
 
 html[data-theme="dark"] .widget-stat-label {
-    color: #6b7280;
+    color: var(--hr-gray-500);
 }
 
 html[data-theme="dark"] .widget-empty {
-    color: #6b7280;
+    color: var(--hr-gray-500);
 }
 
 html[data-theme="dark"] .task-widget-item {
-    border-bottom-color: #374151;
+    border-bottom-color: var(--hr-gray-700);
 }
 
 html[data-theme="dark"] .task-widget-item:hover {
@@ -436,26 +585,26 @@ html[data-theme="dark"] .task-widget-item--static:hover {
 }
 
 html[data-theme="dark"] .task-widget-title {
-    color: #f9fafb;
+    color: var(--hr-gray-50);
 }
 
 html[data-theme="dark"] .task-widget-meta {
-    color: #6b7280;
+    color: var(--hr-gray-500);
 }
 
-html[data-theme="dark"] .due-badge--overdue { background: rgba(220,38,38,0.18);  color: #f87171; }
+html[data-theme="dark"] .due-badge--overdue { background: rgba(220,38,38,0.18);  color: var(--hr-color-danger); }
 html[data-theme="dark"] .due-badge--today   { background: rgba(234,88,12,0.18);  color: #fb923c; }
 html[data-theme="dark"] .due-badge--soon    { background: rgba(202,138,4,0.18);  color: #fbbf24; }
-html[data-theme="dark"] .due-badge--normal  { background: #374151;               color: #d1d5db; }
+html[data-theme="dark"] .due-badge--normal  { background: var(--hr-gray-700);    color: var(--hr-gray-300); }
 
 /* ── Dashboard heading (Home.razor) ──────────────────── */
 
 html[data-theme="dark"] .dashboard-greeting {
-    border-bottom-color: #374151;
+    border-bottom-color: var(--hr-gray-700);
 }
 
 html[data-theme="dark"] .dashboard-heading {
-    color: #f9fafb;
+    color: var(--hr-gray-50);
 }
 
 

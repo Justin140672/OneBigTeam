@@ -16,10 +16,7 @@
 
 @if (_loading)
 {
-    <div class="d-flex align-items-center gap-2 py-3">
-        <div class="spinner-border spinner-border-sm" role="status"></div>
-        <span class="text-muted">Loading…</span>
-    </div>
+    <HrLoadingIndicator />
 }
 else
 {
@@ -33,7 +30,7 @@ else
         <div class="col-lg-5">
             @if (_current is null)
             {
-                <div class="alert alert-secondary">No current compensation record found for this employee.</div>
+                <HrEmptyState Message="No current compensation record found for this employee." Icon="fa-solid fa-money-bill-wave" />
             }
             else
             {
