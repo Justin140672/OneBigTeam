@@ -1,0 +1,110 @@
+using HR.Modules.Recruitment.Domain;
+using HR.Modules.Recruitment.Features.CloseVacancy;
+using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+
+namespace HR.Modules.Recruitment.Tests;
+
+public class CloseVacancyHandlerTests
+{
+    private static readonly DateTime FixedUtcNow = new(2026, 7, 6, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTimeOffset Now = new(2026, 7, 6, 10, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public async Task HandleAsync_Closes_Open_Vacancy()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Senior Software Engineer", null, null, Guid.NewGuid(), Now);
+        vacancy.Open(Now, DateOnly.FromDateTime(Now.UtcDateTime));
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new CloseVacancyRequest { CompanyId = companyId, VacancyId = vacancy.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(VacancyStatus.Closed, result.Value!.Status);
+        Assert.Equal(DateOnly.FromDateTime(FixedUtcNow), result.Value.ClosedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Uses_Provided_ClosedAt_Date()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Backend Engineer", null, null, Guid.NewGuid(), Now);
+        vacancy.Open(Now, DateOnly.FromDateTime(Now.UtcDateTime));
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var closedAt = new DateOnly(2026, 8, 1);
+
+        var result = await handler(db).HandleAsync(
+            new CloseVacancyRequest { CompanyId = companyId, VacancyId = vacancy.Id, ClosedAt = closedAt },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(closedAt, result.Value!.ClosedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_Vacancy_Missing()
+    {
+        await using var db = BuildContext();
+
+        var result = await handler(db).HandleAsync(
+            new CloseVacancyRequest { CompanyId = Guid.NewGuid(), VacancyId = Guid.NewGuid() },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_Already_Closed()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Product Designer", null, null, Guid.NewGuid(), Now);
+        vacancy.Open(Now, DateOnly.FromDateTime(Now.UtcDateTime));
+        vacancy.Close(Now, DateOnly.FromDateTime(Now.UtcDateTime));
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new CloseVacancyRequest { CompanyId = companyId, VacancyId = vacancy.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_Cancelled()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "HR Business Partner", null, null, Guid.NewGuid(), Now);
+        vacancy.Cancel(Now);
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new CloseVacancyRequest { CompanyId = companyId, VacancyId = vacancy.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+    }
+
+    private static CloseVacancyHandler handler(RecruitmentDbContext db) =>
+        new(db, new FakeClock(FixedUtcNow));
+
+    private static RecruitmentDbContext BuildContext() =>
+        new(new DbContextOptionsBuilder<RecruitmentDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options);
+}

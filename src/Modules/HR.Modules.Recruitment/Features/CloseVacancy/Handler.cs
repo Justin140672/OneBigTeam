@@ -1,0 +1,47 @@
+using HR.Modules.Recruitment.Domain;
+using HR.Modules.Recruitment.Persistence;
+using HR.SharedKernel;
+using Microsoft.EntityFrameworkCore;
+
+namespace HR.Modules.Recruitment.Features.CloseVacancy;
+
+internal sealed class CloseVacancyHandler(RecruitmentDbContext db, IClock clock)
+{
+    public async Task<Result<CloseVacancyResponse>> HandleAsync(
+        CloseVacancyRequest request,
+        CancellationToken cancellationToken)
+    {
+        var vacancy = await db.Vacancies
+            .SingleOrDefaultAsync(
+                v => v.Id == request.VacancyId && v.CompanyId == request.CompanyId,
+                cancellationToken);
+
+        if (vacancy is null)
+            return Result.Failure<CloseVacancyResponse>(
+                Error.NotFound($"Vacancy '{request.VacancyId}' was not found."));
+
+        if (vacancy.Status is VacancyStatus.Closed or VacancyStatus.Cancelled)
+            return Result.Failure<CloseVacancyResponse>(
+                Error.Validation($"Cannot close a vacancy with status '{vacancy.Status}'."));
+
+        var now = clock.UtcNowOffset();
+        var closedAt = request.ClosedAt ?? DateOnly.FromDateTime(now.UtcDateTime);
+
+        vacancy.Close(now, closedAt);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(new CloseVacancyResponse(
+            vacancy.Id,
+            vacancy.CompanyId,
+            vacancy.DepartmentId,
+            vacancy.Title,
+            vacancy.Description,
+            vacancy.Location,
+            vacancy.Status,
+            vacancy.HiringManagerId,
+            vacancy.OpenedAt,
+            vacancy.ClosedAt,
+            vacancy.CreatedAt,
+            vacancy.UpdatedAt));
+    }
+}

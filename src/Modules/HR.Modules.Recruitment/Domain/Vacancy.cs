@@ -39,6 +39,22 @@ internal sealed class Vacancy
         UpdatedAt       = now,
     };
 
+    public void UpdateDetails(
+        Guid? departmentId,
+        string title,
+        string? description,
+        string? location,
+        Guid hiringManagerId,
+        DateTimeOffset now)
+    {
+        DepartmentId    = departmentId;
+        Title           = title.Trim();
+        Description     = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        Location        = string.IsNullOrWhiteSpace(location) ? null : location.Trim();
+        HiringManagerId = hiringManagerId;
+        UpdatedAt       = now;
+    }
+
     public void Open(DateTimeOffset now, DateOnly openedAt)
     {
         if (Status is not (VacancyStatus.Draft or VacancyStatus.OnHold))

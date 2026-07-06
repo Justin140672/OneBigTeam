@@ -105,6 +105,12 @@ public static class IdentityModule
             SystemRoles.HrAdministrator,
             SystemRoles.CompanyAdministrator));
 
+        // Recruitment domain policies
+        builder.AddPolicy("recruitment:manage", RolePolicy(
+            SystemRoles.Recruiter,
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
         return builder;
     }
 

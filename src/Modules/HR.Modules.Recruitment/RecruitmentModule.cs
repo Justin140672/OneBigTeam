@@ -1,4 +1,10 @@
+using FluentValidation;
 using HR.Modules.Recruitment.Domain;
+using HR.Modules.Recruitment.Features.CloseVacancy;
+using HR.Modules.Recruitment.Features.CreateVacancy;
+using HR.Modules.Recruitment.Features.GetVacancy;
+using HR.Modules.Recruitment.Features.ListVacancies;
+using HR.Modules.Recruitment.Features.UpdateVacancy;
 using HR.Modules.Recruitment.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,11 +17,30 @@ public static class RecruitmentModule
         this IServiceCollection services,
         string connectionString)
     {
+        AddFeatureServices(services);
+
         services.AddDbContext<RecruitmentDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "recruitment")));
 
         return services;
+    }
+
+    private static void AddFeatureServices(IServiceCollection services)
+    {
+        services.AddScoped<CreateVacancyHandler>();
+        services.AddScoped<IValidator<CreateVacancyRequest>, CreateVacancyValidator>();
+
+        services.AddScoped<GetVacancyHandler>();
+
+        services.AddScoped<ListVacanciesHandler>();
+        services.AddScoped<IValidator<ListVacanciesRequest>, ListVacanciesValidator>();
+
+        services.AddScoped<UpdateVacancyHandler>();
+        services.AddScoped<IValidator<UpdateVacancyRequest>, UpdateVacancyValidator>();
+
+        services.AddScoped<CloseVacancyHandler>();
+        services.AddScoped<IValidator<CloseVacancyRequest>, CloseVacancyValidator>();
     }
 
     public static async Task MigrateRecruitmentAsync(this IServiceProvider services)
