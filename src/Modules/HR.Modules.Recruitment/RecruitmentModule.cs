@@ -1,14 +1,18 @@
 using FluentValidation;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.CloseVacancy;
+using HR.Modules.Recruitment.Features.CreateApplication;
 using HR.Modules.Recruitment.Features.CreateCandidate;
 using HR.Modules.Recruitment.Features.CreateVacancy;
+using HR.Modules.Recruitment.Features.GetApplication;
 using HR.Modules.Recruitment.Features.GetCandidate;
 using HR.Modules.Recruitment.Features.GetVacancy;
+using HR.Modules.Recruitment.Features.ListApplicationsForVacancy;
 using HR.Modules.Recruitment.Features.ListCandidates;
 using HR.Modules.Recruitment.Features.ListVacancies;
 using HR.Modules.Recruitment.Features.UpdateCandidate;
 using HR.Modules.Recruitment.Features.UpdateVacancy;
+using HR.Modules.Recruitment.Features.WithdrawApplication;
 using HR.Modules.Recruitment.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,6 +60,17 @@ public static class RecruitmentModule
 
         services.AddScoped<UpdateCandidateHandler>();
         services.AddScoped<IValidator<UpdateCandidateRequest>, UpdateCandidateValidator>();
+
+        services.AddScoped<CreateApplicationHandler>();
+        services.AddScoped<IValidator<CreateApplicationRequest>, CreateApplicationValidator>();
+
+        services.AddScoped<GetApplicationHandler>();
+
+        services.AddScoped<ListApplicationsForVacancyHandler>();
+        services.AddScoped<IValidator<ListApplicationsForVacancyRequest>, ListApplicationsForVacancyValidator>();
+
+        services.AddScoped<WithdrawApplicationHandler>();
+        services.AddScoped<IValidator<WithdrawApplicationRequest>, WithdrawApplicationValidator>();
     }
 
     public static async Task MigrateRecruitmentAsync(this IServiceProvider services)
