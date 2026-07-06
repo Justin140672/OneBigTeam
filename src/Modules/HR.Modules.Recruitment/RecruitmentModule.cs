@@ -10,7 +10,10 @@ using HR.Modules.Recruitment.Features.GetVacancy;
 using HR.Modules.Recruitment.Features.ListApplicationsForVacancy;
 using HR.Modules.Recruitment.Features.ListCandidates;
 using HR.Modules.Recruitment.Features.ListVacancies;
+using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
+using HR.Modules.Recruitment.Features.ScheduleInterview;
 using HR.Modules.Recruitment.Features.UpdateCandidate;
+using HR.Modules.Recruitment.Features.UpdateInterview;
 using HR.Modules.Recruitment.Features.UpdateVacancy;
 using HR.Modules.Recruitment.Features.WithdrawApplication;
 using HR.Modules.Recruitment.Persistence;
@@ -71,6 +74,15 @@ public static class RecruitmentModule
 
         services.AddScoped<WithdrawApplicationHandler>();
         services.AddScoped<IValidator<WithdrawApplicationRequest>, WithdrawApplicationValidator>();
+
+        services.AddScoped<ScheduleInterviewHandler>();
+        services.AddScoped<IValidator<ScheduleInterviewRequest>, ScheduleInterviewValidator>();
+
+        services.AddScoped<UpdateInterviewHandler>();
+        services.AddScoped<IValidator<UpdateInterviewRequest>, UpdateInterviewValidator>();
+
+        services.AddScoped<RecordInterviewOutcomeHandler>();
+        services.AddScoped<IValidator<RecordInterviewOutcomeRequest>, RecordInterviewOutcomeValidator>();
     }
 
     public static async Task MigrateRecruitmentAsync(this IServiceProvider services)

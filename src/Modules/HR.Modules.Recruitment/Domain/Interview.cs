@@ -38,15 +38,21 @@ internal sealed class Interview
         UpdatedAt             = now,
     };
 
-    public void Reschedule(DateTimeOffset scheduledAt, int? durationMinutes, string? location, DateTimeOffset now)
+    public void UpdateDetails(
+        Guid interviewerEmployeeId,
+        DateTimeOffset scheduledAt,
+        int? durationMinutes,
+        string? location,
+        DateTimeOffset now)
     {
         if (Outcome != InterviewOutcome.Pending)
-            throw new InvalidOperationException($"Cannot reschedule an interview with outcome '{Outcome}'.");
+            throw new InvalidOperationException($"Cannot update an interview with outcome '{Outcome}'.");
 
-        ScheduledAt     = scheduledAt;
-        DurationMinutes = durationMinutes;
-        Location        = string.IsNullOrWhiteSpace(location) ? null : location.Trim();
-        UpdatedAt       = now;
+        InterviewerEmployeeId = interviewerEmployeeId;
+        ScheduledAt            = scheduledAt;
+        DurationMinutes        = durationMinutes;
+        Location               = string.IsNullOrWhiteSpace(location) ? null : location.Trim();
+        UpdatedAt              = now;
     }
 
     public void RecordOutcome(InterviewOutcome outcome, string? notes, DateTimeOffset now)

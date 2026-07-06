@@ -27,25 +27,27 @@ public class InterviewTests
     }
 
     [Fact]
-    public void Reschedule_Updates_ScheduledAt_Duration_And_Location()
+    public void UpdateDetails_Updates_Interviewer_ScheduledAt_Duration_And_Location()
     {
         var interview = CreateInterview();
         var newTime = Now.AddDays(5);
+        var newInterviewerId = Guid.NewGuid();
 
-        interview.Reschedule(newTime, 45, "Office - Room 2", Now);
+        interview.UpdateDetails(newInterviewerId, newTime, 45, "Office - Room 2", Now);
 
+        Assert.Equal(newInterviewerId, interview.InterviewerEmployeeId);
         Assert.Equal(newTime, interview.ScheduledAt);
         Assert.Equal(45, interview.DurationMinutes);
         Assert.Equal("Office - Room 2", interview.Location);
     }
 
     [Fact]
-    public void Reschedule_After_Outcome_Recorded_Throws()
+    public void UpdateDetails_After_Outcome_Recorded_Throws()
     {
         var interview = CreateInterview();
         interview.RecordOutcome(InterviewOutcome.Passed, null, Now);
 
-        Assert.Throws<InvalidOperationException>(() => interview.Reschedule(Now.AddDays(1), null, null, Now));
+        Assert.Throws<InvalidOperationException>(() => interview.UpdateDetails(Guid.NewGuid(), Now.AddDays(1), null, null, Now));
     }
 
     [Fact]
