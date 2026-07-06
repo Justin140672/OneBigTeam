@@ -28,6 +28,7 @@ internal sealed class GetCandidateHandler(RecruitmentDbContext db)
             candidate.Email,
             candidate.Phone,
             candidate.ResumeUrl,
+            candidate.EmployeeId,
             candidate.CreatedAt,
             candidate.UpdatedAt));
     }

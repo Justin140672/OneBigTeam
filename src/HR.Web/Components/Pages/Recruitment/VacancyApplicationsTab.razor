@@ -1,0 +1,465 @@
+@inject ApplicationService ApplicationService
+@inject CandidateService CandidateService
+@inject EmployeeService EmployeeService
+@inject IJSRuntime JS
+
+<div data-testid="vacancy-applications-tab">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Applications</h5>
+        <SfButton IsPrimary="true" OnClick="OpenAddDialog" data-testid="add-application-btn">
+            <i class="fa-solid fa-plus me-1"></i>Add Candidate
+        </SfButton>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_actionError))
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_actionError
+            <button type="button" class="btn-close" @onclick="() => _actionError = null"></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(_actionSuccess))
+    {
+        <div class="alert alert-success">@_actionSuccess</div>
+    }
+
+    @if (_loading)
+    {
+        <HrLoadingIndicator />
+    }
+    else if (_applications.Count == 0)
+    {
+        <p class="text-muted">No applications yet for this vacancy.</p>
+    }
+    else
+    {
+        <HrGrid TValue="ApplicationListItemModel"
+                DataSource="@_applications"
+                AllowFiltering="false"
+                AllowPaging="false">
+            <GridColumns>
+                <GridColumn HeaderText="Candidate" Width="200">
+                    <Template>
+                        @{
+                            var row = (ApplicationListItemModel)context;
+                            <a href="/companies/@CompanyId/candidates/@row.CandidateId">@row.CandidateFirstName @row.CandidateLastName</a>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(ApplicationListItemModel.CandidateEmail)" HeaderText="Email" Width="200" />
+                <GridColumn Field="@nameof(ApplicationListItemModel.Status)" HeaderText="Status" Width="140">
+                    <Template>
+                        @{
+                            var row = (ApplicationListItemModel)context;
+                        }
+                        <StatusBadge Variant="@StatusVariant(row.Status)">@row.Status</StatusBadge>
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(ApplicationListItemModel.AppliedAt)" HeaderText="Applied" Width="130" Format="d" />
+                <GridColumn HeaderText="Actions" Width="260">
+                    <Template>
+                        @{
+                            var row = (ApplicationListItemModel)context;
+                        }
+                        <div class="d-flex gap-1 flex-wrap">
+                            @if (row.Status is "Applied" or "Screening")
+                            {
+                                <SfButton CssClass="e-small" OnClick="() => OpenScheduleDialog(row)">Schedule Interview</SfButton>
+                            }
+                            @if (row.Status is "Interviewed")
+                            {
+                                <SfButton CssClass="e-small" IsPrimary="true" OnClick="() => OfferAsync(row)">Offer</SfButton>
+                            }
+                            @if (row.Status is "Offered")
+                            {
+                                <SfButton CssClass="e-small" IsPrimary="true" OnClick="() => OpenHireDialog(row)">Hire</SfButton>
+                            }
+                            @if (row.Status is "Applied" or "Screening" or "InterviewScheduled" or "Interviewed" or "Offered")
+                            {
+                                <SfButton CssClass="e-small" OnClick="() => OpenRejectDialog(row)">Reject</SfButton>
+                                <SfButton CssClass="e-small" OnClick="() => WithdrawAsync(row)">Withdraw</SfButton>
+                            }
+                        </div>
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </HrGrid>
+    }
+</div>
+
+<SfDialog Width="480px" IsModal="true" @bind-Visible="_showAddDialog" Header="Add Candidate" CssClass="add-application-dialog">
+    <DialogTemplates>
+        <Content>
+            <div class="mb-3">
+                <label class="form-label">Candidate</label>
+                <SfDropDownList TValue="Guid?" TItem="CandidateListItemModel"
+                                DataSource="@_candidates" @bind-Value="_selectedCandidateId"
+                                Placeholder="Select a candidate" AllowFiltering="true">
+                    <DropDownListFieldSettings Value="Id" Text="Email" />
+                    <DropDownListTemplates TItem="CandidateListItemModel">
+                        <ItemTemplate>
+                            @{ var c = (CandidateListItemModel)context; }
+                            <span><strong>@c.FirstName @c.LastName</strong> <span class="text-muted ms-1">@c.Email</span></span>
+                        </ItemTemplate>
+                    </DropDownListTemplates>
+                </SfDropDownList>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Notes (optional)</label>
+                <SfTextBox @bind-Value="_addNotes" Multiline="true" Rows="2" />
+            </div>
+            @if (_dialogError is not null)
+            {
+                <div class="alert alert-danger py-2">@_dialogError</div>
+            }
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Add" IsPrimary="true" OnClick="ConfirmAddAsync" />
+        <DialogButton Content="Cancel" OnClick="() => _showAddDialog = false" />
+    </DialogButtons>
+</SfDialog>
+
+<SfDialog Width="480px" IsModal="true" @bind-Visible="_showScheduleDialog" Header="Schedule Interview" CssClass="schedule-interview-dialog">
+    <DialogTemplates>
+        <Content>
+            <div class="mb-3">
+                <label class="form-label">Interviewer</label>
+                <SfDropDownList TValue="Guid?" TItem="EmployeeListItemModel"
+                                DataSource="@_employees" @bind-Value="_interviewerId"
+                                Placeholder="Select interviewer" AllowFiltering="true">
+                    <DropDownListFieldSettings Value="Id" Text="WorkEmail" />
+                    <DropDownListTemplates TItem="EmployeeListItemModel">
+                        <ItemTemplate>
+                            @{ var e = (EmployeeListItemModel)context; }
+                            <span>@e.FirstName @e.LastName</span>
+                        </ItemTemplate>
+                    </DropDownListTemplates>
+                </SfDropDownList>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Scheduled At</label>
+                <SfDateTimePicker TValue="DateTime?" @bind-Value="_scheduledAt" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Duration (minutes)</label>
+                <SfNumericTextBox TValue="int?" @bind-Value="_durationMinutes" ShowSpinButton="false" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Location</label>
+                <SfTextBox @bind-Value="_location" Placeholder="e.g. Remote" />
+            </div>
+            @if (_dialogError is not null)
+            {
+                <div class="alert alert-danger py-2">@_dialogError</div>
+            }
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Schedule" IsPrimary="true" OnClick="ConfirmScheduleAsync" />
+        <DialogButton Content="Cancel" OnClick="() => _showScheduleDialog = false" />
+    </DialogButtons>
+</SfDialog>
+
+<SfDialog Width="420px" IsModal="true" @bind-Visible="_showRejectDialog" Header="Reject Candidate" CssClass="reject-candidate-dialog">
+    <DialogTemplates>
+        <Content>
+            <div class="mb-3">
+                <label class="form-label">Reason (optional)</label>
+                <SfTextBox @bind-Value="_rejectionReason" Multiline="true" Rows="2" />
+            </div>
+            @if (_dialogError is not null)
+            {
+                <div class="alert alert-danger py-2">@_dialogError</div>
+            }
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Reject" IsPrimary="true" OnClick="ConfirmRejectAsync" />
+        <DialogButton Content="Cancel" OnClick="() => _showRejectDialog = false" />
+    </DialogButtons>
+</SfDialog>
+
+<SfDialog Width="520px" IsModal="true" @bind-Visible="_showHireDialog" Header="Hire Candidate" CssClass="hire-candidate-dialog">
+    <DialogTemplates>
+        <Content>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                    <SfDatePicker TValue="DateOnly?" @bind-Value="_startDate" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
+                    <SfDatePicker TValue="DateOnly?" @bind-Value="_dateOfBirth" Format="dd/MM/yyyy" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Nationality <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="string" TItem="NationalityListItem"
+                                    DataSource="@_nationalities" @bind-Value="_nationality"
+                                    Placeholder="Select nationality" AllowFiltering="true">
+                        <DropDownListFieldSettings Value="Name" Text="Name" />
+                    </SfDropDownList>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Gender <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="string" TItem="string" DataSource="@_genderOptions" @bind-Value="_gender" Placeholder="Select gender" />
+                    @if (_gender == "Other")
+                    {
+                        <div class="mt-2">
+                            <SfTextBox @bind-Value="_genderOther" Placeholder="Please specify" />
+                        </div>
+                    }
+                </div>
+            </div>
+            @if (_dialogError is not null)
+            {
+                <div class="alert alert-danger py-2 mt-3">@_dialogError</div>
+            }
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Hire" IsPrimary="true" OnClick="ConfirmHireAsync" />
+        <DialogButton Content="Cancel" OnClick="() => _showHireDialog = false" />
+    </DialogButtons>
+</SfDialog>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid VacancyId { get; set; }
+
+    private bool _loading = true;
+    private List<ApplicationListItemModel> _applications = [];
+    private string? _actionError;
+    private string? _actionSuccess;
+    private string? _dialogError;
+
+    private bool _showAddDialog;
+    private List<CandidateListItemModel> _candidates = [];
+    private Guid? _selectedCandidateId;
+    private string? _addNotes;
+
+    private bool _showScheduleDialog;
+    private List<EmployeeListItemModel> _employees = [];
+    private ApplicationListItemModel? _activeApplication;
+    private Guid? _interviewerId;
+    private DateTime? _scheduledAt;
+    private int? _durationMinutes;
+    private string? _location;
+
+    private bool _showRejectDialog;
+    private string? _rejectionReason;
+
+    private bool _showHireDialog;
+    private List<NationalityListItem> _nationalities = [];
+    private DateOnly? _startDate;
+    private DateOnly? _dateOfBirth;
+    private string _nationality = string.Empty;
+    private string _gender = string.Empty;
+    private string? _genderOther;
+
+    private static readonly string[] _genderOptions = ["Male", "Female", "Non-binary", "Prefer not to say", "Other"];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var result = await ApplicationService.ListApplicationsForVacancyAsync(CompanyId, VacancyId);
+        _applications = result?.Items ?? [];
+        _loading = false;
+    }
+
+    private static StatusBadgeVariant StatusVariant(string status) => status switch
+    {
+        "Hired" => StatusBadgeVariant.Success,
+        "Offered" => StatusBadgeVariant.Primary,
+        "Interviewed" or "InterviewScheduled" => StatusBadgeVariant.Info,
+        "Rejected" or "Withdrawn" => StatusBadgeVariant.Danger,
+        _ => StatusBadgeVariant.Secondary,
+    };
+
+    private async Task OpenAddDialog()
+    {
+        _dialogError = null;
+        _selectedCandidateId = null;
+        _addNotes = null;
+        var result = await CandidateService.ListCandidatesAsync(CompanyId, pageSize: 200);
+        _candidates = result?.Items ?? [];
+        _showAddDialog = true;
+    }
+
+    private async Task ConfirmAddAsync()
+    {
+        if (_selectedCandidateId is null)
+        {
+            _dialogError = "Please select a candidate.";
+            return;
+        }
+
+        var (created, error) = await ApplicationService.CreateApplicationAsync(CompanyId, VacancyId, _selectedCandidateId.Value, _addNotes);
+        if (created is null)
+        {
+            _dialogError = error;
+            return;
+        }
+
+        _showAddDialog = false;
+        _actionSuccess = "Candidate added to vacancy.";
+        _actionError = null;
+        await LoadAsync();
+    }
+
+    private async Task OpenScheduleDialog(ApplicationListItemModel row)
+    {
+        _dialogError = null;
+        _activeApplication = row;
+        _interviewerId = null;
+        _scheduledAt = DateTime.Today.AddDays(3).AddHours(10);
+        _durationMinutes = 30;
+        _location = null;
+
+        if (_employees.Count == 0)
+        {
+            var result = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
+            _employees = result?.Items.ToList() ?? [];
+        }
+
+        _showScheduleDialog = true;
+    }
+
+    private async Task ConfirmScheduleAsync()
+    {
+        if (_activeApplication is null || _interviewerId is null || _scheduledAt is null)
+        {
+            _dialogError = "Please select an interviewer and a scheduled time.";
+            return;
+        }
+
+        var (result, error) = await InterviewServiceScheduleAsync();
+
+        if (result is null)
+        {
+            _dialogError = error;
+            return;
+        }
+
+        _showScheduleDialog = false;
+        _actionSuccess = "Interview scheduled.";
+        _actionError = null;
+        await LoadAsync();
+    }
+
+    [Inject] private InterviewService InterviewService { get; set; } = default!;
+
+    private Task<(ScheduleInterviewResponse? Result, string? Error)> InterviewServiceScheduleAsync() =>
+        InterviewService.ScheduleInterviewAsync(
+            CompanyId, VacancyId, _activeApplication!.Id,
+            new ScheduleInterviewRequest(
+                CompanyId, VacancyId, _activeApplication.Id, _interviewerId!.Value,
+                new DateTimeOffset(_scheduledAt!.Value), _durationMinutes,
+                string.IsNullOrWhiteSpace(_location) ? null : _location.Trim()));
+
+    private void OpenRejectDialog(ApplicationListItemModel row)
+    {
+        _dialogError = null;
+        _activeApplication = row;
+        _rejectionReason = null;
+        _showRejectDialog = true;
+    }
+
+    private async Task ConfirmRejectAsync()
+    {
+        if (_activeApplication is null) return;
+
+        var (result, error) = await ApplicationService.RejectCandidateAsync(CompanyId, VacancyId, _activeApplication.Id, _rejectionReason);
+        if (result is null)
+        {
+            _dialogError = error;
+            return;
+        }
+
+        _showRejectDialog = false;
+        _actionSuccess = "Candidate rejected.";
+        _actionError = null;
+        await LoadAsync();
+    }
+
+    private async Task OfferAsync(ApplicationListItemModel row)
+    {
+        _actionError = null;
+        var (result, error) = await ApplicationService.OfferCandidateAsync(CompanyId, VacancyId, row.Id);
+        if (result is null)
+        {
+            _actionError = error;
+            return;
+        }
+
+        _actionSuccess = "Offer made to candidate.";
+        await LoadAsync();
+    }
+
+    private async Task WithdrawAsync(ApplicationListItemModel row)
+    {
+        _actionError = null;
+        var (result, error) = await ApplicationService.WithdrawApplicationAsync(CompanyId, VacancyId, row.Id);
+        if (result is null)
+        {
+            _actionError = error;
+            return;
+        }
+
+        _actionSuccess = "Application withdrawn.";
+        await LoadAsync();
+    }
+
+    private async Task OpenHireDialog(ApplicationListItemModel row)
+    {
+        _dialogError = null;
+        _activeApplication = row;
+        _startDate = DateOnly.FromDateTime(DateTime.Today);
+        _dateOfBirth = null;
+        _nationality = string.Empty;
+        _gender = string.Empty;
+        _genderOther = null;
+
+        if (_nationalities.Count == 0)
+        {
+            var result = await EmployeeService.ListNationalitiesAsync();
+            _nationalities = result?.Items.ToList() ?? [];
+        }
+
+        _showHireDialog = true;
+    }
+
+    private async Task ConfirmHireAsync()
+    {
+        if (_activeApplication is null || _startDate is null || _dateOfBirth is null ||
+            string.IsNullOrWhiteSpace(_nationality) || string.IsNullOrWhiteSpace(_gender))
+        {
+            _dialogError = "Please complete all required fields.";
+            return;
+        }
+
+        var request = new HireCandidateRequest(
+            CompanyId, VacancyId, _activeApplication.Id,
+            _startDate.Value, _dateOfBirth.Value, _nationality, _gender,
+            string.IsNullOrWhiteSpace(_genderOther) ? null : _genderOther.Trim(),
+            null, null, null);
+
+        var (result, error) = await ApplicationService.HireCandidateAsync(CompanyId, VacancyId, _activeApplication.Id, request);
+
+        if (result is null)
+        {
+            _dialogError = error;
+            return;
+        }
+
+        _showHireDialog = false;
+        _actionSuccess = $"Candidate hired as employee {result.EmployeeId}.";
+        _actionError = null;
+        await LoadAsync();
+    }
+}

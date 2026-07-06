@@ -13,6 +13,7 @@ using HR.Modules.Recruitment.Features.HireCandidate;
 using HR.Modules.Recruitment.Features.ListApplicationsForVacancy;
 using HR.Modules.Recruitment.Features.ListCandidateDocuments;
 using HR.Modules.Recruitment.Features.ListCandidates;
+using HR.Modules.Recruitment.Features.ListInterviewsForVacancy;
 using HR.Modules.Recruitment.Features.ListVacancies;
 using HR.Modules.Recruitment.Features.OfferCandidate;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
@@ -111,6 +112,9 @@ public static class RecruitmentModule
 
         services.AddScoped<RecordInterviewOutcomeHandler>();
         services.AddScoped<IValidator<RecordInterviewOutcomeRequest>, RecordInterviewOutcomeValidator>();
+
+        services.AddScoped<ListInterviewsForVacancyHandler>();
+        services.AddScoped<IValidator<ListInterviewsForVacancyRequest>, ListInterviewsForVacancyValidator>();
 
         services.AddScoped<UploadCandidateDocumentHandler>();
         services.AddScoped<IValidator<UploadCandidateDocumentRequest>, UploadCandidateDocumentValidator>();

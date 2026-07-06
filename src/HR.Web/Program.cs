@@ -44,6 +44,10 @@ builder.Services.AddScoped<CompensationService>();
 builder.Services.AddScoped<AuditHistoryService>();
 builder.Services.AddScoped<SicknessService>();
 builder.Services.AddScoped<DevAuthService>();
+builder.Services.AddScoped<VacancyService>();
+builder.Services.AddScoped<CandidateService>();
+builder.Services.AddScoped<ApplicationService>();
+builder.Services.AddScoped<InterviewService>();
 builder.Services.AddScoped<AppSession>();
 builder.Services.AddScoped<AuthenticationStateProvider, AppSessionAuthStateProvider>();
 builder.Services.AddAuthentication("NoOp")

@@ -1,0 +1,255 @@
+@page "/companies/{CompanyId:guid}/vacancies/new"
+@page "/companies/{CompanyId:guid}/vacancies/{Id:guid}"
+@page "/companies/{CompanyId:guid}/vacancies/{Id:guid}/view"
+@rendermode InteractiveServer
+@inject VacancyService VacancyService
+@inject DepartmentService DepartmentService
+@inject EmployeeService EmployeeService
+
+@inherits EditPageBase<VacancyEditModel, Guid>
+
+<PageTitle>@PageTitle</PageTitle>
+
+<div class="container py-4">
+    <SfBreadcrumb Class="mb-3">
+        <BreadcrumbItems>
+            <BreadcrumbItem Text="Vacancies" Url="@($"/companies/{CompanyId}/vacancies")" />
+            <BreadcrumbItem Text="@PageTitle" />
+        </BreadcrumbItems>
+    </SfBreadcrumb>
+
+    @if (IsLoading)
+    {
+        <HrLoadingIndicator />
+    }
+    else if (IsNew)
+    {
+        <h1 class="mb-1">Add Vacancy</h1>
+        <p class="text-muted mb-4">Create a new vacancy for a role you're hiring for.</p>
+
+        @if (!string.IsNullOrEmpty(GlobalError))
+        {
+            <div class="alert alert-danger">@GlobalError</div>
+        }
+
+        <EditForm EditContext="EditContext">
+            <DataAnnotationsValidator />
+            @RenderDetailsCard()
+            <div class="d-flex gap-2 mt-3">
+                <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                    @if (Saving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Save
+                </SfButton>
+                <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+            </div>
+        </EditForm>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-3 mb-1">
+            <h1 class="mb-0 fs-4">@Model.Title</h1>
+            @if (_vacancy is not null)
+            {
+                <StatusBadge Variant="@StatusVariant(_vacancy.Status)">@_vacancy.Status</StatusBadge>
+            }
+            @if (CanClose)
+            {
+                <SfButton CssClass="ms-auto" OnClick="CloseVacancyAsync" Disabled="@_closing">
+                    @if (_closing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Close Vacancy
+                </SfButton>
+            }
+        </div>
+        <p class="text-muted mb-3">Manage this vacancy's details, applications, and interviews.</p>
+
+        @if (!string.IsNullOrEmpty(GlobalError))
+        {
+            <div class="alert alert-danger mb-3">@GlobalError</div>
+        }
+        @if (!string.IsNullOrEmpty(_closeError))
+        {
+            <div class="alert alert-danger mb-3">@_closeError</div>
+        }
+
+        <SfTab>
+            <TabItems>
+                <TabItem>
+                    <ChildContent><TabHeader Text="Overview" /></ChildContent>
+                    <ContentTemplate>
+                        <EditForm EditContext="EditContext">
+                            <DataAnnotationsValidator />
+                            <div class="mt-4">
+                                @RenderDetailsCard()
+                                <div class="d-flex gap-2 mt-3">
+                                    @if (!IsViewMode)
+                                    {
+                                        <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                                            @if (Saving)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                            }
+                                            Save
+                                        </SfButton>
+                                    }
+                                    <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                                </div>
+                            </div>
+                        </EditForm>
+                    </ContentTemplate>
+                </TabItem>
+
+                <TabItem>
+                    <ChildContent><TabHeader Text="Applications" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <VacancyApplicationsTab CompanyId="CompanyId" VacancyId="Id!.Value" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
+                <TabItem>
+                    <ChildContent><TabHeader Text="Interviews" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <VacancyInterviewsTab CompanyId="CompanyId" VacancyId="Id!.Value" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+            </TabItems>
+        </SfTab>
+    }
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+
+    private GetVacancyResponse? _vacancy;
+    private List<DepartmentListItemModel> _departments = [];
+    private List<EmployeeListItemModel> _employees = [];
+    private bool _closing;
+    private string? _closeError;
+
+    private string PageTitle => IsNew ? "Add Vacancy"
+        : Model.Title.Trim().Length > 0 ? Model.Title
+        : IsViewMode ? "View Vacancy" : "Edit Vacancy";
+
+    private bool CanClose => _vacancy is not null && _vacancy.Status is not ("Closed" or "Cancelled") && !IsViewMode;
+
+    protected override IEditService<VacancyEditModel, Guid> Service => VacancyService;
+    protected override Guid GetCompanyId() => CompanyId;
+    protected override Guid? GetId() => Id;
+
+    protected override async Task OnLoadedAsync()
+    {
+        var deptResult = await DepartmentService.ListDepartmentsAsync(CompanyId);
+        _departments = deptResult?.Items ?? [];
+
+        var empResult = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
+        _employees = empResult?.Items.ToList() ?? [];
+
+        if (!IsNew)
+            _vacancy = await VacancyService.GetVacancyAsync(CompanyId, Id!.Value);
+    }
+
+    protected override string? ListUrl => $"/companies/{CompanyId}/vacancies";
+
+    private async Task CloseVacancyAsync()
+    {
+        if (_vacancy is null) return;
+
+        _closing = true;
+        _closeError = null;
+        StateHasChanged();
+
+        var (result, error) = await VacancyService.CloseVacancyAsync(CompanyId, _vacancy.Id);
+
+        _closing = false;
+
+        if (result is null)
+        {
+            _closeError = error;
+            return;
+        }
+
+        _vacancy = await VacancyService.GetVacancyAsync(CompanyId, _vacancy.Id);
+    }
+
+    private static StatusBadgeVariant StatusVariant(string status) => status switch
+    {
+        "Open" => StatusBadgeVariant.Success,
+        "OnHold" => StatusBadgeVariant.Warning,
+        "Closed" => StatusBadgeVariant.Secondary,
+        "Cancelled" => StatusBadgeVariant.Danger,
+        _ => StatusBadgeVariant.Info,
+    };
+
+    private RenderFragment RenderDetailsCard() => @<div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Vacancy Details</h5>
+                </div>
+                <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Title <span class="text-danger">*</span></label>
+                            <HrTextBox @bind-Value="Model.Title" Placeholder="e.g. Senior Software Engineer" />
+                            <ValidationMessage For="@(() => Model.Title)" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Location</label>
+                            <HrTextBox @bind-Value="Model.Location" Placeholder="e.g. Remote" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Department</label>
+                            <SfDropDownList TValue="Guid?"
+                                            TItem="DepartmentListItemModel"
+                                            DataSource="@_departments"
+                                            @bind-Value="Model.DepartmentId"
+                                            Placeholder="None"
+                                            AllowFiltering="true">
+                                <DropDownListFieldSettings Value="Id" Text="Name" />
+                            </SfDropDownList>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Hiring Manager <span class="text-danger">*</span></label>
+                            <SfDropDownList TValue="Guid?"
+                                            TItem="EmployeeListItemModel"
+                                            DataSource="@_employees"
+                                            @bind-Value="Model.HiringManagerId"
+                                            Placeholder="Select hiring manager"
+                                            AllowFiltering="true">
+                                <DropDownListFieldSettings Value="Id" Text="WorkEmail" />
+                                <DropDownListTemplates TItem="EmployeeListItemModel">
+                                    <ItemTemplate>
+                                        @{
+                                            var e = (EmployeeListItemModel)context;
+                                        }
+                                        <span>@e.FirstName @e.LastName</span>
+                                    </ItemTemplate>
+                                </DropDownListTemplates>
+                            </SfDropDownList>
+                            <ValidationMessage For="@(() => Model.HiringManagerId)" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <SfTextBox @bind-Value="Model.Description" Multiline="true" Rows="4" Readonly="@IsViewMode" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>;
+}

@@ -1,0 +1,122 @@
+@page "/companies/{CompanyId:guid}/candidates/new"
+@page "/companies/{CompanyId:guid}/candidates/{Id:guid}"
+@page "/companies/{CompanyId:guid}/candidates/{Id:guid}/view"
+@rendermode InteractiveServer
+@inject CandidateService CandidateService
+@inherits EditPageBase<CandidateEditModel, Guid>
+
+<PageTitle>@PageTitle</PageTitle>
+
+<div class="container py-4">
+    <SfBreadcrumb Class="mb-3">
+        <BreadcrumbItems>
+            <BreadcrumbItem Text="Candidates" Url="@($"/companies/{CompanyId}/candidates")" />
+            <BreadcrumbItem Text="@PageTitle" />
+        </BreadcrumbItems>
+    </SfBreadcrumb>
+
+    @if (IsLoading)
+    {
+        <HrLoadingIndicator />
+    }
+    else
+    {
+        <h1 class="mb-1">@PageTitle</h1>
+        <p class="text-muted mb-4">Record the candidate's contact details and resume link.</p>
+
+        @if (!string.IsNullOrEmpty(GlobalError))
+        {
+            <div class="alert alert-danger">@GlobalError</div>
+        }
+
+        @if (_candidate?.EmployeeId is not null)
+        {
+            <div class="alert alert-success d-flex align-items-center gap-2">
+                <i class="fa-solid fa-circle-check"></i>
+                <span>This candidate was hired and linked to an employee (ID: @_candidate.EmployeeId).</span>
+            </div>
+        }
+
+        <EditForm EditContext="EditContext">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Candidate Details</h5>
+                        </div>
+                        <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">First Name <span class="text-danger">*</span></label>
+                                    <HrTextBox @bind-Value="Model.FirstName" Placeholder="First name" />
+                                    <ValidationMessage For="@(() => Model.FirstName)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Last Name <span class="text-danger">*</span></label>
+                                    <HrTextBox @bind-Value="Model.LastName" Placeholder="Last name" />
+                                    <ValidationMessage For="@(() => Model.LastName)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Email <span class="text-danger">*</span></label>
+                                    <HrTextBox @bind-Value="Model.Email" Placeholder="candidate@example.com" />
+                                    <ValidationMessage For="@(() => Model.Email)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Phone</label>
+                                    <HrTextBox @bind-Value="Model.Phone" Placeholder="e.g. 07700 900000" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Resume URL</label>
+                                    <HrTextBox @bind-Value="Model.ResumeUrl" Placeholder="Link to CV / resume" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-3">
+                        @if (!IsViewMode)
+                        {
+                            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                                @if (Saving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                Save
+                            </SfButton>
+                        }
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+    }
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+
+    private GetCandidateResponse? _candidate;
+
+    private string PageTitle => IsNew ? "Add Candidate"
+        : Model.FirstName.Trim().Length > 0 ? $"{Model.FirstName} {Model.LastName}"
+        : IsViewMode ? "View Candidate" : "Edit Candidate";
+
+    protected override IEditService<CandidateEditModel, Guid> Service => CandidateService;
+    protected override Guid GetCompanyId() => CompanyId;
+    protected override Guid? GetId() => Id;
+
+    protected override async Task OnLoadedAsync()
+    {
+        if (!IsNew)
+            _candidate = await CandidateService.GetCandidateAsync(CompanyId, Id!.Value);
+    }
+
+    protected override string? ListUrl => $"/companies/{CompanyId}/candidates";
+}

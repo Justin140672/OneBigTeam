@@ -8,5 +8,6 @@ internal sealed record GetCandidateResponse(
     string Email,
     string? Phone,
     string? ResumeUrl,
+    Guid? EmployeeId,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

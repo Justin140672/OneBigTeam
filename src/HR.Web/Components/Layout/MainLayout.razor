@@ -60,6 +60,12 @@ else
                                     <MenuItem Text="Asset Categories" Url="@_menuItems["AssetCategories"]" />
                                 </MenuItems>
                             </MenuItem>
+                            <MenuItem Text="Recruitment" IconCss="fa-solid fa-user-tie">
+                                <MenuItems>
+                                    <MenuItem Text="Vacancies" Url="@_menuItems["Vacancies"]" />
+                                    <MenuItem Text="Candidates" Url="@_menuItems["Candidates"]" />
+                                </MenuItems>
+                            </MenuItem>
                             <MenuItem Text="Leave" IconCss="fa-solid fa-calendar-days">
                                 <MenuItems>
                                     <MenuItem Text="Leave Types" Url="@_menuItems["LeaveTypes"]" />
@@ -239,6 +245,8 @@ else
         ["EmploymentTypes"] = "/",
         ["Assets"] = "/",
         ["AssetCategories"] = "/",
+        ["Vacancies"] = "/",
+        ["Candidates"] = "/",
         ["LeaveTypes"] = "/",
         ["LeavePolicies"] = "/",
         ["PublicHolidays"] = "/",
@@ -259,6 +267,8 @@ else
         _menuItems["EmploymentTypes"] = $"/companies/{companyId}/employment-types";
         _menuItems["Assets"] = $"/companies/{companyId}/assets";
         _menuItems["AssetCategories"] = $"/companies/{companyId}/asset-categories";
+        _menuItems["Vacancies"] = $"/companies/{companyId}/vacancies";
+        _menuItems["Candidates"] = $"/companies/{companyId}/candidates";
         _menuItems["LeaveTypes"] = $"/companies/{companyId}/leave-types";
         _menuItems["LeavePolicies"] = $"/companies/{companyId}/leave-policies";
         _menuItems["PublicHolidays"] = $"/companies/{companyId}/public-holidays";

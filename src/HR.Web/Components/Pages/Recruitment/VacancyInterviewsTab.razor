@@ -1,0 +1,160 @@
+@inject InterviewService InterviewService
+
+<div data-testid="vacancy-interviews-tab">
+    <h5 class="mb-3">Interviews</h5>
+
+    @if (!string.IsNullOrEmpty(_actionError))
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_actionError
+            <button type="button" class="btn-close" @onclick="() => _actionError = null"></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(_actionSuccess))
+    {
+        <div class="alert alert-success">@_actionSuccess</div>
+    }
+
+    @if (_loading)
+    {
+        <HrLoadingIndicator />
+    }
+    else if (_interviews.Count == 0)
+    {
+        <p class="text-muted">No interviews scheduled yet for this vacancy.</p>
+    }
+    else
+    {
+        <HrGrid TValue="InterviewListItemModel"
+                DataSource="@_interviews"
+                AllowFiltering="false"
+                AllowPaging="false">
+            <GridColumns>
+                <GridColumn HeaderText="Candidate" Width="200">
+                    <Template>
+                        @{
+                            var row = (InterviewListItemModel)context;
+                            <a href="/companies/@CompanyId/candidates/@row.CandidateId">@row.CandidateFirstName @row.CandidateLastName</a>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(InterviewListItemModel.ScheduledAt)" HeaderText="Scheduled" Width="170" Format="g" />
+                <GridColumn Field="@nameof(InterviewListItemModel.DurationMinutes)" HeaderText="Duration (min)" Width="140" />
+                <GridColumn Field="@nameof(InterviewListItemModel.Location)" HeaderText="Location" Width="150" />
+                <GridColumn Field="@nameof(InterviewListItemModel.Outcome)" HeaderText="Outcome" Width="130">
+                    <Template>
+                        @{
+                            var row = (InterviewListItemModel)context;
+                        }
+                        <StatusBadge Variant="@OutcomeVariant(row.Outcome)">@row.Outcome</StatusBadge>
+                    </Template>
+                </GridColumn>
+                <GridColumn HeaderText="Actions" Width="160">
+                    <Template>
+                        @{
+                            var row = (InterviewListItemModel)context;
+                        }
+                        @if (row.Outcome == "Pending")
+                        {
+                            <SfButton CssClass="e-small" IsPrimary="true" OnClick="() => OpenOutcomeDialog(row)">Record Outcome</SfButton>
+                        }
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </HrGrid>
+    }
+</div>
+
+<SfDialog Width="460px" IsModal="true" @bind-Visible="_showOutcomeDialog" Header="Record Interview Outcome" CssClass="record-outcome-dialog">
+    <DialogTemplates>
+        <Content>
+            <div class="mb-3">
+                <label class="form-label">Outcome <span class="text-danger">*</span></label>
+                <SfDropDownList TValue="string" TItem="string" DataSource="@_outcomeOptions" @bind-Value="_outcome" Placeholder="Select outcome" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Notes (optional)</label>
+                <SfTextBox @bind-Value="_notes" Multiline="true" Rows="3" />
+            </div>
+            @if (_dialogError is not null)
+            {
+                <div class="alert alert-danger py-2">@_dialogError</div>
+            }
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Save" IsPrimary="true" OnClick="ConfirmOutcomeAsync" />
+        <DialogButton Content="Cancel" OnClick="() => _showOutcomeDialog = false" />
+    </DialogButtons>
+</SfDialog>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid VacancyId { get; set; }
+
+    private bool _loading = true;
+    private List<InterviewListItemModel> _interviews = [];
+    private string? _actionError;
+    private string? _actionSuccess;
+    private string? _dialogError;
+
+    private bool _showOutcomeDialog;
+    private InterviewListItemModel? _activeInterview;
+    private string _outcome = string.Empty;
+    private string? _notes;
+
+    private static readonly string[] _outcomeOptions = ["Passed", "Failed", "NoShow", "Cancelled"];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var result = await InterviewService.ListInterviewsForVacancyAsync(CompanyId, VacancyId);
+        _interviews = result?.Items ?? [];
+        _loading = false;
+    }
+
+    private static StatusBadgeVariant OutcomeVariant(string outcome) => outcome switch
+    {
+        "Passed" => StatusBadgeVariant.Success,
+        "Failed" or "NoShow" => StatusBadgeVariant.Danger,
+        "Cancelled" => StatusBadgeVariant.Secondary,
+        _ => StatusBadgeVariant.Info,
+    };
+
+    private void OpenOutcomeDialog(InterviewListItemModel row)
+    {
+        _dialogError = null;
+        _activeInterview = row;
+        _outcome = string.Empty;
+        _notes = null;
+        _showOutcomeDialog = true;
+    }
+
+    private async Task ConfirmOutcomeAsync()
+    {
+        if (_activeInterview is null || string.IsNullOrWhiteSpace(_outcome))
+        {
+            _dialogError = "Please select an outcome.";
+            return;
+        }
+
+        var (result, error) = await InterviewService.RecordInterviewOutcomeAsync(
+            CompanyId, VacancyId, _activeInterview.ApplicationId, _activeInterview.Id, _outcome, _notes);
+
+        if (result is null)
+        {
+            _dialogError = error;
+            return;
+        }
+
+        _showOutcomeDialog = false;
+        _actionSuccess = "Interview outcome recorded.";
+        _actionError = null;
+        await LoadAsync();
+    }
+}
