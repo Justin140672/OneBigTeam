@@ -58,6 +58,32 @@ public class ListSicknessCategoriesHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Orders_Ties_By_DisplayOrder_Newest_First()
+    {
+        // Categories created via the UI without an explicit Display Order all default to 0 —
+        // with no secondary sort, Postgres does not guarantee a stable tie order, so a newly
+        // created category could sort anywhere among same-DisplayOrder rows and fall off a
+        // paginated grid's first page. Newest-first as the tiebreaker keeps new rows visible.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var oldest = SicknessCategory.Create(Guid.NewGuid(), companyId, "Oldest", 0, FixedOffset);
+        var middle = SicknessCategory.Create(Guid.NewGuid(), companyId, "Middle", 0, FixedOffset.AddMinutes(1));
+        var newest = SicknessCategory.Create(Guid.NewGuid(), companyId, "Newest", 0, FixedOffset.AddMinutes(2));
+        db.SicknessCategories.AddRange(oldest, middle, newest);
+        await db.SaveChangesAsync();
+
+        var handler = new ListSicknessCategoriesHandler(db);
+
+        var result = await handler.HandleAsync(new ListSicknessCategoriesRequest { CompanyId = companyId }, CancellationToken.None);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal("Newest", result[0].Name);
+        Assert.Equal("Middle", result[1].Name);
+        Assert.Equal("Oldest", result[2].Name);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_Empty_List_When_No_Categories()
     {
         await using var db = BuildContext();

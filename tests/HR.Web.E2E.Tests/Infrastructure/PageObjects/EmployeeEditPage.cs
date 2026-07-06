@@ -275,10 +275,10 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         AuditHistoryRow(actionFragment).First.GetByTitle("View").ClickAsync();
 
     public async Task<bool> HasAuditDetailDialogAsync() =>
-        await page.Locator(".audit-history-detail-dialog").IsVisibleAsync();
+        await page.Locator("[role='dialog'].audit-history-detail-dialog").IsVisibleAsync();
 
     public async Task<string?> GetAuditDetailDialogTextAsync() =>
-        await page.Locator(".audit-history-detail-dialog").TextContentAsync();
+        await page.Locator("[role='dialog'].audit-history-detail-dialog").TextContentAsync();
 
     public async Task CloseAuditDetailDialogAsync()
     {

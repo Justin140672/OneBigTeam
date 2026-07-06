@@ -17,6 +17,7 @@ internal sealed class ListSicknessCategoriesHandler(SicknessDbContext db)
 
         return await query
             .OrderBy(c => c.DisplayOrder)
+            .ThenByDescending(c => c.CreatedAt)
             .Select(c => new ListSicknessCategoriesResponse(
                 c.Id, c.CompanyId, c.Name, c.IsActive, c.DisplayOrder, c.CreatedAt, c.UpdatedAt))
             .ToListAsync(cancellationToken);

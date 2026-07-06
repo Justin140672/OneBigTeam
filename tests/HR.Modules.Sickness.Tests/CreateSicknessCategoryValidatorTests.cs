@@ -44,11 +44,10 @@ public class CreateSicknessCategoryValidatorTests
     }
 
     [Fact]
-    public void Validate_Fails_When_DisplayOrder_Is_Zero()
+    public void Validate_Succeeds_When_DisplayOrder_Is_Zero()
     {
         var result = _validator.Validate(Valid() with { DisplayOrder = 0 });
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateSicknessCategoryRequest.DisplayOrder));
+        Assert.True(result.IsValid);
     }
 
     [Fact]

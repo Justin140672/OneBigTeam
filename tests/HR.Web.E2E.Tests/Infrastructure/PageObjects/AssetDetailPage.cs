@@ -70,7 +70,7 @@ public sealed class AssetDetailPage(IPage page, string baseUrl)
     }
 
     public async Task<bool> IsAssignToEmployeeDialogVisibleAsync() =>
-        await page.Locator(".assign-to-employee-dialog").IsVisibleAsync();
+        await page.Locator("[role='dialog'].assign-to-employee-dialog").IsVisibleAsync();
 
     public async Task CloseAssignToEmployeeDialogAsync()
     {

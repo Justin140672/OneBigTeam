@@ -120,8 +120,11 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
         await _page.Locator("[id='hr-view']").ClickAsync();
 
         // Should open the task in a dialog (TaskViewDialog), not navigate to /tasks/{id}.
-        await _page.WaitForSelectorAsync(".task-view-dialog", new() { Timeout = 15_000 });
-        Assert.True(await _page.Locator(".task-view-dialog").IsVisibleAsync(),
+        // Scoped to [role='dialog'] because Syncfusion's SfDialog CssClass propagates onto
+        // multiple elements (the outer container, the dialog itself, and the close button),
+        // which makes a bare ".task-view-dialog" locator ambiguous under Playwright's strict mode.
+        await _page.WaitForSelectorAsync("[role='dialog'].task-view-dialog", new() { Timeout = 15_000 });
+        Assert.True(await _page.Locator("[role='dialog'].task-view-dialog").IsVisibleAsync(),
             "Expected clicking View on an employee's Tasks tab to open the task in a dialog");
         Assert.Equal(urlBeforeClick, _page.Url);
     }

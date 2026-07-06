@@ -40,6 +40,31 @@ public class UpdateSicknessCategoryHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Succeeds_When_DisplayOrder_Is_Zero()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        await SeedCategory(db, companyId, "Cold", 1);
+
+        var categoryId = (await db.SicknessCategories.SingleAsync()).Id;
+        var handler = new UpdateSicknessCategoryHandler(db, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new UpdateSicknessCategoryRequest
+        {
+            CompanyId = companyId,
+            Id = categoryId,
+            Name = "Cold",
+            DisplayOrder = 0
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0, result.Value!.DisplayOrder);
+
+        var saved = await db.SicknessCategories.SingleAsync();
+        Assert.Equal(0, saved.DisplayOrder);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_Failure_When_Category_Not_Found()
     {
         await using var db = BuildContext();

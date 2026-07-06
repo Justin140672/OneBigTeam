@@ -116,8 +116,11 @@ public sealed class ProfileAssetsTabTests(AppFixture fixture) : E2ETestBase(fixt
         await _page.Locator("[id='hr-view']").ClickAsync();
 
         // Should open the asset in a dialog (AssetDetailDialog), not navigate to /assets/{id}/view.
-        await _page.WaitForSelectorAsync(".asset-detail-dialog", new() { Timeout = 15_000 });
-        Assert.True(await _page.Locator(".asset-detail-dialog").IsVisibleAsync(),
+        // Scoped to [role='dialog'] because Syncfusion's SfDialog CssClass propagates onto
+        // multiple elements (the outer container, the dialog itself, and the close button),
+        // which makes a bare ".asset-detail-dialog" locator ambiguous under Playwright's strict mode.
+        await _page.WaitForSelectorAsync("[role='dialog'].asset-detail-dialog", new() { Timeout = 15_000 });
+        Assert.True(await _page.Locator("[role='dialog'].asset-detail-dialog").IsVisibleAsync(),
             "Expected clicking View on My Profile's Assets tab to open the asset in a dialog");
         Assert.Equal(profileUrlBeforeClick, _page.Url);
     }

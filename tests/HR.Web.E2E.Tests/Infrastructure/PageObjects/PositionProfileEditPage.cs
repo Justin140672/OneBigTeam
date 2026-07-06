@@ -70,10 +70,11 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
 
     public async Task SelectDefaultLeavePolicyAsync(string leavePolicyName)
     {
-        // The Defaults card's leave-policy SfDropDownList is the only combobox labelled by this section;
-        // scope to the "Defaults" card so this doesn't collide with the Department dropdown above it.
-        var card = page.Locator(".card", new PageLocatorOptions { HasText = "Defaults" });
-        await card.Locator("span[role='combobox']").First.ClickAsync();
+        // The Defaults card now has three comboboxes (Salary Type, Default Leave Policy,
+        // Onboarding Template), so scope to the specific field wrapper by its label rather
+        // than taking .First within the whole card.
+        var field = page.Locator(".mb-3", new PageLocatorOptions { HasText = "Default Leave Policy" });
+        await field.Locator("span[role='combobox']").First.ClickAsync();
         await page.Locator(".e-popup-open .e-list-item")
             .Filter(new() { HasText = leavePolicyName })
             .First

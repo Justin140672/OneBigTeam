@@ -55,6 +55,27 @@ public class CreateSicknessCategoryHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Succeeds_When_DisplayOrder_Is_Zero()
+    {
+        await using var db = BuildContext();
+        var handler = new CreateSicknessCategoryHandler(db, new FakeClock(FixedUtcNow));
+        var companyId = Guid.NewGuid();
+
+        var result = await handler.HandleAsync(new CreateSicknessCategoryRequest
+        {
+            CompanyId = companyId,
+            Name = "Cold",
+            DisplayOrder = 0
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0, result.Value!.DisplayOrder);
+
+        var saved = await db.SicknessCategories.SingleAsync();
+        Assert.Equal(0, saved.DisplayOrder);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_Conflict_When_Name_Already_Exists()
     {
         await using var db = BuildContext();

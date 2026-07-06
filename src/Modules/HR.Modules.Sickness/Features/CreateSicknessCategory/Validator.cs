@@ -8,6 +8,6 @@ internal sealed class CreateSicknessCategoryValidator : AbstractValidator<Create
     {
         RuleFor(r => r.CompanyId).NotEmpty();
         RuleFor(r => r.Name).NotEmpty().MaximumLength(100);
-        RuleFor(r => r.DisplayOrder).GreaterThanOrEqualTo(1);
+        RuleFor(r => r.DisplayOrder).GreaterThanOrEqualTo(0);
     }
 }
