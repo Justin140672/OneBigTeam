@@ -47,6 +47,7 @@ public class RecruitmentModuleArchitectureTests
     [InlineData(typeof(Vacancy))]
     [InlineData(typeof(Candidate))]
     [InlineData(typeof(Application))]
+    [InlineData(typeof(Interview))]
     public void Entity_Is_Not_Public(Type entityType)
     {
         Assert.False(entityType.IsPublic, $"{entityType.Name} entity must be internal, not public.");
@@ -64,6 +65,7 @@ public class RecruitmentModuleArchitectureTests
     [InlineData(typeof(Vacancy), "vacancies")]
     [InlineData(typeof(Candidate), "candidates")]
     [InlineData(typeof(Application), "applications")]
+    [InlineData(typeof(Interview), "interviews")]
     public void Entity_Maps_To_Correct_Table_And_Schema(Type clrType, string expectedTable)
     {
         using var context = BuildContext();
@@ -78,6 +80,7 @@ public class RecruitmentModuleArchitectureTests
     [InlineData(typeof(Vacancy))]
     [InlineData(typeof(Candidate))]
     [InlineData(typeof(Application))]
+    [InlineData(typeof(Interview))]
     public void Entity_Primary_Key_Is_Guid(Type clrType)
     {
         using var context = BuildContext();
@@ -93,6 +96,7 @@ public class RecruitmentModuleArchitectureTests
     [InlineData(typeof(Vacancy))]
     [InlineData(typeof(Candidate))]
     [InlineData(typeof(Application))]
+    [InlineData(typeof(Interview))]
     public void Entity_All_Columns_Are_snake_case(Type clrType)
     {
         using var context = BuildContext();

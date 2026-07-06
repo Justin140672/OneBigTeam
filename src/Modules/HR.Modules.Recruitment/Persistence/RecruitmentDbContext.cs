@@ -13,6 +13,7 @@ internal class RecruitmentDbContext : DbContext
     public DbSet<Vacancy> Vacancies => Set<Vacancy>();
     public DbSet<Candidate> Candidates => Set<Candidate>();
     public DbSet<Application> Applications => Set<Application>();
+    public DbSet<Interview> Interviews => Set<Interview>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
