@@ -1,6 +1,7 @@
 using HR.Infrastructure;
 using HR.Modules.Assets;
 using HR.Modules.Companies;
+using HR.Modules.DataImport;
 using HR.Modules.Documents;
 using HR.Modules.Employees;
 using HR.Modules.Identity;
@@ -51,6 +52,7 @@ public class ServiceContainerCompositionTests
         services.AddSingleton<IConfiguration>(configuration);
 
         services.AddCompaniesModule(connectionString);
+        services.AddDataImportModule(connectionString);
         services.AddDocumentsModule(connectionString, configuration);
         services.AddEmployeesModule(connectionString);
         services.AddIdentityModule(connectionString);

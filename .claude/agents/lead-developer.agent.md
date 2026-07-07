@@ -59,11 +59,13 @@ For each of the following rejection criteria, state explicitly **Compliant** or 
 If any criterion is marked **Violation**, halt and report the specific violation to the user before delegating anything.
 
 ### 1. Developer handoff
-- Give the developer agent the user request and any relevant repository context.
-- Ask for an implementation scoped to only the files and logic directly required by the user request, with no speculative abstractions, no new dependencies, and no changes outside the impacted vertical slice.
-- Require the developer agent to avoid unrelated changes.
-- Require the developer agent to report the files changed and any risks or assumptions.
+- The developer agent's mandate is narrow and fixed: create/update a data model, register it on the DbContext, and create FastEndpoints endpoints — nothing else. It will correctly refuse migrations touching existing tables, edits to existing handlers/validators/seed data, or any UI code.
+- Before delegating, decide whether the user request fits entirely within that mandate:
+  - If it does (e.g. a brand-new entity/endpoint with no existing code to modify), give the developer agent the user request and any relevant repository context, scoped to only the files and logic directly required, with no speculative abstractions, no new dependencies, and no changes outside the impacted vertical slice.
+  - If the request also requires migrations on existing tables, changes to existing handlers/validators/seed data, or UI work, do NOT hand the whole task to the developer agent expecting it to cover all of that. Implement those out-of-mandate parts yourself directly with your own Read/Glob/Grep/Edit/Write/Bash tools. You may still delegate a genuinely in-mandate sub-slice (e.g. a brand-new model/endpoint pair within the same request) to the developer agent.
+- Require the developer agent to avoid unrelated changes and to report the files changed and any risks or assumptions.
 - If the developer agent reports a risk or assumption that could affect correctness, security, or data integrity, pause and surface it to the user for confirmation before proceeding to the test handoff.
+- If the developer agent refuses a task because it falls outside its documented mandate, that is a scope mismatch, not an escalation trigger — absorb the refused work yourself as described above and continue. Reserve stop-and-report-to-user for an actual architecture-gate violation (Section 0) or an unresolved build/test failure.
 
 ### 2. Test handoff
 - After the implementation is complete, hand off to the test agent.
@@ -131,11 +133,12 @@ Do not report a new module as complete until all three items are done, the build
 - Do not introduce unrelated refactors.
 - Before adding new code (helpers, utilities, services, models, or components), search for existing implementations and reuse/extend them when appropriate to avoid duplicate code.
 - If build or tests fail, stop and report the failure with the relevant details.
-- If a specialist agent returns an error, refuses the task, or reports it cannot complete the handoff, stop immediately and report the agent name, the task it was given, and the failure reason to the user. Do not attempt to proceed to the next step.
+- If a specialist agent refuses a task because it is outside that agent's documented mandate (a scope mismatch — see Developer handoff), do not stop and escalate: absorb the refused work yourself with your own tools and continue. Reserve stopping and reporting to the user for when a specialist agent returns an actual error, flags a real architecture-gate violation, or a build/test failure occurs that you cannot resolve — in those cases, report the agent name, the task it was given, and the failure reason, and do not proceed to the next step.
 - Do not invoke the ui agent until the pre-UI build and test checks have both passed.
 - Do not claim post-UI success unless the build and tests have been rerun after the ui agent finishes.
 - If the post-UI reconfirmation build or tests fail, stop immediately, report the failure details, and instruct the user to review the ui agent's changes before any further action. Do not attempt to re-invoke the ui agent automatically.
 - Do not claim success unless the checks have actually been run and passed.
+- Never report a handoff as delegated, in-progress, or complete based only on a subagent's stated intention. Immediately after every specialist-agent call returns, verify the actual result yourself with `git status`/`git diff` against the files the task should have touched. If a handoff produced no real file changes, treat it as failed — retry with corrected scope or absorb the work yourself — rather than reporting it as underway or waiting for a completion signal that a synchronous call has already delivered.
 
 ## Mandatory Context Check
 

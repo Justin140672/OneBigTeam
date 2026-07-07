@@ -11,6 +11,7 @@
     <ProjectReference Include="..\Shared\HR.SharedKernel\HR.SharedKernel.csproj" />
     <ProjectReference Include="..\Infrastructure\HR.Infrastructure\HR.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\HR.Modules.Companies\HR.Modules.Companies.csproj" />
+    <ProjectReference Include="..\Modules\HR.Modules.DataImport\HR.Modules.DataImport.csproj" />
     <ProjectReference Include="..\Modules\HR.Modules.Documents\HR.Modules.Documents.csproj" />
     <ProjectReference Include="..\Modules\HR.Modules.Identity\HR.Modules.Identity.csproj" />
     <ProjectReference Include="..\Modules\HR.Modules.Employees\HR.Modules.Employees.csproj" />
