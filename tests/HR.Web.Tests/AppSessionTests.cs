@@ -26,7 +26,7 @@ public class AppSessionTests
         var company = new GetCompanyResponse(companyId, "Acme Corporation", true, DateTime.UtcNow, [],
             new GetCompanyBrandingResponse("logo.png", "small-logo.png", null));
         var settings = new GetCompanySettingsResponse(
-            companyId, "Europe/London", "en-GB", 31, 7.5m, 1, 25m, 6, true, false, null, null,
+            companyId, "Europe/London", "en-GB", 31, 7.5m, 1, 25m, 6, true, false, true, null, null,
             "^postcode$", "^telephone$", "^mobile$", DateTime.UtcNow);
         var employee = new MyEmployeeResponse(employeeId, "Alice", "Smith", "Engineer", null, null, "avatar.png");
 
@@ -63,6 +63,7 @@ public class AppSessionTests
 
         Assert.Equal("Europe/London", session.TimeZone);
         Assert.Equal(25m, session.DefaultHolidayAllowance);
+        Assert.True(session.DisplaySalaryOnEmployeeProfile);
         Assert.Equal("^postcode$", session.PostcodeRegex);
         Assert.Equal("^telephone$", session.TelephoneRegex);
         Assert.Equal("^mobile$", session.MobileRegex);

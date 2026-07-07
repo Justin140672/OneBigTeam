@@ -71,6 +71,18 @@ internal sealed class ListEmployeesHandler
                 .ToDictionaryAsync(d => d.Id, d => d.Name, cancellationToken)
             : new Dictionary<Guid, string>();
 
+        var locationIds = employees
+            .Where(e => e.LocationId is not null)
+            .Select(e => e.LocationId!.Value)
+            .ToHashSet();
+
+        var locationNames = locationIds.Count > 0
+            ? await _dbContext.Locations
+                .AsNoTracking()
+                .Where(l => locationIds.Contains(l.Id))
+                .ToDictionaryAsync(l => l.Id, l => l.Name, cancellationToken)
+            : new Dictionary<Guid, string>();
+
         var positionProfileTitles = positionProfileIds.Count > 0
             ? await _dbContext.PositionProfiles
                 .AsNoTracking()
@@ -91,6 +103,8 @@ internal sealed class ListEmployeesHandler
                 e.CompanyId,
                 e.DepartmentId,
                 e.DepartmentId is not null && departmentNames.TryGetValue(e.DepartmentId.Value, out var deptName) ? deptName : null,
+                e.LocationId,
+                e.LocationId is not null && locationNames.TryGetValue(e.LocationId.Value, out var locName) ? locName : null,
                 e.PositionProfileId,
                 e.PositionProfileId is not null && positionProfileTitles.TryGetValue(e.PositionProfileId.Value, out var ppTitle) ? ppTitle : null,
                 e.ManagerId,

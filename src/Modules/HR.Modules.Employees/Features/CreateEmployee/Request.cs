@@ -5,6 +5,7 @@ internal sealed record CreateEmployeeRequest
     public Guid? Id { get; init; }
     public Guid CompanyId { get; init; }
     public Guid? DepartmentId { get; init; }
+    public Guid? LocationId { get; init; }
     public Guid? PositionProfileId { get; init; }
     public Guid? ManagerId { get; init; }
     public string FirstName { get; init; } = string.Empty;

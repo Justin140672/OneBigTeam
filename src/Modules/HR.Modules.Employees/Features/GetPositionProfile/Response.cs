@@ -7,6 +7,7 @@ internal sealed record GetPositionProfileResponse(
     Guid Id,
     Guid CompanyId,
     Guid? DepartmentId,
+    Guid? LocationId,
     string Title,
     string? Description,
     int? ProbationMonthsOverride,

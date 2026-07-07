@@ -45,6 +45,20 @@ public sealed class OverviewTab(IPage page)
     public async Task ClickViewTasksAsync() =>
         await page.Locator(".action-btn").Filter(new() { HasText = "View Tasks" }).ClickAsync();
 
+    /// <summary>
+    /// Returns the dt label texts, in DOM order, for the Employment summary card
+    /// (the first overview card, headed "Employment").
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetEmploymentCardLabelsAsync()
+    {
+        var card = page.Locator(".overview-card").Filter(new() { HasText = "Employment" }).First;
+        var dts = await card.Locator("dt").AllAsync();
+        var labels = new List<string>();
+        foreach (var dt in dts)
+            labels.Add((await dt.TextContentAsync())?.Trim() ?? "");
+        return labels;
+    }
+
     /// <summary>Returns all stat card titles currently rendered in the stats row.</summary>
     public async Task<IReadOnlyList<string>> GetStatCardTitlesAsync()
     {

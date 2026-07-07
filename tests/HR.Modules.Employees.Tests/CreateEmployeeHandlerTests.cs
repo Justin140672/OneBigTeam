@@ -76,7 +76,7 @@ public class CreateEmployeeHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
-        var positionProfile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, "Developer", null, null, null, null, null, null, null, null, now);
+        var positionProfile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, null, "Developer", null, null, null, null, null, null, null, null, now);
         var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane.manager@example.com", StartDate, hasSystemAccess: true, now);
         context.Departments.Add(department);
         context.PositionProfiles.Add(positionProfile);
@@ -103,6 +103,93 @@ public class CreateEmployeeHandlerTests
         Assert.Equal(department.Id, result.Value!.DepartmentId);
         Assert.Equal(positionProfile.Id, result.Value.PositionProfileId);
         Assert.Equal(manager.Id, result.Value.ManagerId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creates_Employee_With_Location()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
+        var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, now);
+        context.LocationTypes.Add(locationType);
+        context.Locations.Add(location);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
+
+        var result = await handler.HandleAsync(
+            new CreateEmployeeRequest
+            {
+                CompanyId = companyId,
+                LocationId = location.Id,
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice.smith@example.com",
+                StartDate = StartDate
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(location.Id, result.Value!.LocationId);
+
+        var saved = await context.Employees.SingleAsync();
+        Assert.Equal(location.Id, saved.LocationId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_Location_Does_Not_Exist()
+    {
+        await using var context = BuildContext();
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
+
+        var result = await handler.HandleAsync(
+            new CreateEmployeeRequest
+            {
+                CompanyId = Guid.NewGuid(),
+                LocationId = Guid.NewGuid(),
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_Location_Belongs_To_Different_Company()
+    {
+        await using var context = BuildContext();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var otherCompanyId = Guid.NewGuid();
+        var locationType = LocationType.Create(Guid.NewGuid(), otherCompanyId, "Office", null, now);
+        var location = Location.Create(Guid.NewGuid(), otherCompanyId, locationType.Id, "Head Office", null, now);
+        context.LocationTypes.Add(locationType);
+        context.Locations.Add(location);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
+
+        var result = await handler.HandleAsync(
+            new CreateEmployeeRequest
+            {
+                CompanyId = Guid.NewGuid(),
+                LocationId = location.Id,
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
     }
 
     [Fact]
@@ -237,7 +324,7 @@ public class CreateEmployeeHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, "Developer", null, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, null, "Developer", null, null, null, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -499,7 +586,7 @@ public class CreateEmployeeHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Senior Dev", null, 3, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Senior Dev", null, 3, null, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -556,7 +643,7 @@ public class CreateEmployeeHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
         var leavePolicyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Senior Dev", null, null, null, null, null, null, null, leavePolicyId, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Senior Dev", null, null, null, null, null, null, null, leavePolicyId, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 

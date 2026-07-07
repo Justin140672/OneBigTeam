@@ -166,6 +166,12 @@ namespace HR.Modules.Companies.Migrations
                         .HasColumnType("numeric(5,2)")
                         .HasColumnName("default_holiday_allowance");
 
+                    b.Property<bool>("DisplaySalaryOnEmployeeProfile")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("display_salary_on_employee_profile");
+
                     b.Property<bool>("ExcludePublicHolidaysFromLeave")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")

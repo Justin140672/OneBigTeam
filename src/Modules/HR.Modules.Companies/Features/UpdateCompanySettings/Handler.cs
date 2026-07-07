@@ -51,6 +51,7 @@ internal sealed class UpdateCompanySettingsHandler
 				company.Settings.ProbationMonths,
 				company.Settings.ExcludePublicHolidaysFromLeave,
 				company.Settings.ExcludePublicHolidaysFromSickness,
+				company.Settings.DisplaySalaryOnEmployeeProfile,
 				company.Settings.FitNoteRequiredAfterDays,
 				company.Settings.ReturnToWorkRequiredAfterDays);
 
@@ -65,6 +66,7 @@ internal sealed class UpdateCompanySettingsHandler
 			request.ProbationMonths,
 			request.ExcludePublicHolidaysFromLeave,
 			request.ExcludePublicHolidaysFromSickness,
+			request.DisplaySalaryOnEmployeeProfile,
 			request.FitNoteRequiredAfterDays,
 			request.ReturnToWorkRequiredAfterDays,
 			now);
@@ -82,6 +84,7 @@ internal sealed class UpdateCompanySettingsHandler
 			settings.ProbationMonths,
 			settings.ExcludePublicHolidaysFromLeave,
 			settings.ExcludePublicHolidaysFromSickness,
+			settings.DisplaySalaryOnEmployeeProfile,
 			settings.FitNoteRequiredAfterDays,
 			settings.ReturnToWorkRequiredAfterDays,
 			now));
@@ -112,6 +115,7 @@ internal sealed class UpdateCompanySettingsHandler
 					settings.ProbationMonths,
 					settings.ExcludePublicHolidaysFromLeave,
 					settings.ExcludePublicHolidaysFromSickness,
+					settings.DisplaySalaryOnEmployeeProfile,
 					settings.FitNoteRequiredAfterDays,
 					settings.ReturnToWorkRequiredAfterDays)),
 			cancellationToken);
@@ -127,6 +131,7 @@ internal sealed class UpdateCompanySettingsHandler
 			settings.ProbationMonths,
 			settings.ExcludePublicHolidaysFromLeave,
 			settings.ExcludePublicHolidaysFromSickness,
+			settings.DisplaySalaryOnEmployeeProfile,
 			settings.FitNoteRequiredAfterDays,
 			settings.ReturnToWorkRequiredAfterDays,
 			settings.UpdatedAt));

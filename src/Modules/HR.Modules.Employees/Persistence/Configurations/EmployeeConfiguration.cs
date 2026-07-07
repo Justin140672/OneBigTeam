@@ -23,6 +23,14 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.Property(e => e.DepartmentId)
             .HasColumnName("department_id");
 
+        builder.Property(e => e.LocationId)
+            .HasColumnName("location_id");
+
+        builder.HasOne<Location>()
+            .WithMany()
+            .HasForeignKey(e => e.LocationId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.Property(e => e.PositionProfileId)
             .HasColumnName("position_profile_id");
 
@@ -163,6 +171,7 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
 
         builder.HasIndex(e => e.CompanyId);
         builder.HasIndex(e => e.DepartmentId);
+        builder.HasIndex(e => e.LocationId);
         builder.HasIndex(e => e.PositionProfileId);
         builder.HasIndex(e => e.ManagerId);
         builder.HasIndex(e => new { e.CompanyId, e.Status });

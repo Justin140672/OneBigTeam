@@ -78,7 +78,7 @@ internal sealed class AssignManagerHandler
 
         var now = _clock.UtcNowOffset();
 
-        employee.Assign(employee.DepartmentId, employee.PositionProfileId, request.ManagerId, now);
+        employee.Assign(employee.DepartmentId, employee.PositionProfileId, employee.LocationId, request.ManagerId, now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

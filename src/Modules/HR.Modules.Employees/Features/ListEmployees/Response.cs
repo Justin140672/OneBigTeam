@@ -14,6 +14,8 @@ internal sealed record EmployeeListItem(
     Guid CompanyId,
     Guid? DepartmentId,
     string? DepartmentName,
+    Guid? LocationId,
+    string? LocationName,
     Guid? PositionProfileId,
     string? PositionProfileTitle,
     Guid? ManagerId,

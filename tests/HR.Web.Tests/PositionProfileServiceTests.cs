@@ -23,9 +23,10 @@ public class PositionProfileServiceTests
         var companyId = Guid.NewGuid();
         var profileId = Guid.NewGuid();
         var leavePolicyId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
 
         var response = new GetPositionProfileResponse(
-            profileId, companyId, null, "Senior Developer", null,
+            profileId, companyId, null, locationId, "Senior Developer", null,
             ProbationMonthsOverride: 3,
             WorkingDaysOverride: WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday,
             HoursPerDayOverride: 6m,
@@ -53,6 +54,7 @@ public class PositionProfileServiceTests
         Assert.Equal(60000m, result.SalaryMax);
         Assert.Equal("Annual", result.SalaryType);
         Assert.Equal(leavePolicyId, result.DefaultLeavePolicyId);
+        Assert.Equal(locationId, result.LocationId);
     }
 
     [Fact]

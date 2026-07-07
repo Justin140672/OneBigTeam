@@ -45,6 +45,7 @@ internal sealed class GetPositionProfileHandler
             profile.Id,
             profile.CompanyId,
             profile.DepartmentId,
+            profile.LocationId,
             profile.Title,
             profile.Description,
             profile.ProbationMonthsOverride,

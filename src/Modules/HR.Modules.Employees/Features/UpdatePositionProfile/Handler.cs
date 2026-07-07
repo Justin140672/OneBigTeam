@@ -49,6 +49,22 @@ internal sealed class UpdatePositionProfileHandler
             }
         }
 
+        if (request.LocationId is not null)
+        {
+            var locationExists = await _dbContext.Locations
+                .AnyAsync(
+                    l => l.Id == request.LocationId &&
+                         l.CompanyId == request.CompanyId &&
+                         l.IsActive,
+                    cancellationToken);
+
+            if (!locationExists)
+            {
+                return Result.Failure<UpdatePositionProfileResponse>(
+                    Error.NotFound($"Location '{request.LocationId}' was not found."));
+            }
+        }
+
         var newTitle = request.Title.Trim();
 
         if (!string.Equals(profile.Title, newTitle, StringComparison.Ordinal))
@@ -100,6 +116,7 @@ internal sealed class UpdatePositionProfileHandler
 
         profile.Update(
             request.DepartmentId,
+            request.LocationId,
             newTitle,
             string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             request.ProbationMonthsOverride,
@@ -118,6 +135,7 @@ internal sealed class UpdatePositionProfileHandler
             profile.Id,
             profile.CompanyId,
             profile.DepartmentId,
+            profile.LocationId,
             profile.Title,
             profile.Description,
             profile.ProbationMonthsOverride,

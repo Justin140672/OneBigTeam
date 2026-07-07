@@ -17,7 +17,7 @@ public class GetCompanySettingsHandlerTests
         var settings = CompanySettings.CreateDefault(company.Id, now);
         settings.Update(
             "Europe/London", "en-GB", WorkingDays.Monday | WorkingDays.Tuesday, 6m, 4, 30, 8,
-            false, true, 7, 3, now);
+            false, true, true, 7, 3, now);
         company.SetSettings(settings, now);
         context.Companies.Add(company);
         await context.SaveChangesAsync();
@@ -31,6 +31,7 @@ public class GetCompanySettingsHandlerTests
         Assert.Equal(4, result.Value.LeaveYearStartMonth);
         Assert.Equal(30, result.Value.DefaultHolidayAllowance);
         Assert.True(result.Value.ExcludePublicHolidaysFromSickness);
+        Assert.True(result.Value.DisplaySalaryOnEmployeeProfile);
         Assert.Equal(7, result.Value.FitNoteRequiredAfterDays);
     }
 
@@ -53,6 +54,7 @@ public class GetCompanySettingsHandlerTests
         Assert.Equal("en-GB", result.Value.Locale);
         Assert.Equal(1, result.Value.LeaveYearStartMonth);
         Assert.Equal(25, result.Value.DefaultHolidayAllowance);
+        Assert.False(result.Value.DisplaySalaryOnEmployeeProfile);
         Assert.False(string.IsNullOrEmpty(result.Value.PostcodeRegex));
     }
 

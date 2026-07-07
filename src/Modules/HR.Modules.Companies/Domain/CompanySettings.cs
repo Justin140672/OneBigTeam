@@ -17,6 +17,7 @@ internal sealed class CompanySettings
     public int ProbationMonths { get; private set; }
     public bool ExcludePublicHolidaysFromLeave { get; private set; }
     public bool ExcludePublicHolidaysFromSickness { get; private set; }
+    public bool DisplaySalaryOnEmployeeProfile { get; private set; }
     public int? FitNoteRequiredAfterDays { get; private set; }
     public int? ReturnToWorkRequiredAfterDays { get; private set; }
     public string PostcodeRegex { get; private set; } = UkContactRegexDefaults.Postcode;
@@ -40,6 +41,7 @@ internal sealed class CompanySettings
             ProbationMonths = 6,
             ExcludePublicHolidaysFromLeave = true,
             ExcludePublicHolidaysFromSickness = false,
+            DisplaySalaryOnEmployeeProfile = false,
             FitNoteRequiredAfterDays = null,
             ReturnToWorkRequiredAfterDays = null,
             PostcodeRegex = UkContactRegexDefaults.Postcode,
@@ -60,6 +62,7 @@ internal sealed class CompanySettings
         int probationMonths,
         bool excludePublicHolidaysFromLeave,
         bool excludePublicHolidaysFromSickness,
+        bool displaySalaryOnEmployeeProfile,
         int? fitNoteRequiredAfterDays,
         int? returnToWorkRequiredAfterDays,
         DateTimeOffset now)
@@ -73,6 +76,7 @@ internal sealed class CompanySettings
         ProbationMonths = probationMonths;
         ExcludePublicHolidaysFromLeave = excludePublicHolidaysFromLeave;
         ExcludePublicHolidaysFromSickness = excludePublicHolidaysFromSickness;
+        DisplaySalaryOnEmployeeProfile = displaySalaryOnEmployeeProfile;
         FitNoteRequiredAfterDays = fitNoteRequiredAfterDays;
         ReturnToWorkRequiredAfterDays = returnToWorkRequiredAfterDays;
         UpdatedAt = now;

@@ -1,0 +1,135 @@
+@page "/companies/{CompanyId:guid}/locations/new"
+@page "/companies/{CompanyId:guid}/locations/{Id:guid}"
+@page "/companies/{CompanyId:guid}/locations/{Id:guid}/view"
+@rendermode InteractiveServer
+@inject LocationService LocationService
+@inject LocationTypeService LocationTypeService
+@inherits EditPageBase<LocationEditModel, Guid>
+
+<PageTitle>@PageTitle</PageTitle>
+
+<div class="container py-4">
+    <SfBreadcrumb Class="mb-3">
+        <BreadcrumbItems>
+            <BreadcrumbItem Text="Locations" Url="@($"/companies/{CompanyId}/locations")" />
+            <BreadcrumbItem Text="@PageTitle" />
+        </BreadcrumbItems>
+    </SfBreadcrumb>
+
+    @if (IsLoading)
+    {
+        <HrLoadingIndicator />
+    }
+    else
+    {
+        <h1 class="mb-1">@PageTitle</h1>
+        <p class="text-muted mb-4">Set the location's name, description and type.</p>
+
+        @if (!string.IsNullOrEmpty(GlobalError))
+        {
+            <div class="alert alert-danger">@GlobalError</div>
+        }
+
+        <EditForm EditContext="EditContext">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-lg-7">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Location Details</h5>
+                        </div>
+                        <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                            <div class="mb-3">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <HrTextBox @bind-Value="Model.Name" Placeholder="Location name" />
+                                <ValidationMessage For="@(() => Model.Name)" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <HrTextBox @bind-Value="Model.Description" Placeholder="Optional description" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Location Type <span class="text-danger">*</span></label>
+                                <SfDropDownList TValue="Guid?"
+                                                TItem="LocationTypeListItemModel"
+                                                DataSource="@_locationTypes"
+                                                @bind-Value="_locationTypeId"
+                                                Placeholder="Select a location type"
+                                                AllowFiltering="true">
+                                    <DropDownListFieldSettings Value="Id" Text="Name" />
+                                </SfDropDownList>
+                                @if (_locationTypeError is not null)
+                                {
+                                    <div class="invalid-feedback d-block">@_locationTypeError</div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-3">
+                        @if (!IsViewMode)
+                        {
+                            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                                @if (Saving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                Save
+                            </SfButton>
+                        }
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+    }
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+
+    private string PageTitle => IsNew ? "Add Location"
+        : Model.Name.Trim().Length > 0 ? Model.Name
+        : IsViewMode ? "View Location" : "Edit Location";
+
+    private List<LocationTypeListItemModel> _locationTypes = [];
+    private Guid? _locationTypeId;
+    private string? _locationTypeError;
+
+    protected override IEditService<LocationEditModel, Guid> Service => LocationService;
+    protected override Guid GetCompanyId() => CompanyId;
+    protected override Guid? GetId() => Id;
+
+    protected override async Task OnLoadedAsync()
+    {
+        var list = await LocationTypeService.ListLocationTypesAsync(CompanyId);
+        _locationTypes = list?.Items ?? [];
+
+        _locationTypeId = Model.LocationTypeId == Guid.Empty ? null : Model.LocationTypeId;
+    }
+
+    protected override bool Validate()
+    {
+        _locationTypeError = null;
+
+        Model.LocationTypeId = _locationTypeId ?? Guid.Empty;
+
+        var valid = base.Validate();
+
+        if (_locationTypeId is null || _locationTypeId == Guid.Empty)
+        {
+            _locationTypeError = "Location type is required.";
+            valid = false;
+        }
+
+        return valid;
+    }
+
+    protected override string? ListUrl => $"/companies/{CompanyId}/locations";
+}

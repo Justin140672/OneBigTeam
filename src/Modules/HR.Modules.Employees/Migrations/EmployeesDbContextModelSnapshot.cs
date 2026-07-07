@@ -298,6 +298,10 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("date")
                         .HasColumnName("leaving_date");
 
+                    b.Property<Guid?>("LocationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("location_id");
+
                     b.Property<Guid?>("ManagerId")
                         .HasColumnType("uuid")
                         .HasColumnName("manager_id");
@@ -376,6 +380,8 @@ namespace HR.Modules.Employees.Migrations
                     b.HasIndex("DepartmentId");
 
                     b.HasIndex("EmploymentTypeId");
+
+                    b.HasIndex("LocationId");
 
                     b.HasIndex("ManagerId");
 
@@ -681,6 +687,10 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<Guid?>("LocationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("location_id");
+
                     b.Property<Guid?>("OnboardingTemplateId")
                         .HasColumnType("uuid")
                         .HasColumnName("onboarding_template_id");
@@ -723,6 +733,8 @@ namespace HR.Modules.Employees.Migrations
                     b.HasIndex("CompanyId");
 
                     b.HasIndex("DepartmentId");
+
+                    b.HasIndex("LocationId");
 
                     b.ToTable("position_profiles", "employees");
                 });
@@ -834,6 +846,11 @@ namespace HR.Modules.Employees.Migrations
                     b.HasOne("HR.Modules.Employees.Domain.EmploymentType", null)
                         .WithMany()
                         .HasForeignKey("EmploymentTypeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HR.Modules.Employees.Domain.Location", null)
+                        .WithMany()
+                        .HasForeignKey("LocationId")
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 

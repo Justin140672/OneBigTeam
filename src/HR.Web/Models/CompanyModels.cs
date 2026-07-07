@@ -60,6 +60,7 @@ public record GetCompanySettingsResponse(
     int ProbationMonths,
     bool ExcludePublicHolidaysFromLeave,
     bool ExcludePublicHolidaysFromSickness,
+    bool DisplaySalaryOnEmployeeProfile,
     int? FitNoteRequiredAfterDays,
     int? ReturnToWorkRequiredAfterDays,
     string PostcodeRegex,
@@ -78,6 +79,7 @@ public record UpdateCompanySettingsRequest(
     int ProbationMonths,
     bool ExcludePublicHolidaysFromLeave,
     bool ExcludePublicHolidaysFromSickness,
+    bool DisplaySalaryOnEmployeeProfile,
     int? FitNoteRequiredAfterDays,
     int? ReturnToWorkRequiredAfterDays);
 
@@ -92,6 +94,7 @@ public record UpdateCompanySettingsResponse(
     int ProbationMonths,
     bool ExcludePublicHolidaysFromLeave,
     bool ExcludePublicHolidaysFromSickness,
+    bool DisplaySalaryOnEmployeeProfile,
     int? FitNoteRequiredAfterDays,
     int? ReturnToWorkRequiredAfterDays,
     DateTime UpdatedAt);

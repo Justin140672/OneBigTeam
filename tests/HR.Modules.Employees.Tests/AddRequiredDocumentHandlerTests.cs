@@ -21,7 +21,7 @@ public class AddRequiredDocumentHandlerTests
         var actorId = Guid.NewGuid();
         var auditPublisher = new FakeAuditPublisher();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -82,7 +82,7 @@ public class AddRequiredDocumentHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Profile_Belongs_To_Different_Company()
     {
         await using var context = BuildContext();
-        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -108,7 +108,7 @@ public class AddRequiredDocumentHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -135,7 +135,7 @@ public class AddRequiredDocumentHandlerTests
         var companyId = Guid.NewGuid();
         var documentTypeId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
 
         var existing = PositionProfileRequiredDocument.Create(
@@ -167,8 +167,8 @@ public class AddRequiredDocumentHandlerTests
         var companyId = Guid.NewGuid();
         var documentTypeId = Guid.NewGuid();
 
-        var profileA = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
-        var profileB = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Manager", null, null, null, null, null, null, null, null, Now);
+        var profileA = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profileB = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Manager", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.AddRange(profileA, profileB);
 
         var existing = PositionProfileRequiredDocument.Create(

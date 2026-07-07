@@ -18,6 +18,8 @@ public record EmployeeListItemModel(
     Guid CompanyId,
     Guid? DepartmentId,
     string? DepartmentName,
+    Guid? LocationId,
+    string? LocationName,
     Guid? PositionProfileId,
     string? PositionProfileTitle,
     Guid? ManagerId,
@@ -36,6 +38,8 @@ public record GetEmployeeResponse(
     Guid CompanyId,
     Guid? DepartmentId,
     string? DepartmentName,
+    Guid? LocationId,
+    string? LocationName,
     Guid? PositionProfileId,
     string? PositionTitle,
     Guid? ManagerId,
@@ -127,6 +131,7 @@ public sealed class EmployeeProfileEditModel
     public string? TelephoneRegexPattern { get; set; }
     public string? MobileRegexPattern { get; set; }
     public Guid? DepartmentId { get; set; }
+    public Guid? LocationId { get; set; }
     public Guid? PositionProfileId { get; set; }
     public bool HasSystemAccess { get; set; } = true;
     public bool OverrideWorkingPattern { get; set; } = false;
@@ -138,6 +143,7 @@ public record UpdateEmployeeProfileRequest(
     Guid CompanyId,
     Guid Id,
     Guid? DepartmentId,
+    Guid? LocationId,
     Guid? PositionProfileId,
     string FirstName,
     string LastName,
@@ -165,6 +171,7 @@ public record UpdateEmployeeProfileResponse(
     Guid Id,
     Guid CompanyId,
     Guid? DepartmentId,
+    Guid? LocationId,
     string FirstName,
     string LastName,
     string WorkEmail,
@@ -187,6 +194,7 @@ public sealed class CreateEmployeeFormModel
 public record CreateEmployeeRequest(
     Guid CompanyId,
     Guid? DepartmentId,
+    Guid? LocationId,
     Guid? PositionProfileId,
     string FirstName,
     string LastName,
@@ -278,6 +286,7 @@ public record UpdateEmploymentDetailsRequest(
     Guid? EmploymentTypeId,
     string Status,
     Guid? DepartmentId,
+    Guid? LocationId,
     Guid? PositionProfileId,
     Guid? ManagerId,
     DateOnly StartDate,

@@ -78,6 +78,22 @@ internal sealed class CreateEmployeeHandler
             }
         }
 
+        if (request.LocationId is not null)
+        {
+            var locationExists = await _dbContext.Locations
+                .AnyAsync(
+                    l => l.Id == request.LocationId &&
+                         l.CompanyId == request.CompanyId &&
+                         l.IsActive,
+                    cancellationToken);
+
+            if (!locationExists)
+            {
+                return Result.Failure<CreateEmployeeResponse>(
+                    Error.NotFound($"Location '{request.LocationId}' was not found."));
+            }
+        }
+
         PositionProfile? positionProfile = null;
         if (request.PositionProfileId is not null)
         {
@@ -151,9 +167,9 @@ internal sealed class CreateEmployeeHandler
             request.Country,
             now);
 
-        if (request.DepartmentId is not null || request.PositionProfileId is not null || request.ManagerId is not null)
+        if (request.DepartmentId is not null || request.PositionProfileId is not null || request.LocationId is not null || request.ManagerId is not null)
         {
-            employee.Assign(request.DepartmentId, request.PositionProfileId, request.ManagerId, now);
+            employee.Assign(request.DepartmentId, request.PositionProfileId, request.LocationId, request.ManagerId, now);
         }
 
         var probationEndDate = await _probationDateResolver.ResolveEndDateAsync(
@@ -171,6 +187,7 @@ internal sealed class CreateEmployeeHandler
             employee.Id,
             employee.CompanyId,
             employee.DepartmentId,
+            employee.LocationId,
             employee.PositionProfileId,
             employee.ManagerId,
             employee.FirstName,

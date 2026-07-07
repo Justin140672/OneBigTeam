@@ -121,4 +121,39 @@ public sealed class CompanySettingsTests(AppFixture fixture) : E2ETestBase(fixtu
         Assert.Equal(desiredExcludeLeave, await companyEdit.IsExcludePublicHolidaysFromLeaveCheckedAsync());
         Assert.Equal(desiredExcludeSickness, await companyEdit.IsExcludePublicHolidaysFromSicknessCheckedAsync());
     }
+
+    [Fact]
+    public async Task UpdateDisplaySalaryOnEmployeeProfile_PersistsAfterReload()
+    {
+        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
+        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenSettingsTabAsync();
+
+        // Capture the initial checkbox state so we can toggle it to the opposite value.
+        var initialDisplaySalary = await companyEdit.IsDisplaySalaryOnEmployeeProfileCheckedAsync();
+        var desiredDisplaySalary = !initialDisplaySalary;
+
+        await companyEdit.SetDisplaySalaryOnEmployeeProfileAsync(desiredDisplaySalary);
+
+        await companyEdit.SaveAsync();
+        Assert.False(await companyEdit.HasErrorAsync(),
+            "Expected no error after saving the 'display salary on employee profile' setting");
+
+        // Reload the page for real (re-navigate) to exercise the settings-hydration
+        // path in CompanyEdit.OnInitializedAsync, not just in-memory Blazor state.
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenSettingsTabAsync();
+
+        Assert.Equal(desiredDisplaySalary, await companyEdit.IsDisplaySalaryOnEmployeeProfileCheckedAsync());
+
+        // Restore the original value so this test doesn't leak state into other
+        // tests/fixtures that rely on the seeded default for this company.
+        await companyEdit.SetDisplaySalaryOnEmployeeProfileAsync(initialDisplaySalary);
+        await companyEdit.SaveAsync();
+    }
 }

@@ -19,7 +19,7 @@ public class RemoveRequiredAssetHandlerTests
         var actorId = Guid.NewGuid();
         var auditPublisher = new FakeAuditPublisher();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
 
         var asset = PositionProfileRequiredAsset.Create(
@@ -76,7 +76,7 @@ public class RemoveRequiredAssetHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
 
         var asset = PositionProfileRequiredAsset.Create(
@@ -106,7 +106,7 @@ public class RemoveRequiredAssetHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
 
         var asset = PositionProfileRequiredAsset.Create(
@@ -135,8 +135,8 @@ public class RemoveRequiredAssetHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profileA = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
-        var profileB = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Manager", null, null, null, null, null, null, null, null, Now);
+        var profileA = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profileB = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Manager", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.AddRange(profileA, profileB);
 
         var asset = PositionProfileRequiredAsset.Create(

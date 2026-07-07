@@ -138,6 +138,13 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return await group.Locator(".e-input-group input").First.InputValueAsync();
     }
 
+    /// <summary>Reads the current value of the Location dropdown's visible text (new-employee form or Employment tab).</summary>
+    public async Task<string?> GetSelectedLocationTextAsync()
+    {
+        var group = page.Locator(".col-md-4").Filter(new() { HasText = "Location" }).First;
+        return await group.Locator(".e-input-group input").First.InputValueAsync();
+    }
+
     public async Task<bool> HasErrorAsync() =>
         await page.Locator(".alert-danger, .validation-message").First.IsVisibleAsync();
 

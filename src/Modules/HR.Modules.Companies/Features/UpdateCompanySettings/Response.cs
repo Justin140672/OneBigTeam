@@ -14,6 +14,7 @@ internal sealed record UpdateCompanySettingsResponse(
 	int ProbationMonths,
 	bool ExcludePublicHolidaysFromLeave,
 	bool ExcludePublicHolidaysFromSickness,
+	bool DisplaySalaryOnEmployeeProfile,
 	int? FitNoteRequiredAfterDays,
 	int? ReturnToWorkRequiredAfterDays,
 	DateTimeOffset UpdatedAt);

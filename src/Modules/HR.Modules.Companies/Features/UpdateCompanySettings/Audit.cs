@@ -13,6 +13,7 @@ internal sealed record CompanySettingsAuditSnapshot(
     int ProbationMonths,
     bool ExcludePublicHolidaysFromLeave,
     bool ExcludePublicHolidaysFromSickness,
+    bool DisplaySalaryOnEmployeeProfile,
     int? FitNoteRequiredAfterDays,
     int? ReturnToWorkRequiredAfterDays);
 

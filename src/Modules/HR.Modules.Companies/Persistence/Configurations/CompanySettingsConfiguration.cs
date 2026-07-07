@@ -61,6 +61,11 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(settings => settings.DisplaySalaryOnEmployeeProfile)
+            .HasColumnName("display_salary_on_employee_profile")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(settings => settings.FitNoteRequiredAfterDays)
             .HasColumnName("fit_note_required_after_days")
             .IsRequired(false);

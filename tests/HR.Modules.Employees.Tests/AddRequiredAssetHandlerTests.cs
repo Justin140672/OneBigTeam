@@ -21,7 +21,7 @@ public class AddRequiredAssetHandlerTests
         var actorId = Guid.NewGuid();
         var auditPublisher = new FakeAuditPublisher();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -80,7 +80,7 @@ public class AddRequiredAssetHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Profile_Belongs_To_Different_Company()
     {
         await using var context = BuildContext();
-        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -106,7 +106,7 @@ public class AddRequiredAssetHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -133,7 +133,7 @@ public class AddRequiredAssetHandlerTests
         var companyId = Guid.NewGuid();
         var assetCategoryId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
 
         var existing = PositionProfileRequiredAsset.Create(
@@ -165,8 +165,8 @@ public class AddRequiredAssetHandlerTests
         var companyId = Guid.NewGuid();
         var assetCategoryId = Guid.NewGuid();
 
-        var profileA = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
-        var profileB = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Manager", null, null, null, null, null, null, null, null, Now);
+        var profileA = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profileB = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Manager", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.AddRange(profileA, profileB);
 
         var existing = PositionProfileRequiredAsset.Create(

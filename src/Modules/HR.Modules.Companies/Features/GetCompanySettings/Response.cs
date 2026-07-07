@@ -11,6 +11,7 @@ internal sealed record GetCompanySettingsResponse(
     int ProbationMonths,
     bool ExcludePublicHolidaysFromLeave,
     bool ExcludePublicHolidaysFromSickness,
+    bool DisplaySalaryOnEmployeeProfile,
     int? FitNoteRequiredAfterDays,
     int? ReturnToWorkRequiredAfterDays,
     string PostcodeRegex,

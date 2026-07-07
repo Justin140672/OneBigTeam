@@ -12,6 +12,7 @@ internal sealed class PositionProfile
     public Guid Id { get; private set; }
     public Guid CompanyId { get; private set; }
     public Guid? DepartmentId { get; private set; }
+    public Guid? LocationId { get; private set; }
     public string Title { get; private set; } = string.Empty;
     public string? Description { get; private set; }
     public int? ProbationMonthsOverride { get; private set; }
@@ -33,6 +34,7 @@ internal sealed class PositionProfile
         Guid id,
         Guid companyId,
         Guid? departmentId,
+        Guid? locationId,
         string title,
         string? description,
         int? probationMonthsOverride,
@@ -50,6 +52,7 @@ internal sealed class PositionProfile
             Id = id,
             CompanyId = companyId,
             DepartmentId = departmentId,
+            LocationId = locationId,
             Title = title,
             Description = description,
             ProbationMonthsOverride = probationMonthsOverride,
@@ -68,6 +71,7 @@ internal sealed class PositionProfile
 
     public void Update(
         Guid? departmentId,
+        Guid? locationId,
         string title,
         string? description,
         int? probationMonthsOverride,
@@ -81,6 +85,7 @@ internal sealed class PositionProfile
         Guid? onboardingTemplateId = null)
     {
         DepartmentId = departmentId;
+        LocationId = locationId;
         Title = title;
         Description = description;
         ProbationMonthsOverride = probationMonthsOverride;

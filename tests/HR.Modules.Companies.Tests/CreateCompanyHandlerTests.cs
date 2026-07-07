@@ -40,6 +40,7 @@ public class CreateCompanyHandlerTests
         Assert.Equal(1, settings.LeaveYearStartMonth);
         Assert.Equal(25, settings.DefaultHolidayAllowance);
         Assert.Equal(6, settings.ProbationMonths);
+        Assert.False(settings.DisplaySalaryOnEmployeeProfile);
     }
 
     [Fact]

@@ -41,6 +41,18 @@ internal sealed class UpdateEmploymentDetailsHandler
                     Error.NotFound($"Department '{request.DepartmentId}' was not found or is inactive."));
         }
 
+        if (request.LocationId.HasValue)
+        {
+            var locationExists = await _dbContext.Locations
+                .AnyAsync(
+                    l => l.Id == request.LocationId && l.CompanyId == request.CompanyId && l.IsActive,
+                    cancellationToken);
+
+            if (!locationExists)
+                return Result.Failure<UpdateEmploymentDetailsResponse>(
+                    Error.NotFound($"Location '{request.LocationId}' was not found or is inactive."));
+        }
+
         if (request.PositionProfileId.HasValue)
         {
             var posExists = await _dbContext.PositionProfiles
@@ -123,7 +135,7 @@ internal sealed class UpdateEmploymentDetailsHandler
             request.Notes,
             now);
 
-        employee.Assign(request.DepartmentId, request.PositionProfileId, request.ManagerId, now);
+        employee.Assign(request.DepartmentId, request.PositionProfileId, request.LocationId, request.ManagerId, now);
         employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -135,6 +147,7 @@ internal sealed class UpdateEmploymentDetailsHandler
             employee.EmploymentTypeId,
             employee.Status,
             employee.DepartmentId,
+            employee.LocationId,
             employee.PositionProfileId,
             employee.ManagerId,
             employee.StartDate,

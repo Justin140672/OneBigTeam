@@ -1,0 +1,125 @@
+@page "/companies/{CompanyId:guid}/locations"
+@rendermode InteractiveServer
+@inherits SearchPageBase<LocationListItemModel>
+@inject LocationService LocationService
+@inject LocationTypeService LocationTypeService
+@inject AppSession Session
+
+<PageTitle>Locations</PageTitle>
+
+<div class="container-fluid py-4">
+    <h1 class="mb-1">Locations</h1>
+    <p class="text-muted mb-3">Manage the physical or virtual locations employees can be assigned to.</p>
+
+    @if (IsLoading)
+    {
+        <HrLoadingIndicator Label="Loading locations…" />
+    }
+    else if (Error is not null)
+    {
+        <div class="alert alert-danger">@Error</div>
+    }
+    else
+    {
+        @if (ActionError is not null)
+        {
+            <div class="alert alert-danger alert-dismissible">
+                @ActionError
+                <button type="button" class="btn-close" @onclick="ClearActionError"></button>
+            </div>
+        }
+
+        <HrGrid @ref="Grid"
+                TValue="LocationListItemModel"
+                DataSource="@Items"
+                Toolbar="@GridToolbar"
+                AllowFiltering="true">
+            <GridEvents TValue="LocationListItemModel" OnToolbarClick="OnToolbarClick"
+                        RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
+            <GridPageSettings PageSize="20" />
+            <GridColumns>
+                <GridColumn Field="@nameof(LocationListItemModel.Name)" HeaderText="Name" Width="220">
+                    <Template>
+                        @{
+                            var row = (context as LocationListItemModel)!;
+                            <a href="/companies/@CompanyId/locations/@row.Id">@row.Name</a>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn HeaderText="Type" Width="200">
+                    <Template>
+                        @{
+                            var row = (context as LocationListItemModel)!;
+                            @if (_nameMap.TryGetValue(row.LocationTypeId, out var typeName))
+                            {
+                                @typeName
+                            }
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(LocationListItemModel.IsActive)" HeaderText="Status" Width="110">
+                    <Template>
+                        @{
+                            var row = (context as LocationListItemModel)!;
+                            <ActiveStatusBadge IsActive="row.IsActive" />
+                        }
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </HrGrid>
+    }
+</div>
+
+@code {
+    private Dictionary<Guid, string> _nameMap = new();
+
+    protected override bool SupportsActiveFilter => true;
+
+    protected override Task OnBeforeLoadAsync()
+    {
+        if (!Session.CanManageEmployees)
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+        return Task.CompletedTask;
+    }
+
+    protected override void ConfigureToolbar()
+    {
+        AddToolbarAction(
+            id:      "hr-deactivate",
+            text:    "Deactivate",
+            icon:    "fa-solid fa-circle-xmark",
+            onClick: async item =>
+            {
+                if (!item.IsActive) return;
+                await Deactivate(item);
+            },
+            tooltip: "Deactivate selected location");
+    }
+
+    protected override async Task<IReadOnlyList<LocationListItemModel>?> FetchItemsAsync(string? search)
+    {
+        var result = await LocationService.ListLocationsAsync(CompanyId, ShowInactive);
+
+        var types = await LocationTypeService.ListLocationTypesAsync(CompanyId, includeInactive: true);
+        if (types is not null)
+            _nameMap = types.Items.ToDictionary(t => t.Id, t => t.Name);
+
+        return result?.Items;
+    }
+
+    protected override string LoadErrorMessage => "Failed to load locations.";
+
+    protected override string? GetAddUrl()  => $"/companies/{CompanyId}/locations/new";
+    protected override string? GetEditUrl(LocationListItemModel item) => $"/companies/{CompanyId}/locations/{item.Id}";
+    protected override string? GetViewUrl(LocationListItemModel item) => $"/companies/{CompanyId}/locations/{item.Id}/view";
+
+    private async Task Deactivate(LocationListItemModel location)
+    {
+        ClearActionError();
+        var error = await LocationService.DeactivateLocationAsync(CompanyId, location.Id);
+        if (error is not null)
+            SetActionError(error);
+        else
+            await LoadAsync();
+    }
+}

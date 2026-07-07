@@ -2,6 +2,8 @@
 @inject LeaveService LeaveService
 @inject TaskService TaskService
 @inject SicknessService SicknessService
+@inject ProbationService ProbationService
+@inject CompensationService CompensationService
 @inject AppSession Session
 
 @if (!Session.EmployeeId.HasValue || Session.EmployeeId.Value != EmployeeId)
@@ -45,20 +47,57 @@ else
                         <dt>Job Title</dt>
                         <dd>@(_employee.PositionTitle ?? Session.JobTitle ?? "—")</dd>
 
+                        <dt>Employee Number</dt>
+                        <dd>@(_employee.EmployeeNumber ?? "—")</dd>
+
                         <dt>Department</dt>
                         <dd>@(_employee.DepartmentName ?? "—")</dd>
+
+                        <dt>Location</dt>
+                        <dd>@(_employee.LocationName ?? "—")</dd>
 
                         <dt>Manager</dt>
                         <dd>@(_employee.ManagerFullName ?? "—")</dd>
 
+                        <dt>Employment Type</dt>
+                        <dd>@(_employee.EmploymentTypeName ?? "—")</dd>
+
+                        <dt>Employment Status</dt>
+                        <dd>@StatusDisplayName(_employee.Status)</dd>
+
                         <dt>Start Date</dt>
                         <dd>@_employee.StartDate.ToString("d MMMM yyyy")</dd>
+
+                        @if (_employee.ContinuousServiceDate.HasValue)
+                        {
+                            <dt>Continuous Service Date</dt>
+                            <dd>@_employee.ContinuousServiceDate.Value.ToString("d MMMM yyyy")</dd>
+                        }
 
                         <dt>Length of Service</dt>
                         <dd>@LengthOfService(_employee.StartDate)</dd>
 
-                        <dt>Employment Type</dt>
-                        <dd>@(_employee.EmploymentTypeName ?? "—")</dd>
+                        <dt>Working Pattern</dt>
+                        <dd>@WorkingPatternSummary()</dd>
+
+                        @if (_probationRecord is not null)
+                        {
+                            <dt>Probation Status</dt>
+                            <dd>
+                                <span class="badge @ProbationStatusBadgeClass(_probationRecord.Status)">
+                                    @ProbationStatusLabel(_probationRecord.Status)
+                                </span>
+                            </dd>
+
+                            <dt>Probation End Date</dt>
+                            <dd>@_probationRecord.ExpectedEndDate.ToString("d MMMM yyyy")</dd>
+                        }
+
+                        @if (Session.DisplaySalaryOnEmployeeProfile)
+                        {
+                            <dt>Salary</dt>
+                            <dd>@SalarySummary()</dd>
+                        }
                     </dl>
                 </div>
 
@@ -202,6 +241,8 @@ else
     private int _pendingLeaveCount;
     private decimal? _sicknessDays;
     private List<LeaveRequestListItem> _upcomingLeave = [];
+    private ProbationRecordModel? _probationRecord;
+    private CurrentCompensationModel? _currentCompensation;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -213,15 +254,21 @@ else
 
         _loading = true;
 
-        var employeeTask = EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
-        var balanceTask  = LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
-        var requestsTask = LeaveService.ListLeaveRequestsAsync(CompanyId, EmployeeId);
-        var tasksTask    = TaskService.GetMyTasksAsync(CompanyId);
-        var sicknessTask = SicknessService.GetMySicknessRecordsAsync(CompanyId, EmployeeId);
+        var employeeTask   = EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
+        var balanceTask    = LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
+        var requestsTask   = LeaveService.ListLeaveRequestsAsync(CompanyId, EmployeeId);
+        var tasksTask      = TaskService.GetMyTasksAsync(CompanyId);
+        var sicknessTask   = SicknessService.GetMySicknessRecordsAsync(CompanyId, EmployeeId);
+        var probationTask  = ProbationService.GetProbationRecordByEmployeeAsync(CompanyId, EmployeeId);
+        var compensationTask = Session.DisplaySalaryOnEmployeeProfile
+            ? CompensationService.GetCurrentCompensationAsync(CompanyId, EmployeeId)
+            : Task.FromResult<CurrentCompensationModel?>(null);
 
-        await Task.WhenAll(employeeTask, balanceTask, requestsTask, tasksTask, sicknessTask);
+        await Task.WhenAll(employeeTask, balanceTask, requestsTask, tasksTask, sicknessTask, probationTask, compensationTask);
 
         _employee = await employeeTask;
+        _probationRecord = await probationTask;
+        _currentCompensation = await compensationTask;
 
         var balance = await balanceTask;
         if (balance is not null)
@@ -284,4 +331,53 @@ else
         var endStr   = endPart   == "FullDay" ? end.ToString("d MMM yyyy") : $"{end:d MMM yyyy} ({endPart})";
         return start == end ? endStr : $"{startStr} – {endStr}";
     }
+
+    private static string StatusDisplayName(string status) => status switch
+    {
+        "Active"     => "Active",
+        "OnLeave"    => "On Leave",
+        "Suspended"  => "Suspended",
+        "Terminated" => "Leaver",
+        _            => status
+    };
+
+    private string WorkingPatternSummary()
+    {
+        var workingDays = _employee!.WorkingDaysOverride ?? (WorkingDays)Session.WorkingDays;
+        var hoursPerDay = _employee.HoursPerDayOverride ?? Session.HoursPerDay;
+
+        var days = string.Join(", ", Enum.GetValues<WorkingDays>()
+            .Where(d => d != WorkingDays.None && workingDays.HasFlag(d))
+            .Select(d => d.ToString()));
+
+        return $"{days} ({hoursPerDay} hrs/day)";
+    }
+
+    private static string ProbationStatusBadgeClass(string status) => status switch
+    {
+        "Active"    => "bg-primary",
+        "ReviewDue" => "bg-warning text-dark",
+        "Extended"  => "bg-info text-dark",
+        "Passed"    => "bg-success",
+        "Failed"    => "bg-danger",
+        _           => "bg-secondary"
+    };
+
+    private static string ProbationStatusLabel(string status) => status switch
+    {
+        "ReviewDue" => "Review Due",
+        _           => status
+    };
+
+    private string SalarySummary() =>
+        _currentCompensation is not null
+            ? $"{_currentCompensation.Currency} {_currentCompensation.Salary:N2} per {SalaryPeriodLabel(_currentCompensation.SalaryType)}"
+            : "—";
+
+    private static string SalaryPeriodLabel(string salaryType) => salaryType switch
+    {
+        "Hourly" => "hour",
+        "Daily"  => "day",
+        _        => "year"
+    };
 }

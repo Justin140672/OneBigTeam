@@ -142,6 +142,47 @@ public class UpdateCompanySettingsHandlerTests
 		Assert.Equal(excludePublicHolidays, savedSettings.ExcludePublicHolidaysFromLeave);
 	}
 
+	[Theory]
+	[InlineData(true)]
+	[InlineData(false)]
+	public async Task HandleAsync_Persists_DisplaySalaryOnEmployeeProfile(bool displaySalaryOnEmployeeProfile)
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 6, 12, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var handler = new UpdateCompanySettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 6, 12, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher());
+
+		var result = await handler.HandleAsync(
+			new UpdateCompanySettingsRequest
+			{
+				Id = company.Id,
+				TimeZone = "UTC",
+				Locale = "en-GB",
+				WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+				              WorkingDays.Thursday | WorkingDays.Friday,
+				HoursPerDay = 7.5m,
+				LeaveYearStartMonth = 1,
+				DefaultHolidayAllowance = 25,
+				ProbationMonths = 6,
+				DisplaySalaryOnEmployeeProfile = displaySalaryOnEmployeeProfile,
+			},
+			CancellationToken.None);
+
+		Assert.True(result.IsSuccess);
+		Assert.Equal(displaySalaryOnEmployeeProfile, result.Value!.DisplaySalaryOnEmployeeProfile);
+
+		var savedSettings2 = await context.CompanySettings.SingleAsync();
+		Assert.Equal(displaySalaryOnEmployeeProfile, savedSettings2.DisplaySalaryOnEmployeeProfile);
+	}
+
 	[Fact]
 	public async Task HandleAsync_Publishes_CompanySettingsUpdatedAuditEvent()
 	{

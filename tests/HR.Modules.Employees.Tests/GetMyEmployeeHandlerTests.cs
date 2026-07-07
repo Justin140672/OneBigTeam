@@ -16,11 +16,11 @@ public class GetMyEmployeeHandlerTests
         var companyId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Senior Engineer", null, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Senior Engineer", null, null, null, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
 
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
-        employee.Assign(null, profile.Id, null, now);
+        employee.Assign(null, profile.Id, null, null, now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 

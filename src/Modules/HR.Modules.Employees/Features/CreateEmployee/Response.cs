@@ -6,6 +6,7 @@ internal sealed record CreateEmployeeResponse(
     Guid Id,
     Guid CompanyId,
     Guid? DepartmentId,
+    Guid? LocationId,
     Guid? PositionProfileId,
     Guid? ManagerId,
     string FirstName,

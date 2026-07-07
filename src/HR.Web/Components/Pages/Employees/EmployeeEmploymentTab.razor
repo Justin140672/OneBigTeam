@@ -1,6 +1,7 @@
 @using System.ComponentModel.DataAnnotations
 @inject EmployeeService EmployeeService
 @inject DepartmentService DepartmentService
+@inject LocationService LocationService
 @inject PositionProfileService PositionProfileService
 @inject ProbationService ProbationService
 @inject EmploymentTypeService EmploymentTypeService
@@ -119,6 +120,19 @@ else
                                                 AllowFiltering="true"
                                                 ShowClearButton="true">
                                     <DropDownListFieldSettings Value="Id" Text="Title" />
+                                    <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?" ValueChange="OnPositionProfileChanged" />
+                                </SfDropDownList>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Location</label>
+                                <SfDropDownList TValue="Guid?"
+                                                TItem="LocationListItemModel"
+                                                DataSource="@_locations"
+                                                @bind-Value="Model.LocationId"
+                                                Placeholder="None"
+                                                AllowFiltering="true"
+                                                ShowClearButton="true">
+                                    <DropDownListFieldSettings Value="Id" Text="Name" />
                                 </SfDropDownList>
                             </div>
                             <div class="col-md-4">
@@ -229,6 +243,7 @@ else
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
 
     private List<DepartmentListItemModel> _departments = [];
+    private List<LocationListItemModel> _locations = [];
     private List<PositionProfileListItemModel> _positionProfiles = [];
     private List<ManagerOption> _managerOptions = [];
     private List<EmploymentTypeListItemModel> _employmentTypes = [];
@@ -249,14 +264,16 @@ else
     protected override async Task LoadAsync()
     {
         var deptTask       = DepartmentService.ListDepartmentsAsync(CompanyId);
+        var locationTask   = LocationService.ListLocationsAsync(CompanyId);
         var profileTask    = PositionProfileService.ListPositionProfilesAsync(CompanyId);
         var empListTask    = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
         var probationTask  = ProbationService.GetProbationRecordByEmployeeAsync(CompanyId, EmployeeId);
         var empTypesTask   = EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
 
-        await Task.WhenAll(deptTask, profileTask, empListTask, probationTask, empTypesTask);
+        await Task.WhenAll(deptTask, locationTask, profileTask, empListTask, probationTask, empTypesTask);
 
         _departments      = (await deptTask)?.Items ?? [];
+        _locations        = (await locationTask)?.Items ?? [];
         _positionProfiles = (await profileTask)?.Items.ToList() ?? [];
         _employmentTypes  = (await empTypesTask)?.Items ?? [];
         _managerOptions   = ((await empListTask)?.Items ?? [])
@@ -280,6 +297,7 @@ else
                                            ? e.Status
                                            : "Active";
         Model.DepartmentId          = e.DepartmentId;
+        Model.LocationId            = e.LocationId;
         Model.PositionProfileId     = e.PositionProfileId;
         Model.ManagerId             = e.ManagerId;
         Model.StartDate             = e.StartDate;
@@ -327,6 +345,7 @@ else
             Model.EmploymentTypeId,
             Model.Status,
             Model.DepartmentId,
+            Model.LocationId,
             Model.PositionProfileId,
             Model.ManagerId,
             Model.StartDate,
@@ -340,6 +359,21 @@ else
         var (success, error) = await EmployeeService.UpdateEmploymentDetailsAsync(CompanyId, EmployeeId, request);
 
         return success ? null : error ?? "Failed to save employment details.";
+    }
+
+    private async Task OnPositionProfileChanged(ChangeEventArgs<Guid?, PositionProfileListItemModel> args)
+    {
+        Model.PositionProfileId = args.Value;
+
+        if (args.Value is Guid profileId)
+        {
+            var profile = await PositionProfileService.GetPositionProfileAsync(CompanyId, profileId);
+            if (profile is not null)
+            {
+                Model.DepartmentId = profile.DepartmentId;
+                Model.LocationId = profile.LocationId;
+            }
+        }
     }
 
     private void ToggleWorkingDay(string day, bool isChecked)
@@ -372,6 +406,7 @@ else
         public Guid? EmploymentTypeId { get; set; }
         public string Status { get; set; } = "Active";
         public Guid? DepartmentId { get; set; }
+        public Guid? LocationId { get; set; }
         public Guid? PositionProfileId { get; set; }
         public Guid? ManagerId { get; set; }
         public DateOnly StartDate { get; set; }

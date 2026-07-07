@@ -23,6 +23,9 @@ internal sealed class PositionProfileConfiguration : IEntityTypeConfiguration<Po
         builder.Property(p => p.DepartmentId)
             .HasColumnName("department_id");
 
+        builder.Property(p => p.LocationId)
+            .HasColumnName("location_id");
+
         builder.Property(p => p.Title)
             .HasColumnName("title")
             .HasMaxLength(200)
@@ -75,6 +78,7 @@ internal sealed class PositionProfileConfiguration : IEntityTypeConfiguration<Po
 
         builder.HasIndex(p => p.CompanyId);
         builder.HasIndex(p => p.DepartmentId);
+        builder.HasIndex(p => p.LocationId);
 
         builder.HasMany(p => p.RequiredDocuments)
             .WithOne()

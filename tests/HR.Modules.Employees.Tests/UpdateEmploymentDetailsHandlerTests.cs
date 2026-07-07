@@ -173,6 +173,69 @@ public class UpdateEmploymentDetailsHandlerTests
         Assert.Equal("not_found", result.Error.Code);
     }
 
+    [Fact]
+    public async Task HandleAsync_Persists_Valid_LocationId()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
+        var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, now);
+        context.Employees.Add(employee);
+        context.LocationTypes.Add(locationType);
+        context.Locations.Add(location);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
+        {
+            CompanyId = companyId,
+            Id = employee.Id,
+            Status = EmploymentStatus.Active,
+            StartDate = StartDate,
+            LocationId = location.Id
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(location.Id, result.Value!.LocationId);
+        var saved = await context.Employees.SingleAsync();
+        Assert.Equal(location.Id, saved.LocationId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_Location_Belongs_To_Different_Company()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        var otherCompanyId = Guid.NewGuid();
+        var otherCompanyLocationType = LocationType.Create(Guid.NewGuid(), otherCompanyId, "Office", null, now);
+        var otherCompanyLocation = Location.Create(Guid.NewGuid(), otherCompanyId, otherCompanyLocationType.Id, "Head Office", null, now);
+        context.Employees.Add(employee);
+        context.LocationTypes.Add(otherCompanyLocationType);
+        context.Locations.Add(otherCompanyLocation);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
+        {
+            CompanyId = companyId,
+            Id = employee.Id,
+            Status = EmploymentStatus.Active,
+            StartDate = StartDate,
+            LocationId = otherCompanyLocation.Id
+        }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static Employee CreateEmployee(Guid companyId, DateTimeOffset now)

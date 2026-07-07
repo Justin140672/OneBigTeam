@@ -58,6 +58,143 @@ public sealed class ProfileOverviewTabTests(AppFixture fixture) : E2ETestBase(fi
     }
 
     [Fact]
+    public async Task OverviewTab_ShowsEmploymentFields_InExpectedOrder()
+    {
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile  = new MyProfilePage(_page, _fixture.WebBaseUrl);
+        var overview = new OverviewTab(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await profile.GoToAsync(AcmeId, TomId);
+
+        if (!await overview.IsVisibleAsync())
+            await profile.OpenOverviewTabAsync();
+
+        await overview.WaitForLoadAsync();
+
+        // ── Every mandatory field renders with a non-empty value ──────────────
+        var employeeNumber = await overview.GetDetailAsync("Employee Number");
+        Assert.False(string.IsNullOrWhiteSpace(employeeNumber),
+            "Expected an Employee Number to be displayed in the overview");
+
+        var location = await overview.GetDetailAsync("Location");
+        Assert.False(string.IsNullOrWhiteSpace(location),
+            "Expected a Location to be displayed in the overview");
+
+        var employmentType = await overview.GetDetailAsync("Employment Type");
+        Assert.False(string.IsNullOrWhiteSpace(employmentType),
+            "Expected an Employment Type to be displayed in the overview");
+
+        var employmentStatus = await overview.GetDetailAsync("Employment Status");
+        Assert.False(string.IsNullOrWhiteSpace(employmentStatus),
+            "Expected an Employment Status to be displayed in the overview");
+        Assert.Contains(employmentStatus, new[] { "Active", "On Leave", "Suspended", "Leaver" });
+
+        var lengthOfService = await overview.GetDetailAsync("Length of Service");
+        Assert.False(string.IsNullOrWhiteSpace(lengthOfService),
+            "Expected a Length of Service to be displayed in the overview");
+
+        var workingPattern = await overview.GetDetailAsync("Working Pattern");
+        Assert.False(string.IsNullOrWhiteSpace(workingPattern),
+            "Expected a Working Pattern to be displayed in the overview");
+        Assert.Contains("hrs/day", workingPattern, StringComparison.OrdinalIgnoreCase);
+
+        // ── Continuous Service Date is optional — only assert on shape when present ──
+        var continuousServiceDate = await overview.GetDetailAsync("Continuous Service Date");
+        if (continuousServiceDate is not null)
+            Assert.False(string.IsNullOrWhiteSpace(continuousServiceDate));
+
+        // ── Relative field order matches the required Employment card layout ──
+        var labels = await overview.GetEmploymentCardLabelsAsync();
+        var expectedOrder = new[]
+        {
+            "Job Title", "Employee Number", "Department", "Location", "Manager",
+            "Employment Type", "Employment Status", "Start Date", "Length of Service", "Working Pattern",
+        };
+
+        var indices = expectedOrder.Select(label => labels.ToList().IndexOf(label)).ToList();
+        Assert.All(indices, index => Assert.True(index >= 0, "Expected every mandatory Employment field label to be present"));
+        Assert.True(indices.SequenceEqual(indices.OrderBy(i => i)),
+            $"Expected Employment fields in order [{string.Join(", ", expectedOrder)}] but got [{string.Join(", ", labels)}]");
+    }
+
+    [Fact]
+    public async Task OverviewTab_Salary_HiddenByDefault_ShownWhenCompanySettingEnabled()
+    {
+        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile     = new MyProfilePage(_page, _fixture.WebBaseUrl);
+        var overview    = new OverviewTab(_page);
+        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+
+        const string hrAdminEmail = "laura.bennett@acme.example";
+
+        // ── Baseline: Salary row is not rendered while the company setting is off ──
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+        await profile.GoToAsync(AcmeId, TomId);
+        if (!await overview.IsVisibleAsync())
+            await profile.OpenOverviewTabAsync();
+        await overview.WaitForLoadAsync();
+
+        var wasEnabled = false;
+        var salaryBeforeEnabling = await overview.GetDetailAsync("Salary");
+
+        try
+        {
+            // ── Enable the setting as an HR administrator ──────────────────────
+            await login.GoToAsync();
+            await login.LoginAsync(hrAdminEmail);
+            await companyEdit.GoToAsync(AcmeId);
+            await companyEdit.OpenSettingsTabAsync();
+
+            wasEnabled = await companyEdit.IsDisplaySalaryOnEmployeeProfileCheckedAsync();
+            if (!wasEnabled)
+            {
+                await companyEdit.SetDisplaySalaryOnEmployeeProfileAsync(true);
+                await companyEdit.SaveAsync();
+                Assert.False(await companyEdit.HasErrorAsync(),
+                    "Expected no error after enabling 'display salary on employee profile'");
+            }
+            else
+            {
+                // Setting was already enabled — the "hidden by default" baseline captured
+                // above won't be meaningful, but we can still verify it's shown once enabled.
+                Assert.False(string.IsNullOrWhiteSpace(salaryBeforeEnabling));
+            }
+
+            // ── Re-login as Tom so a fresh AppSession picks up the new setting ─
+            await login.GoToAsync();
+            await login.LoginAsync(TomEmail);
+            await profile.GoToAsync(AcmeId, TomId);
+            if (!await overview.IsVisibleAsync())
+                await profile.OpenOverviewTabAsync();
+            await overview.WaitForLoadAsync();
+
+            if (!wasEnabled)
+                Assert.Null(salaryBeforeEnabling);
+
+            var salaryAfterEnabling = await overview.GetDetailAsync("Salary");
+            Assert.False(string.IsNullOrWhiteSpace(salaryAfterEnabling),
+                "Expected a Salary row to be displayed once 'display salary on employee profile' is enabled");
+        }
+        finally
+        {
+            // ── Restore the original setting so this test doesn't leak state ───
+            if (!wasEnabled)
+            {
+                await login.GoToAsync();
+                await login.LoginAsync(hrAdminEmail);
+                await companyEdit.GoToAsync(AcmeId);
+                await companyEdit.OpenSettingsTabAsync();
+                await companyEdit.SetDisplaySalaryOnEmployeeProfileAsync(false);
+                await companyEdit.SaveAsync();
+            }
+        }
+    }
+
+    [Fact]
     public async Task OverviewTab_RequestLeaveButton_OpensLeaveDialog()
     {
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);

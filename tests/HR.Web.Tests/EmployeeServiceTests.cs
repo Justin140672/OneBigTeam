@@ -19,6 +19,7 @@ public class EmployeeServiceTests
     private static CreateEmployeeRequest SampleCreateRequest() => new(
         CompanyId: Guid.NewGuid(),
         DepartmentId: null,
+        LocationId: null,
         PositionProfileId: null,
         FirstName: "Alice",
         LastName: "Smith",
@@ -44,6 +45,7 @@ public class EmployeeServiceTests
         CompanyId: Guid.NewGuid(),
         Id: Guid.NewGuid(),
         DepartmentId: null,
+        LocationId: null,
         PositionProfileId: null,
         FirstName: "Alice",
         LastName: "Smith",

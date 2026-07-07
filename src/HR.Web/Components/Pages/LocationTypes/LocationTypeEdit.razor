@@ -1,0 +1,90 @@
+@page "/companies/{CompanyId:guid}/location-types/new"
+@page "/companies/{CompanyId:guid}/location-types/{Id:guid}"
+@page "/companies/{CompanyId:guid}/location-types/{Id:guid}/view"
+@rendermode InteractiveServer
+@inject LocationTypeService LocationTypeService
+@inherits EditPageBase<LocationTypeEditModel, Guid>
+
+<PageTitle>@PageTitle</PageTitle>
+
+<div class="container py-4">
+    <SfBreadcrumb Class="mb-3">
+        <BreadcrumbItems>
+            <BreadcrumbItem Text="Location Types" Url="@($"/companies/{CompanyId}/location-types")" />
+            <BreadcrumbItem Text="@PageTitle" />
+        </BreadcrumbItems>
+    </SfBreadcrumb>
+
+    @if (IsLoading)
+    {
+        <HrLoadingIndicator />
+    }
+    else
+    {
+        <h1 class="mb-1">@PageTitle</h1>
+        <p class="text-muted mb-4">Set the name and description employees will see for this location type.</p>
+
+        @if (!string.IsNullOrEmpty(GlobalError))
+        {
+            <div class="alert alert-danger">@GlobalError</div>
+        }
+
+        <EditForm EditContext="EditContext">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-lg-7">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Location Type Details</h5>
+                        </div>
+                        <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                            <div class="mb-3">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <HrTextBox @bind-Value="Model.Name" Placeholder="e.g. Office, Warehouse" />
+                                <ValidationMessage For="@(() => Model.Name)" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <HrTextBox @bind-Value="Model.Description" Placeholder="Optional description" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-3">
+                        @if (!IsViewMode)
+                        {
+                            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                                @if (Saving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                Save
+                            </SfButton>
+                        }
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+    }
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+
+    private string PageTitle => IsNew ? "Add Location Type"
+        : Model.Name.Trim().Length > 0 ? Model.Name
+        : IsViewMode ? "View Location Type" : "Edit Location Type";
+
+    protected override IEditService<LocationTypeEditModel, Guid> Service => LocationTypeService;
+    protected override Guid GetCompanyId() => CompanyId;
+    protected override Guid? GetId() => Id;
+
+    protected override string? ListUrl => $"/companies/{CompanyId}/location-types";
+}

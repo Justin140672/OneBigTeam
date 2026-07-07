@@ -111,27 +111,32 @@ public class GetEmployeeHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Null(result.Value!.DepartmentName);
+        Assert.Null(result.Value.LocationName);
         Assert.Null(result.Value.PositionTitle);
         Assert.Null(result.Value.ManagerFullName);
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_DepartmentName_PositionTitle_And_ManagerFullName()
+    public async Task HandleAsync_Returns_DepartmentName_LocationName_PositionTitle_And_ManagerFullName()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
-        var position   = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, "Senior Developer", null, null, null, null, null, null, null, null, now);
+        var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
+        var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, now);
+        var position   = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, null, "Senior Developer", null, null, null, null, null, null, null, null, now);
         var manager    = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, now);
         context.Departments.Add(department);
+        context.LocationTypes.Add(locationType);
+        context.Locations.Add(location);
         context.PositionProfiles.Add(position);
         context.Employees.Add(manager);
         await context.SaveChangesAsync();
 
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
-        employee.Assign(department.Id, position.Id, manager.Id, now);
+        employee.Assign(department.Id, position.Id, location.Id, manager.Id, now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
@@ -142,6 +147,8 @@ public class GetEmployeeHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Engineering", result.Value!.DepartmentName);
+        Assert.Equal("Head Office", result.Value.LocationName);
+        Assert.Equal(location.Id, result.Value.LocationId);
         Assert.Equal("Senior Developer", result.Value.PositionTitle);
         Assert.Equal("Jane Manager", result.Value.ManagerFullName);
     }

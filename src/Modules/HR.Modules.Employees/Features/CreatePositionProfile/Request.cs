@@ -7,6 +7,7 @@ internal sealed record CreatePositionProfileRequest
 {
     public Guid CompanyId { get; init; }
     public Guid? DepartmentId { get; init; }
+    public Guid? LocationId { get; init; }
     public string Title { get; init; } = string.Empty;
     public string? Description { get; init; }
     public int? ProbationMonthsOverride { get; init; }

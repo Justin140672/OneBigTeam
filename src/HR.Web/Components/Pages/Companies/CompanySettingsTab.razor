@@ -73,6 +73,11 @@ else
                                     CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromLeave = v)" />
                     </div>
                     <div class="col-12">
+                        <SfCheckBox TChecked="bool" Label="Display salary to employees on their profile"
+                                    Checked="@Model.DisplaySalaryOnEmployeeProfile"
+                                    CheckedChanged="@((bool v) => Model.DisplaySalaryOnEmployeeProfile = v)" />
+                    </div>
+                    <div class="col-12">
                         <label class="form-label fw-semibold">Sickness</label>
                     </div>
                     <div class="col-12">
@@ -126,6 +131,7 @@ else
             Model.ProbationMonths = settings.ProbationMonths;
             Model.ExcludePublicHolidaysFromLeave = settings.ExcludePublicHolidaysFromLeave;
             Model.ExcludePublicHolidaysFromSickness = settings.ExcludePublicHolidaysFromSickness;
+            Model.DisplaySalaryOnEmployeeProfile = settings.DisplaySalaryOnEmployeeProfile;
             Model.FitNoteRequiredAfterDays = settings.FitNoteRequiredAfterDays;
             Model.ReturnToWorkRequiredAfterDays = settings.ReturnToWorkRequiredAfterDays;
         }
@@ -142,7 +148,8 @@ else
             workingDays, Model.HoursPerDay,
             Model.LeaveYearStartMonth, Model.DefaultHolidayAllowance,
             Model.ProbationMonths, Model.ExcludePublicHolidaysFromLeave,
-            Model.ExcludePublicHolidaysFromSickness, Model.FitNoteRequiredAfterDays,
+            Model.ExcludePublicHolidaysFromSickness, Model.DisplaySalaryOnEmployeeProfile,
+            Model.FitNoteRequiredAfterDays,
             Model.ReturnToWorkRequiredAfterDays);
 
         var result = await CompanyService.UpdateCompanySettingsAsync(CompanyId, request);

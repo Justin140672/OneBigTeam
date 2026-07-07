@@ -75,6 +75,7 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
             defaultHolidayAllowance = 28,
             probationMonths = 3,
             excludePublicHolidaysFromSickness = true,
+            displaySalaryOnEmployeeProfile = true,
             fitNoteRequiredAfterDays = 7,
             returnToWorkRequiredAfterDays = 3
         });
@@ -87,8 +88,48 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal("Europe/London", payload.TimeZone);
         Assert.Equal(28, payload.DefaultHolidayAllowance);
         Assert.True(payload.ExcludePublicHolidaysFromSickness);
+        Assert.True(payload.DisplaySalaryOnEmployeeProfile);
         Assert.Equal(7, payload.FitNoteRequiredAfterDays);
         Assert.Equal(3, payload.ReturnToWorkRequiredAfterDays);
+    }
+
+    [Fact]
+    public async Task Put_Company_Settings_Defaults_DisplaySalaryOnEmployeeProfile_To_False_When_Omitted()
+    {
+        using var client = AuthenticatedClient(UserId);
+
+        var createResponse = await client.PostAsJsonAsync("/api/companies", new
+        {
+            name = $"Settings Test {Guid.NewGuid():N}",
+            addresses = new[]
+            {
+                new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", countryCode = "GB" }
+            }
+        });
+        createResponse.EnsureSuccessStatusCode();
+
+        var createdCompany = await createResponse.Content.ReadFromJsonAsync<CreateCompanyPayload>();
+        Assert.NotNull(createdCompany);
+
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, createdCompany!.Id.ToString());
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{createdCompany.Id}/settings", new
+        {
+            timeZone = "UTC",
+            locale = "en-GB",
+            workingDays = 31,
+            hoursPerDay = 7.5,
+            leaveYearStartMonth = 1,
+            defaultHolidayAllowance = 25,
+            probationMonths = 6
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<UpdateCompanySettingsPayload>();
+        Assert.NotNull(payload);
+        Assert.False(payload!.DisplaySalaryOnEmployeeProfile);
     }
 
     [Fact]
@@ -123,6 +164,7 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
         int ProbationMonths,
         bool ExcludePublicHolidaysFromLeave,
         bool ExcludePublicHolidaysFromSickness,
+        bool DisplaySalaryOnEmployeeProfile,
         int? FitNoteRequiredAfterDays,
         int? ReturnToWorkRequiredAfterDays,
         DateTimeOffset UpdatedAt);

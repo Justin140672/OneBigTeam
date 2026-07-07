@@ -92,6 +92,60 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
     }
 
     [Fact]
+    public async Task CreateEmployee_SelectingPositionProfile_PrepopulatesLocation()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+
+        // "Senior Software Engineer" is seeded with both a Department and a Location
+        // ("London Office") — selecting it should unconditionally overwrite both fields.
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+
+        Assert.True(await empEdit.HasPositionProfileDefaultsSummaryAsync(),
+            "Expected the 'From Position Profile' defaults summary card to appear after selecting a profile");
+
+        var departmentText = await empEdit.GetSelectedDepartmentTextAsync();
+        Assert.False(string.IsNullOrWhiteSpace(departmentText),
+            "Expected the Department dropdown to be pre-populated from the selected position profile");
+
+        var locationText = await empEdit.GetSelectedLocationTextAsync();
+        Assert.Equal("London Office", locationText);
+    }
+
+    [Fact]
+    public async Task EmploymentTab_ChangingPositionProfile_UpdatesDepartmentAndLocation()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        // Emma Jones starts in Sales / Account Executive with no location assigned, so
+        // switching her to "Senior Software Engineer" (Engineering / London Office) produces
+        // a visible change in both the Department and Location dropdowns.
+        var emmaJonesId = Guid.Parse("30000000-0000-0000-0000-000000000009");
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empEdit.GoToAsync(AcmeId, emmaJonesId);
+        await empEdit.OpenEmploymentTabAsync();
+
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+
+        var departmentText = await empEdit.GetSelectedDepartmentTextAsync();
+        Assert.Equal("Engineering", departmentText);
+
+        var locationText = await empEdit.GetSelectedLocationTextAsync();
+        Assert.Equal("London Office", locationText);
+    }
+
+    [Fact]
     public async Task EmployeeTasksTab_ClickingTask_OpensTaskDialog_WithoutNavigatingAway()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);

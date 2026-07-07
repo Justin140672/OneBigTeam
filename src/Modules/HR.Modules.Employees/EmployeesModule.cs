@@ -300,6 +300,15 @@ public static class EmployeesModule
                 Department.Create(deptFinanceId, acmeId, "Finance",       "Finance and accounting",         now),
                 Department.Create(deptSalesId,   acmeId, "Sales",         "Sales and account management",   now));
 
+            // A single seeded office location, referenced by one position profile below so
+            // the "position profile defaults" cascade (Department + Location) has real data
+            // to demonstrate in the UI and in E2E coverage.
+            var locTypeOfficeId = Guid.Parse("60000000-0000-0000-0000-000000000001");
+            var locLondonId     = Guid.Parse("70000000-0000-0000-0000-000000000001");
+
+            db.LocationTypes.Add(LocationType.Create(locTypeOfficeId, acmeId, "Office", null, now));
+            db.Locations.Add(Location.Create(locLondonId, acmeId, locTypeOfficeId, "London Office", null, now));
+
             var posCtoId        = Guid.Parse("20000000-0000-0000-0000-000000000001");
             var posSenDevId     = Guid.Parse("20000000-0000-0000-0000-000000000002");
             var posDevId        = Guid.Parse("20000000-0000-0000-0000-000000000003");
@@ -310,14 +319,14 @@ public static class EmployeesModule
             var posAeId         = Guid.Parse("20000000-0000-0000-0000-000000000008");
 
             db.PositionProfiles.AddRange(
-                PositionProfile.Create(posCtoId,        acmeId, deptEngId,     "Chief Technology Officer", null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posSenDevId,     acmeId, deptEngId,     "Senior Software Engineer", null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posDevId,        acmeId, deptEngId,     "Software Engineer",        null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posHrMgrId,      acmeId, deptHrId,      "HR Manager",               null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posHrAdvisorId,  acmeId, deptHrId,      "HR Advisor",               null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posFinanceMgrId, acmeId, deptFinanceId, "Finance Manager",          null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posSalesMgrId,   acmeId, deptSalesId,   "Sales Manager",            null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posAeId,         acmeId, deptSalesId,   "Account Executive",        null, null, null, null, null, null, null, null, now));
+                PositionProfile.Create(posCtoId,        acmeId, deptEngId,     null, "Chief Technology Officer", null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posSenDevId,     acmeId, deptEngId,     locLondonId, "Senior Software Engineer", null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posDevId,        acmeId, deptEngId,     null, "Software Engineer",        null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posHrMgrId,      acmeId, deptHrId,      null, "HR Manager",               null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posHrAdvisorId,  acmeId, deptHrId,      null, "HR Advisor",               null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posFinanceMgrId, acmeId, deptFinanceId, null, "Finance Manager",          null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posSalesMgrId,   acmeId, deptSalesId,   null, "Sales Manager",            null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posAeId,         acmeId, deptSalesId,   null, "Account Executive",        null, null, null, null, null, null, null, null, now));
 
             var empCtoId      = Guid.Parse("30000000-0000-0000-0000-000000000001");
             var empSenDev1Id  = Guid.Parse("30000000-0000-0000-0000-000000000002");
@@ -339,7 +348,7 @@ public static class EmployeesModule
                               string? preferredName = null)
             {
                 var e = Employee.Create(id, acmeId, first, last, email, start, hasSystemAccess: true, now);
-                e.Assign(deptId, posId, managerId, now);
+                e.Assign(deptId, posId, null, managerId, now);
                 e.UpdatePersonalDetails(preferredName ?? first, dob, nationality, gender, null, now);
                 e.UpdateContactDetails(personalEmail, phone, null, addr1, addr2, city, county, postCode, "United Kingdom", now);
                 e.UpdateEmploymentDetails(employeeNumber, employmentTypeId, start, null, null, null, null, now);
@@ -394,8 +403,8 @@ public static class EmployeesModule
                 Department.Create(betaDeptEngId, betaCorpId, "Engineering", "Software engineering", now));
 
             db.PositionProfiles.AddRange(
-                PositionProfile.Create(betaPosEngMgrId, betaCorpId, betaDeptEngId, "Engineering Manager", null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(betaPosDevId,    betaCorpId, betaDeptEngId, "Software Developer",  null, null, null, null, null, null, null, null, now));
+                PositionProfile.Create(betaPosEngMgrId, betaCorpId, betaDeptEngId, null, "Engineering Manager", null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(betaPosDevId,    betaCorpId, betaDeptEngId, null, "Software Developer",  null, null, null, null, null, null, null, null, now));
 
             Employee MakeBeta(Guid id, string first, string last, string email, DateOnly start,
                               Guid? posId, Guid? managerId, DateOnly dob, string nationality, string gender,
@@ -404,7 +413,7 @@ public static class EmployeesModule
                               string employeeNumber, Guid employmentTypeId)
             {
                 var e = Employee.Create(id, betaCorpId, first, last, email, start, hasSystemAccess: true, now);
-                e.Assign(betaDeptEngId, posId, managerId, now);
+                e.Assign(betaDeptEngId, posId, null, managerId, now);
                 e.UpdatePersonalDetails(first, dob, nationality, gender, null, now);
                 e.UpdateContactDetails(personalEmail, phone, null, addr1, addr2, city, county, postCode, "United Kingdom", now);
                 e.UpdateEmploymentDetails(employeeNumber, employmentTypeId, start, null, null, null, null, now);

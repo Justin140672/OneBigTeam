@@ -250,6 +250,29 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
         }
     }
 
+    /// <summary>Returns true if the "Display salary to employees on their profile" checkbox is currently checked.</summary>
+    public async Task<bool> IsDisplaySalaryOnEmployeeProfileCheckedAsync()
+    {
+        var wrapper = page.Locator(".e-checkbox-wrapper")
+            .Filter(new() { HasText = "Display salary to employees on their profile" });
+        return await wrapper.Locator("input[type='checkbox']").IsCheckedAsync();
+    }
+
+    /// <summary>
+    /// Sets the "Display salary to employees on their profile" checkbox to the desired checked state.
+    /// Only clicks if the current state differs from the requested one.
+    /// </summary>
+    public async Task SetDisplaySalaryOnEmployeeProfileAsync(bool isChecked)
+    {
+        var current = await IsDisplaySalaryOnEmployeeProfileCheckedAsync();
+        if (current != isChecked)
+        {
+            var wrapper = page.Locator(".e-checkbox-wrapper")
+                .Filter(new() { HasText = "Display salary to employees on their profile" });
+            await wrapper.Locator("label").ClickAsync();
+        }
+    }
+
     /// <summary>Sets the "Fit Note Required After (Days)" numeric field. Pass null to clear it.</summary>
     public async Task SetFitNoteRequiredAfterDaysAsync(int? days) =>
         await FillNullableNumericAndVerifyAsync(NumericBoxByLabel(".col-md-4", "Fit Note Required After (Days)"), days);

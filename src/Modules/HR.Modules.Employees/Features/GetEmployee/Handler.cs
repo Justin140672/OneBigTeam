@@ -25,6 +25,7 @@ internal sealed class GetEmployeeHandler
                 e.Id,
                 e.CompanyId,
                 e.DepartmentId,
+                e.LocationId,
                 e.PositionProfileId,
                 e.ManagerId,
                 e.FirstName,
@@ -65,6 +66,10 @@ internal sealed class GetEmployeeHandler
                     .Where(d => d.Id == e.DepartmentId)
                     .Select(d => d.Name)
                     .FirstOrDefault(),
+                LocationName = _dbContext.Locations
+                    .Where(l => l.Id == e.LocationId)
+                    .Select(l => l.Name)
+                    .FirstOrDefault(),
                 PositionTitle = _dbContext.PositionProfiles
                     .Where(p => p.Id == e.PositionProfileId)
                     .Select(p => p.Title)
@@ -87,6 +92,8 @@ internal sealed class GetEmployeeHandler
             result.CompanyId,
             result.DepartmentId,
             result.DepartmentName,
+            result.LocationId,
+            result.LocationName,
             result.PositionProfileId,
             result.PositionTitle,
             result.ManagerId,

@@ -50,6 +50,7 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory)
     public decimal DefaultHolidayAllowance { get; private set; }
     public int ProbationMonths { get; private set; }
     public bool ExcludePublicHolidaysFromLeave { get; private set; }
+    public bool DisplaySalaryOnEmployeeProfile { get; private set; }
     public string TimeZone { get; private set; } = "UTC";
     public string Locale { get; private set; } = "en-GB";
     public string? PostcodeRegex { get; private set; }
@@ -107,6 +108,7 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory)
             DefaultHolidayAllowance      = settings.DefaultHolidayAllowance;
             ProbationMonths              = settings.ProbationMonths;
             ExcludePublicHolidaysFromLeave = settings.ExcludePublicHolidaysFromLeave;
+            DisplaySalaryOnEmployeeProfile = settings.DisplaySalaryOnEmployeeProfile;
             TimeZone                     = settings.TimeZone;
             Locale                       = settings.Locale;
             PostcodeRegex                = settings.PostcodeRegex;

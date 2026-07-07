@@ -10,6 +10,7 @@ internal sealed class Employee
     public Guid Id { get; private set; }
     public Guid CompanyId { get; private set; }
     public Guid? DepartmentId { get; private set; }
+    public Guid? LocationId { get; private set; }
     public Guid? PositionProfileId { get; private set; }
     public Guid? ManagerId { get; private set; }
     public string FirstName { get; private set; } = string.Empty;
@@ -69,10 +70,11 @@ internal sealed class Employee
         };
     }
 
-    public void Assign(Guid? departmentId, Guid? positionProfileId, Guid? managerId, DateTimeOffset now)
+    public void Assign(Guid? departmentId, Guid? positionProfileId, Guid? locationId, Guid? managerId, DateTimeOffset now)
     {
         DepartmentId = departmentId;
         PositionProfileId = positionProfileId;
+        LocationId = locationId;
         ManagerId = managerId;
         UpdatedAt = now;
     }

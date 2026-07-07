@@ -9,6 +9,8 @@ internal sealed record GetEmployeeResponse(
     Guid CompanyId,
     Guid? DepartmentId,
     string? DepartmentName,
+    Guid? LocationId,
+    string? LocationName,
     Guid? PositionProfileId,
     string? PositionTitle,
     Guid? ManagerId,

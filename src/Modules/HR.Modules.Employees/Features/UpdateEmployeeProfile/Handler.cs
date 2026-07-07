@@ -99,7 +99,7 @@ internal sealed class UpdateEmployeeProfileHandler
             request.Country,
             now);
 
-        employee.Assign(request.DepartmentId, request.PositionProfileId, employee.ManagerId, now);
+        employee.Assign(request.DepartmentId, request.PositionProfileId, request.LocationId, employee.ManagerId, now);
         employee.SetSystemAccess(request.HasSystemAccess, now);
         employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);
 
@@ -109,6 +109,7 @@ internal sealed class UpdateEmployeeProfileHandler
             employee.Id,
             employee.CompanyId,
             employee.DepartmentId,
+            employee.LocationId,
             employee.FirstName,
             employee.LastName,
             employee.WorkEmail,

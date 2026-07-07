@@ -4,6 +4,7 @@
 @rendermode InteractiveServer
 @inject EmployeeService EmployeeService
 @inject DepartmentService DepartmentService
+@inject LocationService LocationService
 @inject PositionProfileService PositionProfileService
 @inject LeavePolicyService LeavePolicyService
 @inject InviteService InviteService
@@ -129,6 +130,17 @@
                                                     AllowFiltering="true">
                                         <DropDownListFieldSettings Value="Id" Text="Title" />
                                         <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?" ValueChange="OnPositionProfileChanged" />
+                                    </SfDropDownList>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Location</label>
+                                    <SfDropDownList TValue="Guid?"
+                                                    TItem="LocationListItemModel"
+                                                    DataSource="@_locations"
+                                                    @bind-Value="Model.LocationId"
+                                                    Placeholder="None"
+                                                    AllowFiltering="true">
+                                        <DropDownListFieldSettings Value="Id" Text="Name" />
                                     </SfDropDownList>
                                 </div>
                             </div>
@@ -349,6 +361,17 @@
                                                                     Placeholder="None"
                                                                     AllowFiltering="true">
                                                         <DropDownListFieldSettings Value="Id" Text="Title" />
+                                                    </SfDropDownList>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label">Location</label>
+                                                    <SfDropDownList TValue="Guid?"
+                                                                    TItem="LocationListItemModel"
+                                                                    DataSource="@_locations"
+                                                                    @bind-Value="Model.LocationId"
+                                                                    Placeholder="None"
+                                                                    AllowFiltering="true">
+                                                        <DropDownListFieldSettings Value="Id" Text="Name" />
                                                     </SfDropDownList>
                                                 </div>
                                             </div>
@@ -578,6 +601,7 @@
     private static readonly string[] _genderOptions = ["Male", "Female", "Non-binary", "Prefer not to say", "Other"];
 
     private List<DepartmentListItemModel> _departments = [];
+    private List<LocationListItemModel> _locations = [];
     private List<PositionProfileListItemModel> _positionProfiles = [];
     private List<NationalityListItem> _nationalities = [];
 
@@ -608,6 +632,9 @@
 
         var deptResult = await DepartmentService.ListDepartmentsAsync(CompanyId);
         _departments = deptResult?.Items ?? [];
+
+        var locationResult = await LocationService.ListLocationsAsync(CompanyId);
+        _locations = locationResult?.Items ?? [];
 
         var profileResult = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
         _positionProfiles = profileResult?.Items.ToList() ?? [];
@@ -643,6 +670,7 @@
                 Model.PostCode       = _employee.PostCode       ?? string.Empty;
                 Model.Country        = _employee.Country        ?? string.Empty;
                 Model.DepartmentId = _employee.DepartmentId;
+                Model.LocationId = _employee.LocationId;
                 Model.PositionProfileId = _employee.PositionProfileId;
                 Model.HasSystemAccess = _employee.HasSystemAccess;
             }
@@ -669,8 +697,8 @@
 
             if (_selectedProfileDefaults is not null)
             {
-                if (Model.DepartmentId is null)
-                    Model.DepartmentId = _selectedProfileDefaults.DepartmentId;
+                Model.DepartmentId = _selectedProfileDefaults.DepartmentId;
+                Model.LocationId = _selectedProfileDefaults.LocationId;
 
                 if (_selectedProfileDefaults.DefaultLeavePolicyId is Guid leavePolicyId)
                 {
@@ -708,6 +736,7 @@
             var request = new CreateEmployeeRequest(
                 CompanyId,
                 Model.DepartmentId,
+                Model.LocationId,
                 Model.PositionProfileId,
                 Model.FirstName.Trim(),
                 Model.LastName.Trim(),
@@ -759,6 +788,7 @@
                 CompanyId,
                 Id!.Value,
                 Model.DepartmentId,
+                Model.LocationId,
                 Model.PositionProfileId,
                 Model.FirstName,
                 Model.LastName,

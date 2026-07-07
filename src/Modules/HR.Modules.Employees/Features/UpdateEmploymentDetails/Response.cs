@@ -11,6 +11,7 @@ internal sealed record UpdateEmploymentDetailsResponse(
     Guid? EmploymentTypeId,
     EmploymentStatus Status,
     Guid? DepartmentId,
+    Guid? LocationId,
     Guid? PositionProfileId,
     Guid? ManagerId,
     DateOnly StartDate,

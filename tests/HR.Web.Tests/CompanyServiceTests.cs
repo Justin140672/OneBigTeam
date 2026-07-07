@@ -23,7 +23,7 @@ public class CompanyServiceTests
     public async Task GetCompanySettingsAsync_Returns_Settings_Including_Contact_Validation_Regexes()
     {
         var response = new GetCompanySettingsResponse(
-            Guid.NewGuid(), "UTC", "en-GB", 31, 7.5m, 1, 25m, 6, true, false, null, null,
+            Guid.NewGuid(), "UTC", "en-GB", 31, 7.5m, 1, 25m, 6, true, false, false, null, null,
             "^[A-Za-z]{1,2}\\d[A-Za-z\\d]?\\s?\\d[A-Za-z]{2}$", "^0\\d{9,10}$", "^07\\d{9}$",
             DateTime.UtcNow);
 
@@ -122,13 +122,13 @@ public class CompanyServiceTests
     public async Task UpdateCompanySettingsAsync_Returns_Response_When_Api_Returns_Ok()
     {
         var response = new UpdateCompanySettingsResponse(
-            Guid.NewGuid(), "UTC", "en-GB", WorkingDays.Monday, 7.5m, 1, 25m, 6, true, false, null, null, DateTime.UtcNow);
+            Guid.NewGuid(), "UTC", "en-GB", WorkingDays.Monday, 7.5m, 1, 25m, 6, true, false, false, null, null, DateTime.UtcNow);
 
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
         var service = new CompanyService(factory);
 
         var request = new UpdateCompanySettingsRequest(
-            Guid.NewGuid(), "UTC", "en-GB", WorkingDays.Monday, 7.5m, 1, 25m, 6, true, false, null, null);
+            Guid.NewGuid(), "UTC", "en-GB", WorkingDays.Monday, 7.5m, 1, 25m, 6, true, false, false, null, null);
 
         var result = await service.UpdateCompanySettingsAsync(Guid.NewGuid(), request);
 
@@ -143,7 +143,7 @@ public class CompanyServiceTests
         var service = new CompanyService(factory);
 
         var request = new UpdateCompanySettingsRequest(
-            Guid.NewGuid(), "UTC", "en-GB", WorkingDays.Monday, 7.5m, 1, 25m, 6, true, false, null, null);
+            Guid.NewGuid(), "UTC", "en-GB", WorkingDays.Monday, 7.5m, 1, 25m, 6, true, false, false, null, null);
 
         var result = await service.UpdateCompanySettingsAsync(Guid.NewGuid(), request);
 

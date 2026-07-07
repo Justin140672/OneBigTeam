@@ -12,6 +12,7 @@ internal sealed record UpdateEmploymentDetailsRequest
     public Guid? EmploymentTypeId { get; init; }
     public EmploymentStatus Status { get; init; }
     public Guid? DepartmentId { get; init; }
+    public Guid? LocationId { get; init; }
     public Guid? PositionProfileId { get; init; }
     public Guid? ManagerId { get; init; }
     public DateOnly StartDate { get; init; }

@@ -132,7 +132,7 @@ public class ListEmployeesHandlerTests
         var departmentId = Guid.NewGuid();
 
         var emp1 = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
-        emp1.Assign(departmentId, null, null, now);
+        emp1.Assign(departmentId, null, null, null, now);
         var emp2 = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, now);
         context.Employees.AddRange(emp1, emp2);
         await context.SaveChangesAsync();
@@ -149,22 +149,26 @@ public class ListEmployeesHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Resolves_Department_PositionProfile_And_Manager_Names()
+    public async Task HandleAsync_Resolves_Department_Location_PositionProfile_And_Manager_Names()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Software Developer", null, null, null, null, null, null, null, null, now);
+        var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
+        var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Software Developer", null, null, null, null, null, null, null, null, now);
         var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, now);
         context.Departments.Add(department);
+        context.LocationTypes.Add(locationType);
+        context.Locations.Add(location);
         context.PositionProfiles.Add(profile);
         context.Employees.Add(manager);
         await context.SaveChangesAsync();
 
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
-        employee.Assign(department.Id, profile.Id, manager.Id, now);
+        employee.Assign(department.Id, profile.Id, location.Id, manager.Id, now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
@@ -177,6 +181,8 @@ public class ListEmployeesHandlerTests
         Assert.True(result.IsSuccess);
         var item = result.Value!.Items.Single();
         Assert.Equal("Engineering", item.DepartmentName);
+        Assert.Equal(location.Id, item.LocationId);
+        Assert.Equal("Head Office", item.LocationName);
         Assert.Equal("Software Developer", item.PositionProfileTitle);
         Assert.Equal("Jane Manager", item.ManagerFullName);
     }

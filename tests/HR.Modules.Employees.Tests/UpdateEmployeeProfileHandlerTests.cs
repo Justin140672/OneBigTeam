@@ -51,6 +51,43 @@ public class UpdateEmployeeProfileHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Persists_LocationId()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
+        var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
+        var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, now);
+        context.Employees.Add(employee);
+        context.LocationTypes.Add(locationType);
+        context.Locations.Add(location);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader());
+
+        var result = await handler.HandleAsync(
+            new UpdateEmployeeProfileRequest
+            {
+                CompanyId = companyId,
+                Id = employee.Id,
+                LocationId = location.Id,
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(location.Id, result.Value!.LocationId);
+
+        var saved = await context.Employees.SingleAsync();
+        Assert.Equal(location.Id, saved.LocationId);
+    }
+
+    [Fact]
     public async Task HandleAsync_Normalises_WorkEmail_To_Lowercase()
     {
         await using var context = BuildContext();

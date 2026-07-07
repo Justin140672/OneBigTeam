@@ -46,7 +46,7 @@ public class AssignManagerHandlerTests
 
         var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, now);
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
-        employee.Assign(null, null, manager.Id, now);
+        employee.Assign(null, null, null, manager.Id, now);
         context.Employees.AddRange(manager, employee);
         await context.SaveChangesAsync();
 
@@ -59,6 +59,33 @@ public class AssignManagerHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Null(result.Value!.ManagerId);
         Assert.Null(result.Value.ManagerFullName);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Preserves_LocationId_When_Assigning_Manager()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
+        employee.Assign(null, null, locationId, null, now);
+        context.Employees.AddRange(manager, employee);
+        await context.SaveChangesAsync();
+
+        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(
+            new AssignManagerRequest { CompanyId = companyId, Id = employee.Id, ManagerId = manager.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(manager.Id, result.Value!.ManagerId);
+
+        var saved = await context.Employees.SingleAsync(e => e.Id == employee.Id);
+        Assert.Equal(locationId, saved.LocationId);
     }
 
     [Fact]
@@ -150,7 +177,7 @@ public class AssignManagerHandlerTests
         var empA = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
         var empB = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, now);
         // B reports to A
-        empB.Assign(null, null, empA.Id, now);
+        empB.Assign(null, null, null, empA.Id, now);
         context.Employees.AddRange(empA, empB);
         await context.SaveChangesAsync();
 
@@ -177,8 +204,8 @@ public class AssignManagerHandlerTests
         var empB = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, now);
         var empC = Employee.Create(Guid.NewGuid(), companyId, "Carol", "White", "carol@example.com", StartDate, hasSystemAccess: true, now);
         // B reports to A; C reports to B
-        empB.Assign(null, null, empA.Id, now);
-        empC.Assign(null, null, empB.Id, now);
+        empB.Assign(null, null, null, empA.Id, now);
+        empC.Assign(null, null, null, empB.Id, now);
         context.Employees.AddRange(empA, empB, empC);
         await context.SaveChangesAsync();
 
@@ -204,8 +231,8 @@ public class AssignManagerHandlerTests
         var empA = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
         var empB = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, now);
         var empC = Employee.Create(Guid.NewGuid(), companyId, "Carol", "White", "carol@example.com", StartDate, hasSystemAccess: true, now);
-        empB.Assign(null, null, empA.Id, now);
-        empC.Assign(null, null, empB.Id, now);
+        empB.Assign(null, null, null, empA.Id, now);
+        empC.Assign(null, null, null, empB.Id, now);
         context.Employees.AddRange(empA, empB, empC);
         await context.SaveChangesAsync();
 

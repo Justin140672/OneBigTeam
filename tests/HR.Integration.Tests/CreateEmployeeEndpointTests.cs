@@ -15,6 +15,8 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
     private static readonly Guid User3 = new("aaaaaaaa-0000-0000-0000-000000000003");
     private static readonly Guid User4 = new("aaaaaaaa-0000-0000-0000-000000000004");
     private static readonly Guid User5 = new("aaaaaaaa-0000-0000-0000-000000000005");
+    private static readonly Guid User6 = new("aaaaaaaa-0000-0000-0000-000000000006");
+    private static readonly Guid User7 = new("aaaaaaaa-0000-0000-0000-000000000007");
 
     public CreateEmployeeEndpointTests(ApiWebApplicationFactory factory)
     {
@@ -28,8 +30,33 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
             await TestRoleSeeder.AssignRoleAsync(factory, User3, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, User4, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, User5, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User6, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User7, SystemRoles.HrAdministrator);
         }).GetAwaiter().GetResult();
     }
+
+    private static async Task<Guid> CreateLocationAsync(HttpClient client, Guid companyId, string name = "Head Office")
+    {
+        var locationTypeResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/location-types", new
+        {
+            companyId,
+            name = "Office"
+        });
+        locationTypeResponse.EnsureSuccessStatusCode();
+        var locationType = await locationTypeResponse.Content.ReadFromJsonAsync<IdPayload>();
+
+        var locationResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/locations", new
+        {
+            companyId,
+            name,
+            locationTypeId = locationType!.Id
+        });
+        locationResponse.EnsureSuccessStatusCode();
+        var location = await locationResponse.Content.ReadFromJsonAsync<IdPayload>();
+        return location!.Id;
+    }
+
+    private sealed record IdPayload(Guid Id);
 
     [Fact]
     public async Task Post_Employees_Returns_Unauthorized_For_Anonymous_Request()
@@ -206,6 +233,60 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
     }
 
     [Fact]
+    public async Task Post_Employees_Creates_Employee_With_Location()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User6.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var locationId = await CreateLocationAsync(client, companyId);
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
+        {
+            companyId,
+            locationId,
+            firstName = "Alice",
+            lastName = "Smith",
+            workEmail = $"alice.smith.{Guid.NewGuid():N}@example.com",
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-05-20",
+            nationality = "British",
+            gender = "Female"
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<EmployeePayload>();
+        Assert.NotNull(payload);
+        Assert.Equal(locationId, payload!.LocationId);
+    }
+
+    [Fact]
+    public async Task Post_Employees_Returns_NotFound_For_Unknown_Location()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User7.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
+        {
+            companyId,
+            locationId = Guid.NewGuid(),
+            firstName = "Alice",
+            lastName = "Smith",
+            workEmail = $"alice.{Guid.NewGuid():N}@example.com",
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-05-20",
+            nationality = "British",
+            gender = "Female"
+        });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Post_Employees_Returns_NotFound_For_Unknown_Manager()
     {
         using var client = _factory.CreateClient();
@@ -236,6 +317,7 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         Guid Id,
         Guid CompanyId,
         Guid? DepartmentId,
+        Guid? LocationId,
         Guid? PositionProfileId,
         Guid? ManagerId,
         string FirstName,

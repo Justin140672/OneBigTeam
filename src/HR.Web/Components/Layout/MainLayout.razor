@@ -48,8 +48,10 @@ else
                             <MenuItem Text="People" IconCss="fa-solid fa-users">
                                 <MenuItems>
                                     <MenuItem Text="Employees" Url="@_menuItems["Employees"]" />
-                                    <MenuItem Text="Departments" Url="@_menuItems["Departments"]" />
                                     <MenuItem Text="Position Profiles" Url="@_menuItems["PositionProfiles"]" />
+                                    <MenuItem Text="Departments" Url="@_menuItems["Departments"]" />
+                                    <MenuItem Text="Location Types" Url="@_menuItems["LocationTypes"]" />
+                                    <MenuItem Text="Locations" Url="@_menuItems["Locations"]" />
                                     <MenuItem Text="Onboarding Templates" Url="@_menuItems["OnboardingTemplates"]" />
                                     <MenuItem Text="Employment Types" Url="@_menuItems["EmploymentTypes"]" />
                                     <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
@@ -242,6 +244,8 @@ else
     {
         ["Employees"] = "/",
         ["Departments"] = "/",
+        ["LocationTypes"] = "/",
+        ["Locations"] = "/",
         ["PositionProfiles"] = "/",
         ["OnboardingTemplates"] = "/",
         ["EmploymentTypes"] = "/",
@@ -265,6 +269,8 @@ else
         var companyId = Session.CompanyId;
         _menuItems["Employees"] = $"/companies/{companyId}/employees";
         _menuItems["Departments"] = $"/companies/{companyId}/departments";
+        _menuItems["LocationTypes"] = $"/companies/{companyId}/location-types";
+        _menuItems["Locations"] = $"/companies/{companyId}/locations";
         _menuItems["PositionProfiles"] = $"/companies/{companyId}/position-profiles";
         _menuItems["OnboardingTemplates"] = $"/companies/{companyId}/onboarding-templates";
         _menuItems["EmploymentTypes"] = $"/companies/{companyId}/employment-types";
