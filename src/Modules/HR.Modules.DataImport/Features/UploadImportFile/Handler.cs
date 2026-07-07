@@ -91,9 +91,7 @@ internal sealed class UploadImportFileHandler(
     // Determines the file's data row count (excluding the header row), based on its extension.
     private static int CountDataRows(Stream content, string fileName)
     {
-        var extension = Path.GetExtension(fileName);
-
-        return extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase)
+        return ImportFileFormat.IsXlsx(fileName)
             ? CountXlsxDataRows(content)
             : CountCsvDataRows(content);
     }

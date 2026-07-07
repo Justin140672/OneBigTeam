@@ -1,5 +1,6 @@
 using FluentValidation;
 using HR.Modules.DataImport.Features.UploadImportFile;
+using HR.Modules.DataImport.Features.ValidateImportSession;
 using HR.Modules.DataImport.Persistence;
 using HR.Modules.DataImport.Services;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,11 @@ public static class DataImportModule
 
         services.AddScoped<UploadImportFileHandler>();
         services.AddScoped<IValidator<UploadImportFileRequest>, UploadImportFileValidator>();
+
+        services.AddScoped<EmployeeImportFileParser>();
+        services.AddScoped<EmployeeStagingRowValidator>();
+        services.AddScoped<ValidateImportSessionHandler>();
+        services.AddScoped<IValidator<ValidateImportSessionRequest>, ValidateImportSessionValidator>();
 
         services.AddDbContext<DataImportDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>

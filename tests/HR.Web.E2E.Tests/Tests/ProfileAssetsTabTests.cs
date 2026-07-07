@@ -108,12 +108,8 @@ public sealed class ProfileAssetsTabTests(AppFixture fixture) : E2ETestBase(fixt
 
         var profileUrlBeforeClick = _page.Url;
 
-        // Select the row, then click the "View" toolbar action once it's enabled.
-        await _page.Locator(".e-grid .e-row").First.ClickAsync();
-        await _page.WaitForFunctionAsync(
-            "!document.querySelector('[id=\"hr-view\"]')?.classList?.contains('e-overlay')",
-            null, new PageWaitForFunctionOptions { Timeout = 10_000 });
-        await _page.Locator("[id='hr-view']").ClickAsync();
+        // The "View" action is a button directly on the row — no row selection needed.
+        await _page.Locator(".e-grid .e-row").First.Locator("button[title='View']").ClickAsync();
 
         // Should open the asset in a dialog (AssetDetailDialog), not navigate to /assets/{id}/view.
         // Scoped to [role='dialog'] because Syncfusion's SfDialog CssClass propagates onto

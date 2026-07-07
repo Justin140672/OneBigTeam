@@ -46,6 +46,15 @@ internal sealed class LocalImportFileStorageService : IImportFileStorageService
         return Task.CompletedTask;
     }
 
+    public Task<Stream> OpenReadAsync(
+        string storageKey,
+        CancellationToken cancellationToken)
+    {
+        var fullPath = ToFullPath(storageKey);
+        Stream stream = File.OpenRead(fullPath);
+        return Task.FromResult(stream);
+    }
+
     private string ToFullPath(string storageKey) =>
         Path.Combine(_basePath, storageKey.Replace('/', Path.DirectorySeparatorChar));
 }

@@ -204,20 +204,20 @@ else
         <!-- Actions -->
         <div class="overview-sidebar">
             <div class="overview-actions">
-                <button class="action-btn" @onclick="@(() => OnNavigateToLeave.InvokeAsync())">
-                    <i class="fa-solid fa-calendar-plus"></i>
+                <button class="action-btn action-btn--leave" @onclick="@(() => OnNavigateToLeave.InvokeAsync())">
+                    <span class="action-btn-icon"><i class="fa-solid fa-calendar-plus"></i></span>
                     Request Leave
                 </button>
-                <button class="action-btn" @onclick="@(() => OnNavigateToSickness.InvokeAsync())">
-                    <i class="fa-solid fa-house-medical"></i>
+                <button class="action-btn action-btn--sickness" @onclick="@(() => OnNavigateToSickness.InvokeAsync())">
+                    <span class="action-btn-icon"><i class="fa-solid fa-house-medical"></i></span>
                     Notify Sickness
                 </button>
-                <button class="action-btn" @onclick="@(() => OnNavigateToDocuments.InvokeAsync())">
-                    <i class="fa-solid fa-file-lines"></i>
+                <button class="action-btn action-btn--documents" @onclick="@(() => OnNavigateToDocuments.InvokeAsync())">
+                    <span class="action-btn-icon"><i class="fa-solid fa-file-lines"></i></span>
                     View Documents
                 </button>
-                <button class="action-btn" @onclick="@(() => OnNavigateToTasks.InvokeAsync())">
-                    <i class="fa-solid fa-list-check"></i>
+                <button class="action-btn action-btn--tasks" @onclick="@(() => OnNavigateToTasks.InvokeAsync())">
+                    <span class="action-btn-icon"><i class="fa-solid fa-list-check"></i></span>
                     View Tasks
                 </button>
             </div>
@@ -322,8 +322,11 @@ else
         };
     }
 
-    private static string FormatDays(decimal? days) =>
-        days is null ? "—" : $"{days:0.##} {(days == 1m ? "day" : "days")}";
+    private static string FormatDays(decimal? days)
+    {
+        var value = days ?? 0m;
+        return $"{value:0.##} {(value == 1m ? "day" : "days")}";
+    }
 
     private static string FormatDateRange(DateOnly start, string startPart, DateOnly end, string endPart)
     {

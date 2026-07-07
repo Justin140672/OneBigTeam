@@ -4,12 +4,7 @@
         DataSource="@Tasks"
         AllowFiltering="false"
         AllowPaging="false"
-        AllowSorting="false"
-        Toolbar="@_toolbar">
-    <GridEvents TValue="TaskListItem"
-                OnToolbarClick="OnToolbarClickAsync"
-                RowSelected="OnRowSelected"
-                RowDeselected="OnRowDeselected" />
+        AllowSorting="false">
     <GridColumns>
         <GridColumn HeaderText="Task">
             <Template>
@@ -52,6 +47,16 @@
         {
             <GridColumn Field="@nameof(TaskListItem.AssignedTo)" HeaderText="Assigned To" Width="180" />
         }
+        <GridColumn HeaderText="" Width="90" AllowSorting="false" AllowFiltering="false" TextAlign="TextAlign.Right">
+            <Template>
+                @{
+                    var item = (TaskListItem)context;
+                }
+                <SfButton CssClass="e-outline e-small" title="View" OnClick="() => ViewTaskAsync(item.Id)">
+                    <i class="fa-solid fa-eye"></i>
+                </SfButton>
+            </Template>
+        </GridColumn>
     </GridColumns>
 </HrGrid>
 
@@ -69,36 +74,12 @@
     [Parameter]
     public EventCallback<Guid> OnViewTask { get; set; }
 
-    private TaskListItem? _selected;
-
-    private IEnumerable<object> _toolbar => CompanyId != Guid.Empty
-        ? new List<object>
-          {
-              new ItemModel { Id = "hr-view", Text = "View", PrefixIcon = "fa-solid fa-eye", TooltipText = "View task", Disabled = _selected is null }
-          }
-        : [];
-
-    private void OnRowSelected(RowSelectEventArgs<TaskListItem> args)
+    private async Task ViewTaskAsync(Guid taskId)
     {
-        _selected = args.Data;
-        StateHasChanged();
-    }
-
-    private void OnRowDeselected(RowDeselectEventArgs<TaskListItem> args)
-    {
-        _selected = null;
-        StateHasChanged();
-    }
-
-    private async Task OnToolbarClickAsync(ClickEventArgs args)
-    {
-        if (args.Item.Id != "hr-view" || _selected is null)
-            return;
-
         if (OnViewTask.HasDelegate)
-            await OnViewTask.InvokeAsync(_selected.Id);
+            await OnViewTask.InvokeAsync(taskId);
         else
-            Navigation.NavigateTo($"/companies/{CompanyId}/tasks/{_selected.Id}");
+            Navigation.NavigateTo($"/companies/{CompanyId}/tasks/{taskId}");
     }
 
     private static string StatusLabel(string status) => status switch

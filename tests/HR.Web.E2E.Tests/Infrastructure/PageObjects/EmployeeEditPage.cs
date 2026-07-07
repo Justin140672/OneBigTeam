@@ -185,7 +185,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     {
         await page.GetByRole(AriaRole.Tab, new() { Name = "Compensation" }).ClickAsync();
         await page.WaitForSelectorAsync(
-            "[data-testid='current-compensation-panel'], .alert-secondary",
+            "[data-testid='current-compensation-panel'], [data-testid='no-compensation-message'], [data-testid='no-current-compensation-message']",
             new() { Timeout = 15_000 });
     }
 

@@ -12,6 +12,7 @@ internal sealed class DataImportDbContext : DbContext
 
     public DbSet<ImportSession> ImportSessions => Set<ImportSession>();
     public DbSet<ImportRowError> ImportRowErrors => Set<ImportRowError>();
+    public DbSet<ImportStagingEmployee> ImportStagingEmployees => Set<ImportStagingEmployee>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

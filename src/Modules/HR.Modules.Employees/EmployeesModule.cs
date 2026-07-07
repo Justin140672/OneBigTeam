@@ -228,6 +228,7 @@ public static class EmployeesModule
         services.AddScoped<IPositionProfileAssetsReader, PositionProfileAssetsReader>();
         services.AddScoped<IOnboardingTemplateReader, OnboardingTemplateReader>();
         services.AddScoped<IEmployeeProvisioningService, EmployeeProvisioningService>();
+        services.AddScoped<IEmployeeImportLookupReader, EmployeeImportLookupReader>();
     }
 
     public static async Task MigrateEmployeesAsync(this IServiceProvider services)

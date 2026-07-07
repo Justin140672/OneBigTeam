@@ -240,23 +240,57 @@
 .action-btn {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
+    gap: 10px;
     background: #fff;
     border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 9px 16px;
+    border-radius: 10px;
+    padding: 10px 14px;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 600;
     color: #374151;
     cursor: pointer;
-    transition: background 0.1s, border-color 0.1s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
 }
 
 .action-btn:hover {
-    background: #f9fafb;
-    border-color: #6366f1;
-    color: #6366f1;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    border-color: #c7d2fe;
 }
+
+.action-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.action-btn:focus-visible {
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+}
+
+.action-btn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    background: #eef2ff;
+    color: #6366f1;
+    transition: transform 0.12s ease;
+}
+
+.action-btn:hover .action-btn-icon {
+    transform: scale(1.08);
+}
+
+.action-btn--leave .action-btn-icon      { background: #dcfce7; color: #16a34a; }
+.action-btn--sickness .action-btn-icon   { background: #fee2e2; color: #dc2626; }
+.action-btn--documents .action-btn-icon  { background: #eef2ff; color: #6366f1; }
+.action-btn--tasks .action-btn-icon      { background: #ede9fe; color: #7c3aed; }
 
 /* ── Loading skeleton ────────────────────────────────── */
 

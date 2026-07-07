@@ -25,4 +25,11 @@ internal interface IImportFileStorageService
     Task DeleteAsync(
         string storageKey,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Opens a readable stream for the file previously stored under the given key.
+    /// </summary>
+    Task<Stream> OpenReadAsync(
+        string storageKey,
+        CancellationToken cancellationToken);
 }

@@ -121,6 +121,41 @@ public class DataImportModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(ImportRowError))!);
     }
 
+    // ── ImportStagingEmployee ────────────────────────────────────────────────────
+
+    [Fact]
+    public void ImportStagingEmployee_Entity_Is_Not_Public()
+    {
+        var entityType = ModuleAssembly.GetTypes().Single(t => t.Name == "ImportStagingEmployee");
+        Assert.False(entityType.IsPublic, "ImportStagingEmployee entity must be internal, not public.");
+    }
+
+    [Fact]
+    public void ImportStagingEmployee_Entity_Maps_To_Correct_Table_And_Schema()
+    {
+        using var context = BuildContext();
+        var entityType = context.Model.FindEntityType(typeof(ImportStagingEmployee))!;
+        Assert.Equal("import_staging_employees", entityType.GetTableName());
+        Assert.Equal("data_import", entityType.GetSchema());
+    }
+
+    [Fact]
+    public void ImportStagingEmployee_Entity_Primary_Key_Is_Guid()
+    {
+        using var context = BuildContext();
+        var entityType = context.Model.FindEntityType(typeof(ImportStagingEmployee))!;
+        var pk = entityType.FindPrimaryKey()!;
+        Assert.Single(pk.Properties);
+        Assert.Equal(typeof(Guid), pk.Properties[0].ClrType);
+    }
+
+    [Fact]
+    public void ImportStagingEmployee_Entity_All_Columns_Are_snake_case()
+    {
+        using var context = BuildContext();
+        AssertSnakeCase(context.Model.FindEntityType(typeof(ImportStagingEmployee))!);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private static void AssertSnakeCase(Microsoft.EntityFrameworkCore.Metadata.IEntityType entityType)

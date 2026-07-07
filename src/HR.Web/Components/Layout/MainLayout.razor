@@ -77,11 +77,6 @@ else
                                     <MenuItem Text="Sickness Categories" Url="@_menuItems["SicknessCategories"]" />
                                 </MenuItems>
                             </MenuItem>
-                            <MenuItem Text="HR" IconCss="fa-solid fa-inbox">
-                                <MenuItems>
-                                    <MenuItem Text="HR Inbox" Url="@_menuItems["HrInbox"]" />
-                                </MenuItems>
-                            </MenuItem>
                             @if (Session.CanManageCompany)
                             {
                                 <MenuItem Text="Company" IconCss="fa-solid fa-building" Url="@_menuItems["Company"]" />
@@ -256,7 +251,6 @@ else
         ["LeaveTypes"] = "/",
         ["LeavePolicies"] = "/",
         ["PublicHolidays"] = "/",
-        ["HrInbox"] = "/",
         ["DocumentTypes"] = "/",
         ["SicknessCategories"] = "/",
         ["Company"] = "/",
@@ -281,7 +275,6 @@ else
         _menuItems["LeaveTypes"] = $"/companies/{companyId}/leave-types";
         _menuItems["LeavePolicies"] = $"/companies/{companyId}/leave-policies";
         _menuItems["PublicHolidays"] = $"/companies/{companyId}/public-holidays";
-        _menuItems["HrInbox"] = $"/companies/{companyId}/hr/inbox";
         _menuItems["DocumentTypes"] = $"/companies/{companyId}/document-types";
         _menuItems["SicknessCategories"] = $"/companies/{companyId}/sickness-categories";
         _menuItems["Company"] = $"/companies/{companyId}/edit";

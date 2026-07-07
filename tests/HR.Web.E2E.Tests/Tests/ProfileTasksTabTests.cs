@@ -57,15 +57,10 @@ public sealed class ProfileTasksTabTests(AppFixture fixture) : E2ETestBase(fixtu
 
         await _page.WaitForSelectorAsync(".e-grid, .task-cell", new() { Timeout = 15_000 });
 
-        // The View toolbar button starts disabled (e-overlay) until a row is selected.
-        // Always select the first row first, then wait for Syncfusion to enable the button.
-        await _page.Locator(".e-row").First.ClickAsync();
-        await _page.WaitForFunctionAsync(
-            "!document.querySelector('[id=\"hr-view\"]')?.classList?.contains('e-overlay')",
-            null, new PageWaitForFunctionOptions { Timeout = 10_000 });
-
         var profileUrlBeforeClick = _page.Url;
-        await _page.Locator("[id='hr-view']").ClickAsync();
+
+        // The "View" action is a button directly on the row — no row selection needed.
+        await _page.Locator(".e-row").First.Locator("button[title='View']").ClickAsync();
 
         // Should open the task in a dialog (TaskViewDialog), not navigate to /tasks/{id}.
         // Scoped to [role='dialog'] because Syncfusion's SfDialog CssClass propagates onto

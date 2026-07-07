@@ -12,12 +12,7 @@ else
             AllowFiltering="false"
             AllowPaging="false"
             AllowSorting="false"
-            Toolbar="@_toolbar"
             data-testid="my-assets-grid">
-        <GridEvents TValue="EmployeeAssetItem"
-                    OnToolbarClick="OnToolbarClickAsync"
-                    RowSelected="OnRowSelected"
-                    RowDeselected="OnRowDeselected" />
         <GridColumns>
             <GridColumn HeaderText="Asset">
                 <Template>
@@ -47,6 +42,16 @@ else
                     }
                 </Template>
             </GridColumn>
+            <GridColumn HeaderText="" Width="90" AllowSorting="false" AllowFiltering="false" TextAlign="TextAlign.Right">
+                <Template>
+                    @{
+                        var item = (EmployeeAssetItem)context;
+                    }
+                    <SfButton CssClass="e-outline e-small" title="View" OnClick="() => ViewAsset(item.AssetId)">
+                        <i class="fa-solid fa-eye"></i>
+                    </SfButton>
+                </Template>
+            </GridColumn>
         </GridColumns>
     </HrGrid>
 }
@@ -62,15 +67,9 @@ else
 
     private List<EmployeeAssetItem> _assets = [];
     private bool _loading = true;
-    private EmployeeAssetItem? _selected;
 
     private Guid? _selectedAssetId;
     private bool _dialogOpen;
-
-    private IEnumerable<object> _toolbar => new List<object>
-    {
-        new ItemModel { Id = "hr-view", Text = "View", PrefixIcon = "fa-solid fa-eye", TooltipText = "View asset details", Disabled = _selected is null }
-    };
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 
@@ -81,25 +80,9 @@ else
         _loading = false;
     }
 
-    private void OnRowSelected(RowSelectEventArgs<EmployeeAssetItem> args)
+    private void ViewAsset(Guid assetId)
     {
-        _selected = args.Data;
-        StateHasChanged();
-    }
-
-    private void OnRowDeselected(RowDeselectEventArgs<EmployeeAssetItem> args)
-    {
-        _selected = null;
-        StateHasChanged();
-    }
-
-    private Task OnToolbarClickAsync(ClickEventArgs args)
-    {
-        if (args.Item.Id == "hr-view" && _selected is not null)
-        {
-            _selectedAssetId = _selected.AssetId;
-            _dialogOpen = true;
-        }
-        return Task.CompletedTask;
+        _selectedAssetId = assetId;
+        _dialogOpen = true;
     }
 }

@@ -105,8 +105,10 @@ public sealed class EmployeeCompensationTabTests(AppFixture fixture) : E2ETestBa
         Assert.False(await empEdit.HasCurrentCompensationPanelAsync(),
             "Expected no Current Compensation panel for an employee without a compensation record");
 
-        Assert.True(await _page.Locator(".alert-secondary").IsVisibleAsync(),
-            "Expected an empty-state message when no compensation record exists");
+        // With no current record and no history, the tab shows a single unified empty-state
+        // message rather than separate "no current" and "no history" messages side by side.
+        Assert.True(await _page.Locator("[data-testid='no-compensation-message']").IsVisibleAsync(),
+            "Expected a single unified empty-state message when there is no compensation data at all");
     }
 
     [Fact]
