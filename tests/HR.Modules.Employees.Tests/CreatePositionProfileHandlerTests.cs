@@ -22,8 +22,7 @@ public class CreatePositionProfileHandlerTests
             new CreatePositionProfileRequest
             {
                 CompanyId = companyId,
-                Title = "Software Developer",
-                IsManagerial = false
+                Title = "Software Developer"
             },
             CancellationToken.None);
 
@@ -31,7 +30,6 @@ public class CreatePositionProfileHandlerTests
         Assert.NotNull(result.Value);
         Assert.Equal(companyId, result.Value!.CompanyId);
         Assert.Equal("Software Developer", result.Value.Title);
-        Assert.False(result.Value.IsManagerial);
         Assert.Null(result.Value.DepartmentId);
         Assert.True(result.Value.IsActive);
 
@@ -40,7 +38,7 @@ public class CreatePositionProfileHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Creates_Managerial_PositionProfile_With_Department()
+    public async Task HandleAsync_Creates_PositionProfile_With_Department()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
@@ -57,14 +55,12 @@ public class CreatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 DepartmentId = department.Id,
-                Title = "Engineering Manager",
-                IsManagerial = true
+                Title = "Engineering Manager"
             },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(department.Id, result.Value!.DepartmentId);
-        Assert.True(result.Value.IsManagerial);
     }
 
     [Fact]
@@ -75,7 +71,7 @@ public class CreatePositionProfileHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         context.PositionProfiles.Add(
-            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Software Developer", null, false, null, null, null, null, null, null, null, now));
+            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Software Developer", null, null, null, null, null, null, null, null, now));
         await context.SaveChangesAsync();
 
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
@@ -143,7 +139,7 @@ public class CreatePositionProfileHandlerTests
         var companyB = Guid.NewGuid();
 
         context.PositionProfiles.Add(
-            PositionProfile.Create(Guid.NewGuid(), companyA, null, "Software Developer", null, false, null, null, null, null, null, null, null, now));
+            PositionProfile.Create(Guid.NewGuid(), companyA, null, "Software Developer", null, null, null, null, null, null, null, null, now));
         await context.SaveChangesAsync();
 
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());

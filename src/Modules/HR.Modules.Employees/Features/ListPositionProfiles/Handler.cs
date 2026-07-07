@@ -38,7 +38,6 @@ internal sealed class ListPositionProfilesHandler
                     dept == null ? null : dept.Name,
                     x.Profile.Title,
                     x.Profile.Description,
-                    x.Profile.IsManagerial,
                     x.Profile.IsActive,
                     x.Profile.SalaryMin,
                     x.Profile.SalaryMax,

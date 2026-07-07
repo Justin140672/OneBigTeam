@@ -9,7 +9,6 @@ internal sealed record CreatePositionProfileResponse(
     Guid? DepartmentId,
     string Title,
     string? Description,
-    bool IsManagerial,
     int? ProbationMonthsOverride,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,

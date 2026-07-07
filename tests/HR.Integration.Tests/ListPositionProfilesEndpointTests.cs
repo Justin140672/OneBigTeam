@@ -59,16 +59,14 @@ public class ListPositionProfilesEndpointTests : IClassFixture<ApiWebApplication
         var create1 = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
             companyId,
-            title = "Software Engineer",
-            isManagerial = false
+            title = "Software Engineer"
         });
         create1.EnsureSuccessStatusCode();
 
         var create2 = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
             companyId,
-            title = "Engineering Manager",
-            isManagerial = true
+            title = "Engineering Manager"
         });
         create2.EnsureSuccessStatusCode();
 
@@ -93,8 +91,7 @@ public class ListPositionProfilesEndpointTests : IClassFixture<ApiWebApplication
         var create = await clientA.PostAsJsonAsync($"/api/companies/{companyA}/position-profiles", new
         {
             companyId = companyA,
-            title = "Analyst",
-            isManagerial = false
+            title = "Analyst"
         });
         create.EnsureSuccessStatusCode();
 
@@ -115,6 +112,5 @@ public class ListPositionProfilesEndpointTests : IClassFixture<ApiWebApplication
         string? DepartmentName,
         string Title,
         string? Description,
-        bool IsManagerial,
         bool IsActive);
 }

@@ -48,6 +48,15 @@ using HR.Modules.Employees.Features.GetOnboardingTemplate;
 using HR.Modules.Employees.Features.ListOnboardingTemplates;
 using HR.Modules.Employees.Features.UpdateOnboardingTemplate;
 using HR.Modules.Employees.Features.DeactivateOnboardingTemplate;
+using HR.Modules.Employees.Features.CreateLocationType;
+using HR.Modules.Employees.Features.UpdateLocationType;
+using HR.Modules.Employees.Features.DeactivateLocationType;
+using HR.Modules.Employees.Features.ListLocationTypes;
+using HR.Modules.Employees.Features.CreateLocation;
+using HR.Modules.Employees.Features.UpdateLocation;
+using HR.Modules.Employees.Features.DeactivateLocation;
+using HR.Modules.Employees.Features.GetLocation;
+using HR.Modules.Employees.Features.ListLocations;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
 using HR.SharedKernel;
@@ -183,6 +192,33 @@ public static class EmployeesModule
 
         services.AddScoped<DeactivateOnboardingTemplateHandler>();
 
+        services.AddScoped<CreateLocationTypeHandler>();
+        services.AddScoped<IValidator<CreateLocationTypeRequest>, CreateLocationTypeValidator>();
+
+        services.AddScoped<UpdateLocationTypeHandler>();
+        services.AddScoped<IValidator<UpdateLocationTypeRequest>, UpdateLocationTypeValidator>();
+
+        services.AddScoped<DeactivateLocationTypeHandler>();
+        services.AddScoped<IValidator<DeactivateLocationTypeRequest>, DeactivateLocationTypeValidator>();
+
+        services.AddScoped<ListLocationTypesHandler>();
+        services.AddScoped<IValidator<ListLocationTypesRequest>, ListLocationTypesValidator>();
+
+        services.AddScoped<CreateLocationHandler>();
+        services.AddScoped<IValidator<CreateLocationRequest>, CreateLocationValidator>();
+
+        services.AddScoped<UpdateLocationHandler>();
+        services.AddScoped<IValidator<UpdateLocationRequest>, UpdateLocationValidator>();
+
+        services.AddScoped<DeactivateLocationHandler>();
+        services.AddScoped<IValidator<DeactivateLocationRequest>, DeactivateLocationValidator>();
+
+        services.AddScoped<GetLocationHandler>();
+        services.AddScoped<IValidator<GetLocationRequest>, GetLocationValidator>();
+
+        services.AddScoped<ListLocationsHandler>();
+        services.AddScoped<IValidator<ListLocationsRequest>, ListLocationsValidator>();
+
         services.AddScoped<IProbationDateResolver, ProbationDateResolver>();
         services.AddScoped<IWorkingPatternProvider, WorkingPatternProvider>();
         services.AddScoped<IDirectReportsReader, DirectReportsReader>();
@@ -274,14 +310,14 @@ public static class EmployeesModule
             var posAeId         = Guid.Parse("20000000-0000-0000-0000-000000000008");
 
             db.PositionProfiles.AddRange(
-                PositionProfile.Create(posCtoId,        acmeId, deptEngId,     "Chief Technology Officer", null, isManagerial: true, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posSenDevId,     acmeId, deptEngId,     "Senior Software Engineer", null, isManagerial: false, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posDevId,        acmeId, deptEngId,     "Software Engineer",        null, isManagerial: false, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posHrMgrId,      acmeId, deptHrId,      "HR Manager",               null, isManagerial: true, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posHrAdvisorId,  acmeId, deptHrId,      "HR Advisor",               null, isManagerial: false, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posFinanceMgrId, acmeId, deptFinanceId, "Finance Manager",          null, isManagerial: true, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posSalesMgrId,   acmeId, deptSalesId,   "Sales Manager",            null, isManagerial: true, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posAeId,         acmeId, deptSalesId,   "Account Executive",        null, isManagerial: false, null, null, null, null, null, null, null, now));
+                PositionProfile.Create(posCtoId,        acmeId, deptEngId,     "Chief Technology Officer", null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posSenDevId,     acmeId, deptEngId,     "Senior Software Engineer", null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posDevId,        acmeId, deptEngId,     "Software Engineer",        null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posHrMgrId,      acmeId, deptHrId,      "HR Manager",               null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posHrAdvisorId,  acmeId, deptHrId,      "HR Advisor",               null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posFinanceMgrId, acmeId, deptFinanceId, "Finance Manager",          null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posSalesMgrId,   acmeId, deptSalesId,   "Sales Manager",            null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(posAeId,         acmeId, deptSalesId,   "Account Executive",        null, null, null, null, null, null, null, null, now));
 
             var empCtoId      = Guid.Parse("30000000-0000-0000-0000-000000000001");
             var empSenDev1Id  = Guid.Parse("30000000-0000-0000-0000-000000000002");
@@ -358,8 +394,8 @@ public static class EmployeesModule
                 Department.Create(betaDeptEngId, betaCorpId, "Engineering", "Software engineering", now));
 
             db.PositionProfiles.AddRange(
-                PositionProfile.Create(betaPosEngMgrId, betaCorpId, betaDeptEngId, "Engineering Manager", null, isManagerial: true, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(betaPosDevId,    betaCorpId, betaDeptEngId, "Software Developer",  null, isManagerial: false, null, null, null, null, null, null, null, now));
+                PositionProfile.Create(betaPosEngMgrId, betaCorpId, betaDeptEngId, "Engineering Manager", null, null, null, null, null, null, null, null, now),
+                PositionProfile.Create(betaPosDevId,    betaCorpId, betaDeptEngId, "Software Developer",  null, null, null, null, null, null, null, null, now));
 
             Employee MakeBeta(Guid id, string first, string last, string email, DateOnly start,
                               Guid? posId, Guid? managerId, DateOnly dob, string nationality, string gender,

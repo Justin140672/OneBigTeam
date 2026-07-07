@@ -63,11 +63,6 @@
                                         <DropDownListFieldSettings Value="Id" Text="Name" />
                                     </SfDropDownList>
                                 </div>
-                                <div class="mb-3">
-                                    <SfCheckBox TChecked="bool"
-                                                Label="Managerial role"
-                                                @bind-Checked="Model.IsManagerial" />
-                                </div>
                             </div>
                         </div>
 
@@ -121,11 +116,6 @@
                                                                         AllowFiltering="true">
                                                             <DropDownListFieldSettings Value="Id" Text="Name" />
                                                         </SfDropDownList>
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <SfCheckBox TChecked="bool"
-                                                                    Label="Managerial role"
-                                                                    @bind-Checked="Model.IsManagerial" />
                                                     </div>
                                                 </div>
                                             </div>
@@ -220,7 +210,6 @@
                 Model.Title = profile.Title;
                 Model.Description = profile.Description;
                 Model.DepartmentId = profile.DepartmentId;
-                Model.IsManagerial = profile.IsManagerial;
                 Model.ProbationMonthsOverride = profile.ProbationMonthsOverride;
                 Model.SalaryMin = profile.SalaryMin;
                 Model.SalaryMax = profile.SalaryMax;
@@ -263,7 +252,6 @@
                 Model.DepartmentId,
                 Model.Title.Trim(),
                 string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
-                Model.IsManagerial,
                 Model.ProbationMonthsOverride,
                 workingDaysOverride,
                 hoursPerDayOverride,
@@ -284,7 +272,6 @@
                 Model.DepartmentId,
                 Model.Title.Trim(),
                 string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
-                Model.IsManagerial,
                 Model.ProbationMonthsOverride,
                 workingDaysOverride,
                 hoursPerDayOverride,
@@ -319,10 +306,10 @@
                 <label class="form-label">Salary Range <span class="text-muted small">(guidance only)</span></label>
                 <div class="row g-2">
                     <div class="col-4">
-                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMin" Placeholder="Min" ShowSpinButton="false" />
+                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMin" Placeholder="Min" ShowSpinButton="false" Format="0" />
                     </div>
                     <div class="col-4">
-                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMax" Placeholder="Max" ShowSpinButton="false" />
+                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMax" Placeholder="Max" ShowSpinButton="false" Format="0" />
                     </div>
                     <div class="col-4">
                         <SfDropDownList TValue="string" TItem="AddCompensationDialog.SalaryTypeChoice"

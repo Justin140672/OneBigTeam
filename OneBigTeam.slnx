@@ -16,6 +16,7 @@
     <Project Path="src/Modules/HR.Modules.Identity/HR.Modules.Identity.csproj" />
     <Project Path="src/Modules/HR.Modules.Leave/HR.Modules.Leave.csproj" />
     <Project Path="src/Modules/HR.Modules.Notifications/HR.Modules.Notifications.csproj" />
+    <Project Path="src/Modules/HR.Modules.Onboarding/HR.Modules.Onboarding.csproj" />
     <Project Path="src/Modules/HR.Modules.Probation/HR.Modules.Probation.csproj" />
     <Project Path="src/Modules/HR.Modules.Recruitment/HR.Modules.Recruitment.csproj" />
     <Project Path="src/Modules/HR.Modules.Assets/HR.Modules.Assets.csproj" />
@@ -35,6 +36,7 @@
     <Project Path="tests/HR.Modules.Identity.Tests/HR.Modules.Identity.Tests.csproj" />
     <Project Path="tests/HR.Modules.Leave.Tests/HR.Modules.Leave.Tests.csproj" />
     <Project Path="tests/HR.Modules.Notifications.Tests/HR.Modules.Notifications.Tests.csproj" />
+    <Project Path="tests/HR.Modules.Onboarding.Tests/HR.Modules.Onboarding.Tests.csproj" />
     <Project Path="tests/HR.Modules.Probation.Tests/HR.Modules.Probation.Tests.csproj" />
     <Project Path="tests/HR.Modules.Recruitment.Tests/HR.Modules.Recruitment.Tests.csproj" />
     <Project Path="tests/HR.Modules.Assets.Tests/HR.Modules.Assets.Tests.csproj" />

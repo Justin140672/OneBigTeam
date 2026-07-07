@@ -59,38 +59,6 @@ public sealed class PositionProfileManagementTests(AppFixture fixture) : E2ETest
     }
 
     [Fact]
-    public async Task CreateManagerialPositionProfile_ShowsManagerialBadge()
-    {
-        var profileTitle = $"E2E Manager {Guid.NewGuid().ToString("N")[..8]}";
-
-        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
-        var ppList   = new PositionProfileListPage(_page, _fixture.WebBaseUrl);
-        var ppEdit   = new PositionProfileEditPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
-
-        await ppList.GoToAsync(AcmeId);
-        await ppList.ClickNewPositionProfileAsync();
-
-        await ppEdit.FillTitleAsync(profileTitle);
-        await ppEdit.SetManagerialRoleAsync(true);
-        await ppEdit.SaveAsync();
-
-        // After save the list should show the new profile.
-        Assert.True(await ppList.HasPositionProfileAsync(profileTitle),
-            $"Expected the managerial position profile '{profileTitle}' to appear in the list");
-
-        // The row should contain a "Yes" managerial badge (bg-info text-dark).
-        var row = _page.Locator(".e-row")
-            .Filter(new() { HasText = profileTitle })
-            .First;
-        var badge = row.Locator(".badge.bg-info, .badge.text-bg-info");
-        Assert.True(await badge.IsVisibleAsync(),
-            "Expected the 'Yes' managerial badge to be displayed in the grid row");
-    }
-
-    [Fact]
     public async Task CreatePositionProfile_PersistsTemplateDefaults()
     {
         var profileTitle = $"E2E Template {Guid.NewGuid().ToString("N")[..8]}";

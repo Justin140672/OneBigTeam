@@ -147,7 +147,7 @@ public class ListRequiredDocumentsForPositionProfileEndpointTests : IClassFixtur
     {
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles",
-            new { companyId, title, isManagerial = false });
+            new { companyId, title });
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<IdPayload>())!.Id;
     }

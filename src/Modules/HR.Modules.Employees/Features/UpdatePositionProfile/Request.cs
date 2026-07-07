@@ -10,7 +10,6 @@ internal sealed record UpdatePositionProfileRequest
     public Guid? DepartmentId { get; init; }
     public string Title { get; init; } = string.Empty;
     public string? Description { get; init; }
-    public bool IsManagerial { get; init; }
     public int? ProbationMonthsOverride { get; init; }
     public WorkingDays? WorkingDaysOverride { get; init; }
     public decimal? HoursPerDayOverride { get; init; }

@@ -16,7 +16,7 @@ public class ListRequiredAssetsHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
 
         var categoryAId = Guid.NewGuid();
@@ -46,7 +46,7 @@ public class ListRequiredAssetsHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
 
         var active = PositionProfileRequiredAsset.Create(
@@ -73,7 +73,7 @@ public class ListRequiredAssetsHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -105,8 +105,8 @@ public class ListRequiredAssetsHandlerTests
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        var profileA = PositionProfile.Create(Guid.NewGuid(), companyA, null, "Engineer", null, false, null, null, null, null, null, null, null, Now);
-        var profileB = PositionProfile.Create(Guid.NewGuid(), companyB, null, "Engineer", null, false, null, null, null, null, null, null, null, Now);
+        var profileA = PositionProfile.Create(Guid.NewGuid(), companyA, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profileB = PositionProfile.Create(Guid.NewGuid(), companyB, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.AddRange(profileA, profileB);
 
         var assetForA = PositionProfileRequiredAsset.Create(
@@ -131,8 +131,8 @@ public class ListRequiredAssetsHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profileA = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, null, null, null, null, null, null, Now);
-        var profileB = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Manager", null, true, null, null, null, null, null, null, null, Now);
+        var profileA = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profileB = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Manager", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.AddRange(profileA, profileB);
 
         var assetForA = PositionProfileRequiredAsset.Create(

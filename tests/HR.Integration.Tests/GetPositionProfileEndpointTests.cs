@@ -44,8 +44,7 @@ public class GetPositionProfileEndpointTests : IClassFixture<ApiWebApplicationFa
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
             companyId,
-            title = "Test Engineer",
-            isManagerial = false
+            title = "Test Engineer"
         });
         createResponse.EnsureSuccessStatusCode();
 
@@ -61,7 +60,6 @@ public class GetPositionProfileEndpointTests : IClassFixture<ApiWebApplicationFa
         Assert.Equal(created.Id, payload!.Id);
         Assert.Equal(companyId, payload.CompanyId);
         Assert.Equal("Test Engineer", payload.Title);
-        Assert.False(payload.IsManagerial);
         Assert.True(payload.IsActive);
     }
 
@@ -87,8 +85,7 @@ public class GetPositionProfileEndpointTests : IClassFixture<ApiWebApplicationFa
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyA}/position-profiles", new
         {
             companyId = companyA,
-            title = "Analyst",
-            isManagerial = false
+            title = "Analyst"
         });
         createResponse.EnsureSuccessStatusCode();
         var created = await createResponse.Content.ReadFromJsonAsync<PositionProfilePayload>();
@@ -106,7 +103,6 @@ public class GetPositionProfileEndpointTests : IClassFixture<ApiWebApplicationFa
         Guid? DepartmentId,
         string Title,
         string? Description,
-        bool IsManagerial,
         bool IsActive,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt);

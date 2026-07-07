@@ -88,8 +88,7 @@ public class UpdatePositionProfileValidatorTests
         var result = v.Validate(ValidRequest() with
         {
             DepartmentId = Guid.NewGuid(),
-            Description = "Builds and maintains the core platform.",
-            IsManagerial = true
+            Description = "Builds and maintains the core platform."
         });
         Assert.True(result.IsValid);
     }

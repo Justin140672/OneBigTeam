@@ -38,21 +38,6 @@
                     </Template>
                 </GridColumn>
                 <GridColumn Field="@nameof(PositionProfileListItemModel.DepartmentName)" HeaderText="Department" Width="180" />
-                <GridColumn Field="@nameof(PositionProfileListItemModel.IsManagerial)" HeaderText="Managerial" Width="120">
-                    <Template>
-                        @{
-                            var row = (context as PositionProfileListItemModel)!;
-                            @if (row.IsManagerial)
-                            {
-                                <span class="badge bg-info text-dark">Yes</span>
-                            }
-                            else
-                            {
-                                <span class="text-muted">No</span>
-                            }
-                        }
-                    </Template>
-                </GridColumn>
                 <GridColumn HeaderText="Salary Range" Width="200">
                     <Template>
                         @{

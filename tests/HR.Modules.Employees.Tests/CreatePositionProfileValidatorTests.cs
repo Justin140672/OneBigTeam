@@ -77,8 +77,7 @@ public class CreatePositionProfileValidatorTests
             CompanyId = Guid.NewGuid(),
             DepartmentId = Guid.NewGuid(),
             Title = "Software Developer",
-            Description = "Builds software",
-            IsManagerial = false
+            Description = "Builds software"
         });
 
         Assert.True(result.IsValid);

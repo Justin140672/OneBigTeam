@@ -37,7 +37,7 @@ public class WorkingPatternProviderTests
         var companyId = Guid.NewGuid();
 
         var profile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, null, "Engineer", null, false, null,
+            Guid.NewGuid(), companyId, null, "Engineer", null, null,
             WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday, 6m, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
 
@@ -62,7 +62,7 @@ public class WorkingPatternProviderTests
 
         var profileDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday;
         var profile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, null, "Engineer", null, false, null,
+            Guid.NewGuid(), companyId, null, "Engineer", null, null,
             profileDays, 6m, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
 
@@ -86,7 +86,7 @@ public class WorkingPatternProviderTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, false, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
 
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2026, 1, 1), true, Now);

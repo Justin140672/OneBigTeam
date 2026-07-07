@@ -16,7 +16,7 @@ public class GetMyEmployeeHandlerTests
         var companyId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Senior Engineer", null, false, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Senior Engineer", null, null, null, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
 
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);

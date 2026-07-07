@@ -14,7 +14,6 @@ internal sealed class PositionProfile
     public Guid? DepartmentId { get; private set; }
     public string Title { get; private set; } = string.Empty;
     public string? Description { get; private set; }
-    public bool IsManagerial { get; private set; }
     public int? ProbationMonthsOverride { get; private set; }
     public WorkingDays? WorkingDaysOverride { get; private set; }
     public decimal? HoursPerDayOverride { get; private set; }
@@ -36,7 +35,6 @@ internal sealed class PositionProfile
         Guid? departmentId,
         string title,
         string? description,
-        bool isManagerial,
         int? probationMonthsOverride,
         WorkingDays? workingDaysOverride,
         decimal? hoursPerDayOverride,
@@ -54,7 +52,6 @@ internal sealed class PositionProfile
             DepartmentId = departmentId,
             Title = title,
             Description = description,
-            IsManagerial = isManagerial,
             ProbationMonthsOverride = probationMonthsOverride,
             WorkingDaysOverride = workingDaysOverride,
             HoursPerDayOverride = hoursPerDayOverride,
@@ -73,7 +70,6 @@ internal sealed class PositionProfile
         Guid? departmentId,
         string title,
         string? description,
-        bool isManagerial,
         int? probationMonthsOverride,
         WorkingDays? workingDaysOverride,
         decimal? hoursPerDayOverride,
@@ -87,7 +83,6 @@ internal sealed class PositionProfile
         DepartmentId = departmentId;
         Title = title;
         Description = description;
-        IsManagerial = isManagerial;
         ProbationMonthsOverride = probationMonthsOverride;
         WorkingDaysOverride = workingDaysOverride;
         HoursPerDayOverride = hoursPerDayOverride;

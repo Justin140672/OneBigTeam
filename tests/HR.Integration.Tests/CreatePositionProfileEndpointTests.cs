@@ -48,8 +48,7 @@ public class CreatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         {
             companyId,
             title = "Software Developer",
-            description = "Builds features",
-            isManagerial = false
+            description = "Builds features"
         });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -61,12 +60,11 @@ public class CreatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(companyId, payload.CompanyId);
         Assert.Equal("Software Developer", payload.Title);
         Assert.Equal("Builds features", payload.Description);
-        Assert.False(payload.IsManagerial);
         Assert.True(payload.IsActive);
     }
 
     [Fact]
-    public async Task Post_PositionProfiles_Creates_Managerial_Profile_With_Department()
+    public async Task Post_PositionProfiles_Creates_PositionProfile_With_Department()
     {
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
@@ -84,8 +82,7 @@ public class CreatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         {
             companyId,
             departmentId = dept!.Id,
-            title = "Engineering Manager",
-            isManagerial = true
+            title = "Engineering Manager"
         });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -93,7 +90,6 @@ public class CreatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         var payload = await response.Content.ReadFromJsonAsync<PositionProfilePayload>();
         Assert.NotNull(payload);
         Assert.Equal(dept.Id, payload!.DepartmentId);
-        Assert.True(payload.IsManagerial);
     }
 
     [Fact]
@@ -105,16 +101,14 @@ public class CreatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         var first = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
             companyId,
-            title = "Recruiter",
-            isManagerial = false
+            title = "Recruiter"
         });
         first.EnsureSuccessStatusCode();
 
         var second = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
             companyId,
-            title = "Recruiter",
-            isManagerial = false
+            title = "Recruiter"
         });
 
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
@@ -130,8 +124,7 @@ public class CreatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         {
             companyId,
             departmentId = Guid.NewGuid(),
-            title = "Developer",
-            isManagerial = false
+            title = "Developer"
         });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -145,7 +138,6 @@ public class CreatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         Guid? DepartmentId,
         string Title,
         string? Description,
-        bool IsManagerial,
         bool IsActive,
         DateTimeOffset CreatedAt);
 }

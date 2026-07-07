@@ -31,8 +31,8 @@ public class ListPositionProfilesHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         context.PositionProfiles.AddRange(
-            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Manager", null, true, null, null, null, null, null, null, null, now),
-            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Developer", null, false, null, null, null, null, null, null, null, now));
+            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Manager", null, null, null, null, null, null, null, null, now),
+            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Developer", null, null, null, null, null, null, null, null, now));
         await context.SaveChangesAsync();
 
         var handler = new ListPositionProfilesHandler(context);
@@ -59,8 +59,8 @@ public class ListPositionProfilesHandlerTests
         context.Departments.Add(dept);
 
         context.PositionProfiles.AddRange(
-            PositionProfile.Create(Guid.NewGuid(), companyId, dept.Id, "Developer", null, false, null, null, null, null, null, null, null, now),
-            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Contractor", null, false, null, null, null, null, null, null, null, now));
+            PositionProfile.Create(Guid.NewGuid(), companyId, dept.Id, "Developer", null, null, null, null, null, null, null, null, now),
+            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Contractor", null, null, null, null, null, null, null, null, now));
         await context.SaveChangesAsync();
 
         var handler = new ListPositionProfilesHandler(context);
@@ -83,8 +83,8 @@ public class ListPositionProfilesHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var active = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Active Role", null, false, null, null, null, null, null, null, null, now);
-        var inactive = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Old Role", null, false, null, null, null, null, null, null, null, now);
+        var active = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Active Role", null, null, null, null, null, null, null, null, now);
+        var inactive = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Old Role", null, null, null, null, null, null, null, null, now);
         inactive.Deactivate(now);
 
         context.PositionProfiles.AddRange(active, inactive);
@@ -108,8 +108,8 @@ public class ListPositionProfilesHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var active = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Active Role", null, false, null, null, null, null, null, null, null, now);
-        var inactive = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Old Role", null, false, null, null, null, null, null, null, null, now);
+        var active = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Active Role", null, null, null, null, null, null, null, null, now);
+        var inactive = PositionProfile.Create(Guid.NewGuid(), companyId, null, "Old Role", null, null, null, null, null, null, null, null, now);
         inactive.Deactivate(now);
 
         context.PositionProfiles.AddRange(active, inactive);
@@ -134,7 +134,7 @@ public class ListPositionProfilesHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         context.PositionProfiles.Add(
-            PositionProfile.Create(Guid.NewGuid(), companyA, null, "Engineer", null, false, null, null, null, null, null, null, null, now));
+            PositionProfile.Create(Guid.NewGuid(), companyA, null, "Engineer", null, null, null, null, null, null, null, null, now));
         await context.SaveChangesAsync();
 
         var handler = new ListPositionProfilesHandler(context);
@@ -155,7 +155,7 @@ public class ListPositionProfilesHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         context.PositionProfiles.Add(
-            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Developer", null, false, null, null, null, 40000, 60000, SalaryType.Annual, null, now));
+            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Developer", null, null, null, null, 40000, 60000, SalaryType.Annual, null, now));
         await context.SaveChangesAsync();
 
         var handler = new ListPositionProfilesHandler(context);
@@ -179,7 +179,7 @@ public class ListPositionProfilesHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         context.PositionProfiles.Add(
-            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Developer", null, false, null, null, null, null, null, null, null, now));
+            PositionProfile.Create(Guid.NewGuid(), companyId, null, "Developer", null, null, null, null, null, null, null, null, now));
         await context.SaveChangesAsync();
 
         var handler = new ListPositionProfilesHandler(context);

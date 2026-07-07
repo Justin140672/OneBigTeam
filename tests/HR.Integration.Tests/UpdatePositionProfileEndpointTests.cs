@@ -47,8 +47,7 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
             companyId,
-            title = "Original Title",
-            isManagerial = false
+            title = "Original Title"
         });
         createResponse.EnsureSuccessStatusCode();
         var created = await createResponse.Content.ReadFromJsonAsync<PositionProfilePayload>();
@@ -60,8 +59,7 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
                 companyId,
                 id = created.Id,
                 title = "Updated Title",
-                description = "Now with description",
-                isManagerial = true
+                description = "Now with description"
             });
 
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
@@ -70,7 +68,6 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.NotNull(payload);
         Assert.Equal("Updated Title", payload!.Title);
         Assert.Equal("Now with description", payload.Description);
-        Assert.True(payload.IsManagerial);
     }
 
     [Fact]
@@ -84,8 +81,7 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
             {
                 companyId,
                 id = Guid.NewGuid(),
-                title = "Whatever",
-                isManagerial = false
+                title = "Whatever"
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -100,16 +96,14 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         var create1 = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
             companyId,
-            title = "Profile A",
-            isManagerial = false
+            title = "Profile A"
         });
         create1.EnsureSuccessStatusCode();
 
         var create2 = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
             companyId,
-            title = "Profile B",
-            isManagerial = false
+            title = "Profile B"
         });
         create2.EnsureSuccessStatusCode();
         var profileB = await create2.Content.ReadFromJsonAsync<PositionProfilePayload>();
@@ -120,8 +114,7 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
             {
                 companyId,
                 id = profileB.Id,
-                title = "Profile A",
-                isManagerial = false
+                title = "Profile A"
             });
 
         Assert.Equal(HttpStatusCode.Conflict, updateResponse.StatusCode);
@@ -137,8 +130,7 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyA}/position-profiles", new
         {
             companyId = companyA,
-            title = "Designer",
-            isManagerial = false
+            title = "Designer"
         });
         createResponse.EnsureSuccessStatusCode();
         var created = await createResponse.Content.ReadFromJsonAsync<PositionProfilePayload>();
@@ -150,8 +142,7 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
             {
                 companyId = companyB,
                 id = created.Id,
-                title = "Designer",
-                isManagerial = false
+                title = "Designer"
             });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -163,7 +154,6 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         Guid? DepartmentId,
         string Title,
         string? Description,
-        bool IsManagerial,
         bool IsActive,
         DateTimeOffset CreatedAt);
 
@@ -173,7 +163,6 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         Guid? DepartmentId,
         string Title,
         string? Description,
-        bool IsManagerial,
         bool IsActive,
         DateTimeOffset UpdatedAt);
 }

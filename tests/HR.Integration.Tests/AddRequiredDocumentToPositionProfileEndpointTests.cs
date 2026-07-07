@@ -148,7 +148,7 @@ public class AddRequiredDocumentToPositionProfileEndpointTests : IClassFixture<A
     {
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles",
-            new { companyId, title, isManagerial = false });
+            new { companyId, title });
         response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<IdPayload>();
         return payload!.Id;

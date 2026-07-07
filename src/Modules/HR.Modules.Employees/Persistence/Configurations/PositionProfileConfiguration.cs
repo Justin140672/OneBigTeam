@@ -32,10 +32,6 @@ internal sealed class PositionProfileConfiguration : IEntityTypeConfiguration<Po
             .HasColumnName("description")
             .HasMaxLength(2000);
 
-        builder.Property(p => p.IsManagerial)
-            .HasColumnName("is_managerial")
-            .IsRequired();
-
         builder.Property(p => p.ProbationMonthsOverride)
             .HasColumnName("probation_months_override");
 

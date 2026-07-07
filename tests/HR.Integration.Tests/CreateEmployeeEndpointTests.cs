@@ -101,8 +101,7 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         var ppResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
             companyId,
-            title = $"Developer {Guid.NewGuid():N}",
-            isManagerial = false
+            title = $"Developer {Guid.NewGuid():N}"
         });
         ppResponse.EnsureSuccessStatusCode();
         var pp = await ppResponse.Content.ReadFromJsonAsync<PositionProfilePayload>();

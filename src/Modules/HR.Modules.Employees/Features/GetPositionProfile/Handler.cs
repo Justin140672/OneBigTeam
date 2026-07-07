@@ -47,7 +47,6 @@ internal sealed class GetPositionProfileHandler
             profile.DepartmentId,
             profile.Title,
             profile.Description,
-            profile.IsManagerial,
             profile.ProbationMonthsOverride,
             profile.WorkingDaysOverride,
             profile.HoursPerDayOverride,

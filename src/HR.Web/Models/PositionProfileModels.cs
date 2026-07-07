@@ -13,7 +13,6 @@ public record PositionProfileListItemModel(
     string? DepartmentName,
     string Title,
     string? Description,
-    bool IsManagerial,
     bool IsActive,
     decimal? SalaryMin,
     decimal? SalaryMax,
@@ -27,7 +26,6 @@ public record GetPositionProfileResponse(
     Guid? DepartmentId,
     string Title,
     string? Description,
-    bool IsManagerial,
     int? ProbationMonthsOverride,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,
@@ -63,7 +61,6 @@ public sealed class PositionProfileEditModel
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public Guid? DepartmentId { get; set; }
-    public bool IsManagerial { get; set; }
     [Range(1, 24, ErrorMessage = "Probation months override must be between 1 and 24.")]
     public int? ProbationMonthsOverride { get; set; }
     public bool UseCompanyWorkingPattern { get; set; } = true;
@@ -84,7 +81,6 @@ public record CreatePositionProfileRequest(
     Guid? DepartmentId,
     string Title,
     string? Description,
-    bool IsManagerial,
     int? ProbationMonthsOverride,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,
@@ -100,7 +96,6 @@ public record CreatePositionProfileResponse(
     Guid? DepartmentId,
     string Title,
     string? Description,
-    bool IsManagerial,
     bool IsActive,
     DateTimeOffset CreatedAt);
 
@@ -158,7 +153,6 @@ public record UpdatePositionProfileRequest(
     Guid? DepartmentId,
     string Title,
     string? Description,
-    bool IsManagerial,
     int? ProbationMonthsOverride,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,
@@ -174,6 +168,5 @@ public record UpdatePositionProfileResponse(
     Guid? DepartmentId,
     string Title,
     string? Description,
-    bool IsManagerial,
     bool IsActive,
     DateTimeOffset UpdatedAt);

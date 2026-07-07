@@ -8,6 +8,7 @@ using HR.Modules.Employees;
 using HR.Modules.Identity;
 using HR.Modules.Leave;
 using HR.Modules.Notifications;
+using HR.Modules.Onboarding;
 using HR.Modules.Assets;
 using HR.Modules.Sickness;
 using HR.Modules.Probation;
@@ -29,6 +30,7 @@ builder.Services.AddEmployeesModule(connectionString);
 builder.Services.AddIdentityModule(connectionString);
 builder.Services.AddLeaveModule(connectionString);
 builder.Services.AddNotificationsModule(connectionString);
+builder.Services.AddOnboardingModule(connectionString);
 builder.Services.AddTasksModule(connectionString);
 builder.Services.AddProbationModule(connectionString);
 builder.Services.AddRecruitmentModule(connectionString, builder.Configuration);
@@ -88,6 +90,9 @@ DateTimeOffset? tasksMigrationCheckedAt = null;
 var notificationsMigrationStatus = "unknown";
 string? notificationsMigrationError = null;
 DateTimeOffset? notificationsMigrationCheckedAt = null;
+var onboardingMigrationStatus = "unknown";
+string? onboardingMigrationError = null;
+DateTimeOffset? onboardingMigrationCheckedAt = null;
 var probationMigrationStatus = "unknown";
 string? probationMigrationError = null;
 DateTimeOffset? probationMigrationCheckedAt = null;
@@ -215,6 +220,19 @@ catch (Exception exception)
 
 try
 {
+	await app.Services.MigrateOnboardingAsync();
+	onboardingMigrationStatus = "succeeded";
+	onboardingMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+catch (Exception exception)
+{
+	onboardingMigrationStatus = "failed";
+	onboardingMigrationError = exception.Message;
+	onboardingMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+
+try
+{
 	await app.Services.MigrateProbationAsync();
 	await app.Services.SeedProbationAsync();
 	probationMigrationStatus = "succeeded";
@@ -321,6 +339,12 @@ app.MapGet("/health/startup-migrations", () =>
 			checkedAt = tasksMigrationCheckedAt,
 			error = tasksMigrationError
 		},
+		onboarding = new
+		{
+			status = onboardingMigrationStatus,
+			checkedAt = onboardingMigrationCheckedAt,
+			error = onboardingMigrationError
+		},
 		probation = new
 		{
 			status = probationMigrationStatus,
@@ -347,7 +371,7 @@ app.MapGet("/health/startup-migrations", () =>
 		}
 	};
 
-	return auditMigrationStatus == "failed" || companiesMigrationStatus == "failed" || documentsMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed" || notificationsMigrationStatus == "failed" || tasksMigrationStatus == "failed" || probationMigrationStatus == "failed" || assetsMigrationStatus == "failed" || sicknessMigrationStatus == "failed" || recruitmentMigrationStatus == "failed"
+	return auditMigrationStatus == "failed" || companiesMigrationStatus == "failed" || documentsMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed" || notificationsMigrationStatus == "failed" || tasksMigrationStatus == "failed" || onboardingMigrationStatus == "failed" || probationMigrationStatus == "failed" || assetsMigrationStatus == "failed" || sicknessMigrationStatus == "failed" || recruitmentMigrationStatus == "failed"
 		? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
 		: Results.Ok(response);
 });

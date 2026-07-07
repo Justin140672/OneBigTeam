@@ -28,14 +28,6 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     public async Task FillDescriptionAsync(string description) =>
         await page.GetByPlaceholder("Optional description").FillAsync(description);
 
-    public async Task SetManagerialRoleAsync(bool isManagerial)
-    {
-        var checkbox = page.GetByLabel("Managerial role");
-        var isChecked = await checkbox.IsCheckedAsync();
-        if (isManagerial && !isChecked) await checkbox.CheckAsync();
-        if (!isManagerial && isChecked) await checkbox.UncheckAsync();
-    }
-
     public async Task SaveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();

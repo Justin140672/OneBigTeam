@@ -123,7 +123,7 @@ public class GetEmployeeHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
-        var position   = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, "Senior Developer", null, false, null, null, null, null, null, null, null, now);
+        var position   = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, "Senior Developer", null, null, null, null, null, null, null, null, now);
         var manager    = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, now);
         context.Departments.Add(department);
         context.PositionProfiles.Add(position);

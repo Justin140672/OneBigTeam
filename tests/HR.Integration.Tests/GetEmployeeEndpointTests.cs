@@ -139,8 +139,7 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         {
             companyId,
             departmentId = dept!.Id,
-            title = "Senior Developer",
-            isManagerial = false
+            title = "Senior Developer"
         });
         posResponse.EnsureSuccessStatusCode();
         var pos = await posResponse.Content.ReadFromJsonAsync<PosPayload>();

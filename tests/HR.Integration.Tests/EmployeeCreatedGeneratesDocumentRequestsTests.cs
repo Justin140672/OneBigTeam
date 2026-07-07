@@ -247,7 +247,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests : IClassFixture<ApiWe
     {
         var resp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles",
-            new { companyId, title, isManagerial = false });
+            new { companyId, title });
         resp.EnsureSuccessStatusCode();
         return (await resp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
     }

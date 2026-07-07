@@ -7,7 +7,6 @@ internal sealed record PositionProfileListItem(
     string? DepartmentName,
     string Title,
     string? Description,
-    bool IsManagerial,
     bool IsActive,
     decimal? SalaryMin,
     decimal? SalaryMax,
