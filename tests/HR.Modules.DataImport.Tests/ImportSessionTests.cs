@@ -15,6 +15,8 @@ public class ImportSessionTests
             "employees.csv",
             totalRows,
             Guid.NewGuid(),
+            "company/session/employees.csv",
+            "text/csv",
             now);
     }
 
@@ -32,6 +34,8 @@ public class ImportSessionTests
             "employees.csv",
             100,
             initiatedByUserId,
+            "company/session/employees.csv",
+            "text/csv",
             FixedNow);
 
         Assert.Equal(id, session.Id);
@@ -40,6 +44,8 @@ public class ImportSessionTests
         Assert.Equal("employees.csv", session.FileName);
         Assert.Equal(100, session.TotalRows);
         Assert.Equal(initiatedByUserId, session.InitiatedByUserId);
+        Assert.Equal("company/session/employees.csv", session.StorageKey);
+        Assert.Equal("text/csv", session.ContentType);
         Assert.Equal(FixedNow, session.CreatedAt);
         Assert.Equal(FixedNow, session.UpdatedAt);
     }

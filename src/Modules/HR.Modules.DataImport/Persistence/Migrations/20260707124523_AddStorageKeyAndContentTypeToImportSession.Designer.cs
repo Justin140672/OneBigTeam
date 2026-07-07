@@ -3,6 +3,7 @@ using System;
 using HR.Modules.DataImport.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HR.Modules.DataImport.Persistence.Migrations
 {
     [DbContext(typeof(DataImportDbContext))]
-    partial class DataImportDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260707124523_AddStorageKeyAndContentTypeToImportSession")]
+    partial class AddStorageKeyAndContentTypeToImportSession
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

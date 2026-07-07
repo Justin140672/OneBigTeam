@@ -17,6 +17,8 @@ internal sealed class ImportSession
     public DateTimeOffset? StartedAt { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
     public string? ErrorSummary { get; private set; }
+    public string StorageKey { get; private set; } = string.Empty;
+    public string ContentType { get; private set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -27,6 +29,8 @@ internal sealed class ImportSession
         string fileName,
         int totalRows,
         Guid initiatedByUserId,
+        string storageKey,
+        string contentType,
         DateTimeOffset now)
     {
         return new ImportSession
@@ -41,6 +45,8 @@ internal sealed class ImportSession
             SuccessfulRows = 0,
             FailedRows = 0,
             InitiatedByUserId = initiatedByUserId,
+            StorageKey = storageKey,
+            ContentType = contentType,
             CreatedAt = now,
             UpdatedAt = now,
         };

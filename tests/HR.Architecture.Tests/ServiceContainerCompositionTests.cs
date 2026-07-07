@@ -52,7 +52,7 @@ public class ServiceContainerCompositionTests
         services.AddSingleton<IConfiguration>(configuration);
 
         services.AddCompaniesModule(connectionString);
-        services.AddDataImportModule(connectionString);
+        services.AddDataImportModule(connectionString, configuration);
         services.AddDocumentsModule(connectionString, configuration);
         services.AddEmployeesModule(connectionString);
         services.AddIdentityModule(connectionString);

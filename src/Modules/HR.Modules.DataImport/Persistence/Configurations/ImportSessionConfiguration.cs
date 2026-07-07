@@ -66,6 +66,16 @@ internal sealed class ImportSessionConfiguration : IEntityTypeConfiguration<Impo
             .HasColumnName("error_summary")
             .HasMaxLength(4000);
 
+        builder.Property(s => s.StorageKey)
+            .HasColumnName("storage_key")
+            .HasMaxLength(1000)
+            .IsRequired();
+
+        builder.Property(s => s.ContentType)
+            .HasColumnName("content_type")
+            .HasMaxLength(200)
+            .IsRequired();
+
         builder.Property(s => s.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
