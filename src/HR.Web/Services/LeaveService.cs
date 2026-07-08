@@ -136,4 +136,64 @@ public sealed class LeaveService(IHttpClientFactory httpClientFactory)
             return (null, "Failed to submit leave request.");
         }
     }
+
+    public async Task<(AdjustLeaveBalanceResponse? Response, string? Error)> AdjustLeaveBalanceAsync(
+        Guid companyId,
+        Guid employeeId,
+        AdjustLeaveBalanceModel request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var httpResponse = await Http.PostAsJsonAsync(
+                $"api/companies/{companyId}/employees/{employeeId}/leave-balance-adjustments",
+                request, HrApiJsonOptions.Default, cancellationToken);
+
+            if (httpResponse.IsSuccessStatusCode)
+                return (await httpResponse.Content.ReadFromJsonAsync<AdjustLeaveBalanceResponse>(HrApiJsonOptions.Default, cancellationToken), null);
+
+            if (httpResponse.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity)
+            {
+                var validationBody = await httpResponse.Content.ReadFromJsonAsync<ValidationErrorEnvelope>(cancellationToken);
+                var first = validationBody?.Errors?.Values.SelectMany(v => v).FirstOrDefault();
+                return (null, first ?? "Validation failed.");
+            }
+
+            var body = await httpResponse.Content.ReadAsStringAsync(cancellationToken);
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                var msg = doc.RootElement.TryGetProperty("error", out var e) ? e.GetString() : null;
+                return (null, msg ?? "Failed to adjust leave balance.");
+            }
+            catch
+            {
+                return (null, "Failed to adjust leave balance.");
+            }
+        }
+        catch
+        {
+            return (null, "Failed to adjust leave balance.");
+        }
+    }
+
+    public async Task<LeaveBalanceHistoryResponse?> GetLeaveBalanceHistoryAsync(
+        Guid companyId,
+        Guid employeeId,
+        Guid leaveTypeId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<LeaveBalanceHistoryResponse>(
+                $"api/companies/{companyId}/employees/{employeeId}/leave-types/{leaveTypeId}/balance-history",
+                HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private sealed record ValidationErrorEnvelope(Dictionary<string, string[]>? Errors);
 }

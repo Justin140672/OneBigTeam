@@ -3,6 +3,7 @@ using System;
 using HR.Modules.Leave.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HR.Modules.Leave.Migrations
 {
     [DbContext(typeof(LeaveDbContext))]
-    partial class LeaveDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260708072355_AddLeaveBalanceAdjustments")]
+    partial class AddLeaveBalanceAdjustments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -355,12 +358,6 @@ namespace HR.Modules.Leave.Migrations
                     b.Property<int>("DefaultEntitlementDays")
                         .HasColumnType("integer")
                         .HasColumnName("default_entitlement_days");
-
-                    b.Property<bool>("HasBalance")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("has_balance");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()

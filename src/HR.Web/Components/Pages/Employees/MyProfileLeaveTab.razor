@@ -15,14 +15,21 @@ else
                 <div class="card h-100">
                     <div class="card-header fw-semibold">Annual Leave</div>
                     <div class="card-body">
-                        <dl class="mb-0">
-                            <dt class="text-muted small">Remaining</dt>
-                            <dd class="fs-4 fw-semibold mb-2">@FormatDays(_annualLeave.RemainingDays)</dd>
-                            <dt class="text-muted small">Booked</dt>
-                            <dd class="mb-2">@FormatDays(_annualLeave.UsedDays)</dd>
-                            <dt class="text-muted small">Pending</dt>
-                            <dd class="mb-0">@(_annualLeave.PendingDays > 0 ? FormatDays(_annualLeave.PendingDays) : "—")</dd>
-                        </dl>
+                        @if (_annualLeave.HasBalance)
+                        {
+                            <dl class="mb-0">
+                                <dt class="text-muted small">Remaining</dt>
+                                <dd class="fs-4 fw-semibold mb-2">@FormatHours(_annualLeave.RemainingHours)</dd>
+                                <dt class="text-muted small">Booked</dt>
+                                <dd class="mb-2">@FormatDays(_annualLeave.UsedDays ?? 0)</dd>
+                                <dt class="text-muted small">Pending</dt>
+                                <dd class="mb-0">@(_annualLeave.PendingHours > 0 ? FormatHours(_annualLeave.PendingHours) : "—")</dd>
+                            </dl>
+                        }
+                        else
+                        {
+                            <span class="text-muted">n/a</span>
+                        }
                     </div>
                 </div>
             </div>
@@ -34,10 +41,17 @@ else
                 <div class="card h-100">
                     <div class="card-header fw-semibold">TOIL</div>
                     <div class="card-body">
-                        <dl class="mb-0">
-                            <dt class="text-muted small">Available</dt>
-                            <dd class="fs-4 fw-semibold mb-0">@FormatDays(_toil.RemainingDays)</dd>
-                        </dl>
+                        @if (_toil.HasBalance)
+                        {
+                            <dl class="mb-0">
+                                <dt class="text-muted small">Available</dt>
+                                <dd class="fs-4 fw-semibold mb-0">@FormatHours(_toil.RemainingHours)</dd>
+                            </dl>
+                        }
+                        else
+                        {
+                            <span class="text-muted">n/a</span>
+                        }
                     </div>
                 </div>
             </div>
@@ -227,6 +241,9 @@ else
 
     private static string FormatDays(decimal days) =>
         $"{days:0.##} {(days == 1m ? "day" : "days")}";
+
+    private static string FormatHours(decimal? hours) =>
+        $"{(hours ?? 0):0.#}h";
 
     private static string FormatDate(DateOnly date, string part) =>
         part == "FullDay" ? date.ToString("dd MMM yyyy") : $"{date:dd MMM yyyy} ({part})";

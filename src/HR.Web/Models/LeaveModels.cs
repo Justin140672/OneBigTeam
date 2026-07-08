@@ -8,15 +8,65 @@ public sealed record LeaveBalanceResponse(
     IReadOnlyList<LeaveBalanceItemModel> Balances);
 
 public sealed record LeaveBalanceItemModel(
-    Guid LeaveBalanceId,
+    Guid? LeaveBalanceId,
     Guid LeaveTypeId,
     string LeaveTypeName,
     string LeaveTypeCode,
-    decimal EntitlementDays,
-    decimal UsedDays,
-    decimal AdjustmentDays,
-    decimal RemainingDays,
-    decimal PendingDays);
+    bool HasBalance,
+    decimal? EntitlementDays,
+    decimal? UsedDays,
+    decimal? AdjustmentDays,
+    decimal? RemainingDays,
+    decimal PendingDays,
+    decimal? EntitlementHours,
+    decimal? RemainingHours,
+    decimal PendingHours);
+
+// ── Leave balance adjustment ─────────────────────────────────────────────
+
+public enum LeaveBalanceAdjustmentReason { Correction, CarryOver, ManualAward, ManualDeduction, Other }
+
+public sealed record AdjustLeaveBalanceModel(
+    Guid LeaveTypeId,
+    decimal AdjustmentHours,
+    LeaveBalanceAdjustmentReason Reason,
+    string? Comments,
+    bool AllowNegativeOverride);
+
+public sealed record AdjustLeaveBalanceResponse(
+    Guid AdjustmentId,
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid LeaveTypeId,
+    Guid LeaveBalanceId,
+    decimal AdjustmentHours,
+    decimal NewRemainingHours,
+    string Reason,
+    string? Comments,
+    Guid AdjustedByEmployeeId,
+    DateTimeOffset AdjustedAt);
+
+// ── Leave balance history ────────────────────────────────────────────────
+
+public sealed record LeaveBalanceHistoryResponse(
+    Guid EmployeeId,
+    Guid LeaveTypeId,
+    IReadOnlyList<LeaveBalanceHistoryItemModel> Items);
+
+/// <param name="Category">"ApprovedLeave" | "CancelledLeave" | "ToilAward" | "ManualAdjustment" | "CarryOver".</param>
+/// <param name="Change">Signed hours: negative when the event consumed balance, positive when it added to it.</param>
+/// <param name="Reason">Adjustment reason enum name for manual adjustments/carry-over, or a fixed label
+/// ("Leave Taken"/"Leave Cancelled"/"TOIL Award") for the other categories.</param>
+/// <param name="BalanceAfter">Running balance in hours immediately after this event.</param>
+public sealed record LeaveBalanceHistoryItemModel(
+    string Category,
+    DateTimeOffset Date,
+    string LeaveTypeName,
+    decimal Change,
+    string Reason,
+    decimal BalanceAfter,
+    string CreatedBy,
+    string Description);
 
 // ── Leave request ─────────────────────────────────────────────────────
 

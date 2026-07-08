@@ -117,8 +117,15 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     }
 
     /// <summary>
-    /// Reads the Annual Leave remaining days from the balance card.
-    /// Returns null if the card is not yet visible.
+    /// Reads the Annual Leave remaining balance from the balance card as a decimal, regardless
+    /// of the unit the UI currently renders in. Historically this was "25 days"/"20.5 days"; the
+    /// Leave Balance Adjustment feature changed the self-service display to hours (e.g. "112.5h",
+    /// no space before the suffix). Rather than depending on either exact format, this extracts
+    /// the leading numeric portion so relative before/after comparisons in existing tests
+    /// (LeaveApprovalTests, LeaveRejectionTests, LeaveCancellationTests) keep working regardless
+    /// of the unit — those tests only assert equality/direction of change, never an absolute
+    /// day count, so comparing the hour-denominated value is equally valid for their purposes.
+    /// Returns null if the card is not yet visible or the text has no leading number.
     /// </summary>
     public async Task<decimal?> GetAnnualLeaveRemainingAsync()
     {
@@ -127,10 +134,31 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
         // Wait for the balance to load — it arrives via an async API call after the tab renders.
         await dd.WaitForAsync(new() { Timeout = 20_000 });
         var text = (await dd.TextContentAsync())?.Trim() ?? "";
-        // format is "25 days" or "20.5 days"
-        var parts = text.Split(' ');
-        return decimal.TryParse(parts[0], out var v) ? v : null;
+        var match = System.Text.RegularExpressions.Regex.Match(text, @"[\d.]+");
+        return match.Success && decimal.TryParse(match.Value, out var v) ? v : null;
     }
+
+    /// <summary>
+    /// Returns the raw rendered text of the Annual Leave "Remaining" value on the self-service
+    /// Leave tab (e.g. "112.5h"), without attempting to parse it to a number. Prefer this over
+    /// the (days-format) <see cref="GetAnnualLeaveRemainingAsync"/> helper when asserting on the
+    /// hours-based display introduced by the Leave Balance Adjustment feature.
+    /// </summary>
+    public async Task<string?> GetAnnualLeaveRemainingTextAsync()
+    {
+        var card = page.Locator(".card").Filter(new() { HasText = "Annual Leave" }).First;
+        var dd = card.Locator("dd.fs-4.fw-semibold");
+        await dd.WaitForAsync(new() { Timeout = 20_000 });
+        return (await dd.TextContentAsync())?.Trim();
+    }
+
+    /// <summary>
+    /// Returns true if any "Adjust" button is visible anywhere on the self-service Leave tab.
+    /// There must never be one here — balance adjustments are an HR/admin-only action performed
+    /// from the admin employee edit page, not from an employee's own "My Profile" view.
+    /// </summary>
+    public async Task<bool> HasAnyAdjustButtonOnLeaveTabAsync() =>
+        await page.GetByRole(AriaRole.Button, new() { Name = "Adjust" }).CountAsync() > 0;
 
     /// <summary>Opens the Request Leave dialog.</summary>
     public async Task ClickRequestLeaveAsync()

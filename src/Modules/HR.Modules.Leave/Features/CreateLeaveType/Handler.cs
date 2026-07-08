@@ -24,7 +24,8 @@ internal sealed class CreateLeaveTypeHandler(LeaveDbContext db, IClock clock)
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
         var entity = LeaveType.Create(
             Guid.NewGuid(), request.CompanyId, request.Name, code,
-            request.DefaultEntitlementDays, request.AccrualMethod, request.Behaviour, now);
+            request.DefaultEntitlementDays, request.AccrualMethod, request.Behaviour, now,
+            request.HasBalance);
 
         db.LeaveTypes.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
@@ -34,6 +35,6 @@ internal sealed class CreateLeaveTypeHandler(LeaveDbContext db, IClock clock)
             entity.DefaultEntitlementDays,
             entity.AccrualMethod.ToString(),
             entity.Behaviour.ToString(),
-            entity.IsActive, entity.CreatedAt, entity.UpdatedAt));
+            entity.IsActive, entity.HasBalance, entity.CreatedAt, entity.UpdatedAt));
     }
 }

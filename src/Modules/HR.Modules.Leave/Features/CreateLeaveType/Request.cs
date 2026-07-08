@@ -10,4 +10,5 @@ internal sealed record CreateLeaveTypeRequest
     public int DefaultEntitlementDays { get; init; }
     public AccrualMethod AccrualMethod { get; init; }
     public LeaveTypeBehaviour Behaviour { get; init; }
+    public bool HasBalance { get; init; } = true;
 }

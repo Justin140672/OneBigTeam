@@ -9,5 +9,6 @@ internal sealed record CreateLeaveTypeResponse(
     string AccrualMethod,
     string Behaviour,
     bool IsActive,
+    bool HasBalance,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

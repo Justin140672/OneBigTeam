@@ -227,6 +227,173 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
+    // ── Leave tab ─────────────────────────────────────────────────────────────
+
+    public async Task OpenLeaveTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Leave" }).ClickAsync();
+        // Wait for the spinner to disappear, then for at least one balance value/"n/a" span
+        // to render inside the "Current Balance" card — not just the static card shell that
+        // is present before the async balance fetch completes.
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.Locator(".card-body .fs-4.fw-semibold").First.WaitForAsync(new() { Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// Returns the rendered balance text (e.g. "112.5h" or "n/a") for the given leave type's
+    /// row in the "Current Balance" card. Does not cover the TOIL card — use
+    /// <see cref="GetToilBalanceTextAsync"/> for that.
+    /// </summary>
+    public async Task<string?> GetBalanceRowTextAsync(string leaveTypeName)
+    {
+        var row = page.Locator(".col-md-4").Filter(new() { HasText = leaveTypeName }).First;
+        var value = row.Locator(".fs-4.fw-semibold");
+        await value.WaitForAsync(new() { Timeout = 15_000 });
+        return (await value.TextContentAsync())?.Trim();
+    }
+
+    /// <summary>Returns true if an Adjust button is visible on the given leave type's row
+    /// in the "Current Balance" card.</summary>
+    public async Task<bool> HasAdjustButtonAsync(string leaveTypeName)
+    {
+        var row = page.Locator(".col-md-4").Filter(new() { HasText = leaveTypeName }).First;
+        return await row.GetByRole(AriaRole.Button, new() { Name = "Adjust" }).IsVisibleAsync();
+    }
+
+    /// <summary>Returns the rendered balance text (e.g. "20h" or "n/a") for the TOIL Balance card.</summary>
+    public async Task<string?> GetToilBalanceTextAsync()
+    {
+        var card = page.Locator(".card").Filter(new() { HasText = "TOIL Balance" }).First;
+        var value = card.Locator(".fs-4.fw-semibold");
+        await value.WaitForAsync(new() { Timeout = 15_000 });
+        return (await value.TextContentAsync())?.Trim();
+    }
+
+    /// <summary>Returns true if the Adjust button is visible on the TOIL Balance card.</summary>
+    public async Task<bool> HasToilAdjustButtonAsync()
+    {
+        var card = page.Locator(".card").Filter(new() { HasText = "TOIL Balance" }).First;
+        return await card.GetByRole(AriaRole.Button, new() { Name = "Adjust" }).IsVisibleAsync();
+    }
+
+    /// <summary>
+    /// Clicks the Adjust button on the given leave type's row in the "Current Balance" card
+    /// and waits for the AdjustLeaveBalanceDialog (header "Adjust {leaveTypeName} Balance") to open.
+    /// </summary>
+    public async Task OpenAdjustDialogAsync(string leaveTypeName)
+    {
+        var row = page.Locator(".col-md-4").Filter(new() { HasText = leaveTypeName }).First;
+        await row.GetByRole(AriaRole.Button, new() { Name = "Adjust" }).ClickAsync();
+        await page.GetByRole(AriaRole.Dialog, new() { Name = $"Adjust {leaveTypeName} Balance" })
+            .WaitForAsync(new() { Timeout = 10_000 });
+    }
+
+    /// <summary>
+    /// Clicks the Adjust button on the TOIL Balance card and waits for its dialog to open.
+    /// <paramref name="toilLeaveTypeName"/> must match the leave type's actual Name (e.g.
+    /// "Time Off In Lieu"), since that — not the "TOIL" card label — is what the dialog
+    /// header renders.
+    /// </summary>
+    public async Task OpenToilAdjustDialogAsync(string toilLeaveTypeName = "Time Off In Lieu")
+    {
+        var card = page.Locator(".card").Filter(new() { HasText = "TOIL Balance" }).First;
+        await card.GetByRole(AriaRole.Button, new() { Name = "Adjust" }).ClickAsync();
+        await page.GetByRole(AriaRole.Dialog, new() { Name = $"Adjust {toilLeaveTypeName} Balance" })
+            .WaitForAsync(new() { Timeout = 10_000 });
+    }
+
+    /// <summary>Returns true if the Adjust dialog for the given leave type is currently visible.</summary>
+    public async Task<bool> IsAdjustDialogVisibleAsync(string leaveTypeName) =>
+        await page.GetByRole(AriaRole.Dialog, new() { Name = $"Adjust {leaveTypeName} Balance" }).IsVisibleAsync();
+
+    /// <summary>Fills the numeric hours field of the (already open) Adjust dialog for
+    /// <paramref name="leaveTypeName"/> without submitting — used by cancel-behavior tests.</summary>
+    public Task FillAdjustmentAmountAsync(string leaveTypeName, decimal hours) =>
+        FillAdjustmentFormAsync(
+            page.GetByRole(AriaRole.Dialog, new() { Name = $"Adjust {leaveTypeName} Balance" }),
+            hours, reason: null, comments: null, allowNegativeOverride: false);
+
+    /// <summary>
+    /// Fills and submits the Adjust Leave Balance dialog for the given leave type. Does not
+    /// assume success — after this returns, callers should check
+    /// <see cref="IsAdjustDialogVisibleAsync"/> (still open on failure) and/or
+    /// <see cref="GetAdjustDialogErrorAsync"/> to determine the outcome.
+    /// </summary>
+    public async Task SubmitAdjustmentAsync(
+        string leaveTypeName,
+        decimal? hours,
+        string? reason = null,
+        string? comments = null,
+        bool allowNegativeOverride = false)
+    {
+        var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = $"Adjust {leaveTypeName} Balance" });
+        await FillAdjustmentFormAsync(dialog, hours, reason, comments, allowNegativeOverride);
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+
+        // The save is an async API round-trip. On success the dialog closes; on failure an
+        // inline .alert-danger renders while the dialog stays open. Wait for the dialog to
+        // close first; if it doesn't (validation failure), wait for the error to actually render
+        // before returning control to the caller.
+        try
+        {
+            await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+        }
+        catch (TimeoutException)
+        {
+            await dialog.Locator(".alert-danger")
+                .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 8_000 });
+        }
+    }
+
+    private async Task FillAdjustmentFormAsync(
+        ILocator dialog, decimal? hours, string? reason, string? comments, bool allowNegativeOverride)
+    {
+        if (hours.HasValue)
+        {
+            var hoursInput = dialog.Locator("input.e-numerictextbox");
+            await hoursInput.ClickAsync();
+            await page.Keyboard.PressAsync("Control+A");
+            await page.Keyboard.PressAsync("Delete");
+            await hoursInput.PressSequentiallyAsync(hours.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            await page.Keyboard.PressAsync("Tab");
+        }
+
+        if (!string.IsNullOrEmpty(reason))
+        {
+            await dialog.Locator("span[role='combobox']").ClickAsync();
+            await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+            await page.Locator(".e-popup.e-ddl .e-list-item")
+                .Filter(new() { HasText = reason })
+                .First
+                .ClickAsync();
+        }
+
+        if (!string.IsNullOrEmpty(comments))
+            await dialog.Locator("textarea").FillAsync(comments);
+
+        if (allowNegativeOverride)
+            await dialog.Locator("#allowNegativeOverride").CheckAsync();
+    }
+
+    /// <summary>Clicks Cancel on the given leave type's Adjust dialog and waits for it to close.</summary>
+    public async Task CloseAdjustDialogAsync(string leaveTypeName)
+    {
+        var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = $"Adjust {leaveTypeName} Balance" });
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
+        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    /// <summary>Returns the inline validation error text in the currently-open Adjust dialog for
+    /// <paramref name="leaveTypeName"/>, or null if no error is visible.</summary>
+    public async Task<string?> GetAdjustDialogErrorAsync(string leaveTypeName)
+    {
+        var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = $"Adjust {leaveTypeName} Balance" });
+        var error = dialog.Locator(".alert-danger");
+        return await error.IsVisibleAsync() ? (await error.TextContentAsync())?.Trim() : null;
+    }
+
     // ── Employment tab ────────────────────────────────────────────────────────
 
     public async Task OpenEmploymentTabAsync()

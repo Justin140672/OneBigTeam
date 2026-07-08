@@ -32,6 +32,7 @@ public class LeaveTypeService(IHttpClientFactory httpClientFactory) : IEditServi
             DefaultEntitlementDays = existing.DefaultEntitlementDays,
             AccrualMethod = existing.AccrualMethod,
             Behaviour = existing.Behaviour,
+            HasBalance = existing.HasBalance,
         };
     }
 
@@ -40,7 +41,7 @@ public class LeaveTypeService(IHttpClientFactory httpClientFactory) : IEditServi
     {
         var request = new CreateLeaveTypeRequest(
             companyId, model.Name.Trim(), model.Code.Trim().ToUpperInvariant(),
-            model.DefaultEntitlementDays, model.AccrualMethod, model.Behaviour);
+            model.DefaultEntitlementDays, model.AccrualMethod, model.Behaviour, model.HasBalance);
 
         var (created, error) = await CreateAsync(companyId, request);
         return (created is null ? null : model, error);
@@ -51,7 +52,7 @@ public class LeaveTypeService(IHttpClientFactory httpClientFactory) : IEditServi
     {
         var request = new UpdateLeaveTypeRequest(
             companyId, id, model.Name.Trim(), model.Code.Trim().ToUpperInvariant(),
-            model.DefaultEntitlementDays, model.AccrualMethod, model.Behaviour);
+            model.DefaultEntitlementDays, model.AccrualMethod, model.Behaviour, model.HasBalance);
 
         var (updated, error) = await UpdateAsync(companyId, id, request);
         return (updated is null ? null : model, error);

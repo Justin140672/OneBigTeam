@@ -108,7 +108,9 @@ internal sealed record LeaveBalanceAdjustedAuditEvent(
     decimal AdjustmentDays,
     decimal NewRemainingDays,
     Guid AdjustedByEmployeeId,
-    DateTimeOffset OccurredAt) : IAuditEvent
+    DateTimeOffset OccurredAt,
+    decimal? AdjustmentHours = null,
+    string? Reason = null) : IAuditEvent
 {
     string IAuditEvent.EventType => "leave-balance.adjusted";
     string IAuditEvent.EntityType => "LeaveBalance";
@@ -117,9 +119,11 @@ internal sealed record LeaveBalanceAdjustedAuditEvent(
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => AdjustedByEmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
-    string? IAuditEvent.Summary => $"Leave balance adjusted by {AdjustmentDays} day(s)";
+    string? IAuditEvent.Summary => AdjustmentHours.HasValue
+        ? $"Leave balance adjusted by {AdjustmentHours.Value} hour(s)" + (Reason is null ? "" : $" ({Reason})")
+        : $"Leave balance adjusted by {AdjustmentDays} day(s)";
     object? IAuditEvent.Before => null;
-    object? IAuditEvent.After => new { AdjustmentDays, NewRemainingDays, PolicyYear };
+    object? IAuditEvent.After => new { AdjustmentDays, AdjustmentHours, NewRemainingDays, PolicyYear, Reason };
     object? IAuditEvent.Metadata => null;
 }
 

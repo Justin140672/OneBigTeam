@@ -13,6 +13,7 @@ public record LeaveTypeListItemModel(
     string AccrualMethod,
     string Behaviour,
     bool IsActive,
+    bool HasBalance,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
@@ -22,7 +23,8 @@ public record CreateLeaveTypeRequest(
     string Code,
     int DefaultEntitlementDays,
     string AccrualMethod,
-    string Behaviour);
+    string Behaviour,
+    bool HasBalance = true);
 
 public record CreateLeaveTypeResponse(
     Guid Id,
@@ -33,6 +35,7 @@ public record CreateLeaveTypeResponse(
     string AccrualMethod,
     string Behaviour,
     bool IsActive,
+    bool HasBalance,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
@@ -43,7 +46,8 @@ public record UpdateLeaveTypeRequest(
     string Code,
     int DefaultEntitlementDays,
     string AccrualMethod,
-    string Behaviour);
+    string Behaviour,
+    bool HasBalance = true);
 
 public record UpdateLeaveTypeResponse(
     Guid Id,
@@ -54,6 +58,7 @@ public record UpdateLeaveTypeResponse(
     string AccrualMethod,
     string Behaviour,
     bool IsActive,
+    bool HasBalance,
     DateTimeOffset UpdatedAt);
 
 public sealed class LeaveTypeEditModel
@@ -66,4 +71,5 @@ public sealed class LeaveTypeEditModel
     public int DefaultEntitlementDays { get; set; }
     public string AccrualMethod { get; set; } = "None";
     public string Behaviour { get; set; } = "Standard";
+    public bool HasBalance { get; set; } = true;
 }

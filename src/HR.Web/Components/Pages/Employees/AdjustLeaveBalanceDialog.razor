@@ -1,0 +1,139 @@
+@using HR.Web.Models
+@inject LeaveService LeaveService
+
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="480px" ShowCloseIcon="true">
+    <DialogEvents Closed="Cancel" />
+    <DialogTemplates>
+        <Header>Adjust @LeaveTypeName Balance</Header>
+        <Content>
+            <div class="mb-3">
+                <label class="form-label fw-medium">Current Balance</label>
+                <input class="form-control" readonly value="@FormattedCurrentBalance" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-medium">Adjustment (hours) <span class="text-danger">*</span></label>
+                <div data-testid="adjustment-hours-input">
+                    <SfNumericTextBox TValue="decimal?" @bind-Value="_adjustmentHours" ShowSpinButton="false"
+                                      Placeholder="e.g. 7.5 or -3.5" />
+                </div>
+                <div class="form-text">Use a positive value to add hours, negative to deduct.</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-medium">Reason <span class="text-danger">*</span></label>
+                <SfDropDownList TValue="LeaveBalanceAdjustmentReason" TItem="ReasonChoice"
+                                DataSource="@ReasonOptions"
+                                @bind-Value="_reason">
+                    <DropDownListFieldSettings Value="Value" Text="Label" />
+                </SfDropDownList>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-medium">Comments</label>
+                <textarea class="form-control" rows="3" maxlength="500"
+                          @bind="_comments" placeholder="Optional comments…"></textarea>
+            </div>
+            <div class="mb-3">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="allowNegativeOverride"
+                           @bind="_allowNegativeOverride" />
+                    <label class="form-check-label" for="allowNegativeOverride">
+                        Allow this adjustment to take the balance below zero
+                    </label>
+                </div>
+            </div>
+            @if (_error is not null)
+            {
+                <div class="alert alert-danger mt-2 mb-0">@_error</div>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton IsPrimary="true" Disabled="@_submitting" OnClick="SubmitAsync">
+                @if (_submitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Save
+            </SfButton>
+            <SfButton Disabled="@_submitting" OnClick="Cancel">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter, EditorRequired] public Guid LeaveTypeId { get; set; }
+    [Parameter, EditorRequired] public string LeaveTypeName { get; set; } = string.Empty;
+    [Parameter] public decimal? CurrentBalanceHours { get; set; }
+    [Parameter] public EventCallback OnAdjusted { get; set; }
+
+    private string FormattedCurrentBalance => $"{(CurrentBalanceHours ?? 0):0.#}h";
+
+    private sealed record ReasonChoice(LeaveBalanceAdjustmentReason Value, string Label);
+
+    private static readonly ReasonChoice[] ReasonOptions =
+    [
+        new(LeaveBalanceAdjustmentReason.Correction, "Correction"),
+        new(LeaveBalanceAdjustmentReason.CarryOver, "Carry Over"),
+        new(LeaveBalanceAdjustmentReason.ManualAward, "Manual Award"),
+        new(LeaveBalanceAdjustmentReason.ManualDeduction, "Manual Deduction"),
+        new(LeaveBalanceAdjustmentReason.Other, "Other"),
+    ];
+
+    private decimal? _adjustmentHours;
+    private LeaveBalanceAdjustmentReason _reason = LeaveBalanceAdjustmentReason.Correction;
+    private string? _comments;
+    private bool _allowNegativeOverride;
+    private string? _error;
+    private bool _submitting;
+
+    private async Task SubmitAsync()
+    {
+        if (_adjustmentHours is null || _adjustmentHours == 0)
+        {
+            _error = "Please enter a non-zero adjustment.";
+            return;
+        }
+
+        _submitting = true;
+        _error = null;
+
+        var (response, error) = await LeaveService.AdjustLeaveBalanceAsync(
+            CompanyId, EmployeeId,
+            new AdjustLeaveBalanceModel(
+                LeaveTypeId,
+                _adjustmentHours.Value,
+                _reason,
+                string.IsNullOrWhiteSpace(_comments) ? null : _comments,
+                _allowNegativeOverride));
+
+        _submitting = false;
+
+        if (response is not null)
+        {
+            await VisibleChanged.InvokeAsync(false);
+            Reset();
+            await OnAdjusted.InvokeAsync();
+        }
+        else
+        {
+            _error = error ?? "Failed to adjust leave balance.";
+        }
+    }
+
+    private async Task Cancel()
+    {
+        await VisibleChanged.InvokeAsync(false);
+        Reset();
+    }
+
+    private void Reset()
+    {
+        _adjustmentHours = null;
+        _reason = LeaveBalanceAdjustmentReason.Correction;
+        _comments = null;
+        _allowNegativeOverride = false;
+        _error = null;
+    }
+}

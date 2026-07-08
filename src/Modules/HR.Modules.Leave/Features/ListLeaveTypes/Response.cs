@@ -11,5 +11,6 @@ internal sealed record LeaveTypeItem(
     string AccrualMethod,
     string Behaviour,
     bool IsActive,
+    bool HasBalance,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

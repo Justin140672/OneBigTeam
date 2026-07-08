@@ -49,6 +49,16 @@
                 <GridColumn Field="@nameof(LeaveTypeListItemModel.DefaultEntitlementDays)" HeaderText="Days" Width="80" />
                 <GridColumn Field="@nameof(LeaveTypeListItemModel.AccrualMethod)" HeaderText="Accrual" Width="120" />
                 <GridColumn Field="@nameof(LeaveTypeListItemModel.Behaviour)" HeaderText="Behaviour" Width="130" />
+                <GridColumn Field="@nameof(LeaveTypeListItemModel.HasBalance)" HeaderText="Tracks Balance" Width="130">
+                    <Template>
+                        @{
+                            var row = (context as LeaveTypeListItemModel)!;
+                        }
+                        <span class="badge @(row.HasBalance ? "bg-success" : "bg-secondary")">
+                            @(row.HasBalance ? "Yes" : "No")
+                        </span>
+                    </Template>
+                </GridColumn>
                 <GridColumn Field="@nameof(LeaveTypeListItemModel.IsActive)" HeaderText="Status" Width="100">
                     <Template>
                         @{

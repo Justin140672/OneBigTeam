@@ -9,4 +9,5 @@ internal sealed record UpdateLeaveTypeResponse(
     string AccrualMethod,
     string Behaviour,
     bool IsActive,
+    bool HasBalance,
     DateTimeOffset UpdatedAt);

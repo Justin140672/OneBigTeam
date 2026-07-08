@@ -21,8 +21,9 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
 
     public async Task HandleAsync(EmployeeCreatedIntegrationEvent integrationEvent, CancellationToken cancellationToken)
     {
+        // Only balance-tracked leave types get a LeaveBalance row (see LeaveType.HasBalance).
         var activeLeaveTypes = await _dbContext.LeaveTypes
-            .Where(lt => lt.CompanyId == integrationEvent.CompanyId && lt.IsActive)
+            .Where(lt => lt.CompanyId == integrationEvent.CompanyId && lt.IsActive && lt.HasBalance)
             .ToListAsync(cancellationToken);
 
         if (activeLeaveTypes.Count == 0)

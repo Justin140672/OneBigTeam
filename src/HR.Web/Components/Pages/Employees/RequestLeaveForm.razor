@@ -95,7 +95,7 @@
                     var dateInvalid = EndDate < StartDate;
                     var totalDays = dateInvalid ? 0m : CalculateDays();
                     var selectedBalance = Balances.FirstOrDefault(b => b.LeaveTypeId == _leaveTypeId);
-                    var remainingAfter = !dateInvalid && selectedBalance is not null
+                    var remainingAfter = !dateInvalid && selectedBalance?.RemainingDays is not null
                         ? selectedBalance.RemainingDays - totalDays
                         : (decimal?)null;
                     var wouldExceed = remainingAfter.HasValue && remainingAfter.Value < 0;

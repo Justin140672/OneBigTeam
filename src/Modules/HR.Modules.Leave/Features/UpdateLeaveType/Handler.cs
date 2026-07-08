@@ -28,7 +28,8 @@ internal sealed class UpdateLeaveTypeHandler(LeaveDbContext db, IClock clock)
 
         entity.Update(request.Name, code, request.DefaultEntitlementDays,
             request.AccrualMethod, request.Behaviour,
-            new DateTimeOffset(clock.UtcNow, TimeSpan.Zero));
+            new DateTimeOffset(clock.UtcNow, TimeSpan.Zero),
+            request.HasBalance);
 
         await db.SaveChangesAsync(cancellationToken);
 
@@ -37,6 +38,6 @@ internal sealed class UpdateLeaveTypeHandler(LeaveDbContext db, IClock clock)
             entity.DefaultEntitlementDays,
             entity.AccrualMethod.ToString(),
             entity.Behaviour.ToString(),
-            entity.IsActive, entity.UpdatedAt));
+            entity.IsActive, entity.HasBalance, entity.UpdatedAt));
     }
 }

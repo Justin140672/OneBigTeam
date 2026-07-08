@@ -1,4 +1,5 @@
 @inject LeaveService LeaveService
+@inject AppSession Session
 
 @if (_loading)
 {
@@ -18,12 +19,37 @@ else
                             {
                                 <div class="col-md-4">
                                     <div class="d-flex flex-column">
-                                        <span class="text-muted small">@item.LeaveTypeName</span>
-                                        <span class="fs-4 fw-semibold">@FormatDays(item.RemainingDays)</span>
-                                        <span class="text-muted small">of @FormatDays(item.EntitlementDays) entitlement</span>
-                                        @if (item.PendingDays > 0)
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <span class="text-muted small">@item.LeaveTypeName</span>
+                                            <div class="d-flex gap-1">
+                                                @if (item.HasBalance)
+                                                {
+                                                    <SfButton CssClass="e-outline e-small"
+                                                              OnClick="@(() => SelectHistoryLeaveType(item.LeaveTypeId, item.LeaveTypeName))">
+                                                        History
+                                                    </SfButton>
+                                                }
+                                                @if (item.HasBalance && Session.CanManageEmployees)
+                                                {
+                                                    <SfButton CssClass="e-outline e-small"
+                                                              OnClick="@(() => OpenAdjustDialog(item))">
+                                                        Adjust
+                                                    </SfButton>
+                                                }
+                                            </div>
+                                        </div>
+                                        @if (item.HasBalance)
                                         {
-                                            <span class="text-muted small">@FormatDays(item.PendingDays) pending</span>
+                                            <span class="fs-4 fw-semibold">@FormatHours(item.RemainingHours)</span>
+                                            <span class="text-muted small">of @FormatHours(item.EntitlementHours) entitlement</span>
+                                            @if (item.PendingHours > 0)
+                                            {
+                                                <span class="text-muted small">@FormatHours(item.PendingHours) pending</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="fs-4 fw-semibold text-muted">n/a</span>
                                         }
                                     </div>
                                 </div>
@@ -136,20 +162,116 @@ else
         {
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header fw-semibold">TOIL Balance</div>
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span class="fw-semibold">TOIL Balance</span>
+                        <div class="d-flex gap-1">
+                            @if (_toilBalance.HasBalance)
+                            {
+                                <SfButton CssClass="e-outline e-small"
+                                          OnClick="@(() => SelectHistoryLeaveType(_toilBalance.LeaveTypeId, _toilBalance.LeaveTypeName))">
+                                    History
+                                </SfButton>
+                            }
+                            @if (_toilBalance.HasBalance && Session.CanManageEmployees)
+                            {
+                                <SfButton CssClass="e-outline e-small"
+                                          OnClick="@(() => OpenAdjustDialog(_toilBalance))">
+                                    Adjust
+                                </SfButton>
+                            }
+                        </div>
+                    </div>
                     <div class="card-body">
-                        <span class="fs-4 fw-semibold">@FormatDays(_toilBalance.RemainingDays)</span>
-                        <span class="text-muted small ms-2">available</span>
+                        @if (_toilBalance.HasBalance)
+                        {
+                            <span class="fs-4 fw-semibold">@FormatHours(_toilBalance.RemainingHours)</span>
+                            <span class="text-muted small ms-2">available</span>
+                        }
+                        else
+                        {
+                            <span class="fs-4 fw-semibold text-muted">n/a</span>
+                        }
                     </div>
                 </div>
             </div>
         }
 
         <div class="col-12">
-            <SfButton>Adjust Balance</SfButton>
+            <div class="card">
+                <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <span class="fw-semibold">Balance History</span>
+                    @if (_historyOptions.Count > 0)
+                    {
+                        <div style="min-width: 240px;">
+                            <SfDropDownList TValue="Guid?" TItem="HistoryOption"
+                                            DataSource="@_historyOptions"
+                                            @bind-Value="_historyLeaveTypeId"
+                                            AllowFiltering="true"
+                                            Placeholder="Select leave type">
+                                <DropDownListFieldSettings Value="Id" Text="Name" />
+                                <DropDownListEvents TValue="Guid?" TItem="HistoryOption" ValueChange="OnHistoryLeaveTypeChanged" />
+                            </SfDropDownList>
+                        </div>
+                    }
+                </div>
+                <div class="card-body p-0">
+                    @if (_historyLoading)
+                    {
+                        <HrLoadingIndicator />
+                    }
+                    else if (_historyOptions.Count == 0)
+                    {
+                        <p class="text-muted small p-3 mb-0">No balance-tracked leave types available.</p>
+                    }
+                    else if (_historyItems.Count == 0)
+                    {
+                        <p class="text-muted small p-3 mb-0">No balance history for this leave type.</p>
+                    }
+                    else
+                    {
+                        <HrGrid TValue="LeaveBalanceHistoryItemModel"
+                                DataSource="@_historyItems"
+                                AllowFiltering="false"
+                                AllowPaging="true">
+                            <GridPageSettings PageSize="10" />
+                            <GridColumns>
+                                <GridColumn HeaderText="Date" Width="140" AllowSorting="false" AllowFiltering="false">
+                                    <Template>
+                                        @{ var h = (context as LeaveBalanceHistoryItemModel)!; }
+                                        @h.Date.ToString("dd MMM yyyy")
+                                    </Template>
+                                </GridColumn>
+                                <GridColumn Field="@nameof(LeaveBalanceHistoryItemModel.LeaveTypeName)" HeaderText="Leave Type" Width="160" />
+                                <GridColumn HeaderText="Change" Width="110" AllowSorting="false" AllowFiltering="false">
+                                    <Template>
+                                        @{ var h = (context as LeaveBalanceHistoryItemModel)!; }
+                                        <span class="@(h.Change >= 0 ? "text-success" : "text-danger")">@FormatSignedHours(h.Change)</span>
+                                    </Template>
+                                </GridColumn>
+                                <GridColumn Field="@nameof(LeaveBalanceHistoryItemModel.Reason)" HeaderText="Reason" Width="160" />
+                                <GridColumn HeaderText="Balance After" Width="130" AllowSorting="false" AllowFiltering="false">
+                                    <Template>
+                                        @{ var h = (context as LeaveBalanceHistoryItemModel)!; }
+                                        @FormatHours(h.BalanceAfter)
+                                    </Template>
+                                </GridColumn>
+                                <GridColumn Field="@nameof(LeaveBalanceHistoryItemModel.CreatedBy)" HeaderText="Created By" Width="160" />
+                            </GridColumns>
+                        </HrGrid>
+                    }
+                </div>
+            </div>
         </div>
     </div>
 }
+
+<AdjustLeaveBalanceDialog @bind-Visible="_showAdjustDialog"
+                           CompanyId="CompanyId"
+                           EmployeeId="EmployeeId"
+                           LeaveTypeId="@_adjustLeaveTypeId"
+                           LeaveTypeName="@_adjustLeaveTypeName"
+                           CurrentBalanceHours="@_adjustCurrentBalanceHours"
+                           OnAdjusted="OnBalanceAdjusted" />
 
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
@@ -161,7 +283,24 @@ else
     private List<LeaveRequestListItem> _pendingRequests = [];
     private List<LeaveRequestListItem> _approvedRequests = [];
 
+    private bool _showAdjustDialog;
+    private Guid _adjustLeaveTypeId;
+    private string _adjustLeaveTypeName = string.Empty;
+    private decimal? _adjustCurrentBalanceHours;
+
+    private List<HistoryOption> _historyOptions = [];
+    private Guid? _historyLeaveTypeId;
+    private List<LeaveBalanceHistoryItemModel> _historyItems = [];
+    private bool _historyLoading;
+
+    private sealed record HistoryOption(Guid Id, string Name);
+
     protected override async Task OnParametersSetAsync()
+    {
+        await LoadBalancesAndRequestsAsync();
+    }
+
+    private async Task LoadBalancesAndRequestsAsync()
     {
         _loading = true;
 
@@ -175,6 +314,14 @@ else
         {
             _toilBalance = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "TOIL");
             _nonToilBalances = balance.Balances.Where(b => b.LeaveTypeCode != "TOIL").ToList();
+
+            var trackedBalances = balance.Balances.Where(b => b.HasBalance).ToList();
+            _historyOptions = trackedBalances
+                .Select(b => new HistoryOption(b.LeaveTypeId, b.LeaveTypeName))
+                .ToList();
+
+            if (_historyLeaveTypeId is null || _historyOptions.All(o => o.Id != _historyLeaveTypeId))
+                _historyLeaveTypeId = _historyOptions.FirstOrDefault()?.Id;
         }
 
         var requests = await requestsTask;
@@ -185,10 +332,57 @@ else
         }
 
         _loading = false;
+
+        await LoadHistoryAsync();
+    }
+
+    private async Task LoadHistoryAsync()
+    {
+        if (_historyLeaveTypeId is null)
+        {
+            _historyItems = [];
+            return;
+        }
+
+        _historyLoading = true;
+        var history = await LeaveService.GetLeaveBalanceHistoryAsync(CompanyId, EmployeeId, _historyLeaveTypeId.Value);
+        _historyItems = history?.Items.ToList() ?? [];
+        _historyLoading = false;
+    }
+
+    private async Task SelectHistoryLeaveType(Guid leaveTypeId, string leaveTypeName)
+    {
+        _historyLeaveTypeId = leaveTypeId;
+        await LoadHistoryAsync();
+    }
+
+    private async Task OnHistoryLeaveTypeChanged(ChangeEventArgs<Guid?, HistoryOption> args)
+    {
+        _historyLeaveTypeId = args.Value;
+        await LoadHistoryAsync();
+    }
+
+    private void OpenAdjustDialog(LeaveBalanceItemModel item)
+    {
+        _adjustLeaveTypeId = item.LeaveTypeId;
+        _adjustLeaveTypeName = item.LeaveTypeName;
+        _adjustCurrentBalanceHours = item.RemainingHours;
+        _showAdjustDialog = true;
+    }
+
+    private async Task OnBalanceAdjusted()
+    {
+        await LoadBalancesAndRequestsAsync();
     }
 
     private static string FormatDays(decimal days) =>
         $"{days:0.##} {(days == 1m ? "day" : "days")}";
+
+    private static string FormatHours(decimal? hours) =>
+        $"{(hours ?? 0):0.#}h";
+
+    private static string FormatSignedHours(decimal hours) =>
+        $"{(hours >= 0 ? "+" : "")}{hours:0.#}h";
 
     private static string FormatDate(DateOnly date, string part) =>
         part == "FullDay" ? date.ToString("dd MMM yyyy") : $"{date:dd MMM yyyy} ({part})";

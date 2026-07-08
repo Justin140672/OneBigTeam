@@ -58,8 +58,9 @@ internal sealed class AssignLeavePolicyToEmployeeHandler(
         // matching the behaviour of EmployeeCreatedHandler which runs at employee creation.
         if (isNewAssignment)
         {
+            // Only balance-tracked leave types get a LeaveBalance row (see LeaveType.HasBalance).
             var activeLeaveTypes = await dbContext.LeaveTypes
-                .Where(lt => lt.CompanyId == request.CompanyId && lt.IsActive)
+                .Where(lt => lt.CompanyId == request.CompanyId && lt.IsActive && lt.HasBalance)
                 .ToListAsync(cancellationToken);
 
             if (activeLeaveTypes.Count > 0)

@@ -73,6 +73,15 @@
                                         <DropDownListFieldSettings Value="Value" Text="Label" />
                                     </SfDropDownList>
                                 </div>
+                                <div class="col-12">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="hasBalance"
+                                               @bind="Model.HasBalance" disabled="@IsViewMode" />
+                                        <label class="form-check-label" for="hasBalance">
+                                            Tracks a balance (uncheck for leave types like Unpaid Leave that don't have an entitlement)
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
