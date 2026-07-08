@@ -18,15 +18,6 @@
     top: 16px;
 }
 
-.overview-sidebar .overview-actions {
-    flex-direction: column;
-    align-items: stretch;
-}
-
-.overview-sidebar .action-btn {
-    justify-content: flex-start;
-}
-
 @media (max-width: 900px) {
     .overview-layout {
         flex-direction: column;
@@ -35,11 +26,6 @@
     .overview-sidebar {
         width: 100%;
         position: static;
-    }
-
-    .overview-sidebar .overview-actions {
-        flex-direction: row;
-        flex-wrap: wrap;
     }
 }
 
@@ -72,7 +58,7 @@
 }
 
 .overview-card-icon {
-    color: #6366f1;
+    color: var(--hr-color-primary);
     font-size: 0.95rem;
 }
 
@@ -110,7 +96,7 @@
 }
 
 .overview-link {
-    color: #6366f1;
+    color: var(--hr-color-primary);
     text-decoration: none;
 }
 
@@ -225,61 +211,80 @@
 .upcoming-leave-days {
     font-size: 0.8rem;
     font-weight: 600;
-    color: #6366f1;
+    color: var(--hr-color-primary);
     white-space: nowrap;
 }
 
 /* ── Action buttons ──────────────────────────────────── */
 
+.overview-actions-card {
+    padding: 12px;
+}
+
+.overview-actions-card .overview-card-header {
+    padding: 4px 8px 10px;
+}
+
 .overview-actions {
     display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
+    flex-direction: column;
+    gap: 2px;
 }
 
 .action-btn {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 10px;
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    padding: 10px 14px;
+    gap: 12px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 8px;
     font-size: 0.875rem;
     font-weight: 600;
     color: #374151;
+    text-align: left;
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+    transition: background 0.12s ease;
 }
 
 .action-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-    border-color: #c7d2fe;
-}
-
-.action-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    background: #f9fafb;
 }
 
 .action-btn:focus-visible {
-    outline: 2px solid #6366f1;
-    outline-offset: 2px;
+    outline: 2px solid var(--hr-color-primary);
+    outline-offset: -2px;
+}
+
+.action-btn-label {
+    flex: 1;
+}
+
+.action-btn-chevron {
+    font-size: 0.7rem;
+    color: #d1d5db;
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.action-btn:hover .action-btn-chevron {
+    opacity: 1;
+    transform: translateX(0);
 }
 
 .action-btn-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
     font-size: 0.85rem;
     flex-shrink: 0;
-    background: #eef2ff;
-    color: #6366f1;
+    background: var(--hr-color-primary-subtle);
+    color: var(--hr-color-primary);
     transition: transform 0.12s ease;
 }
 
@@ -289,8 +294,20 @@
 
 .action-btn--leave .action-btn-icon      { background: #dcfce7; color: #16a34a; }
 .action-btn--sickness .action-btn-icon   { background: #fee2e2; color: #dc2626; }
-.action-btn--documents .action-btn-icon  { background: #eef2ff; color: #6366f1; }
+.action-btn--documents .action-btn-icon  { background: var(--hr-color-primary-subtle); color: var(--hr-color-primary); }
 .action-btn--tasks .action-btn-icon      { background: #ede9fe; color: #7c3aed; }
+
+@media (max-width: 900px) {
+    .overview-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .action-btn {
+        width: auto;
+        border: 1px solid #e5e7eb;
+    }
+}
 
 /* ── Loading skeleton ────────────────────────────────── */
 

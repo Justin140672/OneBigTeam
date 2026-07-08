@@ -1,5 +1,4 @@
 @inject ProbationService ProbationService
-@inject EmployeeService EmployeeService
 @inject NavigationManager Navigation
 @inject AppSession Session
 
@@ -82,7 +81,7 @@ else
 @code {
     private bool _loading = true;
     private IReadOnlyList<UpcomingProbationReviewItem> _items = [];
-    private Dictionary<Guid, string> _employeeNames = [];
+    private IReadOnlyDictionary<Guid, string> _employeeNames = new Dictionary<Guid, string>();
     private int _overdue;
     private int _dueSoon;
     private DateOnly _today;
@@ -92,16 +91,12 @@ else
         _today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         var reviewsTask   = ProbationService.GetUpcomingReviewsAsync(Session.CompanyId);
-        var employeesTask = EmployeeService.ListEmployeesAsync(Session.CompanyId, pageSize: 200);
+        var employeesTask = Session.GetEmployeeNamesAsync();
 
         await Task.WhenAll(reviewsTask, employeesTask);
 
         _items = await reviewsTask;
-
-        var employees = (await employeesTask)?.Items ?? [];
-        _employeeNames = employees.ToDictionary(
-            e => e.Id,
-            e => $"{e.FirstName} {e.LastName}");
+        _employeeNames = await employeesTask;
 
         _overdue  = _items.Count(r => r.DueDate < _today);
         _dueSoon  = _items.Count(r => r.DueDate >= _today && r.DueDate <= _today.AddDays(7));

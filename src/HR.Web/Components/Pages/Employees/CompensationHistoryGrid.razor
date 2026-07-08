@@ -1,6 +1,8 @@
 @using HR.Web.Models
 @using Syncfusion.Blazor.Grids
+@using System.Globalization
 @inject CompensationService CompensationService
+@inject AppSession Session
 
 @if (!string.IsNullOrEmpty(_deleteError))
 {
@@ -27,7 +29,7 @@
         <GridColumn HeaderText="Salary" Width="160" AllowSorting="false" AllowFiltering="false">
             <Template>
                 @{ var item = (context as CompensationHistoryItemModel)!; }
-                @($"{item.Currency} {item.Salary:N2}")
+                @item.Salary.ToString("C2", CultureInfo.GetCultureInfo(Session.Locale))
             </Template>
         </GridColumn>
 

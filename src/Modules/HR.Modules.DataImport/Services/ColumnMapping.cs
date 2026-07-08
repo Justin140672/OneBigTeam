@@ -36,6 +36,7 @@ internal static class StandardEmployeeColumnMapping
         ["ManagerReference"] = "Manager Reference",
         ["EmploymentTypeName"] = "Employment Type",
         ["DepartmentName"] = "Department",
+        ["LocationName"] = "Location",
         ["PositionProfileTitle"] = "Position Profile",
         ["ContinuousServiceDate"] = "Continuous Service Date",
         ["ProbationEndDate"] = "Probation End Date",

@@ -18,7 +18,7 @@
 }
 
 .pd-card-icon {
-    color: #6366f1;
+    color: var(--hr-color-primary);
     font-size: 0.95rem;
 }
 
@@ -82,14 +82,14 @@
     padding: 5px 12px;
     font-size: 0.8rem;
     font-weight: 500;
-    color: #6366f1;
+    color: var(--hr-color-primary);
     cursor: pointer;
     transition: background 0.1s, border-color 0.1s;
 }
 
 .pd-change-btn:hover {
-    background: #f5f3ff;
-    border-color: #6366f1;
+    background: var(--hr-color-primary-subtle);
+    border-color: var(--hr-color-primary);
 }
 
 /* ── Success banner ──────────────────────────────────── */

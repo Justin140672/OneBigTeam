@@ -6,12 +6,14 @@
    Syncfusion controls re-themed further down.
    ──────────────────────────────────────────────────────────────────── */
 :root {
-    /* Brand / primary accent */
-    --hr-color-primary: #6366f1;
-    --hr-color-primary-rgb: 99, 102, 241;
-    --hr-color-primary-hover: #4f46e5;
-    --hr-color-primary-active: #4338ca;
-    --hr-color-primary-subtle: rgba(99, 102, 241, 0.12);
+    /* Brand / primary accent — teal from the One Big Team logo mark.
+       #0f766e against white/gray-50 text or backgrounds is ~5.5:1, comfortably
+       past the WCAG AA 4.5:1 threshold for text and UI components. */
+    --hr-color-primary: #0f766e;
+    --hr-color-primary-rgb: 15, 118, 110;
+    --hr-color-primary-hover: #115e59;
+    --hr-color-primary-active: #134e4a;
+    --hr-color-primary-subtle: rgba(15, 118, 110, 0.12);
 
     /* Neutral gray scale */
     --hr-gray-900: #111827;
@@ -35,6 +37,7 @@
     --hr-radius-md: 8px;
     --hr-radius-lg: 12px;
     --hr-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.06);
+    --hr-shadow-md: 0 8px 20px rgba(0, 0, 0, 0.08);
 
     /* Typography */
     --hr-font-sans: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -48,19 +51,21 @@
     --bs-link-color: var(--hr-color-primary);
     --bs-link-color-rgb: var(--hr-color-primary-rgb);
     --bs-link-hover-color: var(--hr-color-primary-hover);
-    --bs-link-hover-color-rgb: 79, 70, 229;
+    --bs-link-hover-color-rgb: 17, 94, 89;
     --bs-font-sans-serif: var(--hr-font-sans);
 }
 
 html[data-theme="dark"] {
-    /* Slightly brighter in dark mode for contrast against dark surfaces. */
-    --hr-color-primary: #818cf8;
-    --hr-color-primary-hover: #6366f1;
-    --hr-color-primary-active: #4f46e5;
-    --hr-color-primary-rgb: 129, 140, 248;
-    --hr-color-primary-subtle: rgba(129, 140, 248, 0.16);
+    /* Brighter teal in dark mode — #2dd4bf against gray-900/gray-800 surfaces
+       is ~9:1+, well past AA, matching the light-mode teal's compliance margin. */
+    --hr-color-primary: #2dd4bf;
+    --hr-color-primary-hover: #14b8a6;
+    --hr-color-primary-active: #0d9488;
+    --hr-color-primary-rgb: 45, 212, 191;
+    --hr-color-primary-subtle: rgba(45, 212, 191, 0.16);
     --hr-color-danger: #f87171;
     --hr-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.4);
+    --hr-shadow-md: 0 8px 20px rgba(0, 0, 0, 0.35);
 }
 
 html, body {
@@ -203,6 +208,19 @@ html[data-theme="dark"] .hr-grid .e-row:hover .e-rowcell:not(.e-active) {
     padding-top: 1.1rem;
 }
 
+h1 {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--hr-gray-900);
+    padding-left: 14px;
+    border-left: 4px solid var(--hr-color-primary);
+    line-height: 1.2;
+}
+
+html[data-theme="dark"] h1 {
+    color: var(--hr-gray-50);
+}
+
 h1:focus {
     outline: none;
 }
@@ -235,11 +253,28 @@ h1:focus {
    ──────────────────────────────────────────────────────────────── */
 
 .widget-card {
+    position: relative;
     background: #fff;
     border: 1px solid var(--hr-gray-200);
     border-radius: var(--hr-radius-lg);
     overflow: hidden;
     box-shadow: var(--hr-shadow-sm);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.widget-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--hr-color-primary), var(--hr-color-primary-hover));
+}
+
+.widget-card:hover {
+    box-shadow: var(--hr-shadow-md);
+    transform: translateY(-2px);
 }
 
 /* ── Header ──────────────────────────────────────────── */
@@ -253,8 +288,16 @@ h1:focus {
 }
 
 .widget-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--hr-radius-md);
+    background: var(--hr-color-primary-subtle);
     color: var(--hr-color-primary);
-    font-size: 1rem;
+    font-size: 0.85rem;
+    flex-shrink: 0;
 }
 
 .widget-title {
@@ -577,6 +620,10 @@ html[data-theme="dark"] .widget-card {
     background: var(--hr-gray-800);
     border-color: var(--hr-gray-700);
     box-shadow: var(--hr-shadow-sm);
+}
+
+html[data-theme="dark"] .widget-card:hover {
+    box-shadow: var(--hr-shadow-md);
 }
 
 html[data-theme="dark"] .widget-header {

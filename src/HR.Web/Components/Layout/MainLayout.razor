@@ -34,8 +34,7 @@ else
                         </button>
                         @if (SidebarOpen)
                         {
-                            <i class="fa-solid fa-people-group sidebar-brand-icon"></i>
-                            <span class="app-title">One Big Team</span>
+                            <img src="/images/one-big-team-logo.png" alt="One Big Team" class="sidebar-logo" />
                         }
                     </div>
 
@@ -97,7 +96,7 @@ else
                         <i class="fa-solid fa-bars"></i>
                     </button>
                 }
-                <span class="page-title">Dashboard</span>
+                <span class="page-title">@(Session.CanManageEmployees ? "Dashboard" : "My Profile")</span>
                 <div class="top-bar-actions">
                     <button class="theme-toggle" @onclick="ToggleTheme" title="@(IsDark ? "Switch to light mode" : "Switch to dark mode")">
                         @if (IsDark)

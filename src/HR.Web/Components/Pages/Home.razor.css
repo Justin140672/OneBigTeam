@@ -9,3 +9,16 @@
     color: #111827;
     margin-bottom: 2px;
 }
+
+.dashboard-section + .dashboard-section {
+    margin-top: 2rem;
+}
+
+.dashboard-section-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--hr-gray-400);
+    margin-bottom: 1rem;
+}

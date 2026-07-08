@@ -49,7 +49,7 @@
                     <ContentTemplate>
                         <div class="mt-4 @(IsViewMode ? "view-mode" : "")">
                             <EditForm EditContext="EditContext">
-                                <DataAnnotationsValidator />
+                                <NestedDataAnnotationsValidator />
                                 <CompanyAddressesTab Model="Model" />
                             </EditForm>
                         </div>
@@ -124,7 +124,8 @@
                 City = a.City,
                 Region = a.Region,
                 PostalCode = a.PostalCode,
-                CountryCode = a.CountryCode
+                CountryCode = a.CountryCode,
+                PostcodeRegexPattern = Session.PostcodeRegex
             }).ToList();
         }
     }

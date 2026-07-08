@@ -18,8 +18,16 @@ public sealed class CompanyAddressEditModel
     public string? Line2 { get; set; }
     public string? City { get; set; }
     public string? Region { get; set; }
-    public string? PostalCode { get; set; }
+    private string? _postalCode;
+    [DynamicRegex(nameof(PostcodeRegexPattern), ErrorMessage = "Enter a valid postcode.")]
+    public string? PostalCode
+    {
+        get => _postalCode;
+        set => _postalCode = value?.ToUpperInvariant();
+    }
     public string? CountryCode { get; set; }
+
+    public string? PostcodeRegexPattern { get; set; }
 }
 
 public sealed class CompanySettingsEditModel

@@ -121,8 +121,13 @@ public sealed class EmployeeProfileEditModel
     public string AddressLine2 { get; set; } = string.Empty;
     public string City { get; set; } = string.Empty;
     public string County { get; set; } = string.Empty;
+    private string _postCode = string.Empty;
     [DynamicRegex(nameof(PostcodeRegexPattern), ErrorMessage = "Enter a valid postcode.")]
-    public string PostCode { get; set; } = string.Empty;
+    public string PostCode
+    {
+        get => _postCode;
+        set => _postCode = value.ToUpperInvariant();
+    }
     public string Country { get; set; } = string.Empty;
 
     // Populated from the company's settings after load; not bound to any input — used only as

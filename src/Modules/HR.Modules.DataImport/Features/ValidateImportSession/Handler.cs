@@ -86,6 +86,10 @@ internal sealed class ValidateImportSessionHandler(
                 GetField(row, "EmployeeNumber"),
                 GetField(row, "WorkEmail"),
                 GetField(row, "ManagerReference"),
+                validation.DepartmentId,
+                validation.LocationId,
+                validation.EmploymentTypeId,
+                validation.PositionProfileId,
                 rawDataJson,
                 isValid,
                 now);
@@ -105,6 +109,21 @@ internal sealed class ValidateImportSessionHandler(
                     now);
 
                 db.ImportRowErrors.Add(rowError);
+            }
+
+            foreach (var warning in validation.Warnings)
+            {
+                var rowWarning = ImportRowError.Create(
+                    Guid.NewGuid(),
+                    request.CompanyId,
+                    session.Id,
+                    row.RowNumber,
+                    ImportRowErrorSeverity.Warning,
+                    warning,
+                    rawDataJson,
+                    now);
+
+                db.ImportRowErrors.Add(rowWarning);
             }
         }
 

@@ -1,6 +1,4 @@
 @inject SicknessService SicknessService
-@inject SicknessCategoryService SicknessCategoryService
-@inject EmployeeService EmployeeService
 @inject NavigationManager Navigation
 @inject AppSession Session
 
@@ -73,8 +71,8 @@
 @code {
     private bool _loading = true;
     private List<CurrentSicknessAbsenceItem> _items = [];
-    private Dictionary<Guid, string> _employeeNames = [];
-    private Dictionary<Guid, string> _categoryNames = [];
+    private IReadOnlyDictionary<Guid, string> _employeeNames = new Dictionary<Guid, string>();
+    private IReadOnlyDictionary<Guid, string> _categoryNames = new Dictionary<Guid, string>();
     private int _pendingEvidence;
     private DateOnly _today;
 
@@ -89,18 +87,14 @@
         _today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         var absencesTask   = SicknessService.GetCurrentSicknessAbsencesAsync(Session.CompanyId);
-        var employeesTask  = EmployeeService.ListEmployeesAsync(Session.CompanyId, pageSize: 200);
-        var categoriesTask = SicknessCategoryService.ListSicknessCategoriesAsync(Session.CompanyId);
+        var employeesTask  = Session.GetEmployeeNamesAsync();
+        var categoriesTask = Session.GetSicknessCategoryNamesAsync();
 
         await Task.WhenAll(absencesTask, employeesTask, categoriesTask);
 
         _items = (await absencesTask)?.Items ?? [];
-
-        var employees = (await employeesTask)?.Items ?? [];
-        _employeeNames = employees.ToDictionary(e => e.Id, e => $"{e.FirstName} {e.LastName}");
-
-        var categories = (await categoriesTask)?.Items ?? [];
-        _categoryNames = categories.ToDictionary(c => c.Id, c => c.Name);
+        _employeeNames = await employeesTask;
+        _categoryNames = await categoriesTask;
 
         _pendingEvidence = _items.Count(i => i.EvidenceStatus == "Pending");
         _loading = false;

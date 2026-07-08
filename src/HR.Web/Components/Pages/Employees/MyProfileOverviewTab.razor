@@ -1,3 +1,4 @@
+@using System.Globalization
 @inject EmployeeService EmployeeService
 @inject LeaveService LeaveService
 @inject TaskService TaskService
@@ -203,23 +204,33 @@ else
 
         <!-- Actions -->
         <div class="overview-sidebar">
-            <div class="overview-actions">
-                <button class="action-btn action-btn--leave" @onclick="@(() => OnNavigateToLeave.InvokeAsync())">
-                    <span class="action-btn-icon"><i class="fa-solid fa-calendar-plus"></i></span>
-                    Request Leave
-                </button>
-                <button class="action-btn action-btn--sickness" @onclick="@(() => OnNavigateToSickness.InvokeAsync())">
-                    <span class="action-btn-icon"><i class="fa-solid fa-house-medical"></i></span>
-                    Notify Sickness
-                </button>
-                <button class="action-btn action-btn--documents" @onclick="@(() => OnNavigateToDocuments.InvokeAsync())">
-                    <span class="action-btn-icon"><i class="fa-solid fa-file-lines"></i></span>
-                    View Documents
-                </button>
-                <button class="action-btn action-btn--tasks" @onclick="@(() => OnNavigateToTasks.InvokeAsync())">
-                    <span class="action-btn-icon"><i class="fa-solid fa-list-check"></i></span>
-                    View Tasks
-                </button>
+            <div class="overview-card overview-actions-card">
+                <div class="overview-card-header">
+                    <i class="fa-solid fa-bolt overview-card-icon"></i>
+                    <span class="overview-card-title">Quick Actions</span>
+                </div>
+                <div class="overview-actions">
+                    <button class="action-btn action-btn--leave" @onclick="@(() => OnNavigateToLeave.InvokeAsync())">
+                        <span class="action-btn-icon"><i class="fa-solid fa-calendar-plus"></i></span>
+                        <span class="action-btn-label">Request Leave</span>
+                        <i class="fa-solid fa-chevron-right action-btn-chevron"></i>
+                    </button>
+                    <button class="action-btn action-btn--sickness" @onclick="@(() => OnNavigateToSickness.InvokeAsync())">
+                        <span class="action-btn-icon"><i class="fa-solid fa-house-medical"></i></span>
+                        <span class="action-btn-label">Notify Sickness</span>
+                        <i class="fa-solid fa-chevron-right action-btn-chevron"></i>
+                    </button>
+                    <button class="action-btn action-btn--documents" @onclick="@(() => OnNavigateToDocuments.InvokeAsync())">
+                        <span class="action-btn-icon"><i class="fa-solid fa-file-lines"></i></span>
+                        <span class="action-btn-label">View Documents</span>
+                        <i class="fa-solid fa-chevron-right action-btn-chevron"></i>
+                    </button>
+                    <button class="action-btn action-btn--tasks" @onclick="@(() => OnNavigateToTasks.InvokeAsync())">
+                        <span class="action-btn-icon"><i class="fa-solid fa-list-check"></i></span>
+                        <span class="action-btn-label">View Tasks</span>
+                        <i class="fa-solid fa-chevron-right action-btn-chevron"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -349,11 +360,7 @@ else
         var workingDays = _employee!.WorkingDaysOverride ?? (WorkingDays)Session.WorkingDays;
         var hoursPerDay = _employee.HoursPerDayOverride ?? Session.HoursPerDay;
 
-        var days = string.Join(", ", Enum.GetValues<WorkingDays>()
-            .Where(d => d != WorkingDays.None && workingDays.HasFlag(d))
-            .Select(d => d.ToString()));
-
-        return $"{days} ({hoursPerDay} hrs/day)";
+        return WorkingPatternFormatter.Summarize(workingDays, hoursPerDay);
     }
 
     private static string ProbationStatusBadgeClass(string status) => status switch
@@ -374,7 +381,7 @@ else
 
     private string SalarySummary() =>
         _currentCompensation is not null
-            ? $"{_currentCompensation.Currency} {_currentCompensation.Salary:N2} per {SalaryPeriodLabel(_currentCompensation.SalaryType)}"
+            ? $"{_currentCompensation.Salary.ToString("C2", CultureInfo.GetCultureInfo(Session.Locale))} per {SalaryPeriodLabel(_currentCompensation.SalaryType)}"
             : "—";
 
     private static string SalaryPeriodLabel(string salaryType) => salaryType switch

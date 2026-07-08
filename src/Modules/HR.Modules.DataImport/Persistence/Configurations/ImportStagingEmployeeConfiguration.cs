@@ -40,6 +40,18 @@ internal sealed class ImportStagingEmployeeConfiguration : IEntityTypeConfigurat
             .HasColumnName("manager_reference")
             .HasMaxLength(320);
 
+        builder.Property(e => e.DepartmentId)
+            .HasColumnName("department_id");
+
+        builder.Property(e => e.LocationId)
+            .HasColumnName("location_id");
+
+        builder.Property(e => e.EmploymentTypeId)
+            .HasColumnName("employment_type_id");
+
+        builder.Property(e => e.PositionProfileId)
+            .HasColumnName("position_profile_id");
+
         builder.Property(e => e.RawData)
             .HasColumnName("raw_data")
             .IsRequired();

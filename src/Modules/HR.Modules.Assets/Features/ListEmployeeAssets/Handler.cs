@@ -10,6 +10,7 @@ internal sealed class ListEmployeeAssetsHandler(AssetsDbContext db)
         CancellationToken cancellationToken)
     {
         var assignments = await db.AssetAssignments
+            .AsNoTracking()
             .Where(aa => aa.CompanyId == request.CompanyId
                       && aa.EmployeeId == request.EmployeeId
                       && aa.ReturnedAt == null)
@@ -22,11 +23,13 @@ internal sealed class ListEmployeeAssetsHandler(AssetsDbContext db)
         var assetIds = assignments.Select(aa => aa.AssetId).ToList();
 
         var assets = await db.Assets
+            .AsNoTracking()
             .Where(a => assetIds.Contains(a.Id))
             .ToDictionaryAsync(a => a.Id, cancellationToken);
 
         var categoryIds = assets.Values.Select(a => a.CategoryId).Distinct().ToList();
         var categories = await db.AssetCategories
+            .AsNoTracking()
             .Where(c => categoryIds.Contains(c.Id))
             .ToDictionaryAsync(c => c.Id, c => c.Name, cancellationToken);
 

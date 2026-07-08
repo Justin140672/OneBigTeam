@@ -1,6 +1,6 @@
 @inject AssetService AssetService
 @inject AppSession Session
-@inject NavigationManager Navigation
+@using HR.Web.Components.Pages.Assets
 
 @if (_loading)
 {
@@ -10,14 +10,8 @@ else
 {
     <div class="mb-3 d-flex gap-2">
         <SfButton IsPrimary="true" OnClick="OpenAssignDialog">Assign Asset</SfButton>
-        <SfButton Disabled="@(_selected is null || _selected.IsAcknowledged is false)"
-                  OnClick="RequestReturnAsync">Request Return</SfButton>
     </div>
 
-    @if (!string.IsNullOrEmpty(_error))
-    {
-        <div class="alert alert-danger mb-3">@_error</div>
-    }
     @if (!string.IsNullOrEmpty(_success))
     {
         <div class="alert alert-success mb-3">@_success</div>
@@ -29,9 +23,6 @@ else
             AllowPaging="false"
             AllowSorting="false"
             data-testid="employee-assets-grid">
-        <GridEvents TValue="EmployeeAssetItem"
-                    RowSelected="OnRowSelected"
-                    RowDeselected="OnRowDeselected" />
         <GridColumns>
             <GridColumn HeaderText="Asset">
                 <Template>
@@ -39,14 +30,7 @@ else
                         var item = (EmployeeAssetItem)context;
                     }
                     <div>
-                        @if (CompanyId != Guid.Empty)
-                        {
-                            <a href="/companies/@CompanyId/assets/@item.AssetId/view" class="fw-medium asset-title-link">@item.AssetNumber</a>
-                        }
-                        else
-                        {
-                            <span class="fw-medium">@item.AssetNumber</span>
-                        }
+                        <span class="fw-medium asset-title-link" role="button" @onclick="() => ViewAsset(item.AssetId)">@item.AssetNumber</span>
                         <span class="text-muted ms-2">@item.Name</span>
                     </div>
                 </Template>
@@ -68,14 +52,18 @@ else
                     }
                 </Template>
             </GridColumn>
-            <GridColumn HeaderText="" Width="90" AllowSorting="false" AllowFiltering="false" TextAlign="TextAlign.Right">
+            <GridColumn HeaderText="" Width="190" AllowSorting="false" AllowFiltering="false" TextAlign="TextAlign.Right">
                 <Template>
                     @{
                         var item = (EmployeeAssetItem)context;
                     }
-                    <SfButton CssClass="e-outline e-small" title="View" OnClick="() => ViewAsset(item.AssetId)">
-                        <i class="fa-solid fa-eye"></i>
-                    </SfButton>
+                    <div class="d-flex gap-1 justify-content-end">
+                        @if (item.IsAcknowledged)
+                        {
+                            <SfButton CssClass="e-outline e-small" OnClick="() => OpenReturnDialog(item)">Request Return</SfButton>
+                        }
+                        <SfButton CssClass="e-outline e-small" OnClick="() => ViewAsset(item.AssetId)">View</SfButton>
+                    </div>
                 </Template>
             </GridColumn>
         </GridColumns>
@@ -123,6 +111,32 @@ else
     </SfDialog>
 }
 
+<AssetDetailDialog CompanyId="CompanyId"
+                   AssetId="_viewedAssetId"
+                   IsOpen="_viewDialogOpen"
+                   OnClosed="@(() => _viewDialogOpen = false)" />
+
+@if (_returnTarget is not null)
+{
+    <SfDialog Width="420px" IsModal="true" @bind-Visible="_showReturnDialog" Header="Request Return">
+        <DialogTemplates>
+            <Content>
+                <p class="mb-0">
+                    Request return of <strong>@_returnTarget.AssetNumber</strong> — @_returnTarget.Name?
+                </p>
+                @if (!string.IsNullOrEmpty(_returnDialogError))
+                {
+                    <div class="alert alert-danger py-2 mt-3 mb-0">@_returnDialogError</div>
+                }
+            </Content>
+        </DialogTemplates>
+        <DialogButtons>
+            <DialogButton Content="Request Return" IsPrimary="true" OnClick="ConfirmReturnAsync" />
+            <DialogButton Content="Cancel" OnClick="CloseReturnDialog" />
+        </DialogButtons>
+    </SfDialog>
+}
+
 @code {
     [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
@@ -130,14 +144,19 @@ else
     private List<EmployeeAssetItem> _assets = [];
     private List<AvailableAssetItem> _availableAssets = [];
     private bool _loading = true;
-    private EmployeeAssetItem? _selected;
-    private string? _error;
     private string? _success;
 
     private bool _showAssignDialog;
     private Guid? _selectedAssetId;
     private string? _assignNotes;
     private string? _dialogError;
+
+    private Guid? _viewedAssetId;
+    private bool _viewDialogOpen;
+
+    private EmployeeAssetItem? _returnTarget;
+    private bool _showReturnDialog;
+    private string? _returnDialogError;
 
     protected override async Task OnInitializedAsync() => await Session.InitialiseAsync();
 
@@ -150,22 +169,11 @@ else
         _loading = false;
     }
 
-    private void OnRowSelected(RowSelectEventArgs<EmployeeAssetItem> args)
+    private void ViewAsset(Guid assetId)
     {
-        _selected = args.Data;
-        _error = null;
-        _success = null;
-        StateHasChanged();
+        _viewedAssetId = assetId;
+        _viewDialogOpen = true;
     }
-
-    private void OnRowDeselected(RowDeselectEventArgs<EmployeeAssetItem> args)
-    {
-        _selected = null;
-        StateHasChanged();
-    }
-
-    private void ViewAsset(Guid assetId) =>
-        Navigation.NavigateTo($"/companies/{CompanyId}/assets/{assetId}/view");
 
     private async Task OpenAssignDialog()
     {
@@ -201,24 +209,32 @@ else
         await LoadAsync();
     }
 
-    private async Task RequestReturnAsync()
+    private void OpenReturnDialog(EmployeeAssetItem item)
     {
-        if (_selected is null) return;
+        _returnTarget = item;
+        _returnDialogError = null;
+        _showReturnDialog = true;
+    }
 
-        _error = null;
-        _success = null;
+    private void CloseReturnDialog() => _showReturnDialog = false;
+
+    private async Task ConfirmReturnAsync()
+    {
+        if (_returnTarget is null) return;
+
+        _returnDialogError = null;
 
         var requestedBy = Session.EmployeeId ?? Session.UserId;
-        var ok = await AssetService.RequestReturnAsync(CompanyId, _selected.Id, requestedBy);
+        var ok = await AssetService.RequestReturnAsync(CompanyId, _returnTarget.Id, requestedBy);
 
         if (!ok)
         {
-            _error = "Failed to request return. The return may already have been requested.";
+            _returnDialogError = "Failed to request return. The return may already have been requested.";
             return;
         }
 
+        _showReturnDialog = false;
         _success = "Return requested successfully.";
-        _selected = null;
         await LoadAsync();
     }
 }

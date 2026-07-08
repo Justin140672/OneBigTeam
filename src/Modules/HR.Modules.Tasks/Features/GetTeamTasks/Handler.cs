@@ -35,10 +35,15 @@ internal sealed class GetTeamTasksHandler(
             query = query.Where(t => t.Status == status);
         }
 
+        // Capped rather than unbounded: without a status filter this can otherwise grow forever
+        // as completed/cancelled history accumulates. Terminal-status tasks sort last so the cap
+        // only ever trims old history, never a currently open/in-progress task.
         var raw = await query
-            .OrderBy(t => t.DueDate == null ? 1 : 0)
+            .OrderBy(t => t.Status == TaskItemStatus.Completed || t.Status == TaskItemStatus.Cancelled ? 1 : 0)
+            .ThenBy(t => t.DueDate == null ? 1 : 0)
             .ThenBy(t => t.DueDate)
             .ThenBy(t => t.CreatedAt)
+            .Take(200)
             .ToListAsync(cancellationToken);
 
         var nameMap = await employeeNameReader.GetNamesAsync(

@@ -16,7 +16,7 @@
 
 .login-logo {
     font-size: 1.6rem;
-    color: #6366f1;
+    color: var(--hr-color-primary);
 }
 
 .login-app-name {

@@ -7,8 +7,10 @@ public class EmployeeStagingRowValidatorTests
 {
     private static readonly Guid CompanyId = Guid.NewGuid();
 
-    private static EmployeeStagingRowValidator BuildValidator(FakeEmployeeImportLookupReader? reader = null) =>
-        new(reader ?? new FakeEmployeeImportLookupReader());
+    private static EmployeeStagingRowValidator BuildValidator(
+        FakeEmployeeImportLookupReader? reader = null,
+        FakeImportLookupResolver? resolver = null) =>
+        new(reader ?? new FakeEmployeeImportLookupReader(), resolver ?? new FakeImportLookupResolver());
 
     // Builds a row that otherwise satisfies all required fields, with optional extras set.
     private static ParsedImportRow ValidRow(
@@ -28,7 +30,11 @@ public class EmployeeStagingRowValidatorTests
         string? hoursPerWeek = null,
         string? fte = null,
         string? leaveTypeCode = null,
-        string? leaveBalanceDays = null)
+        string? leaveBalanceDays = null,
+        string? departmentName = null,
+        string? employmentTypeName = null,
+        string? locationName = null,
+        string? positionProfileTitle = null)
     {
         var fields = new Dictionary<string, string?>
         {
@@ -50,6 +56,10 @@ public class EmployeeStagingRowValidatorTests
         if (fte is not null) fields["FTE"] = fte;
         if (leaveTypeCode is not null) fields["LeaveTypeCode"] = leaveTypeCode;
         if (leaveBalanceDays is not null) fields["LeaveBalanceDays"] = leaveBalanceDays;
+        if (departmentName is not null) fields["DepartmentName"] = departmentName;
+        if (employmentTypeName is not null) fields["EmploymentTypeName"] = employmentTypeName;
+        if (locationName is not null) fields["LocationName"] = locationName;
+        if (positionProfileTitle is not null) fields["PositionProfileTitle"] = positionProfileTitle;
 
         return new ParsedImportRow(rowNumber, fields);
     }
@@ -456,5 +466,108 @@ public class EmployeeStagingRowValidatorTests
         var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
 
         Assert.True(Assert.Single(results).IsValid);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Auto_Creates_Unseeded_Department_EmploymentType_And_Location_With_Warnings()
+    {
+        var validator = BuildValidator();
+        var row = ValidRow(
+            2,
+            departmentName: "Sales",
+            employmentTypeName: "Contractor",
+            locationName: "London");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.True(result.IsValid);
+        Assert.NotNull(result.DepartmentId);
+        Assert.NotNull(result.LocationId);
+        Assert.NotNull(result.EmploymentTypeId);
+        Assert.Contains(result.Warnings, w => w.Contains("Department 'Sales' did not exist and was created."));
+        Assert.Contains(result.Warnings, w => w.Contains("Employment Type 'Contractor' did not exist and was created."));
+        Assert.Contains(result.Warnings, w => w.Contains("Location 'London' did not exist and was created."));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Resolves_Seeded_Department_EmploymentType_And_Location_Without_Warnings()
+    {
+        var existingDepartmentId = Guid.NewGuid();
+        var existingEmploymentTypeId = Guid.NewGuid();
+        var existingLocationId = Guid.NewGuid();
+
+        var resolver = new FakeImportLookupResolver();
+        resolver.SeedExistingDepartment(CompanyId, "Sales", existingDepartmentId);
+        resolver.SeedExistingEmploymentType(CompanyId, "Contractor", existingEmploymentTypeId);
+        resolver.SeedExistingLocation(CompanyId, "London", existingLocationId);
+
+        var validator = BuildValidator(resolver: resolver);
+        var row = ValidRow(
+            2,
+            departmentName: "Sales",
+            employmentTypeName: "Contractor",
+            locationName: "London");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.True(result.IsValid);
+        Assert.Equal(existingDepartmentId, result.DepartmentId);
+        Assert.Equal(existingEmploymentTypeId, result.EmploymentTypeId);
+        Assert.Equal(existingLocationId, result.LocationId);
+        Assert.DoesNotContain(result.Warnings, w => w.Contains("did not exist and was created."));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Flags_PositionProfile_Without_Department_Or_Location_As_Error()
+    {
+        var validator = BuildValidator();
+        var row = ValidRow(2, positionProfileTitle: "Software Developer");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Null(result.PositionProfileId);
+        Assert.Contains(
+            result.Errors,
+            e => e.Contains("could not be created because both Department and Location must be present and resolvable"));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Auto_Creates_PositionProfile_When_Department_And_Location_Resolvable()
+    {
+        var validator = BuildValidator();
+        var row = ValidRow(
+            2,
+            departmentName: "Sales",
+            locationName: "London",
+            positionProfileTitle: "Software Developer");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.True(result.IsValid);
+        Assert.NotNull(result.PositionProfileId);
+        Assert.Contains(result.Warnings, w => w.Contains("Position Profile 'Software Developer' did not exist and was created."));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Resolves_Seeded_PositionProfile_Without_Warning_Regardless_Of_Department_Or_Location()
+    {
+        var existingProfileId = Guid.NewGuid();
+        var resolver = new FakeImportLookupResolver();
+        resolver.SeedExistingPositionProfile(CompanyId, "Software Developer", existingProfileId);
+
+        var validator = BuildValidator(resolver: resolver);
+        var row = ValidRow(2, positionProfileTitle: "Software Developer");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.True(result.IsValid);
+        Assert.Equal(existingProfileId, result.PositionProfileId);
+        Assert.DoesNotContain(result.Warnings, w => w.Contains("Position Profile"));
     }
 }

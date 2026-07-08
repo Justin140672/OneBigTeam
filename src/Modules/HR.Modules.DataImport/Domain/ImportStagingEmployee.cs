@@ -11,6 +11,10 @@ internal sealed class ImportStagingEmployee
     public string? EmployeeNumber { get; private set; }
     public string? WorkEmail { get; private set; }
     public string? ManagerReference { get; private set; }
+    public Guid? DepartmentId { get; private set; }
+    public Guid? LocationId { get; private set; }
+    public Guid? EmploymentTypeId { get; private set; }
+    public Guid? PositionProfileId { get; private set; }
     public string RawData { get; private set; } = string.Empty;
     public bool IsValid { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -23,6 +27,10 @@ internal sealed class ImportStagingEmployee
         string? employeeNumber,
         string? workEmail,
         string? managerReference,
+        Guid? departmentId,
+        Guid? locationId,
+        Guid? employmentTypeId,
+        Guid? positionProfileId,
         string rawData,
         bool isValid,
         DateTimeOffset now)
@@ -36,6 +44,10 @@ internal sealed class ImportStagingEmployee
             EmployeeNumber = employeeNumber,
             WorkEmail = workEmail,
             ManagerReference = managerReference,
+            DepartmentId = departmentId,
+            LocationId = locationId,
+            EmploymentTypeId = employmentTypeId,
+            PositionProfileId = positionProfileId,
             RawData = rawData,
             IsValid = isValid,
             CreatedAt = now,

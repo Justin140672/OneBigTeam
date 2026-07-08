@@ -1,3 +1,4 @@
+@using Syncfusion.Blazor.Data
 @inject ApplicationService ApplicationService
 @inject CandidateService CandidateService
 @inject EmployeeService EmployeeService
@@ -92,10 +93,12 @@
         <Content>
             <div class="mb-3">
                 <label class="form-label">Candidate</label>
-                <SfDropDownList TValue="Guid?" TItem="CandidateListItemModel"
+                <SfDropDownList @ref="_candidateDropdown"
+                                TValue="Guid?" TItem="CandidateListItemModel"
                                 DataSource="@_candidates" @bind-Value="_selectedCandidateId"
                                 Placeholder="Select a candidate" AllowFiltering="true">
                     <DropDownListFieldSettings Value="Id" Text="Email" />
+                    <DropDownListEvents TValue="Guid?" TItem="CandidateListItemModel" Filtering="OnCandidateFilteringAsync" />
                     <DropDownListTemplates TItem="CandidateListItemModel">
                         <ItemTemplate>
                             @{ var c = (CandidateListItemModel)context; }
@@ -234,6 +237,7 @@
     private string? _dialogError;
 
     private bool _showAddDialog;
+    private SfDropDownList<Guid?, CandidateListItemModel> _candidateDropdown = default!;
     private List<CandidateListItemModel> _candidates = [];
     private Guid? _selectedCandidateId;
     private string? _addNotes;
@@ -289,6 +293,17 @@
         var result = await CandidateService.ListCandidatesAsync(CompanyId, pageSize: 200);
         _candidates = result?.Items ?? [];
         _showAddDialog = true;
+    }
+
+    // Candidates are searched server-side as the user types rather than filtered against the
+    // initial 200-row page above — otherwise a candidate outside that first page (e.g. sorted
+    // later alphabetically once the table grows) could never be found no matter what's typed.
+    private async Task OnCandidateFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var result = await CandidateService.ListCandidatesAsync(CompanyId, search: args.Text, pageSize: 50);
+        _candidates = result?.Items ?? [];
+        await _candidateDropdown.FilterAsync(_candidates, new Query());
     }
 
     private async Task ConfirmAddAsync()

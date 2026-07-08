@@ -201,7 +201,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task ClickAddCompensationAsync()
     {
         await page.Locator("[data-testid='add-compensation-btn']").ClickAsync();
-        await page.Locator(".add-compensation-dialog").WaitForAsync(
+        await page.Locator("[role='dialog'].add-compensation-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
@@ -223,8 +223,12 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             .ClickAsync();
     }
 
+    // Salary is an SfNumericTextBox with FloatLabelType.Auto, which renders its Placeholder
+    // prop as a floating label rather than a native HTML placeholder attribute, so
+    // GetByPlaceholder never matches it (see CompanyEditPage.NumericBoxByLabel for the same
+    // caveat). Salary is the first e-numerictextbox in the dialog (before Hours Per Week/FTE).
     public Task FillAddCompensationSalaryAsync(string value) =>
-        page.Locator(".add-compensation-dialog").GetByPlaceholder("e.g. 45000").FillAsync(value);
+        TypeIntoNumericInputAsync(page.Locator(".add-compensation-dialog input.e-numerictextbox").First, value);
 
     public Task FillAddCompensationCurrencyAsync(string value) =>
         page.Locator(".add-compensation-dialog").GetByPlaceholder("e.g. GBP").FillAsync(value);
@@ -232,7 +236,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task SubmitAddCompensationDialogAsync()
     {
         await page.Locator(".add-compensation-dialog .e-footer-content button:has-text('Add')").ClickAsync();
-        await page.Locator(".add-compensation-dialog").WaitForAsync(
+        await page.Locator("[role='dialog'].add-compensation-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
@@ -248,21 +252,47 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public Task ClickDeleteCompensationRowAsync(string effectiveFromFragment) =>
         CompensationHistoryRow(effectiveFromFragment).First.GetByTitle("Delete").ClickAsync();
 
-    public Task ConfirmDeleteCompensationAsync() =>
-        page.Locator("[data-testid='compensation-history-grid']").GetByRole(AriaRole.Button, new() { Name = "Yes" }).ClickAsync();
+    public async Task ConfirmDeleteCompensationAsync()
+    {
+        // Clicking "Yes" triggers an async delete + grid reload round-trip; ClickAsync only
+        // waits for the click event to dispatch, not for that round-trip, so callers that
+        // immediately check row visibility can race ahead of the reload. Wait for the button
+        // itself to disappear (it only renders for the row mid-confirmation) as a signal the
+        // grid has actually re-rendered with fresh data.
+        var yesButton = page.Locator("[data-testid='compensation-history-grid']").GetByRole(AriaRole.Button, new() { Name = "Yes" });
+        await yesButton.ClickAsync();
+        await yesButton.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
 
     public async Task FillEditCompensationSalaryAsync(string value)
     {
-        await page.Locator(".edit-future-compensation-dialog").WaitForAsync(
+        await page.Locator("[role='dialog'].edit-future-compensation-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
-        await page.Locator(".edit-future-compensation-dialog").GetByPlaceholder("e.g. 45000").FillAsync(value);
+        // See FillAddCompensationSalaryAsync — Salary is a FloatLabelType.Auto SfNumericTextBox,
+        // so it must be targeted by its e-numerictextbox class rather than GetByPlaceholder.
+        await TypeIntoNumericInputAsync(page.Locator(".edit-future-compensation-dialog input.e-numerictextbox").First, value);
     }
 
     public async Task SubmitEditCompensationDialogAsync()
     {
         await page.Locator(".edit-future-compensation-dialog .e-footer-content button:has-text('Save')").ClickAsync();
-        await page.Locator(".edit-future-compensation-dialog").WaitForAsync(
+        await page.Locator("[role='dialog'].edit-future-compensation-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    // FillAsync sets a Syncfusion SfNumericTextBox's DOM value through CDP directly, which
+    // bypasses the component's own JS keyup/input listeners that sync the typed value back to
+    // the Blazor-bound model — so a value that visually "fills" never actually round-trips to
+    // the server (see CompanyEditPage.TypeIntoNumericInputAsync for the same issue). Click-to-
+    // focus, select-all, delete, then type each character for real.
+    private async Task TypeIntoNumericInputAsync(ILocator input, string value)
+    {
+        await input.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        if (value.Length > 0)
+            await input.PressSequentiallyAsync(value);
+        await page.Keyboard.PressAsync("Tab");
     }
 
     // ── Audit Tab ───────────────────────────────────────────────────────────────
@@ -290,7 +320,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task CloseAuditDetailDialogAsync()
     {
         await page.Locator(".audit-history-detail-dialog .e-footer-content button:has-text('Close')").ClickAsync();
-        await page.Locator(".audit-history-detail-dialog").WaitForAsync(
+        await page.Locator("[role='dialog'].audit-history-detail-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 

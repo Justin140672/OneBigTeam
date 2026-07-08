@@ -21,6 +21,7 @@ internal sealed class GetUnassignedTasksHandler(TasksDbContext dbContext)
             .ThenBy(t => t.DueDate == null ? 1 : 0)
             .ThenBy(t => t.DueDate)
             .ThenBy(t => t.CreatedAt)
+            .Take(200)
             .Select(t => new UnassignedTaskItem(
                 t.Id,
                 t.CompanyId,

@@ -23,12 +23,15 @@ public class ValidateImportSessionHandlerTests
     private static ValidateImportSessionHandler BuildHandler(
         DataImportDbContext db,
         FakeImportFileStorageService storage,
-        FakeEmployeeImportLookupReader? lookupReader = null) =>
+        FakeEmployeeImportLookupReader? lookupReader = null,
+        FakeImportLookupResolver? lookupResolver = null) =>
         new(
             db,
             storage,
             new EmployeeImportFileParser(),
-            new EmployeeStagingRowValidator(lookupReader ?? new FakeEmployeeImportLookupReader()),
+            new EmployeeStagingRowValidator(
+                lookupReader ?? new FakeEmployeeImportLookupReader(),
+                lookupResolver ?? new FakeImportLookupResolver()),
             new FakeClock(FixedUtcNow));
 
     private static async Task<ImportSession> SeedPendingSessionAsync(

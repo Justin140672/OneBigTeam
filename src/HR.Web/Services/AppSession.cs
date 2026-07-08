@@ -4,7 +4,7 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class AppSession(IHttpClientFactory httpClientFactory)
+public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeService employeeService, SicknessCategoryService sicknessCategoryService)
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -128,5 +128,29 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory)
         }
 
         IsLoaded = true;
+    }
+
+    // Several dashboard widgets each need an employee id -> display name lookup (and a couple
+    // need sickness category names). Cached per-circuit here so they share one fetch instead of
+    // each independently re-requesting the full employee/category list.
+    private Task<IReadOnlyDictionary<Guid, string>>? _employeeNamesTask;
+    private Task<IReadOnlyDictionary<Guid, string>>? _sicknessCategoryNamesTask;
+
+    public Task<IReadOnlyDictionary<Guid, string>> GetEmployeeNamesAsync() =>
+        _employeeNamesTask ??= LoadEmployeeNamesAsync();
+
+    private async Task<IReadOnlyDictionary<Guid, string>> LoadEmployeeNamesAsync()
+    {
+        var employees = (await employeeService.ListEmployeesAsync(CompanyId, pageSize: 200))?.Items ?? [];
+        return employees.ToDictionary(e => e.Id, e => $"{e.FirstName} {e.LastName}");
+    }
+
+    public Task<IReadOnlyDictionary<Guid, string>> GetSicknessCategoryNamesAsync() =>
+        _sicknessCategoryNamesTask ??= LoadSicknessCategoryNamesAsync();
+
+    private async Task<IReadOnlyDictionary<Guid, string>> LoadSicknessCategoryNamesAsync()
+    {
+        var categories = (await sicknessCategoryService.ListSicknessCategoriesAsync(CompanyId))?.Items ?? [];
+        return categories.ToDictionary(c => c.Id, c => c.Name);
     }
 }

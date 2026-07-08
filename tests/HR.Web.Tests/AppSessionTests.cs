@@ -20,6 +20,9 @@ public class AppSessionTests
         return services.BuildServiceProvider().GetRequiredService<IHttpClientFactory>();
     }
 
+    private static AppSession BuildSession(IHttpClientFactory factory) =>
+        new(factory, new EmployeeService(factory), new SicknessCategoryService(factory));
+
     private static RoutingHandler BuildHappyPathHandler(Guid userId, Guid companyId, Guid employeeId)
     {
         var me = new MeResponse(userId, companyId, "alice@example.com", [ManageEmployeesPermission], true);
@@ -47,7 +50,7 @@ public class AppSessionTests
         var employeeId = Guid.NewGuid();
 
         var factory = BuildFactory(BuildHappyPathHandler(userId, companyId, employeeId));
-        var session = new AppSession(factory);
+        var session = BuildSession(factory);
 
         await session.InitialiseAsync();
 
@@ -85,7 +88,7 @@ public class AppSessionTests
 
         var handler = BuildHappyPathHandler(userId, companyId, employeeId);
         var factory = BuildFactory(handler);
-        var session = new AppSession(factory);
+        var session = BuildSession(factory);
 
         await session.InitialiseAsync();
         var requestCountAfterFirstLoad = handler.RequestCount;
@@ -99,7 +102,7 @@ public class AppSessionTests
     public async Task InitialiseAsync_Leaves_Session_Unloaded_When_Me_Endpoint_Fails()
     {
         var factory = BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized));
-        var session = new AppSession(factory);
+        var session = BuildSession(factory);
 
         await session.InitialiseAsync();
 
@@ -111,7 +114,7 @@ public class AppSessionTests
     public void CanManageEmployees_Is_False_Without_The_Permission()
     {
         // Constructed via reflection-free path: rely on default state (no permissions loaded).
-        var session = new AppSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
+        var session = BuildSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
 
         Assert.False(session.CanManageEmployees);
     }
@@ -119,7 +122,7 @@ public class AppSessionTests
     [Fact]
     public void MyProfileUrl_Returns_Root_When_No_Employee_Is_Linked()
     {
-        var session = new AppSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
+        var session = BuildSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
 
         Assert.Equal("/", session.MyProfileUrl);
     }
@@ -127,7 +130,7 @@ public class AppSessionTests
     [Fact]
     public void DisplayName_Falls_Back_To_Email_When_No_Name_Is_Set()
     {
-        var session = new AppSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
+        var session = BuildSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
 
         // Neither FirstName/LastName nor Email are set yet — falls back to "Unknown".
         Assert.Equal("Unknown", session.DisplayName);
@@ -136,7 +139,7 @@ public class AppSessionTests
     [Fact]
     public void Initials_Returns_QuestionMark_When_No_Name_Is_Set()
     {
-        var session = new AppSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
+        var session = BuildSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
 
         Assert.Equal("?", session.Initials);
     }

@@ -1,5 +1,4 @@
 @inject SicknessService SicknessService
-@inject EmployeeService EmployeeService
 @inject NavigationManager Navigation
 @inject AppSession Session
 
@@ -72,7 +71,7 @@
 @code {
     private bool _loading = true;
     private List<OverdueReturnToWorkReviewItem> _items = [];
-    private Dictionary<Guid, string> _employeeNames = [];
+    private IReadOnlyDictionary<Guid, string> _employeeNames = new Dictionary<Guid, string>();
 
     protected override async Task OnInitializedAsync()
     {
@@ -83,14 +82,12 @@
         }
 
         var reviewsTask   = SicknessService.GetOverdueReturnToWorkReviewsAsync(Session.CompanyId);
-        var employeesTask = EmployeeService.ListEmployeesAsync(Session.CompanyId, pageSize: 200);
+        var employeesTask = Session.GetEmployeeNamesAsync();
 
         await Task.WhenAll(reviewsTask, employeesTask);
 
         _items = (await reviewsTask)?.Items ?? [];
-
-        var employees = (await employeesTask)?.Items ?? [];
-        _employeeNames = employees.ToDictionary(e => e.Id, e => $"{e.FirstName} {e.LastName}");
+        _employeeNames = await employeesTask;
 
         _loading = false;
     }

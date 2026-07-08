@@ -183,10 +183,12 @@
                                 <div class="col-md-6">
                                     <label class="form-label">Mobile / Work Phone</label>
                                     <HrTextBox @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" />
+                                    <ValidationMessage For="@(() => Model.PhoneNumber)" />
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Home Phone</label>
                                     <HrTextBox @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" />
+                                    <ValidationMessage For="@(() => Model.HomePhone)" />
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label">Address Line 1</label>
@@ -207,6 +209,7 @@
                                 <div class="col-md-2">
                                     <label class="form-label">Post Code</label>
                                     <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" />
+                                    <ValidationMessage For="@(() => Model.PostCode)" />
                                 </div>
                                 <div class="col-md-2">
                                     <label class="form-label">Country</label>
@@ -387,10 +390,12 @@
                                                 <div class="col-md-6">
                                                     <label class="form-label">Mobile / Work Phone</label>
                                                     <HrTextBox @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" />
+                                                    <ValidationMessage For="@(() => Model.PhoneNumber)" />
                                                 </div>
                                                 <div class="col-md-6">
                                                     <label class="form-label">Home Phone</label>
                                                     <HrTextBox @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" />
+                                                    <ValidationMessage For="@(() => Model.HomePhone)" />
                                                 </div>
                                                 <div class="col-12">
                                                     <label class="form-label">Address Line 1</label>
@@ -411,6 +416,7 @@
                                                 <div class="col-md-2">
                                                     <label class="form-label">Post Code</label>
                                                     <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" />
+                                                    <ValidationMessage For="@(() => Model.PostCode)" />
                                                 </div>
                                                 <div class="col-md-2">
                                                     <label class="form-label">Country</label>
@@ -470,8 +476,17 @@
                 <TabItem>
                     <ChildContent><TabHeader Text="Employment" /></ChildContent>
                     <ContentTemplate>
-                        <div class="mt-4">
+                        <div class="mt-4 @(IsViewMode ? "view-mode" : "")">
                             <EmployeeEmploymentTab @ref="_employmentTab" CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
+                <TabItem>
+                    <ChildContent><TabHeader Text="Compensation" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <EmployeeCompensationTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
                         </div>
                     </ContentTemplate>
                 </TabItem>
@@ -536,15 +551,6 @@
                     <ContentTemplate>
                         <div class="mt-4">
                             <EmployeeAssetsTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
-
-                <TabItem>
-                    <ChildContent><TabHeader Text="Compensation" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4">
-                            <EmployeeCompensationTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
                         </div>
                     </ContentTemplate>
                 </TabItem>
@@ -714,11 +720,7 @@
         if (profile.WorkingDaysOverride is null || profile.HoursPerDayOverride is null)
             return "Company default";
 
-        var days = string.Join(", ", Enum.GetValues<WorkingDays>()
-            .Where(d => d != WorkingDays.None && profile.WorkingDaysOverride.Value.HasFlag(d))
-            .Select(d => d.ToString()));
-
-        return $"{days} ({profile.HoursPerDayOverride} hrs/day)";
+        return WorkingPatternFormatter.Summarize(profile.WorkingDaysOverride.Value, profile.HoursPerDayOverride.Value);
     }
 
     private static string ProfileSalaryRangeSummary(GetPositionProfileResponse profile) => (profile.SalaryMin, profile.SalaryMax) switch

@@ -15,7 +15,7 @@
 }
 
 .task-title-link:hover {
-    color: #6366f1;
+    color: var(--hr-color-primary);
     text-decoration: underline;
 }
 

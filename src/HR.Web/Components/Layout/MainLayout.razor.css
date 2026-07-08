@@ -32,12 +32,14 @@
     align-items: center;
     gap: 10px;
     padding: 0 16px;
-    border-bottom: 1px solid var(--hr-gray-200);
+    background: #011f3a;
+    color: #fff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.sidebar-brand-icon {
-    color: var(--hr-color-primary);
-    font-size: 1.15rem;
+.sidebar-logo {
+    height: 36px;
+    width: auto;
     flex-shrink: 0;
 }
 
@@ -48,12 +50,6 @@
     color: inherit;
     font-size: 22px;
     cursor: pointer;
-}
-
-.app-title {
-    font-weight: 700;
-    font-size: 1rem;
-    white-space: nowrap;
 }
 
 .main-content {

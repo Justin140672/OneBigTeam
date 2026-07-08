@@ -113,7 +113,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task ClickAddCandidateAsync()
     {
         await page.Locator("[data-testid='add-application-btn']").ClickAsync();
-        await page.Locator(".add-application-dialog").WaitForAsync(
+        await page.Locator("[role='dialog'].add-application-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
@@ -134,7 +134,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task SubmitAddApplicationAsync()
     {
         await page.Locator(".add-application-dialog .e-footer-content button:has-text('Add')").ClickAsync();
-        await page.Locator(".add-application-dialog").WaitForAsync(
+        await page.Locator("[role='dialog'].add-application-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
@@ -167,7 +167,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     // ── Schedule Interview dialog ────────────────────────────────────────────────
 
     public async Task WaitForScheduleDialogAsync() =>
-        await page.Locator(".schedule-interview-dialog").WaitForAsync(
+        await page.Locator("[role='dialog'].schedule-interview-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
     public async Task SelectInterviewerAsync(string nameFragment)
@@ -195,7 +195,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task SubmitScheduleInterviewAsync()
     {
         await page.Locator(".schedule-interview-dialog .e-footer-content button:has-text('Schedule')").ClickAsync();
-        await page.Locator(".schedule-interview-dialog").WaitForAsync(
+        await page.Locator("[role='dialog'].schedule-interview-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
@@ -204,14 +204,14 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task SubmitRejectAsync()
     {
         await page.Locator(".reject-candidate-dialog .e-footer-content button:has-text('Reject')").ClickAsync();
-        await page.Locator(".reject-candidate-dialog").WaitForAsync(
+        await page.Locator("[role='dialog'].reject-candidate-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
     // ── Hire dialog ───────────────────────────────────────────────────────────────
 
     public async Task WaitForHireDialogAsync() =>
-        await page.Locator(".hire-candidate-dialog").WaitForAsync(
+        await page.Locator("[role='dialog'].hire-candidate-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
     public async Task FillHireStartDateAsync(string ddMMyyyy)
@@ -258,7 +258,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task SubmitHireAsync()
     {
         await page.Locator(".hire-candidate-dialog .e-footer-content button:has-text('Hire')").ClickAsync();
-        await page.Locator(".hire-candidate-dialog").WaitForAsync(
+        await page.Locator("[role='dialog'].hire-candidate-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
     }
 
@@ -286,7 +286,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         InterviewRow(candidateNameFragment).First.GetByRole(AriaRole.Button, new() { Name = "Record Outcome" }).ClickAsync();
 
     public async Task WaitForOutcomeDialogAsync() =>
-        await page.Locator(".record-outcome-dialog").WaitForAsync(
+        await page.Locator("[role='dialog'].record-outcome-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
     public async Task SelectOutcomeAsync(string outcome)
@@ -303,7 +303,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task SubmitOutcomeAsync()
     {
         await page.Locator(".record-outcome-dialog .e-footer-content button:has-text('Save')").ClickAsync();
-        await page.Locator(".record-outcome-dialog").WaitForAsync(
+        await page.Locator("[role='dialog'].record-outcome-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 }

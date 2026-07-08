@@ -1,5 +1,7 @@
 @using HR.Web.Models
+@using System.Globalization
 @inject CompensationService CompensationService
+@inject AppSession Session
 
 <AddCompensationDialog CompanyId="CompanyId"
                        EmployeeId="EmployeeId"
@@ -136,11 +138,11 @@ else
         await ReloadAsync();
     }
 
-    private static string SalarySummary(CurrentCompensationModel c) =>
-        $"{c.Currency} {c.Salary:N2} per {PeriodLabel(c.SalaryType)}";
+    private string SalarySummary(CurrentCompensationModel c) =>
+        $"{c.Salary.ToString("C2", CultureInfo.GetCultureInfo(Session.Locale))} per {PeriodLabel(c.SalaryType)}";
 
-    private static string AnnualisedSalarySummary(CurrentCompensationModel c) =>
-        c.AnnualisedSalary.HasValue ? $"{c.Currency} {c.AnnualisedSalary.Value:N2}" : "—";
+    private string AnnualisedSalarySummary(CurrentCompensationModel c) =>
+        c.AnnualisedSalary.HasValue ? c.AnnualisedSalary.Value.ToString("C2", CultureInfo.GetCultureInfo(Session.Locale)) : "—";
 
     private static string PeriodLabel(string salaryType) => salaryType switch
     {

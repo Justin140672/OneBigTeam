@@ -66,6 +66,76 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
     }
 
     [Fact]
+    public async Task Returns_Ok_And_Completed_When_A_Row_References_A_New_Department()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AdminClient(companyId);
+
+        const string csv =
+            "First Name,Last Name,Work Email,Start Date,Employee Number,Department\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001,Sales\n" +
+            "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002,Sales\n";
+
+        var sessionId = await UploadAsync(client, companyId, csv);
+
+        var response = await client.PostAsync(ValidateUrl(companyId, sessionId), EmptyJson());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ValidatePayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("Completed", payload!.Status);
+        Assert.Equal(2, payload.TotalRows);
+        Assert.Equal(2, payload.SuccessfulRows);
+        Assert.Equal(0, payload.FailedRows);
+    }
+
+    [Fact]
+    public async Task Returns_Ok_And_CompletedWithErrors_When_PositionProfile_Present_Without_Department_Or_Location()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AdminClient(companyId);
+
+        const string csv =
+            "First Name,Last Name,Work Email,Start Date,Employee Number,Position Profile\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001,Software Developer\n";
+
+        var sessionId = await UploadAsync(client, companyId, csv);
+
+        var response = await client.PostAsync(ValidateUrl(companyId, sessionId), EmptyJson());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ValidatePayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("CompletedWithErrors", payload!.Status);
+        Assert.Equal(1, payload.TotalRows);
+        Assert.Equal(0, payload.SuccessfulRows);
+        Assert.Equal(1, payload.FailedRows);
+    }
+
+    [Fact]
+    public async Task Returns_Ok_And_Completed_When_Department_Location_And_PositionProfile_All_New()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AdminClient(companyId);
+
+        const string csv =
+            "First Name,Last Name,Work Email,Start Date,Employee Number,Department,Location,Position Profile\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001,Sales,London,Software Developer\n";
+
+        var sessionId = await UploadAsync(client, companyId, csv);
+
+        var response = await client.PostAsync(ValidateUrl(companyId, sessionId), EmptyJson());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ValidatePayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("Completed", payload!.Status);
+        Assert.Equal(1, payload.TotalRows);
+        Assert.Equal(1, payload.SuccessfulRows);
+        Assert.Equal(0, payload.FailedRows);
+    }
+
+    [Fact]
     public async Task Returns_Unauthorized_Without_Auth()
     {
         using var client = _factory.CreateClient();

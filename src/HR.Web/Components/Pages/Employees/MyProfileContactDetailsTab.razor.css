@@ -17,7 +17,7 @@
 }
 
 .cd-card-icon {
-    color: #6366f1;
+    color: var(--hr-color-primary);
     font-size: 0.95rem;
 }
 

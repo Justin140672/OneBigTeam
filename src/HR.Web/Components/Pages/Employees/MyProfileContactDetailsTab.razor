@@ -202,9 +202,14 @@ else
         [Required(ErrorMessage = "City is required.")]
         public string City { get; set; } = string.Empty;
         public string? County { get; set; }
+        private string _postCode = string.Empty;
         [Required(ErrorMessage = "Post code is required.")]
         [DynamicRegex(nameof(PostcodeRegexPattern), ErrorMessage = "Enter a valid postcode.")]
-        public string PostCode { get; set; } = string.Empty;
+        public string PostCode
+        {
+            get => _postCode;
+            set => _postCode = value.ToUpperInvariant();
+        }
         [Required(ErrorMessage = "Country is required.")]
         public string Country { get; set; } = string.Empty;
 

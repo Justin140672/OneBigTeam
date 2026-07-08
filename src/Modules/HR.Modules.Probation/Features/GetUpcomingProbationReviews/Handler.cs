@@ -15,8 +15,8 @@ internal sealed class GetUpcomingProbationReviewsHandler(ProbationDbContext dbCo
         var cutoff  = today.AddDays(30);
 
         var items = await (
-            from review in dbContext.ProbationReviews
-            join record in dbContext.ProbationRecords
+            from review in dbContext.ProbationReviews.AsNoTracking()
+            join record in dbContext.ProbationRecords.AsNoTracking()
                 on review.ProbationRecordId equals record.Id
             where review.CompanyId == request.CompanyId
                && review.Status    == ProbationReviewStatus.Pending

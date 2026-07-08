@@ -7,7 +7,14 @@ namespace HR.Modules.DataImport.Services;
 /// <summary>
 /// The outcome of validating a single staged employee import row.
 /// </summary>
-internal sealed record RowValidationResult(int RowNumber, IReadOnlyList<string> Errors)
+internal sealed record RowValidationResult(
+    int RowNumber,
+    IReadOnlyList<string> Errors,
+    IReadOnlyList<string> Warnings,
+    Guid? DepartmentId,
+    Guid? LocationId,
+    Guid? EmploymentTypeId,
+    Guid? PositionProfileId)
 {
     public bool IsValid => Errors.Count == 0;
 }
@@ -16,9 +23,13 @@ internal sealed record RowValidationResult(int RowNumber, IReadOnlyList<string> 
 /// Validates parsed employee import rows for a single import session: required fields,
 /// duplicate employee numbers/work emails (within the file and against existing employees),
 /// date fields, manager references, and (only when the relevant columns are mapped)
-/// compensation and leave balance fields.
+/// compensation and leave balance fields. Also resolves Department/EmploymentType/Location/
+/// PositionProfile references by name, auto-creating any that do not already exist for the
+/// company (recorded as Warning-severity row messages).
 /// </summary>
-internal sealed class EmployeeStagingRowValidator(IEmployeeImportLookupReader lookupReader)
+internal sealed class EmployeeStagingRowValidator(
+    IEmployeeImportLookupReader lookupReader,
+    IImportLookupResolver lookupResolver)
 {
     private static readonly string[] RequiredFields = ["FirstName", "LastName", "WorkEmail", "StartDate"];
     private static readonly string[] DateFields = ["StartDate", "DateOfBirth", "ContinuousServiceDate", "ProbationEndDate"];
@@ -40,6 +51,11 @@ internal sealed class EmployeeStagingRowValidator(IEmployeeImportLookupReader lo
         CancellationToken cancellationToken)
     {
         var errorsByRow = rows.ToDictionary(r => r.RowNumber, _ => new List<string>());
+        var warningsByRow = rows.ToDictionary(r => r.RowNumber, _ => new List<string>());
+        var departmentIdByRow = new Dictionary<int, Guid?>();
+        var locationIdByRow = new Dictionary<int, Guid?>();
+        var employmentTypeIdByRow = new Dictionary<int, Guid?>();
+        var positionProfileIdByRow = new Dictionary<int, Guid?>();
 
         var hasCompensationColumns = CompensationFields.Any(mappedFields.Contains);
         var hasLeaveColumns = LeaveFields.Any(mappedFields.Contains);
@@ -50,6 +66,7 @@ internal sealed class EmployeeStagingRowValidator(IEmployeeImportLookupReader lo
         foreach (var row in rows)
         {
             var rowErrors = errorsByRow[row.RowNumber];
+            var rowWarnings = warningsByRow[row.RowNumber];
 
             ValidateRequiredFields(row, rowErrors);
             ValidateDateFields(row, rowErrors);
@@ -61,11 +78,87 @@ internal sealed class EmployeeStagingRowValidator(IEmployeeImportLookupReader lo
 
             if (hasLeaveColumns)
                 ValidateLeaveFields(row, rowErrors);
+
+            var (departmentId, locationId, employmentTypeId, positionProfileId) =
+                await ResolveLookupsAsync(companyId, row, rowErrors, rowWarnings, cancellationToken);
+
+            departmentIdByRow[row.RowNumber] = departmentId;
+            locationIdByRow[row.RowNumber] = locationId;
+            employmentTypeIdByRow[row.RowNumber] = employmentTypeId;
+            positionProfileIdByRow[row.RowNumber] = positionProfileId;
         }
 
         return rows
-            .Select(r => new RowValidationResult(r.RowNumber, errorsByRow[r.RowNumber]))
+            .Select(r => new RowValidationResult(
+                r.RowNumber,
+                errorsByRow[r.RowNumber],
+                warningsByRow[r.RowNumber],
+                departmentIdByRow[r.RowNumber],
+                locationIdByRow[r.RowNumber],
+                employmentTypeIdByRow[r.RowNumber],
+                positionProfileIdByRow[r.RowNumber]))
             .ToList();
+    }
+
+    private async Task<(Guid? DepartmentId, Guid? LocationId, Guid? EmploymentTypeId, Guid? PositionProfileId)> ResolveLookupsAsync(
+        Guid companyId,
+        ParsedImportRow row,
+        List<string> rowErrors,
+        List<string> rowWarnings,
+        CancellationToken cancellationToken)
+    {
+        Guid? departmentId = null;
+        Guid? locationId = null;
+        Guid? employmentTypeId = null;
+        Guid? positionProfileId = null;
+
+        var departmentName = GetField(row, "DepartmentName");
+        if (!string.IsNullOrWhiteSpace(departmentName))
+        {
+            var result = await lookupResolver.GetOrCreateDepartmentAsync(companyId, departmentName, cancellationToken);
+            departmentId = result.Id;
+            if (result.WasCreated)
+                rowWarnings.Add($"Department '{departmentName.Trim()}' did not exist and was created.");
+        }
+
+        var employmentTypeName = GetField(row, "EmploymentTypeName");
+        if (!string.IsNullOrWhiteSpace(employmentTypeName))
+        {
+            var result = await lookupResolver.GetOrCreateEmploymentTypeAsync(companyId, employmentTypeName, cancellationToken);
+            employmentTypeId = result.Id;
+            if (result.WasCreated)
+                rowWarnings.Add($"Employment Type '{employmentTypeName.Trim()}' did not exist and was created.");
+        }
+
+        var locationName = GetField(row, "LocationName");
+        if (!string.IsNullOrWhiteSpace(locationName))
+        {
+            var result = await lookupResolver.GetOrCreateLocationAsync(companyId, locationName, cancellationToken);
+            locationId = result.Id;
+            if (result.WasCreated)
+                rowWarnings.Add($"Location '{locationName.Trim()}' did not exist and was created.");
+        }
+
+        var positionProfileTitle = GetField(row, "PositionProfileTitle");
+        if (!string.IsNullOrWhiteSpace(positionProfileTitle))
+        {
+            var result = await lookupResolver.GetOrCreatePositionProfileAsync(
+                companyId, positionProfileTitle, departmentId, locationId, cancellationToken);
+
+            if (result.Skipped)
+            {
+                rowErrors.Add(
+                    $"Position Profile '{positionProfileTitle.Trim()}' could not be created because both Department and Location must be present and resolvable on this row.");
+            }
+            else
+            {
+                positionProfileId = result.Id;
+                if (result.WasCreated)
+                    rowWarnings.Add($"Position Profile '{positionProfileTitle.Trim()}' did not exist and was created.");
+            }
+        }
+
+        return (departmentId, locationId, employmentTypeId, positionProfileId);
     }
 
     private static void ValidateRequiredFields(ParsedImportRow row, List<string> rowErrors)

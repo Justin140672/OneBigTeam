@@ -1,5 +1,4 @@
 @inject SicknessService SicknessService
-@inject EmployeeService EmployeeService
 @inject NavigationManager Navigation
 @inject AppSession Session
 
@@ -83,7 +82,7 @@
 @code {
     private bool _loading = true;
     private List<MissingFitNoteItem> _items = [];
-    private Dictionary<Guid, string> _employeeNames = [];
+    private IReadOnlyDictionary<Guid, string> _employeeNames = new Dictionary<Guid, string>();
     private int _overdue;
     private int _pending;
 
@@ -96,14 +95,12 @@
         }
 
         var requestsTask  = SicknessService.GetMissingFitNotesAsync(Session.CompanyId);
-        var employeesTask = EmployeeService.ListEmployeesAsync(Session.CompanyId, pageSize: 200);
+        var employeesTask = Session.GetEmployeeNamesAsync();
 
         await Task.WhenAll(requestsTask, employeesTask);
 
         _items = (await requestsTask)?.Items ?? [];
-
-        var employees = (await employeesTask)?.Items ?? [];
-        _employeeNames = employees.ToDictionary(e => e.Id, e => $"{e.FirstName} {e.LastName}");
+        _employeeNames = await employeesTask;
 
         _overdue = _items.Count(i => i.Status == "Overdue");
         _pending = _items.Count(i => i.Status == "Pending");
