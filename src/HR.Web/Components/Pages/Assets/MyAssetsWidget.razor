@@ -1,5 +1,4 @@
 @inject AssetService AssetService
-@inject NavigationManager Navigation
 @inject AppSession Session
 
 @if (_loading)
@@ -65,10 +64,18 @@ else
     </div>
 }
 
+<AssetDetailDialog CompanyId="Session.CompanyId"
+                   AssetId="_viewedAssetId"
+                   IsOpen="_viewDialogOpen"
+                   OnClosed="CloseAssetDialogAsync" />
+
 @code {
     private bool _loading = true;
     private List<EmployeeAssetItem> _assets = [];
     private string? _profileUrl;
+
+    private Guid? _viewedAssetId;
+    private bool _viewDialogOpen;
 
     protected override async Task OnInitializedAsync()
     {
@@ -80,10 +87,24 @@ else
 
         _profileUrl = $"/companies/{Session.CompanyId}/employees/{Session.EmployeeId.Value}/profile?tab=assets";
 
-        _assets = await AssetService.GetEmployeeAssignmentsAsync(Session.CompanyId, Session.EmployeeId.Value) ?? [];
+        await LoadAssetsAsync();
         _loading = false;
     }
 
-    private void NavigateToAsset(EmployeeAssetItem asset) =>
-        Navigation.NavigateTo($"/companies/{Session.CompanyId}/assets/{asset.AssetId}/view");
+    private async Task LoadAssetsAsync()
+    {
+        _assets = await AssetService.GetEmployeeAssignmentsAsync(Session.CompanyId, Session.EmployeeId!.Value) ?? [];
+    }
+
+    private void NavigateToAsset(EmployeeAssetItem asset)
+    {
+        _viewedAssetId = asset.AssetId;
+        _viewDialogOpen = true;
+    }
+
+    private async Task CloseAssetDialogAsync()
+    {
+        _viewDialogOpen = false;
+        await LoadAssetsAsync();
+    }
 }

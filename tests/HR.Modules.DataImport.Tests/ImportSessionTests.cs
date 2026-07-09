@@ -194,4 +194,98 @@ public class ImportSessionTests
         Assert.Equal(cancelledAt, session.CompletedAt);
         Assert.Equal(cancelledAt, session.UpdatedAt);
     }
+
+    [Fact]
+    public void Validate_With_At_Least_One_Successful_Row_Sets_Status_To_Validated()
+    {
+        var session = CreateSession(FixedNow);
+        session.Start(FixedNow.AddMinutes(1));
+        var validatedAt = FixedNow.AddMinutes(5);
+
+        session.Validate(successfulRows: 1, failedRows: 1, validatedAt);
+
+        Assert.Equal(ImportStatus.Validated, session.Status);
+        Assert.Equal(1, session.SuccessfulRows);
+        Assert.Equal(1, session.FailedRows);
+        Assert.Equal(2, session.ProcessedRows);
+        Assert.Equal(validatedAt, session.CompletedAt);
+        Assert.Equal(validatedAt, session.UpdatedAt);
+    }
+
+    [Fact]
+    public void Validate_With_All_Rows_Successful_Sets_Status_To_Validated()
+    {
+        var session = CreateSession(FixedNow);
+        session.Start(FixedNow.AddMinutes(1));
+        var validatedAt = FixedNow.AddMinutes(5);
+
+        session.Validate(successfulRows: 2, failedRows: 0, validatedAt);
+
+        Assert.Equal(ImportStatus.Validated, session.Status);
+        Assert.Equal(0, session.FailedRows);
+    }
+
+    [Fact]
+    public void Validate_With_Zero_Successful_Rows_Sets_Status_To_CompletedWithErrors()
+    {
+        var session = CreateSession(FixedNow);
+        session.Start(FixedNow.AddMinutes(1));
+        var validatedAt = FixedNow.AddMinutes(5);
+
+        session.Validate(successfulRows: 0, failedRows: 3, validatedAt);
+
+        Assert.Equal(ImportStatus.CompletedWithErrors, session.Status);
+        Assert.Equal(0, session.SuccessfulRows);
+        Assert.Equal(3, session.FailedRows);
+        Assert.Equal(3, session.ProcessedRows);
+    }
+
+    [Fact]
+    public void Confirm_With_Zero_Failed_Rows_Sets_Status_To_Imported()
+    {
+        var session = CreateSession(FixedNow);
+        session.Start(FixedNow.AddMinutes(1));
+        session.Validate(successfulRows: 2, failedRows: 0, FixedNow.AddMinutes(2));
+        var confirmedAt = FixedNow.AddMinutes(10);
+
+        session.Confirm(createdCount: 2, failedCount: 0, confirmedAt);
+
+        Assert.Equal(ImportStatus.Imported, session.Status);
+        Assert.Equal(2, session.SuccessfulRows);
+        Assert.Equal(0, session.FailedRows);
+        Assert.Equal(2, session.ProcessedRows);
+        Assert.Equal(confirmedAt, session.CompletedAt);
+        Assert.Equal(confirmedAt, session.UpdatedAt);
+    }
+
+    [Fact]
+    public void Confirm_With_Some_Failed_Rows_Sets_Status_To_CompletedWithErrors()
+    {
+        var session = CreateSession(FixedNow);
+        session.Start(FixedNow.AddMinutes(1));
+        session.Validate(successfulRows: 3, failedRows: 0, FixedNow.AddMinutes(2));
+        var confirmedAt = FixedNow.AddMinutes(10);
+
+        session.Confirm(createdCount: 2, failedCount: 1, confirmedAt);
+
+        Assert.Equal(ImportStatus.CompletedWithErrors, session.Status);
+        Assert.Equal(2, session.SuccessfulRows);
+        Assert.Equal(1, session.FailedRows);
+        Assert.Equal(3, session.ProcessedRows);
+    }
+
+    [Fact]
+    public void Confirm_With_All_Rows_Failed_Sets_Status_To_CompletedWithErrors()
+    {
+        var session = CreateSession(FixedNow);
+        session.Start(FixedNow.AddMinutes(1));
+        session.Validate(successfulRows: 2, failedRows: 0, FixedNow.AddMinutes(2));
+        var confirmedAt = FixedNow.AddMinutes(10);
+
+        session.Confirm(createdCount: 0, failedCount: 2, confirmedAt);
+
+        Assert.Equal(ImportStatus.CompletedWithErrors, session.Status);
+        Assert.Equal(0, session.SuccessfulRows);
+        Assert.Equal(2, session.FailedRows);
+    }
 }

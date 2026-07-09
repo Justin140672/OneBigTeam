@@ -1,7 +1,6 @@
 @page "/companies/{CompanyId:guid}/hr/inbox"
 @rendermode InteractiveServer
 @inject TaskService TaskService
-@inject NavigationManager Navigation
 @inject AppSession Session
 @inject UserService UserService
 @using HR.SharedKernel
@@ -90,6 +89,11 @@
     }
 </div>
 
+<TaskViewDialog CompanyId="CompanyId"
+                TaskId="_viewedTaskId"
+                IsOpen="_viewDialogOpen"
+                OnClosed="CloseTaskDialogAsync" />
+
 @code {
     [Parameter] public Guid CompanyId { get; set; }
 
@@ -99,6 +103,9 @@
     private Guid? _claiming;
     private string? _claimError;
     private DateOnly _today;
+
+    private Guid? _viewedTaskId;
+    private bool _viewDialogOpen;
 
     protected override async Task OnInitializedAsync()
     {
@@ -111,9 +118,14 @@
             return;
         }
 
+        await LoadTasksAsync();
+        _loading = false;
+    }
+
+    private async Task LoadTasksAsync()
+    {
         var result = await TaskService.GetUnassignedTasksAsync(CompanyId);
         _items = result?.Items.ToList() ?? [];
-        _loading = false;
     }
 
     private async Task ClaimAsync(UnassignedTaskItem item)
@@ -150,8 +162,17 @@
         due.Value == _today.AddDays(1)        ? "medium" :
         "low";
 
-    private void ViewTask(UnassignedTaskItem task) =>
-        Navigation.NavigateTo($"/companies/{CompanyId}/tasks/{task.Id}");
+    private void ViewTask(UnassignedTaskItem task)
+    {
+        _viewedTaskId = task.Id;
+        _viewDialogOpen = true;
+    }
+
+    private async Task CloseTaskDialogAsync()
+    {
+        _viewDialogOpen = false;
+        await LoadTasksAsync();
+    }
 
     private static string FormatAge(DateTimeOffset created)
     {

@@ -1,4 +1,6 @@
 using FluentValidation;
+using HR.Modules.DataImport.Features.ConfirmImportSession;
+using HR.Modules.DataImport.Features.GetImportPreview;
 using HR.Modules.DataImport.Features.UploadImportFile;
 using HR.Modules.DataImport.Features.ValidateImportSession;
 using HR.Modules.DataImport.Persistence;
@@ -27,6 +29,12 @@ public static class DataImportModule
         services.AddScoped<EmployeeStagingRowValidator>();
         services.AddScoped<ValidateImportSessionHandler>();
         services.AddScoped<IValidator<ValidateImportSessionRequest>, ValidateImportSessionValidator>();
+
+        services.AddScoped<GetImportPreviewHandler>();
+        services.AddScoped<IValidator<GetImportPreviewRequest>, GetImportPreviewValidator>();
+
+        services.AddScoped<ConfirmImportSessionHandler>();
+        services.AddScoped<IValidator<ConfirmImportSessionRequest>, ConfirmImportSessionValidator>();
 
         services.AddDbContext<DataImportDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>

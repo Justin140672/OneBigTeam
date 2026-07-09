@@ -99,18 +99,6 @@ else
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-md-4">
-                                <label class="form-label">Department</label>
-                                <SfDropDownList TValue="Guid?"
-                                                TItem="DepartmentListItemModel"
-                                                DataSource="@_departments"
-                                                @bind-Value="Model.DepartmentId"
-                                                Placeholder="None"
-                                                AllowFiltering="true"
-                                                ShowClearButton="true">
-                                    <DropDownListFieldSettings Value="Id" Text="Name" />
-                                </SfDropDownList>
-                            </div>
-                            <div class="col-md-4">
                                 <label class="form-label">Position Profile</label>
                                 <SfDropDownList TValue="Guid?"
                                                 TItem="PositionProfileListItemModel"
@@ -123,6 +111,18 @@ else
                                     <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?" ValueChange="OnPositionProfileChanged" />
                                 </SfDropDownList>
                             </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Department</label>
+                                <SfDropDownList TValue="Guid?"
+                                                TItem="DepartmentListItemModel"
+                                                DataSource="@_departments"
+                                                @bind-Value="Model.DepartmentId"
+                                                Placeholder="None"
+                                                AllowFiltering="true"
+                                                ShowClearButton="true">
+                                    <DropDownListFieldSettings Value="Id" Text="Name" />
+                                </SfDropDownList>
+                            </div>                            
                             <div class="col-md-4">
                                 <label class="form-label">Location</label>
                                 <SfDropDownList TValue="Guid?"

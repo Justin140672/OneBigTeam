@@ -86,6 +86,7 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         services.AddScoped<DeactivateLeaveTypeHandler>();
         services.AddScoped<IValidator<DeactivateLeaveTypeRequest>, DeactivateLeaveTypeValidator>();
         services.AddScoped<ILeavePolicyReader, LeavePolicyReader>();
+        services.AddScoped<ILeaveImportWriter, LeaveImportWriter>();
     }
 
     public static async Task MigrateLeaveAsync(this IServiceProvider services)

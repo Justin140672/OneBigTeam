@@ -230,6 +230,7 @@ public static class EmployeesModule
         services.AddScoped<IEmployeeProvisioningService, EmployeeProvisioningService>();
         services.AddScoped<IEmployeeImportLookupReader, EmployeeImportLookupReader>();
         services.AddScoped<IImportLookupResolver, ImportLookupResolver>();
+        services.AddScoped<IEmployeeImportWriter, EmployeeImportWriter>();
     }
 
     public static async Task MigrateEmployeesAsync(this IServiceProvider services)

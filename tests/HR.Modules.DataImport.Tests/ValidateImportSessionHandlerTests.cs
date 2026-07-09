@@ -82,7 +82,7 @@ public class ValidateImportSessionHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(session.Id, result.Value!.Id);
-        Assert.Equal(nameof(ImportStatus.Completed), result.Value.Status);
+        Assert.Equal(nameof(ImportStatus.Validated), result.Value.Status);
         Assert.Equal(2, result.Value.TotalRows);
         Assert.Equal(2, result.Value.SuccessfulRows);
         Assert.Equal(0, result.Value.FailedRows);
@@ -102,7 +102,7 @@ public class ValidateImportSessionHandlerTests
         Assert.Empty(await db.ImportRowErrors.Where(e => e.ImportSessionId == session.Id).ToListAsync());
 
         var savedSession = await db.ImportSessions.SingleAsync(s => s.Id == session.Id);
-        Assert.Equal(ImportStatus.Completed, savedSession.Status);
+        Assert.Equal(ImportStatus.Validated, savedSession.Status);
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public class ValidateImportSessionHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(nameof(ImportStatus.CompletedWithErrors), result.Value!.Status);
+        Assert.Equal(nameof(ImportStatus.Validated), result.Value!.Status);
         Assert.Equal(2, result.Value.TotalRows);
         Assert.Equal(1, result.Value.SuccessfulRows);
         Assert.Equal(1, result.Value.FailedRows);
@@ -149,7 +149,7 @@ public class ValidateImportSessionHandlerTests
         Assert.Equal(ImportRowErrorSeverity.Error, rowError.Severity);
 
         var savedSession = await db.ImportSessions.SingleAsync(s => s.Id == session.Id);
-        Assert.Equal(ImportStatus.CompletedWithErrors, savedSession.Status);
+        Assert.Equal(ImportStatus.Validated, savedSession.Status);
     }
 
     [Fact]

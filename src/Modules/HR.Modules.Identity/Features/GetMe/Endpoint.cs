@@ -35,7 +35,7 @@ internal sealed class Endpoint(
         // Mirrors the "company:manage" policy roles exactly (HR.Modules.Identity.IdentityModule.AddRolePolicies)
         // so the Company Settings UI gate matches what the update/read endpoints actually allow.
         var roles = await authorizationService.GetEffectiveRolesAsync(userId.Value, ct);
-        var canManageCompany = roles.Contains(SystemRoles.HrAdministrator) || roles.Contains(SystemRoles.CompanyAdministrator);
+        var canManageCompany = roles.Contains(SystemRoles.CompanyAdministrator);
 
         await Send.ResultAsync(TypedResults.Ok(new GetMeResponse(
             userId.Value,

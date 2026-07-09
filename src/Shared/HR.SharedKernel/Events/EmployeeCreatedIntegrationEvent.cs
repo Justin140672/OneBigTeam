@@ -6,4 +6,5 @@ public sealed record EmployeeCreatedIntegrationEvent(
     Guid? ManagerId,
     DateOnly ProbationEndDate,
     Guid? PositionProfileId = null,
-    Guid? DefaultLeavePolicyId = null) : IIntegrationEvent;
+    Guid? DefaultLeavePolicyId = null,
+    bool IsImported = false) : IIntegrationEvent;

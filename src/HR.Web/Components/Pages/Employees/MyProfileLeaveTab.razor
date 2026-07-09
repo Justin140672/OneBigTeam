@@ -19,11 +19,11 @@ else
                         {
                             <dl class="mb-0">
                                 <dt class="text-muted small">Remaining</dt>
-                                <dd class="fs-4 fw-semibold mb-2">@FormatHours(_annualLeave.RemainingHours)</dd>
+                                <dd class="fs-4 fw-semibold mb-2">@FormatDays(_annualLeave.RemainingDays ?? 0)</dd>
                                 <dt class="text-muted small">Booked</dt>
                                 <dd class="mb-2">@FormatDays(_annualLeave.UsedDays ?? 0)</dd>
                                 <dt class="text-muted small">Pending</dt>
-                                <dd class="mb-0">@(_annualLeave.PendingHours > 0 ? FormatHours(_annualLeave.PendingHours) : "—")</dd>
+                                <dd class="mb-0">@(_annualLeave.PendingDays > 0 ? FormatDays(_annualLeave.PendingDays) : "—")</dd>
                             </dl>
                         }
                         else

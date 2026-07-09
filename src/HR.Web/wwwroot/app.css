@@ -247,6 +247,34 @@ h1:focus {
         content: "An error has occurred."
     }
 
+/* ── Generic Bootstrap cards ──────────────────────────────────────
+   Re-skins every plain `.card` used across edit forms, detail pages, etc.
+   (not just the dashboard's `.widget-card`) so the whole app shares one
+   look instead of Bootstrap's default grey card-header/border.
+   ──────────────────────────────────────────────────────────────── */
+
+.card {
+    border-color: var(--hr-gray-200);
+    border-radius: var(--hr-radius-lg);
+    box-shadow: var(--hr-shadow-sm);
+}
+
+.card-header {
+    background-color: var(--hr-gray-50);
+    border-bottom-color: var(--hr-gray-200);
+}
+
+html[data-theme="dark"] .card {
+    background-color: var(--hr-gray-800);
+    border-color: var(--hr-gray-700);
+    color: var(--hr-gray-50);
+}
+
+html[data-theme="dark"] .card-header {
+    background-color: rgba(255, 255, 255, 0.03);
+    border-bottom-color: var(--hr-gray-700);
+}
+
 /* ── Dashboard widgets ───────────────────────────────────────────
    Shared by MyTasksWidget, TeamTasksWidget, UpcomingProbationReviewsWidget,
    HrInboxWidget and any future dashboard card.

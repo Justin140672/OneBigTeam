@@ -6,5 +6,6 @@ internal enum LeaveBalanceAdjustmentReason
     CarryOver,
     ManualAward,
     ManualDeduction,
-    Other
+    Other,
+    Import
 }

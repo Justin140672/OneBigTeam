@@ -69,6 +69,36 @@ internal sealed class ImportSession
         UpdatedAt = now;
     }
 
+    /// <summary>
+    /// Records the outcome of the validate step. Lands on Validated when at least one row is
+    /// valid (so a confirm can proceed against that valid subset); lands on CompletedWithErrors
+    /// when every row failed validation, since there is nothing left to confirm.
+    /// </summary>
+    public void Validate(int successfulRows, int failedRows, DateTimeOffset now)
+    {
+        SuccessfulRows = successfulRows;
+        FailedRows = failedRows;
+        ProcessedRows = successfulRows + failedRows;
+        CompletedAt = now;
+        Status = successfulRows > 0 ? ImportStatus.Validated : ImportStatus.CompletedWithErrors;
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// Records the outcome of the confirm/create step. Lands on Imported when every valid row
+    /// was successfully created; lands on CompletedWithErrors when some rows failed at
+    /// creation time (their row-level errors are recorded separately as ImportRowError rows).
+    /// </summary>
+    public void Confirm(int createdCount, int failedCount, DateTimeOffset now)
+    {
+        SuccessfulRows = createdCount;
+        FailedRows = failedCount;
+        ProcessedRows = createdCount + failedCount;
+        CompletedAt = now;
+        Status = failedCount == 0 ? ImportStatus.Imported : ImportStatus.CompletedWithErrors;
+        UpdatedAt = now;
+    }
+
     public void Fail(string errorSummary, DateTimeOffset now)
     {
         Status = ImportStatus.Failed;

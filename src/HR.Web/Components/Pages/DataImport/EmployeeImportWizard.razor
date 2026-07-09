@@ -1,0 +1,333 @@
+@page "/companies/{CompanyId:guid}/data-import/employees"
+@rendermode InteractiveServer
+@inject DataImportService DataImportService
+@inject AppSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Employee Data Import</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+        <h1 class="mb-1">Employee Data Import</h1>
+    </div>
+    <p class="text-muted mb-4">Upload a CSV or XLSX file of employees, validate it, review the preview, then confirm to create the records.</p>
+
+    @if (_globalError is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_globalError
+            <button type="button" class="btn-close" @onclick="@(() => _globalError = null)"></button>
+        </div>
+    }
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">1. Upload File</h5>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <InputFile class="form-control" OnChange="OnFileSelected" accept=".csv,.xlsx" disabled="@(_session is not null)" />
+            </div>
+            @if (_session is not null)
+            {
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">File</dt>
+                    <dd class="col-sm-9">@_session.FileName</dd>
+                    <dt class="col-sm-3">Status</dt>
+                    <dd class="col-sm-9">@_session.Status</dd>
+                    <dt class="col-sm-3">Total Rows</dt>
+                    <dd class="col-sm-9">@_session.TotalRows</dd>
+                </dl>
+            }
+            <div class="d-flex gap-2 mt-2">
+                @if (_session is null)
+                {
+                    <SfButton IsPrimary="true" Disabled="@(_selectedFile is null || _uploading)" OnClick="UploadAsync">
+                        @if (_uploading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Upload
+                    </SfButton>
+                }
+                else
+                {
+                    <SfButton OnClick="StartNewImport">Start New Import</SfButton>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (_session is not null)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">2. Validate</h5>
+            </div>
+            <div class="card-body">
+                @if (_validation is not null)
+                {
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Status</dt>
+                        <dd class="col-sm-9">@_validation.Status</dd>
+                        <dt class="col-sm-3">Successful Rows</dt>
+                        <dd class="col-sm-9">@_validation.SuccessfulRows</dd>
+                        <dt class="col-sm-3">Failed Rows</dt>
+                        <dd class="col-sm-9">@_validation.FailedRows</dd>
+                    </dl>
+                }
+                <div class="d-flex gap-2 mt-2">
+                    <SfButton IsPrimary="true" Disabled="@_validating" OnClick="ValidateAsync">
+                        @if (_validating)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Validate
+                    </SfButton>
+                    @if (_validation is not null)
+                    {
+                        <SfButton Disabled="@_loadingPreview" OnClick="LoadPreviewAsync">
+                            @if (_loadingPreview)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            View Preview
+                        </SfButton>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_preview is not null)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">3. Preview</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">
+                    <strong>@_preview.ValidRowCount</strong> valid row(s) to be created,
+                    <strong>@_preview.InvalidRowCount</strong> invalid row(s).
+                </p>
+
+                <h6>Rows to be created</h6>
+                <HrGrid TValue="ImportPreviewRow" DataSource="@_preview.ValidRows" AllowPaging="true" AllowSorting="true" class="mb-4">
+                    <GridPageSettings PageSize="10" />
+                    <GridColumns>
+                        <GridColumn Field="@nameof(ImportPreviewRow.RowNumber)" HeaderText="Row" Width="70" />
+                        <GridColumn Field="@nameof(ImportPreviewRow.FirstName)" HeaderText="First Name" Width="120" />
+                        <GridColumn Field="@nameof(ImportPreviewRow.LastName)" HeaderText="Last Name" Width="120" />
+                        <GridColumn Field="@nameof(ImportPreviewRow.WorkEmail)" HeaderText="Work Email" Width="180" />
+                        <GridColumn Field="@nameof(ImportPreviewRow.DepartmentName)" HeaderText="Department" Width="140" />
+                        <GridColumn Field="@nameof(ImportPreviewRow.LocationName)" HeaderText="Location" Width="140" />
+                        <GridColumn Field="@nameof(ImportPreviewRow.EmploymentTypeName)" HeaderText="Employment Type" Width="150" />
+                        <GridColumn Field="@nameof(ImportPreviewRow.PositionProfileTitle)" HeaderText="Position" Width="150" />
+                        <GridColumn Field="@nameof(ImportPreviewRow.ManagerReference)" HeaderText="Manager" Width="140" />
+                        <GridColumn Field="@nameof(ImportPreviewRow.StartDate)" HeaderText="Start Date" Width="110" />
+                    </GridColumns>
+                </HrGrid>
+
+                <h6>Row Errors</h6>
+                @if (_preview.RowErrors.Count == 0)
+                {
+                    <p class="text-muted">No row errors.</p>
+                }
+                else
+                {
+                    <HrGrid TValue="ImportPreviewRowError" DataSource="@_preview.RowErrors" AllowPaging="true" AllowSorting="true" class="mb-4">
+                        <GridPageSettings PageSize="10" />
+                        <GridColumns>
+                            <GridColumn Field="@nameof(ImportPreviewRowError.RowNumber)" HeaderText="Row" Width="70" />
+                            <GridColumn Field="@nameof(ImportPreviewRowError.Severity)" HeaderText="Severity" Width="110">
+                                <Template>
+                                    @{
+                                        var row = (context as ImportPreviewRowError)!;
+                                        var cls = row.Severity.Equals("Error", StringComparison.OrdinalIgnoreCase)
+                                            ? "badge bg-danger"
+                                            : "badge bg-warning text-dark";
+                                    }
+                                    <span class="@cls">@row.Severity</span>
+                                </Template>
+                            </GridColumn>
+                            <GridColumn Field="@nameof(ImportPreviewRowError.Message)" HeaderText="Message" Width="300" />
+                        </GridColumns>
+                    </HrGrid>
+                }
+
+                @if (_preview.ReferenceDataCreatedWarnings.Count > 0)
+                {
+                    <details class="mb-3">
+                        <summary>Reference data that will be created (@_preview.ReferenceDataCreatedWarnings.Count)</summary>
+                        <ul class="mt-2">
+                            @foreach (var warning in _preview.ReferenceDataCreatedWarnings)
+                            {
+                                <li>Row @warning.RowNumber: @warning.Message</li>
+                            }
+                        </ul>
+                    </details>
+                }
+
+                <div class="d-flex gap-2 mt-2">
+                    <SfButton IsPrimary="true" Disabled="@(_preview.ValidRowCount == 0 || _confirming)" OnClick="ConfirmAsync">
+                        @if (_confirming)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Confirm Import
+                    </SfButton>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_confirmResult is not null)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">4. Result</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-3">
+                    <dt class="col-sm-3">Status</dt>
+                    <dd class="col-sm-9">@_confirmResult.Status</dd>
+                    <dt class="col-sm-3">Created</dt>
+                    <dd class="col-sm-9">@_confirmResult.CreatedCount</dd>
+                    <dt class="col-sm-3">Failed</dt>
+                    <dd class="col-sm-9">@_confirmResult.FailedCount</dd>
+                </dl>
+                <div class="d-flex gap-2">
+                    <SfButton OnClick="StartNewImport">Start New Import</SfButton>
+                    <SfButton OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/employees"))">Go to Employees</SfButton>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private IBrowserFile? _selectedFile;
+    private bool _uploading;
+    private bool _validating;
+    private bool _loadingPreview;
+    private bool _confirming;
+
+    private UploadImportFileResponse? _session;
+    private ValidateImportSessionResponse? _validation;
+    private GetImportPreviewResponse? _preview;
+    private ConfirmImportSessionResponse? _confirmResult;
+
+    private string? _globalError;
+
+    protected override void OnInitialized()
+    {
+        if (!Session.CanManageEmployees)
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
+
+    private async Task UploadAsync()
+    {
+        if (_selectedFile is null) return;
+
+        _globalError = null;
+        _uploading = true;
+        try
+        {
+            var (result, error) = await DataImportService.UploadFileAsync(CompanyId, _selectedFile);
+            if (result is null)
+            {
+                _globalError = error ?? "Upload failed.";
+                return;
+            }
+
+            _session = result;
+        }
+        finally
+        {
+            _uploading = false;
+        }
+    }
+
+    private async Task ValidateAsync()
+    {
+        if (_session is null) return;
+
+        _globalError = null;
+        _validating = true;
+        try
+        {
+            var (result, error) = await DataImportService.ValidateSessionAsync(CompanyId, _session.Id);
+            if (result is null)
+            {
+                _globalError = error ?? "Validation failed.";
+                return;
+            }
+
+            _validation = result;
+        }
+        finally
+        {
+            _validating = false;
+        }
+    }
+
+    private async Task LoadPreviewAsync()
+    {
+        if (_session is null) return;
+
+        _globalError = null;
+        _loadingPreview = true;
+        try
+        {
+            var (result, error) = await DataImportService.GetPreviewAsync(CompanyId, _session.Id);
+            if (result is null)
+            {
+                _globalError = error ?? "Failed to load preview.";
+                return;
+            }
+
+            _preview = result;
+        }
+        finally
+        {
+            _loadingPreview = false;
+        }
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (_session is null) return;
+
+        _globalError = null;
+        _confirming = true;
+        try
+        {
+            var (result, error) = await DataImportService.ConfirmSessionAsync(CompanyId, _session.Id);
+            if (result is null)
+            {
+                _globalError = error ?? "Confirm failed.";
+                return;
+            }
+
+            _confirmResult = result;
+        }
+        finally
+        {
+            _confirming = false;
+        }
+    }
+
+    private void StartNewImport()
+    {
+        _selectedFile = null;
+        _session = null;
+        _validation = null;
+        _preview = null;
+        _confirmResult = null;
+        _globalError = null;
+    }
+}

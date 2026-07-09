@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@using HR.Web.Components.Pages.Tasks
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject AppSession Session
@@ -54,6 +55,7 @@ else
                                     <MenuItem Text="Onboarding Templates" Url="@_menuItems["OnboardingTemplates"]" />
                                     <MenuItem Text="Employment Types" Url="@_menuItems["EmploymentTypes"]" />
                                     <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
+                                    <MenuItem Text="Data Import" Url="@_menuItems["DataImport"]" />
                                 </MenuItems>
                             </MenuItem>
                             <MenuItem Text="Assets" IconCss="fa-solid fa-box">
@@ -220,6 +222,11 @@ else
 
     </div>
 
+    <TaskViewDialog CompanyId="Session.CompanyId"
+                    TaskId="_notifiedTaskId"
+                    IsOpen="_taskDialogOpen"
+                    OnClosed="@(() => _taskDialogOpen = false)" />
+
 }
 
 @code {
@@ -231,6 +238,9 @@ else
     private int _unreadCount;
     private List<NotificationDto> _notifications = [];
     private bool _notifOpen;
+
+    private Guid? _notifiedTaskId;
+    private bool _taskDialogOpen;
 
     private IReadOnlyList<DevPersonaDto> _personas = [];
 
@@ -251,6 +261,7 @@ else
         ["LeavePolicies"] = "/",
         ["PublicHolidays"] = "/",
         ["DocumentTypes"] = "/",
+        ["DataImport"] = "/",
         ["SicknessCategories"] = "/",
         ["Company"] = "/",
     };
@@ -275,6 +286,7 @@ else
         _menuItems["LeavePolicies"] = $"/companies/{companyId}/leave-policies";
         _menuItems["PublicHolidays"] = $"/companies/{companyId}/public-holidays";
         _menuItems["DocumentTypes"] = $"/companies/{companyId}/document-types";
+        _menuItems["DataImport"] = $"/companies/{companyId}/data-import/employees";
         _menuItems["SicknessCategories"] = $"/companies/{companyId}/sickness-categories";
         _menuItems["Company"] = $"/companies/{companyId}/edit";
 
@@ -317,8 +329,8 @@ else
             if (idx >= 0)
                 _notifications[idx] = notification with { IsRead = true };
         }
-        NavigationManager.NavigateTo(
-            $"/companies/{Session.CompanyId}/tasks/{notification.SourceEntityId}");
+        _notifiedTaskId = notification.SourceEntityId;
+        _taskDialogOpen = true;
     }
 
     private async Task MarkAllRead()

@@ -40,11 +40,11 @@ else
                                         </div>
                                         @if (item.HasBalance)
                                         {
-                                            <span class="fs-4 fw-semibold">@FormatHours(item.RemainingHours)</span>
-                                            <span class="text-muted small">of @FormatHours(item.EntitlementHours) entitlement</span>
-                                            @if (item.PendingHours > 0)
+                                            <span class="fs-4 fw-semibold">@FormatDays(item.RemainingDays ?? 0)</span>
+                                            <span class="text-muted small">of @FormatDays(item.EntitlementDays ?? 0) entitlement</span>
+                                            @if (item.PendingDays > 0)
                                             {
-                                                <span class="text-muted small">@FormatHours(item.PendingHours) pending</span>
+                                                <span class="text-muted small">@FormatDays(item.PendingDays) pending</span>
                                             }
                                         }
                                         else

@@ -570,4 +570,91 @@ public class EmployeeStagingRowValidatorTests
         Assert.Equal(existingProfileId, result.PositionProfileId);
         Assert.DoesNotContain(result.Warnings, w => w.Contains("Position Profile"));
     }
+
+    // ValidateWorkingPatternFields is only invoked when WorkingDays or HoursPerDay is a mapped
+    // column, mirroring the compensation/leave gating tested above.
+    private static ParsedImportRow ValidRowWithWorkingPattern(
+        int rowNumber, string? workingDays = null, string? hoursPerDay = null)
+    {
+        var row = ValidRow(rowNumber);
+        var fields = new Dictionary<string, string?>(row.Fields);
+        if (workingDays is not null) fields["WorkingDays"] = workingDays;
+        if (hoursPerDay is not null) fields["HoursPerDay"] = hoursPerDay;
+        return new ParsedImportRow(rowNumber, fields);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Skips_WorkingPattern_Validation_When_No_WorkingPattern_Column_Mapped()
+    {
+        var validator = BuildValidator();
+        var row = ValidRowWithWorkingPattern(2, workingDays: "NotADay");
+
+        var mappedFields = new HashSet<string> { "FirstName", "LastName", "WorkEmail", "StartDate" };
+
+        var results = await validator.ValidateAsync(CompanyId, [row], mappedFields, CancellationToken.None);
+
+        Assert.True(Assert.Single(results).IsValid);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Accepts_Valid_Comma_Separated_WorkingDays_List()
+    {
+        var validator = BuildValidator();
+        var row = ValidRowWithWorkingPattern(2, workingDays: "Monday,Tuesday,Wednesday,Thursday,Friday");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        Assert.True(Assert.Single(results).IsValid);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Accepts_WorkingDays_Case_Insensitively()
+    {
+        var validator = BuildValidator();
+        var row = ValidRowWithWorkingPattern(2, workingDays: "monday,TUESDAY,Wednesday");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        Assert.True(Assert.Single(results).IsValid);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Flags_Invalid_Day_Name_In_WorkingDays()
+    {
+        var validator = BuildValidator();
+        var row = ValidRowWithWorkingPattern(2, workingDays: "Monday,Funday");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("'WorkingDays'") && e.Contains("Funday"));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Accepts_Positive_HoursPerDay()
+    {
+        var validator = BuildValidator();
+        var row = ValidRowWithWorkingPattern(2, hoursPerDay: "7.5");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        Assert.True(Assert.Single(results).IsValid);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-2")]
+    [InlineData("not-a-number")]
+    public async Task ValidateAsync_Flags_Non_Positive_Or_Invalid_HoursPerDay(string hoursPerDay)
+    {
+        var validator = BuildValidator();
+        var row = ValidRowWithWorkingPattern(2, hoursPerDay: hoursPerDay);
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("'HoursPerDay'"));
+    }
 }

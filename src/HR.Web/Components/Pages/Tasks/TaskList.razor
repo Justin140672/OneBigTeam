@@ -1,5 +1,3 @@
-@inject NavigationManager Navigation
-
 <HrGrid TValue="TaskListItem"
         DataSource="@Tasks"
         AllowFiltering="false"
@@ -12,18 +10,7 @@
                     var item = (TaskListItem)context;
                 }
                 <div class="task-cell">
-                    @if (OnViewTask.HasDelegate)
-                    {
-                        <span class="task-title task-title-link" role="button" @onclick="() => OnViewTask.InvokeAsync(item.Id)">@item.Title</span>
-                    }
-                    else if (CompanyId != Guid.Empty)
-                    {
-                        <a href="/companies/@CompanyId/tasks/@item.Id" class="task-title task-title-link">@item.Title</a>
-                    }
-                    else
-                    {
-                        <span class="task-title">@item.Title</span>
-                    }
+                    <span class="task-title task-title-link" role="button" @onclick="() => OnViewTask.InvokeAsync(item.Id)">@item.Title</span>
                     @if (item.Description is not null)
                     {
                         <span class="task-description">@item.Description</span>
@@ -52,7 +39,7 @@
                 @{
                     var item = (TaskListItem)context;
                 }
-                <SfButton CssClass="e-outline e-small" OnClick="() => ViewTaskAsync(item.Id)">View</SfButton>
+                <SfButton CssClass="e-outline e-small" OnClick="() => OnViewTask.InvokeAsync(item.Id)">View</SfButton>
             </Template>
         </GridColumn>
     </GridColumns>
@@ -63,22 +50,11 @@
     public IReadOnlyList<TaskListItem> Tasks { get; set; } = [];
 
     [Parameter]
-    public Guid CompanyId { get; set; }
-
-    [Parameter]
     public bool ShowAssignedTo { get; set; } = true;
 
-    // When set, "View" opens the task in a dialog instead of navigating to the full task page.
-    [Parameter]
+    // "View" opens the task in a dialog — see TaskViewDialog.
+    [Parameter, EditorRequired]
     public EventCallback<Guid> OnViewTask { get; set; }
-
-    private async Task ViewTaskAsync(Guid taskId)
-    {
-        if (OnViewTask.HasDelegate)
-            await OnViewTask.InvokeAsync(taskId);
-        else
-            Navigation.NavigateTo($"/companies/{CompanyId}/tasks/{taskId}");
-    }
 
     private static string StatusLabel(string status) => status switch
     {

@@ -1,5 +1,4 @@
 @inject TaskService TaskService
-@inject NavigationManager Navigation
 @inject AppSession Session
 
 @if (_loading)
@@ -71,21 +70,33 @@ else
     </div>
 }
 
+<TaskViewDialog CompanyId="Session.CompanyId"
+                TaskId="_selectedTaskId"
+                IsOpen="_dialogOpen"
+                OnClosed="CloseTaskDialogAsync" />
+
 @code {
     private bool _loading = true;
     private List<UnassignedTaskItem> _items = [];
     private int _overdue;
     private DateOnly _today;
 
+    private Guid? _selectedTaskId;
+    private bool _dialogOpen;
+
     protected override async Task OnInitializedAsync()
     {
         _today = DateOnly.FromDateTime(DateTime.UtcNow);
+        await LoadTasksAsync();
+        _loading = false;
+    }
 
+    private async Task LoadTasksAsync()
+    {
         var result = await TaskService.GetUnassignedTasksAsync(Session.CompanyId);
         _items = result?.Items.ToList() ?? [];
 
         _overdue = _items.Count(t => t.DueDate.HasValue && t.DueDate.Value < _today);
-        _loading = false;
     }
 
     private (string? Label, string Css) DueBadge(DateOnly? due)
@@ -104,6 +115,15 @@ else
         due.Value == _today.AddDays(1) ? "medium" :
         "low";
 
-    private void NavigateToTask(UnassignedTaskItem task) =>
-        Navigation.NavigateTo($"/companies/{Session.CompanyId}/tasks/{task.Id}");
+    private void NavigateToTask(UnassignedTaskItem task)
+    {
+        _selectedTaskId = task.Id;
+        _dialogOpen = true;
+    }
+
+    private async Task CloseTaskDialogAsync()
+    {
+        _dialogOpen = false;
+        await LoadTasksAsync();
+    }
 }

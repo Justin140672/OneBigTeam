@@ -17,6 +17,9 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
 
     public async Task HandleAsync(EmployeeCreatedIntegrationEvent integrationEvent, CancellationToken cancellationToken)
     {
+        if (integrationEvent.IsImported)
+            return;
+
         if (integrationEvent.ManagerId is null)
             return;
 

@@ -1,5 +1,4 @@
 @inject TaskService TaskService
-@inject NavigationManager Navigation
 @inject AppSession Session
 
 @if (_loading)
@@ -86,6 +85,11 @@ else
     </div>
 }
 
+<TaskViewDialog CompanyId="Session.CompanyId"
+                TaskId="_selectedTaskId"
+                IsOpen="_dialogOpen"
+                OnClosed="CloseTaskDialogAsync" />
+
 @code {
     private bool _loading = true;
     private List<TaskListItem> _active = [];
@@ -94,6 +98,9 @@ else
     private string _profileUrl = "#";
     private DateOnly _today;
 
+    private Guid? _selectedTaskId;
+    private bool _dialogOpen;
+
     protected override async Task OnInitializedAsync()
     {
         _today      = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -101,6 +108,12 @@ else
             ? $"/companies/{Session.CompanyId}/employees/{Session.EmployeeId.Value}/profile?tab=tasks"
             : "#";
 
+        await LoadTasksAsync();
+        _loading = false;
+    }
+
+    private async Task LoadTasksAsync()
+    {
         var result = await TaskService.GetMyTasksAsync(Session.CompanyId);
         var all    = result?.Items ?? [];
 
@@ -113,7 +126,6 @@ else
 
         _overdue    = _active.Count(t => t.DueDate.HasValue && t.DueDate.Value < _today);
         _inProgress = _active.Count(t => t.Status == "InProgress");
-        _loading    = false;
     }
 
     private int UrgencyOrder(TaskListItem t) =>
@@ -144,6 +156,15 @@ else
 
     private static string StatusLabel(string s) => s == "InProgress" ? "In progress" : "Not started";
 
-    private void NavigateToTask(TaskListItem task) =>
-        Navigation.NavigateTo($"/companies/{Session.CompanyId}/tasks/{task.Id}");
+    private void NavigateToTask(TaskListItem task)
+    {
+        _selectedTaskId = task.Id;
+        _dialogOpen = true;
+    }
+
+    private async Task CloseTaskDialogAsync()
+    {
+        _dialogOpen = false;
+        await LoadTasksAsync();
+    }
 }

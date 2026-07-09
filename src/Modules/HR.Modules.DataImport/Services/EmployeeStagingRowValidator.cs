@@ -35,6 +35,12 @@ internal sealed class EmployeeStagingRowValidator(
     private static readonly string[] DateFields = ["StartDate", "DateOfBirth", "ContinuousServiceDate", "ProbationEndDate"];
     private static readonly string[] CompensationFields = ["SalaryAmount", "SalaryType", "Currency", "HoursPerWeek", "FTE"];
     private static readonly string[] LeaveFields = ["LeaveTypeCode", "LeaveBalanceDays"];
+    private static readonly string[] WorkingPatternFields = ["WorkingDays", "HoursPerDay"];
+
+    // Comma-separated day names, e.g. "Monday,Tuesday,Wednesday,Thursday,Friday" — mirrors the
+    // flags on HR.Infrastructure.Abstractions.WorkingDays.
+    private static readonly HashSet<string> ValidDayNames =
+        new(StringComparer.OrdinalIgnoreCase) { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
 
     // Mirrors the SalaryType values accepted by HR.Modules.Employees' Domain.SalaryType enum
     // (Annual, Hourly, Daily) via CreateCompensationRecord's validator (IsInEnum()).
@@ -59,6 +65,7 @@ internal sealed class EmployeeStagingRowValidator(
 
         var hasCompensationColumns = CompensationFields.Any(mappedFields.Contains);
         var hasLeaveColumns = LeaveFields.Any(mappedFields.Contains);
+        var hasWorkingPatternColumns = WorkingPatternFields.Any(mappedFields.Contains);
 
         AddDuplicateErrors(rows, "EmployeeNumber", "employee number", errorsByRow);
         AddDuplicateErrors(rows, "WorkEmail", "work email", errorsByRow);
@@ -78,6 +85,9 @@ internal sealed class EmployeeStagingRowValidator(
 
             if (hasLeaveColumns)
                 ValidateLeaveFields(row, rowErrors);
+
+            if (hasWorkingPatternColumns)
+                ValidateWorkingPatternFields(row, rowErrors);
 
             var (departmentId, locationId, employmentTypeId, positionProfileId) =
                 await ResolveLookupsAsync(companyId, row, rowErrors, rowWarnings, cancellationToken);
@@ -265,6 +275,32 @@ internal sealed class EmployeeStagingRowValidator(
         {
             if (!decimal.TryParse(fte, NumberStyles.Number, CultureInfo.InvariantCulture, out var fteValue) || fteValue < 0 || fteValue > 1)
                 rowErrors.Add($"'FTE' value '{fte}' must be between 0 and 1.");
+        }
+    }
+
+    private static void ValidateWorkingPatternFields(ParsedImportRow row, List<string> rowErrors)
+    {
+        var workingDays = GetField(row, "WorkingDays");
+        if (!string.IsNullOrWhiteSpace(workingDays))
+        {
+            var dayNames = workingDays.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (dayNames.Length == 0)
+            {
+                rowErrors.Add("'WorkingDays' must contain at least one day name.");
+            }
+            else
+            {
+                var invalid = dayNames.Where(d => !ValidDayNames.Contains(d)).ToList();
+                if (invalid.Count > 0)
+                    rowErrors.Add($"'WorkingDays' contains invalid day name(s): {string.Join(", ", invalid)}. Expected comma-separated day names, e.g. 'Monday,Tuesday,Wednesday,Thursday,Friday'.");
+            }
+        }
+
+        var hoursPerDay = GetField(row, "HoursPerDay");
+        if (!string.IsNullOrWhiteSpace(hoursPerDay))
+        {
+            if (!decimal.TryParse(hoursPerDay, NumberStyles.Number, CultureInfo.InvariantCulture, out var hours) || hours <= 0)
+                rowErrors.Add($"'HoursPerDay' value '{hoursPerDay}' must be a positive number.");
         }
     }
 

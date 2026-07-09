@@ -7,5 +7,7 @@ internal enum ImportStatus
     Completed,
     CompletedWithErrors,
     Failed,
-    Cancelled
+    Cancelled,
+    Validated,
+    Imported
 }

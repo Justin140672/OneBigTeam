@@ -47,5 +47,7 @@ internal static class StandardEmployeeColumnMapping
         ["FTE"] = "FTE",
         ["LeaveTypeCode"] = "Leave Type Code",
         ["LeaveBalanceDays"] = "Leave Balance Days",
+        ["WorkingDays"] = "Working Days",
+        ["HoursPerDay"] = "Hours Per Day",
     });
 }

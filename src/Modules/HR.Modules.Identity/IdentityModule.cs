@@ -51,9 +51,11 @@ public static class IdentityModule
             SystemRoles.HrAdministrator,
             SystemRoles.CompanyAdministrator));
 
-        // Company domain policies — match spec section 24
+        // Company domain policies — match spec section 24.
+        // Company profile/settings/branding are Company Administrator territory only —
+        // HR Administrator is a distinct role scoped to employee/leave/sickness data and
+        // must not be able to change company-level configuration.
         builder.AddPolicy("company:manage", RolePolicy(
-            SystemRoles.HrAdministrator,
             SystemRoles.CompanyAdministrator));
 
         // Leave domain composite policies — match spec section 14

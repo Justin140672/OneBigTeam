@@ -127,7 +127,7 @@ internal sealed class ValidateImportSessionHandler(
             }
         }
 
-        session.Complete(successfulRows, failedRows, clock.UtcNowOffset());
+        session.Validate(successfulRows, failedRows, clock.UtcNowOffset());
 
         await db.SaveChangesAsync(cancellationToken);
 

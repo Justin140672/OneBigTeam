@@ -10,6 +10,9 @@ internal sealed class EmployeeCreatedHandler(
 {
     public async Task HandleAsync(EmployeeCreatedIntegrationEvent e, CancellationToken cancellationToken)
     {
+        if (e.IsImported)
+            return;
+
         var names = await employeeNameReader.GetNamesAsync(e.CompanyId, [e.EmployeeId], cancellationToken);
         var employeeName = names.GetValueOrDefault(e.EmployeeId, "the new employee");
 

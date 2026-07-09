@@ -13,7 +13,7 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
     public UpdateCompanySettingsEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator))
+        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.CompanyAdministrator))
             .GetAwaiter().GetResult();
     }
 

@@ -1,6 +1,8 @@
 @inject AssetService AssetService
+@inject EmployeeService EmployeeService
+@inject AppSession Session
 
-<SfDialog Visible="Visible" IsModal="true" Width="560px" ShowCloseIcon="true" CssClass="asset-detail-dialog">
+<SfDialog Visible="Visible" IsModal="true" Width="640px" ShowCloseIcon="true" CssClass="asset-detail-dialog">
     <DialogEvents Closed="HandleDialogClosed" />
     <DialogTemplates>
         <Header>@(_asset is null ? "Asset" : $"{_asset.AssetNumber} — {_asset.Name}")</Header>
@@ -51,7 +53,7 @@
                     </div>
                 </div>
 
-                <div class="card">
+                <div class="card mb-3">
                     <div class="card-header"><h6 class="mb-0">Purchase Information</h6></div>
                     <div class="card-body">
                         <dl class="row mb-0">
@@ -67,6 +69,79 @@
                         </dl>
                     </div>
                 </div>
+
+                <div class="card" data-testid="asset-assignments-section">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <h6 class="mb-0">Assignments</h6>
+                        <div class="d-flex gap-2">
+                            @if (_asset.Status == "Available")
+                            {
+                                <SfButton CssClass="e-outline e-small" OnClick="OpenAssignDialog" data-testid="assign-to-employee-btn">
+                                    Assign to Employee
+                                </SfButton>
+                            }
+                            @if (_asset.Status == "Assigned" && ActiveAssignment is not null)
+                            {
+                                <SfButton CssClass="e-outline e-small" OnClick="OpenReturnDialog" data-testid="request-return-btn">
+                                    Request Return
+                                </SfButton>
+                            }
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        @if (_assignmentsLoading)
+                        {
+                            <div class="d-flex align-items-center gap-2 p-3">
+                                <div class="spinner-border spinner-border-sm" role="status"></div>
+                                <span>Loading assignments…</span>
+                            </div>
+                        }
+                        else if (_assignments.Count == 0)
+                        {
+                            <p class="text-muted p-3 mb-0">No assignments recorded for this asset.</p>
+                        }
+                        else
+                        {
+                            <HrGrid TValue="AssetAssignmentItem"
+                                    DataSource="@_assignments"
+                                    AllowFiltering="false"
+                                    AllowPaging="false"
+                                    AllowSorting="false"
+                                    data-testid="asset-assignments-grid">
+                                <GridColumns>
+                                    <GridColumn Field="@nameof(AssetAssignmentItem.EmployeeId)" HeaderText="Employee ID" Width="240" />
+                                    <GridColumn Field="@nameof(AssetAssignmentItem.AssignedAt)" HeaderText="Assigned" Width="130" Format="d" />
+                                    <GridColumn Field="@nameof(AssetAssignmentItem.ReturnedAt)" HeaderText="Returned" Width="130" Format="d" />
+                                    <GridColumn HeaderText="Acknowledged" Width="140">
+                                        <Template>
+                                            @{
+                                                var item = (AssetAssignmentItem)context;
+                                            }
+                                            @if (item.AcknowledgedAt.HasValue)
+                                            {
+                                                <span class="badge text-bg-success">Yes</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge text-bg-warning">Pending</span>
+                                            }
+                                        </Template>
+                                    </GridColumn>
+                                    <GridColumn Field="@nameof(AssetAssignmentItem.Notes)" HeaderText="Notes" />
+                                </GridColumns>
+                            </HrGrid>
+                        }
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_actionSuccess))
+                {
+                    <div class="alert alert-success mt-3 mb-0" data-testid="assign-success-message">@_actionSuccess</div>
+                }
+                @if (!string.IsNullOrEmpty(_actionError))
+                {
+                    <div class="alert alert-danger mt-3 mb-0" data-testid="assign-error-message">@_actionError</div>
+                }
             }
         </Content>
         <FooterTemplate>
@@ -74,6 +149,67 @@
         </FooterTemplate>
     </DialogTemplates>
 </SfDialog>
+
+@if (_showAssignDialog)
+{
+    <SfDialog Width="480px" IsModal="true" @bind-Visible="_showAssignDialog" Header="Assign to Employee"
+              CssClass="assign-to-employee-dialog">
+        <DialogTemplates>
+            <Content>
+                <div class="mb-3">
+                    <label class="form-label">Employee</label>
+                    <SfDropDownList TValue="Guid?"
+                                   TItem="EmployeeListItemModel"
+                                   DataSource="@_employees"
+                                   @bind-Value="_selectedEmployeeId"
+                                   Placeholder="Select an employee"
+                                   AllowFiltering="true">
+                        <DropDownListFieldSettings Value="Id" Text="WorkEmail" />
+                        <DropDownListTemplates TItem="EmployeeListItemModel">
+                            <ItemTemplate>
+                                @{
+                                    var e = (EmployeeListItemModel)context;
+                                }
+                                <span><strong>@e.FirstName @e.LastName</strong> <span class="text-muted ms-1">@e.WorkEmail</span></span>
+                            </ItemTemplate>
+                        </DropDownListTemplates>
+                    </SfDropDownList>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Notes (optional)</label>
+                    <SfTextBox @bind-Value="_assignNotes" Multiline="true" Rows="2" />
+                </div>
+                @if (!string.IsNullOrEmpty(_dialogError))
+                {
+                    <div class="alert alert-danger py-2">@_dialogError</div>
+                }
+            </Content>
+        </DialogTemplates>
+        <DialogButtons>
+            <DialogButton Content="Assign" IsPrimary="true" OnClick="ConfirmAssignAsync" />
+            <DialogButton Content="Cancel" OnClick="CloseAssignDialog" />
+        </DialogButtons>
+    </SfDialog>
+}
+
+@if (_returnTarget is not null)
+{
+    <SfDialog Width="420px" IsModal="true" @bind-Visible="_showReturnDialog" Header="Request Return">
+        <DialogTemplates>
+            <Content>
+                <p class="mb-0">Request return of this asset from its current holder?</p>
+                @if (!string.IsNullOrEmpty(_returnDialogError))
+                {
+                    <div class="alert alert-danger py-2 mt-3 mb-0">@_returnDialogError</div>
+                }
+            </Content>
+        </DialogTemplates>
+        <DialogButtons>
+            <DialogButton Content="Request Return" IsPrimary="true" OnClick="ConfirmReturnAsync" />
+            <DialogButton Content="Cancel" OnClick="CloseReturnDialog" />
+        </DialogButtons>
+    </SfDialog>
+}
 
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
@@ -85,6 +221,24 @@
     private bool _loading;
     private AssetDetailModel? _asset;
     private Guid? _loadedAssetId;
+
+    private List<AssetAssignmentItem> _assignments = [];
+    private bool _assignmentsLoading;
+    private string? _actionSuccess;
+    private string? _actionError;
+
+    private bool _showAssignDialog;
+    private List<EmployeeListItemModel> _employees = [];
+    private Guid? _selectedEmployeeId;
+    private string? _assignNotes;
+    private string? _dialogError;
+
+    private AssetAssignmentItem? _returnTarget;
+    private bool _showReturnDialog;
+    private string? _returnDialogError;
+
+    private AssetAssignmentItem? ActiveAssignment =>
+        _assignments.FirstOrDefault(a => a.ReturnedAt is null);
 
     private string StatusBadgeClass => _asset?.Status switch
     {
@@ -102,15 +256,97 @@
         if (IsOpen && AssetId.HasValue && AssetId != _loadedAssetId)
         {
             _loadedAssetId = AssetId;
+            _actionSuccess = null;
+            _actionError = null;
             _loading = true;
             _asset = await AssetService.GetAssetAsync(CompanyId, AssetId.Value);
             _loading = false;
+
+            await LoadAssignmentsAsync();
         }
+    }
+
+    private async Task LoadAssignmentsAsync()
+    {
+        if (AssetId is null) return;
+
+        _assignmentsLoading = true;
+        _assignments = await AssetService.GetAssetAssignmentsAsync(CompanyId, AssetId.Value) ?? [];
+        _assignmentsLoading = false;
     }
 
     private async Task HandleDialogClosed()
     {
         _loadedAssetId = null;
         await OnClosed.InvokeAsync();
+    }
+
+    private async Task OpenAssignDialog()
+    {
+        _selectedEmployeeId = null;
+        _assignNotes = null;
+        _dialogError = null;
+        var result = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
+        _employees = result?.Items ?? [];
+        _showAssignDialog = true;
+    }
+
+    private void CloseAssignDialog() => _showAssignDialog = false;
+
+    private async Task ConfirmAssignAsync()
+    {
+        if (_selectedEmployeeId is null || AssetId is null)
+        {
+            _dialogError = "Please select an employee.";
+            return;
+        }
+
+        var assignedBy = Session.EmployeeId ?? Session.UserId;
+        var ok = await AssetService.AssignAssetAsync(
+            CompanyId, AssetId.Value, _selectedEmployeeId.Value, assignedBy, _assignNotes);
+
+        if (!ok)
+        {
+            _dialogError = "Failed to assign asset. It may already be assigned or unavailable.";
+            return;
+        }
+
+        _showAssignDialog = false;
+        _actionSuccess = "Asset assigned successfully.";
+        _actionError = null;
+
+        _asset = await AssetService.GetAssetAsync(CompanyId, AssetId.Value);
+        await LoadAssignmentsAsync();
+    }
+
+    private void OpenReturnDialog()
+    {
+        _returnTarget = ActiveAssignment;
+        _returnDialogError = null;
+        _showReturnDialog = true;
+    }
+
+    private void CloseReturnDialog() => _showReturnDialog = false;
+
+    private async Task ConfirmReturnAsync()
+    {
+        if (_returnTarget is null || AssetId is null) return;
+
+        _returnDialogError = null;
+
+        var requestedBy = Session.EmployeeId ?? Session.UserId;
+        var ok = await AssetService.RequestReturnAsync(CompanyId, _returnTarget.Id, requestedBy);
+
+        if (!ok)
+        {
+            _returnDialogError = "Failed to request return. The return may already have been requested.";
+            return;
+        }
+
+        _showReturnDialog = false;
+        _actionSuccess = "Return requested successfully.";
+        _actionError = null;
+
+        await LoadAssignmentsAsync();
     }
 }

@@ -51,6 +51,7 @@ builder.Services.AddScoped<VacancyService>();
 builder.Services.AddScoped<CandidateService>();
 builder.Services.AddScoped<ApplicationService>();
 builder.Services.AddScoped<InterviewService>();
+builder.Services.AddScoped<DataImportService>();
 builder.Services.AddScoped<AppSession>();
 builder.Services.AddScoped<AuthenticationStateProvider, AppSessionAuthStateProvider>();
 builder.Services.AddAuthentication("NoOp")

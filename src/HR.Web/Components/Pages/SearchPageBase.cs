@@ -116,6 +116,15 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
     protected virtual string? GetEditUrl(TItem item) => null;
     protected virtual string? GetViewUrl(TItem item) => null;
 
+    // Default "View" action navigates to GetViewUrl(item). Override to do something else instead
+    // (e.g. open a dialog) — see AssetList for an example.
+    protected virtual Task OnViewSelectedAsync(TItem item)
+    {
+        var url = GetViewUrl(item);
+        if (url is not null) Navigation.NavigateTo(url);
+        return Task.CompletedTask;
+    }
+
     protected void OnRowSelected(RowSelectEventArgs<TItem> args)
     {
         _hasSelection = true;
@@ -142,8 +151,15 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
                 if (Grid is null || !_hasSelection) break;
                 var records = await Grid.GetSelectedRecordsAsync();
                 if (records.Count == 0) break;
-                var url = args.Item.Id == "hr-edit" ? GetEditUrl(records[0]) : GetViewUrl(records[0]);
-                if (url is not null) Navigation.NavigateTo(url);
+                if (args.Item.Id == "hr-edit")
+                {
+                    var url = GetEditUrl(records[0]);
+                    if (url is not null) Navigation.NavigateTo(url);
+                }
+                else
+                {
+                    await OnViewSelectedAsync(records[0]);
+                }
                 break;
 
             case "hr-print":

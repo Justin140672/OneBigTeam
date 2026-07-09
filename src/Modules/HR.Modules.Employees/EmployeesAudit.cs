@@ -110,6 +110,27 @@ internal sealed record CompensationRecordReopenedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
+internal sealed record EmployeeCreatedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid? ActorUserId,
+    DateTimeOffset OccurredAt,
+    string Source,
+    Guid? ImportSessionId) : IAuditEvent
+{
+    string IAuditEvent.EventType => "employee.created";
+    string IAuditEvent.EntityType => "Employee";
+    Guid IAuditEvent.EntityId => EmployeeId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => ActorUserId;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => ImportSessionId;
+    string? IAuditEvent.Summary => Source == "Import" ? "Employee created via import" : "Employee created";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { Source, ImportSessionId };
+    object? IAuditEvent.Metadata => null;
+}
+
 internal sealed record EmergencyContactAddedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,

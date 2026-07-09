@@ -69,7 +69,22 @@
     }
 </div>
 
+<AssetDetailDialog CompanyId="CompanyId"
+                   AssetId="_viewedAssetId"
+                   IsOpen="_viewDialogOpen"
+                   OnClosed="@(() => _viewDialogOpen = false)" />
+
 @code {
+    private Guid? _viewedAssetId;
+    private bool _viewDialogOpen;
+
+    protected override Task OnViewSelectedAsync(AssetListItemModel item)
+    {
+        _viewedAssetId = item.Id;
+        _viewDialogOpen = true;
+        return Task.CompletedTask;
+    }
+
     protected override Task OnBeforeLoadAsync()
     {
         if (!Session.CanManageEmployees)
@@ -101,7 +116,6 @@
 
     protected override string? GetAddUrl()  => $"/companies/{CompanyId}/assets/new";
     protected override string? GetEditUrl(AssetListItemModel item) => $"/companies/{CompanyId}/assets/{item.Id}";
-    protected override string? GetViewUrl(AssetListItemModel item) => $"/companies/{CompanyId}/assets/{item.Id}/view";
 
     private async Task Retire(AssetListItemModel item)
     {

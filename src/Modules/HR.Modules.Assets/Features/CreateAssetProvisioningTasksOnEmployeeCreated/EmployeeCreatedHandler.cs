@@ -11,6 +11,9 @@ internal sealed class EmployeeCreatedHandler(
 {
     public async Task HandleAsync(EmployeeCreatedIntegrationEvent e, CancellationToken cancellationToken)
     {
+        if (e.IsImported)
+            return;
+
         if (e.PositionProfileId is null)
             return;
 
