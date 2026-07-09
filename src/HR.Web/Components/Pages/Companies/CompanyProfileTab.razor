@@ -5,7 +5,7 @@
     <div class="card-body">
         <div class="mb-4">
             <label class="form-label fw-semibold">Name</label>
-            <SfTextBox @bind-Value="Model.Name" Placeholder="Company name" FloatLabelType="FloatLabelType.Auto" />
+            <HrTextBox @bind-Value="Model.Name" Placeholder="Company name" />
             <ValidationMessage For="@(() => Model.Name)" />
         </div>
         <div class="mb-3">

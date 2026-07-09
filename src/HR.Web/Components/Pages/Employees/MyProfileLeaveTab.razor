@@ -152,11 +152,9 @@ else
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
-    [Parameter] public int AutoOpenToken { get; set; }
 
     private bool _loading = true;
     private bool _showRequestForm;
-    private int _handledAutoOpenToken;
     private Guid? _cancelling;
 
     private IReadOnlyList<LeaveBalanceItemModel> _allBalances = [];
@@ -190,13 +188,6 @@ else
         _publicHolidays = (await holidaysTask)?.Items.Select(h => h.Date).ToList() ?? [];
 
         _loading = false;
-
-        if (AutoOpenToken != _handledAutoOpenToken)
-        {
-            _handledAutoOpenToken = AutoOpenToken;
-            if (AutoOpenToken != 0)
-                _showRequestForm = true;
-        }
     }
 
     private async Task RefreshLeaveAsync()

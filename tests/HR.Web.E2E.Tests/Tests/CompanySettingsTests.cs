@@ -27,7 +27,10 @@ public sealed class CompanySettingsTests(AppFixture fixture) : E2ETestBase(fixtu
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example";
+    // CompanyEdit's edit mode (LoadAsync) gates on Session.CanManageCompany, which the
+    // company:manage policy restricts to CompanyAdministrator — HrAdministrator no longer
+    // qualifies, so these tests need a CompanyAdministrator-only persona.
+    private const string CompanyAdminEmail = "priya.shah@acme.example";
 
     [Fact]
     public async Task UpdateSicknessSettings_PersistAfterReload()
@@ -36,7 +39,7 @@ public sealed class CompanySettingsTests(AppFixture fixture) : E2ETestBase(fixtu
         var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(CompanyAdminEmail);
 
         // Navigate to Acme's edit page and open the Settings tab.
         await companyEdit.GoToAsync(AcmeId);
@@ -71,7 +74,7 @@ public sealed class CompanySettingsTests(AppFixture fixture) : E2ETestBase(fixtu
         var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(CompanyAdminEmail);
 
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenSettingsTabAsync();
@@ -129,7 +132,7 @@ public sealed class CompanySettingsTests(AppFixture fixture) : E2ETestBase(fixtu
         var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(CompanyAdminEmail);
 
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenSettingsTabAsync();

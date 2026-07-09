@@ -1,6 +1,7 @@
 @using System.Globalization
 @inject EmployeeService EmployeeService
 @inject LeaveService LeaveService
+@inject PublicHolidayService PublicHolidayService
 @inject TaskService TaskService
 @inject SicknessService SicknessService
 @inject ProbationService ProbationService
@@ -210,12 +211,12 @@ else
                     <span class="overview-card-title">Quick Actions</span>
                 </div>
                 <div class="overview-actions">
-                    <button class="action-btn action-btn--leave" @onclick="@(() => OnNavigateToLeave.InvokeAsync())">
+                    <button class="action-btn action-btn--leave" @onclick="@(() => _showRequestLeaveForm = true)">
                         <span class="action-btn-icon"><i class="fa-solid fa-calendar-plus"></i></span>
                         <span class="action-btn-label">Request Leave</span>
                         <i class="fa-solid fa-chevron-right action-btn-chevron"></i>
                     </button>
-                    <button class="action-btn action-btn--sickness" @onclick="@(() => OnNavigateToSickness.InvokeAsync())">
+                    <button class="action-btn action-btn--sickness" @onclick="@(() => _showRecordSicknessDialog = true)">
                         <span class="action-btn-icon"><i class="fa-solid fa-house-medical"></i></span>
                         <span class="action-btn-label">Notify Sickness</span>
                         <i class="fa-solid fa-chevron-right action-btn-chevron"></i>
@@ -234,18 +235,36 @@ else
             </div>
         </div>
     </div>
+
+    <RequestLeaveForm CompanyId="CompanyId"
+                      EmployeeId="EmployeeId"
+                      Balances="_allBalances"
+                      EffectiveWorkingDays="_effectiveWorkingDays"
+                      EffectiveHoursPerDay="_effectiveHoursPerDay"
+                      ExcludePublicHolidays="_excludePublicHolidays"
+                      PublicHolidays="_publicHolidays"
+                      IsOpen="_showRequestLeaveForm"
+                      OnSubmitted="OnLeaveSubmittedAsync"
+                      OnCancelled="@(() => _showRequestLeaveForm = false)" />
+
+    <RecordSicknessDialog CompanyId="CompanyId"
+                          EmployeeId="EmployeeId"
+                          SelfService="true"
+                          IsOpen="_showRecordSicknessDialog"
+                          OnSaved="OnSicknessRecordedAsync"
+                          OnCancelled="@(() => _showRecordSicknessDialog = false)" />
 }
 
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
 
-    [Parameter] public EventCallback OnNavigateToLeave { get; set; }
-    [Parameter] public EventCallback OnNavigateToSickness { get; set; }
     [Parameter] public EventCallback OnNavigateToDocuments { get; set; }
     [Parameter] public EventCallback OnNavigateToTasks { get; set; }
 
     private bool _loading = true;
+    private bool _showRequestLeaveForm;
+    private bool _showRecordSicknessDialog;
     private GetEmployeeResponse? _employee;
     private int _openTaskCount;
     private decimal? _annualLeaveRemaining;
@@ -254,6 +273,16 @@ else
     private List<LeaveRequestListItem> _upcomingLeave = [];
     private ProbationRecordModel? _probationRecord;
     private CurrentCompensationModel? _currentCompensation;
+
+    // Backing data for the "Request Leave" quick-action dialog, rendered directly on this tab
+    // so it opens on top of whatever tab the user is currently viewing instead of forcing a
+    // navigation to the Leave tab first.
+    private IReadOnlyList<LeaveBalanceItemModel> _allBalances = [];
+    private WorkingDays _effectiveWorkingDays = WorkingDays.Monday | WorkingDays.Tuesday |
+        WorkingDays.Wednesday | WorkingDays.Thursday | WorkingDays.Friday;
+    private decimal _effectiveHoursPerDay = 7.5m;
+    private bool _excludePublicHolidays = true;
+    private IReadOnlyList<DateOnly> _publicHolidays = [];
 
     protected override async Task OnParametersSetAsync()
     {
@@ -265,30 +294,48 @@ else
 
         _loading = true;
 
+        _effectiveWorkingDays  = Session.WorkingDaysOverride ?? (WorkingDays)Session.WorkingDays;
+        _effectiveHoursPerDay  = Session.HoursPerDayOverride ?? Session.HoursPerDay;
+        _excludePublicHolidays = Session.ExcludePublicHolidaysFromLeave;
+
         var employeeTask   = EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
         var balanceTask    = LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
         var requestsTask   = LeaveService.ListLeaveRequestsAsync(CompanyId, EmployeeId);
         var tasksTask      = TaskService.GetMyTasksAsync(CompanyId);
         var sicknessTask   = SicknessService.GetMySicknessRecordsAsync(CompanyId, EmployeeId);
         var probationTask  = ProbationService.GetProbationRecordByEmployeeAsync(CompanyId, EmployeeId);
+        var holidaysTask   = PublicHolidayService.ListAsync(CompanyId);
         var compensationTask = Session.DisplaySalaryOnEmployeeProfile
             ? CompensationService.GetCurrentCompensationAsync(CompanyId, EmployeeId)
             : Task.FromResult<CurrentCompensationModel?>(null);
 
-        await Task.WhenAll(employeeTask, balanceTask, requestsTask, tasksTask, sicknessTask, probationTask, compensationTask);
+        await Task.WhenAll(employeeTask, balanceTask, requestsTask, tasksTask, sicknessTask, probationTask, holidaysTask, compensationTask);
 
         _employee = await employeeTask;
         _probationRecord = await probationTask;
         _currentCompensation = await compensationTask;
+        _publicHolidays = (await holidaysTask)?.Items.Select(h => h.Date).ToList() ?? [];
 
-        var balance = await balanceTask;
+        ApplyLeaveData(await balanceTask, await requestsTask);
+
+        var tasks = await tasksTask;
+        if (tasks is not null)
+            _openTaskCount = tasks.Items.Count(t => t.Status is "Open" or "InProgress");
+
+        ApplySicknessData(await sicknessTask);
+
+        _loading = false;
+    }
+
+    private void ApplyLeaveData(LeaveBalanceResponse? balance, LeaveRequestListResponse? requests)
+    {
         if (balance is not null)
         {
+            _allBalances = balance.Balances;
             var annual = balance.Balances.FirstOrDefault(b => b.LeaveTypeCode == "ANNUAL");
             _annualLeaveRemaining = annual?.RemainingDays;
         }
 
-        var requests = await requestsTask;
         if (requests is not null)
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -298,22 +345,33 @@ else
                 .OrderBy(r => r.StartDate)
                 .ToList();
         }
+    }
 
-        var tasks = await tasksTask;
-        if (tasks is not null)
-            _openTaskCount = tasks.Items.Count(t => t.Status is "Open" or "InProgress");
+    private void ApplySicknessData(ListEmployeeSicknessRecordsResponseModel? sickness)
+    {
+        if (sickness is null) return;
 
-        var sickness = await sicknessTask;
-        if (sickness is not null)
-        {
-            // Open/ongoing records have no TotalDays yet, so only completed records are summed.
-            var completedDays = sickness.Records
-                .Where(r => r.TotalDays.HasValue)
-                .Sum(r => r.TotalDays!.Value);
-            _sicknessDays = sickness.Records.Count == 0 ? null : completedDays;
-        }
+        // Open/ongoing records have no TotalDays yet, so only completed records are summed.
+        var completedDays = sickness.Records
+            .Where(r => r.TotalDays.HasValue)
+            .Sum(r => r.TotalDays!.Value);
+        _sicknessDays = sickness.Records.Count == 0 ? null : completedDays;
+    }
 
-        _loading = false;
+    private async Task OnLeaveSubmittedAsync()
+    {
+        _showRequestLeaveForm = false;
+
+        var balanceTask  = LeaveService.GetEmployeeLeaveBalanceAsync(CompanyId, EmployeeId);
+        var requestsTask = LeaveService.ListLeaveRequestsAsync(CompanyId, EmployeeId);
+        await Task.WhenAll(balanceTask, requestsTask);
+        ApplyLeaveData(await balanceTask, await requestsTask);
+    }
+
+    private async Task OnSicknessRecordedAsync()
+    {
+        _showRecordSicknessDialog = false;
+        ApplySicknessData(await SicknessService.GetMySicknessRecordsAsync(CompanyId, EmployeeId));
     }
 
     private static string LengthOfService(DateOnly startDate)

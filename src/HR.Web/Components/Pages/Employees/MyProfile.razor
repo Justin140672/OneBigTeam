@@ -18,8 +18,6 @@
                     <div class="mt-4">
                         <MyProfileOverviewTab CompanyId="CompanyId"
                                              EmployeeId="EmployeeId"
-                                             OnNavigateToLeave="NavigateToLeaveAndOpen"
-                                             OnNavigateToSickness="NavigateToSicknessAndOpen"
                                              OnNavigateToDocuments="() => _activeTabIndex = 6"
                                              OnNavigateToTasks="() => _activeTabIndex = 7" />
                     </div>
@@ -46,15 +44,13 @@
             <TabItem>
                 <ChildContent><TabHeader Text="Leave" /></ChildContent>
                 <ContentTemplate>
-                    <div class="mt-4"><MyProfileLeaveTab CompanyId="CompanyId" EmployeeId="EmployeeId"
-                                                         AutoOpenToken="_leaveAutoOpenToken" /></div>
+                    <div class="mt-4"><MyProfileLeaveTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
                 </ContentTemplate>
             </TabItem>
             <TabItem>
                 <ChildContent><TabHeader Text="Sickness" /></ChildContent>
                 <ContentTemplate>
-                    <div class="mt-4"><MyProfileSicknessTab CompanyId="CompanyId" EmployeeId="EmployeeId"
-                                                            AutoOpenToken="_sicknessAutoOpenToken" /></div>
+                    <div class="mt-4"><MyProfileSicknessTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
                 </ContentTemplate>
             </TabItem>
             <TabItem>
@@ -84,8 +80,6 @@
     [Parameter] public Guid EmployeeId { get; set; }
 
     private int _activeTabIndex;
-    private int _leaveAutoOpenToken;
-    private int _sicknessAutoOpenToken;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -109,17 +103,5 @@
                 _        => 0
             };
         }
-    }
-
-    private void NavigateToLeaveAndOpen()
-    {
-        _activeTabIndex = 4;
-        _leaveAutoOpenToken++;
-    }
-
-    private void NavigateToSicknessAndOpen()
-    {
-        _activeTabIndex = 5;
-        _sicknessAutoOpenToken++;
     }
 }

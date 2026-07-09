@@ -128,7 +128,10 @@ public sealed class ProfileOverviewTabTests(AppFixture fixture) : E2ETestBase(fi
         var overview    = new OverviewTab(_page);
         var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
 
-        const string hrAdminEmail = "laura.bennett@acme.example";
+        // CompanyEdit's edit mode gates on Session.CanManageCompany (company:manage policy),
+        // which is CompanyAdministrator-only — HrAdministrator can no longer save company
+        // settings, so this needs a CompanyAdministrator persona.
+        const string companyAdminEmail = "priya.shah@acme.example";
 
         // ── Baseline: Salary row is not rendered while the company setting is off ──
         await login.GoToAsync();
@@ -143,9 +146,9 @@ public sealed class ProfileOverviewTabTests(AppFixture fixture) : E2ETestBase(fi
 
         try
         {
-            // ── Enable the setting as an HR administrator ──────────────────────
+            // ── Enable the setting as a company administrator ───────────────────
             await login.GoToAsync();
-            await login.LoginAsync(hrAdminEmail);
+            await login.LoginAsync(companyAdminEmail);
             await companyEdit.GoToAsync(AcmeId);
             await companyEdit.OpenSettingsTabAsync();
 
@@ -185,7 +188,7 @@ public sealed class ProfileOverviewTabTests(AppFixture fixture) : E2ETestBase(fi
             if (!wasEnabled)
             {
                 await login.GoToAsync();
-                await login.LoginAsync(hrAdminEmail);
+                await login.LoginAsync(companyAdminEmail);
                 await companyEdit.GoToAsync(AcmeId);
                 await companyEdit.OpenSettingsTabAsync();
                 await companyEdit.SetDisplaySalaryOnEmployeeProfileAsync(false);

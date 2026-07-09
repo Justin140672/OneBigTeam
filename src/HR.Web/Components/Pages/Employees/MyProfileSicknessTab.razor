@@ -61,11 +61,9 @@ else
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
-    [Parameter] public int AutoOpenToken { get; set; }
 
     private bool _loading = true;
     private bool _showRecordDialog;
-    private int _handledAutoOpenToken;
     private List<SicknessRecordListItemModel> _records = [];
 
     protected override async Task OnParametersSetAsync()
@@ -76,13 +74,6 @@ else
         _records = response?.Records ?? [];
 
         _loading = false;
-
-        if (AutoOpenToken != _handledAutoOpenToken)
-        {
-            _handledAutoOpenToken = AutoOpenToken;
-            if (AutoOpenToken != 0)
-                _showRecordDialog = true;
-        }
     }
 
     private async Task OnRecordedAsync()

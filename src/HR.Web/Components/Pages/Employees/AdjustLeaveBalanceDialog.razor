@@ -14,9 +14,10 @@
                 <label class="form-label fw-medium">Adjustment (hours) <span class="text-danger">*</span></label>
                 <div data-testid="adjustment-hours-input">
                     <SfNumericTextBox TValue="decimal?" @bind-Value="_adjustmentHours" ShowSpinButton="false"
+                                      Min="-9999.99m" Max="9999.99m"
                                       Placeholder="e.g. 7.5 or -3.5" />
                 </div>
-                <div class="form-text">Use a positive value to add hours, negative to deduct.</div>
+                <div class="form-text">Use a positive value to add hours, negative to deduct (max 9,999.99).</div>
             </div>
             <div class="mb-3">
                 <label class="form-label fw-medium">Reason <span class="text-danger">*</span></label>

@@ -47,7 +47,11 @@ public sealed class ApplicationService(IHttpClientFactory httpClientFactory)
 
     public async Task<(ApplicationActionResponse? Result, string? Error)> OfferCandidateAsync(Guid companyId, Guid vacancyId, Guid applicationId)
     {
-        var response = await Http.PostAsync($"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/offer", null);
+        // A truly bodyless POST (no Content-Type header at all) gets rejected by FastEndpoints
+        // with 415 Unsupported Media Type, even though OfferCandidateRequest's properties are
+        // all route-bound — post an empty JSON object instead of a null body (see the identical
+        // fix in DataImportService.ValidateSessionAsync/ConfirmSessionAsync).
+        var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/offer", new { });
 
         if (response.IsSuccessStatusCode)
             return (await response.Content.ReadFromJsonAsync<ApplicationActionResponse>(), null);

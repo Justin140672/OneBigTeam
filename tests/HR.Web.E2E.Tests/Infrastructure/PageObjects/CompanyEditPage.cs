@@ -192,6 +192,11 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
             .Filter(new() { HasText = monthName })
             .First
             .ClickAsync();
+
+        // The popup (and its full-viewport click-away layer) can take a moment to detach after
+        // selection — without waiting for it, a later click elsewhere on the page (e.g. Save)
+        // can get blocked by the still-present overlay and time out looking "not found".
+        await page.WaitForSelectorAsync(".e-popup.e-ddl", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
     /// <summary>Returns the currently displayed value of the "Leave Year Start Month" dropdown.</summary>

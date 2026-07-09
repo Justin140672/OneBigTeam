@@ -125,6 +125,21 @@ html, body {
    "hr-textbox" marker class onto every instance in the app, so every
    grid header, row hover, and text-input focus ring is themed from here.
    ──────────────────────────────────────────────────────────────────── */
+
+/* Grids rendered inside a Bootstrap flex layout (e.g. a .row > .col-lg-*, as in
+   EmployeeProbationTab's two-column review history card) would otherwise force their
+   flex-item ancestor to grow to the grid's full fixed-column content width instead of
+   scrolling internally — flex items default to min-width:auto, i.e. "never shrink below
+   my content's natural size". Any non-visible overflow on a descendant box (this one)
+   stops that box from contributing its children's full size to the ancestor chain, so
+   the grid instead sizes to its actual container and scrolls its own content when the
+   columns don't fit. Applies to every HrGrid in the app via the shared marker class.
+   Ref: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_flexible_box_layout/Mastering_wrapping_of_flex_items */
+.hr-grid {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
 .hr-grid .e-gridheader {
     background-color: var(--hr-gray-50);
 }

@@ -81,6 +81,8 @@
         </EditForm>
     }
 
+    <NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" />
+
     <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
                           OnSaveAndClose="ConfirmSaveAndCloseAsync"
                           OnDiscard="DiscardChangesAndClose"

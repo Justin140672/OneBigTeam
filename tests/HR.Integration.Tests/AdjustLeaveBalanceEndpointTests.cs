@@ -205,6 +205,21 @@ public class AdjustLeaveBalanceEndpointTests : IClassFixture<ApiWebApplicationFa
     }
 
     [Fact]
+    public async Task Post_AdjustLeaveBalance_Returns_UnprocessableEntity_When_AdjustmentHours_Exceeds_Column_Precision()
+    {
+        // adjustment_hours/adjustment_days are numeric(6,2) columns (max magnitude 9999.99) —
+        // a wildly large value like 100,000 must fail FluentValidation with a clean 422 rather
+        // than reach SaveChangesAsync and blow up with a Postgres "numeric field overflow".
+        var (companyId, leaveTypeId, employeeId, hrAdminClient) = await SetupEmployeeWithBalanceAsync();
+
+        var response = await hrAdminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-balance-adjustments",
+            AdjustmentPayload(companyId, employeeId, leaveTypeId, 100_000m, "Correction"));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Post_AdjustLeaveBalance_Returns_BadRequest_When_Negative_Adjustment_Would_Go_Below_Zero_Without_Override()
     {
         // 5 days entitlement, no negative override allowed on the policy.

@@ -60,6 +60,41 @@ public class AdjustLeaveBalanceValidatorTests
     }
 
     [Fact]
+    public void Validate_Fails_When_AdjustmentHours_Exceeds_Maximum()
+    {
+        var v = new AdjustLeaveBalanceValidator();
+        var result = v.Validate(ValidRequest() with { AdjustmentHours = 100_000m });
+        Assert.False(result.IsValid);
+        var error = Assert.Single(result.Errors, e => e.PropertyName == nameof(AdjustLeaveBalanceRequest.AdjustmentHours));
+        Assert.Equal("Adjustment must be between -9,999.99 and 9,999.99 hours.", error.ErrorMessage);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_AdjustmentHours_Is_Below_Minimum()
+    {
+        var v = new AdjustLeaveBalanceValidator();
+        var result = v.Validate(ValidRequest() with { AdjustmentHours = -100_000m });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(AdjustLeaveBalanceRequest.AdjustmentHours));
+    }
+
+    [Fact]
+    public void Validate_Passes_When_AdjustmentHours_Is_At_Maximum_Boundary()
+    {
+        var v = new AdjustLeaveBalanceValidator();
+        var result = v.Validate(ValidRequest() with { AdjustmentHours = 9999.99m });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_AdjustmentHours_Is_At_Minimum_Boundary()
+    {
+        var v = new AdjustLeaveBalanceValidator();
+        var result = v.Validate(ValidRequest() with { AdjustmentHours = -9999.99m });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
     public void Validate_Fails_When_Reason_Is_Not_Defined_Enum_Value()
     {
         var v = new AdjustLeaveBalanceValidator();

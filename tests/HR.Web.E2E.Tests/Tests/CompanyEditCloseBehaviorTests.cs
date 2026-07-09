@@ -18,7 +18,10 @@ public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example";
+    // CompanyEdit's edit mode (LoadAsync) gates on Session.CanManageCompany, which the
+    // company:manage policy restricts to CompanyAdministrator — HrAdministrator no longer
+    // qualifies, so these tests need a CompanyAdministrator-only persona.
+    private const string CompanyAdminEmail = "priya.shah@acme.example";
 
     [Fact]
     public async Task Close_WithNoChanges_NavigatesDirectlyToDashboard()
@@ -27,7 +30,7 @@ public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(CompanyAdminEmail);
 
         await companyEdit.GoToAsync(AcmeId);
 
@@ -43,7 +46,7 @@ public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(CompanyAdminEmail);
 
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenProfileTabAsync();
@@ -64,7 +67,7 @@ public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(CompanyAdminEmail);
 
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenSettingsTabAsync();
@@ -87,7 +90,7 @@ public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(CompanyAdminEmail);
 
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenSettingsTabAsync();
@@ -113,7 +116,7 @@ public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(CompanyAdminEmail);
 
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenSettingsTabAsync();
@@ -142,7 +145,7 @@ public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(CompanyAdminEmail);
 
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenProfileTabAsync();

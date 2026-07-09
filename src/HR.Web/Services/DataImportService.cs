@@ -46,9 +46,12 @@ public sealed class DataImportService(IHttpClientFactory httpClientFactory)
     {
         try
         {
-            var response = await Http.PostAsync(
+            // FastEndpoints rejects a truly bodyless POST (no Content-Type header at all) with
+            // 415 Unsupported Media Type, even though ValidateImportSessionRequest's properties
+            // are all route-bound — so post an empty JSON object rather than a null body.
+            var response = await Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/data-import/sessions/{importSessionId}/validate",
-                content: null, cancellationToken);
+                new { }, HrApiJsonOptions.Default, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -93,9 +96,11 @@ public sealed class DataImportService(IHttpClientFactory httpClientFactory)
     {
         try
         {
-            var response = await Http.PostAsync(
+            // Same bodyless-POST 415 issue as ValidateSessionAsync above — post an empty JSON
+            // object so FastEndpoints sees a valid Content-Type instead of none at all.
+            var response = await Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/data-import/sessions/{importSessionId}/confirm",
-                content: null, cancellationToken);
+                new { }, HrApiJsonOptions.Default, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {

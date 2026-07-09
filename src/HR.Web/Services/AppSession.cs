@@ -85,7 +85,7 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
 
         var companyTask  = Http.GetFromJsonAsync<GetCompanyResponse>($"api/companies/{me.CompanyId}", HrApiJsonOptions.Default);
         var settingsTask = Http.GetFromJsonAsync<GetCompanySettingsResponse>($"api/companies/{me.CompanyId}/settings", HrApiJsonOptions.Default);
-        var employeeTask = Http.GetFromJsonAsync<MyEmployeeResponse>($"api/companies/{me.CompanyId}/employees/me", HrApiJsonOptions.Default);
+        var employeeTask = GetEmployeeOrNullAsync(me.CompanyId);
 
         await Task.WhenAll(companyTask, settingsTask, employeeTask);
 
@@ -128,6 +128,25 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
         }
 
         IsLoaded = true;
+    }
+
+    // A signed-in user isn't always linked to an Employee record (e.g. a Company Administrator
+    // account with no employee profile, like the "just company admin" persona) — MyProfileUrl
+    // and every EmployeeId-derived property above already treat a null EmployeeId as "no linked
+    // employee", so a 404 here is an expected outcome, not a fatal one. Unlike the other two
+    // fetches in InitialiseAsync's Task.WhenAll, this one must not let an HttpRequestException
+    // propagate and take down the whole session load.
+    private async Task<MyEmployeeResponse?> GetEmployeeOrNullAsync(Guid companyId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<MyEmployeeResponse>(
+                $"api/companies/{companyId}/employees/me", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
     }
 
     // Several dashboard widgets each need an employee id -> display name lookup (and a couple

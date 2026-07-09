@@ -1,6 +1,7 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Routing;
 using HR.Web.Services;
 
 namespace HR.Web.Components.Pages;
@@ -13,7 +14,7 @@ namespace HR.Web.Components.Pages;
 /// sections (e.g. a tabbed page whose tabs each own their own model) use this non-generic base
 /// directly.
 /// </summary>
-public abstract class EditPageBase : ComponentBase
+public abstract class EditPageBase : ComponentBase, IDisposable
 {
     [Inject] protected NavigationManager Navigation { get; set; } = default!;
 
@@ -31,6 +32,49 @@ public abstract class EditPageBase : ComponentBase
     // Overridden by EditPageBase<TModel> (diffs the model against a load-time snapshot) and by
     // orchestrator pages that also want to factor in a child section's unsaved state.
     protected virtual bool HasUnsavedChanges => false;
+
+    // Where the user was actually trying to go when a navigation attempt got intercepted by
+    // HandleLocationChangingAsync — null when the dialog was triggered by the Close button
+    // instead, in which case NavigateToList() falls back to ListUrl.
+    private string? _pendingNavigationUri;
+    private IDisposable? _locationChangingRegistration;
+
+    // Set immediately before a NavigateToList()-driven NavigateTo call so the interceptor lets
+    // that one navigation through unchallenged — otherwise e.g. DiscardChangesAndClose's own
+    // follow-up navigation would trip the same guard again (HasUnsavedChanges is still true;
+    // discarding doesn't reset the model, it just abandons this component) and the dialog would
+    // reopen in an infinite loop instead of actually leaving the page.
+    private bool _navigationConfirmed;
+
+    protected override void OnInitialized()
+    {
+        // Catches in-app navigation attempts (NavLink clicks, menu items, NavigateTo calls)
+        // while the page is dirty — e.g. clicking away to another section without saving.
+        // Browser-level navigation (back/forward, refresh, closing the tab) is a separate
+        // concern: each edit page renders its own <NavigationLock ConfirmExternalNavigation>
+        // next to <UnsavedChangesDialog>, which triggers the browser's native "leave site?"
+        // prompt instead — that prompt can't be replaced with our custom dialog, it's a
+        // platform (beforeunload) limitation.
+        _locationChangingRegistration = Navigation.RegisterLocationChangingHandler(HandleLocationChangingAsync);
+    }
+
+    private ValueTask HandleLocationChangingAsync(LocationChangingContext context)
+    {
+        if (_navigationConfirmed)
+        {
+            _navigationConfirmed = false;
+            return ValueTask.CompletedTask;
+        }
+
+        if (!HasUnsavedChanges || ShowUnsavedChangesDialog)
+            return ValueTask.CompletedTask;
+
+        context.PreventNavigation();
+        _pendingNavigationUri = context.TargetLocation;
+        ShowUnsavedChangesDialog = true;
+        StateHasChanged();
+        return ValueTask.CompletedTask;
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -106,15 +150,24 @@ public abstract class EditPageBase : ComponentBase
             NavigateToList();
     }
 
+    // Navigates to wherever the in-progress navigation attempt was headed
+    // (HandleLocationChangingAsync), or ListUrl when the dialog was raised by the Close
+    // button instead (no intercepted navigation, so _pendingNavigationUri is null).
     protected void NavigateToList()
     {
-        if (ListUrl is not null)
-            Navigation.NavigateTo(ListUrl);
+        var target = _pendingNavigationUri ?? ListUrl;
+        _pendingNavigationUri = null;
+
+        if (target is not null)
+        {
+            _navigationConfirmed = true;
+            Navigation.NavigateTo(target);
+        }
     }
 
-    // Save, then always navigate to ListUrl on success — even for pages whose normal
-    // OnSavedAsync stays put (e.g. an orchestrator page showing an inline success banner),
-    // since the user explicitly chose "Save" from the "unsaved changes" close prompt.
+    // Save, then always navigate on success — even for pages whose normal OnSavedAsync stays
+    // put (e.g. an orchestrator page showing an inline success banner), since the user
+    // explicitly chose "Save" from the "unsaved changes" prompt.
     protected async Task ConfirmSaveAndCloseAsync()
     {
         ShowUnsavedChangesDialog = false;
@@ -130,7 +183,13 @@ public abstract class EditPageBase : ComponentBase
         NavigateToList();
     }
 
-    protected void CancelCloseDialog() => ShowUnsavedChangesDialog = false;
+    protected void CancelCloseDialog()
+    {
+        ShowUnsavedChangesDialog = false;
+        _pendingNavigationUri = null;
+    }
+
+    public void Dispose() => _locationChangingRegistration?.Dispose();
 }
 
 /// <summary>
