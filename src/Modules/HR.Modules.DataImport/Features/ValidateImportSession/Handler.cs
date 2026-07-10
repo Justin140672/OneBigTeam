@@ -43,8 +43,10 @@ internal sealed class ValidateImportSessionHandler(
 
         try
         {
+            var mapping = StandardEmployeeColumnMapping.Default.WithOverrides(request.ColumnMapping);
+
             await using var fileStream = await storage.OpenReadAsync(session.StorageKey, cancellationToken);
-            parseResult = parser.Parse(fileStream, session.FileName, StandardEmployeeColumnMapping.Default);
+            parseResult = parser.Parse(fileStream, session.FileName, mapping);
         }
         catch (Exception ex)
         {

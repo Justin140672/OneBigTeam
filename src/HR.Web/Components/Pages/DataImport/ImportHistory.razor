@@ -1,0 +1,84 @@
+@page "/companies/{CompanyId:guid}/data-import/history"
+@rendermode InteractiveServer
+@inject DataImportService DataImportService
+@inject AppSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Import History</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+        <h1 class="mb-1">Import History</h1>
+        <SfButton OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/data-import/employees"))">New Import</SfButton>
+    </div>
+    <p class="text-muted mb-4">Past employee data import sessions for this company.</p>
+
+    @if (_loading)
+    {
+        <HrLoadingIndicator Label="Loading import history…" />
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else if (_sessions.Count == 0)
+    {
+        <p class="text-muted">No import sessions yet.</p>
+    }
+    else
+    {
+        <HrGrid TValue="ImportSessionSummary" DataSource="@_sessions" AllowPaging="true" AllowSorting="true">
+            <GridPageSettings PageSize="20" />
+            <GridColumns>
+                <GridColumn Field="@nameof(ImportSessionSummary.FileName)" HeaderText="File Name" Width="220">
+                    <Template>
+                        @{
+                            var row = (context as ImportSessionSummary)!;
+                            <a href="/companies/@CompanyId/data-import/sessions/@row.Id">@row.FileName</a>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(ImportSessionSummary.Status)" HeaderText="Status" Width="120" />
+                <GridColumn Field="@nameof(ImportSessionSummary.TotalRows)" HeaderText="Total Rows" Width="110" />
+                <GridColumn Field="@nameof(ImportSessionSummary.SuccessfulRows)" HeaderText="Successful Rows" Width="140" />
+                <GridColumn Field="@nameof(ImportSessionSummary.FailedRows)" HeaderText="Failed Rows" Width="120" />
+                <GridColumn Field="@nameof(ImportSessionSummary.CreatedAt)" HeaderText="Created At" Width="170" Format="g" />
+                <GridColumn Field="@nameof(ImportSessionSummary.CompletedAt)" HeaderText="Completed At" Width="170" Format="g" />
+            </GridColumns>
+        </HrGrid>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private List<ImportSessionSummary> _sessions = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.CanManageEmployees)
+        {
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            var (result, error) = await DataImportService.ListSessionsAsync(CompanyId);
+            if (result is null)
+            {
+                _error = error ?? "Failed to load import history.";
+                return;
+            }
+
+            _sessions = result;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

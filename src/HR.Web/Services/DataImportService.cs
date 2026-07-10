@@ -7,6 +7,10 @@ namespace HR.Web.Services;
 
 public sealed class DataImportService(IHttpClientFactory httpClientFactory)
 {
+    /// <summary>Sentinel returned as the error string from <see cref="GetSessionAsync"/> when the
+    /// session doesn't exist, so callers can show a "not found" message instead of a generic error.</summary>
+    public const string NotFoundSentinel = "NotFound";
+
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
     public async Task<(UploadImportFileResponse? Result, string? Error)> UploadFileAsync(
@@ -42,7 +46,8 @@ public sealed class DataImportService(IHttpClientFactory httpClientFactory)
     }
 
     public async Task<(ValidateImportSessionResponse? Result, string? Error)> ValidateSessionAsync(
-        Guid companyId, Guid importSessionId, CancellationToken cancellationToken = default)
+        Guid companyId, Guid importSessionId, IReadOnlyDictionary<string, string>? columnMapping = null,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -51,7 +56,7 @@ public sealed class DataImportService(IHttpClientFactory httpClientFactory)
             // are all route-bound — so post an empty JSON object rather than a null body.
             var response = await Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/data-import/sessions/{importSessionId}/validate",
-                new { }, HrApiJsonOptions.Default, cancellationToken);
+                new { columnMapping }, HrApiJsonOptions.Default, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -115,6 +120,143 @@ public sealed class DataImportService(IHttpClientFactory httpClientFactory)
         {
             return (null, ex.Message);
         }
+    }
+
+    public async Task<(GetImportSessionColumnsResponse? Result, string? Error)> GetSessionColumnsAsync(
+        Guid companyId, Guid importSessionId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.GetAsync(
+                $"api/companies/{companyId}/data-import/sessions/{importSessionId}/columns", cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<GetImportSessionColumnsResponse>(
+                    HrApiJsonOptions.Default, cancellationToken);
+                return (result, null);
+            }
+
+            return (null, await ExtractErrorAsync(response, "Failed to load detected columns.", cancellationToken));
+        }
+        catch (HttpRequestException ex)
+        {
+            return (null, ex.Message);
+        }
+    }
+
+    public async Task<(List<ImportSessionSummary>? Result, string? Error)> ListSessionsAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.GetAsync(
+                $"api/companies/{companyId}/data-import/sessions", cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<List<ImportSessionSummary>>(
+                    HrApiJsonOptions.Default, cancellationToken);
+                return (result, null);
+            }
+
+            return (null, await ExtractErrorAsync(response, "Failed to load import history.", cancellationToken));
+        }
+        catch (HttpRequestException ex)
+        {
+            return (null, ex.Message);
+        }
+    }
+
+    public async Task<(GetImportSessionResponse? Result, string? Error)> GetSessionAsync(
+        Guid companyId, Guid importSessionId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.GetAsync(
+                $"api/companies/{companyId}/data-import/sessions/{importSessionId}", cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<GetImportSessionResponse>(
+                    HrApiJsonOptions.Default, cancellationToken);
+                return (result, null);
+            }
+
+            // Callers distinguish "not found" from other failures by checking for this exact
+            // sentinel value, so a missing session can be shown as a friendly message rather
+            // than a generic error banner.
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return (null, NotFoundSentinel);
+
+            return (null, await ExtractErrorAsync(response, "Failed to load import session.", cancellationToken));
+        }
+        catch (HttpRequestException ex)
+        {
+            return (null, ex.Message);
+        }
+    }
+
+    public async Task<(byte[]? Bytes, string FileName, string? Error)> DownloadErrorReportAsync(
+        Guid companyId, Guid importSessionId, CancellationToken cancellationToken = default)
+    {
+        var fallbackFileName = $"import-errors-{importSessionId}.csv";
+        try
+        {
+            var response = await Http.GetAsync(
+                $"api/companies/{companyId}/data-import/sessions/{importSessionId}/errors/export", cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+                var fileName = GetAttachmentFileName(response, fallbackFileName);
+                return (bytes, fileName, null);
+            }
+
+            return (null, fallbackFileName, await ExtractErrorAsync(response, "Failed to download error report.", cancellationToken));
+        }
+        catch (HttpRequestException ex)
+        {
+            return (null, fallbackFileName, ex.Message);
+        }
+    }
+
+    public async Task<(byte[]? Bytes, string FileName, string? Error)> DownloadTemplateAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        const string fallbackFileName = "employee-import-template.csv";
+        try
+        {
+            var response = await Http.GetAsync(
+                $"api/companies/{companyId}/data-import/employees/template", cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+                var fileName = GetAttachmentFileName(response, fallbackFileName);
+                return (bytes, fileName, null);
+            }
+
+            return (null, fallbackFileName, await ExtractErrorAsync(response, "Failed to download template.", cancellationToken));
+        }
+        catch (HttpRequestException ex)
+        {
+            return (null, fallbackFileName, ex.Message);
+        }
+    }
+
+    private static string GetAttachmentFileName(HttpResponseMessage response, string fallback)
+    {
+        try
+        {
+            var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+                ?? response.Content.Headers.ContentDisposition?.FileName;
+            if (!string.IsNullOrWhiteSpace(fileName))
+                return fileName.Trim('"');
+        }
+        catch { }
+
+        return fallback;
     }
 
     private static async Task<string> ExtractErrorAsync(

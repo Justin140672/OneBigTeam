@@ -14,6 +14,28 @@ internal sealed class ColumnMappingProfile
     }
 
     public IReadOnlyDictionary<string, string> TargetFieldToHeaderName => _targetToHeader;
+
+    /// <summary>
+    /// Returns a new profile with the given target-field -> header-name overrides applied on
+    /// top of this profile's mapping. Target fields not present in <paramref name="overrides"/>
+    /// keep their existing header. A null or empty override collection returns this profile
+    /// unchanged (as a new instance).
+    /// </summary>
+    public ColumnMappingProfile WithOverrides(IReadOnlyDictionary<string, string>? overrides)
+    {
+        var merged = new Dictionary<string, string>(_targetToHeader, StringComparer.OrdinalIgnoreCase);
+
+        if (overrides is not null)
+        {
+            foreach (var (targetField, headerName) in overrides)
+            {
+                if (!string.IsNullOrWhiteSpace(headerName))
+                    merged[targetField] = headerName;
+            }
+        }
+
+        return new ColumnMappingProfile(merged);
+    }
 }
 
 /// <summary>

@@ -1,0 +1,137 @@
+@page "/companies/{CompanyId:guid}/data-import/sessions/{ImportSessionId:guid}"
+@rendermode InteractiveServer
+@inject DataImportService DataImportService
+@inject AppSession Session
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Import Session</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+        <h1 class="mb-1">Import Session</h1>
+        <SfButton OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/data-import/history"))">Back to History</SfButton>
+    </div>
+
+    @if (_loading)
+    {
+        <HrLoadingIndicator Label="Loading import session…" />
+    }
+    else if (_notFound)
+    {
+        <div class="alert alert-warning">Import session not found.</div>
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else if (_session is not null)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">@_session.FileName</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Status</dt>
+                    <dd class="col-sm-9">@_session.Status</dd>
+                    <dt class="col-sm-3">Entity Type</dt>
+                    <dd class="col-sm-9">@_session.EntityType</dd>
+                    <dt class="col-sm-3">Total Rows</dt>
+                    <dd class="col-sm-9">@_session.TotalRows</dd>
+                    <dt class="col-sm-3">Processed Rows</dt>
+                    <dd class="col-sm-9">@_session.ProcessedRows</dd>
+                    <dt class="col-sm-3">Successful Rows</dt>
+                    <dd class="col-sm-9">@_session.SuccessfulRows</dd>
+                    <dt class="col-sm-3">Failed Rows</dt>
+                    <dd class="col-sm-9">@_session.FailedRows</dd>
+                    <dt class="col-sm-3">Created At</dt>
+                    <dd class="col-sm-9">@_session.CreatedAt.ToLocalTime().ToString("g")</dd>
+                    <dt class="col-sm-3">Started At</dt>
+                    <dd class="col-sm-9">@(_session.StartedAt.HasValue ? _session.StartedAt.Value.ToLocalTime().ToString("g") : "—")</dd>
+                    <dt class="col-sm-3">Completed At</dt>
+                    <dd class="col-sm-9">@(_session.CompletedAt.HasValue ? _session.CompletedAt.Value.ToLocalTime().ToString("g") : "—")</dd>
+                    @if (!string.IsNullOrWhiteSpace(_session.ErrorSummary))
+                    {
+                        <dt class="col-sm-3">Error Summary</dt>
+                        <dd class="col-sm-9">@_session.ErrorSummary</dd>
+                    }
+                </dl>
+
+                @if (_session.FailedRows > 0)
+                {
+                    <div class="d-flex gap-2 mt-3">
+                        <SfButton Disabled="@_downloadingErrors" OnClick="DownloadErrorReportAsync">
+                            @if (_downloadingErrors)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            Download Error Report
+                        </SfButton>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid ImportSessionId { get; set; }
+
+    private GetImportSessionResponse? _session;
+    private bool _loading = true;
+    private bool _notFound;
+    private bool _downloadingErrors;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.CanManageEmployees)
+        {
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            var (result, error) = await DataImportService.GetSessionAsync(CompanyId, ImportSessionId);
+            if (result is null)
+            {
+                if (error == DataImportService.NotFoundSentinel)
+                    _notFound = true;
+                else
+                    _error = error ?? "Failed to load import session.";
+                return;
+            }
+
+            _session = result;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task DownloadErrorReportAsync()
+    {
+        _error = null;
+        _downloadingErrors = true;
+        try
+        {
+            var (bytes, fileName, error) = await DataImportService.DownloadErrorReportAsync(CompanyId, ImportSessionId);
+            if (bytes is null)
+            {
+                _error = error ?? "Failed to download error report.";
+                return;
+            }
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, "text/csv", Convert.ToBase64String(bytes));
+        }
+        finally
+        {
+            _downloadingErrors = false;
+        }
+    }
+}

@@ -1,6 +1,11 @@
 using FluentValidation;
 using HR.Modules.DataImport.Features.ConfirmImportSession;
+using HR.Modules.DataImport.Features.DownloadImportTemplate;
+using HR.Modules.DataImport.Features.ExportImportErrors;
 using HR.Modules.DataImport.Features.GetImportPreview;
+using HR.Modules.DataImport.Features.GetImportSession;
+using HR.Modules.DataImport.Features.GetImportSessionColumns;
+using HR.Modules.DataImport.Features.ListImportSessions;
 using HR.Modules.DataImport.Features.UploadImportFile;
 using HR.Modules.DataImport.Features.ValidateImportSession;
 using HR.Modules.DataImport.Persistence;
@@ -30,11 +35,26 @@ public static class DataImportModule
         services.AddScoped<ValidateImportSessionHandler>();
         services.AddScoped<IValidator<ValidateImportSessionRequest>, ValidateImportSessionValidator>();
 
+        services.AddScoped<GetImportSessionColumnsHandler>();
+        services.AddScoped<IValidator<GetImportSessionColumnsRequest>, GetImportSessionColumnsValidator>();
+
         services.AddScoped<GetImportPreviewHandler>();
         services.AddScoped<IValidator<GetImportPreviewRequest>, GetImportPreviewValidator>();
 
         services.AddScoped<ConfirmImportSessionHandler>();
         services.AddScoped<IValidator<ConfirmImportSessionRequest>, ConfirmImportSessionValidator>();
+
+        services.AddScoped<ExportImportErrorsHandler>();
+        services.AddScoped<IValidator<ExportImportErrorsRequest>, ExportImportErrorsValidator>();
+
+        services.AddScoped<ListImportSessionsHandler>();
+        services.AddScoped<IValidator<ListImportSessionsRequest>, ListImportSessionsValidator>();
+
+        services.AddScoped<GetImportSessionHandler>();
+        services.AddScoped<IValidator<GetImportSessionRequest>, GetImportSessionValidator>();
+
+        services.AddScoped<DownloadImportTemplateHandler>();
+        services.AddScoped<IValidator<DownloadImportTemplateRequest>, DownloadImportTemplateValidator>();
 
         services.AddDbContext<DataImportDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>

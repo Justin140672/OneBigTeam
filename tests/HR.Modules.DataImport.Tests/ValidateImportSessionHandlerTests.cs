@@ -201,4 +201,65 @@ public class ValidateImportSessionHandlerTests
 
         Assert.Empty(await db.ImportStagingEmployees.ToListAsync());
     }
+
+    [Fact]
+    public async Task HandleAsync_Header_Not_Matching_Standard_Name_Fails_Required_Field_When_No_ColumnMapping_Supplied()
+    {
+        await using var db = BuildContext();
+        var storage = new FakeImportFileStorageService();
+        var companyId = Guid.NewGuid();
+
+        // File uses "Given Name" instead of the standard "First Name" header, and no
+        // ColumnMapping is supplied, so FirstName is never mapped from this file.
+        var csv =
+            "Given Name,Last Name,Work Email,Start Date,Employee Number\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001\n";
+
+        var session = await SeedPendingSessionAsync(db, storage, companyId, csv, totalRows: 1);
+        var handler = BuildHandler(db, storage);
+
+        var result = await handler.HandleAsync(
+            new ValidateImportSessionRequest { CompanyId = companyId, ImportSessionId = session.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0, result.Value!.SuccessfulRows);
+        Assert.Equal(1, result.Value.FailedRows);
+
+        var rowError = await db.ImportRowErrors.SingleAsync(e => e.ImportSessionId == session.Id);
+        Assert.Contains("'FirstName' is required.", rowError.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ColumnMapping_Override_Allows_Nonstandard_Header_To_Parse_And_Validate_Correctly()
+    {
+        await using var db = BuildContext();
+        var storage = new FakeImportFileStorageService();
+        var companyId = Guid.NewGuid();
+
+        // Same nonstandard "Given Name" header as above, but this time a ColumnMapping override
+        // redirects FirstName to read from that header instead of the default "First Name".
+        var csv =
+            "Given Name,Last Name,Work Email,Start Date,Employee Number\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001\n";
+
+        var session = await SeedPendingSessionAsync(db, storage, companyId, csv, totalRows: 1);
+        var handler = BuildHandler(db, storage);
+
+        var result = await handler.HandleAsync(
+            new ValidateImportSessionRequest
+            {
+                CompanyId = companyId,
+                ImportSessionId = session.Id,
+                ColumnMapping = new Dictionary<string, string> { ["FirstName"] = "Given Name" },
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(nameof(ImportStatus.Validated), result.Value!.Status);
+        Assert.Equal(1, result.Value.SuccessfulRows);
+        Assert.Equal(0, result.Value.FailedRows);
+
+        Assert.Empty(await db.ImportRowErrors.Where(e => e.ImportSessionId == session.Id).ToListAsync());
+    }
 }

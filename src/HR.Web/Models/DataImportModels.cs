@@ -45,3 +45,38 @@ public sealed record ConfirmImportSessionResponse(
     string Status,
     int CreatedCount,
     int FailedCount);
+
+public sealed record ImportFieldSuggestion(
+    string TargetField,
+    string StandardHeaderName,
+    string? SuggestedHeader);
+
+public sealed record GetImportSessionColumnsResponse(
+    Guid ImportSessionId,
+    IReadOnlyList<string> DetectedHeaders,
+    IReadOnlyList<ImportFieldSuggestion> FieldSuggestions);
+
+public sealed record ImportSessionSummary(
+    Guid Id,
+    string FileName,
+    string Status,
+    int TotalRows,
+    int SuccessfulRows,
+    int FailedRows,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? CompletedAt);
+
+public sealed record GetImportSessionResponse(
+    Guid Id,
+    string EntityType,
+    string FileName,
+    string Status,
+    int TotalRows,
+    int ProcessedRows,
+    int SuccessfulRows,
+    int FailedRows,
+    DateTimeOffset? StartedAt,
+    DateTimeOffset? CompletedAt,
+    string? ErrorSummary,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);

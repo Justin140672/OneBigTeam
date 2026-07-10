@@ -3,6 +3,7 @@
 @inject DataImportService DataImportService
 @inject AppSession Session
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>Employee Data Import</PageTitle>
 
@@ -10,7 +11,18 @@
     <div class="d-flex justify-content-between align-items-start mb-1">
         <h1 class="mb-1">Employee Data Import</h1>
     </div>
-    <p class="text-muted mb-4">Upload a CSV or XLSX file of employees, validate it, review the preview, then confirm to create the records.</p>
+    <p class="text-muted mb-4">Upload a CSV or XLSX file of employees, map its columns, validate, review the preview, then confirm to create the records.</p>
+
+    <ul class="nav nav-pills mb-4">
+        @foreach (var step in _steps)
+        {
+            <li class="nav-item">
+                <span class="nav-link @(step.Number == CurrentStep ? "active" : (step.Number < CurrentStep ? "text-success" : "text-muted"))">
+                    @step.Number. @step.Label
+                </span>
+            </li>
+        }
+    </ul>
 
     @if (_globalError is not null)
     {
@@ -49,51 +61,130 @@
                         }
                         Upload
                     </SfButton>
+                    <SfButton Disabled="@_downloadingTemplate" OnClick="DownloadTemplateAsync">
+                        @if (_downloadingTemplate)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Download Template
+                    </SfButton>
                 }
                 else
                 {
                     <SfButton OnClick="StartNewImport">Start New Import</SfButton>
                 }
             </div>
+
+            <details class="mt-3">
+                <summary>Column reference (required fields, formats)</summary>
+                <div class="table-responsive mt-2">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Field</th>
+                                <th>Required</th>
+                                <th>Format</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in _fieldReference)
+                            {
+                                <tr>
+                                    <td>@row.Field</td>
+                                    <td>@(row.Required ? "Required" : "Optional")</td>
+                                    <td>@row.Format</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </details>
         </div>
     </div>
 
-    @if (_session is not null)
+    @if (_session is not null && _validation is null)
     {
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">2. Validate</h5>
+                <h5 class="mb-0">2. Column Mapping</h5>
             </div>
             <div class="card-body">
-                @if (_validation is not null)
+                @if (_loadingColumns)
                 {
-                    <dl class="row mb-0">
-                        <dt class="col-sm-3">Status</dt>
-                        <dd class="col-sm-9">@_validation.Status</dd>
-                        <dt class="col-sm-3">Successful Rows</dt>
-                        <dd class="col-sm-9">@_validation.SuccessfulRows</dd>
-                        <dt class="col-sm-3">Failed Rows</dt>
-                        <dd class="col-sm-9">@_validation.FailedRows</dd>
-                    </dl>
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span> <span>Detecting columns…</span>
                 }
-                <div class="d-flex gap-2 mt-2">
-                    <SfButton IsPrimary="true" Disabled="@_validating" OnClick="ValidateAsync">
-                        @if (_validating)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                        }
-                        Validate
-                    </SfButton>
-                    @if (_validation is not null)
-                    {
-                        <SfButton Disabled="@_loadingPreview" OnClick="LoadPreviewAsync">
-                            @if (_loadingPreview)
+                else if (_columns is not null)
+                {
+                    <p class="text-muted">
+                        Detected @_columns.DetectedHeaders.Count column(s) in the file. Confirm or adjust the mapping below, then continue to validate.
+                    </p>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Standard Field</th>
+                                    <th>File Column</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var field in _columns.FieldSuggestions)
+                                {
+                                    <tr>
+                                        <td>@field.StandardHeaderName</td>
+                                        <td>
+                                            <select class="form-select form-select-sm" style="max-width: 320px;"
+                                                    value="@_mappingSelections.GetValueOrDefault(field.TargetField)"
+                                                    @onchange="@(e => OnMappingChanged(field.TargetField, e))">
+                                                <option value="">Not mapped</option>
+                                                @foreach (var header in _columns.DetectedHeaders)
+                                                {
+                                                    <option value="@header">@header</option>
+                                                }
+                                            </select>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-2">
+                        <SfButton IsPrimary="true" Disabled="@_validating" OnClick="ContinueToValidateAsync">
+                            @if (_validating)
                             {
                                 <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                             }
-                            View Preview
+                            Continue
                         </SfButton>
-                    }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (_validation is not null)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">3. Validation Results</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Status</dt>
+                    <dd class="col-sm-9">@_validation.Status</dd>
+                    <dt class="col-sm-3">Successful Rows</dt>
+                    <dd class="col-sm-9">@_validation.SuccessfulRows</dd>
+                    <dt class="col-sm-3">Failed Rows</dt>
+                    <dd class="col-sm-9">@_validation.FailedRows</dd>
+                </dl>
+                <div class="d-flex gap-2 mt-2">
+                    <SfButton IsPrimary="true" Disabled="@_loadingPreview" OnClick="LoadPreviewAsync">
+                        @if (_loadingPreview)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        View Preview
+                    </SfButton>
                 </div>
             </div>
         </div>
@@ -103,7 +194,7 @@
     {
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">3. Preview</h5>
+                <h5 class="mb-0">4. Preview &amp; Confirm</h5>
             </div>
             <div class="card-body">
                 <p class="mb-3">
@@ -128,7 +219,19 @@
                     </GridColumns>
                 </HrGrid>
 
-                <h6>Row Errors</h6>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Row Errors</h6>
+                    @if (_preview.RowErrors.Count > 0)
+                    {
+                        <SfButton Disabled="@_downloadingErrors" OnClick="DownloadErrorReportAsync">
+                            @if (_downloadingErrors)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            Download Error Report
+                        </SfButton>
+                    }
+                </div>
                 @if (_preview.RowErrors.Count == 0)
                 {
                     <p class="text-muted">No row errors.</p>
@@ -185,7 +288,7 @@
     {
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">4. Result</h5>
+                <h5 class="mb-0">5. Completion Summary</h5>
             </div>
             <div class="card-body">
                 <dl class="row mb-3">
@@ -197,6 +300,16 @@
                     <dd class="col-sm-9">@_confirmResult.FailedCount</dd>
                 </dl>
                 <div class="d-flex gap-2">
+                    @if (_confirmResult.FailedCount > 0)
+                    {
+                        <SfButton Disabled="@_downloadingErrors" OnClick="DownloadErrorReportAsync">
+                            @if (_downloadingErrors)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            Download Error Report
+                        </SfButton>
+                    }
                     <SfButton OnClick="StartNewImport">Start New Import</SfButton>
                     <SfButton OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/employees"))">Go to Employees</SfButton>
                 </div>
@@ -210,16 +323,66 @@
 
     private IBrowserFile? _selectedFile;
     private bool _uploading;
+    private bool _loadingColumns;
     private bool _validating;
     private bool _loadingPreview;
     private bool _confirming;
+    private bool _downloadingTemplate;
+    private bool _downloadingErrors;
 
     private UploadImportFileResponse? _session;
+    private GetImportSessionColumnsResponse? _columns;
+    private Dictionary<string, string?> _mappingSelections = new();
     private ValidateImportSessionResponse? _validation;
     private GetImportPreviewResponse? _preview;
     private ConfirmImportSessionResponse? _confirmResult;
 
     private string? _globalError;
+
+    private int CurrentStep =>
+        _confirmResult is not null ? 5 :
+        _preview is not null ? 4 :
+        _validation is not null ? 3 :
+        _session is not null ? 2 : 1;
+
+    private static readonly (int Number, string Label)[] _steps =
+    [
+        (1, "Upload"),
+        (2, "Column Mapping"),
+        (3, "Validation Results"),
+        (4, "Preview & Confirm"),
+        (5, "Completion"),
+    ];
+
+    private static readonly (string Field, bool Required, string Format)[] _fieldReference =
+    [
+        ("First Name", true, "Free text"),
+        ("Last Name", true, "Free text"),
+        ("Work Email", true, "Valid email address"),
+        ("Start Date", true, "yyyy-MM-dd or dd/MM/yyyy"),
+        ("Preferred Name", false, "Free text"),
+        ("Personal Email", false, "Free text"),
+        ("Nationality", false, "Free text"),
+        ("Gender", false, "Free text"),
+        ("Date Of Birth", false, "yyyy-MM-dd or dd/MM/yyyy; must be in the past"),
+        ("Continuous Service Date", false, "yyyy-MM-dd or dd/MM/yyyy"),
+        ("Probation End Date", false, "yyyy-MM-dd or dd/MM/yyyy"),
+        ("Employee Number", false, "Must be unique within the file and within the company, if provided"),
+        ("Manager Reference", false, "Must match another row's Employee Number/Work Email in the file, or an existing employee's Employee Number/Work Email in the company"),
+        ("Department", false, "Name; auto-created with a warning if it doesn't already exist for the company"),
+        ("Location", false, "Name; auto-created with a warning if it doesn't already exist for the company"),
+        ("Employment Type", false, "Name; auto-created with a warning if it doesn't already exist for the company"),
+        ("Position Profile", false, "Title; auto-created with a warning if it doesn't already exist — only when both Department and Location are present and resolvable on that row"),
+        ("Salary Amount", false, "Positive number"),
+        ("Salary Type", false, "One of: Annual, Hourly, Daily"),
+        ("Currency", false, "3-letter currency code (e.g. GBP, USD)"),
+        ("Hours Per Week", false, "Positive number"),
+        ("FTE", false, "Number between 0 and 1"),
+        ("Leave Type Code", false, "Free text"),
+        ("Leave Balance Days", false, "Non-negative number"),
+        ("Working Days", false, "Comma-separated day names, e.g. Monday,Tuesday,Wednesday,Thursday,Friday"),
+        ("Hours Per Day", false, "Positive number"),
+    ];
 
     protected override void OnInitialized()
     {
@@ -245,6 +408,7 @@
             }
 
             _session = result;
+            await LoadColumnsAsync();
         }
         finally
         {
@@ -252,7 +416,37 @@
         }
     }
 
-    private async Task ValidateAsync()
+    private async Task LoadColumnsAsync()
+    {
+        if (_session is null) return;
+
+        _globalError = null;
+        _loadingColumns = true;
+        try
+        {
+            var (result, error) = await DataImportService.GetSessionColumnsAsync(CompanyId, _session.Id);
+            if (result is null)
+            {
+                _globalError = error ?? "Failed to detect columns.";
+                return;
+            }
+
+            _columns = result;
+            _mappingSelections = result.FieldSuggestions.ToDictionary(f => f.TargetField, f => f.SuggestedHeader);
+        }
+        finally
+        {
+            _loadingColumns = false;
+        }
+    }
+
+    private void OnMappingChanged(string targetField, Microsoft.AspNetCore.Components.ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        _mappingSelections[targetField] = string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    private async Task ContinueToValidateAsync()
     {
         if (_session is null) return;
 
@@ -260,7 +454,12 @@
         _validating = true;
         try
         {
-            var (result, error) = await DataImportService.ValidateSessionAsync(CompanyId, _session.Id);
+            var mapping = _mappingSelections
+                .Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
+                .ToDictionary(kv => kv.Key, kv => kv.Value!);
+
+            var (result, error) = await DataImportService.ValidateSessionAsync(
+                CompanyId, _session.Id, mapping.Count > 0 ? mapping : null);
             if (result is null)
             {
                 _globalError = error ?? "Validation failed.";
@@ -321,10 +520,56 @@
         }
     }
 
+    private async Task DownloadTemplateAsync()
+    {
+        _globalError = null;
+        _downloadingTemplate = true;
+        try
+        {
+            var (bytes, fileName, error) = await DataImportService.DownloadTemplateAsync(CompanyId);
+            if (bytes is null)
+            {
+                _globalError = error ?? "Failed to download template.";
+                return;
+            }
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, "text/csv", Convert.ToBase64String(bytes));
+        }
+        finally
+        {
+            _downloadingTemplate = false;
+        }
+    }
+
+    private async Task DownloadErrorReportAsync()
+    {
+        if (_session is null) return;
+
+        _globalError = null;
+        _downloadingErrors = true;
+        try
+        {
+            var (bytes, fileName, error) = await DataImportService.DownloadErrorReportAsync(CompanyId, _session.Id);
+            if (bytes is null)
+            {
+                _globalError = error ?? "Failed to download error report.";
+                return;
+            }
+
+            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, "text/csv", Convert.ToBase64String(bytes));
+        }
+        finally
+        {
+            _downloadingErrors = false;
+        }
+    }
+
     private void StartNewImport()
     {
         _selectedFile = null;
         _session = null;
+        _columns = null;
+        _mappingSelections = new();
         _validation = null;
         _preview = null;
         _confirmResult = null;

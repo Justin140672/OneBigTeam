@@ -142,4 +142,46 @@ public class EmployeeImportFileParserTests
         Assert.DoesNotContain("WorkEmail", result.MappedFields);
         Assert.All(result.Rows, r => Assert.False(r.Fields.ContainsKey("WorkEmail")));
     }
+
+    [Fact]
+    public void ParseHeaders_Csv_Returns_Header_Row_Split_Correctly()
+    {
+        var csv =
+            "First Name,Last Name,Work Email,Notes\n" +
+            "Alice,Smith,alice@example.com,Likes coffee\n";
+
+        var parser = new EmployeeImportFileParser();
+        var headers = parser.ParseHeaders(ToStream(csv), "employees.csv");
+
+        Assert.Equal(new[] { "First Name", "Last Name", "Work Email", "Notes" }, headers);
+    }
+
+    [Fact]
+    public void ParseHeaders_Xlsx_Returns_Header_Row()
+    {
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Sheet1");
+
+        worksheet.Cell(1, 1).Value = "First Name";
+        worksheet.Cell(1, 2).Value = "Last Name";
+        worksheet.Cell(1, 3).Value = "Work Email";
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        var parser = new EmployeeImportFileParser();
+        var headers = parser.ParseHeaders(stream, "employees.xlsx");
+
+        Assert.Equal(new[] { "First Name", "Last Name", "Work Email" }, headers);
+    }
+
+    [Fact]
+    public void ParseHeaders_Empty_File_Returns_Empty_List()
+    {
+        var parser = new EmployeeImportFileParser();
+        var headers = parser.ParseHeaders(ToStream(string.Empty), "employees.csv");
+
+        Assert.Empty(headers);
+    }
 }

@@ -30,6 +30,52 @@ internal sealed class EmployeeImportFileParser
             : ParseCsv(content, mapping);
     }
 
+    /// <summary>
+    /// Reads just the header row of an import file, for column-mapping purposes.
+    /// </summary>
+    public IReadOnlyList<string> ParseHeaders(Stream content, string fileName)
+    {
+        return ImportFileFormat.IsXlsx(fileName)
+            ? ParseXlsxHeaders(content)
+            : ParseCsvHeaders(content);
+    }
+
+    private static IReadOnlyList<string> ParseCsvHeaders(Stream content)
+    {
+        using var reader = new StreamReader(content, leaveOpen: true);
+
+        var headerLine = reader.ReadLine();
+        if (headerLine is null)
+            return [];
+
+        return SplitCsvLine(headerLine)
+            .Select(h => h.Trim())
+            .Where(h => h.Length > 0)
+            .ToList();
+    }
+
+    private static IReadOnlyList<string> ParseXlsxHeaders(Stream content)
+    {
+        using var workbook = new XLWorkbook(content);
+        var worksheet = workbook.Worksheet(1);
+        var usedRange = worksheet.RangeUsed();
+
+        if (usedRange is null)
+            return [];
+
+        var lastColumn = usedRange.LastColumn().ColumnNumber();
+
+        var headers = new List<string>();
+        for (var col = 1; col <= lastColumn; col++)
+        {
+            var value = worksheet.Cell(1, col).GetString().Trim();
+            if (value.Length > 0)
+                headers.Add(value);
+        }
+
+        return headers;
+    }
+
     private static EmployeeImportParseResult ParseCsv(Stream content, ColumnMappingProfile mapping)
     {
         using var reader = new StreamReader(content, leaveOpen: true);
