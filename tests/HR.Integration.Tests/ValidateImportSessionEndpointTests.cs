@@ -138,6 +138,61 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
     }
 
     [Fact]
+    public async Task Returns_Ok_And_Validated_When_ColumnMapping_Override_Maps_NonStandard_Headers()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AdminClient(companyId);
+
+        // Headers don't match the standard template ("Given Name"/"Family Name" instead of
+        // "First Name"/"Last Name") — without a mapping override this would fail to populate
+        // the required FirstName/LastName fields.
+        const string csv =
+            "Given Name,Family Name,Work Email,Start Date,Employee Number\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001\n";
+
+        var sessionId = await UploadAsync(client, companyId, csv);
+
+        var mappingBody = new StringContent(
+            "{\"columnMapping\":{\"FirstName\":\"Given Name\",\"LastName\":\"Family Name\"}}",
+            Encoding.UTF8, "application/json");
+
+        var response = await client.PostAsync(ValidateUrl(companyId, sessionId), mappingBody);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ValidatePayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("Validated", payload!.Status);
+        Assert.Equal(1, payload.TotalRows);
+        Assert.Equal(1, payload.SuccessfulRows);
+        Assert.Equal(0, payload.FailedRows);
+    }
+
+    [Fact]
+    public async Task Returns_CompletedWithErrors_When_NonStandard_Headers_Used_Without_ColumnMapping_Override()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AdminClient(companyId);
+
+        // Same non-standard headers as the mapping-override test above, but posted with no
+        // override — proves the override in that test is actually doing something, not a no-op.
+        const string csv =
+            "Given Name,Family Name,Work Email,Start Date,Employee Number\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001\n";
+
+        var sessionId = await UploadAsync(client, companyId, csv);
+
+        var response = await client.PostAsync(ValidateUrl(companyId, sessionId), EmptyJson());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ValidatePayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("CompletedWithErrors", payload!.Status);
+        Assert.Equal(1, payload.TotalRows);
+        Assert.Equal(0, payload.SuccessfulRows);
+        Assert.Equal(1, payload.FailedRows);
+    }
+
+    [Fact]
     public async Task Returns_Unauthorized_Without_Auth()
     {
         using var client = _factory.CreateClient();

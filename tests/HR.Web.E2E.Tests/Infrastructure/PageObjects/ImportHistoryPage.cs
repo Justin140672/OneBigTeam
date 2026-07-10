@@ -22,4 +22,16 @@ public sealed class ImportHistoryPage(IPage page, string baseUrl)
         await page.GetByRole(AriaRole.Link, new() { Name = fileNameFragment }).ClickAsync();
         await page.WaitForURLAsync("**/data-import/sessions/*", new() { Timeout = 15_000 });
     }
+
+    /// <summary>
+    /// Returns the text of the given 0-based column index for the row matching
+    /// <paramref name="fileNameFragment"/>. Column order matches ImportHistory.razor's
+    /// GridColumns: 0=File Name, 1=Status, 2=Total Rows, 3=Successful Rows, 4=Failed Rows,
+    /// 5=Created At, 6=Completed At.
+    /// </summary>
+    public async Task<string> GetRowCellAsync(string fileNameFragment, int columnIndex)
+    {
+        var row = page.Locator(".e-row").Filter(new() { HasText = fileNameFragment }).First;
+        return (await row.Locator(".e-rowcell").Nth(columnIndex).InnerTextAsync()).Trim();
+    }
 }

@@ -53,6 +53,12 @@ public sealed class ImportHistoryTests(AppFixture fixture) : E2ETestBase(fixture
             Assert.True(await history.HasSessionAsync(fileName),
                 $"Expected the completed import session for '{fileName}' to appear in import history");
 
+            // Column order per ImportHistory.razor: 0=File Name, 1=Status, 2=Total Rows,
+            // 3=Successful Rows, 4=Failed Rows.
+            Assert.Equal("1", await history.GetRowCellAsync(fileName, 2));
+            Assert.Equal("1", await history.GetRowCellAsync(fileName, 3));
+            Assert.Equal("0", await history.GetRowCellAsync(fileName, 4));
+
             await history.OpenSessionAsync(fileName);
 
             Assert.Contains("/data-import/sessions/", _page.Url);
@@ -60,10 +66,66 @@ public sealed class ImportHistoryTests(AppFixture fixture) : E2ETestBase(fixture
             var detailStatus = await detail.GetStatusAsync();
             Assert.Equal("Imported", detailStatus);
 
-            var pageText = await _page.Locator("body").InnerTextAsync();
-            Assert.Contains("Total Rows", pageText);
-            Assert.Contains("Successful Rows", pageText);
-            Assert.Contains("Failed Rows", pageText);
+            Assert.Equal("1", await detail.GetDetailAsync("Total Rows"));
+            Assert.Equal("1", await detail.GetDetailAsync("Successful Rows"));
+            Assert.Equal("0", await detail.GetDetailAsync("Failed Rows"));
+            Assert.False(await detail.IsDownloadErrorReportButtonVisibleAsync(),
+                "Download Error Report should not be shown when there are no failed rows");
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task PartiallyFailedImport_ShowsFailedRowCount_AndErrorReportDownload()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var workEmail = $"e2e.historyfail.{suffix}@example.com";
+        var employeeNumber = $"E2EHF{suffix}";
+        var fileName = $"e2e-history-fail-{suffix}.csv";
+
+        // Second row is missing the required Last Name — one valid row, one failed row.
+        var csvContent =
+            "First Name,Last Name,Work Email,Start Date,Employee Number\n" +
+            $"Valid,Employee,{workEmail},2026-01-01,{employeeNumber}\n" +
+            $"Invalid,,invalid.{suffix}@example.com,2026-01-02,E2EHFX{suffix}\n";
+
+        var tempFile = Path.Combine(Path.GetTempPath(), fileName);
+        await File.WriteAllTextAsync(tempFile, csvContent);
+
+        try
+        {
+            var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+            var wizard  = new DataImportWizardPage(_page, _fixture.WebBaseUrl);
+            var history = new ImportHistoryPage(_page, _fixture.WebBaseUrl);
+            var detail  = new ImportSessionDetailPage(_page, _fixture.WebBaseUrl);
+
+            await login.GoToAsync();
+            await login.LoginAsync(LauraEmail);
+
+            await wizard.GoToAsync(AcmeId);
+            await wizard.UploadFileAsync(tempFile);
+            await wizard.ContinueFromMappingAsync();
+            await wizard.ViewPreviewAsync();
+            await wizard.ConfirmImportAsync();
+
+            var wizardStatus = await wizard.GetResultStatusAsync();
+            Assert.Equal("CompletedWithErrors", wizardStatus);
+
+            await history.GoToAsync(AcmeId);
+
+            Assert.Equal("2", await history.GetRowCellAsync(fileName, 2));
+            Assert.Equal("1", await history.GetRowCellAsync(fileName, 3));
+            Assert.Equal("1", await history.GetRowCellAsync(fileName, 4));
+
+            await history.OpenSessionAsync(fileName);
+
+            Assert.Equal("1", await detail.GetDetailAsync("Successful Rows"));
+            Assert.Equal("1", await detail.GetDetailAsync("Failed Rows"));
+            Assert.True(await detail.IsDownloadErrorReportButtonVisibleAsync(),
+                "Download Error Report should be shown when there are failed rows");
         }
         finally
         {

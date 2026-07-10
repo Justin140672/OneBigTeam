@@ -19,4 +19,15 @@ public sealed class ImportSessionDetailPage(IPage page, string baseUrl)
     /// session's details list.
     /// </summary>
     public async Task<string> GetStatusAsync() => await page.Locator("dl.row dd").First.InnerTextAsync();
+
+    /// <summary>Returns the &lt;dd&gt; value for the detail row whose &lt;dt&gt; matches <paramref name="label"/>.</summary>
+    public async Task<string?> GetDetailAsync(string label)
+    {
+        var dt = page.Locator("dl.row dt").Filter(new() { HasText = label }).First;
+        if (!await dt.IsVisibleAsync()) return null;
+        return (await dt.Locator("~ dd").First.InnerTextAsync())?.Trim();
+    }
+
+    public async Task<bool> IsDownloadErrorReportButtonVisibleAsync() =>
+        await page.GetByRole(AriaRole.Button, new() { Name = "Download Error Report" }).IsVisibleAsync();
 }
