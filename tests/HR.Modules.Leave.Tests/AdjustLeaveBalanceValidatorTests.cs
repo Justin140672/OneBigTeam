@@ -9,7 +9,7 @@ public class AdjustLeaveBalanceValidatorTests
         CompanyId: Guid.NewGuid(),
         EmployeeId: Guid.NewGuid(),
         LeaveTypeId: Guid.NewGuid(),
-        AdjustmentHours: 7.5m,
+        AdjustmentValue: 7.5m,
         Reason: LeaveBalanceAdjustmentReason.Correction,
         Comments: "Correcting a data entry error",
         AllowNegativeOverride: false);
@@ -42,55 +42,55 @@ public class AdjustLeaveBalanceValidatorTests
     }
 
     [Fact]
-    public void Validate_Fails_When_AdjustmentHours_Is_Zero()
+    public void Validate_Fails_When_AdjustmentValue_Is_Zero()
     {
         var v = new AdjustLeaveBalanceValidator();
-        var result = v.Validate(ValidRequest() with { AdjustmentHours = 0m });
+        var result = v.Validate(ValidRequest() with { AdjustmentValue = 0m });
         Assert.False(result.IsValid);
-        var error = Assert.Single(result.Errors, e => e.PropertyName == nameof(AdjustLeaveBalanceRequest.AdjustmentHours));
+        var error = Assert.Single(result.Errors, e => e.PropertyName == nameof(AdjustLeaveBalanceRequest.AdjustmentValue));
         Assert.Equal("Adjustment cannot be zero.", error.ErrorMessage);
     }
 
     [Fact]
-    public void Validate_Passes_When_AdjustmentHours_Is_Negative()
+    public void Validate_Passes_When_AdjustmentValue_Is_Negative()
     {
         var v = new AdjustLeaveBalanceValidator();
-        var result = v.Validate(ValidRequest() with { AdjustmentHours = -3.75m });
+        var result = v.Validate(ValidRequest() with { AdjustmentValue = -3.75m });
         Assert.True(result.IsValid);
     }
 
     [Fact]
-    public void Validate_Fails_When_AdjustmentHours_Exceeds_Maximum()
+    public void Validate_Fails_When_AdjustmentValue_Exceeds_Maximum()
     {
         var v = new AdjustLeaveBalanceValidator();
-        var result = v.Validate(ValidRequest() with { AdjustmentHours = 100_000m });
+        var result = v.Validate(ValidRequest() with { AdjustmentValue = 100_000m });
         Assert.False(result.IsValid);
-        var error = Assert.Single(result.Errors, e => e.PropertyName == nameof(AdjustLeaveBalanceRequest.AdjustmentHours));
-        Assert.Equal("Adjustment must be between -9,999.99 and 9,999.99 hours.", error.ErrorMessage);
+        var error = Assert.Single(result.Errors, e => e.PropertyName == nameof(AdjustLeaveBalanceRequest.AdjustmentValue));
+        Assert.Equal("Adjustment must be between -9,999.99 and 9,999.99.", error.ErrorMessage);
     }
 
     [Fact]
-    public void Validate_Fails_When_AdjustmentHours_Is_Below_Minimum()
+    public void Validate_Fails_When_AdjustmentValue_Is_Below_Minimum()
     {
         var v = new AdjustLeaveBalanceValidator();
-        var result = v.Validate(ValidRequest() with { AdjustmentHours = -100_000m });
+        var result = v.Validate(ValidRequest() with { AdjustmentValue = -100_000m });
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(AdjustLeaveBalanceRequest.AdjustmentHours));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(AdjustLeaveBalanceRequest.AdjustmentValue));
     }
 
     [Fact]
-    public void Validate_Passes_When_AdjustmentHours_Is_At_Maximum_Boundary()
+    public void Validate_Passes_When_AdjustmentValue_Is_At_Maximum_Boundary()
     {
         var v = new AdjustLeaveBalanceValidator();
-        var result = v.Validate(ValidRequest() with { AdjustmentHours = 9999.99m });
+        var result = v.Validate(ValidRequest() with { AdjustmentValue = 9999.99m });
         Assert.True(result.IsValid);
     }
 
     [Fact]
-    public void Validate_Passes_When_AdjustmentHours_Is_At_Minimum_Boundary()
+    public void Validate_Passes_When_AdjustmentValue_Is_At_Minimum_Boundary()
     {
         var v = new AdjustLeaveBalanceValidator();
-        var result = v.Validate(ValidRequest() with { AdjustmentHours = -9999.99m });
+        var result = v.Validate(ValidRequest() with { AdjustmentValue = -9999.99m });
         Assert.True(result.IsValid);
     }
 

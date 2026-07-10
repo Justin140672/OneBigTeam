@@ -386,6 +386,32 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         return await error.IsVisibleAsync() ? (await error.TextContentAsync())?.Trim() : null;
     }
 
+    /// <summary>
+    /// Returns the trimmed text of the "Adjustment (days)"/"Adjustment (hours)" field label in
+    /// the currently-open Adjust dialog for <paramref name="leaveTypeName"/> — used to assert
+    /// the dialog's unit wording (days for a Standard-behaviour leave type, hours for TOIL).
+    /// </summary>
+    public async Task<string?> GetAdjustmentLabelTextAsync(string leaveTypeName)
+    {
+        var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = $"Adjust {leaveTypeName} Balance" });
+        var label = dialog.Locator("label.form-label").Filter(new() { HasText = "Adjustment (" });
+        await label.WaitForAsync(new() { Timeout = 10_000 });
+        return (await label.TextContentAsync())?.Trim();
+    }
+
+    /// <summary>
+    /// Returns the trimmed text of the read-only "Current Balance" field inside the currently-open
+    /// Adjust dialog for <paramref name="leaveTypeName"/> (e.g. "25 days" or "20h") — distinct from
+    /// <see cref="GetBalanceRowTextAsync"/>/<see cref="GetToilBalanceTextAsync"/>, which read the
+    /// balance card on the main Leave tab rather than the dialog itself.
+    /// </summary>
+    public async Task<string?> GetAdjustDialogCurrentBalanceTextAsync(string leaveTypeName)
+    {
+        var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = $"Adjust {leaveTypeName} Balance" });
+        var input = dialog.Locator("input[readonly]");
+        return (await input.InputValueAsync())?.Trim();
+    }
+
     // ── Employment tab ────────────────────────────────────────────────────────
 
     public async Task OpenEmploymentTabAsync()

@@ -6,7 +6,7 @@ internal sealed record AdjustLeaveBalanceRequest(
     Guid CompanyId,
     Guid EmployeeId,
     Guid LeaveTypeId,
-    decimal AdjustmentHours,
+    decimal AdjustmentValue,
     LeaveBalanceAdjustmentReason Reason,
     string? Comments,
     bool AllowNegativeOverride)

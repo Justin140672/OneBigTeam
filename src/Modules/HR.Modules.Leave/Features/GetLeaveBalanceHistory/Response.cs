@@ -14,8 +14,8 @@ internal sealed record GetLeaveBalanceHistoryResponse(
 /// grid shape stays reusable if this endpoint is ever generalised to span multiple leave types.</param>
 /// <param name="Change">Signed hours: negative when the event consumed balance (leave taken),
 /// positive when it added to the balance (leave cancelled/reversed, TOIL award, a positive manual
-/// adjustment or carry-over). Manual adjustments/carry-over use their actual signed
-/// <c>AdjustmentHours</c> value as-is.</param>
+/// adjustment or carry-over). Manual adjustments/carry-over convert their stored
+/// <c>AdjustmentDays</c> value to hours via the employee's working pattern.</param>
 /// <param name="Reason">The <c>LeaveBalanceAdjustmentReason</c> name for manual adjustments/carry-over;
 /// a fixed descriptive label ("Leave Taken", "Leave Cancelled", "TOIL Award") for the other categories,
 /// which have no reason enum of their own.</param>

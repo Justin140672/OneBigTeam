@@ -11,13 +11,13 @@
                 <input class="form-control" readonly value="@FormattedCurrentBalance" />
             </div>
             <div class="mb-3">
-                <label class="form-label fw-medium">Adjustment (hours) <span class="text-danger">*</span></label>
+                <label class="form-label fw-medium">Adjustment (@(IsToil ? "hours" : "days")) <span class="text-danger">*</span></label>
                 <div data-testid="adjustment-hours-input">
-                    <SfNumericTextBox TValue="decimal?" @bind-Value="_adjustmentHours" ShowSpinButton="false"
+                    <SfNumericTextBox TValue="decimal?" @bind-Value="_adjustmentValue" ShowSpinButton="false"
                                       Min="-9999.99m" Max="9999.99m"
                                       Placeholder="e.g. 7.5 or -3.5" />
                 </div>
-                <div class="form-text">Use a positive value to add hours, negative to deduct (max 9,999.99).</div>
+                <div class="form-text">Use a positive value to add @(IsToil ? "hours" : "days"), negative to deduct (max 9,999.99).</div>
             </div>
             <div class="mb-3">
                 <label class="form-label fw-medium">Reason <span class="text-danger">*</span></label>
@@ -67,9 +67,16 @@
     [Parameter, EditorRequired] public Guid LeaveTypeId { get; set; }
     [Parameter, EditorRequired] public string LeaveTypeName { get; set; } = string.Empty;
     [Parameter] public decimal? CurrentBalanceHours { get; set; }
+    [Parameter] public bool IsToil { get; set; }
+    [Parameter] public decimal? CurrentBalanceDays { get; set; }
     [Parameter] public EventCallback OnAdjusted { get; set; }
 
-    private string FormattedCurrentBalance => $"{(CurrentBalanceHours ?? 0):0.#}h";
+    private string FormattedCurrentBalance => IsToil
+        ? $"{(CurrentBalanceHours ?? 0):0.#}h"
+        : FormatDays(CurrentBalanceDays ?? 0);
+
+    private static string FormatDays(decimal days) =>
+        $"{days:0.##} {(days == 1m ? "day" : "days")}";
 
     private sealed record ReasonChoice(LeaveBalanceAdjustmentReason Value, string Label);
 
@@ -82,7 +89,7 @@
         new(LeaveBalanceAdjustmentReason.Other, "Other"),
     ];
 
-    private decimal? _adjustmentHours;
+    private decimal? _adjustmentValue;
     private LeaveBalanceAdjustmentReason _reason = LeaveBalanceAdjustmentReason.Correction;
     private string? _comments;
     private bool _allowNegativeOverride;
@@ -91,7 +98,7 @@
 
     private async Task SubmitAsync()
     {
-        if (_adjustmentHours is null || _adjustmentHours == 0)
+        if (_adjustmentValue is null || _adjustmentValue == 0)
         {
             _error = "Please enter a non-zero adjustment.";
             return;
@@ -104,7 +111,7 @@
             CompanyId, EmployeeId,
             new AdjustLeaveBalanceModel(
                 LeaveTypeId,
-                _adjustmentHours.Value,
+                _adjustmentValue.Value,
                 _reason,
                 string.IsNullOrWhiteSpace(_comments) ? null : _comments,
                 _allowNegativeOverride));
@@ -131,7 +138,7 @@
 
     private void Reset()
     {
-        _adjustmentHours = null;
+        _adjustmentValue = null;
         _reason = LeaveBalanceAdjustmentReason.Correction;
         _comments = null;
         _allowNegativeOverride = false;

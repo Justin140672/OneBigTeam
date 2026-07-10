@@ -61,9 +61,10 @@ public class AdjustLeaveBalanceEndpointTests : IClassFixture<ApiWebApplicationFa
     {
         var (companyId, leaveTypeId, employeeId, hrAdminClient) = await SetupEmployeeWithBalanceAsync();
 
+        // Standard-behaviour leave type: adjustmentValue is interpreted directly as days.
         var response = await hrAdminClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-balance-adjustments",
-            AdjustmentPayload(companyId, employeeId, leaveTypeId, 15m, "Correction", comments: "Corrected data entry error"));
+            AdjustmentPayload(companyId, employeeId, leaveTypeId, 2m, "Correction", comments: "Corrected data entry error"));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
@@ -72,7 +73,8 @@ public class AdjustLeaveBalanceEndpointTests : IClassFixture<ApiWebApplicationFa
         Assert.Equal(companyId, payload!.CompanyId);
         Assert.Equal(employeeId, payload.EmployeeId);
         Assert.Equal(leaveTypeId, payload.LeaveTypeId);
-        Assert.Equal(15m, payload.AdjustmentHours);
+        Assert.Equal(2m, payload.AdjustmentDays);
+        Assert.Null(payload.AdjustmentHours); // Standard behaviour: no hours value recorded
         Assert.Equal(202.5m, payload.NewRemainingHours); // (25 entitlement + 2 adjustment) days * 7.5 hours/day
         Assert.Equal("Correction", payload.Reason);
         Assert.Equal("Corrected data entry error", payload.Comments);
@@ -93,17 +95,20 @@ public class AdjustLeaveBalanceEndpointTests : IClassFixture<ApiWebApplicationFa
     {
         var (companyId, leaveTypeId, employeeId, hrAdminClient) = await SetupEmployeeWithBalanceAsync();
 
+        // Standard-behaviour leave type: adjustmentValue is interpreted directly as days
+        // (-1 day here, matching the original -7.5 hours / 7.5 hours-per-day intent).
         var response = await hrAdminClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-balance-adjustments",
-            AdjustmentPayload(companyId, employeeId, leaveTypeId, -7.5m, "ManualDeduction", comments: "Correcting an over-award"));
+            AdjustmentPayload(companyId, employeeId, leaveTypeId, -1m, "ManualDeduction", comments: "Correcting an over-award"));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         var payload = await response.Content.ReadFromJsonAsync<AdjustmentPayloadResponse>();
         Assert.NotNull(payload);
-        Assert.Equal(-7.5m, payload!.AdjustmentHours);
+        Assert.Equal(-1m, payload!.AdjustmentDays);
+        Assert.Null(payload.AdjustmentHours); // Standard behaviour: no hours value recorded
         Assert.Equal("ManualDeduction", payload.Reason);
-        Assert.Equal(180m, payload.NewRemainingHours); // 25 entitlement days * 7.5 hours/day - 7.5 = 187.5 - 7.5
+        Assert.Equal(180m, payload.NewRemainingHours); // (25 entitlement - 1 adjustment) days * 7.5 hours/day = 24 * 7.5
 
         // Verify the balance was actually persisted lower by re-querying it.
         var balanceResponse = await hrAdminClient.GetAsync(
@@ -227,9 +232,11 @@ public class AdjustLeaveBalanceEndpointTests : IClassFixture<ApiWebApplicationFa
         var (companyId, leaveTypeId, employeeId, hrAdminClient) =
             await SetupEmployeeWithBalanceAsync(defaultEntitlementDays: 5, allowNegativeBalance: false);
 
+        // Standard-behaviour leave type: adjustmentValue is interpreted directly as days
+        // (-8 days here, matching the original -60 hours / 7.5 hours-per-day intent).
         var response = await hrAdminClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-balance-adjustments",
-            AdjustmentPayload(companyId, employeeId, leaveTypeId, -60m, "ManualDeduction", allowNegativeOverride: false));
+            AdjustmentPayload(companyId, employeeId, leaveTypeId, -8m, "ManualDeduction", allowNegativeOverride: false));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -248,7 +255,7 @@ public class AdjustLeaveBalanceEndpointTests : IClassFixture<ApiWebApplicationFa
         Guid companyId,
         Guid employeeId,
         Guid leaveTypeId,
-        decimal adjustmentHours,
+        decimal adjustmentValue,
         string reason,
         string? comments = "Integration test adjustment",
         bool allowNegativeOverride = false) => new
@@ -256,7 +263,7 @@ public class AdjustLeaveBalanceEndpointTests : IClassFixture<ApiWebApplicationFa
             companyId,
             employeeId,
             leaveTypeId,
-            adjustmentHours,
+            adjustmentValue,
             reason,
             comments,
             allowNegativeOverride
@@ -338,7 +345,9 @@ public class AdjustLeaveBalanceEndpointTests : IClassFixture<ApiWebApplicationFa
         Guid EmployeeId,
         Guid LeaveTypeId,
         Guid LeaveBalanceId,
-        decimal AdjustmentHours,
+        decimal AdjustmentDays,
+        decimal? AdjustmentHours,
+        decimal NewRemainingDays,
         decimal NewRemainingHours,
         string Reason,
         string? Comments,

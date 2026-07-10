@@ -8,7 +8,8 @@ internal sealed class LeaveBalanceAdjustment
     public Guid CompanyId { get; private set; }
     public Guid EmployeeId { get; private set; }
     public Guid LeaveTypeId { get; private set; }
-    public decimal AdjustmentHours { get; private set; }
+    public decimal AdjustmentDays { get; private set; }
+    public decimal? AdjustmentHours { get; private set; }
     public LeaveBalanceAdjustmentReason Reason { get; private set; }
     public string? Comments { get; private set; }
     public Guid AdjustedByEmployeeId { get; private set; }
@@ -19,7 +20,8 @@ internal sealed class LeaveBalanceAdjustment
         Guid companyId,
         Guid employeeId,
         Guid leaveTypeId,
-        decimal adjustmentHours,
+        decimal adjustmentDays,
+        decimal? adjustmentHours,
         LeaveBalanceAdjustmentReason reason,
         string? comments,
         Guid adjustedByEmployeeId,
@@ -31,6 +33,7 @@ internal sealed class LeaveBalanceAdjustment
             CompanyId = companyId,
             EmployeeId = employeeId,
             LeaveTypeId = leaveTypeId,
+            AdjustmentDays = adjustmentDays,
             AdjustmentHours = adjustmentHours,
             Reason = reason,
             Comments = comments,

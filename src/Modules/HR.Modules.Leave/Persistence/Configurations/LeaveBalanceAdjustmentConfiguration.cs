@@ -28,10 +28,15 @@ internal sealed class LeaveBalanceAdjustmentConfiguration : IEntityTypeConfigura
             .HasColumnName("leave_type_id")
             .IsRequired();
 
+        builder.Property(a => a.AdjustmentDays)
+            .HasColumnName("adjustment_days")
+            .HasColumnType("numeric(6,2)")
+            .IsRequired();
+
         builder.Property(a => a.AdjustmentHours)
             .HasColumnName("adjustment_hours")
             .HasColumnType("numeric(6,2)")
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Property(a => a.Reason)
             .HasColumnName("reason")

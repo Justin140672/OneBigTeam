@@ -269,6 +269,8 @@ else
                            LeaveTypeId="@_adjustLeaveTypeId"
                            LeaveTypeName="@_adjustLeaveTypeName"
                            CurrentBalanceHours="@_adjustCurrentBalanceHours"
+                           IsToil="@_adjustIsToil"
+                           CurrentBalanceDays="@_adjustCurrentBalanceDays"
                            OnAdjusted="OnBalanceAdjusted" />
 
 @code {
@@ -285,6 +287,8 @@ else
     private Guid _adjustLeaveTypeId;
     private string _adjustLeaveTypeName = string.Empty;
     private decimal? _adjustCurrentBalanceHours;
+    private decimal? _adjustCurrentBalanceDays;
+    private bool _adjustIsToil;
 
     private List<HistoryOption> _historyOptions = [];
     private Guid? _historyLeaveTypeId;
@@ -362,9 +366,13 @@ else
 
     private void OpenAdjustDialog(LeaveBalanceItemModel item)
     {
+        var isToil = item.LeaveTypeCode == "TOIL";
+
         _adjustLeaveTypeId = item.LeaveTypeId;
         _adjustLeaveTypeName = item.LeaveTypeName;
         _adjustCurrentBalanceHours = item.RemainingHours;
+        _adjustCurrentBalanceDays = item.RemainingDays;
+        _adjustIsToil = isToil;
         _showAdjustDialog = true;
     }
 

@@ -92,14 +92,16 @@ public class GetLeaveBalanceHistoryHandlerTests
             1m, new DateOnly(2026, 3, 8), "Overtime", ToilAwardDate);
         context.ToilTransactions.Add(toilTransaction);
 
+        // Adjustment amounts are stored in days (AdjustmentDays); AdjustmentHours is only
+        // populated for TOIL-behaviour leave types, which this Standard leave type is not.
         var manualAdjustment = LeaveBalanceAdjustment.Create(
             Guid.NewGuid(), company, employee, leaveType,
-            15m, LeaveBalanceAdjustmentReason.ManualAward, "Bonus days", AdjusterId, ManualAdjustmentDate);
+            2m, null, LeaveBalanceAdjustmentReason.ManualAward, "Bonus days", AdjusterId, ManualAdjustmentDate);
         context.LeaveBalanceAdjustments.Add(manualAdjustment);
 
         var carryOver = LeaveBalanceAdjustment.Create(
             Guid.NewGuid(), company, employee, leaveType,
-            10m, LeaveBalanceAdjustmentReason.CarryOver, null, AdjusterId, CarryOverDate);
+            1m, null, LeaveBalanceAdjustmentReason.CarryOver, null, AdjusterId, CarryOverDate);
         context.LeaveBalanceAdjustments.Add(carryOver);
 
         return (company, employee, leaveType, balance.Id);
@@ -174,14 +176,14 @@ public class GetLeaveBalanceHistoryHandlerTests
         Assert.Equal(8m, toil.Change); // 1 day * 8 hours/day
         Assert.Equal("TOIL Award", toil.Reason);
 
-        // Adjustment hours are already stored in hours and are not re-converted; sign is the
-        // adjustment's own signed value.
+        // Adjustment days are converted to hours via the employee's working pattern; sign is
+        // the adjustment's own signed value.
         var manual = Assert.Single(items, i => i.Category == "ManualAdjustment");
-        Assert.Equal(15m, manual.Change);
+        Assert.Equal(16m, manual.Change); // 2 days * 8 hours/day
         Assert.Equal("ManualAward", manual.Reason);
 
         var carryOver = Assert.Single(items, i => i.Category == "CarryOver");
-        Assert.Equal(10m, carryOver.Change);
+        Assert.Equal(8m, carryOver.Change); // 1 day * 8 hours/day
         Assert.Equal("Carry Over", carryOver.Reason);
     }
 
@@ -202,14 +204,15 @@ public class GetLeaveBalanceHistoryHandlerTests
         Assert.True(result.IsSuccess);
         var items = result.Value!.Items;
 
-        // Ascending chronological order: Approved(-30) -> Cancelled(+15) -> Toil(+7.5) ->
-        // ManualAward(+15) -> CarryOver(+10). Starting balance = 187.5 - 17.5 = 170.
+        // Ascending chronological order (default working pattern, 7.5 hours/day):
+        // Approved(-30) -> Cancelled(+15) -> Toil(+7.5) -> ManualAward(2 days = +15) ->
+        // CarryOver(1 day = +7.5). Starting balance = 187.5 - 15 = 172.5.
         var byCategory = items.ToDictionary(i => i.Category);
-        Assert.Equal(140m, byCategory["ApprovedLeave"].BalanceAfter);     // 170 - 30
-        Assert.Equal(155m, byCategory["CancelledLeave"].BalanceAfter);    // 140 + 15
-        Assert.Equal(162.5m, byCategory["ToilAward"].BalanceAfter);       // 155 + 7.5
-        Assert.Equal(177.5m, byCategory["ManualAdjustment"].BalanceAfter);// 162.5 + 15
-        Assert.Equal(187.5m, byCategory["CarryOver"].BalanceAfter);       // 177.5 + 10 == current remaining balance
+        Assert.Equal(142.5m, byCategory["ApprovedLeave"].BalanceAfter);   // 172.5 - 30
+        Assert.Equal(157.5m, byCategory["CancelledLeave"].BalanceAfter);  // 142.5 + 15
+        Assert.Equal(165m, byCategory["ToilAward"].BalanceAfter);        // 157.5 + 7.5
+        Assert.Equal(180m, byCategory["ManualAdjustment"].BalanceAfter); // 165 + 15
+        Assert.Equal(187.5m, byCategory["CarryOver"].BalanceAfter);      // 180 + 7.5 == current remaining balance
     }
 
     [Fact]

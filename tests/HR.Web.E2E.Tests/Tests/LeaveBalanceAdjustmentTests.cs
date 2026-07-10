@@ -49,6 +49,14 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
     private static decimal ParseHours(string text) =>
         decimal.Parse(text.TrimEnd('d', 'a', 'y', 's'), NumberStyles.Number, CultureInfo.InvariantCulture);
 
+    /// <summary>
+    /// Parses the TOIL Balance card's hours-formatted text (e.g. "20h"), as distinct from
+    /// <see cref="ParseHours"/> above which — despite its name — actually parses the days-formatted
+    /// text (e.g. "25 days") used by every other leave type's balance row.
+    /// </summary>
+    private static decimal ParseToilHours(string text) =>
+        decimal.Parse(text.TrimEnd('h'), NumberStyles.Number, CultureInfo.InvariantCulture);
+
     // ── 1. Loading the page ──────────────────────────────────────────────────
 
     [Fact]
@@ -155,8 +163,11 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
         var before = ParseHours((await empAdmin.GetBalanceRowTextAsync("Annual Leave"))!);
 
         await empAdmin.OpenAdjustDialogAsync("Annual Leave");
+        // Annual Leave is a Standard-behaviour leave type, so the dialog's numeric field is now
+        // interpreted as DAYS directly (no working-pattern conversion) — submitting 1m here means
+        // "+1 day", not "+1 hour ÷ hours-per-day" as it did under the old hours-based contract.
         await empAdmin.SubmitAdjustmentAsync(
-            "Annual Leave", hours: 7.5m, reason: "Manual Award", comments: "E2E test award");
+            "Annual Leave", hours: 1m, reason: "Manual Award", comments: "E2E test award");
 
         Assert.False(await empAdmin.IsAdjustDialogVisibleAsync("Annual Leave"),
             "Expected the Adjust dialog to close after a successful adjustment");
@@ -179,6 +190,8 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
         await empAdmin.GoToAsync(AcmeId, TomId);
         await empAdmin.OpenLeaveTabAsync();
 
+        // Sick Leave is Standard-behaviour (days-based), but zero is zero regardless of unit, so
+        // no numeric change is needed here to keep exercising the "must be non-zero" validation.
         await empAdmin.OpenAdjustDialogAsync("Sick Leave");
         await empAdmin.SubmitAdjustmentAsync("Sick Leave", hours: 0m);
 
@@ -206,10 +219,11 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
 
         await empAdmin.OpenAdjustDialogAsync("Annual Leave");
 
-        // Wildly overshoot any plausible remaining balance so this deterministically goes
-        // below zero regardless of prior test runs against the same seeded balance.
+        // Annual Leave is now DAYS-based (Standard behaviour), so -1000 days is already a wildly
+        // overwhelming overshoot of any plausible remaining balance — deterministically drives
+        // the balance below zero regardless of prior test runs against the same seeded balance.
         await empAdmin.SubmitAdjustmentAsync(
-            "Annual Leave", hours: -100_000m, reason: "Manual Deduction",
+            "Annual Leave", hours: -1000m, reason: "Manual Deduction",
             comments: "E2E overshoot without override", allowNegativeOverride: false);
 
         Assert.True(await empAdmin.IsAdjustDialogVisibleAsync("Annual Leave"),
@@ -221,9 +235,10 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
 
         // Retry with the override checked — the hours/reason/comments are still populated from
         // the failed attempt (the dialog only resets on Cancel or success), so only the override
-        // checkbox needs to change.
+        // checkbox needs to change. -30 days is a sensible direct-days overshoot expected to still
+        // plausibly drive a typical seeded Annual Leave balance below zero.
         await empAdmin.SubmitAdjustmentAsync(
-            "Annual Leave", hours: -160m, allowNegativeOverride: true);
+            "Annual Leave", hours: -30m, allowNegativeOverride: true);
 
         Assert.False(await empAdmin.IsAdjustDialogVisibleAsync("Annual Leave"),
             "Expected the dialog to close once the negative-balance override is checked");
@@ -259,7 +274,73 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
         Assert.Equal(before, after);
     }
 
-    // ── 7. Permission boundary ────────────────────────────────────────────────
+    // ── 7. TOIL stays hours-based while other leave types are days-based ─────
+
+    [Fact]
+    public async Task AdjustDialog_UnitLabel_IsDaysForStandardLeaveType_AndHoursForToil()
+    {
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empAdmin.GoToAsync(AcmeId, TomId);
+        await empAdmin.OpenLeaveTabAsync();
+
+        await empAdmin.OpenAdjustDialogAsync("Annual Leave");
+        var annualLeaveLabel = await empAdmin.GetAdjustmentLabelTextAsync("Annual Leave");
+        Assert.NotNull(annualLeaveLabel);
+        Assert.Contains("Adjustment (days)", annualLeaveLabel);
+
+        var annualLeaveDialogBalance = await empAdmin.GetAdjustDialogCurrentBalanceTextAsync("Annual Leave");
+        Assert.NotNull(annualLeaveDialogBalance);
+        Assert.Contains("day", annualLeaveDialogBalance, StringComparison.OrdinalIgnoreCase);
+
+        await empAdmin.CloseAdjustDialogAsync("Annual Leave");
+
+        await empAdmin.OpenToilAdjustDialogAsync();
+        var toilLabel = await empAdmin.GetAdjustmentLabelTextAsync("Time Off In Lieu");
+        Assert.NotNull(toilLabel);
+        Assert.Contains("Adjustment (hours)", toilLabel);
+
+        var toilDialogBalance = await empAdmin.GetAdjustDialogCurrentBalanceTextAsync("Time Off In Lieu");
+        Assert.NotNull(toilDialogBalance);
+        Assert.EndsWith("h", toilDialogBalance, StringComparison.OrdinalIgnoreCase);
+
+        await empAdmin.CloseAdjustDialogAsync("Time Off In Lieu");
+    }
+
+    [Fact]
+    public async Task AdjustDialog_Toil_PositiveAdjustment_IsInterpretedAsHours_NotDays()
+    {
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empAdmin.GoToAsync(AcmeId, TomId);
+        await empAdmin.OpenLeaveTabAsync();
+
+        var before = ParseToilHours((await empAdmin.GetToilBalanceTextAsync())!);
+
+        await empAdmin.OpenToilAdjustDialogAsync();
+        // TOIL is the one leave-type behaviour that is still hours-based: the dialog converts
+        // this 15 to days server-side using the employee's working pattern, then the TOIL card
+        // converts back to hours for display using the same working pattern, so the round trip
+        // should land back on exactly +15h regardless of the seeded hours-per-day figure.
+        await empAdmin.SubmitAdjustmentAsync(
+            "Time Off In Lieu", hours: 15m, reason: "Manual Award", comments: "E2E TOIL award");
+
+        Assert.False(await empAdmin.IsAdjustDialogVisibleAsync("Time Off In Lieu"),
+            "Expected the Adjust dialog to close after a successful TOIL adjustment");
+
+        var after = ParseToilHours((await empAdmin.GetToilBalanceTextAsync())!);
+        Assert.Equal(before + 15m, after, precision: 1);
+    }
+
+    // ── 8. Permission boundary ────────────────────────────────────────────────
 
     [Fact]
     public async Task ManagerRole_IsRedirectedAway_FromAdminEmployeeEditPage_AndNeverReachesAdjustControl()
@@ -281,7 +362,7 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
         Assert.DoesNotContain($"/employees/{TomId}", finalUrl);
     }
 
-    // ── 8. Self-service employee never sees Adjust ───────────────────────────
+    // ── 9. Self-service employee never sees Adjust ───────────────────────────
 
     [Fact]
     public async Task MyProfileLeaveTab_NeverShowsAdjustButton_EvenForHrAdministratorViewingOwnProfile()

@@ -126,7 +126,8 @@ public class LeaveImportWriterTests
         Assert.Equal(companyId, adjustment.CompanyId);
         Assert.Equal(employeeId, adjustment.EmployeeId);
         Assert.Equal(leaveType.Id, adjustment.LeaveTypeId);
-        Assert.Equal(-7m, adjustment.AdjustmentHours);
+        Assert.Equal(-7m, adjustment.AdjustmentDays);
+        Assert.Null(adjustment.AdjustmentHours);
         Assert.Equal(LeaveBalanceAdjustmentReason.Import, adjustment.Reason);
         Assert.Equal(adjustedBy, adjustment.AdjustedByEmployeeId);
     }

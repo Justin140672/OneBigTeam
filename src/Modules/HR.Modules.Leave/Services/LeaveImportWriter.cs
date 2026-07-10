@@ -65,6 +65,7 @@ internal sealed class LeaveImportWriter(
             employeeId,
             leaveType.Id,
             adjustmentDays,
+            null,
             LeaveBalanceAdjustmentReason.Import,
             "Opening balance set during employee import.",
             adjustedByEmployeeId,

@@ -93,7 +93,7 @@ internal sealed class GetLeaveBalanceHistoryHandler(
         raw.AddRange(adjustments.Where(a => a.Reason != LeaveBalanceAdjustmentReason.CarryOver).Select(a => (
             Category: "ManualAdjustment",
             Date: a.AdjustedAt,
-            Change: a.AdjustmentHours,
+            Change: a.AdjustmentDays * workingPattern.HoursPerDay,
             Reason: a.Reason.ToString(),
             Description: a.Reason.ToString() + (a.Comments is null ? "" : $": {a.Comments}"),
             ActorId: a.AdjustedByEmployeeId)));
@@ -101,7 +101,7 @@ internal sealed class GetLeaveBalanceHistoryHandler(
         raw.AddRange(adjustments.Where(a => a.Reason == LeaveBalanceAdjustmentReason.CarryOver).Select(a => (
             Category: "CarryOver",
             Date: a.AdjustedAt,
-            Change: a.AdjustmentHours,
+            Change: a.AdjustmentDays * workingPattern.HoursPerDay,
             Reason: CarryOverReason,
             Description: "Carried over from previous year" + (a.Comments is null ? "" : $": {a.Comments}"),
             ActorId: a.AdjustedByEmployeeId)));

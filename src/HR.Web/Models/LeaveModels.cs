@@ -28,7 +28,7 @@ public enum LeaveBalanceAdjustmentReason { Correction, CarryOver, ManualAward, M
 
 public sealed record AdjustLeaveBalanceModel(
     Guid LeaveTypeId,
-    decimal AdjustmentHours,
+    decimal AdjustmentValue,
     LeaveBalanceAdjustmentReason Reason,
     string? Comments,
     bool AllowNegativeOverride);
@@ -39,7 +39,9 @@ public sealed record AdjustLeaveBalanceResponse(
     Guid EmployeeId,
     Guid LeaveTypeId,
     Guid LeaveBalanceId,
-    decimal AdjustmentHours,
+    decimal AdjustmentDays,
+    decimal? AdjustmentHours,
+    decimal NewRemainingDays,
     decimal NewRemainingHours,
     string Reason,
     string? Comments,

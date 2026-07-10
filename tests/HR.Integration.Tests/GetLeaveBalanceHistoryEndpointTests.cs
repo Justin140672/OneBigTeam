@@ -172,9 +172,12 @@ public class GetLeaveBalanceHistoryEndpointTests : IClassFixture<ApiWebApplicati
             1m, new DateOnly(2026, 2, 1), "Overtime", new DateTimeOffset(2026, 2, 2, 9, 0, 0, TimeSpan.Zero));
         db.ToilTransactions.Add(toilTransaction);
 
+        // 2 days at the default 7.5 hours/day working pattern (no employee/company override
+        // exists for this ad-hoc test data) converts to 15 hours, matching this test's
+        // Change == 15m assertion below.
         var manualAdjustment = LeaveBalanceAdjustment.Create(
             Guid.NewGuid(), companyId, employeeId, leaveTypeId,
-            15m, LeaveBalanceAdjustmentReason.ManualAward, "Bonus days", Guid.NewGuid(),
+            2m, null, LeaveBalanceAdjustmentReason.ManualAward, "Bonus days", Guid.NewGuid(),
             new DateTimeOffset(2026, 3, 3, 9, 0, 0, TimeSpan.Zero));
         db.LeaveBalanceAdjustments.Add(manualAdjustment);
 

@@ -54,7 +54,9 @@ internal sealed class AdjustLeaveBalanceHandler(
         var workingPattern = await workingPatternProvider.GetEffectivePatternAsync(
             request.CompanyId, request.EmployeeId, cancellationToken);
 
-        var adjustmentDays = request.AdjustmentHours / workingPattern.HoursPerDay;
+        var isToil = leaveType.Behaviour == LeaveTypeBehaviour.Toil;
+        var adjustmentDays = isToil ? request.AdjustmentValue / workingPattern.HoursPerDay : request.AdjustmentValue;
+        var adjustmentHoursForRecord = isToil ? (decimal?)request.AdjustmentValue : null;
 
         if (adjustmentDays < 0 && !request.AllowNegativeOverride)
         {
@@ -81,7 +83,8 @@ internal sealed class AdjustLeaveBalanceHandler(
             request.CompanyId,
             request.EmployeeId,
             request.LeaveTypeId,
-            request.AdjustmentHours,
+            adjustmentDays,
+            adjustmentHoursForRecord,
             request.Reason,
             request.Comments,
             request.AdjustedByEmployeeId,
@@ -106,7 +109,7 @@ internal sealed class AdjustLeaveBalanceHandler(
             balance.RemainingDays,
             request.AdjustedByEmployeeId,
             now,
-            AdjustmentHours: request.AdjustmentHours,
+            AdjustmentHours: adjustmentHoursForRecord,
             Reason: request.Reason.ToString()), cancellationToken);
 
         return Result.Success(new AdjustLeaveBalanceResponse(
@@ -115,7 +118,9 @@ internal sealed class AdjustLeaveBalanceHandler(
             adjustment.EmployeeId,
             adjustment.LeaveTypeId,
             balance.Id,
+            adjustment.AdjustmentDays,
             adjustment.AdjustmentHours,
+            balance.RemainingDays,
             newRemainingHours,
             adjustment.Reason.ToString(),
             adjustment.Comments,

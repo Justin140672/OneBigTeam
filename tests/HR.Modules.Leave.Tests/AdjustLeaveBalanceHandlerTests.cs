@@ -27,8 +27,9 @@ public class AdjustLeaveBalanceHandlerTests
         return new LeaveDbContext(options);
     }
 
-    private static LeaveType CreateActiveLeaveType(Guid companyId) =>
-        LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, Now);
+    private static LeaveType CreateActiveLeaveType(
+        Guid companyId, LeaveTypeBehaviour behaviour = LeaveTypeBehaviour.Standard) =>
+        LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.Monthly, behaviour, Now);
 
     private static AdjustLeaveBalanceHandler BuildHandler(
         LeaveDbContext context,
@@ -46,11 +47,11 @@ public class AdjustLeaveBalanceHandlerTests
         Guid companyId,
         Guid employeeId,
         Guid leaveTypeId,
-        decimal adjustmentHours,
+        decimal adjustmentValue,
         bool allowNegativeOverride = false,
         LeaveBalanceAdjustmentReason reason = LeaveBalanceAdjustmentReason.Correction,
         string? comments = "Test adjustment") =>
-        new(companyId, employeeId, leaveTypeId, adjustmentHours, reason, comments, allowNegativeOverride)
+        new(companyId, employeeId, leaveTypeId, adjustmentValue, reason, comments, allowNegativeOverride)
         {
             AdjustedByEmployeeId = Guid.NewGuid()
         };
@@ -65,7 +66,7 @@ public class AdjustLeaveBalanceHandlerTests
         var handler = BuildHandler(context, new Dictionary<Guid, string> { [employeeId] = "Jane Doe" });
 
         var result = await handler.HandleAsync(
-            BuildRequest(companyId, employeeId, Guid.NewGuid(), adjustmentHours: 7.5m),
+            BuildRequest(companyId, employeeId, Guid.NewGuid(), adjustmentValue: 7.5m),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -87,7 +88,7 @@ public class AdjustLeaveBalanceHandlerTests
         var handler = BuildHandler(context, new Dictionary<Guid, string>());
 
         var result = await handler.HandleAsync(
-            BuildRequest(companyId, employeeId, leaveType.Id, adjustmentHours: 7.5m),
+            BuildRequest(companyId, employeeId, leaveType.Id, adjustmentValue: 7.5m),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -109,7 +110,7 @@ public class AdjustLeaveBalanceHandlerTests
         var handler = BuildHandler(context, new Dictionary<Guid, string> { [employeeId] = "Jane Doe" });
 
         var result = await handler.HandleAsync(
-            BuildRequest(companyId, employeeId, leaveType.Id, adjustmentHours: 7.5m),
+            BuildRequest(companyId, employeeId, leaveType.Id, adjustmentValue: 7.5m),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -136,7 +137,9 @@ public class AdjustLeaveBalanceHandlerTests
         var handler = BuildHandler(context, new Dictionary<Guid, string> { [employeeId] = "Jane Doe" }, auditPublisher);
         var adjustedBy = Guid.NewGuid();
 
-        var request = BuildRequest(companyId, employeeId, leaveType.Id, adjustmentHours: 15m, comments: "Awarded extra days") with
+        // Standard-behaviour leave type: AdjustmentValue is interpreted directly as days (no
+        // hours-per-day division), so 2m here means a 2-day adjustment.
+        var request = BuildRequest(companyId, employeeId, leaveType.Id, adjustmentValue: 2m, comments: "Awarded extra days") with
         {
             AdjustedByEmployeeId = adjustedBy
         };
@@ -145,7 +148,8 @@ public class AdjustLeaveBalanceHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(202.5m, result.Value!.NewRemainingHours); // (25 + 2 - 0) days * 7.5 hours/day
-        Assert.Equal(15m, result.Value.AdjustmentHours);
+        Assert.Equal(2m, result.Value.AdjustmentDays);
+        Assert.Null(result.Value.AdjustmentHours); // Standard behaviour: no hours value recorded
         Assert.Equal(adjustedBy, result.Value.AdjustedByEmployeeId);
 
         var updatedBalance = await context.LeaveBalances.SingleAsync();
@@ -156,7 +160,8 @@ public class AdjustLeaveBalanceHandlerTests
         Assert.Equal(companyId, persistedAdjustment.CompanyId);
         Assert.Equal(employeeId, persistedAdjustment.EmployeeId);
         Assert.Equal(leaveType.Id, persistedAdjustment.LeaveTypeId);
-        Assert.Equal(15m, persistedAdjustment.AdjustmentHours);
+        Assert.Equal(2m, persistedAdjustment.AdjustmentDays);
+        Assert.Null(persistedAdjustment.AdjustmentHours);
         Assert.Equal(LeaveBalanceAdjustmentReason.Correction, persistedAdjustment.Reason);
         Assert.Equal("Awarded extra days", persistedAdjustment.Comments);
         Assert.Equal(adjustedBy, persistedAdjustment.AdjustedByEmployeeId);
@@ -169,9 +174,56 @@ public class AdjustLeaveBalanceHandlerTests
         Assert.Equal(balance.Id, auditEvent.LeaveBalanceId);
         Assert.Equal(2m, auditEvent.AdjustmentDays);
         Assert.Equal(27m, auditEvent.NewRemainingDays);
-        Assert.Equal(15m, auditEvent.AdjustmentHours);
+        Assert.Null(auditEvent.AdjustmentHours);
         Assert.Equal("Correction", auditEvent.Reason);
         Assert.Equal(adjustedBy, auditEvent.AdjustedByEmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Applies_Positive_Toil_Adjustment_Converting_Hours_To_Days_And_Preserves_Hours_On_Record()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var leaveType = CreateActiveLeaveType(companyId, LeaveTypeBehaviour.Toil);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, Now);
+        var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, 2026, 25m, Now);
+
+        context.LeaveTypes.Add(leaveType);
+        context.LeavePolicies.Add(policy);
+        context.LeaveBalances.Add(balance);
+        await context.SaveChangesAsync();
+
+        var auditPublisher = new CapturingAuditEventPublisher();
+        var handler = BuildHandler(context, new Dictionary<Guid, string> { [employeeId] = "Jane Doe" }, auditPublisher);
+        var adjustedBy = Guid.NewGuid();
+
+        // Toil-behaviour leave type: AdjustmentValue is interpreted as HOURS and divided by the
+        // fake working pattern's 7.5 hours/day, giving 15 / 7.5 = 2 days.
+        var request = BuildRequest(companyId, employeeId, leaveType.Id, adjustmentValue: 15m, comments: "TOIL awarded") with
+        {
+            AdjustedByEmployeeId = adjustedBy
+        };
+
+        var result = await handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2m, result.Value!.AdjustmentDays);
+        Assert.Equal(15m, result.Value.AdjustmentHours);
+
+        var updatedBalance = await context.LeaveBalances.SingleAsync();
+        Assert.Equal(2m, updatedBalance.AdjustmentDays);
+        Assert.Equal(27m, updatedBalance.RemainingDays);
+
+        var persistedAdjustment = await context.LeaveBalanceAdjustments.SingleAsync();
+        Assert.Equal(2m, persistedAdjustment.AdjustmentDays);
+        Assert.Equal(15m, persistedAdjustment.AdjustmentHours);
+
+        var published = Assert.Single(auditPublisher.Published);
+        var auditEvent = Assert.IsType<LeaveBalanceAdjustedAuditEvent>(published);
+        Assert.Equal(2m, auditEvent.AdjustmentDays);
+        Assert.Equal(15m, auditEvent.AdjustmentHours);
     }
 
     [Fact]
@@ -193,7 +245,7 @@ public class AdjustLeaveBalanceHandlerTests
         var handler = BuildHandler(context, new Dictionary<Guid, string> { [employeeId] = "Jane Doe" });
 
         var result = await handler.HandleAsync(
-            BuildRequest(companyId, employeeId, leaveType.Id, adjustmentHours: -60m, allowNegativeOverride: true),
+            BuildRequest(companyId, employeeId, leaveType.Id, adjustmentValue: -8m, allowNegativeOverride: true),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -223,7 +275,7 @@ public class AdjustLeaveBalanceHandlerTests
         var handler = BuildHandler(context, new Dictionary<Guid, string> { [employeeId] = "Jane Doe" });
 
         var result = await handler.HandleAsync(
-            BuildRequest(companyId, employeeId, leaveType.Id, adjustmentHours: -60m, allowNegativeOverride: false),
+            BuildRequest(companyId, employeeId, leaveType.Id, adjustmentValue: -8m, allowNegativeOverride: false),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -251,7 +303,7 @@ public class AdjustLeaveBalanceHandlerTests
         var handler = BuildHandler(context, new Dictionary<Guid, string> { [employeeId] = "Jane Doe" });
 
         var result = await handler.HandleAsync(
-            BuildRequest(companyId, employeeId, leaveType.Id, adjustmentHours: -60m, allowNegativeOverride: false),
+            BuildRequest(companyId, employeeId, leaveType.Id, adjustmentValue: -8m, allowNegativeOverride: false),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -285,7 +337,7 @@ public class AdjustLeaveBalanceHandlerTests
         var handler = BuildHandler(context, new Dictionary<Guid, string> { [employeeId] = "Jane Doe" });
 
         var result = await handler.HandleAsync(
-            BuildRequest(companyId, employeeId, leaveType.Id, adjustmentHours: -15m, allowNegativeOverride: false),
+            BuildRequest(companyId, employeeId, leaveType.Id, adjustmentValue: -2m, allowNegativeOverride: false),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
