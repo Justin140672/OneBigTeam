@@ -1,0 +1,265 @@
+using HR.Infrastructure.Abstractions;
+using HR.Modules.Onboarding.Domain;
+using HR.Modules.Onboarding.Features.CompleteOnboardingTaskFromTask;
+using HR.Modules.Onboarding.Persistence;
+using HR.Modules.Onboarding.Tests.Infrastructure;
+using HR.SharedKernel;
+using Microsoft.EntityFrameworkCore;
+
+namespace HR.Modules.Onboarding.Tests;
+
+public class CompleteOnboardingTaskFromTaskActionTests
+{
+    private static readonly DateTime FixedUtcNow = new(2026, 6, 25, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTimeOffset Now = new(FixedUtcNow, TimeSpan.Zero);
+
+    private static OnboardingDbContext BuildContext() =>
+        new(new DbContextOptionsBuilder<OnboardingDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options);
+
+    private static OnboardingPlan SeedPlan(
+        OnboardingDbContext dbContext,
+        Guid companyId,
+        DateTimeOffset createdAt,
+        OnboardingStatus? status = null)
+    {
+        var plan = OnboardingPlan.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), DateOnly.FromDateTime(createdAt.Date), null, createdAt);
+
+        if (status == OnboardingStatus.InProgress)
+            plan.Start(createdAt);
+        else if (status == OnboardingStatus.Completed)
+            plan.Complete(createdAt);
+
+        dbContext.OnboardingPlans.Add(plan);
+        return plan;
+    }
+
+    private static OnboardingTask SeedTask(
+        OnboardingDbContext dbContext,
+        Guid companyId,
+        Guid planId,
+        DateTimeOffset createdAt,
+        OnboardingTaskStatus status = OnboardingTaskStatus.Pending,
+        string title = "Some task")
+    {
+        var task = OnboardingTask.Create(
+            Guid.NewGuid(), companyId, planId, title, null,
+            OnboardingTemplateTaskAssignTo.Unassigned, null, createdAt);
+
+        if (status == OnboardingTaskStatus.Completed)
+            task.Complete(createdAt);
+        else if (status == OnboardingTaskStatus.Skipped)
+            task.Skip(createdAt);
+
+        dbContext.OnboardingTasks.Add(task);
+        return task;
+    }
+
+    private static TaskCompletionContext BuildTaskContext(
+        Guid companyId,
+        Guid? sourceEntityId) =>
+        new(
+            companyId,
+            Guid.NewGuid(),
+            "Complete onboarding task — Test Employee",
+            null,
+            TaskSource.Onboarding,
+            TaskActionType.Complete,
+            null,
+            Guid.NewGuid(),
+            Now,
+            sourceEntityId);
+
+    [Fact]
+    public async Task ExecuteAsync_Completes_Matching_Task_And_Updates_UpdatedAt()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt);
+        var task = SeedTask(dbContext, companyId, plan.Id, seedAt);
+        await dbContext.SaveChangesAsync();
+
+        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var context = BuildTaskContext(companyId, task.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var saved = await dbContext.OnboardingTasks.SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(OnboardingTaskStatus.Completed, saved.Status);
+        Assert.Equal(Now, saved.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_First_Task_Transitions_Plan_To_InProgress_Not_Completed()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt);
+        var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B");
+        await dbContext.SaveChangesAsync();
+
+        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var context = BuildTaskContext(companyId, taskToComplete.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedPlan = await dbContext.OnboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(OnboardingStatus.InProgress, savedPlan.Status);
+        Assert.Equal(Now, savedPlan.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_Last_Remaining_Task_Transitions_Plan_To_Completed()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OnboardingStatus.InProgress);
+        var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, OnboardingTaskStatus.Completed, "Task B");
+        await dbContext.SaveChangesAsync();
+
+        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var context = BuildTaskContext(companyId, taskToComplete.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedPlan = await dbContext.OnboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(OnboardingStatus.Completed, savedPlan.Status);
+        Assert.Equal(Now, savedPlan.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Skipped_Siblings_Count_As_Terminal_When_Completing_Final_Pending_Task()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OnboardingStatus.InProgress);
+        var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, OnboardingTaskStatus.Completed, "Task B");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, OnboardingTaskStatus.Skipped, "Task C");
+        await dbContext.SaveChangesAsync();
+
+        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var context = BuildTaskContext(companyId, taskToComplete.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedPlan = await dbContext.OnboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(OnboardingStatus.Completed, savedPlan.Status);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Does_Nothing_When_SourceEntityId_Is_Null()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt);
+        var task = SeedTask(dbContext, companyId, plan.Id, seedAt);
+        await dbContext.SaveChangesAsync();
+
+        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var context = BuildTaskContext(companyId, sourceEntityId: null);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedTask = await dbContext.OnboardingTasks.SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(OnboardingTaskStatus.Pending, savedTask.Status);
+        Assert.Equal(seedAt, savedTask.UpdatedAt);
+
+        var savedPlan = await dbContext.OnboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(OnboardingStatus.NotStarted, savedPlan.Status);
+        Assert.Equal(seedAt, savedPlan.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Does_Nothing_When_Task_Not_Found()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt);
+        var task = SeedTask(dbContext, companyId, plan.Id, seedAt);
+        await dbContext.SaveChangesAsync();
+
+        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var context = BuildTaskContext(companyId, sourceEntityId: Guid.NewGuid());
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedTask = await dbContext.OnboardingTasks.SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(OnboardingTaskStatus.Pending, savedTask.Status);
+        Assert.Equal(seedAt, savedTask.UpdatedAt);
+
+        var savedPlan = await dbContext.OnboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(OnboardingStatus.NotStarted, savedPlan.Status);
+        Assert.Equal(seedAt, savedPlan.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Is_Idempotent_When_Task_Already_Completed()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OnboardingStatus.InProgress);
+        var alreadyCompletedTask = SeedTask(dbContext, companyId, plan.Id, seedAt, OnboardingTaskStatus.Completed, "Task A");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, OnboardingTaskStatus.Completed, "Task B");
+        await dbContext.SaveChangesAsync();
+
+        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var context = BuildTaskContext(companyId, alreadyCompletedTask.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedTask = await dbContext.OnboardingTasks.SingleAsync(t => t.Id == alreadyCompletedTask.Id);
+        Assert.Equal(OnboardingTaskStatus.Completed, savedTask.Status);
+        Assert.Equal(seedAt, savedTask.UpdatedAt);
+
+        // Even though all sibling tasks are Completed, the plan must not be mutated
+        // because the action returns early before re-checking plan completion.
+        var savedPlan = await dbContext.OnboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(OnboardingStatus.InProgress, savedPlan.Status);
+        Assert.Equal(seedAt, savedPlan.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Does_Nothing_When_Task_Belongs_To_Different_Company()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, otherCompanyId, seedAt);
+        var task = SeedTask(dbContext, otherCompanyId, plan.Id, seedAt);
+        await dbContext.SaveChangesAsync();
+
+        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var context = BuildTaskContext(companyId, task.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var savedTask = await dbContext.OnboardingTasks.SingleAsync(t => t.Id == task.Id);
+        Assert.Equal(OnboardingTaskStatus.Pending, savedTask.Status);
+        Assert.Equal(seedAt, savedTask.UpdatedAt);
+
+        var savedPlan = await dbContext.OnboardingPlans.SingleAsync(p => p.Id == plan.Id);
+        Assert.Equal(OnboardingStatus.NotStarted, savedPlan.Status);
+        Assert.Equal(seedAt, savedPlan.UpdatedAt);
+    }
+}

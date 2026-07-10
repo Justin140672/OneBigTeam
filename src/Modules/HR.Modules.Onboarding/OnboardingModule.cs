@@ -1,6 +1,8 @@
+using HR.Modules.Onboarding.Features.CompleteOnboardingTaskFromTask;
 using HR.Modules.Onboarding.Features.CreateOnboardingPlanOnEmployeeCreated;
 using HR.Modules.Onboarding.Persistence;
 using HR.SharedKernel;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,6 +19,7 @@ public static class OnboardingModule
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "onboarding")));
 
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
+        services.AddScoped<ITaskCompletionAction, CompleteOnboardingTaskFromTaskAction>();
 
         return services;
     }
