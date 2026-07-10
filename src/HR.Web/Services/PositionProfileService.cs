@@ -154,6 +154,56 @@ public class PositionProfileService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<ListOnboardingTemplatesForProfileResponse?> ListOnboardingTemplatesForProfileAsync(
+        Guid companyId, Guid positionProfileId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<ListOnboardingTemplatesForProfileResponse>(
+                $"api/companies/{companyId}/position-profiles/{positionProfileId}/onboarding-templates", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<(bool Success, string? Error)> AddOnboardingTemplateAsync(
+        Guid companyId, Guid positionProfileId, AddOnboardingTemplateToProfileRequest request)
+    {
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/position-profiles/{positionProfileId}/onboarding-templates", request);
+
+        if (response.IsSuccessStatusCode)
+            return (true, null);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+            return (false, body?.Error ?? "This onboarding template is already assigned.");
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return (false, "Position profile or onboarding template not found.");
+
+        return (false, "Failed to add onboarding template.");
+    }
+
+    public async Task<bool> RemoveOnboardingTemplateAsync(
+        Guid companyId, Guid positionProfileId, Guid assignmentId)
+    {
+        try
+        {
+            var response = await Http.DeleteAsync(
+                $"api/companies/{companyId}/position-profiles/{positionProfileId}/onboarding-templates/{assignmentId}");
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public async Task<(bool Success, string? Error)> UpdatePositionProfileAsync(
         Guid companyId, Guid id, UpdatePositionProfileRequest request)
     {

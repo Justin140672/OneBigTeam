@@ -1,6 +1,5 @@
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
-using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
@@ -9,7 +8,12 @@ namespace HR.Web.E2E.Tests.Tests;
 /// and that the status changes to "Completed" after the action.
 ///
 /// Uses Sarah Chen's seeded task "Review Q2 performance reports"
-/// (ID: a0000000-0000-0000-0000-000000000001).
+/// (ID: a0000000-0000-0000-0000-000000000001), accessed directly via her own profile Tasks
+/// tab (a self-service route unaffected by the "/" dashboard redirect that now applies to her
+/// CompanyAdministrator-only role — see Home.razor).
+///
+/// The dashboard-widget check (<see cref="Dashboard_ShowsGeneralTasksForEmployee"/>) uses Laura
+/// Bennett instead, since Sarah is redirected away from "/" and can never reach it.
 /// </summary>
 [Collection("E2E")]
 public sealed class GeneralTaskCompletionTests(AppFixture fixture) : E2ETestBase(fixture)
@@ -21,6 +25,7 @@ public sealed class GeneralTaskCompletionTests(AppFixture fixture) : E2ETestBase
     private static readonly Guid TaskQ2ReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000001");
 
     private const string SarahEmail = "sarah.chen@acme.example";
+    private const string LauraEmail = "laura.bennett@acme.example";
 
     [Fact]
     public async Task TaskView_ShowsCorrectDetailsForGeneralTask()
@@ -51,19 +56,23 @@ public sealed class GeneralTaskCompletionTests(AppFixture fixture) : E2ETestBase
     [Fact]
     public async Task Dashboard_ShowsGeneralTasksForEmployee()
     {
+        // Sarah Chen is seeded as CompanyAdministrator-only and is redirected away from "/"
+        // (see Home.razor), so this dashboard-widget check uses Laura Bennett instead, who was
+        // given a parallel seeded "Review Q2 performance reports" task
+        // (a0000000-0000-0000-0000-000000000025) for this purpose.
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var dash  = new DashboardPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(SarahEmail);
+        await login.LoginAsync(LauraEmail);
 
         await dash.GoToAsync();
 
         var taskTitles = await dash.GetTaskTitlesAsync();
 
-        // Sarah has several seeded tasks; at least one should appear on the dashboard.
+        // Laura has several seeded tasks; at least one should appear on the dashboard.
         Assert.True(taskTitles.Count > 0,
-            "Expected Sarah to have tasks in the My Tasks dashboard widget");
+            "Expected Laura to have tasks in the My Tasks dashboard widget");
 
         Assert.Contains(taskTitles, t =>
             t.Contains("Q2", StringComparison.OrdinalIgnoreCase) ||
@@ -90,14 +99,7 @@ public sealed class GeneralTaskCompletionTests(AppFixture fixture) : E2ETestBase
         var statusBefore = await taskView.GetStatusAsync();
         Assert.NotEqual("Completed", statusBefore);
 
-        // Click the "Complete Task" or "Mark Complete" button.
-        var completeBtn = _page.GetByRole(AriaRole.Button, new() { Name = "Complete" });
-        if (!await completeBtn.IsVisibleAsync())
-            completeBtn = _page.GetByRole(AriaRole.Button, new() { Name = "Mark Complete" });
-
-        await completeBtn.ClickAsync();
-
-        await taskView.WaitForCompletedAsync();
+        await taskView.CompleteGeneralTaskAsync();
 
         Assert.Equal("Completed", await taskView.GetStatusAsync());
     }

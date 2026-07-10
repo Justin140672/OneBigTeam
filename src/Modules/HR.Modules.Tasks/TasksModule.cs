@@ -104,6 +104,15 @@ public static class TasksModule
         // Probation review task — links to the active seeded probation review (50000000-...-000000000100)
         var taskProbationReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000005");
 
+        // Fixed IDs for tasks assigned to Laura Bennett (empHrMgrId), mirroring the shape of
+        // Sarah's fixed tasks above. Added additively so E2E dashboard-widget scenarios that
+        // need a reachable "/" dashboard can use Laura instead of Sarah (who is now
+        // CompanyAdministrator-only and gets redirected away from "/"). Sarah's own tasks and
+        // the NotificationsModule seed data that references a0000000-...0001/0002/0004 by ID
+        // are left untouched — these are brand-new tasks, not reassignments.
+        var taskLauraBoardAgendaId = Guid.Parse("a0000000-0000-0000-0000-000000000024");
+        var taskLauraQ2ReviewId    = Guid.Parse("a0000000-0000-0000-0000-000000000025");
+
         TaskItem Make(
             Guid id,
             string title, string? description,
@@ -173,7 +182,24 @@ public static class TasksModule
                 "Analyse employee satisfaction survey results",
                 "Review responses from the May survey and prepare a summary report for leadership.",
                 TaskPriority.High, TaskSource.Manual,
-                new DateOnly(2026, 6, 10), empCtoId));
+                new DateOnly(2026, 6, 10), empCtoId),
+
+            // Laura's equivalent of Sarah's board-agenda task — used by TaskReassignmentTests,
+            // which reassigns this one away from Laura instead of Sarah so the final dashboard
+            // assertion can use a reachable "/" dashboard.
+            Make(taskLauraBoardAgendaId,
+                "Prepare board meeting agenda",
+                "Draft the Q3 board meeting agenda including financial review and product roadmap.",
+                TaskPriority.High, TaskSource.Manual,
+                new DateOnly(2026, 6, 25), empHrMgrId),
+
+            // Laura's equivalent of Sarah's Q2-review task — used by
+            // GeneralTaskCompletionTests.Dashboard_ShowsGeneralTasksForEmployee.
+            Make(taskLauraQ2ReviewId,
+                "Review Q2 performance reports",
+                "Gather scores from all department heads and summarise findings.",
+                TaskPriority.High, TaskSource.Manual,
+                new DateOnly(2026, 6, 30), empHrMgrId));
 
         // Probation review task — linked to the active seeded review in ProbationModule seed.
         // Assigned to Sarah (dev user) so it appears in her task list during E2E tests.
@@ -210,6 +236,21 @@ public static class TasksModule
             assignedUserId: devUserId,
             now,
             sourceEntityId: Guid.Parse("c0000000-0000-0000-0000-000000000005")));
+
+        // Asset acknowledgement task for Laura — linked to her seeded AssetAssignment in
+        // AssetsModule seed (Dell Latitude laptop). Added additively alongside Sarah's and
+        // Tom's equivalents above so E2E dashboard-widget scenarios can use Laura, whose "/"
+        // dashboard remains reachable.
+        db.TaskItems.Add(TaskItem.Create(
+            Guid.Parse("a0000000-0000-0000-0000-000000000023"), companyId, empCtoId,
+            "Acknowledge receipt of asset",
+            "Please acknowledge that you have received and accepted responsibility for the assigned asset.",
+            TaskPriority.Medium, TaskSource.Asset, TaskActionType.Acknowledge,
+            dueDate: new DateOnly(2026, 7, 7),
+            assignedEmployeeId: empHrMgrId,  // Laura Bennett — Dell Latitude laptop
+            assignedUserId: empHrMgrId,
+            now,
+            sourceEntityId: Guid.Parse("c0000000-0000-0000-0000-000000000008")));
 
         // Asset return task for Sarah — linked to her Dell monitor assignment.
         db.TaskItems.Add(TaskItem.Create(

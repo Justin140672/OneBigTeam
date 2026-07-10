@@ -101,6 +101,7 @@ public static class AssetsModule
         var companyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var sarahId   = Guid.Parse("30000000-0000-0000-0000-000000000001"); // Sarah Chen
         var tomId     = Guid.Parse("30000000-0000-0000-0000-000000000004"); // Tom Williams
+        var lauraId   = Guid.Parse("30000000-0000-0000-0000-000000000005"); // Laura Bennett
 
         // Fixed IDs so E2E tests can reference them directly.
         var categoryId        = Guid.Parse("c0000000-0000-0000-0000-000000000001");
@@ -109,6 +110,8 @@ public static class AssetsModule
         var sarahAssetId      = Guid.Parse("c0000000-0000-0000-0000-000000000004");
         var sarahAssignmentId = Guid.Parse("c0000000-0000-0000-0000-000000000005");
         var availableAssetId  = Guid.Parse("c0000000-0000-0000-0000-000000000006");
+        var lauraAssetId      = Guid.Parse("c0000000-0000-0000-0000-000000000007");
+        var lauraAssignmentId = Guid.Parse("c0000000-0000-0000-0000-000000000008");
 
         var category = AssetCategory.Create(categoryId, companyId, "IT Equipment",
             "Laptops, monitors and peripherals", now);
@@ -140,6 +143,18 @@ public static class AssetsModule
             "LGT-0003", purchaseDate: new DateOnly(2024, 6, 1),
             purchasePrice: 129.00m, now);
         db.Assets.Add(availableAsset);
+
+        // Laura's asset — Dell laptop, unacknowledged, so E2E dashboard-widget scenarios that
+        // previously relied on Sarah Chen (who is now CompanyAdministrator-only and redirected
+        // away from "/") can exercise the same "Pending" acknowledgement flow via Laura instead.
+        var lauraAsset = Asset.Create(lauraAssetId, companyId, "ASSET-0007", categoryId,
+            "Dell Latitude 5440", "Dell", "Latitude 5440",
+            "CN-0DEF456", purchaseDate: new DateOnly(2024, 2, 10),
+            purchasePrice: 1199.00m, now);
+        lauraAsset.MarkAssigned(now);
+        db.Assets.Add(lauraAsset);
+        db.AssetAssignments.Add(AssetAssignment.Create(lauraAssignmentId, companyId,
+            lauraAssetId, lauraId, sarahId, notes: "Replacement laptop", now));
 
         await db.SaveChangesAsync();
     }

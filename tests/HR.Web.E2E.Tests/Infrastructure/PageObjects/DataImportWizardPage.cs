@@ -37,7 +37,15 @@ public sealed class DataImportWizardPage(IPage page, string baseUrl)
     public async Task<string> GetMappingSelectionAsync(string standardHeaderName)
     {
         var mappingCard = page.Locator(".card", new() { HasText = "2. Column Mapping" });
-        var row = mappingCard.Locator("tr").Filter(new() { HasText = standardHeaderName }).First;
+
+        // Scoped to the Standard Field cell specifically, using an exact text match — every
+        // row's <select> lists ALL detected file headers as <option>s (only one of which is
+        // actually selected), so filtering the whole <tr> by HasText is ambiguous: a header
+        // name like "First Name" also shows up as an unselected <option> inside every other
+        // row, and a plain HasText filter on <tr> would just match the first row in the table.
+        var row = mappingCard.Locator("tr")
+            .Filter(new() { Has = page.Locator($"td:text-is(\"{standardHeaderName}\")") })
+            .First;
         return await row.Locator("select").InputValueAsync();
     }
 
@@ -55,8 +63,10 @@ public sealed class DataImportWizardPage(IPage page, string baseUrl)
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "View Preview" }).ClickAsync();
 
-        // The Preview card header only renders once preview data has loaded.
-        await page.GetByText("4. Preview & Confirm").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        // The Preview card header only renders once preview data has loaded. Scoped to the
+        // heading role since the stepper nav-link above the card has the identical text.
+        await page.GetByRole(AriaRole.Heading, new() { Name = "4. Preview & Confirm" })
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
     }
 
     public async Task<bool> HasValidRowAsync(string workEmailFragment) =>

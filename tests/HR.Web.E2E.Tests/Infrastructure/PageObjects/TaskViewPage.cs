@@ -165,6 +165,15 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
         await WaitForCompletedAsync();
     }
 
+    // ── General task panel ───────────────────────────────────────────────────
+
+    /// <summary>Clicks "Mark as Complete" on a general task and waits for it to become Completed.</summary>
+    public async Task CompleteGeneralTaskAsync()
+    {
+        await Dialog.Locator("[data-testid='complete-task-btn']").ClickAsync();
+        await WaitForCompletedAsync();
+    }
+
     // ── Asset return panel ───────────────────────────────────────────────────
 
     /// <summary>Returns true if the asset return panel is present and visible.</summary>

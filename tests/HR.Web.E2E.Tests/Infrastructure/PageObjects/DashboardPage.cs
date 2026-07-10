@@ -152,7 +152,7 @@ public sealed class DashboardPage(IPage page, string baseUrl)
             .First;
 
         await item.ClickAsync();
-        await page.WaitForURLAsync(new System.Text.RegularExpressions.Regex("/assets/"), new() { Timeout = 15_000 });
+        await page.WaitForURLAsync(new Regex("/assets/"), new() { Timeout = 15_000 });
     }
 
     // ── Recruitment Summary Widget ────────────────────────────────────────────

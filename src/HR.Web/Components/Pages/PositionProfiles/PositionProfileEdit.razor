@@ -163,6 +163,17 @@
                             </div>
                         </ContentTemplate>
                     </TabItem>
+                    <TabItem>
+                        <ChildContent><TabHeader Text="Onboarding Templates" /></ChildContent>
+                        <ContentTemplate>
+                            <div class="mt-4">
+                                <PositionProfileOnboardingTab
+                                    CompanyId="CompanyId"
+                                    PositionProfileId="Id!.Value"
+                                    CanEdit="!IsViewMode" />
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
                 </TabItems>
             </SfTab>
         }

@@ -1,0 +1,120 @@
+@inject PositionProfileService PositionProfileService
+
+<AddOnboardingTemplateDialog CompanyId="CompanyId"
+                             PositionProfileId="PositionProfileId"
+                             ExistingTemplateIds="_templates.Select(t => t.OnboardingTemplateId).ToHashSet()"
+                             IsOpen="_addOpen"
+                             OnSaved="OnTemplateAdded"
+                             OnCancelled="@(() => _addOpen = false)" />
+
+@if (_loading)
+{
+    <HrLoadingIndicator />
+}
+else
+{
+    <div class="card">
+        <div class="card-header d-flex align-items-center">
+            <i class="fa-solid fa-clipboard-check text-muted me-2"></i>
+            <h5 class="mb-0">Onboarding Templates</h5>
+            @if (CanEdit)
+            {
+                <div class="ms-auto">
+                    <SfButton CssClass="e-primary e-small" OnClick="@(() => _addOpen = true)">
+                        <i class="fa-solid fa-plus me-1"></i> Add
+                    </SfButton>
+                </div>
+            }
+        </div>
+        <div class="card-body p-0">
+            @if (_templates.Count == 0)
+            {
+                <p class="text-muted small p-3 mb-0">No onboarding templates assigned to this position profile.</p>
+            }
+            else
+            {
+                <HrGrid TValue="OnboardingTemplateAssignmentListItemModel"
+                        DataSource="@_templates"
+                        AllowFiltering="false"
+                        AllowPaging="false">
+                    <GridColumns>
+                        <GridColumn Field="@nameof(OnboardingTemplateAssignmentListItemModel.Name)"
+                                    HeaderText="Name" />
+                        <GridColumn Field="@nameof(OnboardingTemplateAssignmentListItemModel.Description)"
+                                    HeaderText="Description">
+                            <Template>
+                                @{ var r = (context as OnboardingTemplateAssignmentListItemModel)!; }
+                                <span class="text-muted small">@(r.Description ?? "—")</span>
+                            </Template>
+                        </GridColumn>
+                        <GridColumn Field="@nameof(OnboardingTemplateAssignmentListItemModel.TaskCount)"
+                                    HeaderText="Task Count" Width="130" />
+                        @if (CanEdit)
+                        {
+                            <GridColumn HeaderText="" Width="160" AllowSorting="false" AllowFiltering="false"
+                                        TextAlign="TextAlign.Right">
+                                <Template>
+                                    @{ var r = (context as OnboardingTemplateAssignmentListItemModel)!; }
+                                    @if (_removeTargetId == r.Id)
+                                    {
+                                        <span class="me-2 text-muted small">Remove?</span>
+                                        <SfButton CssClass="e-danger e-small me-1"
+                                                  OnClick="() => ConfirmRemoveAsync(r.Id)">
+                                            Yes
+                                        </SfButton>
+                                        <SfButton CssClass="e-small" OnClick="CancelRemove">No</SfButton>
+                                    }
+                                    else
+                                    {
+                                        <SfButton CssClass="e-danger e-outline e-small"
+                                                  OnClick="() => StartRemove(r.Id)"
+                                                  title="Remove">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </SfButton>
+                                    }
+                                </Template>
+                            </GridColumn>
+                        }
+                    </GridColumns>
+                </HrGrid>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid PositionProfileId { get; set; }
+    [Parameter] public bool CanEdit { get; set; }
+
+    private bool  _loading = true;
+    private bool  _addOpen;
+    private Guid? _removeTargetId;
+    private List<OnboardingTemplateAssignmentListItemModel> _templates = [];
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading   = _templates.Count == 0;
+        _templates = (await PositionProfileService.ListOnboardingTemplatesForProfileAsync(CompanyId, PositionProfileId))?.Items.ToList() ?? [];
+        _loading   = false;
+        StateHasChanged();
+    }
+
+    private async Task OnTemplateAdded()
+    {
+        _addOpen = false;
+        await LoadAsync();
+    }
+
+    private void StartRemove(Guid id)  => _removeTargetId = id;
+    private void CancelRemove()        => _removeTargetId = null;
+
+    private async Task ConfirmRemoveAsync(Guid id)
+    {
+        _removeTargetId = null;
+        await PositionProfileService.RemoveOnboardingTemplateAsync(CompanyId, PositionProfileId, id);
+        await LoadAsync();
+    }
+}

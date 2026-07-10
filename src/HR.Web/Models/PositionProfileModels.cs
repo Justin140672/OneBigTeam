@@ -146,6 +146,24 @@ public record AddRequiredAssetToProfileRequest(
 
 public record AddRequiredAssetToProfileResponse(Guid Id);
 
+// ── LIST / ADD / REMOVE ONBOARDING TEMPLATES ──────────────────────────────────
+
+public record ListOnboardingTemplatesForProfileResponse(IReadOnlyList<OnboardingTemplateAssignmentListItemModel> Items);
+
+public record OnboardingTemplateAssignmentListItemModel(
+    Guid Id,
+    Guid OnboardingTemplateId,
+    string Name,
+    string? Description,
+    int TaskCount);
+
+public record AddOnboardingTemplateToProfileRequest(
+    Guid CompanyId,
+    Guid PositionProfileId,
+    Guid OnboardingTemplateId);
+
+public record AddOnboardingTemplateToProfileResponse(Guid Id);
+
 // ── UPDATE ────────────────────────────────────────────────────────────────────
 
 public record UpdatePositionProfileRequest(

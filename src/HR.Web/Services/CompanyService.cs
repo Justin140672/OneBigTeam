@@ -45,10 +45,9 @@ public class CompanyService(IHttpClientFactory httpClientFactory)
 
     public async Task<UpdateCompanySettingsResponse?> UpdateCompanySettingsAsync(Guid id, UpdateCompanySettingsRequest request)
     {
-        var response = await Http.PutAsJsonAsync($"api/companies/{id}/settings", request);
-        var responseContent = await response.Content.ReadAsStringAsync();
+        var response = await Http.PutAsJsonAsync($"api/companies/{id}/settings", request, HrApiJsonOptions.Default);
         if (!response.IsSuccessStatusCode) return null;
-        return await response.Content.ReadFromJsonAsync<UpdateCompanySettingsResponse>();
+        return await response.Content.ReadFromJsonAsync<UpdateCompanySettingsResponse>(HrApiJsonOptions.Default);
     }
 
     public async Task<UploadCompanyLogoResponse?> UploadCompanyLogoAsync(

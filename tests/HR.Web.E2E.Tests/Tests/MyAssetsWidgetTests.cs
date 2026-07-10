@@ -12,8 +12,19 @@ namespace HR.Web.E2E.Tests.Tests;
 ///     employee ID 30000000-…-0004 — assignment is unacknowledged → shows "Pending" badge.
 ///   - ASSET-0002 (Dell UltraSharp 27") assigned to Sarah Chen (sarah.chen@acme.example)
 ///     employee ID 30000000-…-0001 — assignment is unacknowledged → shows "Pending" badge.
-///   - Laura Bennett (laura.bennett@acme.example) has an employee record but no asset
+///     Sarah is checked directly on her profile's Assets tab elsewhere; the dashboard-widget
+///     "Pending" check below uses Laura instead (see note).
+///   - ASSET-0007 (Dell Latitude 5440) assigned to Laura Bennett (laura.bennett@acme.example)
+///     employee ID 30000000-…-0005 — assignment is unacknowledged → shows "Pending" badge.
+///   - Carlos Rivera (carlos.rivera@acme.example) has an employee record but no asset
 ///     assignments → widget shows empty state.
+///
+/// Note: Sarah Chen is seeded as CompanyAdministrator-only, and per Home.razor's redirect logic
+/// (CanManageCompany &amp;&amp; !CanManageEmployees), she is sent straight to her company edit page
+/// instead of "/" and can never reach the dashboard. The "Pending" badge scenario previously
+/// covered by Sarah below now uses Laura, who was given a parallel unacknowledged asset
+/// assignment for this purpose. The empty-state scenario previously used Laura, but she now
+/// has an asset assignment, so it was moved to Carlos Rivera, who has zero asset assignments.
 /// </summary>
 [Collection("E2E")]
 public sealed class MyAssetsWidgetTests(AppFixture fixture) : E2ETestBase(fixture)
@@ -21,9 +32,9 @@ public sealed class MyAssetsWidgetTests(AppFixture fixture) : E2ETestBase(fixtur
     private static readonly Guid AcmeId     = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomAssetId = Guid.Parse("c0000000-0000-0000-0000-000000000002");
 
-    private const string TomEmail   = "tom.williams@acme.example";
-    private const string SarahEmail = "sarah.chen@acme.example";
-    private const string LauraEmail = "laura.bennett@acme.example";
+    private const string TomEmail    = "tom.williams@acme.example";
+    private const string LauraEmail  = "laura.bennett@acme.example";
+    private const string CarlosEmail = "carlos.rivera@acme.example";
 
     [Fact]
     public async Task Dashboard_ShowsMyAssetsWidget()
@@ -60,12 +71,16 @@ public sealed class MyAssetsWidgetTests(AppFixture fixture) : E2ETestBase(fixtur
     [Fact]
     public async Task Dashboard_MyAssetsWidget_ShowsEmptyState_WhenNoAssetsAssigned()
     {
-        // Laura Bennett is an HR Manager with an employee record but no asset assignments.
+        // Carlos Rivera is an Account Executive with an employee record but no asset
+        // assignments. Laura Bennett previously covered this case, but she was given a
+        // seeded asset assignment (see class doc comment) so a different zero-asset employee
+        // is used here instead — verified against AssetsModule.SeedAssetsAsync, where only
+        // Tom Williams and Laura Bennett have assigned assets.
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
         var dashboard = new DashboardPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(CarlosEmail);
         await dashboard.GoToAsync();
 
         Assert.True(await dashboard.IsMyAssetsWidgetEmptyAsync(),
@@ -88,13 +103,16 @@ public sealed class MyAssetsWidgetTests(AppFixture fixture) : E2ETestBase(fixtur
     }
 
     [Fact]
-    public async Task Dashboard_MyAssetsWidget_ShowsPendingBadge_ForSarahsUnacknowledgedAsset()
+    public async Task Dashboard_MyAssetsWidget_ShowsPendingBadge_ForLaurasUnacknowledgedAsset()
     {
+        // Sarah Chen is seeded as CompanyAdministrator-only and is redirected away from "/"
+        // (see Home.razor), so she can no longer reach the dashboard to check this widget.
+        // Laura Bennett was given a parallel unacknowledged Dell asset assignment for this test.
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
         var dashboard = new DashboardPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(SarahEmail);
+        await login.LoginAsync(LauraEmail);
         await dashboard.GoToAsync();
 
         var badge = await dashboard.GetMyAssetAcknowledgementBadgeAsync("Dell");

@@ -5,7 +5,7 @@
 {
     <div class="alert alert-danger mb-3">@_error</div>
 }
-<button class="btn btn-success" @onclick="CompleteAsync" disabled="@_submitting">
+<button class="btn btn-success" data-testid="complete-task-btn" @onclick="CompleteAsync" disabled="@_submitting">
     @if (_submitting)
     {
         <span class="spinner-border spinner-border-sm me-1" role="status"></span>

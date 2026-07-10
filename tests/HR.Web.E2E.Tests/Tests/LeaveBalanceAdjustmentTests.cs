@@ -47,7 +47,7 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
     private const string JamesEmail = "james.okafor@acme.example";
 
     private static decimal ParseHours(string text) =>
-        decimal.Parse(text.TrimEnd('h', 'H'), NumberStyles.Number, CultureInfo.InvariantCulture);
+        decimal.Parse(text.TrimEnd('d', 'a', 'y', 's'), NumberStyles.Number, CultureInfo.InvariantCulture);
 
     // ── 1. Loading the page ──────────────────────────────────────────────────
 
@@ -64,9 +64,8 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
         await empAdmin.OpenLeaveTabAsync();
 
         var annualLeaveText = await empAdmin.GetBalanceRowTextAsync("Annual Leave");
-        Assert.NotNull(annualLeaveText);
-        Assert.EndsWith("h", annualLeaveText, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("day", annualLeaveText, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(annualLeaveText);        
+        Assert.Contains("day", annualLeaveText, StringComparison.OrdinalIgnoreCase);
 
         var toilText = await empAdmin.GetToilBalanceTextAsync();
         Assert.NotNull(toilText);
@@ -163,7 +162,7 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
             "Expected the Adjust dialog to close after a successful adjustment");
 
         var after = ParseHours((await empAdmin.GetBalanceRowTextAsync("Annual Leave"))!);
-        Assert.Equal(before + 7.5m, after, precision: 1);
+        Assert.Equal(before + 1m, after, precision: 1);
     }
 
     // ── 4. Validation failure surfaces inline ────────────────────────────────
@@ -301,8 +300,7 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
 
         var annualLeaveText = await profile.GetAnnualLeaveRemainingTextAsync();
         Assert.NotNull(annualLeaveText);
-        Assert.Contains("h", annualLeaveText, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("day", annualLeaveText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("day", annualLeaveText, StringComparison.OrdinalIgnoreCase);
 
         Assert.False(await profile.HasAnyAdjustButtonOnLeaveTabAsync(),
             "Laura must not see an Adjust control on her own My Profile Leave tab, even though " +

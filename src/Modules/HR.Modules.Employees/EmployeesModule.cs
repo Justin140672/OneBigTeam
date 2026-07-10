@@ -40,6 +40,9 @@ using HR.Modules.Employees.Features.RemoveRequiredDocumentFromPositionProfile;
 using HR.Modules.Employees.Features.AddRequiredAssetToPositionProfile;
 using HR.Modules.Employees.Features.ListRequiredAssetsForPositionProfile;
 using HR.Modules.Employees.Features.RemoveRequiredAssetFromPositionProfile;
+using HR.Modules.Employees.Features.AddOnboardingTemplateToPositionProfile;
+using HR.Modules.Employees.Features.ListOnboardingTemplatesForPositionProfile;
+using HR.Modules.Employees.Features.RemoveOnboardingTemplateFromPositionProfile;
 using HR.Modules.Employees.Features.UpdatePositionProfile;
 using HR.Modules.Employees.Features.ListEmploymentTypes;
 using HR.Modules.Employees.Features.CreateEmploymentType;
@@ -117,6 +120,14 @@ public static class EmployeesModule
         services.AddScoped<RemoveRequiredAssetHandler>();
 
         services.AddScoped<ListRequiredAssetsHandler>();
+
+        services.AddScoped<AddOnboardingTemplateHandler>();
+        services.AddScoped<IValidator<AddOnboardingTemplateRequest>, AddOnboardingTemplateValidator>();
+
+        services.AddScoped<RemoveOnboardingTemplateHandler>();
+
+        services.AddScoped<ListOnboardingTemplatesForPositionProfileHandler>();
+        services.AddScoped<IValidator<ListOnboardingTemplatesForPositionProfileRequest>, ListOnboardingTemplatesForPositionProfileValidator>();
 
         services.AddScoped<CreateEmployeeHandler>();
         services.AddScoped<IValidator<CreateEmployeeRequest>, CreateEmployeeValidator>();

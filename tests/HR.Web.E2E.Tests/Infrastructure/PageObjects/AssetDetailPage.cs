@@ -7,7 +7,7 @@ public sealed class AssetDetailPage(IPage page, string baseUrl)
     public async Task GoToAsync(Guid companyId, Guid assetId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/assets/{assetId}/view");
-        await page.WaitForSelectorAsync("[data-testid='asset-detail-page']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync("[data-testid='asset-detail-content']", new() { Timeout = 20_000 });
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border')",
             null, new PageWaitForFunctionOptions { Timeout = 20_000 });

@@ -17,6 +17,7 @@ internal sealed class EmployeesDbContext : DbContext
     public DbSet<EmergencyContact> EmergencyContacts => Set<EmergencyContact>();
     public DbSet<PositionProfileRequiredDocument> PositionProfileRequiredDocuments => Set<PositionProfileRequiredDocument>();
     public DbSet<PositionProfileRequiredAsset> PositionProfileRequiredAssets => Set<PositionProfileRequiredAsset>();
+    public DbSet<PositionProfileOnboardingTemplate> PositionProfileOnboardingTemplates => Set<PositionProfileOnboardingTemplate>();
     public DbSet<EmploymentType> EmploymentTypes => Set<EmploymentType>();
     public DbSet<Compensation> Compensations => Set<Compensation>();
     public DbSet<OnboardingTemplate> OnboardingTemplates => Set<OnboardingTemplate>();

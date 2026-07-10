@@ -42,11 +42,10 @@ else
                         <ValidationMessage For="@(() => Model.HoursPerDay)" />
                     </div>
                     <div class="col-md-3">
+                        <label class="form-label">Leave Year Start Month</label>
                         <SfDropDownList TValue="int" TItem="MonthItem"
                                         @bind-Value="Model.LeaveYearStartMonth"
-                                        DataSource="@Months"
-                                        Placeholder="Leave Year Start Month"
-                                        FloatLabelType="FloatLabelType.Auto">
+                                        DataSource="@Months">
                             <DropDownListFieldSettings Value="Number" Text="Name" />
                         </SfDropDownList>
                         <div class="form-text">The month each employee's annual leave allowance resets.</div>

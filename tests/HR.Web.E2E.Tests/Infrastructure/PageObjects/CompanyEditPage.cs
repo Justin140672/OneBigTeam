@@ -26,6 +26,9 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     {
         await page.GetByRole(AriaRole.Tab, new() { Name = "Settings" }).ClickAsync();
         await page.WaitForSelectorAsync(".card", new() { Timeout = 15_000 });
+        // Wait for Syncfusion to initialise — span[role='combobox'] (the Leave Year Start
+        // Month SfDropDownList) only appears after Blazor's interactive render completes.
+        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     public async Task OpenAddressesTabAsync()
