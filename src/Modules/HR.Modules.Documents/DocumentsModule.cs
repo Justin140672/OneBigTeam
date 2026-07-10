@@ -99,6 +99,7 @@ public static class DocumentsModule
         services.AddScoped<ProcessDocumentExpiryNotificationsHandler>();
 
         services.AddScoped<IDocumentTypeReader, DocumentTypeReader>();
+        services.AddScoped<IOutstandingDocumentRequestReader, OutstandingDocumentRequestReader>();
 
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
 

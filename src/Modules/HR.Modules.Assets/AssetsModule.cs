@@ -68,6 +68,7 @@ public static class AssetsModule
         services.AddScoped<IValidator<UpdateAssetRequest>, UpdateAssetValidator>();
         services.AddScoped<AssetReminderJob>();
         services.AddScoped<IAssetCategoryReader, AssetCategoryReader>();
+        services.AddScoped<IOutstandingAssetAcknowledgementReader, OutstandingAssetAcknowledgementReader>();
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
     }
 

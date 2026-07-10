@@ -14,6 +14,7 @@ using HR.Modules.Probation.Features.GetUpcomingProbationReviews;
 using HR.Modules.Probation.Features.UpdateProbationRecord;
 using HR.Modules.Probation.Jobs;
 using HR.Modules.Probation.Persistence;
+using HR.Modules.Probation.Services;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Builder;
@@ -53,6 +54,7 @@ public static class ProbationModule
         services.AddScoped<CompleteProbationReviewHandler>();
         services.AddScoped<IValidator<CompleteProbationReviewRequest>, CompleteProbationReviewValidator>();
         services.AddScoped<ITaskCompletionAction, CompleteProbationReviewFromTaskAction>();
+        services.AddScoped<IProbationSummaryReader, ProbationSummaryReader>();
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddScoped<GenerateDueProbationReviewsJob>();
     }

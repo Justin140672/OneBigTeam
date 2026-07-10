@@ -1,5 +1,6 @@
 using HR.Modules.Onboarding.Features.CompleteOnboardingTaskFromTask;
 using HR.Modules.Onboarding.Features.CreateOnboardingPlanOnEmployeeCreated;
+using HR.Modules.Onboarding.Features.GetOnboardingOverview;
 using HR.Modules.Onboarding.Persistence;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
@@ -20,6 +21,7 @@ public static class OnboardingModule
 
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddScoped<ITaskCompletionAction, CompleteOnboardingTaskFromTaskAction>();
+        services.AddScoped<GetOnboardingOverviewHandler>();
 
         return services;
     }
