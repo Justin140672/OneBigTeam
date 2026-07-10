@@ -30,11 +30,14 @@ public sealed class DataImportWizardPage(IPage page, string baseUrl)
 
     /// <summary>
     /// Reads the selected file-column value from the Column Mapping table for a given standard
-    /// field's row (e.g. "First Name").
+    /// field's row (e.g. "First Name"). Scoped to the "2. Column Mapping" card specifically,
+    /// since the Upload step's collapsible "Column reference" table also has rows containing
+    /// the same standard field names (but no &lt;select&gt;).
     /// </summary>
     public async Task<string> GetMappingSelectionAsync(string standardHeaderName)
     {
-        var row = page.Locator("tr").Filter(new() { HasText = standardHeaderName }).First;
+        var mappingCard = page.Locator(".card", new() { HasText = "2. Column Mapping" });
+        var row = mappingCard.Locator("tr").Filter(new() { HasText = standardHeaderName }).First;
         return await row.Locator("select").InputValueAsync();
     }
 
