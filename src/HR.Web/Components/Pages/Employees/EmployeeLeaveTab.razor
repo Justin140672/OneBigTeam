@@ -18,26 +18,8 @@ else
                             @foreach (var item in _nonToilBalances)
                             {
                                 <div class="col-md-4">
-                                    <div class="d-flex flex-column">
-                                        <div class="d-flex align-items-center justify-content-between">
-                                            <span class="text-muted small">@item.LeaveTypeName</span>
-                                            <div class="d-flex gap-1">
-                                                @if (item.HasBalance)
-                                                {
-                                                    <SfButton CssClass="e-outline e-small"
-                                                              OnClick="@(() => SelectHistoryLeaveType(item.LeaveTypeId, item.LeaveTypeName))">
-                                                        History
-                                                    </SfButton>
-                                                }
-                                                @if (item.HasBalance && Session.CanManageEmployees)
-                                                {
-                                                    <SfButton CssClass="e-outline e-small"
-                                                              OnClick="@(() => OpenAdjustDialog(item))">
-                                                        Adjust
-                                                    </SfButton>
-                                                }
-                                            </div>
-                                        </div>
+                                    <div class="d-flex flex-column h-100">
+                                        <span class="text-muted small">@item.LeaveTypeName</span>
                                         @if (item.HasBalance)
                                         {
                                             <span class="fs-4 fw-semibold">@FormatDays(item.RemainingDays ?? 0)</span>
@@ -51,6 +33,22 @@ else
                                         {
                                             <span class="fs-4 fw-semibold text-muted">n/a</span>
                                         }
+                                        <div class="d-flex gap-1 mt-2">
+                                            @if (item.HasBalance)
+                                            {
+                                                <SfButton CssClass="e-outline e-small"
+                                                          OnClick="@(() => SelectHistoryLeaveType(item.LeaveTypeId, item.LeaveTypeName))">
+                                                    History
+                                                </SfButton>
+                                            }
+                                            @if (item.HasBalance && Session.CanManageEmployees)
+                                            {
+                                                <SfButton CssClass="e-outline e-small"
+                                                          OnClick="@(() => OpenAdjustDialog(item))">
+                                                    Adjust
+                                                </SfButton>
+                                            }
+                                        </div>
                                     </div>
                                 </div>
                             }

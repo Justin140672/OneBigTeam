@@ -16,6 +16,8 @@ namespace HR.Web.E2E.Tests.Tests;
 public sealed class AssetAcknowledgementTaskTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId              = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid TomId               = Guid.Parse("30000000-0000-0000-0000-000000000004");
+    private static readonly Guid CarlosId            = Guid.Parse("30000000-0000-0000-0000-000000000010");
     private static readonly Guid TomAssetTaskId      = Guid.Parse("a0000000-0000-0000-0000-000000000020");
     private static readonly Guid CarlosUploadTaskId  = Guid.Parse("a0000000-0000-0000-0000-000000000011");
 
@@ -31,7 +33,7 @@ public sealed class AssetAcknowledgementTaskTests(AppFixture fixture) : E2ETestB
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
-        await taskView.GoToAsync(AcmeId, TomAssetTaskId);
+        await taskView.GoToAsync(AcmeId, TomId, TomAssetTaskId);
 
         Assert.True(await taskView.HasAssetAcknowledgementPanelAsync(),
             "Expected the asset acknowledgement panel for an Acknowledge/Asset task");
@@ -52,7 +54,7 @@ public sealed class AssetAcknowledgementTaskTests(AppFixture fixture) : E2ETestB
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
-        await taskView.GoToAsync(AcmeId, TomAssetTaskId);
+        await taskView.GoToAsync(AcmeId, TomId, TomAssetTaskId);
 
         Assert.True(await taskView.HasAssetAcknowledgementPanelAsync(),
             "Expected the acknowledgement panel to be visible");
@@ -72,7 +74,7 @@ public sealed class AssetAcknowledgementTaskTests(AppFixture fixture) : E2ETestB
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
-        await taskView.GoToAsync(AcmeId, TomAssetTaskId);
+        await taskView.GoToAsync(AcmeId, TomId, TomAssetTaskId);
 
         Assert.True(await taskView.HasAssetAcknowledgementPanelAsync(),
             "Expected the acknowledgement panel before acknowledging");
@@ -94,7 +96,7 @@ public sealed class AssetAcknowledgementTaskTests(AppFixture fixture) : E2ETestB
         await login.GoToAsync();
         await login.LoginAsync(CarlosEmail);
 
-        await taskView.GoToAsync(AcmeId, CarlosUploadTaskId);
+        await taskView.GoToAsync(AcmeId, CarlosId, CarlosUploadTaskId);
 
         Assert.False(await taskView.HasAssetAcknowledgementPanelAsync(),
             "Asset acknowledgement panel must not appear on a document upload task");

@@ -11,12 +11,14 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         Guid companyId,
         string? search = null,
         int pageNumber = 1,
-        int pageSize = 20)
+        int pageSize = 20,
+        Guid? departmentId = null)
     {
         var query = HttpUtility.ParseQueryString(string.Empty);
         if (!string.IsNullOrWhiteSpace(search)) query["search"] = search;
         query["pageNumber"] = pageNumber.ToString();
         query["pageSize"] = pageSize.ToString();
+        if (departmentId is not null) query["departmentId"] = departmentId.ToString();
 
         try
         {
@@ -24,6 +26,34 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
                 $"api/companies/{companyId}/employees?{query}", HrApiJsonOptions.Default);
         }
         catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<GetHeadcountSummaryResponse?> GetHeadcountSummaryAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetHeadcountSummaryResponse>(
+                $"api/companies/{companyId}/employees/headcount-summary", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<GetNewHiresTrendResponse?> GetNewHiresTrendAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetNewHiresTrendResponse>(
+                $"api/companies/{companyId}/employees/new-hires-trend", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
         {
             return null;
         }

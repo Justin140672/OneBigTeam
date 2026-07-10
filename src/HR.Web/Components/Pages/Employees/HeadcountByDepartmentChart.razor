@@ -1,0 +1,100 @@
+@inject EmployeeService EmployeeService
+@inject AppSession Session
+
+@if (Session.CanManageEmployees)
+{
+    <div class="widget-card chart-tile">
+        <div class="widget-header">
+            <i class="fa-solid fa-chart-pie widget-icon"></i>
+            <span class="widget-title">Headcount by Department</span>
+            <a href="/companies/@Session.CompanyId/employees" class="widget-view-all ms-auto">
+                View all <i class="fa-solid fa-arrow-right fa-xs"></i>
+            </a>
+        </div>
+
+        <div class="widget-body">
+            @if (_loading)
+            {
+                <HrLoadingIndicator Label="Loading headcount…" />
+            }
+            else if (_data.Count == 0)
+            {
+                <div class="widget-empty">
+                    <i class="fa-solid fa-users-slash fa-lg mb-2"></i>
+                    <p class="mb-0">No active employees yet</p>
+                </div>
+            }
+            else
+            {
+                <SfAccumulationChart Title="" Height="280px">
+                    <AccumulationChartLegendSettings Visible="true" Position="LegendPosition.Right" />
+                    <AccumulationChartSeriesCollection>
+                        <AccumulationChartSeries DataSource="@_data"
+                                                  XName="@nameof(ChartSlice.Label)"
+                                                  YName="@nameof(ChartSlice.Value)"
+                                                  PointColorMapping="@nameof(ChartSlice.Fill)"
+                                                  Type="AccumulationType.Pie"
+                                                  InnerRadius="55%">
+                            <AccumulationDataLabelSettings Visible="true" Name="@nameof(ChartSlice.Value)" />
+                        </AccumulationChartSeries>
+                    </AccumulationChartSeriesCollection>
+                    <AccumulationChartEvents OnPointClick="OnSliceClicked" />
+                </SfAccumulationChart>
+            }
+        </div>
+    </div>
+
+    <EmployeesByDepartmentDialog CompanyId="Session.CompanyId"
+                                  DepartmentId="_selectedDepartmentId"
+                                  DepartmentName="_selectedDepartmentName"
+                                  IsOpen="_dialogOpen"
+                                  OnClosed="@(() => _dialogOpen = false)" />
+}
+
+@code {
+    private static readonly string[] Palette =
+    [
+        "#0f766e", "#f97316", "#eab308", "#16a34a", "#6b7280", "#0d9488", "#dc2626", "#9333ea"
+    ];
+
+    private bool _loading = true;
+    private List<ChartSlice> _data = [];
+
+    private Guid? _selectedDepartmentId;
+    private string _selectedDepartmentName = "";
+    private bool _dialogOpen;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.CanManageEmployees)
+        {
+            _loading = false;
+            return;
+        }
+
+        var result = await EmployeeService.GetHeadcountSummaryAsync(Session.CompanyId);
+        var items = result?.Items ?? [];
+
+        _data = items
+            .Select((item, index) => new ChartSlice(
+                item.DepartmentId,
+                item.DepartmentName,
+                item.EmployeeCount,
+                Palette[index % Palette.Length]))
+            .ToList();
+
+        _loading = false;
+    }
+
+    private void OnSliceClicked(AccumulationPointEventArgs args)
+    {
+        if (args.PointIndex < 0 || args.PointIndex >= _data.Count) return;
+
+        var slice = _data[args.PointIndex];
+        _selectedDepartmentId = slice.DepartmentId;
+        _selectedDepartmentName = slice.Label;
+        _dialogOpen = true;
+    }
+
+    private sealed record ChartSlice(Guid? DepartmentId, string Label, int Value, string Fill);
+}

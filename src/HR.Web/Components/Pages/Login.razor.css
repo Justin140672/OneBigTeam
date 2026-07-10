@@ -10,19 +10,13 @@
 .login-brand {
     display: flex;
     align-items: center;
-    gap: 10px;
     margin-bottom: 28px;
 }
 
-.login-logo {
-    font-size: 1.6rem;
-    color: var(--hr-color-primary);
-}
-
-.login-app-name {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #111827;
+.login-logo-img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
 }
 
 .login-heading {

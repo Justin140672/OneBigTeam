@@ -1,0 +1,14 @@
+@page "/companies/{CompanyId:guid}/assets/{AssetId:guid}/view"
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+
+<PageTitle>Asset</PageTitle>
+
+<AssetDetailDialog CompanyId="CompanyId" AssetId="AssetId" IsOpen="true" OnClosed="GoBack" />
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid AssetId { get; set; }
+
+    private void GoBack() => Navigation.NavigateTo($"/companies/{CompanyId}/assets");
+}

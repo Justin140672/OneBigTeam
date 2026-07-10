@@ -19,6 +19,7 @@ namespace HR.Web.E2E.Tests.Tests;
 public sealed class ProbationReviewFlowTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId           = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid SarahId           = Guid.Parse("30000000-0000-0000-0000-000000000001");
     private static readonly Guid CarlosRivera      = Guid.Parse("30000000-0000-0000-0000-000000000010");
     private static readonly Guid ProbationTaskId   = Guid.Parse("a0000000-0000-0000-0000-000000000005");
 
@@ -40,7 +41,7 @@ public sealed class ProbationReviewFlowTests(AppFixture fixture) : E2ETestBase(f
         await login.GoToAsync();
         await login.LoginAsync(SarahEmail);
 
-        await taskView.GoToAsync(AcmeId, ProbationTaskId);
+        await taskView.GoToAsync(AcmeId, SarahId, ProbationTaskId);
 
         var statusBefore = await taskView.GetStatusAsync();
         if (statusBefore != "Completed")

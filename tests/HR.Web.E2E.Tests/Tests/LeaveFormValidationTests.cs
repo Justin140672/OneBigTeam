@@ -45,7 +45,7 @@ public sealed class LeaveFormValidationTests(AppFixture fixture) : E2ETestBase(f
         await _page.WaitForSelectorAsync(".invalid-feedback", new() { Timeout = 5_000 });
 
         // Dialog must NOT close on invalid input.
-        Assert.True(await _page.Locator(".e-dialog").IsVisibleAsync(),
+        Assert.True(await _page.GetByRole(AriaRole.Dialog, new() { Name = "Request Leave" }).IsVisibleAsync(),
             "The leave request dialog should remain open when end date is before start date");
 
         // An inline validation error must be visible.
@@ -68,7 +68,7 @@ public sealed class LeaveFormValidationTests(AppFixture fixture) : E2ETestBase(f
         await profile.ClickRequestLeaveAsync();
 
         // Fill dates but skip selecting a leave type.
-        var dialog = _page.Locator(".e-dialog");
+        var dialog = _page.GetByRole(AriaRole.Dialog, new() { Name = "Request Leave" });
         var dateInputs = dialog.Locator(".e-date-wrapper input.e-input");
 
         await dateInputs.Nth(0).ClickAsync();
@@ -85,7 +85,7 @@ public sealed class LeaveFormValidationTests(AppFixture fixture) : E2ETestBase(f
         await _page.WaitForSelectorAsync(".invalid-feedback", new() { Timeout = 5_000 });
 
         // Dialog should remain open.
-        Assert.True(await _page.Locator(".e-dialog").IsVisibleAsync(),
+        Assert.True(await _page.GetByRole(AriaRole.Dialog, new() { Name = "Request Leave" }).IsVisibleAsync(),
             "The leave request dialog should remain open when no leave type is selected");
 
         // An inline validation error must be visible.
@@ -108,7 +108,7 @@ public sealed class LeaveFormValidationTests(AppFixture fixture) : E2ETestBase(f
         await profile.ClickRequestLeaveAsync();
 
         // Select leave type but leave dates empty.
-        var dialog = _page.Locator(".e-dialog");
+        var dialog = _page.GetByRole(AriaRole.Dialog, new() { Name = "Request Leave" });
         var typeCombobox = dialog.Locator("span[role='combobox']:has([placeholder='Select leave type'])");
         await typeCombobox.ClickAsync();
         await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
@@ -123,7 +123,7 @@ public sealed class LeaveFormValidationTests(AppFixture fixture) : E2ETestBase(f
         await _page.WaitForSelectorAsync(".invalid-feedback", new() { Timeout = 5_000 });
 
         // Dialog should remain open.
-        Assert.True(await _page.Locator(".e-dialog").IsVisibleAsync(),
+        Assert.True(await _page.GetByRole(AriaRole.Dialog, new() { Name = "Request Leave" }).IsVisibleAsync(),
             "The leave request dialog should remain open when no start date is provided");
 
         // An inline validation error for the missing date must be visible.

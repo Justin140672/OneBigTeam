@@ -308,3 +308,22 @@ public record ListNationalitiesResponse(IReadOnlyList<NationalityListItem> Items
 
 public record NationalityListItem(int Id, string Name);
 
+// ── DASHBOARD: HEADCOUNT SUMMARY ────────────────────────────────────────────────
+
+public sealed record GetHeadcountSummaryResponse(IReadOnlyList<HeadcountSummaryItem> Items);
+
+public sealed record HeadcountSummaryItem(
+    Guid? DepartmentId,
+    string DepartmentName,
+    int EmployeeCount);
+
+// ── DASHBOARD: NEW HIRES TREND ──────────────────────────────────────────────────
+
+public sealed record GetNewHiresTrendResponse(IReadOnlyList<NewHiresTrendItem> Items);
+
+public sealed record NewHiresTrendItem(
+    int Year,
+    int Month,
+    string MonthLabel,
+    int NewHireCount);
+

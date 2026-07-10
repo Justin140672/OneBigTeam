@@ -1,0 +1,77 @@
+@inject LeaveService LeaveService
+@inject NavigationManager Navigation
+@inject AppSession Session
+
+@if (_loading)
+{
+    <div class="widget-card">
+        <div class="widget-header">
+            <i class="fa-solid fa-plane-departure widget-icon"></i>
+            <span class="widget-title">Leave Requests</span>
+        </div>
+        <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
+            <HrLoadingIndicator Label="Loading leave requests…" />
+        </div>
+    </div>
+}
+else
+{
+    <div class="widget-card">
+        <div class="widget-header">
+            <i class="fa-solid fa-plane-departure widget-icon"></i>
+            <span class="widget-title">Leave Requests</span>
+            @if (_items.Count > 0)
+            {
+                <span class="widget-count-badge ms-auto">@_items.Count</span>
+            }
+        </div>
+
+        <div class="widget-body">
+            @if (_items.Count == 0)
+            {
+                <div class="widget-empty">
+                    <i class="fa-solid fa-circle-check fa-lg mb-2"></i>
+                    <p class="mb-0">No recent leave requests</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var item in _items)
+                {
+                    var i = item;
+                    <div class="task-widget-item" @onclick="() => NavigateToRequest(i)">
+                        <div class="task-widget-content">
+                            <span class="task-widget-title">@i.EmployeeName</span>
+                            <span class="task-widget-meta">@i.LeaveTypeName · @i.StartDate.ToString("d MMM") – @i.EndDate.ToString("d MMM")</span>
+                        </div>
+                        <span class="due-badge due-badge--@StatusCss(i.Status)">@i.Status</span>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private List<RecentLeaveRequestItem> _items = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await LeaveService.GetRecentLeaveRequestsAsync(Session.CompanyId);
+        _items = result?.Items.ToList() ?? [];
+        _loading = false;
+    }
+
+    private static string StatusCss(string status) => status switch
+    {
+        "Pending"  => "soon",
+        "Approved" => "approved",
+        "Declined" => "overdue",
+        "Rejected" => "overdue",
+        _          => "normal",
+    };
+
+    private void NavigateToRequest(RecentLeaveRequestItem item) =>
+        Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/{item.EmployeeId}/profile?tab=leave");
+}

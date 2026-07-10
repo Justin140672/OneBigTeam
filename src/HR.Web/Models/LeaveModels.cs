@@ -205,3 +205,18 @@ public sealed record GetLeaveRequestResponse(
     string? Reason,
     string? RejectionReason,
     DateTimeOffset CreatedAt);
+
+// ── DASHBOARD: RECENT LEAVE REQUESTS ────────────────────────────────────────────
+
+public sealed record GetRecentLeaveRequestsResponse(IReadOnlyList<RecentLeaveRequestItem> Items);
+
+public sealed record RecentLeaveRequestItem(
+    Guid LeaveRequestId,
+    Guid EmployeeId,
+    string EmployeeName,
+    string LeaveTypeName,
+    string Status,
+    DateOnly StartDate,
+    DateOnly EndDate,
+    decimal TotalDays,
+    DateTimeOffset CreatedAt);

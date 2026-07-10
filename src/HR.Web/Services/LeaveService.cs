@@ -42,6 +42,23 @@ public sealed class LeaveService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<GetRecentLeaveRequestsResponse?> GetRecentLeaveRequestsAsync(
+        Guid companyId,
+        int take = 10,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetRecentLeaveRequestsResponse>(
+                $"api/companies/{companyId}/leave-requests/recent?take={take}",
+                HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public async Task<GetLeaveRequestResponse?> GetLeaveRequestAsync(
         Guid companyId,
         Guid employeeId,

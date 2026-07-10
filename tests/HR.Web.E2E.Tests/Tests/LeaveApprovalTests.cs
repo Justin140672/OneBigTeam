@@ -75,7 +75,7 @@ public sealed class LeaveApprovalTests(AppFixture fixture) : E2ETestBase(fixture
 
         // ── Step 7: Click notification to navigate to the task view ───────────
         await notif.ClickNotificationAsync("Tom Williams");
-        var taskId = task.GetTaskIdFromUrl();
+        await task.WaitForLoadedAsync();
 
         // ── Step 8: Verify task details ───────────────────────────────────────
         var taskTitle = await task.GetTitleAsync();

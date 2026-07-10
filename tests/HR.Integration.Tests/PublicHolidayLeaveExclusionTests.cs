@@ -16,8 +16,11 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
     public PublicHolidayLeaveExclusionTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+        // CompanyAdministrator (not just HrAdministrator) because SetupCompanyAsync calls
+        // UpdateCompanySettings, which the company:manage policy restricts to
+        // CompanyAdministrator only.
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator))
+            await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.CompanyAdministrator))
             .GetAwaiter().GetResult();
     }
 
@@ -109,7 +112,7 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
         var client = ClientForCompany(companyId);
 
         // Update settings
-        await client.PutAsJsonAsync($"/api/companies/{companyId}/settings", new
+        var settingsResp = await client.PutAsJsonAsync($"/api/companies/{companyId}/settings", new
         {
             timeZone = "UTC",
             locale = "en-GB",
@@ -120,6 +123,7 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
             probationMonths = 0,
             excludePublicHolidaysFromLeave = excludePublicHolidays
         });
+        settingsResp.EnsureSuccessStatusCode();
 
         // Seed a leave type directly — no API endpoint exists for this
         var leaveTypeId = Guid.NewGuid();

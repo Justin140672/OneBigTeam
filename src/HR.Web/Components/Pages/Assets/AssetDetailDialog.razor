@@ -5,7 +5,7 @@
 <SfDialog Visible="Visible" IsModal="true" Width="640px" ShowCloseIcon="true" CssClass="asset-detail-dialog">
     <DialogEvents Closed="HandleDialogClosed" />
     <DialogTemplates>
-        <Header>@(_asset is null ? "Asset" : $"{_asset.AssetNumber} — {_asset.Name}")</Header>
+        <Header><span data-testid="asset-title">@(_asset is null ? "Asset" : $"{_asset.AssetNumber} — {_asset.Name}")</span></Header>
         <Content>
             @if (_loading)
             {
@@ -17,8 +17,9 @@
             }
             else
             {
+                <div data-testid="asset-detail-content">
                 <div class="mb-3">
-                    <span class="@StatusBadgeClass">@_asset.Status</span>
+                    <span class="@StatusBadgeClass" data-testid="asset-status">@_asset.Status</span>
                 </div>
 
                 <div class="card mb-3">
@@ -26,13 +27,13 @@
                     <div class="card-body">
                         <dl class="row mb-0">
                             <dt class="col-sm-5">Asset Number</dt>
-                            <dd class="col-sm-7">@_asset.AssetNumber</dd>
+                            <dd class="col-sm-7" data-testid="asset-number">@_asset.AssetNumber</dd>
 
                             <dt class="col-sm-5">Name</dt>
-                            <dd class="col-sm-7">@_asset.Name</dd>
+                            <dd class="col-sm-7" data-testid="asset-name">@_asset.Name</dd>
 
                             <dt class="col-sm-5">Category</dt>
-                            <dd class="col-sm-7">@(_asset.CategoryName ?? "—")</dd>
+                            <dd class="col-sm-7" data-testid="asset-category">@(_asset.CategoryName ?? "—")</dd>
                         </dl>
                     </div>
                 </div>
@@ -42,13 +43,13 @@
                     <div class="card-body">
                         <dl class="row mb-0">
                             <dt class="col-sm-5">Manufacturer</dt>
-                            <dd class="col-sm-7">@(_asset.Manufacturer ?? "—")</dd>
+                            <dd class="col-sm-7" data-testid="asset-manufacturer">@(_asset.Manufacturer ?? "—")</dd>
 
                             <dt class="col-sm-5">Model</dt>
-                            <dd class="col-sm-7">@(_asset.Model ?? "—")</dd>
+                            <dd class="col-sm-7" data-testid="asset-model">@(_asset.Model ?? "—")</dd>
 
                             <dt class="col-sm-5">Serial Number</dt>
-                            <dd class="col-sm-7">@(_asset.SerialNumber ?? "—")</dd>
+                            <dd class="col-sm-7" data-testid="asset-serial">@(_asset.SerialNumber ?? "—")</dd>
                         </dl>
                     </div>
                 </div>
@@ -142,6 +143,7 @@
                 {
                     <div class="alert alert-danger mt-3 mb-0" data-testid="assign-error-message">@_actionError</div>
                 }
+                </div>
             }
         </Content>
         <FooterTemplate>

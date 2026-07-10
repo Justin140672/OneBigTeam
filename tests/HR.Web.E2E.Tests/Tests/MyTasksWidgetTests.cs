@@ -79,6 +79,7 @@ public sealed class MyTasksWidgetTests(AppFixture fixture) : E2ETestBase(fixture
         await dashboard.GoToAsync();
 
         await dashboard.ClickTaskAsync("Acknowledge");
+        await taskView.WaitForLoadedAsync();
 
         Assert.True(await taskView.HasAssetAcknowledgementPanelAsync(),
             "Expected the asset acknowledgement panel on the task view page after clicking the widget item");

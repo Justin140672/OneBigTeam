@@ -33,7 +33,7 @@ public sealed class GeneralTaskCompletionTests(AppFixture fixture) : E2ETestBase
         await login.LoginAsync(SarahEmail);
 
         // ── Step 2: Navigate directly to the seeded task ──────────────────────
-        await taskView.GoToAsync(AcmeId, TaskQ2ReviewId);
+        await taskView.GoToAsync(AcmeId, SarahId, TaskQ2ReviewId);
 
         // ── Step 3: Verify title ──────────────────────────────────────────────
         var title = await taskView.GetTitleAsync();
@@ -84,7 +84,7 @@ public sealed class GeneralTaskCompletionTests(AppFixture fixture) : E2ETestBase
         await login.GoToAsync();
         await login.LoginAsync(SarahEmail);
 
-        await taskView.GoToAsync(AcmeId, taskSurveyId);
+        await taskView.GoToAsync(AcmeId, SarahId, taskSurveyId);
 
         // Verify it is open / not yet completed.
         var statusBefore = await taskView.GetStatusAsync();
@@ -97,10 +97,7 @@ public sealed class GeneralTaskCompletionTests(AppFixture fixture) : E2ETestBase
 
         await completeBtn.ClickAsync();
 
-        // Wait for status badge to update.
-        await _page.WaitForFunctionAsync(
-            "document.querySelector('.task-status-badge')?.textContent?.includes('Completed')",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await taskView.WaitForCompletedAsync();
 
         Assert.Equal("Completed", await taskView.GetStatusAsync());
     }

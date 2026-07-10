@@ -380,6 +380,18 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-grid, .task-cell, p", new() { Timeout = 15_000 });
     }
 
+    /// <summary>
+    /// Clicks the task row (by task id) in the admin Tasks tab grid, opening TaskViewDialog.
+    /// Use TaskViewPage.WaitForLoadedAsync (or its own methods) to read the opened task's content.
+    /// </summary>
+    public async Task ClickTaskAsync(Guid taskId)
+    {
+        var row = page.Locator($"[data-testid='task-view-btn-{taskId}']");
+        await row.WaitForAsync(new() { Timeout = 15_000 });
+        await row.ClickAsync();
+        await page.WaitForSelectorAsync(".task-view-dialog", new() { Timeout = 15_000 });
+    }
+
     // ── Sickness Tab ────────────────────────────────────────────────────────────
 
     public async Task OpenSicknessTabAsync()

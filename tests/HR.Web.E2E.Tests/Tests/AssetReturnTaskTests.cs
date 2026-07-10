@@ -16,6 +16,8 @@ namespace HR.Web.E2E.Tests.Tests;
 public sealed class AssetReturnTaskTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId             = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid SarahId            = Guid.Parse("30000000-0000-0000-0000-000000000001");
+    private static readonly Guid TomId              = Guid.Parse("30000000-0000-0000-0000-000000000004");
     private static readonly Guid SarahReturnTaskId  = Guid.Parse("a0000000-0000-0000-0000-000000000022");
     private static readonly Guid TomAcknowledgeTaskId = Guid.Parse("a0000000-0000-0000-0000-000000000020");
 
@@ -31,7 +33,7 @@ public sealed class AssetReturnTaskTests(AppFixture fixture) : E2ETestBase(fixtu
         await login.GoToAsync();
         await login.LoginAsync(SarahEmail);
 
-        await taskView.GoToAsync(AcmeId, SarahReturnTaskId);
+        await taskView.GoToAsync(AcmeId, SarahId, SarahReturnTaskId);
 
         Assert.True(await taskView.HasAssetReturnPanelAsync(),
             "Expected the asset return panel for a Return/Asset task");
@@ -55,7 +57,7 @@ public sealed class AssetReturnTaskTests(AppFixture fixture) : E2ETestBase(fixtu
         await login.GoToAsync();
         await login.LoginAsync(SarahEmail);
 
-        await taskView.GoToAsync(AcmeId, SarahReturnTaskId);
+        await taskView.GoToAsync(AcmeId, SarahId, SarahReturnTaskId);
 
         Assert.True(await taskView.HasAssetReturnPanelAsync(),
             "Expected the return panel to be visible");
@@ -75,7 +77,7 @@ public sealed class AssetReturnTaskTests(AppFixture fixture) : E2ETestBase(fixtu
         await login.GoToAsync();
         await login.LoginAsync(SarahEmail);
 
-        await taskView.GoToAsync(AcmeId, SarahReturnTaskId);
+        await taskView.GoToAsync(AcmeId, SarahId, SarahReturnTaskId);
 
         Assert.True(await taskView.HasAssetReturnPanelAsync(),
             "Expected the return panel before confirming return");
@@ -97,7 +99,7 @@ public sealed class AssetReturnTaskTests(AppFixture fixture) : E2ETestBase(fixtu
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
-        await taskView.GoToAsync(AcmeId, TomAcknowledgeTaskId);
+        await taskView.GoToAsync(AcmeId, TomId, TomAcknowledgeTaskId);
 
         Assert.False(await taskView.HasAssetReturnPanelAsync(),
             "Asset return panel must not appear on an acknowledgement task");

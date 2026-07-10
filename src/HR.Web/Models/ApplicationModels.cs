@@ -89,3 +89,16 @@ public record HireCandidateResponse(
     DateTimeOffset AppliedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
+
+// ── DASHBOARD: APPLICATIONS BY STATUS ───────────────────────────────────────────
+
+public record GetApplicationsByStatusResponse(IReadOnlyList<ApplicationByStatusItem> Items);
+
+public record ApplicationByStatusItem(
+    Guid ApplicationId,
+    Guid CandidateId,
+    string CandidateName,
+    string CandidateEmail,
+    Guid VacancyId,
+    string VacancyTitle,
+    DateTimeOffset AppliedAt);

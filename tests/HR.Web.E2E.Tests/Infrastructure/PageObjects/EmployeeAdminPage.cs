@@ -159,27 +159,19 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
     public async Task<bool> HasAssignAssetButtonAsync() =>
         await page.GetByRole(AriaRole.Button, new() { Name = "Assign Asset" }).IsVisibleAsync();
 
-    /// <summary>Returns true if the Request Return button is visible on the Assets tab.</summary>
-    public async Task<bool> HasRequestReturnButtonAsync() =>
-        await page.GetByRole(AriaRole.Button, new() { Name = "Request Return" }).IsVisibleAsync();
-
-    /// <summary>Returns true if the Request Return button is currently disabled.</summary>
-    public async Task<bool> IsRequestReturnButtonDisabledAsync()
-    {
-        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Request Return" });
-        return await btn.IsDisabledAsync();
-    }
+    /// <summary>Returns true if the Return Asset button is visible on the Assets tab.</summary>
+    public async Task<bool> HasReturnAssetButtonAsync() =>
+        await page.GetByRole(AriaRole.Button, new() { Name = "Return Asset" }).IsVisibleAsync();
 
     /// <summary>
-    /// Clicks the first row in the assets grid to select it, then waits for Blazor
-    /// to re-render (the Request Return button re-evaluates its Disabled binding).
+    /// Returns true if the Return Asset button is currently disabled (no acknowledged asset
+    /// is available to return — the button is a standalone action above the grid, not tied to
+    /// row selection).
     /// </summary>
-    public async Task SelectFirstAssetRowAsync()
+    public async Task<bool> IsReturnAssetButtonDisabledAsync()
     {
-        var firstRow = page.Locator("[data-testid='employee-assets-grid'] .e-row").First;
-        await firstRow.ClickAsync();
-        // Give Blazor time to process the RowSelected event and re-render.
-        await page.WaitForTimeoutAsync(500);
+        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Return Asset" });
+        return await btn.IsDisabledAsync();
     }
 
     /// <summary>

@@ -269,6 +269,7 @@ h1:focus {
    ──────────────────────────────────────────────────────────────── */
 
 .card {
+    background-color: #fff;
     border-color: var(--hr-gray-200);
     border-radius: var(--hr-radius-lg);
     box-shadow: var(--hr-shadow-sm);
@@ -541,10 +542,43 @@ html[data-theme="dark"] .card-header {
     flex-shrink: 0;
 }
 
-.due-badge--overdue { background: #fee2e2; color: var(--hr-color-danger); }
-.due-badge--today   { background: #ffedd5; color: #ea580c; }
-.due-badge--soon    { background: #fef3c7; color: #ca8a04; }
-.due-badge--normal  { background: var(--hr-gray-100); color: var(--hr-gray-500); }
+.due-badge--overdue  { background: #fee2e2; color: var(--hr-color-danger); }
+.due-badge--today    { background: #ffedd5; color: #ea580c; }
+.due-badge--soon     { background: #fef3c7; color: #ca8a04; }
+.due-badge--normal   { background: var(--hr-gray-100); color: var(--hr-gray-500); }
+.due-badge--approved { background: #dcfce7; color: var(--hr-color-success); }
+
+/* ── Dashboard bento grid (Home.razor) ────────────────── */
+
+.dashboard-overview-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.chart-tile {
+    display: flex;
+    flex-direction: column;
+    min-height: 360px;
+}
+
+.chart-tile .widget-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 12px 16px 16px;
+}
+
+.chart-tile .widget-body > * {
+    width: 100%;
+}
+
+.dashboard-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.25rem;
+}
 
 /* ── Dark mode ───────────────────────────────────────────────────
    Uses html[data-theme="dark"] so specificity (0,2,1) beats every
@@ -738,10 +772,11 @@ html[data-theme="dark"] .task-widget-meta {
     color: var(--hr-gray-500);
 }
 
-html[data-theme="dark"] .due-badge--overdue { background: rgba(220,38,38,0.18);  color: var(--hr-color-danger); }
-html[data-theme="dark"] .due-badge--today   { background: rgba(234,88,12,0.18);  color: #fb923c; }
-html[data-theme="dark"] .due-badge--soon    { background: rgba(202,138,4,0.18);  color: #fbbf24; }
-html[data-theme="dark"] .due-badge--normal  { background: var(--hr-gray-700);    color: var(--hr-gray-300); }
+html[data-theme="dark"] .due-badge--overdue  { background: rgba(220,38,38,0.18);  color: var(--hr-color-danger); }
+html[data-theme="dark"] .due-badge--today    { background: rgba(234,88,12,0.18);  color: #fb923c; }
+html[data-theme="dark"] .due-badge--soon     { background: rgba(202,138,4,0.18);  color: #fbbf24; }
+html[data-theme="dark"] .due-badge--normal   { background: var(--hr-gray-700);    color: var(--hr-gray-300); }
+html[data-theme="dark"] .due-badge--approved { background: rgba(22,163,74,0.18);  color: #4ade80; }
 
 /* ── Dashboard heading (Home.razor) ──────────────────── */
 

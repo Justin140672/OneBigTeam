@@ -37,7 +37,7 @@ public sealed class DocumentUploadTaskTests(AppFixture fixture) : E2ETestBase(fi
         await login.GoToAsync();
         await login.LoginAsync(CarlosEmail);
 
-        await taskView.GoToAsync(AcmeId, CarlosUploadTaskId);
+        await taskView.GoToAsync(AcmeId, CarlosId, CarlosUploadTaskId);
 
         Assert.True(await taskView.HasDocumentUploadPanelAsync(),
             "Expected the document upload panel to be shown for an Upload/Document task");
@@ -58,7 +58,7 @@ public sealed class DocumentUploadTaskTests(AppFixture fixture) : E2ETestBase(fi
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
-        await taskView.GoToAsync(AcmeId, TomUploadTaskId);
+        await taskView.GoToAsync(AcmeId, TomId, TomUploadTaskId);
 
         Assert.True(await taskView.HasDocumentUploadPanelAsync(),
             "Expected the document upload panel to be visible");

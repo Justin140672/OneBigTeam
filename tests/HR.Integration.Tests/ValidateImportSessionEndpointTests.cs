@@ -34,19 +34,21 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
         var payload = await response.Content.ReadFromJsonAsync<ValidatePayload>();
         Assert.NotNull(payload);
         Assert.Equal(sessionId, payload!.Id);
-        Assert.Equal("Completed", payload.Status);
+        Assert.Equal("Validated", payload.Status);
         Assert.Equal(2, payload.TotalRows);
         Assert.Equal(2, payload.SuccessfulRows);
         Assert.Equal(0, payload.FailedRows);
     }
 
     [Fact]
-    public async Task Returns_Ok_With_CompletedWithErrors_When_A_Row_Is_Invalid()
+    public async Task Returns_Ok_And_Validated_When_One_Row_Is_Invalid_But_Another_Succeeds()
     {
         var companyId = Guid.NewGuid();
         using var client = AdminClient(companyId);
 
-        // Second data row is missing a required "Last Name" value.
+        // Second data row is missing a required "Last Name" value. One row is still valid, so
+        // per ImportSession.Validate() the session lands on Validated (ready to confirm the
+        // valid subset) rather than CompletedWithErrors (which is reserved for "every row failed").
         const string csv =
             "First Name,Last Name,Work Email,Start Date,Employee Number\n" +
             "John,Doe,john.doe@example.com,2026-01-01,EMP001\n" +
@@ -59,14 +61,14 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ValidatePayload>();
         Assert.NotNull(payload);
-        Assert.Equal("CompletedWithErrors", payload!.Status);
+        Assert.Equal("Validated", payload!.Status);
         Assert.Equal(2, payload.TotalRows);
         Assert.Equal(1, payload.SuccessfulRows);
         Assert.Equal(1, payload.FailedRows);
     }
 
     [Fact]
-    public async Task Returns_Ok_And_Completed_When_A_Row_References_A_New_Department()
+    public async Task Returns_Ok_And_Validated_When_A_Row_References_A_New_Department()
     {
         var companyId = Guid.NewGuid();
         using var client = AdminClient(companyId);
@@ -83,7 +85,7 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ValidatePayload>();
         Assert.NotNull(payload);
-        Assert.Equal("Completed", payload!.Status);
+        Assert.Equal("Validated", payload!.Status);
         Assert.Equal(2, payload.TotalRows);
         Assert.Equal(2, payload.SuccessfulRows);
         Assert.Equal(0, payload.FailedRows);
@@ -113,7 +115,7 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
     }
 
     [Fact]
-    public async Task Returns_Ok_And_Completed_When_Department_Location_And_PositionProfile_All_New()
+    public async Task Returns_Ok_And_Validated_When_Department_Location_And_PositionProfile_All_New()
     {
         var companyId = Guid.NewGuid();
         using var client = AdminClient(companyId);
@@ -129,7 +131,7 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ValidatePayload>();
         Assert.NotNull(payload);
-        Assert.Equal("Completed", payload!.Status);
+        Assert.Equal("Validated", payload!.Status);
         Assert.Equal(1, payload.TotalRows);
         Assert.Equal(1, payload.SuccessfulRows);
         Assert.Equal(0, payload.FailedRows);

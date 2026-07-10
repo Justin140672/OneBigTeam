@@ -1,79 +1,82 @@
 @inject TaskService TaskService
 @inject AppSession Session
 
-@if (_loading)
+@if (Session.CanManageEmployees)
 {
-    <div class="widget-card">
-        <div class="widget-header">
-            <i class="fa-solid fa-inbox widget-icon"></i>
-            <span class="widget-title">HR Inbox</span>
-        </div>
-        <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
-            <HrLoadingIndicator Label="Loading inbox…" />
-        </div>
-    </div>
-}
-else
-{
-    <div class="widget-card">
-        <div class="widget-header">
-            <i class="fa-solid fa-inbox widget-icon"></i>
-            <span class="widget-title">HR Inbox</span>
-            @if (_items.Count > 0)
-            {
-                <span class="widget-count-badge">@_items.Count</span>
-            }
-            <a href="/companies/@Session.CompanyId/hr/inbox" class="widget-view-all ms-auto">
-                View all <i class="fa-solid fa-arrow-right fa-xs"></i>
-            </a>
-        </div>
-
-        @if (_overdue > 0)
-        {
-            <div class="widget-stats">
-                <div class="widget-stat widget-stat--danger">
-                    <i class="fa-solid fa-triangle-exclamation fa-xs"></i>
-                    <span class="widget-stat-value">@_overdue</span>
-                    <span class="widget-stat-label">overdue</span>
-                </div>
+    @if (_loading)
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-inbox widget-icon"></i>
+                <span class="widget-title">HR Inbox</span>
             </div>
-        }
+            <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
+                <HrLoadingIndicator Label="Loading inbox…" />
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-inbox widget-icon"></i>
+                <span class="widget-title">HR Inbox</span>
+                @if (_items.Count > 0)
+                {
+                    <span class="widget-count-badge">@_items.Count</span>
+                }
+                <a href="/companies/@Session.CompanyId/hr/inbox" class="widget-view-all ms-auto">
+                    View all <i class="fa-solid fa-arrow-right fa-xs"></i>
+                </a>
+            </div>
 
-        <div class="widget-body">
-            @if (_items.Count == 0)
+            @if (_overdue > 0)
             {
-                <div class="widget-empty">
-                    <i class="fa-solid fa-circle-check fa-lg mb-2"></i>
-                    <p class="mb-0">Inbox clear</p>
+                <div class="widget-stats">
+                    <div class="widget-stat widget-stat--danger">
+                        <i class="fa-solid fa-triangle-exclamation fa-xs"></i>
+                        <span class="widget-stat-value">@_overdue</span>
+                        <span class="widget-stat-label">overdue</span>
+                    </div>
                 </div>
             }
-            else
-            {
-                @foreach (var task in _items.Take(5))
+
+            <div class="widget-body">
+                @if (_items.Count == 0)
                 {
-                    var t = task;
-                    var (dueLabel, dueCss) = DueBadge(t.DueDate);
-                    <div class="task-widget-item" @onclick="() => NavigateToTask(t)">
-                        <span class="priority-pip priority-pip--@DuePip(t.DueDate)" title="@t.Priority priority"></span>
-                        <div class="task-widget-content">
-                            <span class="task-widget-title">@t.Title</span>
-                            <span class="task-widget-meta">@t.Source</span>
-                        </div>
-                        @if (dueLabel is not null)
-                        {
-                            <span class="due-badge due-badge--@dueCss">@dueLabel</span>
-                        }
+                    <div class="widget-empty">
+                        <i class="fa-solid fa-circle-check fa-lg mb-2"></i>
+                        <p class="mb-0">Inbox clear</p>
                     </div>
                 }
-            }
+                else
+                {
+                    @foreach (var task in _items.Take(5))
+                    {
+                        var t = task;
+                        var (dueLabel, dueCss) = DueBadge(t.DueDate);
+                        <div class="task-widget-item" @onclick="() => NavigateToTask(t)">
+                            <span class="priority-pip priority-pip--@DuePip(t.DueDate)" title="@t.Priority priority"></span>
+                            <div class="task-widget-content">
+                                <span class="task-widget-title">@t.Title</span>
+                                <span class="task-widget-meta">@t.Source</span>
+                            </div>
+                            @if (dueLabel is not null)
+                            {
+                                <span class="due-badge due-badge--@dueCss">@dueLabel</span>
+                            }
+                        </div>
+                    }
+                }
+            </div>
         </div>
-    </div>
-}
+    }
 
-<TaskViewDialog CompanyId="Session.CompanyId"
-                TaskId="_selectedTaskId"
-                IsOpen="_dialogOpen"
-                OnClosed="CloseTaskDialogAsync" />
+    <TaskViewDialog CompanyId="Session.CompanyId"
+                    TaskId="_selectedTaskId"
+                    IsOpen="_dialogOpen"
+                    OnClosed="CloseTaskDialogAsync" />
+}
 
 @code {
     private bool _loading = true;
@@ -86,6 +89,12 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        if (!Session.CanManageEmployees)
+        {
+            _loading = false;
+            return;
+        }
+
         _today = DateOnly.FromDateTime(DateTime.UtcNow);
         await LoadTasksAsync();
         _loading = false;

@@ -1,0 +1,109 @@
+@inject VacancyService VacancyService
+@inject AppSession Session
+
+@if (Session.CanManageEmployees)
+{
+    <div class="widget-card chart-tile">
+        <div class="widget-header">
+            <i class="fa-solid fa-filter widget-icon"></i>
+            <span class="widget-title">Hiring Pipeline</span>
+            <a href="/companies/@Session.CompanyId/candidates" class="widget-view-all ms-auto">
+                View all <i class="fa-solid fa-arrow-right fa-xs"></i>
+            </a>
+        </div>
+
+        <div class="widget-body">
+            @if (_loading)
+            {
+                <HrLoadingIndicator Label="Loading pipeline…" />
+            }
+            else if (_data.Count == 0)
+            {
+                <div class="widget-empty">
+                    <i class="fa-solid fa-user-tie fa-lg mb-2"></i>
+                    <p class="mb-0">No applications in the pipeline</p>
+                </div>
+            }
+            else
+            {
+                <SfAccumulationChart Title="" Height="280px">
+                    <AccumulationChartLegendSettings Visible="true" Position="LegendPosition.Right" />
+                    <AccumulationChartSeriesCollection>
+                        <AccumulationChartSeries DataSource="@_data"
+                                                  XName="@nameof(FunnelStage.Label)"
+                                                  YName="@nameof(FunnelStage.Value)"
+                                                  PointColorMapping="@nameof(FunnelStage.Fill)"
+                                                  Type="AccumulationType.Funnel">
+                            <AccumulationDataLabelSettings Visible="true" Name="@nameof(FunnelStage.Value)" />
+                        </AccumulationChartSeries>
+                    </AccumulationChartSeriesCollection>
+                    <AccumulationChartEvents OnPointClick="OnStageClicked" />
+                </SfAccumulationChart>
+            }
+        </div>
+    </div>
+
+    <ApplicationsByStatusDialog CompanyId="Session.CompanyId"
+                                 Status="_selectedStatus"
+                                 IsOpen="_dialogOpen"
+                                 OnClosed="@(() => _dialogOpen = false)" />
+}
+
+@code {
+    // Natural funnel order — Rejected/Withdrawn are excluded by the backend.
+    private static readonly string[] StageOrder =
+        ["Applied", "Screening", "InterviewScheduled", "Interviewed", "Offered", "Hired"];
+
+    private static readonly Dictionary<string, string> StageLabels = new()
+    {
+        ["Applied"] = "Applied",
+        ["Screening"] = "Screening",
+        ["InterviewScheduled"] = "Interview Scheduled",
+        ["Interviewed"] = "Interviewed",
+        ["Offered"] = "Offered",
+        ["Hired"] = "Hired",
+    };
+
+    private static readonly string[] Palette =
+    [
+        "#0f766e", "#0d9488", "#eab308", "#f97316", "#6366f1", "#16a34a"
+    ];
+
+    private bool _loading = true;
+    private List<FunnelStage> _data = [];
+    private string? _selectedStatus;
+    private bool _dialogOpen;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.CanManageEmployees)
+        {
+            _loading = false;
+            return;
+        }
+
+        var result = await VacancyService.GetPipelineSummaryAsync(Session.CompanyId);
+        var byStatus = (result?.Items ?? []).ToDictionary(i => i.Status, i => i.ApplicationCount);
+
+        _data = StageOrder
+            .Where(byStatus.ContainsKey)
+            .Select((status, index) => new FunnelStage(
+                status,
+                StageLabels.GetValueOrDefault(status, status),
+                byStatus[status],
+                Palette[index % Palette.Length]))
+            .ToList();
+
+        _loading = false;
+    }
+
+    private void OnStageClicked(AccumulationPointEventArgs args)
+    {
+        if (args.PointIndex < 0 || args.PointIndex >= _data.Count) return;
+
+        _selectedStatus = _data[args.PointIndex].Status;
+        _dialogOpen = true;
+    }
+
+    private sealed record FunnelStage(string Status, string Label, int Value, string Fill);
+}

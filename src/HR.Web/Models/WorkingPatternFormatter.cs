@@ -16,7 +16,7 @@ public static class WorkingPatternFormatter
     ];
 
     public static string Summarize(WorkingDays workingDays, decimal hoursPerDay) =>
-        $"{FormatDays(workingDays)} ({hoursPerDay.ToString("0.##")}hrs)";
+        $"{FormatDays(workingDays)} ({hoursPerDay.ToString("0.##")}hrs/day)";
 
     private static string FormatDays(WorkingDays workingDays)
     {

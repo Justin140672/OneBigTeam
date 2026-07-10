@@ -5,44 +5,47 @@
 @inject NavigationManager Navigation
 @inject AppSession Session
 
-@if (_loading)
+@if (Session.CanManageEmployees)
 {
-    <div class="widget-card">
-        <div class="widget-header">
-            <i class="fa-solid fa-user-tie widget-icon"></i>
-            <span class="widget-title">Recruitment</span>
+    @if (_loading)
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-user-tie widget-icon"></i>
+                <span class="widget-title">Recruitment</span>
+            </div>
+            <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
+                <HrLoadingIndicator />
+            </div>
         </div>
-        <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
-            <HrLoadingIndicator />
-        </div>
-    </div>
-}
-else
-{
-    <div class="widget-card">
-        <div class="widget-header">
-            <i class="fa-solid fa-user-tie widget-icon"></i>
-            <span class="widget-title">Recruitment</span>
-            <a href="/companies/@Session.CompanyId/vacancies" class="widget-view-all ms-auto">
-                View all <i class="fa-solid fa-arrow-right fa-xs"></i>
-            </a>
-        </div>
+    }
+    else
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-user-tie widget-icon"></i>
+                <span class="widget-title">Recruitment</span>
+                <a href="/companies/@Session.CompanyId/vacancies" class="widget-view-all ms-auto">
+                    View all <i class="fa-solid fa-arrow-right fa-xs"></i>
+                </a>
+            </div>
 
-        <div class="widget-kpi-row">
-            <div class="widget-kpi widget-kpi--link" @onclick="NavigateToVacancies">
-                <span class="widget-kpi-value">@_openVacancies</span>
-                <span class="widget-kpi-label">Open Vacancies</span>
-            </div>
-            <div class="widget-kpi">
-                <span class="widget-kpi-value">@_interviewsToday</span>
-                <span class="widget-kpi-label">Interviews Today</span>
-            </div>
-            <div class="widget-kpi @(_outstandingFeedbackTasks > 0 ? "widget-kpi--danger" : "")">
-                <span class="widget-kpi-value">@_outstandingFeedbackTasks</span>
-                <span class="widget-kpi-label">Outstanding Feedback Tasks</span>
+            <div class="widget-kpi-row">
+                <div class="widget-kpi widget-kpi--link" @onclick="NavigateToVacancies">
+                    <span class="widget-kpi-value">@_openVacancies</span>
+                    <span class="widget-kpi-label">Open Vacancies</span>
+                </div>
+                <div class="widget-kpi">
+                    <span class="widget-kpi-value">@_interviewsToday</span>
+                    <span class="widget-kpi-label">Interviews Today</span>
+                </div>
+                <div class="widget-kpi @(_outstandingFeedbackTasks > 0 ? "widget-kpi--danger" : "")">
+                    <span class="widget-kpi-value">@_outstandingFeedbackTasks</span>
+                    <span class="widget-kpi-label">Outstanding Feedback Tasks</span>
+                </div>
             </div>
         </div>
-    </div>
+    }
 }
 
 @code {
@@ -53,6 +56,12 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        if (!Session.CanManageEmployees)
+        {
+            _loading = false;
+            return;
+        }
+
         var vacanciesTask = VacancyService.ListVacanciesAsync(Session.CompanyId, status: "Open");
         var interviewsTask = InterviewService.GetInterviewsTodayCountAsync(Session.CompanyId);
         var feedbackTasksTask = TaskService.GetOutstandingTaskCountAsync(

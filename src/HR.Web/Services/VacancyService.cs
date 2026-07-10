@@ -26,6 +26,20 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
         }
     }
 
+    public async Task<GetPipelineSummaryResponse?> GetPipelineSummaryAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetPipelineSummaryResponse>(
+                $"api/companies/{companyId}/recruitment/pipeline-summary", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public async Task<GetVacancyResponse?> GetVacancyAsync(Guid companyId, Guid id)
     {
         try

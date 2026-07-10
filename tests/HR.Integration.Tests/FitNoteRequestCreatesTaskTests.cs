@@ -23,8 +23,11 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
     public FitNoteRequestCreatesTaskTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+        // CompanyAdministrator (not just HrAdministrator) because this user calls
+        // UpdateCompanySettings, which the company:manage policy restricts to
+        // CompanyAdministrator only.
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator))
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.CompanyAdministrator))
             .GetAwaiter().GetResult();
     }
 

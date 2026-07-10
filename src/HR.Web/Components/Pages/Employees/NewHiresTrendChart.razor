@@ -1,0 +1,65 @@
+@inject EmployeeService EmployeeService
+@inject AppSession Session
+
+@if (Session.CanManageEmployees)
+{
+    <div class="widget-card chart-tile">
+        <div class="widget-header">
+            <i class="fa-solid fa-arrow-trend-up widget-icon"></i>
+            <span class="widget-title">New Hires (Last 6 Months)</span>
+        </div>
+
+        <div class="widget-body">
+            @if (_loading)
+            {
+                <HrLoadingIndicator Label="Loading trend…" />
+            }
+            else if (_data.Count == 0)
+            {
+                <div class="widget-empty">
+                    <i class="fa-solid fa-chart-line fa-lg mb-2"></i>
+                    <p class="mb-0">No hires in the last 6 months</p>
+                </div>
+            }
+            else
+            {
+                <SfChart Title="" Height="280px">
+                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category"></ChartPrimaryXAxis>
+                    <ChartPrimaryYAxis Minimum="0"></ChartPrimaryYAxis>
+                    <ChartTooltipSettings Enable="true"></ChartTooltipSettings>
+                    <ChartSeriesCollection>
+                        <ChartSeries DataSource="@_data"
+                                     XName="@nameof(TrendPoint.MonthLabel)"
+                                     YName="@nameof(TrendPoint.NewHireCount)"
+                                     Type="ChartSeriesType.Column"
+                                     Fill="#0f766e">
+                        </ChartSeries>
+                    </ChartSeriesCollection>
+                </SfChart>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private List<TrendPoint> _data = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.CanManageEmployees)
+        {
+            _loading = false;
+            return;
+        }
+
+        var result = await EmployeeService.GetNewHiresTrendAsync(Session.CompanyId);
+        _data = (result?.Items ?? [])
+            .Select(i => new TrendPoint(i.MonthLabel, i.NewHireCount))
+            .ToList();
+
+        _loading = false;
+    }
+
+    private sealed record TrendPoint(string MonthLabel, int NewHireCount);
+}

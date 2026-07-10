@@ -21,7 +21,9 @@ using HR.Modules.Employees.Features.CreatePositionProfile;
 using HR.Modules.Employees.Features.DeactivateDepartment;
 using HR.Modules.Employees.Features.GetDepartment;
 using HR.Modules.Employees.Features.GetEmployee;
+using HR.Modules.Employees.Features.GetHeadcountSummary;
 using HR.Modules.Employees.Features.GetMyEmployee;
+using HR.Modules.Employees.Features.GetNewHiresTrend;
 using HR.Modules.Employees.Features.GetMyPersonalDetails;
 using HR.Modules.Employees.Features.RequestPersonalDetailsChange;
 using HR.Modules.Employees.Features.ListDepartments;
@@ -131,6 +133,12 @@ public static class EmployeesModule
 
         services.AddScoped<ListEmployeesHandler>();
         services.AddScoped<IValidator<ListEmployeesRequest>, ListEmployeesValidator>();
+
+        services.AddScoped<GetHeadcountSummaryHandler>();
+        services.AddScoped<IValidator<GetHeadcountSummaryRequest>, GetHeadcountSummaryValidator>();
+
+        services.AddScoped<GetNewHiresTrendHandler>();
+        services.AddScoped<IValidator<GetNewHiresTrendRequest>, GetNewHiresTrendValidator>();
 
         services.AddScoped<UpdateEmployeeProfileHandler>();
         services.AddScoped<IValidator<UpdateEmployeeProfileRequest>, UpdateEmployeeProfileValidator>();

@@ -1,0 +1,14 @@
+@page "/companies/{CompanyId:guid}/tasks/{TaskId:guid}"
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+
+<PageTitle>Task</PageTitle>
+
+<TaskViewDialog CompanyId="CompanyId" TaskId="TaskId" IsOpen="true" OnClosed="GoBack" />
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid TaskId { get; set; }
+
+    private void GoBack() => Navigation.NavigateTo("/");
+}

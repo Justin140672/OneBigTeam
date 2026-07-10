@@ -2,80 +2,83 @@
 @inject NavigationManager Navigation
 @inject AppSession Session
 
-@if (_loading)
+@if (Session.CanManageEmployees)
 {
-    <div class="widget-card">
-        <div class="widget-header">
-            <i class="fa-solid fa-clipboard-list widget-icon"></i>
-            <span class="widget-title">Upcoming Probation Reviews</span>
+    @if (_loading)
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-clipboard-list widget-icon"></i>
+                <span class="widget-title">Upcoming Probation Reviews</span>
+            </div>
+            <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
+                <HrLoadingIndicator />
+            </div>
         </div>
-        <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
-            <HrLoadingIndicator />
-        </div>
-    </div>
-}
-else
-{
-    <div class="widget-card">
-        <div class="widget-header">
-            <i class="fa-solid fa-clipboard-list widget-icon"></i>
-            <span class="widget-title">Upcoming Probation Reviews</span>
-            @if (_items.Count > 0)
-            {
-                <span class="widget-count-badge">@_items.Count</span>
-            }
-        </div>
-
-        @if (_overdue > 0 || _dueSoon > 0)
-        {
-            <div class="widget-stats">
-                @if (_overdue > 0)
+    }
+    else
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-clipboard-list widget-icon"></i>
+                <span class="widget-title">Upcoming Probation Reviews</span>
+                @if (_items.Count > 0)
                 {
-                    <div class="widget-stat widget-stat--danger">
-                        <i class="fa-solid fa-triangle-exclamation fa-xs"></i>
-                        <span class="widget-stat-value">@_overdue</span>
-                        <span class="widget-stat-label">overdue</span>
-                    </div>
-                }
-                @if (_dueSoon > 0)
-                {
-                    <div class="widget-stat">
-                        <span class="widget-stat-value">@_dueSoon</span>
-                        <span class="widget-stat-label">due this week</span>
-                    </div>
+                    <span class="widget-count-badge">@_items.Count</span>
                 }
             </div>
-        }
 
-        <div class="widget-body">
-            @if (_items.Count == 0)
+            @if (_overdue > 0 || _dueSoon > 0)
             {
-                <div class="widget-empty">
-                    <i class="fa-solid fa-circle-check fa-lg mb-2"></i>
-                    <p class="mb-0">No upcoming reviews</p>
+                <div class="widget-stats">
+                    @if (_overdue > 0)
+                    {
+                        <div class="widget-stat widget-stat--danger">
+                            <i class="fa-solid fa-triangle-exclamation fa-xs"></i>
+                            <span class="widget-stat-value">@_overdue</span>
+                            <span class="widget-stat-label">overdue</span>
+                        </div>
+                    }
+                    @if (_dueSoon > 0)
+                    {
+                        <div class="widget-stat">
+                            <span class="widget-stat-value">@_dueSoon</span>
+                            <span class="widget-stat-label">due this week</span>
+                        </div>
+                    }
                 </div>
             }
-            else
-            {
-                @foreach (var item in _items.Take(5))
+
+            <div class="widget-body">
+                @if (_items.Count == 0)
                 {
-                    var r = item;
-                    var (dueLabel, dueCss) = DueBadge(r.DueDate);
-                    var name = EmployeeName(r.EmployeeId);
-                    var url  = $"/companies/{Session.CompanyId}/employees/{r.EmployeeId}?tab=probation";
-                    <div class="task-widget-item"
-                         @onclick="() => Navigation.NavigateTo(url)">
-                        <span class="priority-pip priority-pip--@DuePip(r.DueDate)"></span>
-                        <div class="task-widget-content">
-                            <span class="task-widget-title">@name</span>
-                            <span class="task-widget-meta">@FormatReviewType(r.ReviewType)</span>
-                        </div>
-                        <span class="due-badge due-badge--@dueCss">@dueLabel</span>
+                    <div class="widget-empty">
+                        <i class="fa-solid fa-circle-check fa-lg mb-2"></i>
+                        <p class="mb-0">No upcoming reviews</p>
                     </div>
                 }
-            }
+                else
+                {
+                    @foreach (var item in _items.Take(5))
+                    {
+                        var r = item;
+                        var (dueLabel, dueCss) = DueBadge(r.DueDate);
+                        var name = EmployeeName(r.EmployeeId);
+                        var url  = $"/companies/{Session.CompanyId}/employees/{r.EmployeeId}?tab=probation";
+                        <div class="task-widget-item"
+                             @onclick="() => Navigation.NavigateTo(url)">
+                            <span class="priority-pip priority-pip--@DuePip(r.DueDate)"></span>
+                            <div class="task-widget-content">
+                                <span class="task-widget-title">@name</span>
+                                <span class="task-widget-meta">@FormatReviewType(r.ReviewType)</span>
+                            </div>
+                            <span class="due-badge due-badge--@dueCss">@dueLabel</span>
+                        </div>
+                    }
+                }
+            </div>
         </div>
-    </div>
+    }
 }
 
 @code {
@@ -88,6 +91,12 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        if (!Session.CanManageEmployees)
+        {
+            _loading = false;
+            return;
+        }
+
         _today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         var reviewsTask   = ProbationService.GetUpcomingReviewsAsync(Session.CompanyId);

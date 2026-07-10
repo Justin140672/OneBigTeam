@@ -8,8 +8,10 @@ using HR.Modules.Recruitment.Features.CreateVacancy;
 using HR.Modules.Recruitment.Features.DeleteCandidateDocument;
 using HR.Modules.Recruitment.Features.DownloadCandidateDocument;
 using HR.Modules.Recruitment.Features.GetApplication;
+using HR.Modules.Recruitment.Features.GetApplicationsByStatus;
 using HR.Modules.Recruitment.Features.GetCandidate;
 using HR.Modules.Recruitment.Features.GetInterviewsTodayCount;
+using HR.Modules.Recruitment.Features.GetPipelineSummary;
 using HR.Modules.Recruitment.Features.GetVacancy;
 using HR.Modules.Recruitment.Features.HireCandidate;
 using HR.Modules.Recruitment.Features.ListApplicationsForVacancy;
@@ -95,6 +97,12 @@ public static class RecruitmentModule
 
         services.AddScoped<ListApplicationsForVacancyHandler>();
         services.AddScoped<IValidator<ListApplicationsForVacancyRequest>, ListApplicationsForVacancyValidator>();
+
+        services.AddScoped<GetPipelineSummaryHandler>();
+        services.AddScoped<IValidator<GetPipelineSummaryRequest>, GetPipelineSummaryValidator>();
+
+        services.AddScoped<GetApplicationsByStatusHandler>();
+        services.AddScoped<IValidator<GetApplicationsByStatusRequest>, GetApplicationsByStatusValidator>();
 
         services.AddScoped<WithdrawApplicationHandler>();
         services.AddScoped<IValidator<WithdrawApplicationRequest>, WithdrawApplicationValidator>();

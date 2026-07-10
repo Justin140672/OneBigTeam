@@ -126,7 +126,7 @@ public sealed class EmployeeAssetsTabTests(AppFixture fixture) : E2ETestBase(fix
     }
 
     [Fact]
-    public async Task AssetsTab_ShowsRequestReturnButton()
+    public async Task AssetsTab_ShowsReturnAssetButton()
     {
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);
         var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
@@ -137,12 +137,12 @@ public sealed class EmployeeAssetsTabTests(AppFixture fixture) : E2ETestBase(fix
         await empAdmin.GoToAsync(AcmeId, TomId);
         await empAdmin.OpenAssetsTabAsync();
 
-        Assert.True(await empAdmin.HasRequestReturnButtonAsync(),
-            "Expected the 'Request Return' button to be visible on the admin Assets tab");
+        Assert.True(await empAdmin.HasReturnAssetButtonAsync(),
+            "Expected the 'Return Asset' button to be visible on the admin Assets tab");
     }
 
     [Fact]
-    public async Task AssetsTab_RequestReturnButton_IsDisabled_WhenNoRowSelected()
+    public async Task AssetsTab_ReturnAssetButton_IsDisabled_WhenNoAssetsAssigned()
     {
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);
         var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
@@ -150,11 +150,12 @@ public sealed class EmployeeAssetsTabTests(AppFixture fixture) : E2ETestBase(fix
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await empAdmin.GoToAsync(AcmeId, TomId);
+        // Carlos has no assigned assets, so there is nothing to return.
+        await empAdmin.GoToAsync(AcmeId, CarlosId);
         await empAdmin.OpenAssetsTabAsync();
 
-        Assert.True(await empAdmin.IsRequestReturnButtonDisabledAsync(),
-            "Expected the 'Request Return' button to be disabled when no row is selected");
+        Assert.True(await empAdmin.IsReturnAssetButtonDisabledAsync(),
+            "Expected the 'Return Asset' button to be disabled when the employee has no assigned assets");
     }
 
     [Fact]

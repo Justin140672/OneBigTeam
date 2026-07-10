@@ -22,6 +22,21 @@ public sealed class ApplicationService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<GetApplicationsByStatusResponse?> GetApplicationsByStatusAsync(
+        Guid companyId, string status, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetApplicationsByStatusResponse>(
+                $"api/companies/{companyId}/recruitment/applications?status={status}",
+                HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public async Task<(CreateApplicationResponse? Result, string? Error)> CreateApplicationAsync(
         Guid companyId, Guid vacancyId, Guid candidateId, string? notes)
     {

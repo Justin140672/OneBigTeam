@@ -43,7 +43,7 @@ public sealed class LeaveTypeListPage(IPage page, string baseUrl)
         var row = page.Locator(".e-row")
             .Filter(new() { HasText = nameFragment })
             .First;
-        return await row.Locator(".badge.bg-success").IsVisibleAsync();
+        return await row.Locator(".status-badge.status-badge--success").IsVisibleAsync();
     }
 
     public async Task ShowInactiveAsync()

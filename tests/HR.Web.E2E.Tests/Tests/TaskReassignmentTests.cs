@@ -31,14 +31,22 @@ public sealed class TaskReassignmentTests(AppFixture fixture) : E2ETestBase(fixt
     {
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);
         var taskView = new TaskViewPage(_page, _fixture.WebBaseUrl);
+        var empEdit  = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
         var dash     = new DashboardPage(_page, _fixture.WebBaseUrl);
 
         // ── Step 1: Login as Laura (HR Admin) ─────────────────────────────────
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // ── Step 2: Navigate to the board agenda task ─────────────────────────
-        await taskView.GoToAsync(AcmeId, BoardAgendaTaskId);
+        // ── Step 2: Navigate to Sarah's admin Tasks tab and open the board agenda task ──
+        // TaskViewPage.GoToAsync is a self-service route restricted to the logged-in
+        // employee, so an HR admin viewing someone else's task must go through the
+        // admin employee edit page's Tasks tab instead (EmployeeTasksTab.razor), which
+        // opens the same TaskViewDialog.
+        await empEdit.GoToAsync(AcmeId, SarahId);
+        await empEdit.OpenTasksTabAsync();
+        await empEdit.ClickTaskAsync(BoardAgendaTaskId);
+        await taskView.WaitForLoadedAsync();
 
         var taskTitle = await taskView.GetTitleAsync();
         Assert.Contains("board meeting", taskTitle, StringComparison.OrdinalIgnoreCase);

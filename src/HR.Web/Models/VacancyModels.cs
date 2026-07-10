@@ -112,3 +112,11 @@ public sealed class VacancyEditModel
     [Required(ErrorMessage = "Hiring manager is required.")]
     public Guid? HiringManagerId { get; set; }
 }
+
+// ── DASHBOARD: HIRING PIPELINE SUMMARY ──────────────────────────────────────────
+
+public sealed record GetPipelineSummaryResponse(IReadOnlyList<PipelineSummaryItem> Items);
+
+public sealed record PipelineSummaryItem(
+    string Status,
+    int ApplicationCount);

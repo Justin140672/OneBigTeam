@@ -44,6 +44,15 @@ When adding EF-model architecture tests:
 - Prefer shared test helpers or fixtures for repeated Aspire startup logic instead of duplicating distributed app bootstrapping in each test.
 - Keep tests feature-focused, with one primary test class per area such as Employees, validation, or integration behavior.
 
+## Playwright E2E Locator Conventions
+Applies whenever writing or editing Playwright locators in `tests/HR.Web.E2E.Tests` (page objects and tests alike):
+
+- Never locate an element by a bare CSS class alone (`page.Locator(".e-dialog")`, `.Locator(".task-view-dialog")`, `.Locator(".badge.bg-success")`, etc.). Syncfusion applies a component's `CssClass` (and Bootstrap utility classes like `bg-success`) to several related DOM nodes — e.g. a dialog's outer container, the dialog itself, and its close button all carry the same `CssClass`; two unrelated badges on the same grid row can both carry `bg-success`. A bare-class locator breaks under Playwright's strict mode (`resolved to N elements`) the moment a second matching element exists anywhere on the page, even if it worked when first written.
+- Prefer `GetByRole` with an accessible name for interactive widgets (dialogs, buttons, comboboxes): `page.GetByRole(AriaRole.Dialog, new() { Name = "Request Leave" })`.
+- If a CSS locator is unavoidable, scope it narrowly instead of using the class alone — e.g. `[role='dialog'].task-view-dialog` rather than `.task-view-dialog`, or a distinguishing class combo like `.status-badge.status-badge--success` rather than `.badge.bg-success`.
+- Where a stable identity per row/item is needed (e.g. selecting a specific task by ID out of a list), prefer adding a `data-testid` on the product component over trying to disambiguate via CSS/text — see `data-testid="task-view-btn-{item.Id}"` in `TaskList.razor` for the pattern.
+- `page.WaitForSelectorAsync(selector, ...)` (the page-level API) tolerates multiple matches — it just waits for at least one. `Locator(...).WaitForAsync()` / `.IsVisibleAsync()` and friends are strict-mode-checked and will throw on ambiguity. Don't assume a passing `WaitForSelectorAsync` means the equivalent `Locator` call is safe.
+
 ## Approach
 1. Inspect the current solution, target project, and existing validation or integration patterns.
 2. Create missing test projects only when needed.

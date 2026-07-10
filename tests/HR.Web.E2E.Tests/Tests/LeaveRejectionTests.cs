@@ -69,6 +69,7 @@ public sealed class LeaveRejectionTests(AppFixture fixture) : E2ETestBase(fixtur
 
         // ── Step 7: Navigate to task via notification ─────────────────────────
         await notif.ClickNotificationAsync("Tom Williams");
+        await task.WaitForLoadedAsync();
 
         // ── Step 8: Verify task details ───────────────────────────────────────
         var taskTitle = await task.GetTitleAsync();

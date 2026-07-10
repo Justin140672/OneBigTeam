@@ -14,7 +14,8 @@ namespace HR.Web.E2E.Tests.Tests;
 [Collection("E2E")]
 public sealed class ProbationReviewTaskTests(AppFixture fixture) : E2ETestBase(fixture)
 {
-    private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid SarahId = Guid.Parse("30000000-0000-0000-0000-000000000001");
 
     // Seeded probation review task — ManagerCheckIn for Carlos Rivera, assigned to Sarah.
     private static readonly Guid TaskProbationReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000005");
@@ -33,7 +34,7 @@ public sealed class ProbationReviewTaskTests(AppFixture fixture) : E2ETestBase(f
         await login.GoToAsync();
         await login.LoginAsync(SarahEmail);
 
-        await taskView.GoToAsync(AcmeId, TaskProbationReviewId);
+        await taskView.GoToAsync(AcmeId, SarahId, TaskProbationReviewId);
 
         Assert.True(await taskView.HasProbationReviewPanelAsync(),
             "Expected 'Complete Probation Review' panel to be visible for a ProbationReview task");
@@ -48,7 +49,7 @@ public sealed class ProbationReviewTaskTests(AppFixture fixture) : E2ETestBase(f
         await login.GoToAsync();
         await login.LoginAsync(SarahEmail);
 
-        await taskView.GoToAsync(AcmeId, TaskProbationReviewId);
+        await taskView.GoToAsync(AcmeId, SarahId, TaskProbationReviewId);
 
         var reviewType = await taskView.GetProbationReviewTypeAsync();
         Assert.Equal("Manager Check-in", reviewType);
@@ -63,7 +64,7 @@ public sealed class ProbationReviewTaskTests(AppFixture fixture) : E2ETestBase(f
         await login.GoToAsync();
         await login.LoginAsync(SarahEmail);
 
-        await taskView.GoToAsync(AcmeId, TaskProbationReviewId);
+        await taskView.GoToAsync(AcmeId, SarahId, TaskProbationReviewId);
 
         var title = await taskView.GetTitleAsync();
         Assert.Contains("Carlos Rivera", title, StringComparison.OrdinalIgnoreCase);
@@ -78,7 +79,7 @@ public sealed class ProbationReviewTaskTests(AppFixture fixture) : E2ETestBase(f
         await login.GoToAsync();
         await login.LoginAsync(SarahEmail);
 
-        await taskView.GoToAsync(AcmeId, TaskQ2ReviewId);
+        await taskView.GoToAsync(AcmeId, SarahId, TaskQ2ReviewId);
 
         Assert.False(await taskView.HasProbationReviewPanelAsync(),
             "Expected no 'Complete Probation Review' panel on a non-ProbationReview task");
@@ -94,7 +95,7 @@ public sealed class ProbationReviewTaskTests(AppFixture fixture) : E2ETestBase(f
         await login.GoToAsync();
         await login.LoginAsync(SarahEmail);
 
-        await taskView.GoToAsync(AcmeId, TaskProbationReviewId);
+        await taskView.GoToAsync(AcmeId, SarahId, TaskProbationReviewId);
 
         var statusBefore = await taskView.GetStatusAsync();
         Assert.NotEqual("Completed", statusBefore);

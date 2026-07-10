@@ -2,90 +2,128 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
+/// <summary>
+/// Interacts with TaskViewDialog (src/HR.Web/Components/Pages/Tasks/TaskViewDialog.razor),
+/// which replaced the old standalone "/companies/{id}/tasks/{taskId}" page. There is no longer
+/// a URL that opens a specific task directly — the dialog must be opened by clicking a task
+/// row somewhere in the UI. GoToAsync uses the employee's own "My Profile" Tasks tab
+/// (TaskList.razor), which renders a stable data-testid per row keyed by task id; other entry
+/// points (dashboard widget, notification bell) are handled by DashboardPage/NotificationPanel,
+/// which open the same dialog and hand control back here for reading its content.
+/// </summary>
 public sealed class TaskViewPage(IPage page, string baseUrl)
 {
-    public async Task GoToAsync(Guid companyId, Guid taskId)
+    // Scoped to [role='dialog'] because Syncfusion's SfDialog CssClass propagates onto multiple
+    // elements (the outer container, the dialog itself, and the close button), which makes a
+    // bare ".task-view-dialog" locator ambiguous under Playwright's strict mode.
+    private ILocator Dialog => page.Locator("[role='dialog'].task-view-dialog");
+
+    /// <summary>
+    /// Navigates to the given employee's own Tasks tab and opens the specified task's dialog.
+    /// The employee must be the currently logged-in user (this is the self-service route).
+    /// </summary>
+    public async Task GoToAsync(Guid companyId, Guid employeeId, Guid taskId)
     {
-        await page.GotoAsync($"{baseUrl}/companies/{companyId}/tasks/{taskId}");
-        await page.WaitForSelectorAsync("h1", new() { Timeout = 20_000 });
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}/profile?tab=tasks");
+
+        var row = page.Locator($"[data-testid='task-view-btn-{taskId}']");
+        await row.WaitForAsync(new() { Timeout = 20_000 });
+        await row.ClickAsync();
+
+        await WaitForLoadedAsync();
     }
 
-    /// <summary>Returns the task title shown in the h1.</summary>
+    /// <summary>
+    /// Waits for the dialog to be visible and its content to finish loading — the header shows
+    /// a "Task" placeholder while the task detail is still being fetched, so this waits for the
+    /// title to become anything else. Call this after opening the dialog via any entry point
+    /// other than <see cref="GoToAsync"/> (which already calls it).
+    /// </summary>
+    public async Task WaitForLoadedAsync()
+    {
+        await Dialog.WaitForAsync(new() { Timeout = 15_000 });
+        await page.WaitForFunctionAsync(
+            "document.querySelector('.task-view-dialog [data-testid=\"task-title\"]')?.textContent?.trim() !== 'Task'",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
+    /// <summary>Returns the task title shown in the dialog header.</summary>
     public async Task<string> GetTitleAsync() =>
-        (await page.Locator("h1").TextContentAsync())?.Trim() ?? "";
+        (await Dialog.Locator("[data-testid='task-title']").TextContentAsync())?.Trim() ?? "";
 
     /// <summary>Returns the task description paragraph text, or null if absent.</summary>
     public async Task<string?> GetDescriptionAsync()
     {
-        var p = page.Locator(".card-body p.mb-3").First;
+        var p = Dialog.Locator(".card-body p.mb-3").First;
         return await p.IsVisibleAsync() ? (await p.TextContentAsync())?.Trim() : null;
     }
 
     /// <summary>Returns the value of a detail row identified by its label text.</summary>
     public async Task<string?> GetDetailAsync(string label)
     {
-        var dt = page.Locator("dl.row dt").Filter(new() { HasText = label }).First;
+        var dt = Dialog.Locator("dl.row dt").Filter(new() { HasText = label }).First;
         if (!await dt.IsVisibleAsync()) return null;
         // The corresponding dd follows the dt in DOM order.
         return (await dt.Locator("~ dd").First.TextContentAsync())?.Trim();
     }
 
-    /// <summary>Returns the status badge text (e.g. "Not Started", "Completed").</summary>
-    public async Task<string> GetStatusAsync() =>
-        (await page.Locator(".task-status-badge").TextContentAsync())?.Trim() ?? "";
+    /// <summary>
+    /// Returns "Completed" once the dialog's detail list shows a "Completed" row — the only
+    /// status signal left in the dialog now that the status badge has been removed — otherwise
+    /// "Not Started". None of the current E2E scenarios distinguish Open from InProgress, so
+    /// both collapse to "Not Started" here.
+    /// </summary>
+    public async Task<string> GetStatusAsync()
+    {
+        var completedRow = Dialog.Locator("dl.row dt").Filter(new() { HasText = "Completed" });
+        return await completedRow.IsVisibleAsync() ? "Completed" : "Not Started";
+    }
 
-    /// <summary>Returns true if the "Task not found" error alert is displayed.</summary>
-    public async Task<bool> IsNotFoundAsync() =>
-        await page.Locator(".alert-danger").Filter(new() { HasText = "Task not found" }).IsVisibleAsync();
+    /// <summary>Waits for the dialog's detail list to show a "Completed" row.</summary>
+    public async Task WaitForCompletedAsync() =>
+        await page.WaitForFunctionAsync(
+            @"() => Array.from(document.querySelectorAll('.task-view-dialog dl.row dt'))
+                .some(dt => dt.textContent?.trim() === 'Completed')",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+
+    /// <summary>Closes the dialog via its Close button.</summary>
+    public async Task CloseAsync()
+    {
+        await Dialog.GetByRole(AriaRole.Button, new() { Name = "Close" }).ClickAsync();
+        await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
 
     // ── Leave review panel ───────────────────────────────────────────────────
 
     /// <summary>Returns true if the "Review Leave Request" card is present and active.</summary>
     public async Task<bool> HasLeaveReviewPanelAsync() =>
-        await page.Locator(".card-header").Filter(new() { HasText = "Review Leave Request" }).IsVisibleAsync();
+        await Dialog.Locator(".card-header").Filter(new() { HasText = "Review Leave Request" }).IsVisibleAsync();
 
-    public async Task EnterDecisionReasonAsync(string reason)
-    {
-        await page.GetByPlaceholder("Enter a reason for your decision…").FillAsync(reason);
-    }
+    public async Task EnterDecisionReasonAsync(string reason) =>
+        await Dialog.GetByPlaceholder("Enter a reason for your decision…").FillAsync(reason);
 
     public async Task ApproveAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Approve" }).ClickAsync();
-        // After approval the card is hidden and status badge changes.
-        await page.WaitForSelectorAsync(".task-status-badge",
-            new() { Timeout = 15_000 });
-        await page.WaitForFunctionAsync(
-            "document.querySelector('.task-status-badge')?.textContent?.includes('Completed')",
-            null, new() { Timeout = 15_000 });
+        await Dialog.GetByRole(AriaRole.Button, new() { Name = "Approve" }).ClickAsync();
+        await WaitForCompletedAsync();
     }
 
     public async Task RejectAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Reject" }).ClickAsync();
-        await page.WaitForFunctionAsync(
-            "document.querySelector('.task-status-badge')?.textContent?.includes('Completed')",
-            null, new() { Timeout = 15_000 });
-    }
-
-    /// <summary>Extracts the task GUID from the current page URL.</summary>
-    public Guid GetTaskIdFromUrl()
-    {
-        var url   = page.Url;
-        var parts = url.TrimEnd('/').Split('/');
-        return Guid.Parse(parts[^1]);
+        await Dialog.GetByRole(AriaRole.Button, new() { Name = "Reject" }).ClickAsync();
+        await WaitForCompletedAsync();
     }
 
     // ── Document upload panel ────────────────────────────────────────────────
 
     /// <summary>Returns true if the document upload panel is present and visible.</summary>
     public async Task<bool> HasDocumentUploadPanelAsync() =>
-        await page.Locator("[data-testid='document-upload-panel']").IsVisibleAsync();
+        await Dialog.Locator("[data-testid='document-upload-panel']").IsVisibleAsync();
 
     /// <summary>Fills the title input in the document upload panel.</summary>
     public async Task SetDocumentTitleAsync(string title)
     {
-        var panel = page.Locator("[data-testid='document-upload-panel']");
+        var panel = Dialog.Locator("[data-testid='document-upload-panel']");
         var input = panel.GetByPlaceholder("Document title");
         await input.ClearAsync();
         await input.FillAsync(title);
@@ -94,92 +132,84 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     /// <summary>Sets the file to be uploaded via the document upload panel's file input.</summary>
     public async Task AttachUploadFileAsync(string filePath)
     {
-        var fileInput = page.Locator("[data-testid='document-upload-panel'] input[type='file']");
+        var fileInput = Dialog.Locator("[data-testid='document-upload-panel'] input[type='file']");
         await fileInput.SetInputFilesAsync(filePath);
     }
 
-    /// <summary>Clicks "Upload Document" and waits for the task status to change to Completed.</summary>
+    /// <summary>Clicks "Upload Document" and waits for the task to become Completed.</summary>
     public async Task SubmitDocumentUploadAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Upload Document" }).ClickAsync();
-        await page.WaitForFunctionAsync(
-            "document.querySelector('.task-status-badge')?.textContent?.includes('Completed')",
-            null, new() { Timeout = 20_000 });
+        await Dialog.GetByRole(AriaRole.Button, new() { Name = "Upload Document" }).ClickAsync();
+        await WaitForCompletedAsync();
     }
 
     // ── Asset acknowledgement panel ──────────────────────────────────────────
 
     /// <summary>Returns true if the asset acknowledgement panel is present and visible.</summary>
     public async Task<bool> HasAssetAcknowledgementPanelAsync() =>
-        await page.Locator("[data-testid='asset-acknowledgement-panel']").IsVisibleAsync();
+        await Dialog.Locator("[data-testid='asset-acknowledgement-panel']").IsVisibleAsync();
 
     /// <summary>Returns the asset number shown in the acknowledgement panel, waiting for async load.</summary>
     public async Task<string?> GetAcknowledgementAssetNumberAsync()
     {
-        var panel = page.Locator("[data-testid='asset-acknowledgement-panel']");
+        var panel = Dialog.Locator("[data-testid='asset-acknowledgement-panel']");
         var dd = panel.Locator("dd").First;
         await dd.WaitForAsync(new() { Timeout = 10_000 });
         return (await dd.TextContentAsync())?.Trim();
     }
 
-    /// <summary>Clicks "I Acknowledge Receipt" and waits for the task status to become Completed.</summary>
+    /// <summary>Clicks "I Acknowledge Receipt" and waits for the task to become Completed.</summary>
     public async Task AcknowledgeAssetAsync()
     {
-        await page.Locator("[data-testid='acknowledge-btn']").ClickAsync();
-        await page.WaitForFunctionAsync(
-            "document.querySelector('.task-status-badge')?.textContent?.includes('Completed')",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await Dialog.Locator("[data-testid='acknowledge-btn']").ClickAsync();
+        await WaitForCompletedAsync();
     }
 
     // ── Asset return panel ───────────────────────────────────────────────────
 
     /// <summary>Returns true if the asset return panel is present and visible.</summary>
     public async Task<bool> HasAssetReturnPanelAsync() =>
-        await page.Locator("[data-testid='asset-return-panel']").IsVisibleAsync();
+        await Dialog.Locator("[data-testid='asset-return-panel']").IsVisibleAsync();
 
     /// <summary>Returns the asset number shown in the return panel, waiting for async load.</summary>
     public async Task<string?> GetReturnAssetNumberAsync()
     {
-        var panel = page.Locator("[data-testid='asset-return-panel']");
+        var panel = Dialog.Locator("[data-testid='asset-return-panel']");
         var dd = panel.Locator("dd").First;
         await dd.WaitForAsync(new() { Timeout = 10_000 });
         return (await dd.TextContentAsync())?.Trim();
     }
 
-    /// <summary>Clicks "Confirm Return" and waits for the task status to become Completed.</summary>
+    /// <summary>Clicks "Confirm Return" and waits for the task to become Completed.</summary>
     public async Task ConfirmReturnAsync()
     {
-        await page.Locator("[data-testid='return-btn']").ClickAsync();
-        await page.WaitForFunctionAsync(
-            "document.querySelector('.task-status-badge')?.textContent?.includes('Completed')",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await Dialog.Locator("[data-testid='return-btn']").ClickAsync();
+        await WaitForCompletedAsync();
     }
 
     // ── Probation review panel ───────────────────────────────────────────────
 
     /// <summary>Returns true if the "Complete Probation Review" card is present.</summary>
     public async Task<bool> HasProbationReviewPanelAsync() =>
-        await page.Locator("[data-testid='probation-review-panel']").IsVisibleAsync();
+        await Dialog.Locator("[data-testid='probation-review-panel']").IsVisibleAsync();
 
     /// <summary>Returns the review type text shown in the probation review panel.</summary>
     public async Task<string?> GetProbationReviewTypeAsync()
     {
-        var el = page.Locator("[data-testid='review-type']");
+        var el = Dialog.Locator("[data-testid='review-type']");
         return await el.IsVisibleAsync() ? (await el.TextContentAsync())?.Trim() : null;
     }
 
     /// <summary>Fills the review notes textarea.</summary>
     public async Task EnterReviewNotesAsync(string notes) =>
-        await page.GetByPlaceholder("Enter your review notes…").FillAsync(notes);
+        await Dialog.GetByPlaceholder("Enter your review notes…").FillAsync(notes);
 
-    /// <summary>Clicks "Complete Review", dismisses the confirmation, and waits for the status badge to show Completed.</summary>
+    /// <summary>Clicks "Complete Review", dismisses the confirmation, and waits for the task to become Completed.</summary>
     public async Task CompleteReviewAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Complete Review" }).ClickAsync();
+        await Dialog.GetByRole(AriaRole.Button, new() { Name = "Complete Review" }).ClickAsync();
         // Panel shows "Review completed." with a Done button before reloading the task.
-        await page.GetByRole(AriaRole.Button, new() { Name = "Done" }).ClickAsync();
-        await page.WaitForFunctionAsync(
-            "document.querySelector('.task-status-badge')?.textContent?.includes('Completed')",
-            null, new() { Timeout = 15_000 });
+        await Dialog.GetByRole(AriaRole.Button, new() { Name = "Done" }).ClickAsync();
+        await WaitForCompletedAsync();
     }
 }

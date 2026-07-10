@@ -5,8 +5,9 @@
 @using HR.Web.Components.Pages.Assets
 @using HR.Web.Components.Pages.Sickness
 @using HR.Web.Components.Pages.Recruitment
+@using HR.Web.Components.Pages.Leave
+@using HR.Web.Components.Pages.Employees
 @inject AppSession Session
-@inject NavigationManager Navigation
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -16,61 +17,42 @@
         <p class="text-muted mb-0">@DateTime.Now.ToString("dddd, d MMMM yyyy")</p>
     </div>
 
+    <div class="dashboard-overview-row">
+        <HeadcountByDepartmentChart />
+        <HiringPipelineChart />
+        <NewHiresTrendChart />
+    </div>
+
     <section class="dashboard-section">
-        <h2 class="dashboard-section-title">Tasks &amp; Inbox</h2>
-        <div class="row g-4">
-            <div class="col-xl-5 col-lg-6">
-                <HrInboxWidget />
-            </div>
-            <div class="col-xl-5 col-lg-6">
-                <MyTasksWidget />
-            </div>
-            <div class="col-xl-5 col-lg-6">
-                <TeamTasksWidget />
-            </div>
+        <h2 class="dashboard-section-title">Tasks &amp; Leave</h2>
+        <div class="dashboard-detail-grid">
+            <HrInboxWidget />
+            <MyTasksWidget />
+            <TeamTasksWidget />
+            <LeaveRequestsWidget />
         </div>
     </section>
 
     <section class="dashboard-section">
-        <h2 class="dashboard-section-title">People</h2>
-        <div class="row g-4">
-            <div class="col-xl-5 col-lg-6">
-                <UpcomingProbationReviewsWidget />
-            </div>
-            <div class="col-xl-5 col-lg-6">
-                <RecruitmentSummaryWidget />
-            </div>
-            <div class="col-xl-5 col-lg-6">
-                <MyAssetsWidget />
-            </div>
-        </div>
-    </section>
-
-    <section class="dashboard-section">
-        <h2 class="dashboard-section-title">Sickness &amp; Absence</h2>
-        <div class="row g-4">
-            <div class="col-xl-5 col-lg-6">
-                <CurrentSicknessAbsenceWidget />
-            </div>
-            <div class="col-xl-5 col-lg-6">
-                <TeamSicknessTodayWidget />
-            </div>
-            <div class="col-xl-5 col-lg-6">
-                <OverdueReturnToWorkReviewsWidget />
-            </div>
-            <div class="col-xl-5 col-lg-6">
-                <MissingFitNotesWidget />
-            </div>
+        <h2 class="dashboard-section-title">People &amp; Wellbeing</h2>
+        <div class="dashboard-detail-grid">
+            <UpcomingProbationReviewsWidget />
+            <RecruitmentSummaryWidget />
+            <MyAssetsWidget />
+            <CurrentSicknessAbsenceWidget />
+            <TeamSicknessTodayWidget />
+            <OverdueReturnToWorkReviewsWidget />
+            <MissingFitNotesWidget />
         </div>
     </section>
 </div>
 
 @code {
-    protected override void OnInitialized()
-    {
-        if (!Session.CanManageEmployees)
-            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
-    }
+    // Any authenticated employee lands on the dashboard — manager/HR-only widgets self-gate
+    // on Session.CanManageEmployees (see RecruitmentSummaryWidget, HrInboxWidget,
+    // UpcomingProbationReviewsWidget, and the overview charts). A signed-in user with no
+    // linked employee record has nowhere else to land — MyProfileUrl already falls back to
+    // "/" for that case, so no redirect is needed here.
 
     private static string Greeting()
     {

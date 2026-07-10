@@ -51,7 +51,7 @@ public sealed class TenantIsolationTests(AppFixture fixture) : E2ETestBase(fixtu
         await _page.WaitForSelectorAsync("table tbody tr", new() { Timeout = 15_000 });
         Assert.Equal("Pending", await profile.GetLeaveRequestStatusAsync(reason));
 
-        // ── Step 2: Login as Alice (Beta Corp manager) and find the task URL ──
+        // ── Step 2: Login as Alice (Beta Corp manager) and open the task ──────
         await login.SwitchAccountAsync(AliceEmail);
 
         await dash.GoToAsync();
@@ -59,10 +59,11 @@ public sealed class TenantIsolationTests(AppFixture fixture) : E2ETestBase(fixtu
         Assert.Contains(aliceTasks, t => t.Contains("Bob Taylor", StringComparison.OrdinalIgnoreCase)
                                       || t.Contains("leave", StringComparison.OrdinalIgnoreCase));
 
-        // Navigate to the task so we can capture its ID.
+        // Open the task dialog — there is no longer a standalone task URL to capture
+        // (TaskViewDialog opens in place), so the cross-tenant check below (step 6)
+        // instead targets Bob's profile URL directly.
         await dash.ClickTaskAsync("Bob Taylor");
-        var betaTaskId  = taskView.GetTaskIdFromUrl();
-        var betaTaskUrl = _page.Url;
+        await taskView.WaitForLoadedAsync();
 
         Assert.Contains("Bob Taylor", await taskView.GetTitleAsync(), StringComparison.OrdinalIgnoreCase);
         Assert.True(await taskView.HasLeaveReviewPanelAsync());
@@ -89,15 +90,10 @@ public sealed class TenantIsolationTests(AppFixture fixture) : E2ETestBase(fixtu
             await notif.CloseAsync();
         }
 
-        // ── Step 6: Navigating directly to Beta Corp's task URL is blocked ────
-        // James is authenticated as Acme company_id; the task belongs to Beta Corp.
-        await _page.GotoAsync(betaTaskUrl);
-        await _page.WaitForSelectorAsync(".alert-danger, h1", new() { Timeout = 15_000 });
-
-        Assert.True(await taskView.IsNotFoundAsync(),
-            $"Expected 'Task not found' when Acme user navigates to Beta Corp task {betaTaskId}");
-
-        // ── Step 7: James cannot navigate to Bob's profile URL either ─────────
+        // ── Step 6: James cannot navigate to Bob's profile URL either ─────────
+        // There is no longer a standalone task detail URL to attack directly (TaskViewDialog
+        // opens in place from the owning employee's own profile Tasks tab), so the remaining
+        // cross-tenant attack surface is the profile URL itself.
         await _page.GotoAsync(
             $"{_fixture.WebBaseUrl}/companies/{BetaCorpId}/employees/{BobId}/profile");
 

@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
@@ -51,8 +50,9 @@ public sealed class NotificationPanel(IPage page)
     }
 
     /// <summary>
-    /// Clicks the first notification whose title contains <paramref name="titleFragment"/>
-    /// and waits for navigation to the task view page.
+    /// Clicks the first notification whose title contains <paramref name="titleFragment"/>.
+    /// This opens TaskViewDialog in place (no navigation) — use TaskViewPage.WaitForLoadedAsync
+    /// (or its own methods, which wait internally) to read the opened task's content.
     /// </summary>
     public async Task ClickNotificationAsync(string titleFragment)
     {
@@ -61,6 +61,6 @@ public sealed class NotificationPanel(IPage page)
             .First;
 
         await item.ClickAsync();
-        await page.WaitForURLAsync(new Regex("/tasks/"), new() { Timeout = 15_000 });
+        await page.WaitForSelectorAsync(".task-view-dialog", new() { Timeout = 15_000 });
     }
 }

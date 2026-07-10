@@ -4,7 +4,7 @@
 <SfDialog Visible="Visible" IsModal="true" Width="720px" ShowCloseIcon="true" CssClass="task-view-dialog">
     <DialogEvents Closed="HandleDialogClosed" />
     <DialogTemplates>
-        <Header>@(_task?.Title ?? "Task")</Header>
+        <Header><span data-testid="task-title">@(_task?.Title ?? "Task")</span></Header>
         <Content>
             @if (_loading)
             {
@@ -16,12 +16,6 @@
             }
             else
             {
-                <div class="mb-3">
-                    <span class="task-status-badge task-status-badge--@_task.Status.ToLowerInvariant()">
-                        @StatusLabel(_task.Status)
-                    </span>
-                </div>
-
                 <div class="card mb-3">
                     <div class="card-body">
                         @if (_task.Description is not null)
@@ -133,13 +127,4 @@
         _loadedTaskId = null;
         await OnClosed.InvokeAsync();
     }
-
-    private static string StatusLabel(string status) => status switch
-    {
-        "Open"       => "Not Started",
-        "InProgress" => "In Progress",
-        "Completed"  => "Completed",
-        "Cancelled"  => "Cancelled",
-        _            => status
-    };
 }

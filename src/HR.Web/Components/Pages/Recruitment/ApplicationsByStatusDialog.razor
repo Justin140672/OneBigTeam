@@ -1,0 +1,77 @@
+@inject ApplicationService ApplicationService
+
+<SfDialog Visible="Visible" IsModal="true" Width="720px" ShowCloseIcon="true" CssClass="applications-by-status-dialog">
+    <DialogEvents Closed="HandleDialogClosed" />
+    <DialogTemplates>
+        <Header>@(string.IsNullOrEmpty(Status) ? "Applications" : $"Applications — {Status}")</Header>
+        <Content>
+            @if (_loading)
+            {
+                <HrLoadingIndicator Label="Loading applications…" />
+            }
+            else if (_items.Count == 0)
+            {
+                <p class="text-muted mb-0">No applications at this stage.</p>
+            }
+            else
+            {
+                <HrGrid TValue="ApplicationByStatusItem"
+                        DataSource="@_items"
+                        AllowPaging="false"
+                        AllowFiltering="false">
+                    <GridColumns>
+                        <GridColumn HeaderText="Candidate" Width="200">
+                            <Template>
+                                @{
+                                    var row = (ApplicationByStatusItem)context;
+                                }
+                                <a href="/companies/@CompanyId/candidates/@row.CandidateId">@row.CandidateName</a>
+                            </Template>
+                        </GridColumn>
+                        <GridColumn Field="@nameof(ApplicationByStatusItem.CandidateEmail)" HeaderText="Email" Width="200" />
+                        <GridColumn Field="@nameof(ApplicationByStatusItem.VacancyTitle)" HeaderText="Vacancy" Width="200" />
+                        <GridColumn Field="@nameof(ApplicationByStatusItem.AppliedAt)" HeaderText="Applied" Width="120" Format="d" />
+                    </GridColumns>
+                </HrGrid>
+            }
+            <div class="mt-3">
+                <a href="/companies/@CompanyId/candidates">View all candidates</a>
+            </div>
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Close" OnClick="HandleDialogClosed" />
+    </DialogButtons>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter] public string? Status { get; set; }
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+
+    private bool Visible;
+    private bool _loading;
+    private List<ApplicationByStatusItem> _items = [];
+    private string? _loadedStatus;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Visible = IsOpen;
+
+        if (IsOpen && !string.IsNullOrEmpty(Status) && Status != _loadedStatus)
+        {
+            _loadedStatus = Status;
+            _loading = true;
+            var result = await ApplicationService.GetApplicationsByStatusAsync(CompanyId, Status);
+            _items = result?.Items.ToList() ?? [];
+            _loading = false;
+        }
+    }
+
+    private async Task HandleDialogClosed()
+    {
+        Visible = false;
+        await OnClosed.InvokeAsync();
+    }
+}
