@@ -10,9 +10,10 @@ using Microsoft.Extensions.DependencyInjection;
 namespace HR.Integration.Tests;
 
 /// <summary>
-/// leave:manage is granted to HrAdministrator/CompanyAdministrator only (see
-/// LeavePolicyCrudEndpointTests) — Manager has leave:approve but NOT leave:manage, which makes it
-/// the correct role to exercise the 403 boundary for this leave:manage-gated endpoint.
+/// leave:manage is granted to HrAdministrator only (see LeavePolicyCrudEndpointTests;
+/// CompanyAdministrator is scoped to company profile/settings and does not hold it) —
+/// Manager has leave:approve but NOT leave:manage, which makes it the correct role to
+/// exercise the 403 boundary for this leave:manage-gated endpoint.
 /// </summary>
 public class AdjustLeaveBalanceEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {

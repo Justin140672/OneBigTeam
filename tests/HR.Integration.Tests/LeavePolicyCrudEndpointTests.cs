@@ -8,8 +8,9 @@ namespace HR.Integration.Tests;
 public class LeavePolicyCrudEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
-    // leave:approve = Manager, HrAdministrator, CompanyAdministrator
-    // leave:manage  = HrAdministrator, CompanyAdministrator
+    // leave:approve = Manager, HrAdministrator
+    // leave:manage  = HrAdministrator only (CompanyAdministrator is scoped to
+    //                  company profile/settings and does not hold it)
     private static readonly Guid HrAdminUser     = Guid.Parse("11100008-0000-0000-0000-000000000001");
     private static readonly Guid ManagerUser      = Guid.Parse("11100008-0000-0000-0000-000000000002");
     private static readonly Guid SeededCompanyId  = Guid.Parse("00000000-0000-0000-0000-000000000001");

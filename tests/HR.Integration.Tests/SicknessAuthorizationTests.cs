@@ -18,6 +18,7 @@ public class SicknessAuthorizationTests : IClassFixture<ApiWebApplicationFactory
     private static readonly Guid ManagerUser = new("ee000001-0000-0000-0000-000000000002");
     private static readonly Guid OtherManagerUser = new("ee000001-0000-0000-0000-000000000003");
     private static readonly Guid HrAdminUser = new("ee000001-0000-0000-0000-000000000004");
+    private static readonly Guid CompanyAdministratorUser = new("ee000001-0000-0000-0000-000000000005");
 
     public SicknessAuthorizationTests(ApiWebApplicationFactory factory)
     {
@@ -31,6 +32,7 @@ public class SicknessAuthorizationTests : IClassFixture<ApiWebApplicationFactory
             await TestRoleSeeder.AssignRoleAsync(factory, OtherManagerUser, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, OtherManagerUser, SystemRoles.Manager);
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdministratorUser, SystemRoles.CompanyAdministrator);
         }).GetAwaiter().GetResult();
     }
 
@@ -117,6 +119,37 @@ public class SicknessAuthorizationTests : IClassFixture<ApiWebApplicationFactory
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    // Company Administrator is scoped to company profile/settings management only and no
+    // longer holds sickness:manage / sickness:view-team — see the narrowing in
+    // HR.Modules.Identity.IdentityModule.AddRolePolicies.
+    [Fact]
+    public async Task CompanyAdministrator_Gets_Forbidden_Creating_Sickness_Category()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = ClientFor(companyId, CompanyAdministratorUser);
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/sickness-categories", new
+        {
+            companyId,
+            name = "Cold",
+            displayOrder = 1
+        });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CompanyAdministrator_Gets_Forbidden_Listing_Employee_Sickness_Records()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = ClientFor(companyId, CompanyAdministratorUser);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/sickness-records");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     // --- sickness:view-team — GetTeamSicknessToday manager self-scoping ---
 
     [Fact]
@@ -163,6 +196,18 @@ public class SicknessAuthorizationTests : IClassFixture<ApiWebApplicationFactory
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{PlainEmployeeUser}/team-sickness-today");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CompanyAdministrator_Gets_Forbidden_Viewing_Team_Sickness_Today()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = ClientFor(companyId, CompanyAdministratorUser);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{CompanyAdministratorUser}/team-sickness-today");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }

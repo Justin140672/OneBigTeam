@@ -110,8 +110,12 @@ public class CreateEmployeeAuthorizationTests : IClassFixture<ApiWebApplicationF
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
+    // Company Administrator is scoped to company profile/settings management only and must
+    // not be able to manage employees — see the mirror-image rule on company:manage in
+    // HR.Modules.Identity.IdentityModule.AddRolePolicies. This is a deliberate narrowing:
+    // only HR Administrator holds employee:manage.
     [Fact]
-    public async Task Post_Employee_Succeeds_For_Company_Administrator_Role()
+    public async Task Post_Employee_Returns_Forbidden_For_Company_Administrator_Role()
     {
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
@@ -134,6 +138,6 @@ public class CreateEmployeeAuthorizationTests : IClassFixture<ApiWebApplicationF
             gender = "Male"
         });
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 }

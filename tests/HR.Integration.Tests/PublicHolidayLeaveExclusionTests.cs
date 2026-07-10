@@ -11,17 +11,22 @@ namespace HR.Integration.Tests;
 public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
-    private static readonly Guid UserId = new("cccccccc-0000-0000-0000-000000000001");
+    private static readonly Guid CompanyAdminUserId = new("cccccccc-0000-0000-0000-000000000001");
+    private static readonly Guid HrAdminUserId = new("cccccccc-0000-0000-0000-000000000002");
 
     public PublicHolidayLeaveExclusionTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        // CompanyAdministrator (not just HrAdministrator) because SetupCompanyAsync calls
-        // UpdateCompanySettings, which the company:manage policy restricts to
-        // CompanyAdministrator only.
+        // CompanyAdministrator is required for UpdateCompanySettings (company:manage is
+        // CompanyAdministrator-only). HrAdministrator is required for public holiday
+        // creation, leave policy creation/assignment, employee creation, and leave request
+        // submission (leave:manage / employee:manage / leave:request) — Company
+        // Administrator no longer holds those permissions.
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.CompanyAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdminUserId, SystemRoles.CompanyAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUserId, SystemRoles.HrAdministrator);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]
@@ -84,10 +89,10 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
         Assert.Equal(5m, payload!.TotalDays);
     }
 
-    private HttpClient ClientForCompany(Guid companyId)
+    private HttpClient ClientForCompany(Guid companyId, Guid userId)
     {
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         return client;
     }
@@ -96,8 +101,8 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
     {
         // Create company — route has no {companyId}, so any tenant is fine here
         var bootstrapClient = _factory.CreateClient();
-        bootstrapClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
-        bootstrapClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, UserId.ToString());
+        bootstrapClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, CompanyAdminUserId.ToString());
+        bootstrapClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, CompanyAdminUserId.ToString());
 
         var createResp = await bootstrapClient.PostAsJsonAsync("/api/companies", new
         {
@@ -108,11 +113,9 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
         var company = await createResp.Content.ReadFromJsonAsync<CompanyPayload>();
         var companyId = company!.Id;
 
-        // All subsequent calls use a client authenticated as this company
-        var client = ClientForCompany(companyId);
-
-        // Update settings
-        var settingsResp = await client.PutAsJsonAsync($"/api/companies/{companyId}/settings", new
+        // Update settings — company:manage is CompanyAdministrator-only
+        var companyAdminClient = ClientForCompany(companyId, CompanyAdminUserId);
+        var settingsResp = await companyAdminClient.PutAsJsonAsync($"/api/companies/{companyId}/settings", new
         {
             timeZone = "UTC",
             locale = "en-GB",
@@ -134,7 +137,10 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
             AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, DateTimeOffset.UtcNow));
         await db.SaveChangesAsync();
 
-        return (client, companyId, leaveTypeId);
+        // All subsequent calls (public holidays, leave policies, employees, leave requests)
+        // require leave:manage / employee:manage / leave:request — HrAdministrator only.
+        var hrAdminClient = ClientForCompany(companyId, HrAdminUserId);
+        return (hrAdminClient, companyId, leaveTypeId);
     }
 
     private async Task<(Guid EmployeeId, Guid PolicyId)> CreateEmployeeWithPolicyAsync(HttpClient client, Guid companyId)

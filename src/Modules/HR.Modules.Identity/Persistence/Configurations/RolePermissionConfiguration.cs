@@ -65,21 +65,12 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
             RolePermission.Create(SystemRoles.Finance, SystemPermissions.EmployeeRead),
             RolePermission.Create(SystemRoles.Finance, SystemPermissions.CompanyRead),
 
-            // Company Administrator: all permissions
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.SelfRead),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.SelfEdit),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.EmployeeRead),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.EmployeeEdit),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.EmployeeCreate),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.EmployeeDelete),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.LeaveRequest),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.LeaveApprove),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.DocumentManage),
+            // Company Administrator: scoped to company profile/settings management only.
+            // HR-facing permissions (employee, leave, document, sickness) belong to
+            // HR Administrator/Manager/Employee roles, not Company Administrator.
             RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.CompanyRead),
             RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.CompanyEdit),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.RoleAssign),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.SicknessRead),
-            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.SicknessManage)
+            RolePermission.Create(SystemRoles.CompanyAdministrator, SystemPermissions.RoleAssign)
         );
     }
 }

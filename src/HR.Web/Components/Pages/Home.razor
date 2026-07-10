@@ -8,44 +8,48 @@
 @using HR.Web.Components.Pages.Leave
 @using HR.Web.Components.Pages.Employees
 @inject AppSession Session
+@inject NavigationManager Navigation
 
 <PageTitle>Dashboard</PageTitle>
 
-<div class="container-fluid py-4">
-    <div class="dashboard-greeting mb-4">
-        <h1 class="dashboard-heading">@Greeting(), @Session.FirstName</h1>
-        <p class="text-muted mb-0">@DateTime.Now.ToString("dddd, d MMMM yyyy")</p>
-    </div>
-
-    <div class="dashboard-overview-row">
-        <HeadcountByDepartmentChart />
-        <HiringPipelineChart />
-        <NewHiresTrendChart />
-    </div>
-
-    <section class="dashboard-section">
-        <h2 class="dashboard-section-title">Tasks &amp; Leave</h2>
-        <div class="dashboard-detail-grid">
-            <HrInboxWidget />
-            <MyTasksWidget />
-            <TeamTasksWidget />
-            <LeaveRequestsWidget />
+@if (_ready)
+{
+    <div class="container-fluid py-4">
+        <div class="dashboard-greeting mb-4">
+            <h1 class="dashboard-heading">@Greeting(), @Session.FirstName</h1>
+            <p class="text-muted mb-0">@DateTime.Now.ToString("dddd, d MMMM yyyy")</p>
         </div>
-    </section>
 
-    <section class="dashboard-section">
-        <h2 class="dashboard-section-title">People &amp; Wellbeing</h2>
-        <div class="dashboard-detail-grid">
-            <UpcomingProbationReviewsWidget />
-            <RecruitmentSummaryWidget />
-            <MyAssetsWidget />
-            <CurrentSicknessAbsenceWidget />
-            <TeamSicknessTodayWidget />
-            <OverdueReturnToWorkReviewsWidget />
-            <MissingFitNotesWidget />
+        <div class="dashboard-overview-row">
+            <HeadcountByDepartmentChart />
+            <HiringPipelineChart />
+            <NewHiresTrendChart />
         </div>
-    </section>
-</div>
+
+        <section class="dashboard-section">
+            <h2 class="dashboard-section-title">Tasks &amp; Leave</h2>
+            <div class="dashboard-detail-grid">
+                <HrInboxWidget />
+                <MyTasksWidget />
+                <TeamTasksWidget />
+                <LeaveRequestsWidget />
+            </div>
+        </section>
+
+        <section class="dashboard-section">
+            <h2 class="dashboard-section-title">People &amp; Wellbeing</h2>
+            <div class="dashboard-detail-grid">
+                <UpcomingProbationReviewsWidget />
+                <RecruitmentSummaryWidget />
+                <MyAssetsWidget />
+                <CurrentSicknessAbsenceWidget />
+                <TeamSicknessTodayWidget />
+                <OverdueReturnToWorkReviewsWidget />
+                <MissingFitNotesWidget />
+            </div>
+        </section>
+    </div>
+}
 
 @code {
     // Any authenticated employee lands on the dashboard — manager/HR-only widgets self-gate
@@ -53,6 +57,23 @@
     // UpcomingProbationReviewsWidget, and the overview charts). A signed-in user with no
     // linked employee record has nowhere else to land — MyProfileUrl already falls back to
     // "/" for that case, so no redirect is needed here.
+
+    private bool _ready;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.InitialiseAsync();
+
+        // Company-Administrator-only users have no HR permissions and no dashboard to see —
+        // send them straight to the Company edit screen instead.
+        if (Session.CanManageCompany && !Session.CanManageEmployees)
+        {
+            Navigation.NavigateTo($"/companies/{Session.CompanyId}/edit", replace: true);
+            return;
+        }
+
+        _ready = true;
+    }
 
     private static string Greeting()
     {

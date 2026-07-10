@@ -29,6 +29,8 @@ Coordinate implementation and validation work by delegating in sequence:
 
 ## Workflow
 
+**Every specialist-agent call (developer, test, ui, Explore) must be synchronous.** Invoke the Agent tool with `run_in_background: false` every time. This entire workflow — developer handoff, test handoff, final checks, ui handoff, E2E test handoff, reconfirmation — is a strict sequential chain where each step needs the previous one's actual result before proceeding; there is nothing to parallelize. If a specialist agent is called in the background instead, your own turn ends while it runs and nothing automatically wakes you back up when it finishes — you will sit idle until an external nudge arrives, silently stalling the whole task. Foreground calls block within your own turn and return the result directly, exactly as the rest of this workflow (and the guardrail below about verifying real file changes immediately after every call) already assumes.
+
 ### 0. Architecture gate
 Read all of the following specification files before evaluating anything:
 - `specifications/architecture/01-solution-structure.md`

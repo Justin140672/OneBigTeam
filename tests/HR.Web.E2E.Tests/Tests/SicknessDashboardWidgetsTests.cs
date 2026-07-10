@@ -5,10 +5,10 @@ namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
 /// Verifies the HR-only sickness dashboard widgets (Current Sickness Absence, Overdue
-/// Return-to-Work Reviews, Missing Fit Notes) are shown for HR Administrator / Company
-/// Administrator and hidden for a plain employee — these widgets gate on
-/// Session.CanManageEmployees, which mirrors the sickness:manage policy roles
-/// (HR Administrator, Company Administrator).
+/// Return-to-Work Reviews, Missing Fit Notes) are shown for HR Administrator and hidden
+/// for a plain employee — these widgets gate on Session.CanManageEmployees, which mirrors
+/// the sickness:manage policy roles (HR Administrator only; Company Administrator is
+/// scoped to company profile/settings and does not hold HR-facing permissions).
 ///
 /// Also verifies the Team Sickness Today widget, which is visible to any authenticated
 /// employee (it self-scopes to the caller's own direct reports; a plain employee with

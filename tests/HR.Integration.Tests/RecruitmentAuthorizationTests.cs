@@ -12,8 +12,9 @@ namespace HR.Integration.Tests;
 ///
 /// Vacancy-only reads (recruitment:view) remain visible to any authenticated employee
 /// (internal job board visibility). Candidate/application/interview/document reads
-/// (candidate:view) are restricted to Recruiter/HrAdministrator/CompanyAdministrator,
-/// since they expose candidate PII, resumes, and interview notes.
+/// (candidate:view) are restricted to Recruiter/HrAdministrator, since they expose
+/// candidate PII, resumes, and interview notes. Company Administrator is scoped to
+/// company profile/settings and does not hold recruitment permissions.
 /// </summary>
 public class RecruitmentAuthorizationTests : IClassFixture<ApiWebApplicationFactory>
 {
@@ -23,6 +24,7 @@ public class RecruitmentAuthorizationTests : IClassFixture<ApiWebApplicationFact
     private static readonly Guid ManagerUser = new("aa000002-0000-0000-0000-000000000002");
     private static readonly Guid RecruiterUser = new("aa000002-0000-0000-0000-000000000003");
     private static readonly Guid HrAdminUser = new("aa000002-0000-0000-0000-000000000004");
+    private static readonly Guid CompanyAdministratorUser = new("aa000002-0000-0000-0000-000000000005");
 
     public RecruitmentAuthorizationTests(ApiWebApplicationFactory factory)
     {
@@ -35,6 +37,7 @@ public class RecruitmentAuthorizationTests : IClassFixture<ApiWebApplicationFact
             await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.Manager);
             await TestRoleSeeder.AssignRoleAsync(factory, RecruiterUser, SystemRoles.Recruiter);
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdministratorUser, SystemRoles.CompanyAdministrator);
         }).GetAwaiter().GetResult();
     }
 
@@ -160,6 +163,31 @@ public class RecruitmentAuthorizationTests : IClassFixture<ApiWebApplicationFact
         using var client = ClientAs(ManagerUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/candidates");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    // Company Administrator is scoped to company profile/settings management only and does
+    // not hold candidate:view — see the narrowing in
+    // HR.Modules.Identity.IdentityModule.AddRolePolicies.
+    [Fact]
+    public async Task CompanyAdministrator_Gets_Forbidden_Listing_Candidates()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = ClientAs(CompanyAdministratorUser, companyId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/candidates");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CompanyAdministrator_Gets_Forbidden_Getting_A_Candidate()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = ClientAs(CompanyAdministratorUser, companyId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/candidates/{Guid.NewGuid()}");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }

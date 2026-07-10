@@ -90,16 +90,47 @@ else
 
             </SfSidebar>
         }
+        else if (Session.CanManageCompany)
+        {
+            <SfSidebar Width="280px"
+                       Type="SidebarType.Push"
+                       @bind-IsOpen="SidebarOpen"
+                       CssClass="app-sidebar">
+
+                <ChildContent>
+                    <div class="sidebar-header">
+                        <button class="sidebar-toggle" @onclick="ToggleSidebar">
+                            <i class="fa-solid fa-bars"></i>
+                        </button>
+                        @if (SidebarOpen)
+                        {
+                            <img src="/images/one-big-team-logo.png" alt="One Big Team" class="sidebar-logo" />
+                        }
+                    </div>
+
+                    <SfMenu TValue="MenuItem"
+                            Orientation="Syncfusion.Blazor.Navigations.Orientation.Vertical"
+                            CssClass="app-nav-menu"
+                            ShowItemOnClick="true">
+                        <MenuItems>
+                            <MenuItem Text="Company" IconCss="fa-solid fa-building" Url="@_menuItems["Company"]" />
+                        </MenuItems>
+                    </SfMenu>
+
+                </ChildContent>
+
+            </SfSidebar>
+        }
 
         <main class="main-content">
             <div class="top-bar">
-                @if (Session.CanManageEmployees && !SidebarOpen)
+                @if ((Session.CanManageEmployees || Session.CanManageCompany) && !SidebarOpen)
                 {
                     <button class="mobile-menu-button" @onclick="ToggleSidebar">
                         <i class="fa-solid fa-bars"></i>
                     </button>
                 }
-                <span class="page-title">@(Session.CanManageEmployees ? "Dashboard" : "My Profile")</span>
+                <span class="page-title">@(Session.CanManageEmployees ? "Dashboard" : Session.CanManageCompany ? "Company" : "My Profile")</span>
                 <div class="top-bar-actions">
                     <button class="theme-toggle" @onclick="ToggleTheme" title="@(IsDark ? "Switch to light mode" : "Switch to dark mode")">
                         @if (IsDark)

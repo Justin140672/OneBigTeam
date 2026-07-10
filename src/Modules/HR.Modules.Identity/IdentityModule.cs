@@ -46,10 +46,11 @@ public static class IdentityModule
         builder.AddPolicy("role:finance",              RolePolicy(SystemRoles.Finance));
         builder.AddPolicy("role:company-administrator",RolePolicy(SystemRoles.CompanyAdministrator));
 
-        // Employee domain policies — match spec section 12/13
+        // Employee domain policies — match spec section 12/13.
+        // Company Administrator is scoped to company profile/settings only and must not
+        // manage employee/HR data — see the mirror-image rule on company:manage below.
         builder.AddPolicy("employee:manage", RolePolicy(
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
+            SystemRoles.HrAdministrator));
 
         // Company domain policies — match spec section 24.
         // Company profile/settings/branding are Company Administrator territory only —
@@ -58,60 +59,51 @@ public static class IdentityModule
         builder.AddPolicy("company:manage", RolePolicy(
             SystemRoles.CompanyAdministrator));
 
-        // Leave domain composite policies — match spec section 14
+        // Leave domain composite policies — match spec section 14.
+        // Company Administrator no longer participates in HR workflows (see employee:manage above).
         builder.AddPolicy("leave:request", RolePolicy(
             SystemRoles.Employee,
             SystemRoles.Manager,
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
+            SystemRoles.HrAdministrator));
 
         builder.AddPolicy("leave:approve", RolePolicy(
             SystemRoles.Manager,
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
+            SystemRoles.HrAdministrator));
 
         builder.AddPolicy("leave:manage", RolePolicy(
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
+            SystemRoles.HrAdministrator));
 
         builder.AddPolicy("probation:manage", RolePolicy(
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
+            SystemRoles.HrAdministrator));
 
         builder.AddPolicy("probation:review", RolePolicy(
             SystemRoles.Manager,
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
+            SystemRoles.HrAdministrator));
 
         // Sickness domain — read access to a manager's assigned return-to-work review task
         builder.AddPolicy("sickness:review", RolePolicy(
             SystemRoles.Manager,
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
+            SystemRoles.HrAdministrator));
 
         // Sickness domain — HR-only management of categories/records
         builder.AddPolicy("sickness:manage", RolePolicy(
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
+            SystemRoles.HrAdministrator));
 
-        // Sickness domain — team visibility for managers plus HR/Admin auditing
+        // Sickness domain — team visibility for managers plus HR auditing
         builder.AddPolicy("sickness:view-team", RolePolicy(
             SystemRoles.Manager,
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
+            SystemRoles.HrAdministrator));
 
         // Asset domain policies
         builder.AddPolicy("asset:view", RolePolicy(
             SystemRoles.Employee,
             SystemRoles.Manager,
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
+            SystemRoles.HrAdministrator));
 
         // Recruitment domain policies
         builder.AddPolicy("recruitment:manage", RolePolicy(
             SystemRoles.Recruiter,
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
+            SystemRoles.HrAdministrator));
 
         // Recruitment domain — vacancy-only reads (internal job board visibility).
         // Broad by design: seeing what roles are open is general visibility, not sensitive.
@@ -119,16 +111,14 @@ public static class IdentityModule
             SystemRoles.Employee,
             SystemRoles.Manager,
             SystemRoles.Recruiter,
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
+            SystemRoles.HrAdministrator));
 
         // Recruitment domain — candidate/application/interview/document reads.
         // Restricted to the same role set as recruitment:manage: candidate PII, resumes,
         // and interview notes must not be visible to plain Employees/Managers.
         builder.AddPolicy("candidate:view", RolePolicy(
             SystemRoles.Recruiter,
-            SystemRoles.HrAdministrator,
-            SystemRoles.CompanyAdministrator));
+            SystemRoles.HrAdministrator));
 
         return builder;
     }

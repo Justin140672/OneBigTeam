@@ -18,34 +18,39 @@ namespace HR.Integration.Tests;
 public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
-    private static readonly Guid AdminUser = Guid.Parse("fa000001-0000-0000-0000-000000000001");
+    private static readonly Guid CompanyAdminUser = Guid.Parse("fa000001-0000-0000-0000-000000000001");
+    private static readonly Guid HrAdminUser = Guid.Parse("fa000001-0000-0000-0000-000000000002");
 
     public FitNoteRequestCreatesTaskTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        // CompanyAdministrator (not just HrAdministrator) because this user calls
-        // UpdateCompanySettings, which the company:manage policy restricts to
-        // CompanyAdministrator only.
+        // CompanyAdministrator is required for UpdateCompanySettings (company:manage is
+        // CompanyAdministrator-only). HrAdministrator is required for employee/sickness
+        // category/sickness record creation (employee:manage / sickness:manage) — Company
+        // Administrator no longer holds those permissions.
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.CompanyAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdminUser, SystemRoles.CompanyAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.HrAdministrator);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]
     public async Task FitNoteRequestJob_Creates_Upload_Task_For_Employee()
     {
-        var (client, companyId) = await CreateAuthenticatedClientWithCompanyAsync();
-        using var _ = client;
+        var (companyAdminClient, hrClient, companyId) = await CreateAuthenticatedClientWithCompanyAsync();
+        using var _1 = companyAdminClient;
+        using var _2 = hrClient;
 
         // 1. Create company settings with FitNoteRequiredAfterDays = 1
-        await SetFitNoteThresholdAsync(client, companyId, fitNoteRequiredAfterDays: 1);
+        await SetFitNoteThresholdAsync(companyAdminClient, companyId, fitNoteRequiredAfterDays: 1);
 
         // 2. Create an employee
-        var employeeId = await CreateEmployeeAsync(client, companyId);
+        var employeeId = await CreateEmployeeAsync(hrClient, companyId);
 
         // 3. Create a sickness category and record
-        var categoryId = await CreateSicknessCategoryAsync(client, companyId);
-        await CreateSicknessRecordAsync(client, companyId, employeeId, categoryId);
+        var categoryId = await CreateSicknessCategoryAsync(hrClient, companyId);
+        await CreateSicknessRecordAsync(hrClient, companyId, employeeId, categoryId);
 
         // 4. Directly set TotalDays >= threshold via the DbContext (bypass private setter)
         await SetSicknessRecordTotalDaysAsync(companyId, employeeId, totalDays: 3m);
@@ -54,7 +59,7 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
         await RunFitNoteRequestJobAsync();
 
         // 6. Assert an upload task was created for the employee
-        var tasks = await GetSicknessTasksForEmployeeAsync(client, companyId, employeeId);
+        var tasks = await GetSicknessTasksForEmployeeAsync(hrClient, companyId, employeeId);
         var fitNoteTask = Assert.Single(tasks);
         Assert.Equal("Upload fit note", fitNoteTask.Title);
         Assert.Equal("Upload",          fitNoteTask.ActionType);
@@ -65,13 +70,14 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
     [Fact]
     public async Task FitNoteRequestJob_Does_Not_Duplicate_Task_On_Second_Run()
     {
-        var (client, companyId) = await CreateAuthenticatedClientWithCompanyAsync();
-        using var _ = client;
+        var (companyAdminClient, hrClient, companyId) = await CreateAuthenticatedClientWithCompanyAsync();
+        using var _1 = companyAdminClient;
+        using var _2 = hrClient;
 
-        await SetFitNoteThresholdAsync(client, companyId, fitNoteRequiredAfterDays: 1);
-        var employeeId = await CreateEmployeeAsync(client, companyId);
-        var categoryId = await CreateSicknessCategoryAsync(client, companyId);
-        await CreateSicknessRecordAsync(client, companyId, employeeId, categoryId);
+        await SetFitNoteThresholdAsync(companyAdminClient, companyId, fitNoteRequiredAfterDays: 1);
+        var employeeId = await CreateEmployeeAsync(hrClient, companyId);
+        var categoryId = await CreateSicknessCategoryAsync(hrClient, companyId);
+        await CreateSicknessRecordAsync(hrClient, companyId, employeeId, categoryId);
         await SetSicknessRecordTotalDaysAsync(companyId, employeeId, totalDays: 3m);
 
         // Run the job twice
@@ -79,44 +85,46 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
         await RunFitNoteRequestJobAsync();
 
         // Should still only have one evidence request (idempotent) and one task
-        var tasks = await GetSicknessTasksForEmployeeAsync(client, companyId, employeeId);
+        var tasks = await GetSicknessTasksForEmployeeAsync(hrClient, companyId, employeeId);
         Assert.Single(tasks);
     }
 
     [Fact]
     public async Task FitNoteRequestJob_Does_Not_Create_Task_When_TotalDays_Below_Threshold()
     {
-        var (client, companyId) = await CreateAuthenticatedClientWithCompanyAsync();
-        using var _ = client;
+        var (companyAdminClient, hrClient, companyId) = await CreateAuthenticatedClientWithCompanyAsync();
+        using var _1 = companyAdminClient;
+        using var _2 = hrClient;
 
         // Threshold is 5 but TotalDays will be 1
-        await SetFitNoteThresholdAsync(client, companyId, fitNoteRequiredAfterDays: 5);
-        var employeeId = await CreateEmployeeAsync(client, companyId);
-        var categoryId = await CreateSicknessCategoryAsync(client, companyId);
-        await CreateSicknessRecordAsync(client, companyId, employeeId, categoryId);
+        await SetFitNoteThresholdAsync(companyAdminClient, companyId, fitNoteRequiredAfterDays: 5);
+        var employeeId = await CreateEmployeeAsync(hrClient, companyId);
+        var categoryId = await CreateSicknessCategoryAsync(hrClient, companyId);
+        await CreateSicknessRecordAsync(hrClient, companyId, employeeId, categoryId);
         await SetSicknessRecordTotalDaysAsync(companyId, employeeId, totalDays: 1m);
 
         await RunFitNoteRequestJobAsync();
 
-        var tasks = await GetSicknessTasksForEmployeeAsync(client, companyId, employeeId);
+        var tasks = await GetSicknessTasksForEmployeeAsync(hrClient, companyId, employeeId);
         Assert.Empty(tasks);
     }
 
     [Fact]
     public async Task FitNoteRequestJob_Task_DueDate_Is_Seven_Days_From_Now()
     {
-        var (client, companyId) = await CreateAuthenticatedClientWithCompanyAsync();
-        using var _ = client;
+        var (companyAdminClient, hrClient, companyId) = await CreateAuthenticatedClientWithCompanyAsync();
+        using var _1 = companyAdminClient;
+        using var _2 = hrClient;
 
-        await SetFitNoteThresholdAsync(client, companyId, fitNoteRequiredAfterDays: 1);
-        var employeeId = await CreateEmployeeAsync(client, companyId);
-        var categoryId = await CreateSicknessCategoryAsync(client, companyId);
-        await CreateSicknessRecordAsync(client, companyId, employeeId, categoryId);
+        await SetFitNoteThresholdAsync(companyAdminClient, companyId, fitNoteRequiredAfterDays: 1);
+        var employeeId = await CreateEmployeeAsync(hrClient, companyId);
+        var categoryId = await CreateSicknessCategoryAsync(hrClient, companyId);
+        await CreateSicknessRecordAsync(hrClient, companyId, employeeId, categoryId);
         await SetSicknessRecordTotalDaysAsync(companyId, employeeId, totalDays: 3m);
 
         await RunFitNoteRequestJobAsync();
 
-        var tasks      = await GetSicknessTasksForEmployeeAsync(client, companyId, employeeId);
+        var tasks      = await GetSicknessTasksForEmployeeAsync(hrClient, companyId, employeeId);
         var task       = Assert.Single(tasks);
         var expectedDue = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7);
         Assert.Equal(expectedDue, task.DueDate);
@@ -124,24 +132,26 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
-    private HttpClient AdminClient(Guid companyId)
+    private HttpClient ClientFor(Guid userId, Guid tenantId)
     {
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, tenantId.ToString());
         return client;
     }
 
     /// <summary>
     /// Creates a real Company row (UpdateCompanySettings requires one to exist) and returns
-    /// a client whose tenant header points at it. Uses AdminUser's own id as a placeholder
-    /// tenant header for the initial creation call, then swaps to the real company id.
+    /// a CompanyAdministrator client (for settings management) and an HrAdministrator client
+    /// (for employee/sickness setup), both scoped to the new company. Uses CompanyAdminUser's
+    /// own id as a placeholder tenant header for the initial creation call, then swaps to the
+    /// real company id.
     /// </summary>
-    private async Task<(HttpClient Client, Guid CompanyId)> CreateAuthenticatedClientWithCompanyAsync()
+    private async Task<(HttpClient CompanyAdminClient, HttpClient HrClient, Guid CompanyId)> CreateAuthenticatedClientWithCompanyAsync()
     {
-        var client = AdminClient(AdminUser);
+        var companyAdminClient = ClientFor(CompanyAdminUser, CompanyAdminUser);
 
-        var resp = await client.PostAsJsonAsync("/api/companies", new
+        var resp = await companyAdminClient.PostAsJsonAsync("/api/companies", new
         {
             name = $"FitNote Test {Guid.NewGuid():N}",
             addresses = new[]
@@ -152,10 +162,12 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
         resp.EnsureSuccessStatusCode();
         var company = await resp.Content.ReadFromJsonAsync<IdPayload>();
 
-        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, company!.Id.ToString());
+        companyAdminClient.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        companyAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, company!.Id.ToString());
 
-        return (client, company.Id);
+        var hrClient = ClientFor(HrAdminUser, company.Id);
+
+        return (companyAdminClient, hrClient, company.Id);
     }
 
     private async Task SetFitNoteThresholdAsync(HttpClient client, Guid companyId, int fitNoteRequiredAfterDays)
