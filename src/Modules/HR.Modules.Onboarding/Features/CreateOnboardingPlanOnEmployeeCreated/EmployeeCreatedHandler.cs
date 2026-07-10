@@ -1,20 +1,29 @@
+using HR.Modules.Onboarding.Domain;
+using HR.Modules.Onboarding.Persistence;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 
-namespace HR.Modules.Tasks.Features.CreateOnboardingTasksOnEmployeeCreated;
+namespace HR.Modules.Onboarding.Features.CreateOnboardingPlanOnEmployeeCreated;
 
 internal sealed class EmployeeCreatedHandler(
+    OnboardingDbContext dbContext,
     ITaskCreator taskCreator,
     IEmployeeNameReader employeeNameReader,
-    IOnboardingTemplateReader onboardingTemplateReader) : IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>
+    IOnboardingTemplateReader onboardingTemplateReader,
+    IClock clock) : IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>
 {
     public async Task HandleAsync(EmployeeCreatedIntegrationEvent e, CancellationToken cancellationToken)
     {
         if (e.IsImported)
             return;
 
+        var now = clock.UtcNowOffset();
+
         var names = await employeeNameReader.GetNamesAsync(e.CompanyId, [e.EmployeeId], cancellationToken);
         var employeeName = names.GetValueOrDefault(e.EmployeeId, "the new employee");
+
+        var plan = OnboardingPlan.Create(Guid.NewGuid(), e.CompanyId, e.EmployeeId, e.StartDate, notes: null, now);
+        dbContext.OnboardingPlans.Add(plan);
 
         var templateTasks = await GetTemplateTasksAsync(e, cancellationToken);
 
@@ -29,6 +38,14 @@ internal sealed class EmployeeCreatedHandler(
                     _ => ((Guid?)null, (Guid?)null),
                 };
 
+                var dueDate = e.StartDate.AddDays(task.DueDaysAfterStart);
+
+                var onboardingTask = OnboardingTask.Create(
+                    Guid.NewGuid(), e.CompanyId, plan.Id,
+                    $"{task.Title} — {employeeName}", task.Description,
+                    task.AssignTo, dueDate, now);
+                dbContext.OnboardingTasks.Add(onboardingTask);
+
                 await taskCreator.CreateAsync(
                     e.CompanyId,
                     createdBy:          e.EmployeeId,
@@ -37,15 +54,23 @@ internal sealed class EmployeeCreatedHandler(
                     priority:           task.Priority,
                     source:             TaskSource.Onboarding,
                     actionType:         TaskActionType.Complete,
-                    dueDate:            e.StartDate.AddDays(task.DueDaysAfterStart),
+                    dueDate:            dueDate,
                     assignedEmployeeId: assignedEmployeeId,
                     assignedUserId:     assignedUserId,
-                    sourceEntityId:     null,
+                    sourceEntityId:     onboardingTask.Id,
                     cancellationToken);
             }
 
+            await dbContext.SaveChangesAsync(cancellationToken);
             return;
         }
+
+        var workstationTask = OnboardingTask.Create(
+            Guid.NewGuid(), e.CompanyId, plan.Id,
+            $"Set up workstation and system access — {employeeName}",
+            $"Provision equipment, accounts and system access ahead of {employeeName}'s start date.",
+            OnboardingTemplateTaskAssignTo.Unassigned, e.StartDate, now);
+        dbContext.OnboardingTasks.Add(workstationTask);
 
         await taskCreator.CreateAsync(
             e.CompanyId,
@@ -58,8 +83,15 @@ internal sealed class EmployeeCreatedHandler(
             dueDate:            e.StartDate,
             assignedEmployeeId: null,
             assignedUserId:     null,
-            sourceEntityId:     null,
+            sourceEntityId:     workstationTask.Id,
             cancellationToken);
+
+        var welcomeTask = OnboardingTask.Create(
+            Guid.NewGuid(), e.CompanyId, plan.Id,
+            $"Send welcome email and first-day details — {employeeName}",
+            $"Send {employeeName} their first-day joining instructions and welcome pack.",
+            OnboardingTemplateTaskAssignTo.Manager, e.StartDate, now);
+        dbContext.OnboardingTasks.Add(welcomeTask);
 
         await taskCreator.CreateAsync(
             e.CompanyId,
@@ -72,8 +104,16 @@ internal sealed class EmployeeCreatedHandler(
             dueDate:            e.StartDate,
             assignedEmployeeId: e.ManagerId,
             assignedUserId:     e.ManagerId,
-            sourceEntityId:     null,
+            sourceEntityId:     welcomeTask.Id,
             cancellationToken);
+
+        var inductionDueDate = e.StartDate.AddDays(7);
+        var inductionTask = OnboardingTask.Create(
+            Guid.NewGuid(), e.CompanyId, plan.Id,
+            $"Schedule welcome and induction meeting — {employeeName}",
+            $"Book an induction meeting with {employeeName} during their first week.",
+            OnboardingTemplateTaskAssignTo.Manager, inductionDueDate, now);
+        dbContext.OnboardingTasks.Add(inductionTask);
 
         await taskCreator.CreateAsync(
             e.CompanyId,
@@ -83,11 +123,13 @@ internal sealed class EmployeeCreatedHandler(
             priority:           TaskPriority.Medium,
             source:             TaskSource.Onboarding,
             actionType:         TaskActionType.Complete,
-            dueDate:            e.StartDate.AddDays(7),
+            dueDate:            inductionDueDate,
             assignedEmployeeId: e.ManagerId,
             assignedUserId:     e.ManagerId,
-            sourceEntityId:     null,
+            sourceEntityId:     inductionTask.Id,
             cancellationToken);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>

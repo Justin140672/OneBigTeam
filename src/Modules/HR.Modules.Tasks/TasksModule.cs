@@ -2,7 +2,6 @@ using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.CandidateHired;
 using HR.Modules.Tasks.Features.CompleteTask;
 using HR.Modules.Tasks.Features.CompleteTask.Actions;
-using HR.Modules.Tasks.Features.CreateOnboardingTasksOnEmployeeCreated;
 using HR.Modules.Tasks.Features.GetEmployeeTasks;
 using HR.Modules.Tasks.Features.GetMyTasks;
 using HR.Modules.Tasks.Features.GetTeamTasks;
@@ -49,7 +48,6 @@ public static class TasksModule
         services.AddScoped<ITaskCompletionAction, AssetTaskCompletionAction>();
         services.AddScoped<ITaskCompletionAction, AssetReturnTaskCompletionAction>();
         services.AddScoped<ITaskCompletionAction, InterviewFeedbackTaskCompletionAction>();
-        services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddScoped<IIntegrationEventHandler<LeaveRequestedIntegrationEvent>, LeaveRequestedHandler>();
         services.AddScoped<IIntegrationEventHandler<SicknessEvidenceRequestedIntegrationEvent>, SicknessEvidenceRequestedHandler>();
         services.AddScoped<IIntegrationEventHandler<SicknessEvidenceRequestedIntegrationEvent>, NotifyHrOfFitNoteThresholdHandler>();

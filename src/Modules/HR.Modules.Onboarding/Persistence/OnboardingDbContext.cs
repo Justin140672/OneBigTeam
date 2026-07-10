@@ -12,6 +12,7 @@ internal sealed class OnboardingDbContext : DbContext
 
     public DbSet<OnboardingPlan> OnboardingPlans => Set<OnboardingPlan>();
     public DbSet<OnboardingTaskTemplate> OnboardingTaskTemplates => Set<OnboardingTaskTemplate>();
+    public DbSet<OnboardingTask> OnboardingTasks => Set<OnboardingTask>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
