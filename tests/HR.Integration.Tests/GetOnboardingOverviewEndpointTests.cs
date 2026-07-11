@@ -79,7 +79,7 @@ public class GetOnboardingOverviewEndpointTests : IClassFixture<ApiWebApplicatio
         using var client = AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Software Engineer");
-        var docTypeId = await CreateDocumentTypeAsync(client, companyId, "Passport");
+        var (docTypeId, docTypeName) = await CreateDocumentTypeAsync(client, companyId, "Passport");
         await AddRequiredDocumentAsync(client, companyId, profileId, docTypeId, isMandatory: true, dueDays: 30);
 
         var employeeId = await CreateEmployeeAsync(client, companyId, profileId);
@@ -99,7 +99,7 @@ public class GetOnboardingOverviewEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.True(payload!.HasPlan);
 
         var docRequest = Assert.Single(payload.OutstandingDocumentRequests);
-        Assert.Equal("Passport", docRequest.DocumentTypeName);
+        Assert.Equal(docTypeName, docRequest.DocumentTypeName);
         Assert.True(docRequest.IsMandatory);
 
         var assetAck = Assert.Single(payload.OutstandingAssetAcknowledgements);
@@ -151,13 +151,15 @@ public class GetOnboardingOverviewEndpointTests : IClassFixture<ApiWebApplicatio
         return (await resp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
     }
 
-    private async Task<Guid> CreateDocumentTypeAsync(HttpClient client, Guid companyId, string name)
+    private async Task<(Guid Id, string Name)> CreateDocumentTypeAsync(HttpClient client, Guid companyId, string namePrefix)
     {
+        var name = $"{namePrefix} {Guid.NewGuid():N}";
         var resp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/document-types",
-            new { companyId, name = $"{name} {Guid.NewGuid():N}" });
+            new { companyId, name });
         resp.EnsureSuccessStatusCode();
-        return (await resp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+        var id = (await resp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+        return (id, name);
     }
 
     private async Task AddRequiredDocumentAsync(

@@ -73,7 +73,7 @@ public class ListOnboardingTemplatesForPositionProfileEndpointTests : IClassFixt
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Software Engineer");
         var templateId = await CreateOnboardingTemplateAsync(client, companyId, "Standard Onboarding", "Default checklist");
-        await SetTemplateTasksAsync(client, companyId, templateId, "Send welcome email", "Order equipment");
+        await SetTemplateTasksAsync(client, companyId, templateId, "Default checklist", "Send welcome email", "Order equipment");
 
         await AssignOnboardingTemplateAsync(client, companyId, profileId, templateId);
 
@@ -163,7 +163,8 @@ public class ListOnboardingTemplatesForPositionProfileEndpointTests : IClassFixt
         return (await response.Content.ReadFromJsonAsync<IdPayload>())!.Id;
     }
 
-    private async Task SetTemplateTasksAsync(HttpClient client, Guid companyId, Guid templateId, params string[] taskTitles)
+    private async Task SetTemplateTasksAsync(
+        HttpClient client, Guid companyId, Guid templateId, string? description, params string[] taskTitles)
     {
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/onboarding-templates/{templateId}",
@@ -172,6 +173,7 @@ public class ListOnboardingTemplatesForPositionProfileEndpointTests : IClassFixt
                 companyId,
                 id = templateId,
                 name = "Standard Onboarding",
+                description,
                 tasks = taskTitles.Select((title, index) => new
                 {
                     id = (Guid?)null,
