@@ -11,19 +11,23 @@ internal sealed class UpdateEmployeeProfileHandler
     private readonly EmployeesDbContext _dbContext;
     private readonly IClock _clock;
     private readonly ICompanyContactValidationReader _contactValidationReader;
+    private readonly IAuditEventPublisher _auditEventPublisher;
 
     public UpdateEmployeeProfileHandler(
         EmployeesDbContext dbContext,
         IClock clock,
-        ICompanyContactValidationReader contactValidationReader)
+        ICompanyContactValidationReader contactValidationReader,
+        IAuditEventPublisher auditEventPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
         _contactValidationReader = contactValidationReader;
+        _auditEventPublisher = auditEventPublisher;
     }
 
     public async Task<Result<UpdateEmployeeProfileResponse>> HandleAsync(
         UpdateEmployeeProfileRequest request,
+        Guid actorEmployeeId,
         CancellationToken cancellationToken)
     {
         var contactRules = await _contactValidationReader.GetContactValidationRulesAsync(request.CompanyId, cancellationToken);
@@ -71,6 +75,22 @@ internal sealed class UpdateEmployeeProfileHandler
 
         var now = _clock.UtcNowOffset();
 
+        var before = new EmployeeProfileSnapshot(
+            employee.FirstName,
+            employee.LastName,
+            employee.WorkEmail,
+            employee.PersonalEmail,
+            employee.StartDate,
+            employee.PreferredName,
+            employee.DateOfBirth,
+            employee.Nationality,
+            employee.Gender,
+            employee.GenderOther,
+            employee.DepartmentId,
+            employee.PositionProfileId,
+            employee.LocationId,
+            employee.HasSystemAccess);
+
         employee.UpdateProfile(
             request.FirstName.Trim(),
             request.LastName.Trim(),
@@ -104,6 +124,26 @@ internal sealed class UpdateEmployeeProfileHandler
         employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var after = new EmployeeProfileSnapshot(
+            employee.FirstName,
+            employee.LastName,
+            employee.WorkEmail,
+            employee.PersonalEmail,
+            employee.StartDate,
+            employee.PreferredName,
+            employee.DateOfBirth,
+            employee.Nationality,
+            employee.Gender,
+            employee.GenderOther,
+            employee.DepartmentId,
+            employee.PositionProfileId,
+            employee.LocationId,
+            employee.HasSystemAccess);
+
+        await _auditEventPublisher.PublishAsync(
+            new EmployeeProfileUpdatedAuditEvent(employee.CompanyId, employee.Id, actorEmployeeId, now, before, after),
+            cancellationToken);
 
         return Result.Success(new UpdateEmployeeProfileResponse(
             employee.Id,

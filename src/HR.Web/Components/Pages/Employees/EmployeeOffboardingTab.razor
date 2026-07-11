@@ -1,0 +1,226 @@
+@using HR.Web.Models
+@inject OffboardingService OffboardingService
+
+@if (_loading)
+{
+    <HrLoadingIndicator />
+}
+else if (_overview is null || !_overview.HasPlan)
+{
+    <div class="mb-3">
+        <SfButton IsPrimary="true" OnClick="OpenStartDialog">Start Offboarding</SfButton>
+    </div>
+    <HrEmptyState Message="No offboarding plan found for this employee." Icon="fa-solid fa-person-walking-arrow-right" />
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h6 class="text-muted fw-normal mb-1">Offboarding Plan</h6>
+                    <p class="mb-0 fw-medium">
+                        Last Working Day @_overview.LastWorkingDay?.ToString("d MMM yyyy")
+                    </p>
+                    @if (!string.IsNullOrWhiteSpace(_overview.Notes))
+                    {
+                        <p class="text-muted small mb-0 mt-1">@_overview.Notes</p>
+                    }
+                </div>
+                <span class="badge fs-6 px-3 py-2 @StatusBadgeClass(_overview.PlanStatus)">@StatusLabel(_overview.PlanStatus)</span>
+            </div>
+
+            <div class="mb-1 d-flex justify-content-between small text-muted">
+                <span>@CompletedCount of @TotalCount tasks complete</span>
+                <span>@ProgressPercent%</span>
+            </div>
+            <div class="progress" style="height: 8px;">
+                <div class="progress-bar @ProgressBarClass(_overview.PlanStatus)"
+                     role="progressbar"
+                     style="width: @ProgressPercent%"
+                     aria-valuenow="@ProgressPercent"
+                     aria-valuemin="0"
+                     aria-valuemax="100">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Offboarding Checklist</h5>
+        </div>
+        <div class="card-body p-0">
+            @if (_overview.Tasks.Count == 0)
+            {
+                <p class="text-muted small p-3 mb-0">No offboarding tasks have been created for this plan.</p>
+            }
+            else
+            {
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Task</th>
+                            <th width="120">Assign To</th>
+                            <th width="130">Due Date</th>
+                            <th width="130">Status</th>
+                            <th width="150">Completed</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in _overview.Tasks.OrderBy(t => t.DueDate ?? DateOnly.MaxValue))
+                        {
+                            var (css, label) = GetTaskBadge(t);
+                            <tr>
+                                <td class="align-middle">@t.Title</td>
+                                <td class="align-middle text-muted small">@t.AssignTo</td>
+                                <td class="align-middle text-muted small">
+                                    @(t.DueDate?.ToString("d MMM yyyy") ?? "—")
+                                </td>
+                                <td class="align-middle">
+                                    <span class="badge @css">@label</span>
+                                </td>
+                                <td class="align-middle text-muted small">
+                                    @(t.CompletedAt?.LocalDateTime.ToString("d MMM yyyy") ?? "—")
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+}
+
+@if (_showStartDialog)
+{
+    <SfDialog Width="480px" IsModal="true" @bind-Visible="_showStartDialog" Header="Start Offboarding">
+        <DialogTemplates>
+            <Content>
+                <div class="mb-3">
+                    <label class="form-label">Last Working Day <span class="text-danger">*</span></label>
+                    <SfDatePicker TValue="DateOnly?"
+                                  @bind-Value="_lastWorkingDay"
+                                  Format="dd/MM/yyyy"
+                                  Placeholder="dd/mm/yyyy" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Notes</label>
+                    <textarea class="form-control" rows="3" maxlength="1000"
+                              @bind="_notes" placeholder="Optional notes…"></textarea>
+                </div>
+                @if (!string.IsNullOrEmpty(_dialogError))
+                {
+                    <div class="alert alert-danger py-2">@_dialogError</div>
+                }
+            </Content>
+        </DialogTemplates>
+        <DialogButtons>
+            <DialogButton Content="Start" IsPrimary="true" OnClick="ConfirmStartAsync" Disabled="@_starting" />
+            <DialogButton Content="Cancel" OnClick="CloseStartDialog" Disabled="@_starting" />
+        </DialogButtons>
+    </SfDialog>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private bool _loading = true;
+    private OffboardingOverviewModel? _overview;
+
+    private bool _showStartDialog;
+    private DateOnly? _lastWorkingDay;
+    private string? _notes;
+    private string? _dialogError;
+    private bool _starting;
+
+    private int TotalCount => _overview?.Tasks.Count ?? 0;
+    private int CompletedCount => _overview?.Tasks.Count(t => t.Status is "Completed" or "Skipped") ?? 0;
+    private int ProgressPercent => TotalCount == 0 ? 0 : (int)Math.Round(CompletedCount * 100.0 / TotalCount);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _overview = await OffboardingService.GetOverviewAsync(CompanyId, EmployeeId);
+        _loading = false;
+    }
+
+    private void OpenStartDialog()
+    {
+        _lastWorkingDay = null;
+        _notes = null;
+        _dialogError = null;
+        _showStartDialog = true;
+    }
+
+    private void CloseStartDialog() => _showStartDialog = false;
+
+    private async Task ConfirmStartAsync()
+    {
+        if (_lastWorkingDay is null)
+        {
+            _dialogError = "Please select a last working day.";
+            return;
+        }
+
+        _starting = true;
+        _dialogError = null;
+
+        var error = await OffboardingService.StartOffboardingAsync(CompanyId, EmployeeId, _lastWorkingDay.Value, _notes);
+
+        _starting = false;
+
+        if (error is not null)
+        {
+            _dialogError = error;
+            return;
+        }
+
+        _showStartDialog = false;
+        _loading = true;
+        _overview = await OffboardingService.GetOverviewAsync(CompanyId, EmployeeId);
+        _loading = false;
+    }
+
+    private static string StatusLabel(string? status) => status switch
+    {
+        "NotStarted" => "Not Started",
+        "InProgress" => "In Progress",
+        "Completed"  => "Completed",
+        "Cancelled"  => "Cancelled",
+        _            => status ?? "Unknown"
+    };
+
+    private static string StatusBadgeClass(string? status) => status switch
+    {
+        "NotStarted" => "bg-secondary",
+        "InProgress" => "bg-primary",
+        "Completed"  => "bg-success",
+        "Cancelled"  => "bg-danger",
+        _            => "bg-secondary"
+    };
+
+    private static string ProgressBarClass(string? status) => status switch
+    {
+        "Completed" => "bg-success",
+        "Cancelled" => "bg-danger",
+        _           => "bg-primary"
+    };
+
+    private static (string Css, string Label) GetTaskBadge(OffboardingTaskOverviewItem t)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (t.Status == "Pending" && t.DueDate.HasValue && t.DueDate.Value < today)
+            return ("text-bg-danger", "Overdue");
+
+        return t.Status switch
+        {
+            "Pending"    => ("text-bg-secondary", "Pending"),
+            "InProgress" => ("text-bg-primary",    "In Progress"),
+            "Completed"  => ("text-bg-success",    "Completed"),
+            "Skipped"    => ("text-bg-secondary",  "Skipped"),
+            _            => ("text-bg-secondary",  t.Status),
+        };
+    }
+}

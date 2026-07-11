@@ -23,7 +23,7 @@ public class UpdateEmployeeProfileHandlerTests
         await context.SaveChangesAsync();
 
         var updateTime = new DateTime(2026, 6, 8, 12, 0, 0, DateTimeKind.Utc);
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(updateTime), new FakeCompanyContactValidationReader());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(updateTime), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -36,6 +36,7 @@ public class UpdateEmployeeProfileHandlerTests
                 PersonalEmail = "alicia@gmail.com",
                 StartDate = new DateOnly(2026, 8, 1)
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -48,6 +49,54 @@ public class UpdateEmployeeProfileHandlerTests
         var saved = await context.Employees.SingleAsync();
         Assert.Equal("Alicia", saved.FirstName);
         Assert.Equal("alicia.jones@example.com", saved.WorkEmail);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_With_Before_And_After_Snapshots()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
+        employee.UpdatePersonalDetails(null, null, null, "Female", null, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var handler = new UpdateEmployeeProfileHandler(
+            context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), auditPublisher);
+
+        var actorId = Guid.NewGuid();
+
+        var result = await handler.HandleAsync(
+            new UpdateEmployeeProfileRequest
+            {
+                CompanyId = companyId,
+                Id = employee.Id,
+                FirstName = "Alicia",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate,
+                Gender = "Male"
+            },
+            actorId,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(auditPublisher.Published);
+
+        var auditEvent = auditPublisher.Published[0];
+        Assert.Equal("employee.profile.updated", auditEvent.EventType);
+        Assert.Equal(employee.Id, auditEvent.EntityId);
+        Assert.Equal(actorId, auditEvent.ActorEmployeeId);
+
+        var before = Assert.IsType<EmployeeProfileSnapshot>(auditEvent.Before);
+        var after = Assert.IsType<EmployeeProfileSnapshot>(auditEvent.After);
+        Assert.Equal("Alice", before.FirstName);
+        Assert.Equal("Female", before.Gender);
+        Assert.Equal("Alicia", after.FirstName);
+        Assert.Equal("Male", after.Gender);
     }
 
     [Fact]
@@ -65,7 +114,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Locations.Add(location);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -78,6 +127,7 @@ public class UpdateEmployeeProfileHandlerTests
                 WorkEmail = "alice@example.com",
                 StartDate = StartDate
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -98,7 +148,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -110,6 +160,7 @@ public class UpdateEmployeeProfileHandlerTests
                 WorkEmail = "Alice.SMITH@EXAMPLE.COM",
                 StartDate = StartDate
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -120,7 +171,7 @@ public class UpdateEmployeeProfileHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Employee_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -132,6 +183,7 @@ public class UpdateEmployeeProfileHandlerTests
                 WorkEmail = "alice@example.com",
                 StartDate = StartDate
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -148,7 +200,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -160,6 +212,7 @@ public class UpdateEmployeeProfileHandlerTests
                 WorkEmail = "alice@example.com",
                 StartDate = StartDate
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -178,7 +231,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.AddRange(emp1, emp2);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -190,6 +243,7 @@ public class UpdateEmployeeProfileHandlerTests
                 WorkEmail = "bob@example.com",  // taken by emp2
                 StartDate = StartDate
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -207,7 +261,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -219,6 +273,7 @@ public class UpdateEmployeeProfileHandlerTests
                 WorkEmail = "alice@example.com",  // same email, same employee
                 StartDate = StartDate
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -236,7 +291,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -249,6 +304,7 @@ public class UpdateEmployeeProfileHandlerTests
                 StartDate = StartDate,
                 HasSystemAccess = false
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -269,7 +325,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -282,6 +338,7 @@ public class UpdateEmployeeProfileHandlerTests
                 StartDate = StartDate,
                 HasSystemAccess = true
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -302,7 +359,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -315,6 +372,7 @@ public class UpdateEmployeeProfileHandlerTests
                 StartDate = StartDate,
                 PostCode = "not a postcode"
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -332,7 +390,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -345,6 +403,7 @@ public class UpdateEmployeeProfileHandlerTests
                 StartDate = StartDate,
                 PhoneNumber = "12345"
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -362,7 +421,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -375,6 +434,7 @@ public class UpdateEmployeeProfileHandlerTests
                 StartDate = StartDate,
                 HomePhone = "abcdefg"
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -392,7 +452,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -407,6 +467,7 @@ public class UpdateEmployeeProfileHandlerTests
                 PhoneNumber = "07700 900123",
                 HomePhone = "01234 567890"
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);

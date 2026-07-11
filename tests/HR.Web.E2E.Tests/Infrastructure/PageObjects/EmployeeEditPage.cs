@@ -239,7 +239,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     // GetByPlaceholder never matches it (see CompanyEditPage.NumericBoxByLabel for the same
     // caveat). Salary is the first e-numerictextbox in the dialog (before Hours Per Week/FTE).
     public Task FillAddCompensationSalaryAsync(string value) =>
-        TypeIntoNumericInputAsync(page.Locator(".add-compensation-dialog input.e-numerictextbox").First, value);
+        FillNumericAndVerifyAsync(page.Locator(".add-compensation-dialog input.e-numerictextbox").First, value, decimal.Parse(value));
 
     public Task FillAddCompensationCurrencyAsync(string value) =>
         page.Locator(".add-compensation-dialog").GetByPlaceholder("e.g. GBP").FillAsync(value);
@@ -281,7 +281,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         // See FillAddCompensationSalaryAsync — Salary is a FloatLabelType.Auto SfNumericTextBox,
         // so it must be targeted by its e-numerictextbox class rather than GetByPlaceholder.
-        await TypeIntoNumericInputAsync(page.Locator(".edit-future-compensation-dialog input.e-numerictextbox").First, value);
+        await FillNumericAndVerifyAsync(page.Locator(".edit-future-compensation-dialog input.e-numerictextbox").First, value, decimal.Parse(value));
     }
 
     public async Task SubmitEditCompensationDialogAsync()
@@ -304,6 +304,30 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         if (value.Length > 0)
             await input.PressSequentiallyAsync(value);
         await page.Keyboard.PressAsync("Tab");
+    }
+
+    /// <summary>
+    /// Fills a numeric input and confirms the parsed value actually stuck before returning,
+    /// retrying if not — a bare "fire and forget" fill can race with Blazor's server round-trip
+    /// for the two-way bound value (see CompanyEditPage.FillNumericAndVerifyAsync for the same
+    /// issue, originally observed with DefaultHolidayAllowance reverting after save+reload).
+    /// </summary>
+    private async Task FillNumericAndVerifyAsync(ILocator input, string value, decimal expected, int maxAttempts = 3)
+    {
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            await TypeIntoNumericInputAsync(input, value);
+
+            var actual = await input.InputValueAsync();
+            if (decimal.TryParse(actual, out var parsed) && parsed == expected)
+                return;
+
+            if (attempt < maxAttempts)
+                await page.WaitForTimeoutAsync(200);
+        }
+
+        throw new PlaywrightException(
+            $"Numeric input value did not stick after {maxAttempts} attempts: expected '{expected}', got '{await input.InputValueAsync()}'.");
     }
 
     // ── Audit Tab ───────────────────────────────────────────────────────────────

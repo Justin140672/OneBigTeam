@@ -41,6 +41,7 @@
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Assets\HR.Modules.Assets.csproj" />
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Sickness\HR.Modules.Sickness.csproj" />
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Onboarding\HR.Modules.Onboarding.csproj" />
+    <ProjectReference Include="..\..\src\Modules\HR.Modules.Offboarding\HR.Modules.Offboarding.csproj" />
     <ProjectReference Include="..\..\src\Infrastructure\HR.Infrastructure\HR.Infrastructure.csproj" />
   </ItemGroup>
 

@@ -158,6 +158,47 @@ public class AuditHistoryIntegrationTests : IClassFixture<ApiWebApplicationFacto
     }
 
     [Fact]
+    public async Task UpdateEmployeeProfile_Creates_Audit_Record_Retrievable_Via_AuditHistory_Endpoint()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = AuthenticatedClient(companyId);
+
+        var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
+
+        var updateResp = await hrAdminClient.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/profile",
+            new
+            {
+                companyId,
+                id = employeeId,
+                firstName = "Audrey",
+                lastName = "Tester",
+                workEmail = $"audit.tester.{Guid.NewGuid():N}@example.com",
+                startDate = "2026-01-01",
+                gender = "Female",
+                hasSystemAccess = true
+            });
+        updateResp.EnsureSuccessStatusCode();
+
+        var historyResp = await hrAdminClient.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/audit-history");
+        historyResp.EnsureSuccessStatusCode();
+
+        var history = await historyResp.Content.ReadFromJsonAsync<AuditHistoryPayload>();
+        Assert.NotNull(history);
+
+        var entry = Assert.Single(history!.Items, i => i.Action == "Employee profile updated");
+        Assert.Equal("Employees", entry.Module);
+        Assert.Contains(entry.Changes, c => c.Field == "First Name" && c.After == "Audrey");
+        Assert.Contains(entry.Changes, c => c.Field == "Gender" && c.After == "Female");
+
+        // GetEmployeeAuditHistoryHandler.ResolveUser renders "System" only when ActorEmployeeId is
+        // null. The HR admin has no seeded Employee record in this test, so the name itself can't
+        // resolve ("Unknown" is expected) — but proving it isn't "System" confirms the acting
+        // employee id (from the "sub" claim) is actually reaching the audit event, not being lost.
+        Assert.NotEqual("System", entry.User);
+    }
+
+    [Fact]
     public async Task UpdateCompanySettings_Persists_Audit_Record()
     {
         // No API surface exposes company-level audit events (GetEmployeeAuditHistory is scoped to

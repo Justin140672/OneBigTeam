@@ -573,6 +573,15 @@
                     </ContentTemplate>
                 </TabItem>
 
+                <TabItem>
+                    <ChildContent><TabHeader Text="Offboarding" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <EmployeeOffboardingTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
             </TabItems>
         </SfTab>
 
@@ -644,6 +653,7 @@
             {
                 "probation" => 3,
                 "onboarding" => 11,
+                "offboarding" => 12,
                 _ => 0
             };
         }

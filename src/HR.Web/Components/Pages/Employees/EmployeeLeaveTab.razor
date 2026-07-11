@@ -34,13 +34,6 @@ else
                                             <span class="fs-4 fw-semibold text-muted">n/a</span>
                                         }
                                         <div class="d-flex gap-1 mt-2">
-                                            @if (item.HasBalance)
-                                            {
-                                                <SfButton CssClass="e-outline e-small"
-                                                          OnClick="@(() => SelectHistoryLeaveType(item.LeaveTypeId, item.LeaveTypeName))">
-                                                    History
-                                                </SfButton>
-                                            }
                                             @if (item.HasBalance && Session.CanManageEmployees)
                                             {
                                                 <SfButton CssClass="e-outline e-small"
@@ -162,22 +155,15 @@ else
                 <div class="card">
                     <div class="card-header d-flex align-items-center justify-content-between">
                         <span class="fw-semibold">TOIL Balance</span>
-                        <div class="d-flex gap-1">
-                            @if (_toilBalance.HasBalance)
-                            {
-                                <SfButton CssClass="e-outline e-small"
-                                          OnClick="@(() => SelectHistoryLeaveType(_toilBalance.LeaveTypeId, _toilBalance.LeaveTypeName))">
-                                    History
-                                </SfButton>
-                            }
-                            @if (_toilBalance.HasBalance && Session.CanManageEmployees)
-                            {
+                        @if (_toilBalance.HasBalance && Session.CanManageEmployees)
+                        {
+                            <div class="d-flex gap-1">
                                 <SfButton CssClass="e-outline e-small"
                                           OnClick="@(() => OpenAdjustDialog(_toilBalance))">
                                     Adjust
                                 </SfButton>
-                            }
-                        </div>
+                            </div>
+                        }
                     </div>
                     <div class="card-body">
                         @if (_toilBalance.HasBalance)
@@ -350,12 +336,6 @@ else
         var history = await LeaveService.GetLeaveBalanceHistoryAsync(CompanyId, EmployeeId, _historyLeaveTypeId.Value);
         _historyItems = history?.Items.ToList() ?? [];
         _historyLoading = false;
-    }
-
-    private async Task SelectHistoryLeaveType(Guid leaveTypeId, string leaveTypeName)
-    {
-        _historyLeaveTypeId = leaveTypeId;
-        await LoadHistoryAsync();
     }
 
     private async Task OnHistoryLeaveTypeChanged(ChangeEventArgs<Guid?, HistoryOption> args)

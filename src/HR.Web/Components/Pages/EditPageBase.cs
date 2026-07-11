@@ -118,6 +118,16 @@ public abstract class EditPageBase : ComponentBase, IDisposable
         if (error is null)
         {
             CaptureBaseline();
+
+            // OnSavedAsync often does a forceLoad navigation (a real browser unload), and
+            // <NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" /> arms the
+            // browser's native beforeunload prompt off that same flag. Clearing the flag above
+            // only queues a re-render; without giving that render a chance to reach the client
+            // first, the browser can still unload with its old (dirty) listener attached and
+            // show "Changes that you made may not be saved" even though the save just succeeded.
+            StateHasChanged();
+            await Task.Delay(50);
+
             await OnSavedAsync();
         }
         else

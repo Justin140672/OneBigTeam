@@ -10,6 +10,7 @@ using HR.Modules.Identity;
 using HR.Modules.Leave;
 using HR.Modules.Notifications;
 using HR.Modules.Onboarding;
+using HR.Modules.Offboarding;
 using HR.Modules.Assets;
 using HR.Modules.Sickness;
 using HR.Modules.Probation;
@@ -33,6 +34,7 @@ builder.Services.AddIdentityModule(connectionString);
 builder.Services.AddLeaveModule(connectionString);
 builder.Services.AddNotificationsModule(connectionString);
 builder.Services.AddOnboardingModule(connectionString);
+builder.Services.AddOffboardingModule(connectionString);
 builder.Services.AddTasksModule(connectionString);
 builder.Services.AddProbationModule(connectionString);
 builder.Services.AddRecruitmentModule(connectionString, builder.Configuration);
@@ -98,6 +100,9 @@ DateTimeOffset? notificationsMigrationCheckedAt = null;
 var onboardingMigrationStatus = "unknown";
 string? onboardingMigrationError = null;
 DateTimeOffset? onboardingMigrationCheckedAt = null;
+var offboardingMigrationStatus = "unknown";
+string? offboardingMigrationError = null;
+DateTimeOffset? offboardingMigrationCheckedAt = null;
 var probationMigrationStatus = "unknown";
 string? probationMigrationError = null;
 DateTimeOffset? probationMigrationCheckedAt = null;
@@ -251,6 +256,19 @@ catch (Exception exception)
 
 try
 {
+	await app.Services.MigrateOffboardingAsync();
+	offboardingMigrationStatus = "succeeded";
+	offboardingMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+catch (Exception exception)
+{
+	offboardingMigrationStatus = "failed";
+	offboardingMigrationError = exception.Message;
+	offboardingMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+
+try
+{
 	await app.Services.MigrateProbationAsync();
 	await app.Services.SeedProbationAsync();
 	probationMigrationStatus = "succeeded";
@@ -369,6 +387,12 @@ app.MapGet("/health/startup-migrations", () =>
 			checkedAt = onboardingMigrationCheckedAt,
 			error = onboardingMigrationError
 		},
+		offboarding = new
+		{
+			status = offboardingMigrationStatus,
+			checkedAt = offboardingMigrationCheckedAt,
+			error = offboardingMigrationError
+		},
 		probation = new
 		{
 			status = probationMigrationStatus,
@@ -395,7 +419,7 @@ app.MapGet("/health/startup-migrations", () =>
 		}
 	};
 
-	return auditMigrationStatus == "failed" || companiesMigrationStatus == "failed" || dataImportMigrationStatus == "failed" || documentsMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed" || notificationsMigrationStatus == "failed" || tasksMigrationStatus == "failed" || onboardingMigrationStatus == "failed" || probationMigrationStatus == "failed" || assetsMigrationStatus == "failed" || sicknessMigrationStatus == "failed" || recruitmentMigrationStatus == "failed"
+	return auditMigrationStatus == "failed" || companiesMigrationStatus == "failed" || dataImportMigrationStatus == "failed" || documentsMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed" || notificationsMigrationStatus == "failed" || tasksMigrationStatus == "failed" || onboardingMigrationStatus == "failed" || offboardingMigrationStatus == "failed" || probationMigrationStatus == "failed" || assetsMigrationStatus == "failed" || sicknessMigrationStatus == "failed" || recruitmentMigrationStatus == "failed"
 		? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
 		: Results.Ok(response);
 });
@@ -415,6 +439,7 @@ app.UseAssetsRecurringJobs();
 app.UseSicknessRecurringJobs();
 app.UseRecruitmentRecurringJobs();
 app.UseOnboardingRecurringJobs();
+app.UseOffboardingRecurringJobs();
 app.UseLoggingMiddleware();
 app.UseRouting();
 app.UseAuthentication();

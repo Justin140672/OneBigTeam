@@ -180,6 +180,43 @@ internal sealed record EmergencyContactUpdatedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
+internal sealed record EmployeeProfileSnapshot(
+    string FirstName,
+    string LastName,
+    string WorkEmail,
+    string? PersonalEmail,
+    DateOnly StartDate,
+    string? PreferredName,
+    DateOnly? DateOfBirth,
+    string? Nationality,
+    string? Gender,
+    string? GenderOther,
+    Guid? DepartmentId,
+    Guid? PositionProfileId,
+    Guid? LocationId,
+    bool HasSystemAccess);
+
+internal sealed record EmployeeProfileUpdatedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid ActorEmployeeId,
+    DateTimeOffset OccurredAt,
+    EmployeeProfileSnapshot Before,
+    EmployeeProfileSnapshot After) : IAuditEvent
+{
+    string IAuditEvent.EventType => "employee.profile.updated";
+    string IAuditEvent.EntityType => "Employee";
+    Guid IAuditEvent.EntityId => EmployeeId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Employee profile updated";
+    object? IAuditEvent.Before => Before;
+    object? IAuditEvent.After => After;
+    object? IAuditEvent.Metadata => null;
+}
+
 internal sealed record ContactDetailsSnapshot(
     string? PersonalEmail,
     string? PhoneNumber,

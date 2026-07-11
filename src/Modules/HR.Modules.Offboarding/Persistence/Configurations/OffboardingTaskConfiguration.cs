@@ -1,0 +1,69 @@
+using HR.Modules.Offboarding.Domain;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace HR.Modules.Offboarding.Persistence.Configurations;
+
+internal sealed class OffboardingTaskConfiguration : IEntityTypeConfiguration<OffboardingTask>
+{
+    public void Configure(EntityTypeBuilder<OffboardingTask> builder)
+    {
+        builder.ToTable("offboarding_tasks");
+
+        builder.HasKey(t => t.Id);
+
+        builder.Property(t => t.Id)
+            .HasColumnName("id")
+            .ValueGeneratedNever();
+
+        builder.Property(t => t.CompanyId)
+            .HasColumnName("company_id")
+            .IsRequired();
+
+        builder.Property(t => t.OffboardingPlanId)
+            .HasColumnName("offboarding_plan_id")
+            .IsRequired();
+
+        builder.Property(t => t.Title)
+            .HasColumnName("title")
+            .HasMaxLength(500)
+            .IsRequired();
+
+        builder.Property(t => t.Description)
+            .HasColumnName("description")
+            .HasMaxLength(2000);
+
+        builder.Property(t => t.AssignTo)
+            .HasColumnName("assign_to")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(t => t.DueDate)
+            .HasColumnName("due_date");
+
+        builder.Property(t => t.Status)
+            .HasColumnName("status")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(t => t.CompletedAt)
+            .HasColumnName("completed_at");
+
+        builder.Property(t => t.CreatedAt)
+            .HasColumnName("created_at")
+            .IsRequired();
+
+        builder.Property(t => t.UpdatedAt)
+            .HasColumnName("updated_at")
+            .IsRequired();
+
+        builder.HasOne<OffboardingPlan>()
+            .WithMany()
+            .HasForeignKey(t => t.OffboardingPlanId);
+
+        builder.HasIndex(t => t.OffboardingPlanId);
+        builder.HasIndex(t => new { t.CompanyId, t.OffboardingPlanId });
+    }
+}
