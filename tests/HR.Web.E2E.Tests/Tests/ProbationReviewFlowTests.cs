@@ -8,9 +8,11 @@ namespace HR.Web.E2E.Tests.Tests;
 /// End-to-end smoke test verifying that completing a probation review via the task view
 /// is reflected on the employee's probation tab.
 ///
-/// Uses the seeded Carlos Rivera employee (ID: 30000000-0000-0000-0000-000000000010,
+/// Uses the seeded Sophie Laurent employee (ID: 30000000-0000-0000-0000-000000000007,
 /// company: Acme 00000000-0000-0000-0000-000000000001) who has an active ManagerCheckIn
-/// review linked to task a0000000-0000-0000-0000-000000000005.
+/// review linked to task a0000000-0000-0000-0000-000000000026. This is a separate,
+/// independent review from the Carlos Rivera scenario used by ProbationReviewTaskTests,
+/// so completing it here does not affect that test's read-only assertions.
 ///
 /// This test is designed to be resilient: if another test has already completed the review,
 /// this test simply verifies the completed state is visible on the probation tab.
@@ -20,8 +22,8 @@ public sealed class ProbationReviewFlowTests(AppFixture fixture) : E2ETestBase(f
 {
     private static readonly Guid AcmeId           = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid SarahId           = Guid.Parse("30000000-0000-0000-0000-000000000001");
-    private static readonly Guid CarlosRivera      = Guid.Parse("30000000-0000-0000-0000-000000000010");
-    private static readonly Guid ProbationTaskId   = Guid.Parse("a0000000-0000-0000-0000-000000000005");
+    private static readonly Guid SophieLaurent     = Guid.Parse("30000000-0000-0000-0000-000000000007");
+    private static readonly Guid ProbationTaskId   = Guid.Parse("a0000000-0000-0000-0000-000000000026");
 
     private const string SarahEmail = "sarah.chen@acme.example";
     private const string LauraEmail = "laura.bennett@acme.example";
@@ -47,7 +49,7 @@ public sealed class ProbationReviewFlowTests(AppFixture fixture) : E2ETestBase(f
         if (statusBefore != "Completed")
         {
             await taskView.EnterReviewNotesAsync(
-                "Manager check-in complete. Carlos is meeting all objectives.");
+                "Manager check-in complete. Sophie is meeting all objectives.");
             await taskView.CompleteReviewAsync();
         }
 
@@ -57,7 +59,7 @@ public sealed class ProbationReviewFlowTests(AppFixture fixture) : E2ETestBase(f
 
         await login.SwitchAccountAsync(LauraEmail);
 
-        await empEdit.GoToAsync(AcmeId, CarlosRivera);
+        await empEdit.GoToAsync(AcmeId, SophieLaurent);
         await empEdit.OpenProbationTabAsync();
 
         var reviewStatus = await empEdit.GetReviewStatusInGridAsync("Manager Check-in");
@@ -78,7 +80,7 @@ public sealed class ProbationReviewFlowTests(AppFixture fixture) : E2ETestBase(f
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await empEdit.GoToAsync(AcmeId, CarlosRivera);
+        await empEdit.GoToAsync(AcmeId, SophieLaurent);
         await empEdit.OpenProbationTabAsync();
 
         Assert.True(await empEdit.HasProbationReviewsGridAsync(),

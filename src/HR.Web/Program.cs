@@ -43,6 +43,7 @@ builder.Services.AddScoped<DocumentTypeService>();
 builder.Services.AddScoped<SicknessCategoryService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<ProbationService>();
+builder.Services.AddScoped<OnboardingService>();
 builder.Services.AddScoped<CompensationService>();
 builder.Services.AddScoped<AuditHistoryService>();
 builder.Services.AddScoped<SicknessService>();

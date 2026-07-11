@@ -231,6 +231,57 @@ public class GetOnboardingOverviewHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Surfaces_CreatedAt_UpdatedAt_And_Null_CompletedAt_For_Pending_Task()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var plan = SeedPlan(db, companyId, employeeId, Now, OnboardingStatus.InProgress);
+        var task = SeedTask(db, companyId, plan.Id, Now, "Complete paperwork");
+        await db.SaveChangesAsync();
+
+        var handler = BuildHandler(db);
+        var result = await handler.HandleAsync(
+            new GetOnboardingOverviewRequest { CompanyId = companyId, EmployeeId = employeeId },
+            CancellationToken.None);
+
+        Assert.Single(result.Tasks);
+        var item = result.Tasks[0];
+        Assert.Equal(task.CreatedAt, item.CreatedAt);
+        Assert.Null(item.CompletedAt);
+        Assert.Equal(task.UpdatedAt, item.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Surfaces_CompletedAt_Matching_Completion_Time_For_Completed_Task()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var completedAt = Now.AddDays(3);
+
+        var plan = SeedPlan(db, companyId, employeeId, Now, OnboardingStatus.InProgress);
+        var task = OnboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, "Sign contract", null,
+            OnboardingTemplateTaskAssignTo.Unassigned, null, Now);
+        task.Complete(completedAt);
+        db.OnboardingTasks.Add(task);
+        await db.SaveChangesAsync();
+
+        var handler = BuildHandler(db);
+        var result = await handler.HandleAsync(
+            new GetOnboardingOverviewRequest { CompanyId = companyId, EmployeeId = employeeId },
+            CancellationToken.None);
+
+        Assert.Single(result.Tasks);
+        var item = result.Tasks[0];
+        Assert.Equal(Now, item.CreatedAt);
+        Assert.Equal(completedAt, item.CompletedAt);
+        Assert.Equal(completedAt, item.UpdatedAt);
+    }
+
+    [Fact]
     public async Task HandleAsync_Does_Not_Return_Plan_For_Different_Company()
     {
         await using var db = BuildContext();

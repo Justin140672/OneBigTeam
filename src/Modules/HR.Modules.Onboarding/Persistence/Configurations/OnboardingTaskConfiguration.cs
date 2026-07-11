@@ -48,6 +48,9 @@ internal sealed class OnboardingTaskConfiguration : IEntityTypeConfiguration<Onb
             .HasMaxLength(20)
             .IsRequired();
 
+        builder.Property(t => t.CompletedAt)
+            .HasColumnName("completed_at");
+
         builder.Property(t => t.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

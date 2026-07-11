@@ -11,8 +11,10 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Uses Tom Williams (tom.williams@acme.example) who has:
 ///   - acknowledgement task a0000000-…-0020 (MacBook Pro — completed by AssetAcknowledgementTaskTests)
 ///
-/// Note: Sarah Chen (sarah.chen@acme.example) is seeded as CompanyAdministrator-only and is
-/// redirected away from "/" straight to her company edit page, so she can no longer reach the
+/// Note: Sarah Chen (sarah.chen@acme.example) is seeded as CompanyAdministrator + Manager (the
+/// Manager role is needed so she satisfies the "probation:review" policy for reviews she's
+/// assigned as manager on — it does not grant EmployeeEdit, so she still lacks CanManageEmployees
+/// and is redirected away from "/" straight to her company edit page, unable to reach the
 /// dashboard. Laura (HrAdministrator) has full dashboard access and was given parallel seed
 /// data (see TasksModule.SeedTasksAsync/AssetsModule.SeedAssetsAsync) for these widget checks.
 /// </summary>

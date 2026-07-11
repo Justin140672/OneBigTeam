@@ -1,0 +1,81 @@
+@using HR.Web.Models
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Onboarding Timeline</h5>
+    </div>
+    <div class="card-body p-0">
+        @if (_entries.Count == 0)
+        {
+            <p class="text-muted small p-3 mb-0">No timeline events yet.</p>
+        }
+        else
+        {
+            <ul class="list-group list-group-flush">
+                @foreach (var entry in _entries)
+                {
+                    <li class="list-group-item d-flex align-items-start gap-3">
+                        <span class="badge text-bg-light border text-muted flex-shrink-0" style="min-width: 100px;">
+                            @entry.Timestamp.LocalDateTime.ToString("d MMM yyyy")
+                        </span>
+                        <div>
+                            <div class="fw-medium">@entry.Title</div>
+                            @if (!string.IsNullOrWhiteSpace(entry.Description))
+                            {
+                                <div class="text-muted small">@entry.Description</div>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public OnboardingOverviewModel Overview { get; set; } = null!;
+
+    private List<TimelineEntry> _entries = [];
+
+    protected override void OnParametersSet()
+    {
+        var entries = new List<TimelineEntry>();
+
+        if (Overview.StartDate.HasValue)
+        {
+            entries.Add(new TimelineEntry(
+                ToTimestamp(Overview.StartDate.Value),
+                "Onboarding plan started",
+                null));
+        }
+
+        foreach (var task in Overview.Tasks)
+        {
+            entries.Add(new TimelineEntry(task.CreatedAt, $"Task added: {task.Title}", null));
+
+            if (task.DueDate.HasValue)
+            {
+                entries.Add(new TimelineEntry(
+                    ToTimestamp(task.DueDate.Value),
+                    $"Task due: {task.Title}",
+                    null));
+            }
+
+            if (task.CompletedAt.HasValue)
+            {
+                entries.Add(new TimelineEntry(task.CompletedAt.Value, $"Task completed: {task.Title}", null));
+            }
+            else if (task.Status == "Skipped")
+            {
+                entries.Add(new TimelineEntry(task.UpdatedAt, $"Task skipped: {task.Title}", null));
+            }
+        }
+
+        _entries = entries.OrderBy(e => e.Timestamp).ToList();
+    }
+
+    private static DateTimeOffset ToTimestamp(DateOnly date) =>
+        new(date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+
+    private sealed record TimelineEntry(DateTimeOffset Timestamp, string Title, string? Description);
+}

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 
@@ -107,6 +108,35 @@ public class GetOnboardingOverviewEndpointTests : IClassFixture<ApiWebApplicatio
 
         Assert.NotNull(payload.Probation);
         Assert.Equal("Active", payload.Probation!.Status);
+    }
+
+    [Fact]
+    public async Task Get_OnboardingOverview_Surfaces_CompletedAt_For_Completed_Task_And_Null_For_Pending_Task()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+
+        var employeeId = await CreateEmployeeAsync(client, companyId, positionProfileId: null);
+
+        await CompleteUnassignedOnboardingTaskAsync(client, companyId, "Set up workstation");
+
+        var response = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/onboarding-overview");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<OverviewPayload>();
+        Assert.NotNull(payload);
+
+        var completedTask = Assert.Single(payload!.Tasks, t => t.Title.Contains("Set up workstation"));
+        Assert.Equal("Completed", completedTask.Status);
+        Assert.NotNull(completedTask.CompletedAt);
+        Assert.True(completedTask.CompletedAt >= completedTask.CreatedAt);
+        Assert.Equal(completedTask.CompletedAt, completedTask.UpdatedAt);
+
+        var pendingTask = Assert.Single(payload.Tasks, t => t.Title.Contains("Send welcome email"));
+        Assert.Equal("Pending", pendingTask.Status);
+        Assert.Null(pendingTask.CompletedAt);
+        Assert.Equal(pendingTask.CreatedAt, pendingTask.UpdatedAt);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -219,7 +249,26 @@ public class GetOnboardingOverviewEndpointTests : IClassFixture<ApiWebApplicatio
         resp.EnsureSuccessStatusCode();
     }
 
+    private async Task<Guid> CompleteUnassignedOnboardingTaskAsync(HttpClient client, Guid companyId, string titleContains)
+    {
+        var listResp = await client.GetAsync($"/api/companies/{companyId}/tasks/unassigned");
+        listResp.EnsureSuccessStatusCode();
+        var payload = await listResp.Content.ReadFromJsonAsync<UnassignedTasksPayload>();
+        var task = payload!.Items.Single(t => t.Source == "Onboarding" && t.Title.Contains(titleContains));
+
+        var completeResp = await client.PostAsync(
+            $"/api/companies/{companyId}/tasks/{task.Id}/complete",
+            new StringContent("{}", Encoding.UTF8, "application/json"));
+        completeResp.EnsureSuccessStatusCode();
+
+        return task.Id;
+    }
+
     private sealed record IdPayload(Guid Id);
+
+    private sealed record UnassignedTasksPayload(IReadOnlyList<UnassignedTaskPayload> Items);
+
+    private sealed record UnassignedTaskPayload(Guid Id, string Title, string? Source);
 
     private sealed record OverviewPayload(
         Guid EmployeeId,
@@ -231,7 +280,14 @@ public class GetOnboardingOverviewEndpointTests : IClassFixture<ApiWebApplicatio
         List<AssetAcknowledgementItemPayload> OutstandingAssetAcknowledgements,
         ProbationSummaryPayload? Probation);
 
-    private sealed record OnboardingTaskItemPayload(Guid Id, string Title, string Status, DateOnly? DueDate);
+    private sealed record OnboardingTaskItemPayload(
+        Guid Id,
+        string Title,
+        string Status,
+        DateOnly? DueDate,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset? CompletedAt,
+        DateTimeOffset UpdatedAt);
 
     private sealed record DocumentRequestItemPayload(Guid Id, string DocumentTypeName, DateOnly? DueDate, bool IsMandatory);
 

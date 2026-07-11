@@ -7,6 +7,7 @@
 @using HR.Web.Components.Pages.Recruitment
 @using HR.Web.Components.Pages.Leave
 @using HR.Web.Components.Pages.Employees
+@using HR.Web.Components.Pages.Onboarding
 @inject AppSession Session
 @inject NavigationManager Navigation
 
@@ -31,6 +32,7 @@
             <div class="dashboard-detail-grid">
                 <HrInboxWidget />
                 <MyTasksWidget />
+                <MyOnboardingTasksWidget />
                 <TeamTasksWidget />
                 <LeaveRequestsWidget />
             </div>
@@ -40,6 +42,7 @@
             <h2 class="dashboard-section-title">People &amp; Wellbeing</h2>
             <div class="dashboard-detail-grid">
                 <UpcomingProbationReviewsWidget />
+                <TeamOnboardingWidget />
                 <RecruitmentSummaryWidget />
                 <MyAssetsWidget />
                 <CurrentSicknessAbsenceWidget />

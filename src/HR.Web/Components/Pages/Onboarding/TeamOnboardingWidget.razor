@@ -1,0 +1,109 @@
+@inject OnboardingService OnboardingService
+@inject NavigationManager Navigation
+@inject AppSession Session
+
+@if (Session.CanManageEmployees && Session.EmployeeId.HasValue)
+{
+    @if (_loading)
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-route widget-icon"></i>
+                <span class="widget-title">Team Onboarding</span>
+            </div>
+            <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
+                <HrLoadingIndicator />
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-route widget-icon"></i>
+                <span class="widget-title">Team Onboarding</span>
+                @if (_items.Count > 0)
+                {
+                    <span class="widget-count-badge">@_items.Count</span>
+                }
+            </div>
+
+            @if (_notStarted > 0)
+            {
+                <div class="widget-stats">
+                    <div class="widget-stat">
+                        <span class="widget-stat-value">@_notStarted</span>
+                        <span class="widget-stat-label">not started</span>
+                    </div>
+                </div>
+            }
+
+            <div class="widget-body">
+                @if (_items.Count == 0)
+                {
+                    <div class="widget-empty">
+                        <i class="fa-solid fa-circle-check fa-lg mb-2"></i>
+                        <p class="mb-0">No employees currently onboarding</p>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var item in _items.Take(5))
+                    {
+                        var r = item;
+                        var url = $"/companies/{Session.CompanyId}/employees/{r.EmployeeId}?tab=onboarding";
+                        <div class="task-widget-item"
+                             @onclick="() => Navigation.NavigateTo(url)">
+                            <span class="priority-pip priority-pip--@StatusPip(r.PlanStatus)"></span>
+                            <div class="task-widget-content">
+                                <span class="task-widget-title">@r.EmployeeName</span>
+                                <span class="task-widget-meta">@StatusLabel(r.PlanStatus) &middot; @r.CompletedTasks/@r.TotalTasks tasks</span>
+                            </div>
+                            <span class="due-badge due-badge--@PercentCss(r.PercentComplete)">@r.PercentComplete%</span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private IReadOnlyList<TeamOnboardingItem> _items = [];
+    private int _notStarted;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.CanManageEmployees || !Session.EmployeeId.HasValue)
+        {
+            _loading = false;
+            return;
+        }
+
+        var result = await OnboardingService.GetTeamOnboardingAsync(Session.CompanyId, Session.EmployeeId.Value);
+        _items = result?.Items ?? [];
+
+        _notStarted = _items.Count(i => i.PlanStatus == "NotStarted");
+        _loading = false;
+    }
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "NotStarted" => "Not Started",
+        "InProgress" => "In Progress",
+        _            => status
+    };
+
+    private static string StatusPip(string status) => status switch
+    {
+        "NotStarted" => "medium",
+        "InProgress" => "low",
+        _            => "low"
+    };
+
+    private static string PercentCss(int percent) =>
+        percent >= 100 ? "normal" :
+        percent >= 50  ? "soon" :
+        "today";
+}

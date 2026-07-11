@@ -1,0 +1,139 @@
+@using HR.Web.Models
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Onboarding Checklist</h5>
+    </div>
+    <div class="card-body p-0">
+        @if (Overview.Tasks.Count == 0)
+        {
+            <p class="text-muted small p-3 mb-0">No onboarding tasks have been created for this plan.</p>
+        }
+        else
+        {
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Task</th>
+                        <th width="130">Due Date</th>
+                        <th width="130">Status</th>
+                        <th width="150">Completed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Overview.Tasks.OrderBy(t => t.DueDate ?? DateOnly.MaxValue))
+                    {
+                        var (css, label) = GetTaskBadge(t);
+                        <tr>
+                            <td class="align-middle">@t.Title</td>
+                            <td class="align-middle text-muted small">
+                                @(t.DueDate?.ToString("d MMM yyyy") ?? "—")
+                            </td>
+                            <td class="align-middle">
+                                <span class="badge @css">@label</span>
+                            </td>
+                            <td class="align-middle text-muted small">
+                                @(t.CompletedAt?.LocalDateTime.ToString("d MMM yyyy") ?? "—")
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@if (Overview.OutstandingDocumentRequests.Count > 0)
+{
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Outstanding Document Requests</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Document Type</th>
+                        <th width="130">Due Date</th>
+                        <th width="120">Mandatory</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in Overview.OutstandingDocumentRequests)
+                    {
+                        <tr>
+                            <td class="align-middle">@d.DocumentTypeName</td>
+                            <td class="align-middle text-muted small">
+                                @(d.DueDate?.ToString("d MMM yyyy") ?? "—")
+                            </td>
+                            <td class="align-middle">
+                                @if (d.IsMandatory)
+                                {
+                                    <span class="badge text-bg-warning">Mandatory</span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-secondary">Optional</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@if (Overview.OutstandingAssetAcknowledgements.Count > 0)
+{
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Outstanding Asset Acknowledgements</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Asset</th>
+                        <th width="150">Assigned</th>
+                        <th width="130">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in Overview.OutstandingAssetAcknowledgements)
+                    {
+                        <tr>
+                            <td class="align-middle">@a.AssetLabel</td>
+                            <td class="align-middle text-muted small">
+                                @a.AssignedAt.LocalDateTime.ToString("d MMM yyyy")
+                            </td>
+                            <td class="align-middle">
+                                <span class="badge text-bg-warning">Pending</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public OnboardingOverviewModel Overview { get; set; } = null!;
+
+    private static (string Css, string Label) GetTaskBadge(OnboardingTaskOverviewItem t)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (t.Status == "Pending" && t.DueDate.HasValue && t.DueDate.Value < today)
+            return ("text-bg-danger", "Overdue");
+
+        return t.Status switch
+        {
+            "Pending"     => ("text-bg-secondary", "Pending"),
+            "InProgress"  => ("text-bg-primary",    "In Progress"),
+            "Completed"   => ("text-bg-success",    "Completed"),
+            "Skipped"     => ("text-bg-secondary",  "Skipped"),
+            _             => ("text-bg-secondary",  t.Status),
+        };
+    }
+}

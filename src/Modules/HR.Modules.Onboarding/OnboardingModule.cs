@@ -1,6 +1,7 @@
 using HR.Modules.Onboarding.Features.CompleteOnboardingTaskFromTask;
 using HR.Modules.Onboarding.Features.CreateOnboardingPlanOnEmployeeCreated;
 using HR.Modules.Onboarding.Features.GetOnboardingOverview;
+using HR.Modules.Onboarding.Features.GetTeamOnboarding;
 using HR.Modules.Onboarding.Jobs;
 using HR.Modules.Onboarding.Persistence;
 using HR.SharedKernel;
@@ -25,6 +26,7 @@ public static class OnboardingModule
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddScoped<ITaskCompletionAction, CompleteOnboardingTaskFromTaskAction>();
         services.AddScoped<GetOnboardingOverviewHandler>();
+        services.AddScoped<GetTeamOnboardingHandler>();
         services.AddScoped<OnboardingReminderJob>();
 
         return services;

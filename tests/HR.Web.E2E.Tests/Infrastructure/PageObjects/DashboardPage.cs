@@ -140,8 +140,9 @@ public sealed class DashboardPage(IPage page, string baseUrl)
     }
 
     /// <summary>
-    /// Clicks the asset item whose name contains <paramref name="assetNameFragment"/>
-    /// and waits for navigation to the asset detail page.
+    /// Clicks the asset item whose name contains <paramref name="assetNameFragment"/>.
+    /// This opens AssetDetailDialog in place (no navigation) — use AssetDetailPage's
+    /// getters (which read testids without requiring GoToAsync) to inspect the opened asset.
     /// </summary>
     public async Task ClickMyAssetAsync(string assetNameFragment)
     {
@@ -152,7 +153,7 @@ public sealed class DashboardPage(IPage page, string baseUrl)
             .First;
 
         await item.ClickAsync();
-        await page.WaitForURLAsync(new Regex("/assets/"), new() { Timeout = 15_000 });
+        await page.WaitForSelectorAsync("[data-testid='asset-detail-content']", new() { Timeout = 15_000 });
     }
 
     // ── Recruitment Summary Widget ────────────────────────────────────────────
@@ -210,5 +211,89 @@ public sealed class DashboardPage(IPage page, string baseUrl)
     {
         var widget = page.Locator(".widget-card").Filter(new() { HasText = widgetTitle }).First;
         await widget.Locator(".task-widget-item, .widget-empty").First.WaitForAsync(new() { Timeout = 15_000 });
+    }
+
+    // ── My Onboarding Tasks Widget ────────────────────────────────────────────
+
+    private ILocator MyOnboardingTasksWidget =>
+        page.Locator(".widget-card").Filter(new() { HasText = "My Onboarding Tasks" }).First;
+
+    /// <summary>Waits for the My Onboarding Tasks widget to finish loading (spinner gone).</summary>
+    private async Task WaitForMyOnboardingTasksWidgetAsync() =>
+        await MyOnboardingTasksWidget
+            .Locator(".task-widget-item, .widget-empty")
+            .First
+            .WaitForAsync(new() { Timeout = 15_000 });
+
+    /// <summary>Returns true if the My Onboarding Tasks widget header is visible on the dashboard.</summary>
+    public async Task<bool> HasMyOnboardingTasksWidgetAsync() =>
+        await page.Locator(".widget-header")
+            .Filter(new() { HasText = "My Onboarding Tasks" })
+            .IsVisibleAsync();
+
+    /// <summary>Returns the task titles currently shown in the My Onboarding Tasks widget.</summary>
+    public async Task<IReadOnlyList<string>> GetMyOnboardingTaskTitlesAsync()
+    {
+        await WaitForMyOnboardingTasksWidgetAsync();
+
+        var titles = await MyOnboardingTasksWidget.Locator(".task-widget-title").AllAsync();
+        var names  = new List<string>();
+        foreach (var t in titles)
+            names.Add((await t.TextContentAsync())?.Trim() ?? "");
+        return names;
+    }
+
+    /// <summary>Returns true if the My Onboarding Tasks widget shows the "All caught up!" empty state.</summary>
+    public async Task<bool> IsMyOnboardingTasksWidgetEmptyAsync()
+    {
+        await WaitForMyOnboardingTasksWidgetAsync();
+        return await MyOnboardingTasksWidget.Locator(".widget-empty").IsVisibleAsync();
+    }
+
+    /// <summary>
+    /// Clicks the first item in the My Onboarding Tasks widget whose title contains
+    /// <paramref name="titleFragment"/>. Opens TaskViewDialog in place (no navigation) — use
+    /// TaskViewPage.WaitForLoadedAsync (or its own methods, which wait internally) to read the
+    /// opened task's content.
+    /// </summary>
+    public async Task ClickMyOnboardingTaskAsync(string titleFragment)
+    {
+        await WaitForMyOnboardingTasksWidgetAsync();
+
+        var item = MyOnboardingTasksWidget.Locator(".task-widget-item")
+            .Filter(new() { HasText = titleFragment })
+            .First;
+
+        await item.ClickAsync();
+        await page.WaitForSelectorAsync(".task-view-dialog", new() { Timeout = 15_000 });
+    }
+
+    // ── Team Onboarding Widget ─────────────────────────────────────────────────
+
+    /// <summary>Returns true if the Team Onboarding widget header is visible.</summary>
+    public async Task<bool> HasTeamOnboardingWidgetAsync() =>
+        await page.Locator(".widget-header")
+            .Filter(new() { HasText = "Team Onboarding" })
+            .IsVisibleAsync();
+
+    /// <summary>
+    /// Returns the employee names shown in the Team Onboarding widget items.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetTeamOnboardingEmployeeNamesAsync()
+    {
+        var teamOnboardingWidget = page.Locator(".widget-card")
+            .Filter(new() { HasText = "Team Onboarding" });
+
+        // Wait for the widget to finish loading — items or empty state replaces the spinner.
+        await teamOnboardingWidget
+            .Locator(".task-widget-item, .widget-empty")
+            .First
+            .WaitForAsync(new() { Timeout = 15_000 });
+
+        var titles = await teamOnboardingWidget.Locator(".task-widget-title").AllAsync();
+        var names  = new List<string>();
+        foreach (var t in titles)
+            names.Add((await t.TextContentAsync())?.Trim() ?? "");
+        return names;
     }
 }

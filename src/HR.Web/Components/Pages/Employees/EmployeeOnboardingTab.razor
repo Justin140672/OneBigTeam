@@ -1,0 +1,32 @@
+@using HR.Web.Models
+@inject OnboardingService OnboardingService
+
+@if (_loading)
+{
+    <HrLoadingIndicator />
+}
+else if (_overview is null || !_overview.HasPlan)
+{
+    <HrEmptyState Message="No onboarding plan found for this employee." Icon="fa-solid fa-user-plus" />
+}
+else
+{
+    <OnboardingProgressPanel Overview="_overview" />
+    <OnboardingChecklist Overview="_overview" />
+    <OnboardingTimeline Overview="_overview" />
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private bool _loading = true;
+    private OnboardingOverviewModel? _overview;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _overview = await OnboardingService.GetOverviewAsync(CompanyId, EmployeeId);
+        _loading = false;
+    }
+}

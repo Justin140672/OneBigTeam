@@ -14,6 +14,7 @@ internal sealed class OnboardingTask
     public OnboardingTemplateTaskAssignTo AssignTo { get; private set; }
     public DateOnly? DueDate { get; private set; }
     public OnboardingTaskStatus Status { get; private set; }
+    public DateTimeOffset? CompletedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -45,6 +46,7 @@ internal sealed class OnboardingTask
     public void Complete(DateTimeOffset now)
     {
         Status = OnboardingTaskStatus.Completed;
+        CompletedAt = now;
         UpdatedAt = now;
     }
 

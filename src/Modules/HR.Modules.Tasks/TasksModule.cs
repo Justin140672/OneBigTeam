@@ -212,6 +212,22 @@ public static class TasksModule
             now,
             sourceEntityId: Guid.Parse("50000000-0000-0000-0000-000000000100")));
 
+        // Second, independent probation review task — linked to the second active seeded
+        // review in ProbationModule seed (Sophie Laurent). Kept separate from the Carlos
+        // Rivera task above so ProbationReviewFlowTests (which completes this review) does not
+        // mutate the review that ProbationReviewTaskTests relies on staying open.
+        // Assigned to Sarah (dev user) so it appears in her task list during E2E tests.
+        db.TaskItems.Add(TaskItem.Create(
+            Guid.Parse("a0000000-0000-0000-0000-000000000026"), companyId, empCtoId,
+            "Complete probation review — Sophie Laurent",
+            "Probation manager check-in due 7 May 2026.",
+            TaskPriority.High, TaskSource.Probation, TaskActionType.Review,
+            new DateOnly(2026, 5, 7),
+            assignedEmployeeId: empCtoId,
+            assignedUserId: devUserId,
+            now,
+            sourceEntityId: Guid.Parse("50000000-0000-0000-0000-000000000101")));
+
         // Asset acknowledgement tasks — linked to seeded AssetAssignments in AssetsModule seed.
         db.TaskItems.Add(TaskItem.Create(
             Guid.Parse("a0000000-0000-0000-0000-000000000020"), companyId, empCtoId,

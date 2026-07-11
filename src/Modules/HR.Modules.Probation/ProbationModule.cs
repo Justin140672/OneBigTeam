@@ -152,6 +152,28 @@ public static class ProbationModule
             activeReviewId, acmeId, activeRecordId,
             ProbationReviewType.ManagerCheckIn, new DateOnly(2026, 5, 7), now));
 
+        // Second, independent active probation — Sophie Laurent under Sarah Chen.
+        // Sophie does not appear in the completed-probation-loop `entries` array above and is
+        // not the Carlos Rivera active scenario, so this record/review is not shared with any
+        // other seeded scenario. Kept deliberately separate from the Carlos Rivera review so
+        // that E2E tests which complete a review (ProbationReviewFlowTests) don't mutate the
+        // same review that other E2E tests (ProbationReviewTaskTests) rely on staying open.
+        // Fixed IDs so the UI/E2E tests can navigate directly to this review.
+        var activeRecord2Id = Guid.Parse("40000000-0000-0000-0000-000000000011");
+        var activeReview2Id = Guid.Parse("50000000-0000-0000-0000-000000000101");
+        var empSophieId     = Guid.Parse("30000000-0000-0000-0000-000000000007");
+        var empSarahId      = Guid.Parse("30000000-0000-0000-0000-000000000001");
+
+        var activeRecord2 = ProbationRecord.Create(
+            activeRecord2Id, acmeId, empSophieId, empSarahId,
+            new DateOnly(2026, 4, 7), new DateOnly(2026, 7, 7), null, now);
+        activeRecord2.MarkReviewDue(now);
+        db.ProbationRecords.Add(activeRecord2);
+
+        db.ProbationReviews.Add(ProbationReview.Create(
+            activeReview2Id, acmeId, activeRecord2Id,
+            ProbationReviewType.ManagerCheckIn, new DateOnly(2026, 5, 7), now));
+
         await db.SaveChangesAsync();
     }
 }

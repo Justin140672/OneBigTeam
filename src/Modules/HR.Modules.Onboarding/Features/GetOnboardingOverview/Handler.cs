@@ -53,7 +53,8 @@ internal sealed class GetOnboardingOverviewHandler(
             .ToListAsync(cancellationToken);
 
         var taskItems = tasks
-            .Select(t => new OnboardingTaskOverviewItem(t.Id, t.Title, t.Status.ToString(), t.DueDate))
+            .Select(t => new OnboardingTaskOverviewItem(
+                t.Id, t.Title, t.Status.ToString(), t.DueDate, t.CreatedAt, t.CompletedAt, t.UpdatedAt))
             .ToList();
 
         return new GetOnboardingOverviewResponse(

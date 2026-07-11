@@ -19,7 +19,9 @@ namespace HR.Web.E2E.Tests.Tests;
 ///   - Carlos Rivera (carlos.rivera@acme.example) has an employee record but no asset
 ///     assignments → widget shows empty state.
 ///
-/// Note: Sarah Chen is seeded as CompanyAdministrator-only, and per Home.razor's redirect logic
+/// Note: Sarah Chen is seeded as CompanyAdministrator + Manager (Manager grants no
+/// EmployeeEdit — it's needed only so she satisfies the "probation:review" policy for
+/// reviews she's assigned as manager on), and per Home.razor's redirect logic
 /// (CanManageCompany &amp;&amp; !CanManageEmployees), she is sent straight to her company edit page
 /// instead of "/" and can never reach the dashboard. The "Pending" badge scenario previously
 /// covered by Sarah below now uses Laura, who was given a parallel unacknowledged asset
@@ -29,8 +31,7 @@ namespace HR.Web.E2E.Tests.Tests;
 [Collection("E2E")]
 public sealed class MyAssetsWidgetTests(AppFixture fixture) : E2ETestBase(fixture)
 {
-    private static readonly Guid AcmeId     = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private static readonly Guid TomAssetId = Guid.Parse("c0000000-0000-0000-0000-000000000002");
+    private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string TomEmail    = "tom.williams@acme.example";
     private const string LauraEmail  = "laura.bennett@acme.example";
@@ -121,18 +122,20 @@ public sealed class MyAssetsWidgetTests(AppFixture fixture) : E2ETestBase(fixtur
     }
 
     [Fact]
-    public async Task Dashboard_MyAssetsWidget_ClickingAsset_NavigatesToAssetDetailPage()
+    public async Task Dashboard_MyAssetsWidget_ClickingAsset_OpensAssetDetailDialog()
     {
-        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
-        var dashboard = new DashboardPage(_page, _fixture.WebBaseUrl);
+        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard   = new DashboardPage(_page, _fixture.WebBaseUrl);
+        var assetDetail = new AssetDetailPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
         await dashboard.GoToAsync();
 
+        // Clicking an asset item opens AssetDetailDialog in place (no navigation).
         await dashboard.ClickMyAssetAsync("MacBook");
 
-        Assert.Contains($"/assets/{TomAssetId}/view", _page.Url,
+        Assert.Contains("MacBook", await assetDetail.GetAssetNameAsync(),
             StringComparison.OrdinalIgnoreCase);
     }
 }

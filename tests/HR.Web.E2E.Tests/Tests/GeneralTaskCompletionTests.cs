@@ -10,7 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Uses Sarah Chen's seeded task "Review Q2 performance reports"
 /// (ID: a0000000-0000-0000-0000-000000000001), accessed directly via her own profile Tasks
 /// tab (a self-service route unaffected by the "/" dashboard redirect that now applies to her
-/// CompanyAdministrator-only role — see Home.razor).
+/// CompanyAdministrator + Manager role, which still lacks EmployeeEdit — see Home.razor).
 ///
 /// The dashboard-widget check (<see cref="Dashboard_ShowsGeneralTasksForEmployee"/>) uses Laura
 /// Bennett instead, since Sarah is redirected away from "/" and can never reach it.

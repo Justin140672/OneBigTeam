@@ -25,6 +25,17 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
     }
 
+    /// <summary>
+    /// Navigates directly to the employee edit page with a query string appended (e.g.
+    /// "tab=onboarding") — used to verify deep-link tab activation (see EmployeeEdit.razor's
+    /// LoadAsync, which maps the "tab" query parameter to an initial SfTab selected index).
+    /// </summary>
+    public async Task GoToAsync(Guid companyId, Guid employeeId, string query)
+    {
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}?{query}");
+        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+    }
+
     // ── New Employee — Personal Information ───────────────────────────────────
 
     public async Task FillFirstNameAsync(string value) =>
@@ -489,5 +500,59 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             .ClickAsync();
         await page.Locator("[role='dialog'].close-sickness-record-dialog")
             .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
+
+    // ── Onboarding Tab ──────────────────────────────────────────────────────────
+
+    public async Task OpenOnboardingTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }).ClickAsync();
+        // Wait for the tab content to render — either the progress panel's progress bar
+        // (a plan exists) or the "No onboarding plan found for this employee" empty state.
+        await page.WaitForSelectorAsync(".progress, .hr-empty-state", new() { Timeout = 15_000 });
+    }
+
+    /// <summary>Returns true if the onboarding progress panel (status badge + progress bar) is visible.</summary>
+    public async Task<bool> HasOnboardingProgressPanelAsync() =>
+        await page.Locator(".progress").IsVisibleAsync();
+
+    /// <summary>Returns true if the Onboarding Checklist card is visible.</summary>
+    public async Task<bool> HasOnboardingChecklistAsync() =>
+        await page.Locator(".card-header:has-text('Onboarding Checklist')").IsVisibleAsync();
+
+    /// <summary>Returns true if the Onboarding Timeline card is visible.</summary>
+    public async Task<bool> HasOnboardingTimelineAsync() =>
+        await page.Locator(".card-header:has-text('Onboarding Timeline')").IsVisibleAsync();
+
+    /// <summary>Returns the text of the onboarding plan status badge on the progress panel.</summary>
+    public async Task<string?> GetOnboardingStatusBadgeTextAsync()
+    {
+        var badge = page.Locator(".card .badge").First;
+        return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
+    }
+
+    /// <summary>
+    /// Returns the current onboarding progress percentage, read from the progress bar's
+    /// aria-valuenow attribute (more robust than scraping the "NN%" caption text).
+    /// </summary>
+    public async Task<int> GetOnboardingProgressPercentAsync()
+    {
+        var bar = page.Locator(".progress .progress-bar");
+        var value = await bar.GetAttributeAsync("aria-valuenow");
+        return int.TryParse(value, out var percent) ? percent : 0;
+    }
+
+    /// <summary>
+    /// Returns the status badge text ("Pending"/"In Progress"/"Completed"/"Overdue"/"Skipped")
+    /// for the Onboarding Checklist row whose Task cell contains <paramref name="taskTitleFragment"/>.
+    /// Scoped to the "Onboarding Checklist" card specifically, since the Outstanding Document
+    /// Requests / Outstanding Asset Acknowledgements cards below it share the same table classes.
+    /// </summary>
+    public async Task<string?> GetOnboardingChecklistTaskStatusAsync(string taskTitleFragment)
+    {
+        var checklistCard = page.Locator(".card").Filter(new() { HasText = "Onboarding Checklist" }).First;
+        var row = checklistCard.Locator("table tbody tr").Filter(new() { HasText = taskTitleFragment }).First;
+        var badge = row.Locator(".badge");
+        return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
 }

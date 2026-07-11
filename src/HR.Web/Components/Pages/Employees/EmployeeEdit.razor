@@ -564,6 +564,15 @@
                     </ContentTemplate>
                 </TabItem>
 
+                <TabItem>
+                    <ChildContent><TabHeader Text="Onboarding" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <EmployeeOnboardingTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
             </TabItems>
         </SfTab>
 
@@ -633,7 +642,8 @@
         {
             _activeTabIndex = tab.ToString() switch
             {
-                "probation" => 2,
+                "probation" => 3,
+                "onboarding" => 11,
                 _ => 0
             };
         }

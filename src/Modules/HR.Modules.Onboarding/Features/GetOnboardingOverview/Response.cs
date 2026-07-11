@@ -12,4 +12,11 @@ internal sealed record GetOnboardingOverviewResponse(
     IReadOnlyList<OutstandingAssetAcknowledgementItem> OutstandingAssetAcknowledgements,
     ProbationSummaryItem? Probation);
 
-internal sealed record OnboardingTaskOverviewItem(Guid Id, string Title, string Status, DateOnly? DueDate);
+internal sealed record OnboardingTaskOverviewItem(
+    Guid Id,
+    string Title,
+    string Status,
+    DateOnly? DueDate,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? CompletedAt,
+    DateTimeOffset UpdatedAt);

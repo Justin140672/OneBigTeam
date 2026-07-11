@@ -1,0 +1,62 @@
+@using HR.Web.Models
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h6 class="text-muted fw-normal mb-1">Onboarding Plan</h6>
+                <p class="mb-0 fw-medium">
+                    Started @Overview.StartDate?.ToString("d MMM yyyy")
+                </p>
+            </div>
+            <span class="badge fs-6 px-3 py-2 @StatusBadgeClass(Overview.PlanStatus)">@StatusLabel(Overview.PlanStatus)</span>
+        </div>
+
+        <div class="mb-1 d-flex justify-content-between small text-muted">
+            <span>@CompletedCount of @TotalCount tasks complete</span>
+            <span>@ProgressPercent%</span>
+        </div>
+        <div class="progress" style="height: 8px;">
+            <div class="progress-bar @ProgressBarClass(Overview.PlanStatus)"
+                 role="progressbar"
+                 style="width: @ProgressPercent%"
+                 aria-valuenow="@ProgressPercent"
+                 aria-valuemin="0"
+                 aria-valuemax="100">
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public OnboardingOverviewModel Overview { get; set; } = null!;
+
+    private int TotalCount => Overview.Tasks.Count;
+    private int CompletedCount => Overview.Tasks.Count(t => t.Status is "Completed" or "Skipped");
+    private int ProgressPercent => TotalCount == 0 ? 0 : (int)Math.Round(CompletedCount * 100.0 / TotalCount);
+
+    private static string StatusLabel(string? status) => status switch
+    {
+        "NotStarted" => "Not Started",
+        "InProgress" => "In Progress",
+        "Completed"  => "Completed",
+        "Cancelled"  => "Cancelled",
+        _            => status ?? "Unknown"
+    };
+
+    private static string StatusBadgeClass(string? status) => status switch
+    {
+        "NotStarted" => "bg-secondary",
+        "InProgress" => "bg-primary",
+        "Completed"  => "bg-success",
+        "Cancelled"  => "bg-danger",
+        _            => "bg-secondary"
+    };
+
+    private static string ProgressBarClass(string? status) => status switch
+    {
+        "Completed" => "bg-success",
+        "Cancelled" => "bg-danger",
+        _           => "bg-primary"
+    };
+}
