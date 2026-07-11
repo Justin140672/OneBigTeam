@@ -21,6 +21,7 @@ public sealed class AppFixture : IAsyncLifetime
 
         // Ensure DevAuth is active in child processes launched by Aspire.
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
+        Environment.SetEnvironmentVariable("E2E_TESTING", "true");
 
         var appHost = await DistributedApplicationTestingBuilder
             .CreateAsync<Projects.HR_AppHost>();
@@ -29,7 +30,7 @@ public sealed class AppFixture : IAsyncLifetime
         await _app.StartAsync();
 
         // Strip trailing slash so page objects can safely append paths.
-        WebBaseUrl = _app.GetEndpoint("web").ToString().TrimEnd('/');
+        WebBaseUrl = _app.GetEndpoint("web", "http").ToString().TrimEnd('/');
 
         // Probe until the web app is actually serving requests.
         // StartAsync returns as soon as Aspire begins orchestrating — Postgres migrations
