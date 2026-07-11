@@ -101,9 +101,9 @@ internal sealed class UpdateEmployeeProfileHandler
 
         employee.UpdatePersonalDetails(
             request.PreferredName,
-            request.DateOfBirth,
-            request.Nationality,
-            request.Gender,
+            request.DateOfBirth ?? employee.DateOfBirth,
+            request.Nationality ?? employee.Nationality,
+            request.Gender ?? employee.Gender,
             request.GenderOther,
             now);
 
@@ -119,7 +119,12 @@ internal sealed class UpdateEmployeeProfileHandler
             request.Country,
             now);
 
-        employee.Assign(request.DepartmentId, request.PositionProfileId, request.LocationId, employee.ManagerId, now);
+        employee.Assign(
+            request.DepartmentId ?? employee.DepartmentId,
+            request.PositionProfileId ?? employee.PositionProfileId,
+            request.LocationId ?? employee.LocationId,
+            employee.ManagerId,
+            now);
         employee.SetSystemAccess(request.HasSystemAccess, now);
         employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);
 

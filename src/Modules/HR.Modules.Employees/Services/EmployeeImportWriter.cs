@@ -33,6 +33,14 @@ internal sealed class EmployeeImportWriter(
             request.WorkEmail,
             request.StartDate,
             hasSystemAccess: false,
+            request.DateOfBirth,
+            request.Nationality,
+            request.Gender,
+            request.EmployeeNumber,
+            request.EmploymentTypeId,
+            request.DepartmentId,
+            request.LocationId,
+            request.PositionProfileId,
             now);
 
         employee.UpdatePersonalDetails(
@@ -46,28 +54,11 @@ internal sealed class EmployeeImportWriter(
         employee.UpdateContactDetails(
             request.PersonalEmail, null, null, null, null, null, null, null, null, now);
 
-        if (request.DepartmentId is not null || request.PositionProfileId is not null ||
-            request.LocationId is not null)
-        {
-            employee.Assign(request.DepartmentId, request.PositionProfileId, request.LocationId, null, now);
-        }
-
-        if (request.EmployeeNumber is not null || request.EmploymentTypeId is not null)
-        {
-            employee.UpdateEmploymentDetails(
-                request.EmployeeNumber, request.EmploymentTypeId, request.StartDate,
-                continuousServiceDate: null, probationEndDate: null, leavingDate: null, notes: null, now);
-        }
-
-        PositionProfile? positionProfile = null;
-        if (request.PositionProfileId is not null)
-        {
-            positionProfile = await dbContext.PositionProfiles
-                .AsNoTracking()
-                .SingleOrDefaultAsync(
-                    p => p.Id == request.PositionProfileId && p.CompanyId == request.CompanyId,
-                    cancellationToken);
-        }
+        var positionProfile = await dbContext.PositionProfiles
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                p => p.Id == request.PositionProfileId && p.CompanyId == request.CompanyId,
+                cancellationToken);
 
         var probationEndDate = await probationDateResolver.ResolveEndDateAsync(
             request.CompanyId, positionProfile?.ProbationMonthsOverride, employee.StartDate, cancellationToken);

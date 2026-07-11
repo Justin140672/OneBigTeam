@@ -159,6 +159,15 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task<bool> HasErrorAsync() =>
         await page.Locator(".alert-danger, .validation-message").First.IsVisibleAsync();
 
+    /// <summary>
+    /// Returns true if a field-level validation message containing <paramref name="messageText"/>
+    /// is visible (e.g. "Employee number is required." from EmployeeProfileEditModel's
+    /// [Required(ErrorMessage = ...)] attributes) — used to verify a specific required field's
+    /// validation, rather than the generic "some error is present" check in <see cref="HasErrorAsync"/>.
+    /// </summary>
+    public async Task<bool> HasValidationMessageAsync(string messageText) =>
+        await page.Locator(".validation-message").Filter(new() { HasText = messageText }).First.IsVisibleAsync();
+
     /// <summary>Fills the Employee Number field on the Employment tab.</summary>
     public async Task FillEmployeeNumberAsync(string value) =>
         await page.GetByPlaceholder("e.g. EMP-001").FillAsync(value);

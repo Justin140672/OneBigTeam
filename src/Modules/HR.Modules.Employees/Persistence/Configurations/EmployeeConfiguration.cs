@@ -21,18 +21,21 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .IsRequired();
 
         builder.Property(e => e.DepartmentId)
-            .HasColumnName("department_id");
+            .HasColumnName("department_id")
+            .IsRequired();
 
         builder.Property(e => e.LocationId)
-            .HasColumnName("location_id");
+            .HasColumnName("location_id")
+            .IsRequired();
 
         builder.HasOne<Location>()
             .WithMany()
             .HasForeignKey(e => e.LocationId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(e => e.PositionProfileId)
-            .HasColumnName("position_profile_id");
+            .HasColumnName("position_profile_id")
+            .IsRequired();
 
         builder.Property(e => e.ManagerId)
             .HasColumnName("manager_id");
@@ -90,15 +93,18 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .HasMaxLength(100);
 
         builder.Property(e => e.DateOfBirth)
-            .HasColumnName("date_of_birth");
+            .HasColumnName("date_of_birth")
+            .IsRequired();
 
         builder.Property(e => e.Nationality)
             .HasColumnName("nationality")
-            .HasMaxLength(100);
+            .HasMaxLength(100)
+            .IsRequired();
 
         builder.Property(e => e.Gender)
             .HasColumnName("gender")
-            .HasMaxLength(50);
+            .HasMaxLength(50)
+            .IsRequired();
 
         builder.Property(e => e.GenderOther)
             .HasColumnName("gender_other")
@@ -138,15 +144,17 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
 
         builder.Property(e => e.EmployeeNumber)
             .HasColumnName("employee_number")
-            .HasMaxLength(50);
+            .HasMaxLength(50)
+            .IsRequired();
 
         builder.Property(e => e.EmploymentTypeId)
-            .HasColumnName("employment_type_id");
+            .HasColumnName("employment_type_id")
+            .IsRequired();
 
         builder.HasOne<EmploymentType>()
             .WithMany()
             .HasForeignKey(e => e.EmploymentTypeId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(e => e.ContinuousServiceDate)
             .HasColumnName("continuous_service_date");

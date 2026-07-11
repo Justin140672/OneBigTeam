@@ -13,7 +13,7 @@ public class TaskItemTests
     private static TaskItem CreateOpen(
         string title = "Test task",
         TaskPriority priority = TaskPriority.Medium,
-        TaskSource source = TaskSource.Manual,
+        TaskSource source = TaskSource.Workflow,
         DateOnly? dueDate = null,
         Guid? assignedEmployeeId = null,
         Guid? assignedUserId = null) =>

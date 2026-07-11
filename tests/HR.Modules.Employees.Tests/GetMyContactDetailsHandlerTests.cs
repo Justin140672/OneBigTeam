@@ -16,7 +16,7 @@ public class GetMyContactDetailsHandlerTests
         var companyId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
 
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         employee.UpdateContactDetails("alice.personal@example.com", "07700 900000", "01234 567890",
             "1 Test Street", null, "London", null, "SW1A 1AA", "United Kingdom", now);
         context.Employees.Add(employee);
@@ -48,7 +48,7 @@ public class GetMyContactDetailsHandlerTests
     {
         await using var context = BuildContext();
         var now = DateTimeOffset.UtcNow;
-        var employee = Employee.Create(Guid.NewGuid(), Guid.NewGuid(), "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
+        var employee = Employee.Create(Guid.NewGuid(), Guid.NewGuid(), "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 

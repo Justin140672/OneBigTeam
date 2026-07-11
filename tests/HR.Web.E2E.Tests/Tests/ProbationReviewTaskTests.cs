@@ -21,7 +21,11 @@ public sealed class ProbationReviewTaskTests(AppFixture fixture) : E2ETestBase(f
     private static readonly Guid TaskProbationReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000005");
 
     // A non-probation-review task used to verify the panel is absent for other sources.
-    private static readonly Guid TaskQ2ReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000001");
+    // Originally Sarah's TaskSource.Manual "Review Q2 performance reports" task
+    // (a0000000-...0001); that source has been removed entirely, so this now points at her
+    // existing seeded Asset-acknowledgement task instead — it's an unrelated, real-domain
+    // task and serves the same purpose (verifying the probation panel doesn't render for it).
+    private static readonly Guid TaskQ2ReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000021");
 
     private const string SarahEmail = "sarah.chen@acme.example";
 

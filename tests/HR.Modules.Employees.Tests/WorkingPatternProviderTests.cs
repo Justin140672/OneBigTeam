@@ -17,7 +17,7 @@ public class WorkingPatternProviderTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2026, 1, 1), true, Now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2026, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
@@ -41,8 +41,8 @@ public class WorkingPatternProviderTests
             WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday, 6m, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
 
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2026, 1, 1), true, Now);
-        employee.Assign(null, profile.Id, null, null, Now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2026, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
+        employee.Assign(Guid.NewGuid(), profile.Id, Guid.NewGuid(), null, Now);
         employee.SetWorkingPattern(WorkingDays.Friday, 4m, Now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
@@ -66,8 +66,8 @@ public class WorkingPatternProviderTests
             profileDays, 6m, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
 
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2026, 1, 1), true, Now);
-        employee.Assign(null, profile.Id, null, null, Now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2026, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
+        employee.Assign(Guid.NewGuid(), profile.Id, Guid.NewGuid(), null, Now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
@@ -89,8 +89,8 @@ public class WorkingPatternProviderTests
         var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
         context.PositionProfiles.Add(profile);
 
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2026, 1, 1), true, Now);
-        employee.Assign(null, profile.Id, null, null, Now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2026, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
+        employee.Assign(Guid.NewGuid(), profile.Id, Guid.NewGuid(), null, Now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 

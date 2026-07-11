@@ -21,7 +21,7 @@ public class GetMyTasksHandlerTests
     {
         var t = TaskItem.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
-            title, null, TaskPriority.Medium, TaskSource.Manual, TaskActionType.Complete,
+            title, null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
             dueDate, null, assignedUserId, Now);
 
         if (status == TaskItemStatus.InProgress) t.Start(Now);

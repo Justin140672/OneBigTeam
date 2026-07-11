@@ -13,7 +13,12 @@ public class ValidateImportSessionHandlerTests
     private static readonly DateTime FixedUtcNow = new(2026, 6, 20, 9, 0, 0, DateTimeKind.Utc);
     private static readonly DateTimeOffset FixedNowOffset = new(FixedUtcNow, TimeSpan.Zero);
 
-    private const string StandardHeader = "First Name,Last Name,Work Email,Start Date,Employee Number";
+    private const string StandardHeader =
+        "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile";
+
+    // Appended to a data row (after Employee Number) to satisfy the mandatory
+    // DateOfBirth/Nationality/Gender/Department/Location/EmploymentType/PositionProfile fields.
+    private const string MandatoryFieldSuffix = "1990-01-01,British,Female,Engineering,London,Permanent,Developer";
 
     private static DataImportDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<DataImportDbContext>()
@@ -33,6 +38,19 @@ public class ValidateImportSessionHandlerTests
                 lookupReader ?? new FakeEmployeeImportLookupReader(),
                 lookupResolver ?? new FakeImportLookupResolver()),
             new FakeClock(FixedUtcNow));
+
+    // Pre-seeds a lookup resolver with the Department/EmploymentType/Location/PositionProfile
+    // names used by MandatoryFieldSuffix, so validating rows with those mandatory lookup fields
+    // resolves quietly instead of generating "did not exist and was created" warnings.
+    private static FakeImportLookupResolver SeededResolver(Guid companyId)
+    {
+        var resolver = new FakeImportLookupResolver();
+        resolver.SeedExistingDepartment(companyId, "Engineering", Guid.NewGuid());
+        resolver.SeedExistingEmploymentType(companyId, "Permanent", Guid.NewGuid());
+        resolver.SeedExistingLocation(companyId, "London", Guid.NewGuid());
+        resolver.SeedExistingPositionProfile(companyId, "Developer", Guid.NewGuid());
+        return resolver;
+    }
 
     private static async Task<ImportSession> SeedPendingSessionAsync(
         DataImportDbContext db,
@@ -70,11 +88,11 @@ public class ValidateImportSessionHandlerTests
 
         var csv =
             StandardHeader + "\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001\n" +
-            "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002\n";
+            $"John,Doe,john.doe@example.com,2026-01-01,EMP001,{MandatoryFieldSuffix}\n" +
+            $"Jane,Doe,jane.doe@example.com,2026-01-02,EMP002,{MandatoryFieldSuffix}\n";
 
         var session = await SeedPendingSessionAsync(db, storage, companyId, csv, totalRows: 2);
-        var handler = BuildHandler(db, storage);
+        var handler = BuildHandler(db, storage, lookupResolver: SeededResolver(companyId));
 
         var result = await handler.HandleAsync(
             new ValidateImportSessionRequest { CompanyId = companyId, ImportSessionId = session.Id },
@@ -114,11 +132,11 @@ public class ValidateImportSessionHandlerTests
 
         var csv =
             StandardHeader + "\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001\n" +
-            "Jane,,jane.doe@example.com,2026-01-02,EMP002\n"; // row 3: missing Last Name
+            $"John,Doe,john.doe@example.com,2026-01-01,EMP001,{MandatoryFieldSuffix}\n" +
+            $"Jane,,jane.doe@example.com,2026-01-02,EMP002,{MandatoryFieldSuffix}\n"; // row 3: missing Last Name
 
         var session = await SeedPendingSessionAsync(db, storage, companyId, csv, totalRows: 2);
-        var handler = BuildHandler(db, storage);
+        var handler = BuildHandler(db, storage, lookupResolver: SeededResolver(companyId));
 
         var result = await handler.HandleAsync(
             new ValidateImportSessionRequest { CompanyId = companyId, ImportSessionId = session.Id },
@@ -212,11 +230,11 @@ public class ValidateImportSessionHandlerTests
         // File uses "Given Name" instead of the standard "First Name" header, and no
         // ColumnMapping is supplied, so FirstName is never mapped from this file.
         var csv =
-            "Given Name,Last Name,Work Email,Start Date,Employee Number\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001\n";
+            $"Given Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
+            $"John,Doe,john.doe@example.com,2026-01-01,EMP001,{MandatoryFieldSuffix}\n";
 
         var session = await SeedPendingSessionAsync(db, storage, companyId, csv, totalRows: 1);
-        var handler = BuildHandler(db, storage);
+        var handler = BuildHandler(db, storage, lookupResolver: SeededResolver(companyId));
 
         var result = await handler.HandleAsync(
             new ValidateImportSessionRequest { CompanyId = companyId, ImportSessionId = session.Id },
@@ -226,7 +244,8 @@ public class ValidateImportSessionHandlerTests
         Assert.Equal(0, result.Value!.SuccessfulRows);
         Assert.Equal(1, result.Value.FailedRows);
 
-        var rowError = await db.ImportRowErrors.SingleAsync(e => e.ImportSessionId == session.Id);
+        var rowError = await db.ImportRowErrors.SingleAsync(
+            e => e.ImportSessionId == session.Id && e.Severity == ImportRowErrorSeverity.Error);
         Assert.Contains("'FirstName' is required.", rowError.ErrorMessage);
     }
 
@@ -240,11 +259,11 @@ public class ValidateImportSessionHandlerTests
         // Same nonstandard "Given Name" header as above, but this time a ColumnMapping override
         // redirects FirstName to read from that header instead of the default "First Name".
         var csv =
-            "Given Name,Last Name,Work Email,Start Date,Employee Number\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001\n";
+            $"Given Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
+            $"John,Doe,john.doe@example.com,2026-01-01,EMP001,{MandatoryFieldSuffix}\n";
 
         var session = await SeedPendingSessionAsync(db, storage, companyId, csv, totalRows: 1);
-        var handler = BuildHandler(db, storage);
+        var handler = BuildHandler(db, storage, lookupResolver: SeededResolver(companyId));
 
         var result = await handler.HandleAsync(
             new ValidateImportSessionRequest

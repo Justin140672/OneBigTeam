@@ -184,6 +184,11 @@ public class CreateEmployeeValidatorTests
         var result = validator.Validate(new CreateEmployeeRequest
         {
             CompanyId = Guid.NewGuid(),
+            DepartmentId = Guid.NewGuid(),
+            LocationId = Guid.NewGuid(),
+            PositionProfileId = Guid.NewGuid(),
+            EmploymentTypeId = Guid.NewGuid(),
+            EmployeeNumber = "EMP-0001",
             FirstName = "Alice",
             LastName = "Smith",
             WorkEmail = "alice@example.com",
@@ -205,7 +210,10 @@ public class CreateEmployeeValidatorTests
         {
             CompanyId = Guid.NewGuid(),
             DepartmentId = Guid.NewGuid(),
+            LocationId = Guid.NewGuid(),
             PositionProfileId = Guid.NewGuid(),
+            EmploymentTypeId = Guid.NewGuid(),
+            EmployeeNumber = "EMP-0001",
             ManagerId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = "Smith",

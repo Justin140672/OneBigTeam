@@ -58,6 +58,15 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
         // Start date.
         await empEdit.FillStartDateAsync(startDate);
 
+        // Employee Number and Employment Type are required.
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+
+        // Department and Location are required too — selecting a Position Profile that has both
+        // attached ("Senior Software Engineer" is seeded with Engineering / London Office)
+        // pre-populates them, satisfying all three required fields in one step.
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+
         // ── Step 5: Save the new employee ─────────────────────────────────────
         await empEdit.SaveNewEmployeeAsync();
 
@@ -224,5 +233,116 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
 
         Assert.True(await empEdit.HasErrorAsync(),
             "Expected validation errors to appear when saving an empty employee form");
+    }
+
+    [Fact]
+    public async Task CreateEmployee_MissingEmployeeNumber_ShowsValidationError_AndDoesNotCreateEmployee()
+    {
+        var unique    = Guid.NewGuid().ToString("N")[..8];
+        var lastName  = $"NoEmpNum{unique}";
+        var workEmail = $"e2e.noempnum{unique}@acme.example";
+
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empEdit.GoToNewAsync(AcmeId);
+
+        // Fill every required field except Employee Number.
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+
+        await _page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+
+        await _page.WaitForSelectorAsync(".validation-message", new() { Timeout = 15_000 });
+
+        Assert.Contains("/employees/new", _page.Url);
+        Assert.True(await empEdit.HasValidationMessageAsync("Employee number is required."),
+            "Expected a validation message indicating Employee Number is required");
+    }
+
+    [Fact]
+    public async Task CreateEmployee_MissingEmploymentType_ShowsValidationError_AndDoesNotCreateEmployee()
+    {
+        var unique    = Guid.NewGuid().ToString("N")[..8];
+        var lastName  = $"NoEmpType{unique}";
+        var workEmail = $"e2e.noemptype{unique}@acme.example";
+
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empEdit.GoToNewAsync(AcmeId);
+
+        // Fill every required field except Employment Type.
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+
+        await _page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+
+        await _page.WaitForSelectorAsync(".validation-message", new() { Timeout = 15_000 });
+
+        Assert.Contains("/employees/new", _page.Url);
+        Assert.True(await empEdit.HasValidationMessageAsync("Employment type is required."),
+            "Expected a validation message indicating Employment Type is required");
+    }
+
+    [Fact]
+    public async Task CreateEmployee_MissingDepartmentLocationAndPositionProfile_ShowsValidationErrors_AndDoesNotCreateEmployee()
+    {
+        var unique    = Guid.NewGuid().ToString("N")[..8];
+        var lastName  = $"NoDeptLocProf{unique}";
+        var workEmail = $"e2e.nodeptlocprof{unique}@acme.example";
+
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empEdit.GoToNewAsync(AcmeId);
+
+        // Fill every required field except Department, Location and Position Profile — leaving
+        // all three dropdowns unset (no Position Profile is selected, so none of the three get
+        // auto-populated by the profile-defaults cascade).
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+
+        await _page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+
+        await _page.WaitForSelectorAsync(".validation-message", new() { Timeout = 15_000 });
+
+        Assert.Contains("/employees/new", _page.Url);
+        Assert.True(await empEdit.HasValidationMessageAsync("Department is required."),
+            "Expected a validation message indicating Department is required");
+        Assert.True(await empEdit.HasValidationMessageAsync("Location is required."),
+            "Expected a validation message indicating Location is required");
+        Assert.True(await empEdit.HasValidationMessageAsync("Position profile is required."),
+            "Expected a validation message indicating Position Profile is required");
     }
 }

@@ -52,7 +52,7 @@ public class TaskCreatorNotificationTests
         await creator.CreateAsync(
             Guid.NewGuid(), Guid.NewGuid(),
             "Unassigned task", null,
-            TaskPriority.Low, TaskSource.Manual, TaskActionType.Complete,
+            TaskPriority.Low, TaskSource.Workflow, TaskActionType.Complete,
             null,
             assignedEmployeeId: null,
             assignedUserId: null,
@@ -75,7 +75,7 @@ public class TaskCreatorNotificationTests
         await creator.CreateAsync(
             companyId, Guid.NewGuid(),
             "A task", null,
-            TaskPriority.High, TaskSource.Manual, TaskActionType.Complete,
+            TaskPriority.High, TaskSource.Workflow, TaskActionType.Complete,
             null,
             assignedEmployeeId: assignedEmployeeId,
             assignedUserId: null,
@@ -102,7 +102,7 @@ public class TaskCreatorNotificationTests
         await creator.CreateAsync(
             Guid.NewGuid(), Guid.NewGuid(),
             "A task", null,
-            taskPriority, TaskSource.Manual, TaskActionType.Complete,
+            taskPriority, TaskSource.Workflow, TaskActionType.Complete,
             null,
             assignedEmployeeId: Guid.NewGuid(),
             assignedUserId: null,
@@ -125,7 +125,7 @@ public class TaskCreatorNotificationTests
         await creator.CreateAsync(
             Guid.NewGuid(), Guid.NewGuid(),
             longTitle, null,
-            TaskPriority.Low, TaskSource.Manual, TaskActionType.Complete,
+            TaskPriority.Low, TaskSource.Workflow, TaskActionType.Complete,
             null,
             assignedEmployeeId: assignedEmployeeId,
             assignedUserId: null,

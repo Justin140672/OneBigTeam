@@ -156,10 +156,7 @@ public class GetRecentLeaveRequestsEndpointTests : IClassFixture<ApiWebApplicati
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
-        var employee = Employee.Create(
-            Guid.NewGuid(), companyId, firstName, lastName,
-            $"{firstName}.{lastName}.{Guid.NewGuid():N}@example.com".ToLowerInvariant(),
-            new DateOnly(2026, 1, 1), hasSystemAccess: true, Now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, firstName, lastName, $"{firstName}.{lastName}.{Guid.NewGuid():N}@example.com".ToLowerInvariant(), new DateOnly(2026, 1, 1), hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
         db.Employees.Add(employee);
         await db.SaveChangesAsync();
         return employee.Id;

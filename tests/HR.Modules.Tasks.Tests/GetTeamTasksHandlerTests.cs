@@ -21,7 +21,7 @@ public class GetTeamTasksHandlerTests
     {
         var t = TaskItem.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
-            title, null, TaskPriority.Medium, TaskSource.Manual, TaskActionType.Complete,
+            title, null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
             dueDate, assignedEmployeeId, null, Now);
 
         if (status == TaskItemStatus.InProgress) t.Start(Now);

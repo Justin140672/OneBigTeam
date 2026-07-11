@@ -239,7 +239,7 @@ public class UpdateEmploymentDetailsHandlerTests
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static Employee CreateEmployee(Guid companyId, DateTimeOffset now)
-        => Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, true, now);
+        => Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
 
     private static EmployeesDbContext BuildContext()
     {

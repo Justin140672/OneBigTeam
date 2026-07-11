@@ -126,8 +126,8 @@ internal sealed class UpdateEmploymentDetailsHandler
         }
 
         employee.UpdateEmploymentDetails(
-            request.EmployeeNumber,
-            request.EmploymentTypeId,
+            request.EmployeeNumber ?? employee.EmployeeNumber,
+            request.EmploymentTypeId ?? employee.EmploymentTypeId,
             request.StartDate,
             request.ContinuousServiceDate,
             request.ProbationEndDate,
@@ -135,7 +135,12 @@ internal sealed class UpdateEmploymentDetailsHandler
             request.Notes,
             now);
 
-        employee.Assign(request.DepartmentId, request.PositionProfileId, request.LocationId, request.ManagerId, now);
+        employee.Assign(
+            request.DepartmentId ?? employee.DepartmentId,
+            request.PositionProfileId ?? employee.PositionProfileId,
+            request.LocationId ?? employee.LocationId,
+            request.ManagerId,
+            now);
         employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);

@@ -100,7 +100,7 @@ public class GetOutstandingTaskCountHandlerTests
         context.TaskItems.AddRange(
             MakeTask(companyId, TaskSource.Recruitment, TaskActionType.Complete, title: "Feedback"),
             MakeTask(companyId, TaskSource.Asset, TaskActionType.Acknowledge, title: "Acknowledge asset"),
-            MakeTask(companyId, TaskSource.Manual, TaskActionType.Complete, TaskItemStatus.Completed, "Done"));
+            MakeTask(companyId, TaskSource.Workflow, TaskActionType.Complete, TaskItemStatus.Completed, "Done"));
 
         await context.SaveChangesAsync();
 

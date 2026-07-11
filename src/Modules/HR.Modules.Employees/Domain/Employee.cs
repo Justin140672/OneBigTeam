@@ -9,9 +9,9 @@ internal sealed class Employee
 
     public Guid Id { get; private set; }
     public Guid CompanyId { get; private set; }
-    public Guid? DepartmentId { get; private set; }
-    public Guid? LocationId { get; private set; }
-    public Guid? PositionProfileId { get; private set; }
+    public Guid DepartmentId { get; private set; }
+    public Guid LocationId { get; private set; }
+    public Guid PositionProfileId { get; private set; }
     public Guid? ManagerId { get; private set; }
     public string FirstName { get; private set; } = string.Empty;
     public string LastName { get; private set; } = string.Empty;
@@ -24,9 +24,9 @@ internal sealed class Employee
     public decimal? HoursPerDayOverride { get; private set; }
     public string? ProfileImageUrl { get; private set; }
     public string? PreferredName { get; private set; }
-    public DateOnly? DateOfBirth { get; private set; }
-    public string? Nationality { get; private set; }
-    public string? Gender { get; private set; }
+    public DateOnly DateOfBirth { get; private set; }
+    public string Nationality { get; private set; } = string.Empty;
+    public string Gender { get; private set; } = string.Empty;
     public string? GenderOther { get; private set; }
     public string? PhoneNumber { get; private set; }
     public string? HomePhone { get; private set; }
@@ -36,8 +36,8 @@ internal sealed class Employee
     public string? County { get; private set; }
     public string? PostCode { get; private set; }
     public string? Country { get; private set; }
-    public string? EmployeeNumber { get; private set; }
-    public Guid? EmploymentTypeId { get; private set; }
+    public string EmployeeNumber { get; private set; } = string.Empty;
+    public Guid EmploymentTypeId { get; private set; }
     public DateOnly? ContinuousServiceDate { get; private set; }
     public DateOnly? ProbationEndDate { get; private set; }
     public DateOnly? LeavingDate { get; private set; }
@@ -53,6 +53,14 @@ internal sealed class Employee
         string workEmail,
         DateOnly startDate,
         bool hasSystemAccess,
+        DateOnly dateOfBirth,
+        string nationality,
+        string gender,
+        string employeeNumber,
+        Guid employmentTypeId,
+        Guid departmentId,
+        Guid locationId,
+        Guid positionProfileId,
         DateTimeOffset now)
     {
         return new Employee
@@ -65,12 +73,20 @@ internal sealed class Employee
             StartDate = startDate,
             Status = EmploymentStatus.Draft,
             HasSystemAccess = hasSystemAccess,
+            DateOfBirth = dateOfBirth,
+            Nationality = nationality,
+            Gender = gender,
+            EmployeeNumber = employeeNumber,
+            EmploymentTypeId = employmentTypeId,
+            DepartmentId = departmentId,
+            LocationId = locationId,
+            PositionProfileId = positionProfileId,
             CreatedAt = now,
             UpdatedAt = now,
         };
     }
 
-    public void Assign(Guid? departmentId, Guid? positionProfileId, Guid? locationId, Guid? managerId, DateTimeOffset now)
+    public void Assign(Guid departmentId, Guid positionProfileId, Guid locationId, Guid? managerId, DateTimeOffset now)
     {
         DepartmentId = departmentId;
         PositionProfileId = positionProfileId;
@@ -146,16 +162,16 @@ internal sealed class Employee
 
     public void UpdatePersonalDetails(
         string? preferredName,
-        DateOnly? dateOfBirth,
-        string? nationality,
-        string? gender,
+        DateOnly dateOfBirth,
+        string nationality,
+        string gender,
         string? genderOther,
         DateTimeOffset now)
     {
         PreferredName = Norm(preferredName);
         DateOfBirth   = dateOfBirth;
-        Nationality   = Norm(nationality);
-        Gender        = Norm(gender);
+        Nationality   = nationality.Trim();
+        Gender        = gender.Trim();
         GenderOther   = Norm(genderOther);
         UpdatedAt     = now;
     }
@@ -185,8 +201,8 @@ internal sealed class Employee
     }
 
     public void UpdateEmploymentDetails(
-        string? employeeNumber,
-        Guid? employmentTypeId,
+        string employeeNumber,
+        Guid employmentTypeId,
         DateOnly startDate,
         DateOnly? continuousServiceDate,
         DateOnly? probationEndDate,
@@ -194,7 +210,7 @@ internal sealed class Employee
         string? notes,
         DateTimeOffset now)
     {
-        EmployeeNumber        = Norm(employeeNumber);
+        EmployeeNumber        = employeeNumber.Trim();
         EmploymentTypeId      = employmentTypeId;
         StartDate             = startDate;
         ContinuousServiceDate = continuousServiceDate;

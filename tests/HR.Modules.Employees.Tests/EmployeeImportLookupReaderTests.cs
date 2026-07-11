@@ -26,12 +26,11 @@ public class EmployeeImportLookupReaderTests
         string workEmail,
         string? employeeNumber = null)
     {
-        var employee = Employee.Create(
-            Guid.NewGuid(), companyId, "Alice", "Smith", workEmail, StartDate, hasSystemAccess: false, Now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", workEmail, StartDate, hasSystemAccess: false, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
 
         if (employeeNumber is not null)
         {
-            employee.UpdateEmploymentDetails(employeeNumber, null, StartDate, null, null, null, null, Now);
+            employee.UpdateEmploymentDetails(employeeNumber, Guid.NewGuid(), StartDate, null, null, null, null, Now);
         }
 
         db.Employees.Add(employee);

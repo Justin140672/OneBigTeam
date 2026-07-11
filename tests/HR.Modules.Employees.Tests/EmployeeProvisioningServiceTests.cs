@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
@@ -10,6 +11,7 @@ namespace HR.Modules.Employees.Tests;
 public class EmployeeProvisioningServiceTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 8, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTimeOffset Now = new(FixedUtcNow, TimeSpan.Zero);
     private static readonly DateOnly StartDate = new(2026, 7, 1);
     private static readonly DateOnly DateOfBirth = new(1995, 3, 20);
 
@@ -17,16 +19,19 @@ public class EmployeeProvisioningServiceTests
     public async Task CreateFromCandidateAsync_Creates_Employee_And_Returns_Id()
     {
         await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (departmentId, locationId, employmentTypeId, positionProfileId) = await SeedMandatoryLookupsAsync(context, companyId);
+
         var createEmployeeHandler = new CreateEmployeeHandler(
             context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(),
             new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
         var service = new EmployeeProvisioningService(createEmployeeHandler);
-        var companyId = Guid.NewGuid();
 
         var result = await service.CreateFromCandidateAsync(
             new EmployeeProvisioningRequest(
                 companyId, "Emma", "Clarke", "emma.clarke@example.com",
-                StartDate, DateOfBirth, "British", "Female"),
+                StartDate, DateOfBirth, "British", "Female",
+                "EMP-0001", employmentTypeId, departmentId, locationId, positionProfileId),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -43,27 +48,52 @@ public class EmployeeProvisioningServiceTests
     public async Task CreateFromCandidateAsync_Returns_Failure_When_Underlying_Handler_Fails()
     {
         await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (departmentId, locationId, employmentTypeId, positionProfileId) = await SeedMandatoryLookupsAsync(context, companyId);
+
         var createEmployeeHandler = new CreateEmployeeHandler(
             context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(),
             new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
         var service = new EmployeeProvisioningService(createEmployeeHandler);
-        var companyId = Guid.NewGuid();
 
         await service.CreateFromCandidateAsync(
             new EmployeeProvisioningRequest(
                 companyId, "Emma", "Clarke", "emma.clarke@example.com",
-                StartDate, DateOfBirth, "British", "Female"),
+                StartDate, DateOfBirth, "British", "Female",
+                "EMP-0001", employmentTypeId, departmentId, locationId, positionProfileId),
             CancellationToken.None);
 
         // Same work email in the same company should conflict.
         var result = await service.CreateFromCandidateAsync(
             new EmployeeProvisioningRequest(
                 companyId, "Emma", "Clarke", "emma.clarke@example.com",
-                StartDate, DateOfBirth, "British", "Female"),
+                StartDate, DateOfBirth, "British", "Female",
+                "EMP-0002", employmentTypeId, departmentId, locationId, positionProfileId),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("conflict", result.Error.Code);
+    }
+
+    private static async Task<(Guid DepartmentId, Guid LocationId, Guid EmploymentTypeId, Guid PositionProfileId)> SeedMandatoryLookupsAsync(
+        EmployeesDbContext context, Guid companyId)
+    {
+        var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, Now);
+        var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, Now);
+        var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, Now);
+        var positionProfile = PositionProfile.Create(
+            Guid.NewGuid(), companyId, department.Id, location.Id, "Developer",
+            null, null, null, null, null, null, null, null, Now);
+        var employmentType = EmploymentType.Create(Guid.NewGuid(), companyId, "Permanent", null, Now);
+
+        context.Departments.Add(department);
+        context.LocationTypes.Add(locationType);
+        context.Locations.Add(location);
+        context.PositionProfiles.Add(positionProfile);
+        context.EmploymentTypes.Add(employmentType);
+        await context.SaveChangesAsync();
+
+        return (department.Id, location.Id, employmentType.Id, positionProfile.Id);
     }
 
     private static EmployeesDbContext BuildContext() =>

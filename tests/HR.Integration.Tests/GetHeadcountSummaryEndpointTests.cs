@@ -126,13 +126,11 @@ public class GetHeadcountSummaryEndpointTests : IClassFixture<ApiWebApplicationF
     private static void AddEmployee(EmployeesDbContext context, Guid companyId, Guid? departmentId, EmploymentStatus status)
     {
         var now = DateTimeOffset.UtcNow;
-        var employee = Employee.Create(
-            Guid.NewGuid(), companyId, "First", "Last",
-            $"employee.{Guid.NewGuid():N}@example.com", StartDate, hasSystemAccess: true, now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "First", "Last", $"employee.{Guid.NewGuid():N}@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
 
         if (departmentId is not null)
         {
-            employee.Assign(departmentId, null, null, null, now);
+            employee.Assign(departmentId.Value, Guid.NewGuid(), Guid.NewGuid(), null, now);
         }
 
         switch (status)

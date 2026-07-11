@@ -73,7 +73,7 @@ public class GetTaskHandlerTests
 
         var task = TaskItem.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            "Some task", null, TaskPriority.Low, TaskSource.Manual, TaskActionType.Complete,
+            "Some task", null, TaskPriority.Low, TaskSource.Workflow, TaskActionType.Complete,
             null, null, null, Now);
 
         context.TaskItems.Add(task);

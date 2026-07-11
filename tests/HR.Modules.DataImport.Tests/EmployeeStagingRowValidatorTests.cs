@@ -13,15 +13,22 @@ public class EmployeeStagingRowValidatorTests
         new(reader ?? new FakeEmployeeImportLookupReader(), resolver ?? new FakeImportLookupResolver());
 
     // Builds a row that otherwise satisfies all required fields, with optional extras set.
+    // DateOfBirth/Nationality/Gender/EmployeeNumber/DepartmentName/LocationName/
+    // EmploymentTypeName/PositionProfileTitle all default to valid values (rather than being
+    // omitted) since they are mandatory Employee fields — tests that need to exercise a
+    // specific missing/absent scenario for one of them pass that parameter as an explicit
+    // `null` to override the default.
     private static ParsedImportRow ValidRow(
         int rowNumber,
         string firstName = "Alice",
         string lastName = "Smith",
         string? workEmail = "alice@example.com",
         string? startDate = "2026-01-01",
-        string? employeeNumber = null,
+        string? employeeNumber = "EMP-0001",
         string? managerReference = null,
-        string? dateOfBirth = null,
+        string? dateOfBirth = "1990-01-01",
+        string? nationality = "British",
+        string? gender = "Female",
         string? continuousServiceDate = null,
         string? probationEndDate = null,
         string? salaryAmount = null,
@@ -31,10 +38,10 @@ public class EmployeeStagingRowValidatorTests
         string? fte = null,
         string? leaveTypeCode = null,
         string? leaveBalanceDays = null,
-        string? departmentName = null,
-        string? employmentTypeName = null,
-        string? locationName = null,
-        string? positionProfileTitle = null)
+        string? departmentName = "Engineering",
+        string? employmentTypeName = "Permanent",
+        string? locationName = "London",
+        string? positionProfileTitle = "Developer")
     {
         var fields = new Dictionary<string, string?>
         {
@@ -47,6 +54,8 @@ public class EmployeeStagingRowValidatorTests
         if (employeeNumber is not null) fields["EmployeeNumber"] = employeeNumber;
         if (managerReference is not null) fields["ManagerReference"] = managerReference;
         if (dateOfBirth is not null) fields["DateOfBirth"] = dateOfBirth;
+        if (nationality is not null) fields["Nationality"] = nationality;
+        if (gender is not null) fields["Gender"] = gender;
         if (continuousServiceDate is not null) fields["ContinuousServiceDate"] = continuousServiceDate;
         if (probationEndDate is not null) fields["ProbationEndDate"] = probationEndDate;
         if (salaryAmount is not null) fields["SalaryAmount"] = salaryAmount;
@@ -209,8 +218,8 @@ public class EmployeeStagingRowValidatorTests
     public async Task ValidateAsync_Accepts_Both_Supported_Date_Formats()
     {
         var validator = BuildValidator();
-        var row1 = ValidRow(2, workEmail: "a@example.com", startDate: "2026-01-15");
-        var row2 = ValidRow(3, workEmail: "b@example.com", startDate: "15/01/2026");
+        var row1 = ValidRow(2, workEmail: "a@example.com", startDate: "2026-01-15", employeeNumber: "EMP-0001");
+        var row2 = ValidRow(3, workEmail: "b@example.com", startDate: "15/01/2026", employeeNumber: "EMP-0002");
 
         var results = await validator.ValidateAsync(CompanyId, [row1, row2], MappedFieldsFrom(row1, row2), CancellationToken.None);
 
@@ -272,8 +281,8 @@ public class EmployeeStagingRowValidatorTests
     public async Task ValidateAsync_Accepts_ManagerReference_Matching_Another_Row_In_File_By_WorkEmail()
     {
         var validator = BuildValidator();
-        var manager = ValidRow(2, workEmail: "manager@example.com");
-        var report = ValidRow(3, workEmail: "report@example.com", managerReference: "manager@example.com");
+        var manager = ValidRow(2, workEmail: "manager@example.com", employeeNumber: "EMP-0001");
+        var report = ValidRow(3, workEmail: "report@example.com", managerReference: "manager@example.com", employeeNumber: "EMP-0002");
 
         var results = await validator.ValidateAsync(CompanyId, [manager, report], MappedFieldsFrom(manager, report), CancellationToken.None);
 
@@ -501,6 +510,7 @@ public class EmployeeStagingRowValidatorTests
         resolver.SeedExistingDepartment(CompanyId, "Sales", existingDepartmentId);
         resolver.SeedExistingEmploymentType(CompanyId, "Contractor", existingEmploymentTypeId);
         resolver.SeedExistingLocation(CompanyId, "London", existingLocationId);
+        resolver.SeedExistingPositionProfile(CompanyId, "Developer", Guid.NewGuid());
 
         var validator = BuildValidator(resolver: resolver);
         var row = ValidRow(
@@ -523,7 +533,7 @@ public class EmployeeStagingRowValidatorTests
     public async Task ValidateAsync_Flags_PositionProfile_Without_Department_Or_Location_As_Error()
     {
         var validator = BuildValidator();
-        var row = ValidRow(2, positionProfileTitle: "Software Developer");
+        var row = ValidRow(2, departmentName: null, locationName: null, positionProfileTitle: "Software Developer");
 
         var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
 

@@ -2,7 +2,6 @@ namespace HR.Infrastructure.Abstractions;
 
 public enum TaskSource
 {
-    Manual = 1,
     Leave = 2,
     Sickness = 3,
     Recruitment = 4,

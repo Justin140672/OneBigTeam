@@ -106,6 +106,16 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         await vacancyDetail.FillHireDateOfBirthAsync("15/06/1990");
         await vacancyDetail.SelectHireNationalityAsync("British");
         await vacancyDetail.SelectHireGenderAsync("Male");
+
+        // Employee Number, Employment Type, Department, Location and Position Profile are now
+        // required — hiring a candidate creates a real Employee record, which can no longer
+        // exist without them. Reuse the same seeded Acme reference data as CreateEmployeeTests.
+        await vacancyDetail.FillHireEmployeeNumberAsync($"E2E-{unique}");
+        await vacancyDetail.SelectHireDropdownAsync("Employment Type", "Permanent");
+        await vacancyDetail.SelectHireDropdownAsync("Department", "Engineering");
+        await vacancyDetail.SelectHireDropdownAsync("Location", "London Office");
+        await vacancyDetail.SelectHireDropdownAsync("Position Profile", "Senior Software Engineer");
+
         await vacancyDetail.SubmitHireAsync();
 
         Assert.Equal("Hired", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
@@ -120,5 +130,95 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         await employeeList.GoToAsync(AcmeId);
         Assert.True(await employeeList.HasEmployeeAsync(candidateLast),
             $"Expected an employee named '{candidateLast}' to appear in the employee list after hiring");
+    }
+
+    [Fact]
+    public async Task HireCandidateDialog_MissingNewlyRequiredFields_ShowsValidationError_AndDoesNotHire()
+    {
+        var (candidateLast, vacancyDetail) = await ArrangeOfferedApplicationAsync();
+
+        await vacancyDetail.ClickHireForAsync(candidateLast);
+        await vacancyDetail.WaitForHireDialogAsync();
+
+        // Fill in the fields that were already required before Department/Location/Position
+        // Profile/Employment Type/Employee Number became mandatory...
+        await vacancyDetail.FillHireStartDateAsync("01/10/2026");
+        await vacancyDetail.FillHireDateOfBirthAsync("15/06/1990");
+        await vacancyDetail.SelectHireNationalityAsync("British");
+        await vacancyDetail.SelectHireGenderAsync("Male");
+
+        // ...but deliberately leave the newly-required fields (Employee Number, Employment Type,
+        // Department, Location, Position Profile) blank and attempt to submit anyway.
+        await vacancyDetail.ClickHireSubmitButtonAsync();
+
+        await _page.WaitForSelectorAsync(".hire-candidate-dialog .alert-danger", new() { Timeout = 10_000 });
+        Assert.True(await vacancyDetail.HasDialogErrorAsync("hire-candidate-dialog"),
+            "Expected a validation error when submitting the Hire dialog without the newly required fields");
+
+        // The dialog stayed open rather than closing (which SubmitHireAsync would otherwise wait
+        // for), confirming the hire did not go through — the application should still be Offered.
+        await vacancyDetail.CancelHireDialogAsync();
+        Assert.Equal("Offered", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
+    }
+
+    /// <summary>
+    /// Runs the candidate/vacancy/application/interview/offer pipeline (steps 1-6 of
+    /// <see cref="Candidate_Applies_Interviews_IsOffered_AndHired_BecomesEmployee"/>) so a test can
+    /// exercise just the Hire dialog against a fresh Offered application, without duplicating this
+    /// multi-step setup inline.
+    /// </summary>
+    private async Task<(string CandidateLast, VacancyDetailPage VacancyDetail)> ArrangeOfferedApplicationAsync()
+    {
+        var unique         = Guid.NewGuid().ToString("N")[..8];
+        var candidateFirst = "E2E";
+        var candidateLast  = $"Cand{unique}";
+        var candidateEmail = $"e2e.cand{unique}@example.com";
+        var vacancyTitle   = $"E2E Test Role {unique}";
+
+        var login         = new LoginPage(_page, _fixture.WebBaseUrl);
+        var candidateList = new CandidateListPage(_page, _fixture.WebBaseUrl);
+        var candidateEdit = new CandidateEditPage(_page, _fixture.WebBaseUrl);
+        var vacancyList   = new VacancyListPage(_page, _fixture.WebBaseUrl);
+        var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await candidateList.GoToAsync(AcmeId);
+        await candidateList.ClickNewCandidateAsync();
+        await candidateEdit.FillFirstNameAsync(candidateFirst);
+        await candidateEdit.FillLastNameAsync(candidateLast);
+        await candidateEdit.FillEmailAsync(candidateEmail);
+        await candidateEdit.SaveNewCandidateAsync();
+
+        await vacancyList.GoToAsync(AcmeId);
+        await vacancyList.ClickNewVacancyAsync();
+        await vacancyDetail.FillTitleAsync(vacancyTitle);
+        await vacancyDetail.FillLocationAsync("Remote");
+        await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SaveNewVacancyAsync();
+
+        await vacancyList.ClickVacancyAsync(vacancyTitle);
+        await vacancyDetail.OpenApplicationsTabAsync();
+        await vacancyDetail.ClickAddCandidateAsync();
+        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateEmail);
+        await vacancyDetail.SubmitAddApplicationAsync();
+
+        await vacancyDetail.ClickScheduleInterviewForAsync(candidateLast);
+        await vacancyDetail.WaitForScheduleDialogAsync();
+        await vacancyDetail.SelectInterviewerAsync("James");
+        await vacancyDetail.FillScheduledAtAsync("01/09/2026 10:00 AM");
+        await vacancyDetail.SubmitScheduleInterviewAsync();
+
+        await vacancyDetail.OpenInterviewsTabAsync();
+        await vacancyDetail.ClickRecordOutcomeForAsync(candidateLast);
+        await vacancyDetail.WaitForOutcomeDialogAsync();
+        await vacancyDetail.SelectOutcomeAsync("Passed");
+        await vacancyDetail.SubmitOutcomeAsync();
+
+        await vacancyDetail.OpenApplicationsTabAsync();
+        await vacancyDetail.ClickOfferForAsync(candidateLast);
+
+        return (candidateLast, vacancyDetail);
     }
 }

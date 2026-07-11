@@ -74,9 +74,7 @@ public class GetNewHiresTrendEndpointTests : IClassFixture<ApiWebApplicationFact
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
-            db.Employees.Add(Employee.Create(
-                Guid.NewGuid(), companyId, "Alice", "Smith",
-                $"alice.{Guid.NewGuid():N}@example.com", currentMonthStart, hasSystemAccess: true, DateTimeOffset.UtcNow));
+            db.Employees.Add(Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com", currentMonthStart, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow));
             await db.SaveChangesAsync();
         }
 
@@ -104,9 +102,7 @@ public class GetNewHiresTrendEndpointTests : IClassFixture<ApiWebApplicationFact
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
-            db.Employees.Add(Employee.Create(
-                Guid.NewGuid(), otherCompanyId, "Alice", "Smith",
-                $"alice.{Guid.NewGuid():N}@example.com", currentMonthStart, hasSystemAccess: true, DateTimeOffset.UtcNow));
+            db.Employees.Add(Employee.Create(Guid.NewGuid(), otherCompanyId, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com", currentMonthStart, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow));
             await db.SaveChangesAsync();
         }
 

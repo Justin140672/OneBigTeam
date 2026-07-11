@@ -50,41 +50,26 @@ public static class NotificationsModule
         var companyId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var empCtoId   = Guid.Parse("30000000-0000-0000-0000-000000000001"); // Sarah Chen
 
-        // Fixed task IDs matching TasksModule seed data
-        var taskQ2ReviewId    = Guid.Parse("a0000000-0000-0000-0000-000000000001");
-        var taskBoardAgendaId = Guid.Parse("a0000000-0000-0000-0000-000000000002");
-        var taskInterviewId   = Guid.Parse("a0000000-0000-0000-0000-000000000003");
-        var taskSurveyId      = Guid.Parse("a0000000-0000-0000-0000-000000000004");
+        // Fixed task IDs matching TasksModule seed data. These used to reference four
+        // TaskSource.Manual tasks (a0000000-...0001/0002/0003/0004); that source has been
+        // removed entirely, along with its seeded tasks. The two generic Workflow-sourced
+        // tasks that replaced the Q2-review/survey tasks (still assigned to Sarah) are
+        // referenced here instead, so Sarah keeps at least one valid, non-dangling
+        // notification (see IndividualNotificationTests, which requires this).
+        var taskGenericReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000027");
+        var taskGenericSurveyId = Guid.Parse("a0000000-0000-0000-0000-000000000028");
 
         db.Notifications.AddRange(
             Notification.Create(Guid.NewGuid(), companyId, empCtoId,
                 "New task assigned: Review Q2 performance reports",
                 "Gather scores from all department heads and summarise findings.",
-                taskQ2ReviewId, now.AddHours(-2),
+                taskGenericReviewId, now.AddHours(-2),
                 NotificationType.TaskAssigned, NotificationPriority.High),
-
-            Notification.Create(Guid.NewGuid(), companyId, empCtoId,
-                "New task assigned: Prepare board meeting agenda",
-                "Draft the Q3 board meeting agenda including financial review and product roadmap.",
-                taskBoardAgendaId, now.AddHours(-1),
-                NotificationType.TaskAssigned, NotificationPriority.High),
-
-            Notification.Create(Guid.NewGuid(), companyId, empCtoId,
-                "New task assigned: Engineering lead interview debrief",
-                "Consolidate panel feedback and make hiring recommendation to the board.",
-                taskInterviewId, now.AddDays(-1),
-                NotificationType.TaskAssigned, NotificationPriority.Normal),
-
-            Notification.Create(Guid.NewGuid(), companyId, empCtoId,
-                "Due soon: Engineering lead interview debrief",
-                "This task is due on 22 Jun 2026.",
-                taskInterviewId, now.AddMinutes(-30),
-                NotificationType.TaskDueSoon, NotificationPriority.High),
 
             Notification.Create(Guid.NewGuid(), companyId, empCtoId,
                 "Overdue: Analyse employee satisfaction survey results",
                 "This task was due on 10 Jun 2026 and has not been completed.",
-                taskSurveyId, now.AddMinutes(-15),
+                taskGenericSurveyId, now.AddMinutes(-15),
                 NotificationType.TaskOverdue, NotificationPriority.Urgent));
 
         await db.SaveChangesAsync();

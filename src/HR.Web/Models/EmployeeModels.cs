@@ -135,8 +135,15 @@ public sealed class EmployeeProfileEditModel
     public string? PostcodeRegexPattern { get; set; }
     public string? TelephoneRegexPattern { get; set; }
     public string? MobileRegexPattern { get; set; }
+    [Required(ErrorMessage = "Employee number is required.")]
+    public string EmployeeNumber { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Employment type is required.")]
+    public Guid? EmploymentTypeId { get; set; }
+    [Required(ErrorMessage = "Department is required.")]
     public Guid? DepartmentId { get; set; }
+    [Required(ErrorMessage = "Location is required.")]
     public Guid? LocationId { get; set; }
+    [Required(ErrorMessage = "Position profile is required.")]
     public Guid? PositionProfileId { get; set; }
     public bool HasSystemAccess { get; set; } = true;
     public bool OverrideWorkingPattern { get; set; } = false;
@@ -198,9 +205,9 @@ public sealed class CreateEmployeeFormModel
 
 public record CreateEmployeeRequest(
     Guid CompanyId,
-    Guid? DepartmentId,
-    Guid? LocationId,
-    Guid? PositionProfileId,
+    Guid DepartmentId,
+    Guid LocationId,
+    Guid PositionProfileId,
     string FirstName,
     string LastName,
     string? PreferredName,
@@ -211,6 +218,8 @@ public record CreateEmployeeRequest(
     string Nationality,
     string Gender,
     string? GenderOther,
+    string EmployeeNumber,
+    Guid EmploymentTypeId,
     string? PhoneNumber,
     string? HomePhone,
     string? AddressLine1,

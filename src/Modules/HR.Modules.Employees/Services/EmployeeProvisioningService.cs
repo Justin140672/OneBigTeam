@@ -15,6 +15,7 @@ internal sealed class EmployeeProvisioningService(CreateEmployeeHandler createEm
             {
                 CompanyId         = request.CompanyId,
                 DepartmentId      = request.DepartmentId,
+                LocationId        = request.LocationId,
                 PositionProfileId = request.PositionProfileId,
                 ManagerId         = request.ManagerId,
                 FirstName         = request.FirstName,
@@ -27,6 +28,8 @@ internal sealed class EmployeeProvisioningService(CreateEmployeeHandler createEm
                 Gender            = request.Gender,
                 GenderOther       = request.GenderOther,
                 PhoneNumber       = request.PhoneNumber,
+                EmployeeNumber    = request.EmployeeNumber,
+                EmploymentTypeId  = request.EmploymentTypeId,
             },
             cancellationToken);
 

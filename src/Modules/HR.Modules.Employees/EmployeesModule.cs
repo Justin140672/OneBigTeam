@@ -362,15 +362,18 @@ public static class EmployeesModule
             var empAe2Id      = Guid.Parse("30000000-0000-0000-0000-000000000010");
 
             Employee MakeAcme(Guid id, string first, string last, string email, DateOnly start,
-                              Guid? deptId, Guid? posId, Guid? managerId,
+                              Guid deptId, Guid posId, Guid? managerId,
                               DateOnly dob, string nationality, string gender,
                               string? personalEmail, string? phone,
                               string addr1, string? addr2, string city, string? county, string postCode,
                               string employeeNumber, Guid employmentTypeId,
                               string? preferredName = null)
             {
-                var e = Employee.Create(id, acmeId, first, last, email, start, hasSystemAccess: true, now);
-                e.Assign(deptId, posId, null, managerId, now);
+                var e = Employee.Create(
+                    id, acmeId, first, last, email, start, hasSystemAccess: true,
+                    dob, nationality, gender, employeeNumber, employmentTypeId,
+                    deptId, locLondonId, posId, now);
+                e.Assign(deptId, posId, locLondonId, managerId, now);
                 e.UpdatePersonalDetails(preferredName ?? first, dob, nationality, gender, null, now);
                 e.UpdateContactDetails(personalEmail, phone, null, addr1, addr2, city, county, postCode, "United Kingdom", now);
                 e.UpdateEmploymentDetails(employeeNumber, employmentTypeId, start, null, null, null, null, now);
@@ -424,18 +427,27 @@ public static class EmployeesModule
             db.Departments.Add(
                 Department.Create(betaDeptEngId, betaCorpId, "Engineering", "Software engineering", now));
 
+            var betaLocTypeOfficeId = Guid.Parse("60000000-0000-0000-0000-000000000011");
+            var betaLocLeedsId      = Guid.Parse("70000000-0000-0000-0000-000000000011");
+
+            db.LocationTypes.Add(LocationType.Create(betaLocTypeOfficeId, betaCorpId, "Office", null, now));
+            db.Locations.Add(Location.Create(betaLocLeedsId, betaCorpId, betaLocTypeOfficeId, "Leeds Office", null, now));
+
             db.PositionProfiles.AddRange(
                 PositionProfile.Create(betaPosEngMgrId, betaCorpId, betaDeptEngId, null, "Engineering Manager", null, null, null, null, null, null, null, null, now),
                 PositionProfile.Create(betaPosDevId,    betaCorpId, betaDeptEngId, null, "Software Developer",  null, null, null, null, null, null, null, null, now));
 
             Employee MakeBeta(Guid id, string first, string last, string email, DateOnly start,
-                              Guid? posId, Guid? managerId, DateOnly dob, string nationality, string gender,
+                              Guid posId, Guid? managerId, DateOnly dob, string nationality, string gender,
                               string? personalEmail, string? phone,
                               string addr1, string? addr2, string city, string? county, string postCode,
                               string employeeNumber, Guid employmentTypeId)
             {
-                var e = Employee.Create(id, betaCorpId, first, last, email, start, hasSystemAccess: true, now);
-                e.Assign(betaDeptEngId, posId, null, managerId, now);
+                var e = Employee.Create(
+                    id, betaCorpId, first, last, email, start, hasSystemAccess: true,
+                    dob, nationality, gender, employeeNumber, employmentTypeId,
+                    betaDeptEngId, betaLocLeedsId, posId, now);
+                e.Assign(betaDeptEngId, posId, betaLocLeedsId, managerId, now);
                 e.UpdatePersonalDetails(first, dob, nationality, gender, null, now);
                 e.UpdateContactDetails(personalEmail, phone, null, addr1, addr2, city, county, postCode, "United Kingdom", now);
                 e.UpdateEmploymentDetails(employeeNumber, employmentTypeId, start, null, null, null, null, now);

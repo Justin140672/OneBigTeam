@@ -31,7 +31,15 @@ internal sealed class EmployeeStagingRowValidator(
     IEmployeeImportLookupReader lookupReader,
     IImportLookupResolver lookupResolver)
 {
-    private static readonly string[] RequiredFields = ["FirstName", "LastName", "WorkEmail", "StartDate"];
+    private static readonly string[] RequiredFields =
+        ["FirstName", "LastName", "WorkEmail", "StartDate", "DateOfBirth", "Nationality", "Gender", "EmployeeNumber"];
+
+    // Lookup-by-name fields that resolve to a mandatory Employee foreign key (Department,
+    // Location, EmploymentType, PositionProfile). These are validated for presence here in
+    // addition to the ResolveLookupsAsync existence/auto-create logic below, since an employee
+    // row missing any of them can never produce a valid Employee (all four are NOT NULL columns).
+    private static readonly string[] RequiredLookupFields =
+        ["DepartmentName", "LocationName", "EmploymentTypeName", "PositionProfileTitle"];
     private static readonly string[] DateFields = ["StartDate", "DateOfBirth", "ContinuousServiceDate", "ProbationEndDate"];
     private static readonly string[] CompensationFields = ["SalaryAmount", "SalaryType", "Currency", "HoursPerWeek", "FTE"];
     private static readonly string[] LeaveFields = ["LeaveTypeCode", "LeaveBalanceDays"];
@@ -174,6 +182,12 @@ internal sealed class EmployeeStagingRowValidator(
     private static void ValidateRequiredFields(ParsedImportRow row, List<string> rowErrors)
     {
         foreach (var field in RequiredFields)
+        {
+            if (string.IsNullOrWhiteSpace(GetField(row, field)))
+                rowErrors.Add($"'{field}' is required.");
+        }
+
+        foreach (var field in RequiredLookupFields)
         {
             if (string.IsNullOrWhiteSpace(GetField(row, field)))
                 rowErrors.Add($"'{field}' is required.");

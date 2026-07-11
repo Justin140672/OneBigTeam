@@ -74,8 +74,11 @@ public record HireCandidateRequest(
     string Nationality,
     string Gender,
     string? GenderOther,
-    Guid? DepartmentId,
-    Guid? PositionProfileId,
+    string EmployeeNumber,
+    Guid EmploymentTypeId,
+    Guid DepartmentId,
+    Guid LocationId,
+    Guid PositionProfileId,
     Guid? ManagerId);
 
 public record HireCandidateResponse(

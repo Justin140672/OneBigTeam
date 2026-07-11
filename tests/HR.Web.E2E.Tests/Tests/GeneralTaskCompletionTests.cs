@@ -8,9 +8,16 @@ namespace HR.Web.E2E.Tests.Tests;
 /// and that the status changes to "Completed" after the action.
 ///
 /// Uses Sarah Chen's seeded task "Review Q2 performance reports"
-/// (ID: a0000000-0000-0000-0000-000000000001), accessed directly via her own profile Tasks
+/// (ID: a0000000-0000-0000-0000-000000000027), accessed directly via her own profile Tasks
 /// tab (a self-service route unaffected by the "/" dashboard redirect that now applies to her
 /// CompanyAdministrator + Manager role, which still lacks EmployeeEdit — see Home.razor).
+///
+/// This task is TaskSource.Workflow (a generic, non-domain-specific source) rather than the
+/// TaskSource.Manual it used to be — that source has been removed entirely. Workflow is the
+/// closest generic bucket, and this test genuinely needs a task that exercises the
+/// CompleteTaskPanel fallback (i.e. one that doesn't match any of the specialised
+/// Source+ActionType panel combinations in TaskViewDialog), so the fixture was kept as a
+/// newly-seeded Workflow task rather than deleted.
 ///
 /// The dashboard-widget check (<see cref="Dashboard_ShowsGeneralTasksForEmployee"/>) uses Laura
 /// Bennett instead, since Sarah is redirected away from "/" and can never reach it.
@@ -21,8 +28,8 @@ public sealed class GeneralTaskCompletionTests(AppFixture fixture) : E2ETestBase
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid SarahId = Guid.Parse("30000000-0000-0000-0000-000000000001");
 
-    // Seeded task assigned to Sarah Chen.
-    private static readonly Guid TaskQ2ReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000001");
+    // Seeded task assigned to Sarah Chen (TaskSource.Workflow).
+    private static readonly Guid TaskQ2ReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000027");
 
     private const string SarahEmail = "sarah.chen@acme.example";
     private const string LauraEmail = "laura.bennett@acme.example";
@@ -57,9 +64,12 @@ public sealed class GeneralTaskCompletionTests(AppFixture fixture) : E2ETestBase
     public async Task Dashboard_ShowsGeneralTasksForEmployee()
     {
         // Sarah Chen is seeded as CompanyAdministrator-only and is redirected away from "/"
-        // (see Home.razor), so this dashboard-widget check uses Laura Bennett instead, who was
-        // given a parallel seeded "Review Q2 performance reports" task
-        // (a0000000-0000-0000-0000-000000000025) for this purpose.
+        // (see Home.razor), so this dashboard-widget check uses Laura Bennett instead.
+        // Laura's previous "Review Q2 performance reports" / "Prepare board meeting agenda"
+        // tasks (TaskSource.Manual) were removed along with that source; her remaining seeded
+        // tasks — "Update annual leave policy documentation" (Leave) and "Acknowledge receipt
+        // of asset" (Asset) — are real, domain-sourced tasks that already existed for other
+        // purposes, so no new seed data was needed here.
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var dash  = new DashboardPage(_page, _fixture.WebBaseUrl);
 
@@ -75,9 +85,8 @@ public sealed class GeneralTaskCompletionTests(AppFixture fixture) : E2ETestBase
             "Expected Laura to have tasks in the My Tasks dashboard widget");
 
         Assert.Contains(taskTitles, t =>
-            t.Contains("Q2", StringComparison.OrdinalIgnoreCase) ||
-            t.Contains("board meeting", StringComparison.OrdinalIgnoreCase) ||
-            t.Contains("survey", StringComparison.OrdinalIgnoreCase));
+            t.Contains("leave policy", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("acknowledge", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -86,9 +95,10 @@ public sealed class GeneralTaskCompletionTests(AppFixture fixture) : E2ETestBase
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);
         var taskView = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
-        // Use "Analyse employee satisfaction survey results" (a0000000-0000-0000-0000-000000000004)
-        // — a separate seeded task so this test does not conflict with other tests that use Q2.
-        var taskSurveyId = Guid.Parse("a0000000-0000-0000-0000-000000000004");
+        // Use "Analyse employee satisfaction survey results" (a0000000-0000-0000-0000-000000000028,
+        // TaskSource.Workflow) — a separate seeded task so this test does not conflict with
+        // other tests that use Q2.
+        var taskSurveyId = Guid.Parse("a0000000-0000-0000-0000-000000000028");
 
         await login.GoToAsync();
         await login.LoginAsync(SarahEmail);

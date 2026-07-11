@@ -19,8 +19,8 @@ public class GetMyEmployeeHandlerTests
         var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Senior Engineer", null, null, null, null, null, null, null, null, now);
         context.PositionProfiles.Add(profile);
 
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
-        employee.Assign(null, profile.Id, null, null, now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        employee.Assign(Guid.NewGuid(), profile.Id, Guid.NewGuid(), null, now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
@@ -40,7 +40,7 @@ public class GetMyEmployeeHandlerTests
         var companyId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
 
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 

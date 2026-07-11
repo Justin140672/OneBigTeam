@@ -94,22 +94,20 @@ public static class TasksModule
         var empHrMgrId    = Guid.Parse("30000000-0000-0000-0000-000000000005"); // Laura Bennett
         var empAe2Id      = Guid.Parse("30000000-0000-0000-0000-000000000010"); // Carlos Rivera
 
-        // Fixed IDs for tasks assigned to Sarah so notifications can reference them
-        var taskQ2ReviewId      = Guid.Parse("a0000000-0000-0000-0000-000000000001");
-        var taskBoardAgendaId   = Guid.Parse("a0000000-0000-0000-0000-000000000002");
-        var taskInterviewId     = Guid.Parse("a0000000-0000-0000-0000-000000000003");
-        var taskSurveyId        = Guid.Parse("a0000000-0000-0000-0000-000000000004");
         // Probation review task — links to the active seeded probation review (50000000-...-000000000100)
         var taskProbationReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000005");
 
-        // Fixed IDs for tasks assigned to Laura Bennett (empHrMgrId), mirroring the shape of
-        // Sarah's fixed tasks above. Added additively so E2E dashboard-widget scenarios that
-        // need a reachable "/" dashboard can use Laura instead of Sarah (who is now
-        // CompanyAdministrator-only and gets redirected away from "/"). Sarah's own tasks and
-        // the NotificationsModule seed data that references a0000000-...0001/0002/0004 by ID
-        // are left untouched — these are brand-new tasks, not reassignments.
-        var taskLauraBoardAgendaId = Guid.Parse("a0000000-0000-0000-0000-000000000024");
-        var taskLauraQ2ReviewId    = Guid.Parse("a0000000-0000-0000-0000-000000000025");
+        // Generic, non-domain-specific tasks (previously TaskSource.Manual — that source was
+        // removed entirely; TaskSource.Workflow is the closest generic bucket). Kept only
+        // because specific E2E tests exercise mechanics that are source-agnostic (the generic
+        // CompleteTaskPanel fallback, and task reassignment) and need a task that doesn't match
+        // any of the specialised Source+ActionType panel combinations in TaskViewDialog.
+        // Assigned to Sarah — used by GeneralTaskCompletionTests (task-view detail + generic
+        // completion flow). Also referenced by NotificationsModule seed data by ID.
+        var taskGenericReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000027");
+        var taskGenericSurveyId = Guid.Parse("a0000000-0000-0000-0000-000000000028");
+        // Assigned to Laura — used by TaskReassignmentTests.
+        var taskLauraGenericAgendaId = Guid.Parse("a0000000-0000-0000-0000-000000000029");
 
         TaskItem Make(
             Guid id,
@@ -128,12 +126,6 @@ public static class TasksModule
         }
 
         db.TaskItems.AddRange(
-            Make(taskQ2ReviewId,
-                "Review Q2 performance reports",
-                "Gather scores from all department heads and summarise findings.",
-                TaskPriority.High, TaskSource.Manual,
-                new DateOnly(2026, 6, 30), empCtoId),
-
             Make(Guid.NewGuid(),
                 "Schedule probation review — Tom Williams",
                 "Tom's 3-month probation ends 20 May. Book a review meeting with his line manager.",
@@ -164,40 +156,32 @@ public static class TasksModule
                 TaskPriority.High, TaskSource.Document,
                 null, null),
 
-            Make(taskBoardAgendaId,
-                "Prepare board meeting agenda",
-                "Draft the Q3 board meeting agenda including financial review and product roadmap.",
-                TaskPriority.High, TaskSource.Manual,
-                new DateOnly(2026, 6, 25), empCtoId),
-
-            Make(taskInterviewId,
-                "Engineering lead interview debrief",
-                "Consolidate panel feedback and make hiring recommendation to the board.",
-                TaskPriority.Medium, TaskSource.Manual,
-                new DateOnly(2026, 6, 22), empCtoId, TaskItemStatus.InProgress),
-
-            Make(taskSurveyId,
-                "Analyse employee satisfaction survey results",
-                "Review responses from the May survey and prepare a summary report for leadership.",
-                TaskPriority.High, TaskSource.Manual,
-                new DateOnly(2026, 6, 10), empCtoId),
-
-            // Laura's equivalent of Sarah's board-agenda task — used by TaskReassignmentTests,
-            // which reassigns this one away from Laura instead of Sarah so the final dashboard
-            // assertion can use a reachable "/" dashboard.
-            Make(taskLauraBoardAgendaId,
-                "Prepare board meeting agenda",
-                "Draft the Q3 board meeting agenda including financial review and product roadmap.",
-                TaskPriority.High, TaskSource.Manual,
-                new DateOnly(2026, 6, 25), empHrMgrId),
-
-            // Laura's equivalent of Sarah's Q2-review task — used by
-            // GeneralTaskCompletionTests.Dashboard_ShowsGeneralTasksForEmployee.
-            Make(taskLauraQ2ReviewId,
+            // Generic (non-domain-specific) task assigned to Sarah — exercises the
+            // CompleteTaskPanel fallback in TaskViewDialog. Used by
+            // GeneralTaskCompletionTests.TaskView_ShowsCorrectDetailsForGeneralTask and
+            // referenced by NotificationsModule seed data.
+            Make(taskGenericReviewId,
                 "Review Q2 performance reports",
                 "Gather scores from all department heads and summarise findings.",
-                TaskPriority.High, TaskSource.Manual,
-                new DateOnly(2026, 6, 30), empHrMgrId));
+                TaskPriority.High, TaskSource.Workflow,
+                new DateOnly(2026, 6, 30), empCtoId),
+
+            // Generic (non-domain-specific) task assigned to Sarah — a second, independent one
+            // so completing it in GeneralTaskCompletionTests.TaskView_CompleteTask_ChangesStatusToCompleted
+            // doesn't conflict with the task above. Referenced by NotificationsModule seed data.
+            Make(taskGenericSurveyId,
+                "Analyse employee satisfaction survey results",
+                "Review responses from the May survey and prepare a summary report for leadership.",
+                TaskPriority.High, TaskSource.Workflow,
+                new DateOnly(2026, 6, 10), empCtoId),
+
+            // Generic (non-domain-specific) task assigned to Laura — used by
+            // TaskReassignmentTests, which reassigns this one away from Laura to James.
+            Make(taskLauraGenericAgendaId,
+                "Prepare board meeting agenda",
+                "Draft the Q3 board meeting agenda including financial review and product roadmap.",
+                TaskPriority.High, TaskSource.Workflow,
+                new DateOnly(2026, 6, 25), empHrMgrId));
 
         // Probation review task — linked to the active seeded review in ProbationModule seed.
         // Assigned to Sarah (dev user) so it appears in her task list during E2E tests.

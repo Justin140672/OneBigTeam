@@ -50,13 +50,11 @@ internal sealed class ListEmployeesHandler
 
         // Resolve display names with two targeted lookups — no N+1
         var departmentIds = employees
-            .Where(e => e.DepartmentId is not null)
-            .Select(e => e.DepartmentId!.Value)
+            .Select(e => e.DepartmentId)
             .ToHashSet();
 
         var positionProfileIds = employees
-            .Where(e => e.PositionProfileId is not null)
-            .Select(e => e.PositionProfileId!.Value)
+            .Select(e => e.PositionProfileId)
             .ToHashSet();
 
         var managerIds = employees
@@ -72,8 +70,7 @@ internal sealed class ListEmployeesHandler
             : new Dictionary<Guid, string>();
 
         var locationIds = employees
-            .Where(e => e.LocationId is not null)
-            .Select(e => e.LocationId!.Value)
+            .Select(e => e.LocationId)
             .ToHashSet();
 
         var locationNames = locationIds.Count > 0
@@ -102,11 +99,11 @@ internal sealed class ListEmployeesHandler
                 e.Id,
                 e.CompanyId,
                 e.DepartmentId,
-                e.DepartmentId is not null && departmentNames.TryGetValue(e.DepartmentId.Value, out var deptName) ? deptName : null,
+                departmentNames.TryGetValue(e.DepartmentId, out var deptName) ? deptName : null,
                 e.LocationId,
-                e.LocationId is not null && locationNames.TryGetValue(e.LocationId.Value, out var locName) ? locName : null,
+                locationNames.TryGetValue(e.LocationId, out var locName) ? locName : null,
                 e.PositionProfileId,
-                e.PositionProfileId is not null && positionProfileTitles.TryGetValue(e.PositionProfileId.Value, out var ppTitle) ? ppTitle : null,
+                positionProfileTitles.TryGetValue(e.PositionProfileId, out var ppTitle) ? ppTitle : null,
                 e.ManagerId,
                 e.ManagerId is not null && managerNames.TryGetValue(e.ManagerId.Value, out var mgrName) ? mgrName : null,
                 e.FirstName,

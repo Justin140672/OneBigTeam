@@ -9,6 +9,22 @@ internal sealed class CreateEmployeeValidator : AbstractValidator<CreateEmployee
         RuleFor(r => r.CompanyId)
             .NotEmpty();
 
+        RuleFor(r => r.DepartmentId)
+            .NotEmpty().WithMessage("Department is required.");
+
+        RuleFor(r => r.LocationId)
+            .NotEmpty().WithMessage("Location is required.");
+
+        RuleFor(r => r.PositionProfileId)
+            .NotEmpty().WithMessage("Position profile is required.");
+
+        RuleFor(r => r.EmploymentTypeId)
+            .NotEmpty().WithMessage("Employment type is required.");
+
+        RuleFor(r => r.EmployeeNumber)
+            .NotEmpty().WithMessage("Employee number is required.")
+            .MaximumLength(50);
+
         RuleFor(r => r.FirstName)
             .NotEmpty()
             .MaximumLength(100);

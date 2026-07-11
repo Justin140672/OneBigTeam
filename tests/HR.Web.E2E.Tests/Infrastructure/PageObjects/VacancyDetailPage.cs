@@ -255,11 +255,50 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             .ClickAsync();
     }
 
+    /// <summary>Fills the Employee Number field in the (currently open) Hire Candidate dialog.</summary>
+    public Task FillHireEmployeeNumberAsync(string value) =>
+        page.Locator(".hire-candidate-dialog").GetByPlaceholder("e.g. EMP-001").FillAsync(value);
+
+    /// <summary>
+    /// Selects a value from a Syncfusion SfDropDownList in the (currently open) Hire Candidate
+    /// dialog, identified by nearby label text — used for the Employment Type, Department,
+    /// Location and Position Profile dropdowns (Nationality and Gender have their own dedicated
+    /// methods above, predating this generic helper).
+    /// </summary>
+    public async Task SelectHireDropdownAsync(string labelText, string optionText)
+    {
+        var group = page.Locator(".hire-candidate-dialog .col-md-6")
+            .Filter(new() { HasText = labelText })
+            .First;
+        await group.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = optionText })
+            .First
+            .ClickAsync();
+    }
+
     public async Task SubmitHireAsync()
     {
         await page.Locator(".hire-candidate-dialog .e-footer-content button:has-text('Hire')").ClickAsync();
         await page.Locator("[role='dialog'].hire-candidate-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
+    }
+
+    /// <summary>
+    /// Clicks the Hire dialog's "Hire" button without waiting for the dialog to close — for tests
+    /// that expect client-side validation to keep the dialog open (see <see cref="SubmitHireAsync"/>
+    /// for the happy-path variant that waits for the dialog to hide after a successful hire).
+    /// </summary>
+    public Task ClickHireSubmitButtonAsync() =>
+        page.Locator(".hire-candidate-dialog .e-footer-content button:has-text('Hire')").ClickAsync();
+
+    /// <summary>Clicks "Cancel" on the (currently open) Hire Candidate dialog and waits for it to close.</summary>
+    public async Task CancelHireDialogAsync()
+    {
+        await page.Locator(".hire-candidate-dialog .e-footer-content button:has-text('Cancel')").ClickAsync();
+        await page.Locator("[role='dialog'].hire-candidate-dialog").WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
     public async Task<bool> HasDialogErrorAsync(string dialogCssClass) =>

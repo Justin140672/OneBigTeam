@@ -62,54 +62,71 @@ internal sealed class CreateEmployeeHandler
                 Error.Conflict($"An employee with work email '{request.WorkEmail.Trim()}' already exists in this company."));
         }
 
-        if (request.DepartmentId is not null)
-        {
-            var departmentExists = await _dbContext.Departments
-                .AnyAsync(
-                    d => d.Id == request.DepartmentId &&
-                         d.CompanyId == request.CompanyId &&
-                         d.IsActive,
-                    cancellationToken);
+        var employeeNumber = request.EmployeeNumber.Trim();
 
-            if (!departmentExists)
-            {
-                return Result.Failure<CreateEmployeeResponse>(
-                    Error.NotFound($"Department '{request.DepartmentId}' was not found."));
-            }
+        var employeeNumberExists = await _dbContext.Employees
+            .AnyAsync(
+                e => e.CompanyId == request.CompanyId &&
+                     e.EmployeeNumber == employeeNumber,
+                cancellationToken);
+
+        if (employeeNumberExists)
+        {
+            return Result.Failure<CreateEmployeeResponse>(
+                Error.Conflict($"An employee with employee number '{employeeNumber}' already exists in this company."));
         }
 
-        if (request.LocationId is not null)
-        {
-            var locationExists = await _dbContext.Locations
-                .AnyAsync(
-                    l => l.Id == request.LocationId &&
-                         l.CompanyId == request.CompanyId &&
-                         l.IsActive,
-                    cancellationToken);
+        var departmentExists = await _dbContext.Departments
+            .AnyAsync(
+                d => d.Id == request.DepartmentId &&
+                     d.CompanyId == request.CompanyId &&
+                     d.IsActive,
+                cancellationToken);
 
-            if (!locationExists)
-            {
-                return Result.Failure<CreateEmployeeResponse>(
-                    Error.NotFound($"Location '{request.LocationId}' was not found."));
-            }
+        if (!departmentExists)
+        {
+            return Result.Failure<CreateEmployeeResponse>(
+                Error.NotFound($"Department '{request.DepartmentId}' was not found."));
         }
 
-        PositionProfile? positionProfile = null;
-        if (request.PositionProfileId is not null)
-        {
-            positionProfile = await _dbContext.PositionProfiles
-                .AsNoTracking()
-                .SingleOrDefaultAsync(
-                    p => p.Id == request.PositionProfileId &&
-                         p.CompanyId == request.CompanyId &&
-                         p.IsActive,
-                    cancellationToken);
+        var locationExists = await _dbContext.Locations
+            .AnyAsync(
+                l => l.Id == request.LocationId &&
+                     l.CompanyId == request.CompanyId &&
+                     l.IsActive,
+                cancellationToken);
 
-            if (positionProfile is null)
-            {
-                return Result.Failure<CreateEmployeeResponse>(
-                    Error.NotFound($"Position profile '{request.PositionProfileId}' was not found."));
-            }
+        if (!locationExists)
+        {
+            return Result.Failure<CreateEmployeeResponse>(
+                Error.NotFound($"Location '{request.LocationId}' was not found."));
+        }
+
+        var positionProfile = await _dbContext.PositionProfiles
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                p => p.Id == request.PositionProfileId &&
+                     p.CompanyId == request.CompanyId &&
+                     p.IsActive,
+                cancellationToken);
+
+        if (positionProfile is null)
+        {
+            return Result.Failure<CreateEmployeeResponse>(
+                Error.NotFound($"Position profile '{request.PositionProfileId}' was not found."));
+        }
+
+        var employmentTypeExists = await _dbContext.EmploymentTypes
+            .AnyAsync(
+                t => t.Id == request.EmploymentTypeId &&
+                     t.CompanyId == request.CompanyId &&
+                     t.IsActive,
+                cancellationToken);
+
+        if (!employmentTypeExists)
+        {
+            return Result.Failure<CreateEmployeeResponse>(
+                Error.NotFound($"Employment type '{request.EmploymentTypeId}' was not found."));
         }
 
         if (request.ManagerId is not null)
@@ -141,6 +158,14 @@ internal sealed class CreateEmployeeHandler
             normalizedEmail,
             request.StartDate,
             request.HasSystemAccess,
+            request.DateOfBirth,
+            request.Nationality.Trim(),
+            request.Gender.Trim(),
+            employeeNumber,
+            request.EmploymentTypeId,
+            request.DepartmentId,
+            request.LocationId,
+            request.PositionProfileId,
             now);
 
         var preferredName = string.IsNullOrWhiteSpace(request.PreferredName)
@@ -167,10 +192,7 @@ internal sealed class CreateEmployeeHandler
             request.Country,
             now);
 
-        if (request.DepartmentId is not null || request.PositionProfileId is not null || request.LocationId is not null || request.ManagerId is not null)
-        {
-            employee.Assign(request.DepartmentId, request.PositionProfileId, request.LocationId, request.ManagerId, now);
-        }
+        employee.Assign(request.DepartmentId, request.PositionProfileId, request.LocationId, request.ManagerId, now);
 
         var probationEndDate = await _probationDateResolver.ResolveEndDateAsync(
             request.CompanyId, positionProfile?.ProbationMonthsOverride, employee.StartDate, cancellationToken);

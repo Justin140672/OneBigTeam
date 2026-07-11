@@ -53,6 +53,9 @@ public class ConfirmImportSessionHandlerTests
         string lastName = "Smith",
         string workEmail = "alice@example.com",
         string startDate = "2026-01-01",
+        string dateOfBirth = "1990-01-01",
+        string nationality = "British",
+        string gender = "Female",
         string? workingDays = null,
         string? hoursPerDay = null,
         string? salaryAmount = null,
@@ -65,6 +68,9 @@ public class ConfirmImportSessionHandlerTests
             ["LastName"] = lastName,
             ["WorkEmail"] = workEmail,
             ["StartDate"] = startDate,
+            ["DateOfBirth"] = dateOfBirth,
+            ["Nationality"] = nationality,
+            ["Gender"] = gender,
         };
         if (workingDays is not null) fields["WorkingDays"] = workingDays;
         if (hoursPerDay is not null) fields["HoursPerDay"] = hoursPerDay;
@@ -81,13 +87,21 @@ public class ConfirmImportSessionHandlerTests
         Guid sessionId,
         int rowNumber,
         string workEmail = "alice@example.com",
-        string? employeeNumber = null,
+        string? employeeNumber = "EMP-0001",
         string? managerReference = null,
-        string rawData = "")
+        string rawData = "",
+        Guid? departmentId = null,
+        Guid? locationId = null,
+        Guid? employmentTypeId = null,
+        Guid? positionProfileId = null)
     {
         var row = ImportStagingEmployee.Create(
             Guid.NewGuid(), companyId, sessionId, rowNumber, employeeNumber, workEmail,
-            managerReference, null, null, null, null,
+            managerReference,
+            departmentId ?? Guid.NewGuid(),
+            locationId ?? Guid.NewGuid(),
+            employmentTypeId ?? Guid.NewGuid(),
+            positionProfileId ?? Guid.NewGuid(),
             string.IsNullOrEmpty(rawData) ? BuildRawData(workEmail: workEmail) : rawData,
             isValid: true, FixedNowOffset);
         db.ImportStagingEmployees.Add(row);

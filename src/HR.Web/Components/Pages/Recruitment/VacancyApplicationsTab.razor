@@ -2,6 +2,10 @@
 @inject ApplicationService ApplicationService
 @inject CandidateService CandidateService
 @inject EmployeeService EmployeeService
+@inject DepartmentService DepartmentService
+@inject LocationService LocationService
+@inject PositionProfileService PositionProfileService
+@inject EmploymentTypeService EmploymentTypeService
 @inject IJSRuntime JS
 
 <div data-testid="vacancy-applications-tab">
@@ -213,6 +217,53 @@
                         </div>
                     }
                 </div>
+                <div class="col-md-6">
+                    <label class="form-label">Employee Number <span class="text-danger">*</span></label>
+                    <SfTextBox @bind-Value="_employeeNumber" Placeholder="e.g. EMP-001" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Employment Type <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="Guid?"
+                                    TItem="EmploymentTypeListItemModel"
+                                    DataSource="@_employmentTypes"
+                                    @bind-Value="_employmentTypeId"
+                                    Placeholder="Select type">
+                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                    </SfDropDownList>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Department <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="Guid?"
+                                    TItem="DepartmentListItemModel"
+                                    DataSource="@_departments"
+                                    @bind-Value="_departmentId"
+                                    Placeholder="Select department"
+                                    AllowFiltering="true">
+                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                    </SfDropDownList>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Location <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="Guid?"
+                                    TItem="LocationListItemModel"
+                                    DataSource="@_locations"
+                                    @bind-Value="_locationId"
+                                    Placeholder="Select location"
+                                    AllowFiltering="true">
+                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                    </SfDropDownList>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Position Profile <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="Guid?"
+                                    TItem="PositionProfileListItemModel"
+                                    DataSource="@_positionProfiles"
+                                    @bind-Value="_positionProfileId"
+                                    Placeholder="Select position profile"
+                                    AllowFiltering="true">
+                        <DropDownListFieldSettings Value="Id" Text="Title" />
+                    </SfDropDownList>
+                </div>
             </div>
             @if (_dialogError is not null)
             {
@@ -255,11 +306,20 @@
 
     private bool _showHireDialog;
     private List<NationalityListItem> _nationalities = [];
+    private List<DepartmentListItemModel> _departments = [];
+    private List<LocationListItemModel> _locations = [];
+    private List<PositionProfileListItemModel> _positionProfiles = [];
+    private List<EmploymentTypeListItemModel> _employmentTypes = [];
     private DateOnly? _startDate;
     private DateOnly? _dateOfBirth;
     private string _nationality = string.Empty;
     private string _gender = string.Empty;
     private string? _genderOther;
+    private string _employeeNumber = string.Empty;
+    private Guid? _employmentTypeId;
+    private Guid? _departmentId;
+    private Guid? _locationId;
+    private Guid? _positionProfileId;
 
     private static readonly string[] _genderOptions = ["Male", "Female", "Non-binary", "Prefer not to say", "Other"];
 
@@ -439,6 +499,11 @@
         _nationality = string.Empty;
         _gender = string.Empty;
         _genderOther = null;
+        _employeeNumber = string.Empty;
+        _employmentTypeId = null;
+        _departmentId = null;
+        _locationId = null;
+        _positionProfileId = null;
 
         if (_nationalities.Count == 0)
         {
@@ -446,13 +511,27 @@
             _nationalities = result?.Items.ToList() ?? [];
         }
 
+        var deptTask = DepartmentService.ListDepartmentsAsync(CompanyId);
+        var locationTask = LocationService.ListLocationsAsync(CompanyId);
+        var profileTask = PositionProfileService.ListPositionProfilesAsync(CompanyId);
+        var employmentTypeTask = EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
+
+        await Task.WhenAll(deptTask, locationTask, profileTask, employmentTypeTask);
+
+        _departments = (await deptTask)?.Items ?? [];
+        _locations = (await locationTask)?.Items ?? [];
+        _positionProfiles = (await profileTask)?.Items.ToList() ?? [];
+        _employmentTypes = (await employmentTypeTask)?.Items ?? [];
+
         _showHireDialog = true;
     }
 
     private async Task ConfirmHireAsync()
     {
         if (_activeApplication is null || _startDate is null || _dateOfBirth is null ||
-            string.IsNullOrWhiteSpace(_nationality) || string.IsNullOrWhiteSpace(_gender))
+            string.IsNullOrWhiteSpace(_nationality) || string.IsNullOrWhiteSpace(_gender) ||
+            string.IsNullOrWhiteSpace(_employeeNumber) || _employmentTypeId is null ||
+            _departmentId is null || _locationId is null || _positionProfileId is null)
         {
             _dialogError = "Please complete all required fields.";
             return;
@@ -462,7 +541,9 @@
             CompanyId, VacancyId, _activeApplication.Id,
             _startDate.Value, _dateOfBirth.Value, _nationality, _gender,
             string.IsNullOrWhiteSpace(_genderOther) ? null : _genderOther.Trim(),
-            null, null, null);
+            _employeeNumber.Trim(), _employmentTypeId.Value,
+            _departmentId.Value, _locationId.Value, _positionProfileId.Value,
+            null);
 
         var (result, error) = await ApplicationService.HireCandidateAsync(CompanyId, VacancyId, _activeApplication.Id, request);
 

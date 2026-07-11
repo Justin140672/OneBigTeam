@@ -53,11 +53,14 @@ internal sealed class HireCandidateHandler(
                 request.DateOfBirth,
                 request.Nationality,
                 request.Gender,
+                request.EmployeeNumber,
+                request.EmploymentTypeId,
+                request.DepartmentId,
+                request.LocationId,
+                request.PositionProfileId,
                 request.GenderOther,
                 PersonalEmail: null,
                 candidate.Phone,
-                request.DepartmentId,
-                request.PositionProfileId,
                 request.ManagerId),
             cancellationToken);
 

@@ -113,10 +113,7 @@ public class GetNewHiresTrendHandlerTests
     }
 
     private static Employee NewEmployee(Guid companyId, DateOnly startDate) =>
-        Employee.Create(
-            Guid.NewGuid(), companyId, "First", "Last",
-            $"employee.{Guid.NewGuid():N}@example.com",
-            startDate, hasSystemAccess: true, Now);
+        Employee.Create(Guid.NewGuid(), companyId, "First", "Last", $"employee.{Guid.NewGuid():N}@example.com", startDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
 
     private static GetNewHiresTrendHandler BuildHandler(EmployeesDbContext context) =>
         new(context, new FakeClock(FixedUtcNow));

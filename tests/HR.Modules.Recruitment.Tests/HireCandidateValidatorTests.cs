@@ -8,13 +8,18 @@ public class HireCandidateValidatorTests
 
     private static HireCandidateRequest ValidRequest() => new()
     {
-        CompanyId     = Guid.NewGuid(),
-        VacancyId     = Guid.NewGuid(),
-        ApplicationId = Guid.NewGuid(),
-        StartDate     = new DateOnly(2026, 8, 1),
-        DateOfBirth   = new DateOnly(1995, 3, 20),
-        Nationality   = "British",
-        Gender        = "Female",
+        CompanyId         = Guid.NewGuid(),
+        VacancyId         = Guid.NewGuid(),
+        ApplicationId     = Guid.NewGuid(),
+        StartDate         = new DateOnly(2026, 8, 1),
+        DateOfBirth       = new DateOnly(1995, 3, 20),
+        Nationality       = "British",
+        Gender            = "Female",
+        EmployeeNumber    = "EMP-0001",
+        EmploymentTypeId  = Guid.NewGuid(),
+        DepartmentId      = Guid.NewGuid(),
+        LocationId        = Guid.NewGuid(),
+        PositionProfileId = Guid.NewGuid(),
     };
 
     [Fact]

@@ -6,6 +6,7 @@
 @inject DepartmentService DepartmentService
 @inject LocationService LocationService
 @inject PositionProfileService PositionProfileService
+@inject EmploymentTypeService EmploymentTypeService
 @inject LeavePolicyService LeavePolicyService
 @inject InviteService InviteService
 @inject AppSession Session
@@ -110,7 +111,23 @@
                                     <SfDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Department</label>
+                                    <label class="form-label">Employee Number <span class="text-danger">*</span></label>
+                                    <HrTextBox @bind-Value="Model.EmployeeNumber" Placeholder="e.g. EMP-001" />
+                                    <ValidationMessage For="@(() => Model.EmployeeNumber)" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Employment Type <span class="text-danger">*</span></label>
+                                    <SfDropDownList TValue="Guid?"
+                                                    TItem="EmploymentTypeListItemModel"
+                                                    DataSource="@_employmentTypes"
+                                                    @bind-Value="Model.EmploymentTypeId"
+                                                    Placeholder="Select type">
+                                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                                    </SfDropDownList>
+                                    <ValidationMessage For="@(() => Model.EmploymentTypeId)" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Department <span class="text-danger">*</span></label>
                                     <SfDropDownList TValue="Guid?"
                                                     TItem="DepartmentListItemModel"
                                                     DataSource="@_departments"
@@ -119,9 +136,10 @@
                                                     AllowFiltering="true">
                                         <DropDownListFieldSettings Value="Id" Text="Name" />
                                     </SfDropDownList>
+                                    <ValidationMessage For="@(() => Model.DepartmentId)" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Position Profile</label>
+                                    <label class="form-label">Position Profile <span class="text-danger">*</span></label>
                                     <SfDropDownList TValue="Guid?"
                                                     TItem="PositionProfileListItemModel"
                                                     DataSource="@_positionProfiles"
@@ -131,9 +149,10 @@
                                         <DropDownListFieldSettings Value="Id" Text="Title" />
                                         <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?" ValueChange="OnPositionProfileChanged" />
                                     </SfDropDownList>
+                                    <ValidationMessage For="@(() => Model.PositionProfileId)" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Location</label>
+                                    <label class="form-label">Location <span class="text-danger">*</span></label>
                                     <SfDropDownList TValue="Guid?"
                                                     TItem="LocationListItemModel"
                                                     DataSource="@_locations"
@@ -142,6 +161,7 @@
                                                     AllowFiltering="true">
                                         <DropDownListFieldSettings Value="Id" Text="Name" />
                                     </SfDropDownList>
+                                    <ValidationMessage For="@(() => Model.LocationId)" />
                                 </div>
                             </div>
                         </div>
@@ -629,6 +649,7 @@
     private List<DepartmentListItemModel> _departments = [];
     private List<LocationListItemModel> _locations = [];
     private List<PositionProfileListItemModel> _positionProfiles = [];
+    private List<EmploymentTypeListItemModel> _employmentTypes = [];
     private List<NationalityListItem> _nationalities = [];
 
     private GetPositionProfileResponse? _selectedProfileDefaults;
@@ -667,6 +688,9 @@
         var profileResult = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
         _positionProfiles = profileResult?.Items.ToList() ?? [];
 
+        var employmentTypeResult = await EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
+        _employmentTypes = employmentTypeResult?.Items ?? [];
+
         var natResult = await EmployeeService.ListNationalitiesAsync();
         _nationalities = natResult?.Items.ToList() ?? [];
 
@@ -701,6 +725,12 @@
                 Model.LocationId = _employee.LocationId;
                 Model.PositionProfileId = _employee.PositionProfileId;
                 Model.HasSystemAccess = _employee.HasSystemAccess;
+                // Not shown on this tab (owned by the Employment tab's own model/form), but
+                // EmployeeProfileEditModel is validated as a whole via the shared EditContext, so
+                // these must still be populated here or Save on the Details tab would fail
+                // DataAnnotations validation for an existing employee.
+                Model.EmployeeNumber = _employee.EmployeeNumber ?? string.Empty;
+                Model.EmploymentTypeId = _employee.EmploymentTypeId;
             }
 
             var uri = new Uri(Navigation.Uri);
@@ -759,9 +789,9 @@
         {
             var request = new CreateEmployeeRequest(
                 CompanyId,
-                Model.DepartmentId,
-                Model.LocationId,
-                Model.PositionProfileId,
+                Model.DepartmentId!.Value,
+                Model.LocationId!.Value,
+                Model.PositionProfileId!.Value,
                 Model.FirstName.Trim(),
                 Model.LastName.Trim(),
                 string.IsNullOrWhiteSpace(Model.PreferredName)  ? null : Model.PreferredName.Trim(),
@@ -772,6 +802,8 @@
                 Model.Nationality.Trim(),
                 Model.Gender.Trim(),
                 string.IsNullOrWhiteSpace(Model.GenderOther)    ? null : Model.GenderOther.Trim(),
+                Model.EmployeeNumber.Trim(),
+                Model.EmploymentTypeId!.Value,
                 string.IsNullOrWhiteSpace(Model.PhoneNumber)    ? null : Model.PhoneNumber.Trim(),
                 string.IsNullOrWhiteSpace(Model.HomePhone)      ? null : Model.HomePhone.Trim(),
                 string.IsNullOrWhiteSpace(Model.AddressLine1)   ? null : Model.AddressLine1.Trim(),

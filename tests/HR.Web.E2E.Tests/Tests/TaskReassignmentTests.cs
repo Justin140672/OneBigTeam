@@ -11,17 +11,20 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - The new assignee sees the task in their dashboard.
 ///
 /// Uses Laura Bennett's seeded "Prepare board meeting agenda" task
-/// (ID: a0000000-0000-0000-0000-000000000024) and reassigns it to James Okafor.
+/// (ID: a0000000-0000-0000-0000-000000000029) and reassigns it to James Okafor.
 ///
 /// Note: this scenario originally used Sarah Chen's equivalent task
-/// (a0000000-0000-0000-0000-000000000002), reassigning it from Sarah to James. Sarah is now
-/// seeded as CompanyAdministrator-only and is redirected away from "/" (see Home.razor), so she
-/// can no longer reach the dashboard for the final assertion. Rather than move Sarah's existing
-/// task (which NotificationsModule seed data references by ID), a brand-new parallel task owned
-/// by Laura was added instead (see TasksModule.SeedTasksAsync), and Laura — who is also the
-/// logged-in HR Administrator performing the reassignment — plays both roles here: the actor
-/// carrying out the reassignment, and the original assignee whose dashboard is checked
-/// afterwards. Sarah's original task is untouched and still covered by other tests/notifications.
+/// (a0000000-0000-0000-0000-000000000002, TaskSource.Manual), reassigning it from Sarah to
+/// James. Sarah is now seeded as CompanyAdministrator-only and is redirected away from "/" (see
+/// Home.razor), so she can no longer reach the dashboard for the final assertion. Rather than
+/// move Sarah's existing task, a brand-new parallel task owned by Laura was added instead (see
+/// TasksModule.SeedTasksAsync), and Laura — who is also the logged-in HR Administrator
+/// performing the reassignment — plays both roles here: the actor carrying out the
+/// reassignment, and the original assignee whose dashboard is checked afterwards.
+///
+/// TaskSource.Manual has since been removed entirely; Laura's task (and Sarah's original, now
+/// also removed) used that source purely as generic filler unrelated to reassignment mechanics,
+/// which are source-agnostic (see ReassignTaskHandler). Laura's task now uses TaskSource.Workflow.
 /// </summary>
 [Collection("E2E")]
 public sealed class TaskReassignmentTests(AppFixture fixture) : E2ETestBase(fixture)
@@ -29,8 +32,8 @@ public sealed class TaskReassignmentTests(AppFixture fixture) : E2ETestBase(fixt
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid LauraId = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
-    // Laura's seeded task — "Prepare board meeting agenda".
-    private static readonly Guid BoardAgendaTaskId = Guid.Parse("a0000000-0000-0000-0000-000000000024");
+    // Laura's seeded task — "Prepare board meeting agenda" (TaskSource.Workflow).
+    private static readonly Guid BoardAgendaTaskId = Guid.Parse("a0000000-0000-0000-0000-000000000029");
 
     private const string LauraEmail = "laura.bennett@acme.example";
     private const string JamesEmail = "james.okafor@acme.example";

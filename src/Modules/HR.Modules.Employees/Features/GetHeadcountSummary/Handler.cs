@@ -21,8 +21,7 @@ internal sealed class GetHeadcountSummaryHandler(EmployeesDbContext dbContext)
             .ToListAsync(cancellationToken);
 
         var departmentIds = counts
-            .Where(c => c.DepartmentId is not null)
-            .Select(c => c.DepartmentId!.Value)
+            .Select(c => c.DepartmentId)
             .ToHashSet();
 
         var departmentNames = departmentIds.Count > 0
@@ -35,7 +34,7 @@ internal sealed class GetHeadcountSummaryHandler(EmployeesDbContext dbContext)
         var items = counts
             .Select(c => new HeadcountSummaryItem(
                 c.DepartmentId,
-                c.DepartmentId is not null && departmentNames.TryGetValue(c.DepartmentId.Value, out var name)
+                departmentNames.TryGetValue(c.DepartmentId, out var name)
                     ? name
                     : UnassignedLabel,
                 c.EmployeeCount))

@@ -23,7 +23,7 @@ public class ReassignTaskHandlerTests
     {
         return TaskItem.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
-            "Original title", null, TaskPriority.Medium, TaskSource.Manual, TaskActionType.Complete,
+            "Original title", null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
             null, assignedEmployeeId, assignedUserId, DateTimeOffset.UtcNow);
     }
 

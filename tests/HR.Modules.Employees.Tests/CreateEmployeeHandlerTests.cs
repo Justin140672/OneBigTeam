@@ -19,15 +19,25 @@ public class CreateEmployeeHandlerTests
         await using var context = BuildContext();
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
         var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
                 CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice.smith@example.com",
-                StartDate = StartDate
+                StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female"
             },
             CancellationToken.None);
 
@@ -39,8 +49,8 @@ public class CreateEmployeeHandlerTests
         Assert.Equal("alice.smith@example.com", result.Value.WorkEmail);
         Assert.Equal(StartDate, result.Value.StartDate);
         Assert.Equal(EmploymentStatus.Draft, result.Value.Status);
-        Assert.Null(result.Value.DepartmentId);
-        Assert.Null(result.Value.PositionProfileId);
+        Assert.Equal(departmentId, result.Value.DepartmentId);
+        Assert.Equal(positionProfileId, result.Value.PositionProfileId);
         Assert.Null(result.Value.ManagerId);
 
         var saved = await context.Employees.SingleAsync();
@@ -52,15 +62,26 @@ public class CreateEmployeeHandlerTests
     {
         await using var context = BuildContext();
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
-                CompanyId = Guid.NewGuid(),
+                CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Bob",
                 LastName = "Jones",
                 WorkEmail = "Bob.Jones@EXAMPLE.COM",
-                StartDate = StartDate
+                StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Male"
             },
             CancellationToken.None);
 
@@ -77,11 +98,13 @@ public class CreateEmployeeHandlerTests
 
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
         var positionProfile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, null, "Developer", null, null, null, null, null, null, null, null, now);
-        var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane.manager@example.com", StartDate, hasSystemAccess: true, now);
+        var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane.manager@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Departments.Add(department);
         context.PositionProfiles.Add(positionProfile);
         context.Employees.Add(manager);
         await context.SaveChangesAsync();
+
+        var (_, locationId, _, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
 
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
 
@@ -90,12 +113,18 @@ public class CreateEmployeeHandlerTests
             {
                 CompanyId = companyId,
                 DepartmentId = department.Id,
+                LocationId = locationId,
                 PositionProfileId = positionProfile.Id,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0002",
                 ManagerId = manager.Id,
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice.smith@example.com",
-                StartDate = StartDate
+                StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female"
             },
             CancellationToken.None);
 
@@ -118,17 +147,26 @@ public class CreateEmployeeHandlerTests
         context.Locations.Add(location);
         await context.SaveChangesAsync();
 
+        var (departmentId, _, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
                 CompanyId = companyId,
+                DepartmentId = departmentId,
                 LocationId = location.Id,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice.smith@example.com",
-                StartDate = StartDate
+                StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female"
             },
             CancellationToken.None);
 
@@ -199,7 +237,7 @@ public class CreateEmployeeHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        context.Employees.Add(Employee.Create(Guid.NewGuid(), companyId, "Existing", "User", "alice.smith@example.com", StartDate, hasSystemAccess: true, now));
+        context.Employees.Add(Employee.Create(Guid.NewGuid(), companyId, "Existing", "User", "alice.smith@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
@@ -227,8 +265,10 @@ public class CreateEmployeeHandlerTests
         var companyB = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        context.Employees.Add(Employee.Create(Guid.NewGuid(), companyA, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, now));
+        context.Employees.Add(Employee.Create(Guid.NewGuid(), companyA, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
         await context.SaveChangesAsync();
+
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyB, now);
 
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
 
@@ -236,10 +276,18 @@ public class CreateEmployeeHandlerTests
             new CreateEmployeeRequest
             {
                 CompanyId = companyB,
+                DepartmentId = departmentId,
+                LocationId = locationId,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
-                StartDate = StartDate
+                StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female"
             },
             CancellationToken.None);
 
@@ -375,7 +423,7 @@ public class CreateEmployeeHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, now);
+        var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         manager.Terminate(now);
         context.Employees.Add(manager);
         await context.SaveChangesAsync();
@@ -403,15 +451,26 @@ public class CreateEmployeeHandlerTests
     {
         await using var context = BuildContext();
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
-                CompanyId = Guid.NewGuid(),
+                CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
-                StartDate = StartDate
+                StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female"
             },
             CancellationToken.None);
 
@@ -424,15 +483,26 @@ public class CreateEmployeeHandlerTests
     {
         await using var context = BuildContext();
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
-                CompanyId = Guid.NewGuid(),
+                CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
                 StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female",
                 HasSystemAccess = false
             },
             CancellationToken.None);
@@ -449,11 +519,19 @@ public class CreateEmployeeHandlerTests
     {
         await using var context = BuildContext();
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
-                CompanyId = Guid.NewGuid(),
+                CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
@@ -474,11 +552,19 @@ public class CreateEmployeeHandlerTests
     {
         await using var context = BuildContext();
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
-                CompanyId = Guid.NewGuid(),
+                CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Alice",
                 LastName = "Smith",
                 PreferredName = "Al",
@@ -505,15 +591,25 @@ public class CreateEmployeeHandlerTests
         var publisher = new CapturingIntegrationEventPublisher();
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
         var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
                 CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
                 StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female",
                 HasSystemAccess = true
             },
             CancellationToken.None);
@@ -534,8 +630,7 @@ public class CreateEmployeeHandlerTests
         var companyId = Guid.NewGuid();
 
         // seed a conflicting employee so creation fails
-        var existing = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones",
-            "alice@example.com", StartDate, true, new DateTimeOffset(FixedUtcNow, TimeSpan.Zero));
+        var existing = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "alice@example.com", StartDate, true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateTimeOffset(FixedUtcNow, TimeSpan.Zero));
         context.Employees.Add(existing);
         await context.SaveChangesAsync();
 
@@ -560,6 +655,11 @@ public class CreateEmployeeHandlerTests
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        // The seeded position profile below has no ProbationMonthsOverride, so the resolver's
+        // company default still applies (this only exercises the "no override present" path,
+        // not a literal absence of PositionProfile — that is no longer a valid Employee state).
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
         var reader = new FakeProbationDateResolver(months: 6);
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), reader, new FakeCompanyContactValidationReader());
 
@@ -567,10 +667,18 @@ public class CreateEmployeeHandlerTests
             new CreateEmployeeRequest
             {
                 CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
-                StartDate = StartDate
+                StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female"
             },
             CancellationToken.None);
 
@@ -590,6 +698,8 @@ public class CreateEmployeeHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
+        var (departmentId, locationId, _, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+
         var reader = new FakeProbationDateResolver(months: 6);
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), reader, new FakeCompanyContactValidationReader());
 
@@ -597,11 +707,18 @@ public class CreateEmployeeHandlerTests
             new CreateEmployeeRequest
             {
                 CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
                 PositionProfileId = profile.Id,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
-                StartDate = StartDate
+                StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female"
             },
             CancellationToken.None);
 
@@ -615,6 +732,8 @@ public class CreateEmployeeHandlerTests
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
         var publisher = new CapturingIntegrationEventPublisher();
         var reader = new FakeProbationDateResolver(months: 9);
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), publisher, reader, new FakeCompanyContactValidationReader());
@@ -623,10 +742,18 @@ public class CreateEmployeeHandlerTests
             new CreateEmployeeRequest
             {
                 CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
-                StartDate = StartDate
+                StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female"
             },
             CancellationToken.None);
 
@@ -647,6 +774,8 @@ public class CreateEmployeeHandlerTests
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
+        var (departmentId, locationId, _, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+
         var publisher = new CapturingIntegrationEventPublisher();
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
 
@@ -654,11 +783,18 @@ public class CreateEmployeeHandlerTests
             new CreateEmployeeRequest
             {
                 CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
                 PositionProfileId = profile.Id,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
-                StartDate = StartDate
+                StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female"
             },
             CancellationToken.None);
 
@@ -672,6 +808,11 @@ public class CreateEmployeeHandlerTests
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        // The seeded position profile has no DefaultLeavePolicyId configured, so the published
+        // event's DefaultLeavePolicyId is still null (a literal absence of PositionProfile is no
+        // longer a valid Employee state now that PositionProfile is mandatory).
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
         var publisher = new CapturingIntegrationEventPublisher();
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
 
@@ -679,10 +820,18 @@ public class CreateEmployeeHandlerTests
             new CreateEmployeeRequest
             {
                 CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
-                StartDate = StartDate
+                StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female"
             },
             CancellationToken.None);
 
@@ -770,15 +919,26 @@ public class CreateEmployeeHandlerTests
         await using var context = BuildContext();
         var handler = new CreateEmployeeHandler(
             context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), UkContactRules());
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
-                CompanyId = Guid.NewGuid(),
+                CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
                 StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female",
                 PostCode = "SW1A 1AA",
                 PhoneNumber = "07700 900000",
                 HomePhone = "01234 567890"
@@ -798,15 +958,26 @@ public class CreateEmployeeHandlerTests
         await using var context = BuildContext();
         var handler = new CreateEmployeeHandler(
             context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher(), new FakeProbationDateResolver(), UkContactRules());
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
 
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
-                CompanyId = Guid.NewGuid(),
+                CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
                 FirstName = "Alice",
                 LastName = "Smith",
                 WorkEmail = "alice@example.com",
                 StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female",
                 PostCode = null,
                 PhoneNumber = null,
                 HomePhone = null
@@ -823,5 +994,32 @@ public class CreateEmployeeHandlerTests
             .Options;
 
         return new EmployeesDbContext(options);
+    }
+
+    /// <summary>
+    /// Seeds an active Department, Location, PositionProfile and EmploymentType for
+    /// <paramref name="companyId"/> and returns their ids. CreateEmployeeRequest requires all
+    /// four (plus DateOfBirth/Nationality/Gender/EmployeeNumber) to resolve to a real, active,
+    /// same-company row, so most handler tests need this fixture.
+    /// </summary>
+    private static async Task<(Guid DepartmentId, Guid LocationId, Guid PositionProfileId, Guid EmploymentTypeId)> SeedMandatoryLookupsAsync(
+        EmployeesDbContext context, Guid companyId, DateTimeOffset now)
+    {
+        var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
+        var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
+        var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, now);
+        var positionProfile = PositionProfile.Create(
+            Guid.NewGuid(), companyId, department.Id, location.Id, "Developer",
+            null, null, null, null, null, null, null, null, now);
+        var employmentType = EmploymentType.Create(Guid.NewGuid(), companyId, "Permanent", null, now);
+
+        context.Departments.Add(department);
+        context.LocationTypes.Add(locationType);
+        context.Locations.Add(location);
+        context.PositionProfiles.Add(positionProfile);
+        context.EmploymentTypes.Add(employmentType);
+        await context.SaveChangesAsync();
+
+        return (department.Id, location.Id, positionProfile.Id, employmentType.Id);
     }
 }

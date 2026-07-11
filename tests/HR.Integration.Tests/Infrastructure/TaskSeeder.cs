@@ -14,7 +14,7 @@ internal static class TaskSeeder
         string title = "Test Task",
         string? description = null,
         TaskPriority priority = TaskPriority.Medium,
-        TaskSource source = TaskSource.Manual,
+        TaskSource source = TaskSource.Workflow,
         TaskActionType actionType = TaskActionType.Complete,
         DateOnly? dueDate = null,
         Guid? assignedEmployeeId = null,
