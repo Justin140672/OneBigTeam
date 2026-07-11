@@ -72,6 +72,21 @@ public class CompleteOnboardingTaskFromTaskActionTests
             Now,
             sourceEntityId);
 
+    private static (CompleteOnboardingTaskFromTaskAction Action, FakeNotificationWriter Notifications, FakeTaskCreator TaskCreator)
+        BuildAction(OnboardingDbContext dbContext, Guid? managerId = null)
+    {
+        var notifications = new FakeNotificationWriter();
+        var taskCreator = new FakeTaskCreator();
+        var action = new CompleteOnboardingTaskFromTaskAction(
+            dbContext,
+            new FakeClock(FixedUtcNow),
+            new FakeManagerReader(managerId),
+            new FakeEmployeeNameReader(),
+            notifications,
+            taskCreator);
+        return (action, notifications, taskCreator);
+    }
+
     [Fact]
     public async Task ExecuteAsync_Completes_Matching_Task_And_Updates_UpdatedAt()
     {
@@ -83,7 +98,7 @@ public class CompleteOnboardingTaskFromTaskActionTests
         var task = SeedTask(dbContext, companyId, plan.Id, seedAt);
         await dbContext.SaveChangesAsync();
 
-        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var (action, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, task.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -105,7 +120,7 @@ public class CompleteOnboardingTaskFromTaskActionTests
         SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B");
         await dbContext.SaveChangesAsync();
 
-        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var (action, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, taskToComplete.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -127,7 +142,7 @@ public class CompleteOnboardingTaskFromTaskActionTests
         SeedTask(dbContext, companyId, plan.Id, seedAt, OnboardingTaskStatus.Completed, "Task B");
         await dbContext.SaveChangesAsync();
 
-        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var (action, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, taskToComplete.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -150,7 +165,7 @@ public class CompleteOnboardingTaskFromTaskActionTests
         SeedTask(dbContext, companyId, plan.Id, seedAt, OnboardingTaskStatus.Skipped, "Task C");
         await dbContext.SaveChangesAsync();
 
-        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var (action, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, taskToComplete.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -170,7 +185,7 @@ public class CompleteOnboardingTaskFromTaskActionTests
         var task = SeedTask(dbContext, companyId, plan.Id, seedAt);
         await dbContext.SaveChangesAsync();
 
-        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var (action, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, sourceEntityId: null);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -195,7 +210,7 @@ public class CompleteOnboardingTaskFromTaskActionTests
         var task = SeedTask(dbContext, companyId, plan.Id, seedAt);
         await dbContext.SaveChangesAsync();
 
-        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var (action, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, sourceEntityId: Guid.NewGuid());
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -221,7 +236,7 @@ public class CompleteOnboardingTaskFromTaskActionTests
         SeedTask(dbContext, companyId, plan.Id, seedAt, OnboardingTaskStatus.Completed, "Task B");
         await dbContext.SaveChangesAsync();
 
-        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var (action, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, alreadyCompletedTask.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -249,7 +264,7 @@ public class CompleteOnboardingTaskFromTaskActionTests
         var task = SeedTask(dbContext, otherCompanyId, plan.Id, seedAt);
         await dbContext.SaveChangesAsync();
 
-        var action = new CompleteOnboardingTaskFromTaskAction(dbContext, new FakeClock(FixedUtcNow));
+        var (action, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, task.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -261,5 +276,124 @@ public class CompleteOnboardingTaskFromTaskActionTests
         var savedPlan = await dbContext.OnboardingPlans.SingleAsync(p => p.Id == plan.Id);
         Assert.Equal(OnboardingStatus.NotStarted, savedPlan.Status);
         Assert.Equal(seedAt, savedPlan.UpdatedAt);
+    }
+
+    // ── Notifications on plan start, HR review task on plan completion ────────
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_First_Task_Notifies_Employee()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt);
+        var task = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B"); // still Pending afterwards
+        await dbContext.SaveChangesAsync();
+
+        var (action, notifications, taskCreator) = BuildAction(dbContext);
+        var context = BuildTaskContext(companyId, task.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var employeeNotification = Assert.Single(notifications.Written);
+        Assert.Equal(plan.EmployeeId, employeeNotification.EmployeeId);
+        Assert.Equal(NotificationType.OnboardingStarted, employeeNotification.Type);
+        Assert.Equal(plan.Id, employeeNotification.SourceEntityId);
+        Assert.Empty(taskCreator.Created);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_First_Task_Also_Notifies_Manager_When_Present()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt);
+        var task = SeedTask(dbContext, companyId, plan.Id, seedAt);
+        await dbContext.SaveChangesAsync();
+
+        var (action, notifications, _) = BuildAction(dbContext, managerId);
+        var context = BuildTaskContext(companyId, task.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.Equal(2, notifications.Written.Count);
+        Assert.Contains(notifications.Written, n => n.EmployeeId == plan.EmployeeId && n.Type == NotificationType.OnboardingStarted);
+        Assert.Contains(notifications.Written, n => n.EmployeeId == managerId && n.Type == NotificationType.OnboardingStarted);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_A_NonFirst_NonLast_Task_Sends_No_Notifications_And_Creates_No_Tasks()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OnboardingStatus.InProgress);
+        var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B"); // still Pending afterwards
+        await dbContext.SaveChangesAsync();
+
+        var (action, notifications, taskCreator) = BuildAction(dbContext, Guid.NewGuid());
+        var context = BuildTaskContext(companyId, taskToComplete.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.Empty(notifications.Written);
+        Assert.Empty(taskCreator.Created);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_Last_Remaining_Task_Creates_Unassigned_HR_Review_Task()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OnboardingStatus.InProgress);
+        var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, OnboardingTaskStatus.Completed, "Task B");
+        await dbContext.SaveChangesAsync();
+
+        var (action, notifications, taskCreator) = BuildAction(dbContext);
+        var context = BuildTaskContext(companyId, taskToComplete.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var created = Assert.Single(taskCreator.Created);
+        Assert.Equal(TaskSource.Onboarding, created.Source);
+        Assert.Equal(TaskActionType.Review, created.ActionType);
+        Assert.Null(created.AssignedEmployeeId);
+        Assert.Null(created.AssignedUserId);
+        Assert.Equal(plan.Id, created.SourceEntityId);
+
+        // The plan was already InProgress, so completing its last task does not re-trigger the
+        // "onboarding started" notifications — only the HR review task is created.
+        Assert.Empty(notifications.Written);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_NoOp_Paths_Send_No_Notifications_And_Create_No_Tasks()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OnboardingStatus.InProgress);
+        var alreadyCompletedTask = SeedTask(dbContext, companyId, plan.Id, seedAt, OnboardingTaskStatus.Completed, "Task A");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, OnboardingTaskStatus.Completed, "Task B");
+        await dbContext.SaveChangesAsync();
+
+        var (action, notifications, taskCreator) = BuildAction(dbContext, Guid.NewGuid());
+        var context = BuildTaskContext(companyId, alreadyCompletedTask.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.Empty(notifications.Written);
+        Assert.Empty(taskCreator.Created);
     }
 }

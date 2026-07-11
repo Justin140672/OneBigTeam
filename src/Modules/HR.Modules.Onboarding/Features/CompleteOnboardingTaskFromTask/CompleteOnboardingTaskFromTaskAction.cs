@@ -8,8 +8,14 @@ namespace HR.Modules.Onboarding.Features.CompleteOnboardingTaskFromTask;
 
 internal sealed class CompleteOnboardingTaskFromTaskAction(
     OnboardingDbContext dbContext,
-    IClock clock) : ITaskCompletionAction
+    IClock clock,
+    IManagerReader managerReader,
+    IEmployeeNameReader employeeNameReader,
+    INotificationWriter notificationWriter,
+    ITaskCreator taskCreator) : ITaskCompletionAction
 {
+    private static readonly Guid SystemUserId = Guid.Empty;
+
     public TaskSource Source => TaskSource.Onboarding;
     public TaskActionType ActionType => TaskActionType.Complete;
 
@@ -42,19 +48,76 @@ internal sealed class CompleteOnboardingTaskFromTaskAction(
 
         var now = clock.UtcNowOffset();
 
-        if (plan.Status == OnboardingStatus.NotStarted)
+        var isStarting = plan.Status == OnboardingStatus.NotStarted;
+        if (isStarting)
             plan.Start(now);
 
         var planTasks = await dbContext.OnboardingTasks
             .Where(t => t.OnboardingPlanId == plan.Id)
             .ToListAsync(cancellationToken);
 
-        if (planTasks.Count > 0
-            && planTasks.All(t => t.Status is OnboardingTaskStatus.Completed or OnboardingTaskStatus.Skipped))
-        {
+        var isCompleting = planTasks.Count > 0
+            && planTasks.All(t => t.Status is OnboardingTaskStatus.Completed or OnboardingTaskStatus.Skipped);
+
+        if (isCompleting)
             plan.Complete(now);
-        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (isStarting)
+            await NotifyOnboardingStartedAsync(plan, now, cancellationToken);
+
+        if (isCompleting)
+            await CreateHrCompletionReviewTaskAsync(plan, cancellationToken);
+    }
+
+    private async Task NotifyOnboardingStartedAsync(OnboardingPlan plan, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var names = await employeeNameReader.GetNamesAsync(plan.CompanyId, [plan.EmployeeId], cancellationToken);
+        var employeeName = names.GetValueOrDefault(plan.EmployeeId, "the new employee");
+
+        var managerId = await managerReader.GetManagerIdAsync(plan.CompanyId, plan.EmployeeId, cancellationToken);
+        if (managerId.HasValue)
+        {
+            await notificationWriter.WriteAsync(
+                Guid.NewGuid(), plan.CompanyId, managerId.Value,
+                $"Onboarding started for {employeeName}",
+                $"{employeeName}'s onboarding plan has been created with their start-date tasks. Review their checklist.",
+                plan.Id,
+                NotificationType.OnboardingStarted,
+                NotificationPriority.Normal,
+                now,
+                cancellationToken);
+        }
+
+        await notificationWriter.WriteAsync(
+            Guid.NewGuid(), plan.CompanyId, plan.EmployeeId,
+            "Your onboarding has started",
+            "Your onboarding checklist has been created — check your tasks to get started.",
+            plan.Id,
+            NotificationType.OnboardingStarted,
+            NotificationPriority.Normal,
+            now,
+            cancellationToken);
+    }
+
+    private async Task CreateHrCompletionReviewTaskAsync(OnboardingPlan plan, CancellationToken cancellationToken)
+    {
+        var names = await employeeNameReader.GetNamesAsync(plan.CompanyId, [plan.EmployeeId], cancellationToken);
+        var employeeName = names.GetValueOrDefault(plan.EmployeeId, "Unknown Employee");
+
+        await taskCreator.CreateAsync(
+            plan.CompanyId,
+            createdBy:          SystemUserId,
+            title:              $"Onboarding completed — {employeeName}",
+            description:        $"{employeeName}'s onboarding plan is complete. Review and close out any final steps.",
+            priority:           TaskPriority.Medium,
+            source:             TaskSource.Onboarding,
+            actionType:         TaskActionType.Review,
+            dueDate:            null,
+            assignedEmployeeId: null,
+            assignedUserId:     null,
+            sourceEntityId:     plan.Id,
+            cancellationToken);
     }
 }
