@@ -414,6 +414,7 @@ app.UseProbationRecurringJobs();
 app.UseAssetsRecurringJobs();
 app.UseSicknessRecurringJobs();
 app.UseRecruitmentRecurringJobs();
+app.UseOnboardingRecurringJobs();
 app.UseLoggingMiddleware();
 app.UseRouting();
 app.UseAuthentication();

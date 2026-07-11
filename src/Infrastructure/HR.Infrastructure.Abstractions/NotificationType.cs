@@ -26,4 +26,5 @@ public enum NotificationType
     InterviewFeedbackOverdue     = 22,
     InterviewReminder            = 23,
     OnboardingStarted            = 24,
+    OnboardingTaskOverdue        = 25,
 }

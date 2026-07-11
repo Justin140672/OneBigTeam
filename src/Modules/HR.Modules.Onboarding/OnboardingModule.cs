@@ -1,9 +1,12 @@
 using HR.Modules.Onboarding.Features.CompleteOnboardingTaskFromTask;
 using HR.Modules.Onboarding.Features.CreateOnboardingPlanOnEmployeeCreated;
 using HR.Modules.Onboarding.Features.GetOnboardingOverview;
+using HR.Modules.Onboarding.Jobs;
 using HR.Modules.Onboarding.Persistence;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
+using Hangfire;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,8 +25,19 @@ public static class OnboardingModule
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddScoped<ITaskCompletionAction, CompleteOnboardingTaskFromTaskAction>();
         services.AddScoped<GetOnboardingOverviewHandler>();
+        services.AddScoped<OnboardingReminderJob>();
 
         return services;
+    }
+
+    public static WebApplication UseOnboardingRecurringJobs(this WebApplication app)
+    {
+        var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+        jobManager.AddOrUpdate<OnboardingReminderJob>(
+            "onboarding-reminders",
+            job => job.ExecuteAsync(),
+            Cron.Daily(7));
+        return app;
     }
 
     public static async Task MigrateOnboardingAsync(this IServiceProvider services)
