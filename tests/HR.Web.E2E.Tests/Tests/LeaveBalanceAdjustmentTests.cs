@@ -83,12 +83,13 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
     [Fact]
     public async Task AdminLeaveTab_EmployeeWithNoLeavePolicyAssignment_ShowsNaAndNoAdjustButtons()
     {
-        // An employee created without a Position Profile gets no DefaultLeavePolicyId, so
-        // HR.Modules.Leave's EmployeeCreatedHandler never creates a policy assignment or any
-        // LeaveBalance rows for them (see EmployeeCreatedHandler.HandleAsync: it returns early
-        // when integrationEvent.DefaultLeavePolicyId is null and no assignment already exists).
-        // That deterministically reproduces the "n/a" / HasBalance == false row for every leave
-        // type, unlike relying on a specific seeded leave type name.
+        // Position Profile is now mandatory, so this employee must have one — but "Senior
+        // Software Engineer" (like every seeded profile) has no DefaultLeavePolicyId, so
+        // HR.Modules.Leave's EmployeeCreatedHandler still never creates a policy assignment or
+        // any LeaveBalance rows for them (see EmployeeCreatedHandler.HandleAsync: it returns
+        // early when integrationEvent.DefaultLeavePolicyId is null and no assignment already
+        // exists). That deterministically reproduces the "n/a" / HasBalance == false row for
+        // every leave type, unlike relying on a specific seeded leave type name.
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList  = new EmployeeListPage(_page, _fixture.WebBaseUrl);
         var empEdit  = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
@@ -111,7 +112,15 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");
         await empEdit.FillStartDateAsync("01/03/2026");
-        // Deliberately no Position Profile selected.
+
+        // Employee Number, Employment Type, Department, Location and Position Profile are all
+        // mandatory now — selecting "Senior Software Engineer" (seeded with Engineering / London
+        // Office attached, and crucially no DefaultLeavePolicyId) satisfies all of them while
+        // preserving this test's "no leave policy assigned" premise.
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+
         await empEdit.SaveNewEmployeeAsync();
 
         await empList.ClickEmployeeAsync(lastName);

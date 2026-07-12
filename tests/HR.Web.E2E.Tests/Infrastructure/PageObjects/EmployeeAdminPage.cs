@@ -408,7 +408,12 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
     public async Task<string?> GetAdjustDialogCurrentBalanceTextAsync(string leaveTypeName)
     {
         var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = $"Adjust {leaveTypeName} Balance" });
-        var input = dialog.Locator("input[readonly]");
+        // AdjustLeaveBalanceDialog.razor's "Reason" SfDropDownList also renders a hidden
+        // readonly input under the hood, so a bare "input[readonly]" matches both it and the
+        // intended Current Balance field. Scope to ".form-control" (the Current Balance input's
+        // own class; the dropdown's internal input uses Syncfusion's "e-control"/"e-input"
+        // classes instead) to disambiguate.
+        var input = dialog.Locator("input.form-control[readonly]");
         return (await input.InputValueAsync())?.Trim();
     }
 

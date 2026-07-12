@@ -15,6 +15,8 @@ internal sealed record GetEmployeeResponse(
     string? PositionTitle,
     Guid? ManagerId,
     string? ManagerFullName,
+    int DirectReportsCount,
+    IReadOnlyList<ReportingChainItem> ReportingChain,
     string FirstName,
     string LastName,
     string? PreferredName,
@@ -46,3 +48,7 @@ internal sealed record GetEmployeeResponse(
     string? Notes,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
+
+// Ordered from the top of the org (no manager) down to the employee's immediate manager;
+// does not include the employee themselves.
+internal sealed record ReportingChainItem(Guid EmployeeId, string Name, string? JobTitle);

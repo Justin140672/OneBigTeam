@@ -30,9 +30,20 @@ public sealed class OrganisationChartTests(AppFixture fixture) : E2ETestBase(fix
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        Assert.True(
-            await _page.GetByRole(AriaRole.Menuitem, new() { Name = "Organisation Chart" }).IsVisibleAsync(),
-            "Expected an 'Organisation Chart' nav item to be visible to an HR Administrator");
+        // "Organisation Chart" lives inside the "People" submenu (MainLayout.razor). Confirmed by
+        // actually running this: ".app-nav-menu"'s DOM content is only the five top-level labels
+        // ("DashboardPeopleAssetsRecruitmentLeave") until "People" is clicked — Syncfusion's
+        // SfMenu doesn't just CSS-hide the submenu, it isn't rendered at all until expanded, and
+        // (per Syncfusion's usual popup-based submenu rendering) it may render as a portal
+        // elsewhere in the DOM rather than nested inside ".app-nav-menu" — so search the whole
+        // page for the resulting text instead of assuming it stays inside that container.
+        await _page.Locator(".app-nav-menu").GetByText("People", new() { Exact = true }).ClickAsync();
+
+        var orgChartLink = _page.GetByText("Organisation Chart", new() { Exact = true });
+        await orgChartLink.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
+        Assert.True(await orgChartLink.IsVisibleAsync(),
+            "Expected an 'Organisation Chart' nav item to be visible to an HR Administrator after expanding People");
     }
 
     [Fact]
@@ -103,6 +114,74 @@ public sealed class OrganisationChartTests(AppFixture fixture) : E2ETestBase(fix
 
         var cardClass = await lauraCard.First.GetAttributeAsync("class");
         Assert.Contains("org-chart-card-highlighted", cardClass ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task HrAdministrator_CanCollapseAndExpandManagerCard()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/organisation-chart");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        // Sarah Chen is seeded with two direct reports (James Okafor, Priya Sharma) — her card
+        // should show a collapse toggle, and collapsing it should hide James Okafor's card.
+        var sarahCard = _page.Locator(".org-chart-card").Filter(new() { HasText = "Sarah Chen" });
+        await sarahCard.First.WaitForAsync(new() { Timeout = 15_000 });
+
+        var jamesCard = _page.Locator(".org-chart-card").Filter(new() { HasText = "James Okafor" });
+        await jamesCard.First.WaitForAsync(new() { Timeout = 15_000 });
+
+        var toggle = sarahCard.First.Locator(".org-chart-toggle");
+        await toggle.ClickAsync();
+
+        await jamesCard.First.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+
+        var toggleText = await toggle.InnerTextAsync();
+        Assert.Contains("2", toggleText);
+
+        // Expand again — James Okafor's card should reappear.
+        await toggle.ClickAsync();
+        await jamesCard.First.WaitForAsync(new() { Timeout = 15_000 });
+
+        Assert.True(await jamesCard.First.IsVisibleAsync(),
+            "Expected James Okafor's card to reappear after expanding Sarah Chen's card again");
+    }
+
+    [Fact]
+    public async Task OrganisationChart_ZoomControls_ChangeAndPersistZoomLevel()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/organisation-chart");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        var zoomLevel = _page.Locator(".org-chart-zoom-level");
+        await zoomLevel.WaitForAsync(new() { Timeout = 15_000 });
+
+        var initialText = await zoomLevel.InnerTextAsync();
+
+        await _page.GetByTitle("Zoom in").ClickAsync();
+        await Assertions.Expect(zoomLevel).Not.ToHaveTextAsync(initialText, new() { Timeout = 10_000 });
+
+        var zoomedText = await zoomLevel.InnerTextAsync();
+
+        // Reloading re-establishes a brand-new Blazor circuit, so the zoom level surviving the
+        // reload can only be explained by the localStorage-backed restore in OnAfterRenderAsync,
+        // not any in-memory state.
+        await _page.ReloadAsync();
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        var zoomLevelAfterReload = _page.Locator(".org-chart-zoom-level");
+        await zoomLevelAfterReload.WaitForAsync(new() { Timeout = 15_000 });
+
+        Assert.Equal(zoomedText, await zoomLevelAfterReload.InnerTextAsync());
     }
 
     [Fact]

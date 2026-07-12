@@ -20,6 +20,17 @@ function goBack() {
     window.history.back();
 }
 
+function setOrgChartZoom(zoom) {
+    try { localStorage.setItem('orgChartZoom', zoom.toString()); } catch {}
+}
+
+function getOrgChartZoom() {
+    try {
+        const stored = localStorage.getItem('orgChartZoom');
+        return stored ? parseFloat(stored) : null;
+    } catch { return null; }
+}
+
 function downloadFileFromBase64(fileName, contentType, base64Content) {
     const link = document.createElement('a');
     link.href = `data:${contentType};base64,${base64Content}`;

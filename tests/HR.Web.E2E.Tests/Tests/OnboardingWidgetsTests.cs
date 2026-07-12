@@ -48,18 +48,23 @@ public sealed class OnboardingWidgetsTests(AppFixture fixture) : E2ETestBase(fix
         await empEdit.FillDateOfBirthAsync("15/06/1990");
         await empEdit.FillStartDateAsync("01/03/2026");
 
+        // Employee Number, Employment Type, Department, Location and Position Profile are all
+        // mandatory now. Selecting "Senior Software Engineer" (seeded with Engineering / London
+        // Office attached) pre-populates Department and Location in one step — same pattern as
+        // CreateEmployeeTests.cs.
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+
         await empEdit.SaveNewEmployeeAsync();
         await empList.ClickEmployeeAsync(lastName);
 
         var match = Regex.Match(_page.Url, @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
         var employeeId = Guid.Parse(match.Groups[1].Value);
 
-        // The New Employee form doesn't collect Employee Number / Employment Type, but both are
-        // required on the Employment tab's own EditContext — they must be filled here too, or
-        // saving the Manager selection alongside them will fail client-side validation.
+        // Employee Number / Employment Type are already saved from the New Employee form above;
+        // only the Manager (which that form has no field for) still needs to be set here.
         await empEdit.OpenEmploymentTabAsync();
-        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
-        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
         await empEdit.SelectManagerAsync("Laura Bennett");
         await empEdit.ClickSaveChangesAsync();
 
@@ -190,6 +195,15 @@ public sealed class OnboardingWidgetsTests(AppFixture fixture) : E2ETestBase(fix
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");
         await empEdit.FillStartDateAsync("01/03/2026");
+
+        // Employee Number, Employment Type, Department, Location and Position Profile are all
+        // mandatory now. Selecting "Senior Software Engineer" (seeded with Engineering / London
+        // Office attached) pre-populates Department and Location in one step — same pattern as
+        // CreateEmployeeTests.cs.
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+
         await empEdit.SaveNewEmployeeAsync();
 
         await empList.ClickEmployeeAsync(lastName);

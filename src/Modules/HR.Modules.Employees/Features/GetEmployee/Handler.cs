@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -77,7 +78,9 @@ internal sealed class GetEmployeeHandler
                 ManagerFullName = _dbContext.Employees
                     .Where(m => m.Id == e.ManagerId)
                     .Select(m => m.FirstName + " " + m.LastName)
-                    .FirstOrDefault()
+                    .FirstOrDefault(),
+                DirectReportsCount = _dbContext.Employees
+                    .Count(r => r.ManagerId == e.Id && r.Status != EmploymentStatus.Terminated)
             })
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -86,6 +89,9 @@ internal sealed class GetEmployeeHandler
             return Result.Failure<GetEmployeeResponse>(
                 Error.NotFound($"Employee with id '{request.Id}' was not found."));
         }
+
+        var reportingChain = await BuildReportingChainAsync(
+            request.CompanyId, result.Id, result.ManagerId, cancellationToken);
 
         return Result.Success(new GetEmployeeResponse(
             result.Id,
@@ -98,6 +104,8 @@ internal sealed class GetEmployeeHandler
             result.PositionTitle,
             result.ManagerId,
             result.ManagerFullName,
+            result.DirectReportsCount,
+            reportingChain,
             result.FirstName,
             result.LastName,
             result.PreferredName,
@@ -129,5 +137,42 @@ internal sealed class GetEmployeeHandler
             result.Notes,
             result.CreatedAt,
             result.UpdatedAt));
+    }
+
+    // Walks the ManagerId chain from the employee's own manager up to the root, using an
+    // in-memory visited set so a corrupt/circular manager reference can't cause an infinite loop.
+    private async Task<IReadOnlyList<ReportingChainItem>> BuildReportingChainAsync(
+        Guid companyId, Guid employeeId, Guid? managerId, CancellationToken cancellationToken)
+    {
+        if (managerId is null)
+            return [];
+
+        var employees = await _dbContext.Employees
+            .AsNoTracking()
+            .Where(e => e.CompanyId == companyId)
+            .Select(e => new { e.Id, e.FirstName, e.LastName, e.ManagerId, e.PositionProfileId })
+            .ToDictionaryAsync(e => e.Id, cancellationToken);
+
+        var positionTitles = await _dbContext.PositionProfiles
+            .AsNoTracking()
+            .Where(p => p.CompanyId == companyId)
+            .ToDictionaryAsync(p => p.Id, p => p.Title, cancellationToken);
+
+        var chain = new List<ReportingChainItem>();
+        var visited = new HashSet<Guid> { employeeId };
+        var currentManagerId = managerId;
+
+        while (currentManagerId is Guid id && visited.Add(id) && employees.TryGetValue(id, out var manager))
+        {
+            var jobTitle = manager.PositionProfileId is Guid profileId && positionTitles.TryGetValue(profileId, out var title)
+                ? title
+                : null;
+
+            chain.Add(new ReportingChainItem(manager.Id, $"{manager.FirstName} {manager.LastName}", jobTitle));
+            currentManagerId = manager.ManagerId;
+        }
+
+        chain.Reverse();
+        return chain;
     }
 }

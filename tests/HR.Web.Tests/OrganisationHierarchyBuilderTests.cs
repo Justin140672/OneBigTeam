@@ -8,7 +8,7 @@ public class OrganisationHierarchyBuilderTests
     private readonly OrganisationHierarchyBuilder _builder = new();
 
     private static OrganisationChartEmployeeModel Employee(Guid id, string name, Guid? managerId = null) =>
-        new(id, name, "Job Title", "Department", managerId, "Location", null);
+        new(id, name, "EMP-0001", "Job Title", "Department", managerId, "Location", null);
 
     [Fact]
     public void Build_Returns_Empty_For_No_Employees()

@@ -5,6 +5,7 @@ internal sealed record GetOrganisationChartResponse(IReadOnlyList<OrganisationCh
 internal sealed record OrganisationChartEmployeeItem(
     Guid EmployeeId,
     string Name,
+    string EmployeeNumber,
     string JobTitle,
     string Department,
     Guid? ManagerId,

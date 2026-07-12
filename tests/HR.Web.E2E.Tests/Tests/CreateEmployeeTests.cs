@@ -13,6 +13,7 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
 {
     private static readonly Guid AcmeId        = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid JamesOkaforId = Guid.Parse("30000000-0000-0000-0000-000000000002");
+    private static readonly Guid TomWilliamsId = Guid.Parse("30000000-0000-0000-0000-000000000004");
 
     private const string LauraEmail = "laura.bennett@acme.example";
 
@@ -173,14 +174,12 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
 
         await _page.WaitForSelectorAsync(".e-grid, .task-cell", new() { Timeout = 15_000 });
 
-        // The View toolbar button starts disabled (e-overlay) until a row is selected.
-        await _page.Locator(".e-row").First.ClickAsync();
-        await _page.WaitForFunctionAsync(
-            "!document.querySelector('[id=\"hr-view\"]')?.classList?.contains('e-overlay')",
-            null, new PageWaitForFunctionOptions { Timeout = 10_000 });
-
         var urlBeforeClick = _page.Url;
-        await _page.Locator("[id='hr-view']").ClickAsync();
+
+        // The "View" action is a button directly on the row (TaskList.razor) — there's no grid
+        // toolbar here, so no row selection is needed; matches ProfileTasksTabTests' equivalent
+        // test for My Profile's own Tasks tab.
+        await _page.Locator(".e-row").First.Locator("button[title='View']").ClickAsync();
 
         // Should open the task in a dialog (TaskViewDialog), not navigate to /tasks/{id}.
         // Scoped to [role='dialog'] because Syncfusion's SfDialog CssClass propagates onto
@@ -206,6 +205,59 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
 
         Assert.True(await empEdit.HasProbationSummaryAsync(),
             "Expected a probation summary card on the Employment tab for an employee with a manager and a seeded probation record");
+    }
+
+    [Fact]
+    public async Task Employee_WithManager_ShowsReportsToOnOverview()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // James Okafor is seeded reporting to Sarah Chen (EmployeesModule.SeedEmployeesAsync).
+        await empEdit.GoToAsync(AcmeId, JamesOkaforId);
+
+        var content = await _page.ContentAsync();
+        Assert.Contains("Reports To:", content);
+        Assert.Contains("Sarah Chen", content);
+    }
+
+    [Fact]
+    public async Task Employee_WithDirectReports_ShowsDirectReportsCountOnOverview()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // James Okafor is seeded as Tom Williams's manager (EmployeesModule.SeedEmployeesAsync).
+        await empEdit.GoToAsync(AcmeId, JamesOkaforId);
+
+        var content = await _page.ContentAsync();
+        Assert.Contains("Direct Reports:", content);
+        Assert.Contains("1 Employee", content);
+    }
+
+    [Fact]
+    public async Task Employee_WithManagerChain_ShowsReportingChainOnOverview()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Tom Williams reports to James Okafor, who reports to Sarah Chen (no manager).
+        await empEdit.GoToAsync(AcmeId, TomWilliamsId);
+
+        var content = await _page.ContentAsync();
+        Assert.Contains("Reporting Chain", content);
+        Assert.Contains("Sarah Chen", content);
+        Assert.Contains("James Okafor", content);
+        Assert.Contains("Current Employee", content);
     }
 
     [Fact]

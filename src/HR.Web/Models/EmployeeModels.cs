@@ -44,6 +44,8 @@ public record GetEmployeeResponse(
     string? PositionTitle,
     Guid? ManagerId,
     string? ManagerFullName,
+    int DirectReportsCount,
+    IReadOnlyList<ReportingChainItemModel> ReportingChain,
     string FirstName,
     string LastName,
     string? PreferredName,
@@ -75,6 +77,10 @@ public record GetEmployeeResponse(
     string? Notes,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
+
+// Ordered from the top of the org down to the employee's immediate manager; does not include
+// the employee themselves.
+public sealed record ReportingChainItemModel(Guid EmployeeId, string Name, string? JobTitle);
 
 // ── PERSONAL DETAILS ──────────────────────────────────────────────────────────
 

@@ -124,6 +124,29 @@ public class ListEmployeesHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Filters_By_Search_On_EmployeeNumber()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        context.Employees.AddRange(
+            Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0042", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now),
+            Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0099", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
+        await context.SaveChangesAsync();
+
+        var handler = new ListEmployeesHandler(context);
+
+        var result = await handler.HandleAsync(
+            new ListEmployeesRequest { CompanyId = companyId, Search = "0042" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value!.TotalCount);
+        Assert.Equal("Alice", result.Value.Items[0].FirstName);
+    }
+
+    [Fact]
     public async Task HandleAsync_Filters_By_DepartmentId()
     {
         await using var context = BuildContext();

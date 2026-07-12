@@ -55,16 +55,50 @@ public class GetOrganisationChartHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Excludes_Draft_Employees()
+    public async Task HandleAsync_Returns_Employees_Of_All_Statuses_When_No_Status_Filter_Applied()
     {
-        // Freshly created employees start as Draft — no transition needed.
-        await AssertExcludedAsync(employee => { });
+        // Status is an optional filter, not a hardcoded restriction — with none supplied, every
+        // employee regardless of status is returned (the Organisation Chart page itself defaults
+        // its own Status dropdown to Active, but the handler stays a generic, flexible filter).
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var draft = Employee.Create(Guid.NewGuid(), companyId, "Dana", "Draft", "dana@example.com", StartDate,
+            hasSystemAccess: true, Dob, "British", "Female", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+
+        var active = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Active", "alice@example.com", StartDate,
+            hasSystemAccess: true, Dob, "British", "Female", "EMP-0002", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        active.Activate(now);
+
+        var terminated = Employee.Create(Guid.NewGuid(), companyId, "Tom", "Terminated", "tom@example.com", StartDate,
+            hasSystemAccess: true, Dob, "British", "Male", "EMP-0003", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        terminated.Activate(now);
+        terminated.Terminate(now);
+
+        context.Employees.AddRange(draft, active, terminated);
+        await context.SaveChangesAsync();
+
+        var handler = new GetOrganisationChartHandler(context);
+
+        var result = await handler.HandleAsync(
+            new GetOrganisationChartRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(3, result.Value!.Items.Count);
     }
 
     [Fact]
-    public async Task HandleAsync_Excludes_OnLeave_Employees()
+    public async Task HandleAsync_Filters_By_Status_Active_Excludes_Draft_Employees()
     {
-        await AssertExcludedAsync(employee =>
+        await AssertStatusFilteredAsync(employee => { });
+    }
+
+    [Fact]
+    public async Task HandleAsync_Filters_By_Status_Active_Excludes_OnLeave_Employees()
+    {
+        await AssertStatusFilteredAsync(employee =>
         {
             employee.Activate(default);
             employee.SetOnLeave(default);
@@ -72,9 +106,9 @@ public class GetOrganisationChartHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Excludes_Suspended_Employees()
+    public async Task HandleAsync_Filters_By_Status_Active_Excludes_Suspended_Employees()
     {
-        await AssertExcludedAsync(employee =>
+        await AssertStatusFilteredAsync(employee =>
         {
             employee.Activate(default);
             employee.Suspend(default);
@@ -82,16 +116,18 @@ public class GetOrganisationChartHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Excludes_Terminated_Employees()
+    public async Task HandleAsync_Filters_By_Status_Active_Excludes_Terminated_Employees()
     {
-        await AssertExcludedAsync(employee =>
+        await AssertStatusFilteredAsync(employee =>
         {
             employee.Activate(default);
             employee.Terminate(default);
         });
     }
 
-    private static async Task AssertExcludedAsync(Action<Employee> transition)
+    // Transitions the given employee (starting Draft) via `transition`, then confirms an explicit
+    // Status = Active request excludes them (they never reach Active themselves in these cases).
+    private static async Task AssertStatusFilteredAsync(Action<Employee> transition)
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
@@ -108,11 +144,79 @@ public class GetOrganisationChartHandlerTests
         var handler = new GetOrganisationChartHandler(context);
 
         var result = await handler.HandleAsync(
-            new GetOrganisationChartRequest { CompanyId = companyId },
+            new GetOrganisationChartRequest { CompanyId = companyId, Status = EmploymentStatus.Active },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value!.Items);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Filters_By_DepartmentId()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var engineering = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
+        var sales = Department.Create(Guid.NewGuid(), companyId, "Sales", null, now);
+        context.Departments.AddRange(engineering, sales);
+
+        var engineer = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate,
+            hasSystemAccess: true, Dob, "British", "Female", "EMP-0001", Guid.NewGuid(), engineering.Id, Guid.NewGuid(), Guid.NewGuid(), now);
+        engineer.Activate(now);
+
+        var salesperson = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate,
+            hasSystemAccess: true, Dob, "British", "Male", "EMP-0002", Guid.NewGuid(), sales.Id, Guid.NewGuid(), Guid.NewGuid(), now);
+        salesperson.Activate(now);
+
+        context.Employees.AddRange(engineer, salesperson);
+        await context.SaveChangesAsync();
+
+        var handler = new GetOrganisationChartHandler(context);
+
+        var result = await handler.HandleAsync(
+            new GetOrganisationChartRequest { CompanyId = companyId, DepartmentId = engineering.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal(engineer.Id, item.EmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Filters_By_LocationId()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
+        var london = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "London Office", null, now);
+        var manchester = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Manchester Office", null, now);
+        context.LocationTypes.Add(locationType);
+        context.Locations.AddRange(london, manchester);
+
+        var londonEmployee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate,
+            hasSystemAccess: true, Dob, "British", "Female", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), london.Id, Guid.NewGuid(), now);
+        londonEmployee.Activate(now);
+
+        var manchesterEmployee = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate,
+            hasSystemAccess: true, Dob, "British", "Male", "EMP-0002", Guid.NewGuid(), Guid.NewGuid(), manchester.Id, Guid.NewGuid(), now);
+        manchesterEmployee.Activate(now);
+
+        context.Employees.AddRange(londonEmployee, manchesterEmployee);
+        await context.SaveChangesAsync();
+
+        var handler = new GetOrganisationChartHandler(context);
+
+        var result = await handler.HandleAsync(
+            new GetOrganisationChartRequest { CompanyId = companyId, LocationId = london.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal(londonEmployee.Id, item.EmployeeId);
     }
 
     [Fact]
@@ -156,6 +260,7 @@ public class GetOrganisationChartHandlerTests
         var item = Assert.Single(result.Value!.Items, i => i.EmployeeId == employee.Id);
 
         Assert.Equal("Alice Smith", item.Name);
+        Assert.Equal("EMP-0001", item.EmployeeNumber);
         Assert.Equal("Senior Software Engineer", item.JobTitle);
         Assert.Equal("Engineering", item.Department);
         Assert.Equal("London Office", item.Location);

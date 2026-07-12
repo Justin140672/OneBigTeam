@@ -62,6 +62,10 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
             .First;
         await link.ClickAsync();
         await page.WaitForURLAsync("**/employees/**", new() { Timeout = 15_000 });
+        // The edit page shows a spinner while its LoadAsync() runs; without this wait, callers
+        // that immediately assert on page content (e.g. tab visibility) can race the load and
+        // observe the page still in its loading state.
+        await page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 15_000 });
     }
 
     public async Task SearchAsync(string query)

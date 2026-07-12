@@ -18,9 +18,23 @@ internal sealed class GetOrganisationChartHandler
         GetOrganisationChartRequest request,
         CancellationToken cancellationToken)
     {
-        var employees = await _dbContext.Employees
+        var query = _dbContext.Employees
             .AsNoTracking()
-            .Where(e => e.CompanyId == request.CompanyId && e.Status == EmploymentStatus.Active)
+            .Where(e => e.CompanyId == request.CompanyId);
+
+        // Status is an optional filter rather than a hardcoded "Active only" — the caller (the
+        // Organisation Chart page) defaults its own Status dropdown to Active, but HR can widen
+        // or change this, e.g. to review who's on leave or check a leaver's old reporting line.
+        if (request.Status is not null)
+            query = query.Where(e => e.Status == request.Status);
+
+        if (request.DepartmentId is not null)
+            query = query.Where(e => e.DepartmentId == request.DepartmentId);
+
+        if (request.LocationId is not null)
+            query = query.Where(e => e.LocationId == request.LocationId);
+
+        var employees = await query
             .OrderBy(e => e.LastName)
             .ThenBy(e => e.FirstName)
             .ToListAsync(cancellationToken);
@@ -55,6 +69,7 @@ internal sealed class GetOrganisationChartHandler
             .Select(e => new OrganisationChartEmployeeItem(
                 e.Id,
                 $"{e.FirstName} {e.LastName}",
+                e.EmployeeNumber,
                 positionProfileTitles.TryGetValue(e.PositionProfileId, out var title) ? title : string.Empty,
                 departmentNames.TryGetValue(e.DepartmentId, out var deptName) ? deptName : string.Empty,
                 e.ManagerId,

@@ -195,6 +195,107 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         Assert.Equal("Jane Manager", payload.ManagerFullName);
     }
 
+    [Fact]
+    public async Task Get_Employee_Includes_DirectReportsCount_And_ReportingChain()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser3.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        // Department, Location, Position Profile, Employee Number and Employment Type are all
+        // mandatory on employee creation — set up shared reference data once, then reuse it for
+        // every employee below (the reporting-chain relationships are what's under test, not
+        // these fields).
+        var deptResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/departments",
+            new { companyId, name = $"Dept-{Guid.NewGuid():N}" });
+        deptResponse.EnsureSuccessStatusCode();
+        var departmentId = (await deptResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locTypeResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/location-types",
+            new { companyId, name = $"LocType-{Guid.NewGuid():N}" });
+        locTypeResponse.EnsureSuccessStatusCode();
+        var locationTypeId = (await locTypeResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/locations",
+            new { companyId, name = $"Loc-{Guid.NewGuid():N}", locationTypeId });
+        locResponse.EnsureSuccessStatusCode();
+        var locationId = (await locResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var posResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles",
+            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}" });
+        posResponse.EnsureSuccessStatusCode();
+        var positionProfileId = (await posResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var etResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employment-types",
+            new { companyId, name = $"EmpType-{Guid.NewGuid():N}" });
+        etResponse.EnsureSuccessStatusCode();
+        var employmentTypeId = (await etResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        async Task<EmployeePayload> CreateEmployeeAsync(string firstName, string lastName)
+        {
+            var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
+            {
+                companyId,
+                firstName,
+                lastName,
+                workEmail = $"{firstName}.{lastName}.{Guid.NewGuid():N}@example.com".ToLowerInvariant(),
+                startDate = "2025-01-01",
+                dateOfBirth = "1985-01-01",
+                nationality = "British",
+                gender = "Female",
+                employeeNumber = $"EMP-{Guid.NewGuid():N}",
+                employmentTypeId,
+                departmentId,
+                locationId,
+                positionProfileId
+            });
+            createResponse.EnsureSuccessStatusCode();
+            return (await createResponse.Content.ReadFromJsonAsync<EmployeePayload>())!;
+        }
+
+        async Task AssignManagerAsync(Guid employeeId, Guid managerId)
+        {
+            var assignResponse = await client.PutAsJsonAsync(
+                $"/api/companies/{companyId}/employees/{employeeId}/manager",
+                new { companyId, employeeId, managerId });
+            assignResponse.EnsureSuccessStatusCode();
+        }
+
+        var ceo      = await CreateEmployeeAsync("Carla", "Ceo");
+        var manager  = await CreateEmployeeAsync("Dan", "Director");
+        var employee = await CreateEmployeeAsync("Alice", "Smith");
+        var peer     = await CreateEmployeeAsync("Bob", "Jones");
+
+        await AssignManagerAsync(manager.Id, ceo.Id);
+        await AssignManagerAsync(employee.Id, manager.Id);
+        await AssignManagerAsync(peer.Id, manager.Id);
+
+        var employeeResponse = await client.GetAsync($"/api/companies/{companyId}/employees/{employee.Id}");
+        Assert.Equal(HttpStatusCode.OK, employeeResponse.StatusCode);
+        var employeePayload = await employeeResponse.Content.ReadFromJsonAsync<EmployeePayload>();
+        Assert.NotNull(employeePayload);
+        Assert.NotNull(employeePayload!.ReportingChain);
+        Assert.Equal(2, employeePayload.ReportingChain!.Count);
+        Assert.Equal(ceo.Id, employeePayload.ReportingChain[0].EmployeeId);
+        Assert.Equal("Carla Ceo", employeePayload.ReportingChain[0].Name);
+        Assert.Equal(manager.Id, employeePayload.ReportingChain[1].EmployeeId);
+        Assert.Equal("Dan Director", employeePayload.ReportingChain[1].Name);
+
+        var managerResponse = await client.GetAsync($"/api/companies/{companyId}/employees/{manager.Id}");
+        Assert.Equal(HttpStatusCode.OK, managerResponse.StatusCode);
+        var managerPayload = await managerResponse.Content.ReadFromJsonAsync<EmployeePayload>();
+        Assert.NotNull(managerPayload);
+        Assert.Equal(2, managerPayload!.DirectReportsCount);
+        Assert.Single(managerPayload.ReportingChain!);
+        Assert.Equal(ceo.Id, managerPayload.ReportingChain![0].EmployeeId);
+    }
+
     private sealed record EmployeePayload(
         Guid Id,
         Guid CompanyId,
@@ -204,6 +305,8 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         string? PositionTitle,
         Guid? ManagerId,
         string? ManagerFullName,
+        int DirectReportsCount,
+        List<ReportingChainItemPayload>? ReportingChain,
         string FirstName,
         string LastName,
         string WorkEmail,
@@ -213,6 +316,9 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt);
 
+    private sealed record ReportingChainItemPayload(Guid EmployeeId, string Name, string? JobTitle);
+
     private sealed record DeptPayload(Guid Id, string Name);
     private sealed record PosPayload(Guid Id, string Title);
+    private sealed record IdPayload(Guid Id);
 }

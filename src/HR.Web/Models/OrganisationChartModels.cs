@@ -5,6 +5,7 @@ public sealed record OrganisationChartResponse(IReadOnlyList<OrganisationChartEm
 public sealed record OrganisationChartEmployeeModel(
     Guid EmployeeId,
     string Name,
+    string EmployeeNumber,
     string JobTitle,
     string Department,
     Guid? ManagerId,
@@ -33,4 +34,6 @@ public sealed class OrganisationChartDiagramItem
     public string JobTitle { get; set; } = string.Empty;
     public string Department { get; set; } = string.Empty;
     public string? ProfilePhotoUrl { get; set; }
+    public int DirectReportCount { get; set; }
+    public bool IsCollapsed { get; set; }
 }

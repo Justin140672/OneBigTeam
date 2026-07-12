@@ -283,7 +283,47 @@
                 <i class="fa-solid fa-sitemap me-1"></i>View Org Chart
             </a>
         </div>
+        @if (_employee?.ManagerId is not null)
+        {
+            <p class="text-muted small mb-1">
+                Reports To:
+                <a href="/companies/@CompanyId/employees/@_employee.ManagerId">@_employee.ManagerFullName</a>
+            </p>
+        }
+        @if (_employee?.DirectReportsCount > 0)
+        {
+            <p class="text-muted small mb-1">
+                Direct Reports:
+                <a href="/companies/@CompanyId/organisation-chart?employeeId=@Id">@_employee.DirectReportsCount Employee@(_employee.DirectReportsCount == 1 ? "" : "s")</a>
+            </p>
+        }
         <p class="text-muted mb-3">View and manage this employee's profile, employment, leave, and documents.</p>
+
+        @if (_employee?.ReportingChain is { Count: > 0 })
+        {
+            <div class="card mb-3">
+                <div class="card-body py-2 px-3">
+                    <h6 class="text-muted small text-uppercase mb-2">Reporting Chain</h6>
+                    <div class="d-flex flex-column align-items-start">
+                        @foreach (var link in _employee.ReportingChain)
+                        {
+                            <div class="mb-1">
+                                <a href="/companies/@CompanyId/employees/@link.EmployeeId" class="fw-semibold text-decoration-none">@link.Name</a>
+                                @if (!string.IsNullOrEmpty(link.JobTitle))
+                                {
+                                    <span class="text-muted small"> — @link.JobTitle</span>
+                                }
+                            </div>
+                            <div class="text-muted mb-1">↓</div>
+                        }
+                        <div>
+                            <span class="fw-semibold">@_employee.FirstName @_employee.LastName</span>
+                            <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">Current Employee</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
 
         @if (!string.IsNullOrEmpty(GlobalError))
         {

@@ -27,7 +27,8 @@ internal sealed class ListEmployeesHandler
             query = query.Where(e =>
                 e.FirstName.ToLower().Contains(search) ||
                 e.LastName.ToLower().Contains(search) ||
-                e.WorkEmail.ToLower().Contains(search));
+                e.WorkEmail.ToLower().Contains(search) ||
+                e.EmployeeNumber.ToLower().Contains(search));
         }
 
         if (request.DepartmentId is not null)

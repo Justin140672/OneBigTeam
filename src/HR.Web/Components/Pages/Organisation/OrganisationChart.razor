@@ -6,6 +6,9 @@
 @inject NavigationManager Navigation
 @inject OrganisationChartService OrganisationChartService
 @inject OrganisationHierarchyBuilder HierarchyBuilder
+@inject DepartmentService DepartmentService
+@inject LocationService LocationService
+@inject IJSRuntime JS
 
 <PageTitle>Organisation Chart</PageTitle>
 
@@ -76,15 +79,125 @@
     }
 
     .org-chart-canvas {
+        position: relative;
         width: 100%;
         height: calc(100vh - 260px);
         min-height: 420px;
+    }
+
+    .org-chart-toggle {
+        position: absolute;
+        bottom: -12px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 1px solid #D5D5D5;
+        background: var(--bs-body-bg, #FFFFFF);
+        color: var(--bs-secondary-color, #6b7280);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        line-height: 1;
+        padding: 0;
+        cursor: pointer;
+        z-index: 2;
+    }
+
+    .org-chart-toggle:hover {
+        border-color: var(--bs-primary, #0d6efd);
+        color: var(--bs-primary, #0d6efd);
+    }
+
+    .org-chart-toggle-count {
+        position: absolute;
+        top: -7px;
+        right: -7px;
+        min-width: 15px;
+        padding: 1px 4px;
+        border-radius: 999px;
+        background: var(--bs-primary, #0d6efd);
+        color: #fff;
+        font-size: 9px;
+        line-height: 1.2;
+        text-align: center;
+    }
+
+    .org-chart-zoom-toolbar {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        background: var(--bs-body-bg, #FFFFFF);
+        border: 1px solid #D5D5D5;
+        border-radius: 6px;
+        padding: 4px 6px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    }
+
+    .org-chart-zoom-level {
+        min-width: 42px;
+        text-align: center;
+        font-size: 12px;
+        color: var(--bs-secondary-color, #6b7280);
     }
 </style>
 
 <div class="container-fluid py-4">
     <h1 class="mb-1">Organisation Chart</h1>
     <p class="text-muted mb-4">Visualise reporting lines and team structure across the company.</p>
+
+    @if (!_loading || _diagramItems.Count > 0)
+    {
+        <div class="row g-2 align-items-end mb-3">
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">Search</label>
+                <HrTextBox Value="@_searchTerm"
+                           ValueChanged="@OnSearchChanged"
+                           Placeholder="Search by name or employee number" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">Department</label>
+                <SfDropDownList TValue="Guid?" TItem="DepartmentListItemModel"
+                                DataSource="@_departments"
+                                Value="@_selectedDepartmentId"
+                                ValueChanged="@OnDepartmentFilterChanged"
+                                Placeholder="All Departments"
+                                AllowFiltering="true">
+                    <DropDownListFieldSettings Value="Id" Text="Name" />
+                </SfDropDownList>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">Location</label>
+                <SfDropDownList TValue="Guid?" TItem="LocationListItemModel"
+                                DataSource="@_locations"
+                                Value="@_selectedLocationId"
+                                ValueChanged="@OnLocationFilterChanged"
+                                Placeholder="All Locations"
+                                AllowFiltering="true">
+                    <DropDownListFieldSettings Value="Id" Text="Name" />
+                </SfDropDownList>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">Employment Status</label>
+                <SfDropDownList TValue="string" TItem="StatusOption"
+                                DataSource="@StatusOptions"
+                                Value="@_selectedStatus"
+                                ValueChanged="@OnStatusFilterChanged">
+                    <DropDownListFieldSettings Value="Value" Text="Label" />
+                </SfDropDownList>
+            </div>
+        </div>
+        @if (_searchNotFound)
+        {
+            <p class="text-muted small mb-3">No employee found matching "@_searchTerm".</p>
+        }
+    }
 
     @if (_loading)
     {
@@ -99,7 +212,7 @@
         <div class="card">
             <div class="card-body text-center py-5">
                 <i class="fa-solid fa-sitemap fa-2x text-muted mb-3"></i>
-                <p class="text-muted mb-0">No active employees to display yet.</p>
+                <p class="text-muted mb-0">No employees match the current filters.</p>
             </div>
         </div>
     }
@@ -107,6 +220,18 @@
     {
         <div class="card">
             <div class="card-body p-0 org-chart-canvas">
+                <div class="org-chart-zoom-toolbar">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ZoomOut" title="Zoom out">
+                        <i class="fa-solid fa-minus"></i>
+                    </button>
+                    <span class="org-chart-zoom-level">@($"{_currentZoom * 100:0}%")</span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ZoomIn" title="Zoom in">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="FitToScreen" title="Fit chart to screen">
+                        <i class="fa-solid fa-expand"></i>
+                    </button>
+                </div>
                 <SfDiagramComponent @ref="_diagram" Height="100%" Width="100%"
                                     NodeCreating="OnNodeCreating"
                                     ConnectorCreating="OnConnectorCreating"
@@ -117,6 +242,7 @@
                     <Layout @bind-Type="_layoutType" @bind-Orientation="_orientation"
                             HorizontalSpacing="30" VerticalSpacing="30" />
                     <SnapSettings Constraints="SnapConstraints.None"></SnapSettings>
+                    <ScrollSettings CurrentZoom="_currentZoom" CurrentZoomChanged="OnCurrentZoomChangedAsync" />
                     <DiagramTemplates>
                         <NodeTemplate>
                             @{
@@ -142,6 +268,19 @@
                                         <div class="org-chart-title">@item.JobTitle</div>
                                         <div class="org-chart-department">@item.Department</div>
                                     </div>
+                                    @if (item.DirectReportCount > 0)
+                                    {
+                                        <button type="button" class="org-chart-toggle"
+                                                @onclick="() => ToggleCollapse(item.Id)"
+                                                @onclick:stopPropagation="true"
+                                                title="@(item.IsCollapsed ? $"Expand ({item.DirectReportCount} direct reports)" : "Collapse")">
+                                            <i class="fa-solid @(item.IsCollapsed ? "fa-chevron-down" : "fa-chevron-up")"></i>
+                                            @if (item.IsCollapsed)
+                                            {
+                                                <span class="org-chart-toggle-count">@item.DirectReportCount</span>
+                                            }
+                                        </button>
+                                    }
                                 </div>
                             }
                         </NodeTemplate>
@@ -158,6 +297,32 @@
     private bool _loading = true;
     private string? _error;
     private List<OrganisationChartDiagramItem> _diagramItems = [];
+    private List<OrganisationChartEmployeeModel> _employees = [];
+
+    private string? _searchTerm;
+    private bool _searchNotFound;
+
+    private List<DepartmentListItemModel> _departments = [];
+    private List<LocationListItemModel> _locations = [];
+    private Guid? _selectedDepartmentId;
+    private Guid? _selectedLocationId;
+
+    // "Active" by default — preserves this page's original "Inactive/leavers excluded" behaviour
+    // out of the box, while letting HR widen or change it (e.g. to review who's on leave, or
+    // check a leaver's old reporting line). Empty string = no Status filter (all statuses).
+    private string _selectedStatus = "Active";
+
+    private static readonly List<StatusOption> StatusOptions =
+    [
+        new("Active", "Active only"),
+        new("", "All Statuses"),
+        new("OnLeave", "On Leave"),
+        new("Suspended", "Suspended"),
+        new("Terminated", "Terminated"),
+        new("Draft", "Draft"),
+    ];
+
+    private sealed record StatusOption(string Value, string Label);
 
     private LayoutType _layoutType = LayoutType.OrganizationalChart;
     private LayoutOrientation _orientation = LayoutOrientation.TopToBottom;
@@ -168,6 +333,18 @@
     // drives both the highlighted card border (NodeTemplate above) and the auto-centering once
     // the diagram finishes laying itself out (OnDataLoaded).
     private string? _focusEmployeeId;
+
+    // Full hierarchy from the last load, kept around so toggling a manager's expand/collapse
+    // state can re-flatten in memory (ToggleCollapse) instead of re-fetching from the API.
+    private IReadOnlyList<OrganisationChartNode> _tree = [];
+    private readonly HashSet<Guid> _collapsedManagerIds = [];
+
+    // Absolute zoom scale (1.0 = 100%), two-way bound to <ScrollSettings> so it also picks up
+    // zoom changes from mouse-wheel/pinch, not just our own toolbar buttons. Restored from
+    // localStorage on first render (OnAfterRenderAsync) and persisted on every change.
+    private double _currentZoom = 1;
+    private const double MinZoom = 0.1;
+    private const double MaxZoom = 4;
 
     protected override async Task OnInitializedAsync()
     {
@@ -181,9 +358,36 @@
         if (query.TryGetValue("employeeId", out var employeeId) && Guid.TryParse(employeeId, out var parsed))
             _focusEmployeeId = parsed.ToString();
 
-        _loading = true;
+        var deptTask = DepartmentService.ListDepartmentsAsync(CompanyId);
+        var locTask = LocationService.ListLocationsAsync(CompanyId);
+        await Task.WhenAll(deptTask, locTask);
 
-        var response = await OrganisationChartService.GetOrganisationChartAsync(CompanyId);
+        _departments = (await deptTask)?.Items ?? [];
+        _locations = (await locTask)?.Items ?? [];
+
+        await LoadChartAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var storedZoom = await JS.InvokeAsync<double?>("getOrgChartZoom");
+        if (storedZoom is double zoom && zoom >= MinZoom && zoom <= MaxZoom)
+        {
+            _currentZoom = zoom;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadChartAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        var response = await OrganisationChartService.GetOrganisationChartAsync(
+            CompanyId, _selectedDepartmentId, _selectedLocationId,
+            string.IsNullOrEmpty(_selectedStatus) ? null : _selectedStatus);
 
         if (response is null)
         {
@@ -191,23 +395,59 @@
         }
         else
         {
+            _error = null;
+            _employees = response.Items.ToList();
+
             // Route the flat API data through the hierarchy builder first so the diagram only
             // ever sees clean, acyclic parent links — dangling/self/circular manager references
             // are already resolved there, not something the diagram itself has to cope with.
-            var tree = HierarchyBuilder.Build(response.Items);
-            _diagramItems = Flatten(tree, managerId: null);
+            _tree = HierarchyBuilder.Build(response.Items);
+            _diagramItems = Flatten(_tree, managerId: null, _collapsedManagerIds);
         }
 
         _loading = false;
     }
 
+    // Toggles a manager's collapsed state and re-flattens the already-loaded tree in memory —
+    // no API round-trip needed, since collapsing/expanding doesn't change what data exists, only
+    // how much of it the diagram currently renders.
+    private void ToggleCollapse(string employeeId)
+    {
+        if (!Guid.TryParse(employeeId, out var id)) return;
+
+        if (!_collapsedManagerIds.Remove(id))
+            _collapsedManagerIds.Add(id);
+
+        _diagramItems = Flatten(_tree, managerId: null, _collapsedManagerIds);
+    }
+
+    private async Task OnDepartmentFilterChanged(Guid? value)
+    {
+        _selectedDepartmentId = value;
+        await LoadChartAsync();
+    }
+
+    private async Task OnLocationFilterChanged(Guid? value)
+    {
+        _selectedLocationId = value;
+        await LoadChartAsync();
+    }
+
+    private async Task OnStatusFilterChanged(string value)
+    {
+        _selectedStatus = value;
+        await LoadChartAsync();
+    }
+
     private static List<OrganisationChartDiagramItem> Flatten(
-        IReadOnlyList<OrganisationChartNode> nodes, string? managerId)
+        IReadOnlyList<OrganisationChartNode> nodes, string? managerId, HashSet<Guid> collapsedManagerIds)
     {
         var items = new List<OrganisationChartDiagramItem>();
 
         foreach (var node in nodes)
         {
+            var isCollapsed = collapsedManagerIds.Contains(node.EmployeeId);
+
             items.Add(new OrganisationChartDiagramItem
             {
                 Id = node.EmployeeId.ToString(),
@@ -216,9 +456,15 @@
                 JobTitle = node.JobTitle,
                 Department = node.Department,
                 ProfilePhotoUrl = node.ProfilePhotoUrl,
+                DirectReportCount = node.DirectReports.Count,
+                IsCollapsed = isCollapsed,
             });
 
-            items.AddRange(Flatten(node.DirectReports, node.EmployeeId.ToString()));
+            // A collapsed manager's own card still renders, but its subtree is omitted entirely —
+            // removing those descendants (and their connectors) from the diagram's data source is
+            // what actually hides them, rather than any Diagram-side expand/collapse feature.
+            if (!isCollapsed)
+                items.AddRange(Flatten(node.DirectReports, node.EmployeeId.ToString(), collapsedManagerIds));
         }
 
         return items;
@@ -282,11 +528,13 @@
     // Fires once the diagram has finished laying itself out from DataSourceSettings — the
     // earliest safe point at which _diagram.Nodes is actually populated. Centers the viewport on
     // the employee we arrived here to look at, if any.
-    private void OnDataLoaded(object args)
-    {
-        if (_diagram is null || _focusEmployeeId is null) return;
+    private void OnDataLoaded(object args) => CenterOnEmployee(_focusEmployeeId);
 
-        var node = _diagram.Nodes.FirstOrDefault(n => n.ID == _focusEmployeeId);
+    private void CenterOnEmployee(string? employeeId)
+    {
+        if (_diagram is null || employeeId is null) return;
+
+        var node = _diagram.Nodes.FirstOrDefault(n => n.ID == employeeId);
         if (node is null) return;
 
         _diagram.BringIntoCenter(new DiagramRect(
@@ -294,5 +542,69 @@
             node.OffsetY - node.Height / 2,
             node.Width,
             node.Height));
+    }
+
+    // The relative-factor Zoom() call (rather than setting _currentZoom directly) is the
+    // documented way to change zoom programmatically; the resulting new zoom level comes back
+    // through OnCurrentZoomChangedAsync (ScrollSettings' two-way binding), which is also what
+    // keeps _currentZoom in sync with mouse-wheel/pinch zooming.
+    private void ZoomIn()
+    {
+        _diagram?.Zoom(1.2, null!);
+    }
+
+    private void ZoomOut()
+    {
+        _diagram?.Zoom(0.8, null!);
+    }
+
+    private void FitToScreen()
+    {
+        _diagram?.FitToPage(new FitOptions
+        {
+            Mode = FitMode.Both,
+            Region = DiagramRegion.Content,
+            CanZoomIn = true,
+        });
+    }
+
+    // Fires for every zoom change regardless of source (toolbar buttons, mouse wheel, pinch) —
+    // keeps _currentZoom (and the % label) accurate and persists it so the chart reopens at the
+    // same zoom level next time.
+    private async Task OnCurrentZoomChangedAsync(double value)
+    {
+        _currentZoom = value;
+        await JS.InvokeVoidAsync("setOrgChartZoom", value);
+    }
+
+    // Live search as the user types — matches by name or employee number and, on a hit,
+    // highlights and centers that employee's card using the same mechanism as the "View Org
+    // Chart" deep link (CenterOnEmployee/_focusEmployeeId).
+    private void OnSearchChanged(string? value)
+    {
+        _searchTerm = value;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            _searchNotFound = false;
+            _focusEmployeeId = null;
+            return;
+        }
+
+        var term = value.Trim();
+        var match = _employees.FirstOrDefault(e =>
+            e.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+            e.EmployeeNumber.Contains(term, StringComparison.OrdinalIgnoreCase));
+
+        if (match is null)
+        {
+            _searchNotFound = true;
+            _focusEmployeeId = null;
+            return;
+        }
+
+        _searchNotFound = false;
+        _focusEmployeeId = match.EmployeeId.ToString();
+        CenterOnEmployee(_focusEmployeeId);
     }
 }

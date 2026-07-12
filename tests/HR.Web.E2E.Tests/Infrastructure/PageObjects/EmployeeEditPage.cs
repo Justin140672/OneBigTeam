@@ -33,7 +33,12 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task GoToAsync(Guid companyId, Guid employeeId, string query)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}?{query}");
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        // Deep-linking can land on any tab, and not every tab renders a combobox (Onboarding and
+        // Offboarding don't), so — unlike the other GoToAsync overloads above, which always land
+        // on "Details" (which does) — wait on the tab list itself instead. It's rendered by the
+        // same SfTab regardless of which tab query-string selects, so it's still a reliable
+        // signal that Blazor's interactive circuit has connected.
+        await page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
     }
 
     // ── New Employee — Personal Information ───────────────────────────────────
