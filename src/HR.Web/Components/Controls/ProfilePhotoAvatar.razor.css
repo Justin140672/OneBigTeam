@@ -1,0 +1,16 @@
+.hr-profile-avatar {
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    display: inline-flex;
+}
+
+.hr-profile-avatar--initials {
+    align-items: center;
+    justify-content: center;
+    background: var(--hr-color-primary);
+    color: #ffffff;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    user-select: none;
+}

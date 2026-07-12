@@ -1,0 +1,149 @@
+@inject ProfilePhotoService ProfilePhotoService
+
+<div class="d-flex align-items-start gap-3 mb-3">
+    <ProfilePhotoAvatar PhotoUrl="@_currentPhotoUrl" Initials="@Initials" SizePx="72" />
+    <div>
+        <SfButton CssClass="e-small" OnClick="OpenUploadDialog" Disabled="@_loading">Upload / Replace Photo</SfButton>
+
+        @if (!string.IsNullOrEmpty(_uploadSuccessMsg))
+        {
+            <div class="alert alert-success py-1 px-2 mt-2 mb-0 small" style="max-width: 480px;">@_uploadSuccessMsg</div>
+        }
+
+        @if (_pending is not null)
+        {
+            <div class="alert alert-info py-2 px-3 mt-2 mb-0" style="max-width: 480px;">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <img src="@_pending.DownloadUrl" alt="Pending photo"
+                         style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;" />
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold small">Pending Review</div>
+                        <div class="small text-muted">Submitted @_pending.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div>
+                    </div>
+                </div>
+
+                @if (_showRejectReason)
+                {
+                    <HrTextBox @bind-Value="_rejectReason" Placeholder="Reason for rejection (optional)" CssClass="mb-2 w-100" />
+                    <div class="d-flex gap-2">
+                        <SfButton CssClass="e-small" IsPrimary="true" Disabled="@_reviewing" OnClick="ConfirmRejectAsync">Confirm Reject</SfButton>
+                        <SfButton CssClass="e-small e-flat" Disabled="@_reviewing" OnClick="@(() => _showRejectReason = false)">Back</SfButton>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex gap-2">
+                        <SfButton CssClass="e-small" IsPrimary="true" Disabled="@_reviewing" OnClick="ApproveAsync">
+                            @if (_reviewing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            Approve
+                        </SfButton>
+                        <SfButton CssClass="e-small" Disabled="@_reviewing" OnClick="@(() => _showRejectReason = true)">Reject</SfButton>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger py-1 px-2 mt-2 mb-0 small" style="max-width: 480px;">@_error</div>
+        }
+    </div>
+</div>
+
+<UploadProfilePhotoDialog IsOpen="_dialogOpen"
+                           Title="Upload / Replace Profile Photo"
+                           UploadFunc="@((file, ct) => ProfilePhotoService.UploadEmployeeProfilePhotoAsync(CompanyId, EmployeeId, file, ct))"
+                           OnSaved="HandleUploaded"
+                           OnCancelled="CloseDialog" />
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter, EditorRequired] public string Initials { get; set; } = "?";
+
+    private GetPendingProfilePhotoResponse? _pending;
+
+    // The employee's current (approved) live photo, fetched via GetEmployeeProfilePhotoAsync.
+    // Null when the employee has no approved photo yet, in which case ProfilePhotoAvatar falls
+    // back to showing initials.
+    private string? _currentPhotoUrl;
+
+    private bool _loading;
+    private bool _reviewing;
+    private bool _dialogOpen;
+    private bool _showRejectReason;
+    private string? _rejectReason;
+    private string? _error;
+    private string? _uploadSuccessMsg;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPendingAsync();
+        await LoadCurrentPhotoAsync();
+    }
+
+    private async Task LoadPendingAsync()
+    {
+        _loading = true;
+        _pending = await ProfilePhotoService.GetPendingProfilePhotoAsync(CompanyId, EmployeeId);
+        _loading = false;
+    }
+
+    private async Task LoadCurrentPhotoAsync()
+    {
+        var current = await ProfilePhotoService.GetEmployeeProfilePhotoAsync(CompanyId, EmployeeId);
+        _currentPhotoUrl = current?.DownloadUrl;
+    }
+
+    private void OpenUploadDialog()
+    {
+        _error = null;
+        _uploadSuccessMsg = null;
+        _dialogOpen = true;
+    }
+
+    private void CloseDialog() => _dialogOpen = false;
+
+    private async Task HandleUploaded()
+    {
+        _dialogOpen = false;
+        _uploadSuccessMsg = "Photo uploaded successfully.";
+        await LoadPendingAsync();
+        await LoadCurrentPhotoAsync();
+    }
+
+    private async Task ApproveAsync()
+    {
+        _reviewing = true;
+        _error = null;
+        StateHasChanged();
+
+        var error = await ProfilePhotoService.ApproveProfilePhotoAsync(CompanyId, EmployeeId);
+        if (error is not null)
+            _error = error;
+        else
+            await LoadCurrentPhotoAsync();
+
+        _reviewing = false;
+        await LoadPendingAsync();
+    }
+
+    private async Task ConfirmRejectAsync()
+    {
+        _reviewing = true;
+        _error = null;
+        StateHasChanged();
+
+        var error = await ProfilePhotoService.RejectProfilePhotoAsync(CompanyId, EmployeeId, _rejectReason);
+        if (error is not null)
+            _error = error;
+
+        _reviewing = false;
+        _showRejectReason = false;
+        _rejectReason = null;
+        await LoadPendingAsync();
+    }
+}

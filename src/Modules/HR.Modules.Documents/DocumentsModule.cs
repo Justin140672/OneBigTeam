@@ -9,6 +9,7 @@ using HR.Modules.Documents.Features.DeactivateDocumentType;
 using HR.Modules.Documents.Features.DeleteEmployeeDocument;
 using HR.Modules.Documents.Features.DownloadEmployeeDocument;
 using HR.Modules.Documents.Features.GetEmployeeDocument;
+using HR.Modules.Documents.Features.GetEmployeeProfilePhoto;
 using HR.Modules.Documents.Features.GetExpiringDocuments;
 using HR.Modules.Documents.Features.ProcessDocumentExpiryNotifications;
 using HR.Modules.Documents.Features.GetDocumentRequest;
@@ -106,6 +107,9 @@ public static class DocumentsModule
 
         services.AddScoped<GetPendingProfilePhotoHandler>();
         services.AddScoped<IValidator<GetPendingProfilePhotoRequest>, GetPendingProfilePhotoValidator>();
+
+        services.AddScoped<GetEmployeeProfilePhotoHandler>();
+        services.AddScoped<IValidator<GetEmployeeProfilePhotoRequest>, GetEmployeeProfilePhotoValidator>();
 
         services.AddScoped<ApproveProfilePhotoHandler>();
         services.AddScoped<IValidator<ApproveProfilePhotoRequest>, ApproveProfilePhotoValidator>();

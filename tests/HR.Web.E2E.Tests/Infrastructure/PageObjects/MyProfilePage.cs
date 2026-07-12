@@ -37,6 +37,33 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
         return (await active.TextContentAsync())?.Trim() ?? "";
     }
 
+    // ── Profile Photo Header (MyProfilePhotoHeader — self-service) ──────────────
+    // Rendered above the tabs on every profile page (not gated on any permission); see
+    // MyProfile.razor. Unlike EmployeeEditPage's HR-direct upload, this always creates a
+    // pending submission awaiting HR review.
+
+    /// <summary>
+    /// Uploads a photo via the self-service "Change Photo" button on the profile page header.
+    /// Always goes through the pending-review flow (see UploadMyProfilePhotoAsync on the
+    /// backend) — never writes straight to the current photo. Waits for the dialog to close.
+    /// </summary>
+    public async Task UploadMyProfilePhotoAsync(string filePath)
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Change Photo" }).ClickAsync();
+
+        var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = "Change Profile Photo" });
+        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
+        await dialog.Locator("input[type='file']").SetInputFilesAsync(filePath);
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
+
+        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
+
+    /// <summary>Returns true if the "Pending approval" banner is visible on the profile photo header.</summary>
+    public Task<bool> HasPendingProfilePhotoBannerAsync() =>
+        page.Locator(".alert-warning").Filter(new() { HasText = "Pending approval" }).First.IsVisibleAsync();
+
     // ── Tab navigation ────────────────────────────────────────────────────────
 
     public async Task OpenOverviewTabAsync()

@@ -1,0 +1,87 @@
+@inject ProfilePhotoService ProfilePhotoService
+
+<div class="d-flex align-items-start gap-3 mb-3">
+    <ProfilePhotoAvatar PhotoUrl="@_photo?.CurrentPhoto?.DownloadUrl" Initials="@Initials" SizePx="72" />
+    <div>
+        <SfButton CssClass="e-small" OnClick="OpenUploadDialog" Disabled="@_loading">Change Photo</SfButton>
+
+        @if (_photo?.PendingPhoto is not null)
+        {
+            <div class="alert alert-warning py-2 px-3 mt-2 mb-0 d-flex align-items-center gap-2" style="max-width: 420px;">
+                <img src="@_photo.PendingPhoto.DownloadUrl" alt="Pending photo"
+                     style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;" />
+                <div class="flex-grow-1">
+                    <div class="fw-semibold small">Pending approval</div>
+                    <div class="small text-muted">Awaiting HR review</div>
+                </div>
+                <SfButton CssClass="e-small e-flat" Disabled="@_cancelling" OnClick="CancelPendingAsync">
+                    @if (_cancelling)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Cancel
+                </SfButton>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger py-1 px-2 mt-2 mb-0 small" style="max-width: 420px;">@_error</div>
+        }
+    </div>
+</div>
+
+<UploadProfilePhotoDialog IsOpen="_dialogOpen"
+                           Title="Change Profile Photo"
+                           UploadFunc="@((file, ct) => ProfilePhotoService.UploadMyProfilePhotoAsync(CompanyId, file, ct))"
+                           OnSaved="HandleUploaded"
+                           OnCancelled="CloseDialog" />
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter, EditorRequired] public string Initials { get; set; } = "?";
+
+    private GetMyProfilePhotoResponse? _photo;
+    private bool _loading;
+    private bool _cancelling;
+    private bool _dialogOpen;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _photo = await ProfilePhotoService.GetMyProfilePhotoAsync(CompanyId);
+        _loading = false;
+    }
+
+    private void OpenUploadDialog()
+    {
+        _error = null;
+        _dialogOpen = true;
+    }
+
+    private void CloseDialog() => _dialogOpen = false;
+
+    private async Task HandleUploaded()
+    {
+        _dialogOpen = false;
+        await LoadAsync();
+    }
+
+    private async Task CancelPendingAsync()
+    {
+        _cancelling = true;
+        _error = null;
+        StateHasChanged();
+
+        var success = await ProfilePhotoService.CancelPendingProfilePhotoAsync(CompanyId);
+        if (!success)
+            _error = "Failed to cancel the pending photo.";
+
+        _cancelling = false;
+        await LoadAsync();
+    }
+}

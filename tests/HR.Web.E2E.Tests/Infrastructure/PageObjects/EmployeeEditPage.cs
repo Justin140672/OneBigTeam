@@ -593,4 +593,62 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         var badge = row.Locator(".badge");
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
+
+    // ── Profile Photo Header (EmployeeProfilePhotoHeader — HR-managed photo for another employee) ──
+    // Rendered near the top of the page (outside the tabs) whenever Session.CanManageEmployees
+    // is true; see EmployeeEdit.razor.
+
+    private ILocator ProfilePhotoImage => page.Locator("img.hr-profile-avatar");
+    private ILocator ProfilePhotoInitials => page.Locator("span.hr-profile-avatar--initials");
+
+    private ILocator PendingProfilePhotoCard =>
+        page.Locator(".alert-info").Filter(new() { HasText = "Pending Review" }).First;
+
+    /// <summary>
+    /// Returns true if the profile photo header is showing an actual photo (an &lt;img&gt;)
+    /// rather than the initials placeholder — i.e. the employee has an approved current photo.
+    /// </summary>
+    public Task<bool> HasProfilePhotoImageAsync() => ProfilePhotoImage.IsVisibleAsync();
+
+    /// <summary>
+    /// Returns true if the profile photo header is showing the initials placeholder — i.e. the
+    /// employee has no approved current photo yet (see ProfilePhotoAvatar's fallback rendering).
+    /// </summary>
+    public Task<bool> HasProfilePhotoInitialsAsync() => ProfilePhotoInitials.IsVisibleAsync();
+
+    /// <summary>
+    /// HR uploads a photo directly via the "Upload / Replace Photo" button on the Employee Edit
+    /// page header. Unlike self-service uploads, this writes straight to the approved/current
+    /// photo table — no pending-review step. Per EmployeeProfilePhotoHeader.HandleUploaded, the
+    /// dialog only closes (an EventCallback-driven re-render of the parent) after the header has
+    /// already reloaded the current photo, so callers can assert on the new state immediately
+    /// after this returns.
+    /// </summary>
+    public async Task UploadProfilePhotoDirectAsync(string filePath)
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Upload / Replace Photo" }).ClickAsync();
+
+        var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = "Upload / Replace Profile Photo" });
+        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
+        await dialog.Locator("input[type='file']").SetInputFilesAsync(filePath);
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
+
+        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
+
+    /// <summary>Returns true if a pending profile photo review card ("Pending Review") is visible in the header.</summary>
+    public Task<bool> HasPendingProfilePhotoCardAsync() => PendingProfilePhotoCard.IsVisibleAsync();
+
+    /// <summary>
+    /// Approves the pending profile photo shown in the header's review card. Waits for the card
+    /// to disappear as the signal that the header has refreshed with the newly-approved photo
+    /// (ApproveAsync reloads both the pending and current photo before its final render).
+    /// </summary>
+    public async Task ApprovePendingProfilePhotoAsync()
+    {
+        var card = PendingProfilePhotoCard;
+        await card.GetByRole(AriaRole.Button, new() { Name = "Approve" }).ClickAsync();
+        await card.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
 }

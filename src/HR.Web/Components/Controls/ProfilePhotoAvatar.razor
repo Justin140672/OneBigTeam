@@ -1,0 +1,18 @@
+@if (!string.IsNullOrEmpty(PhotoUrl))
+{
+    <img src="@PhotoUrl" alt="@Alt" class="hr-profile-avatar" style="width:@(SizePx)px;height:@(SizePx)px;" />
+}
+else
+{
+    <span class="hr-profile-avatar hr-profile-avatar--initials"
+          style="width:@(SizePx)px;height:@(SizePx)px;font-size:@(SizePx / 2.6)px;">
+        @Initials
+    </span>
+}
+
+@code {
+    [Parameter] public string? PhotoUrl { get; set; }
+    [Parameter] public string Initials { get; set; } = "?";
+    [Parameter] public string Alt { get; set; } = "Profile photo";
+    [Parameter] public int SizePx { get; set; } = 72;
+}

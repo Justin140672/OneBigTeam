@@ -289,6 +289,12 @@
                 <i class="fa-solid fa-sitemap me-1"></i>View Org Chart
             </a>
         </div>
+
+        @if (Session.CanManageEmployees && _employee is not null)
+        {
+            <EmployeeProfilePhotoHeader CompanyId="CompanyId" EmployeeId="Id!.Value" Initials="@EmployeeInitials" />
+        }
+
         @if (_employee?.ManagerId is not null)
         {
             <p class="text-muted small mb-1">
@@ -694,6 +700,11 @@
     private string PageTitle => IsNew ? "Add Employee" : $"{Model.FirstName} {Model.LastName}".Trim();
 
     private GetEmployeeResponse? _employee;
+
+    private string EmployeeInitials => string.Concat(
+        (_employee?.FirstName?.Length > 0 ? _employee.FirstName[0].ToString() : ""),
+        (_employee?.LastName?.Length  > 0 ? _employee.LastName[0].ToString()  : "")).ToUpperInvariant()
+        is { Length: > 0 } i ? i : "?";
 
     private bool _sendInviteOnCreate;
     private bool _sendingInvite;

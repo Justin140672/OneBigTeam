@@ -1,0 +1,91 @@
+@inherits EditDialogBase<UploadProfilePhotoDialog.UploadProfilePhotoFormModel>
+@using Microsoft.AspNetCore.Components.Forms
+
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="480px" ShowCloseIcon="true">
+    <DialogEvents Closed="HandleDialogClosed" />
+    <DialogTemplates>
+        <Header>@Title</Header>
+        <Content>
+            @if (!string.IsNullOrEmpty(GlobalError))
+            {
+                <div class="alert alert-danger alert-dismissible mb-3">
+                    @GlobalError
+                    <button type="button" class="btn-close" @onclick="@(() => GlobalError = null)"></button>
+                </div>
+            }
+            <div class="mb-3">
+                <label class="form-label">Photo <span class="text-danger">*</span></label>
+                <InputFile class="form-control" OnChange="OnFileSelected" accept=".jpg,.jpeg,.png" />
+                <div class="form-text">JPEG or PNG, up to 5 MB.</div>
+            </div>
+            @if (_selectedFile is not null)
+            {
+                <div class="text-muted small">Selected: @_selectedFile.Name (@FormatFileSize(_selectedFile.Size))</div>
+            }
+        </Content>
+        <FooterTemplate>
+            <HrDialogButtonBar SaveLabel="Upload" Saving="Saving" OnSave="SubmitAsync" OnCancel="CancelAsync" />
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    private const long MaxFileSizeBytes = 5 * 1024 * 1024;
+    private static readonly HashSet<string> AllowedContentTypes = ["image/jpeg", "image/png"];
+
+    [Parameter] public string Title { get; set; } = "Upload Profile Photo";
+
+    // The caller supplies which upload endpoint to call (self vs. HR-direct) — keeps the dialog
+    // markup shared between MyProfile and EmployeeEdit without duplicating it.
+    [Parameter, EditorRequired] public Func<IBrowserFile, CancellationToken, Task<string?>> UploadFunc { get; set; } = default!;
+
+    private IBrowserFile? _selectedFile;
+
+    protected override Task OnOpenedAsync()
+    {
+        _selectedFile = null;
+        return Task.CompletedTask;
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        GlobalError = null;
+        var file = e.File;
+
+        if (!AllowedContentTypes.Contains(file.ContentType))
+        {
+            GlobalError = "File must be a JPEG or PNG image.";
+            _selectedFile = null;
+            return;
+        }
+
+        if (file.Size <= 0 || file.Size > MaxFileSizeBytes)
+        {
+            GlobalError = "File size must be greater than zero and not exceed 5 MB.";
+            _selectedFile = null;
+            return;
+        }
+
+        _selectedFile = file;
+    }
+
+    protected override string? ValidateExtra() =>
+        _selectedFile is null ? "Please select a photo." : null;
+
+    protected override async Task<string?> SaveCoreAsync() =>
+        await UploadFunc(_selectedFile!, CancellationToken.None);
+
+    protected override void ResetForm()
+    {
+        _selectedFile = null;
+    }
+
+    private static string FormatFileSize(long bytes) =>
+        bytes < 1024 * 1024
+            ? $"{bytes / 1024.0:F0} KB"
+            : $"{bytes / (1024.0 * 1024.0):F1} MB";
+
+    public sealed class UploadProfilePhotoFormModel
+    {
+    }
+}
