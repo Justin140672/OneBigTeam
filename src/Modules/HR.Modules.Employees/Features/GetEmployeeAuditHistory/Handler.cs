@@ -20,6 +20,8 @@ internal sealed class GetEmployeeAuditHistoryHandler(
         ["ToilTransaction"] = "Leave",
         ["ProbationRecord"] = "Probation",
         ["ProbationReview"] = "Probation",
+        ["OnboardingPlan"] = "Onboarding",
+        ["OffboardingPlan"] = "Offboarding",
         ["EmployeeDocument"] = "Documents",
         ["DocumentRequest"] = "Documents",
         ["AssetAssignment"] = "Assets",

@@ -1,5 +1,9 @@
 namespace HR.Web.Models;
 
+// Deliberately minimal — used only to decide whether the Employee Overview page should show its
+// Probation tab at all; see ProbationService.GetStatusAsync.
+public sealed record ProbationStatusModel(bool HasRecord, string? Status);
+
 public sealed record ProbationRecordModel(
     Guid Id,
     Guid CompanyId,

@@ -16,9 +16,27 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// </summary>
 public sealed class EmployeeOffboardingTab(IPage page)
 {
+    /// <summary>
+    /// Opens the Offboarding tab. Since the tab is only rendered once an active plan exists
+    /// (or the caller deep-linked with "?tab=offboarding"), an employee with no plan yet has no
+    /// tab to click — for that case this clicks the Employee Overview header's "Start
+    /// Offboarding" button instead, which deep-links here and makes the tab (with its own empty
+    /// state) appear.
+    /// </summary>
     public async Task OpenAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" }).ClickAsync();
+        var tab = page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" });
+
+        if (await tab.IsVisibleAsync())
+        {
+            await tab.ClickAsync();
+        }
+        else
+        {
+            await page.GetByRole(AriaRole.Button, new() { Name = "Start Offboarding" }).ClickAsync();
+            await tab.WaitForAsync(new() { Timeout = 15_000 });
+        }
+
         // Wait for the tab content to render — either the progress panel's progress bar
         // (a plan exists) or the "No offboarding plan found for this employee" empty state.
         await page.WaitForSelectorAsync(".progress, .hr-empty-state", new() { Timeout = 15_000 });

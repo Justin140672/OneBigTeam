@@ -47,7 +47,10 @@ internal sealed record GetEmployeeResponse(
     DateOnly? LeavingDate,
     string? Notes,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool ShowOnboardingTab,
+    bool ShowProbationTab,
+    bool ShowOffboardingTab);
 
 // Ordered from the top of the org (no manager) down to the employee's immediate manager;
 // does not include the employee themselves.

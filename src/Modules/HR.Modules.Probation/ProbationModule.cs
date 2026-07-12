@@ -10,6 +10,7 @@ using HR.Modules.Probation.Features.GetProbationRecord;
 using HR.Modules.Probation.Features.GetProbationRecordByEmployee;
 using HR.Modules.Probation.Features.GetProbationReview;
 using HR.Modules.Probation.Features.GetProbationReviews;
+using HR.Modules.Probation.Features.GetProbationStatus;
 using HR.Modules.Probation.Features.GetUpcomingProbationReviews;
 using HR.Modules.Probation.Features.UpdateProbationRecord;
 using HR.Modules.Probation.Jobs;
@@ -44,6 +45,7 @@ public static class ProbationModule
         services.AddScoped<IValidator<CreateProbationRecordRequest>, CreateProbationRecordValidator>();
         services.AddScoped<GetProbationRecordHandler>();
         services.AddScoped<GetProbationRecordByEmployeeHandler>();
+        services.AddScoped<GetProbationStatusHandler>();
         services.AddScoped<GetProbationReviewHandler>();
         services.AddScoped<UpdateProbationRecordHandler>();
         services.AddScoped<IValidator<UpdateProbationRecordRequest>, UpdateProbationRecordValidator>();
@@ -55,6 +57,7 @@ public static class ProbationModule
         services.AddScoped<IValidator<CompleteProbationReviewRequest>, CompleteProbationReviewValidator>();
         services.AddScoped<ITaskCompletionAction, CompleteProbationReviewFromTaskAction>();
         services.AddScoped<IProbationSummaryReader, ProbationSummaryReader>();
+        services.AddScoped<IProbationStatusReader, ProbationStatusReader>();
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddScoped<GenerateDueProbationReviewsJob>();
     }

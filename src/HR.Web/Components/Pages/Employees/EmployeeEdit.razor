@@ -279,7 +279,13 @@
             {
                 <span class="badge rounded-pill px-3 py-2 fs-6 fw-normal @StatusBadgeClass(_employee.Status)">@StatusDisplayName(_employee.Status)</span>
             }
-            <a class="btn btn-outline-secondary btn-sm ms-auto" href="/companies/@CompanyId/organisation-chart?employeeId=@Id">
+            @if (!_showOffboardingTab)
+            {
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" @onclick="GoToStartOffboarding">
+                    <i class="fa-solid fa-person-walking-arrow-right me-1"></i>Start Offboarding
+                </button>
+            }
+            <a class="btn btn-outline-secondary btn-sm @(_showOffboardingTab ? "ms-auto" : "")" href="/companies/@CompanyId/organisation-chart?employeeId=@Id">
                 <i class="fa-solid fa-sitemap me-1"></i>View Org Chart
             </a>
         </div>
@@ -554,14 +560,17 @@
                     </ContentTemplate>
                 </TabItem>
 
-                <TabItem>
-                    <ChildContent><TabHeader Text="Probation" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4">
-                            <EmployeeProbationTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
+                @if (_showProbationTab)
+                {
+                    <TabItem>
+                        <ChildContent><TabHeader Text="Probation" /></ChildContent>
+                        <ContentTemplate>
+                            <div class="mt-4">
+                                <EmployeeProbationTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+                }
 
                 <TabItem>
                     <ChildContent><TabHeader Text="Emergency Contacts" /></ChildContent>
@@ -627,23 +636,29 @@
                     </ContentTemplate>
                 </TabItem>
 
-                <TabItem>
-                    <ChildContent><TabHeader Text="Onboarding" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4">
-                            <EmployeeOnboardingTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
+                @if (_showOnboardingTab)
+                {
+                    <TabItem>
+                        <ChildContent><TabHeader Text="Onboarding" /></ChildContent>
+                        <ContentTemplate>
+                            <div class="mt-4">
+                                <EmployeeOnboardingTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+                }
 
-                <TabItem>
-                    <ChildContent><TabHeader Text="Offboarding" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4">
-                            <EmployeeOffboardingTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
+                @if (_showOffboardingTab)
+                {
+                    <TabItem>
+                        <ChildContent><TabHeader Text="Offboarding" /></ChildContent>
+                        <ContentTemplate>
+                            <div class="mt-4">
+                                <EmployeeOffboardingTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+                }
 
             </TabItems>
         </SfTab>
@@ -701,6 +716,28 @@
     private EmployeeEmploymentTab? _employmentTab;
     private int _activeTabIndex;
 
+    // Probation only gets a tab while an active record exists (Active/ReviewDue/Extended) —
+    // hidden once Passed/Failed, or when the employee never had a record at all. Since Probation
+    // sits above every other conditional/fixed tab in this markup, hiding it shifts every
+    // subsequent tab's index down by one.
+    private bool _showProbationTab;
+    private int ProbationOffset => _showProbationTab ? 0 : -1;
+
+    // Onboarding only gets a tab once a plan exists, and loses it again once that plan is
+    // Completed — completed history remains visible via the Audit tab instead (see
+    // OnboardingPlanCompletedAuditEvent). Offboarding's tab index shifts whenever Onboarding's (or
+    // Probation's) tab isn't rendered, since Syncfusion's SfTab indexes by however many <TabItem>
+    // elements actually render, not by their position in this markup.
+    private bool _showOnboardingTab;
+    private int OnboardingTabIndex => 11 + ProbationOffset;
+    private int OffboardingTabIndex => (_showOnboardingTab ? 12 : 11) + ProbationOffset;
+
+    // Offboarding only gets a tab once a plan has been started, and loses it again once that
+    // plan is Completed/Cancelled — completed history remains visible via the Audit tab instead
+    // (see OffboardingPlanCompletedAuditEvent). It's the last tab, so its own visibility never
+    // affects any other tab's index.
+    private bool _showOffboardingTab;
+
     protected override async Task LoadAsync()
     {
         await Session.InitialiseAsync();
@@ -708,18 +745,6 @@
         {
             Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
             return;
-        }
-
-        var query = QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
-        if (query.TryGetValue("tab", out var tab))
-        {
-            _activeTabIndex = tab.ToString() switch
-            {
-                "probation" => 3,
-                "onboarding" => 11,
-                "offboarding" => 12,
-                _ => 0
-            };
         }
 
         var deptResult = await DepartmentService.ListDepartmentsAsync(CompanyId);
@@ -774,6 +799,14 @@
                 // DataAnnotations validation for an existing employee.
                 Model.EmployeeNumber = _employee.EmployeeNumber ?? string.Empty;
                 Model.EmploymentTypeId = _employee.EmploymentTypeId;
+
+                // The employee profile response is the single source of truth for lifecycle tab
+                // visibility — these rules live server-side (GetEmployeeHandler) precisely so
+                // this page doesn't have to re-derive them from separately-fetched plan/record
+                // statuses.
+                _showProbationTab = _employee.ShowProbationTab;
+                _showOnboardingTab = _employee.ShowOnboardingTab;
+                _showOffboardingTab = _employee.ShowOffboardingTab;
             }
 
             var uri = new Uri(Navigation.Uri);
@@ -784,7 +817,34 @@
         {
             Model.StartDate = DateOnly.FromDateTime(DateTime.Today);
         }
+
+        // Parsed after _showProbationTab/_showOnboardingTab/_showOffboardingTab are known, since
+        // every later tab's index depends on whether those actually rendered above it.
+        var query = QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
+        if (query.TryGetValue("tab", out var tab))
+        {
+            var tabValue = tab.ToString();
+
+            // Unlike Onboarding/Probation, Offboarding has no other entry point once its tab is
+            // hidden — starting one happens *inside* the tab itself (EmployeeOffboardingTab's own
+            // empty-state "Start Offboarding" button). The header button (GoToStartOffboarding)
+            // deep-links here specifically so that flow stays reachable for an employee with no
+            // active plan yet.
+            if (tabValue == "offboarding")
+                _showOffboardingTab = true;
+
+            _activeTabIndex = tabValue switch
+            {
+                "probation" => _showProbationTab ? 3 : 0,
+                "onboarding" => _showOnboardingTab ? OnboardingTabIndex : 0,
+                "offboarding" => OffboardingTabIndex,
+                _ => 0
+            };
+        }
     }
+
+    private void GoToStartOffboarding() =>
+        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{Id}?tab=offboarding", forceLoad: true);
 
     private async Task OnPositionProfileChanged(ChangeEventArgs<Guid?, PositionProfileListItemModel> args)
     {

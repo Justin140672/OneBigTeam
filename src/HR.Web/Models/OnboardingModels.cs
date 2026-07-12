@@ -1,5 +1,9 @@
 namespace HR.Web.Models;
 
+// Deliberately minimal — used only to decide whether the Employee Overview page should show its
+// Onboarding tab at all; see OnboardingService.GetStatusAsync.
+public sealed record OnboardingStatusModel(bool HasPlan, string? Status);
+
 public sealed record OnboardingOverviewModel(
     Guid EmployeeId,
     bool HasPlan,

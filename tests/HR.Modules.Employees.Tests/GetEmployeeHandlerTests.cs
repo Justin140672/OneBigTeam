@@ -1,6 +1,8 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.GetEmployee;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Tests;
@@ -9,6 +11,16 @@ public class GetEmployeeHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 8, 10, 0, 0, DateTimeKind.Utc);
     private static readonly DateOnly StartDate = new(2026, 7, 1);
+
+    private static GetEmployeeHandler BuildHandler(
+        EmployeesDbContext context,
+        OnboardingStatusSummary? onboardingStatus = null,
+        ProbationStatusSummary? probationStatus = null,
+        OffboardingStatusSummary? offboardingStatus = null) =>
+        new(context,
+            new FakeOnboardingStatusReader(onboardingStatus),
+            new FakeProbationStatusReader(probationStatus),
+            new FakeOffboardingStatusReader(offboardingStatus));
 
     [Fact]
     public async Task HandleAsync_Returns_Employee_When_Found()
@@ -21,7 +33,7 @@ public class GetEmployeeHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new GetEmployeeHandler(context);
+        var handler = BuildHandler(context);
 
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
@@ -41,7 +53,7 @@ public class GetEmployeeHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Employee_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new GetEmployeeHandler(context);
+        var handler = BuildHandler(context);
 
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = Guid.NewGuid(), Id = Guid.NewGuid() },
@@ -61,7 +73,7 @@ public class GetEmployeeHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new GetEmployeeHandler(context);
+        var handler = BuildHandler(context);
 
         // Request uses a different companyId — should not find the employee
         var result = await handler.HandleAsync(
@@ -83,7 +95,7 @@ public class GetEmployeeHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new GetEmployeeHandler(context);
+        var handler = BuildHandler(context);
 
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
@@ -104,7 +116,7 @@ public class GetEmployeeHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new GetEmployeeHandler(context);
+        var handler = BuildHandler(context);
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
             CancellationToken.None);
@@ -140,7 +152,7 @@ public class GetEmployeeHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new GetEmployeeHandler(context);
+        var handler = BuildHandler(context);
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
             CancellationToken.None);
@@ -164,7 +176,7 @@ public class GetEmployeeHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new GetEmployeeHandler(context);
+        var handler = BuildHandler(context);
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
             CancellationToken.None);
@@ -197,7 +209,7 @@ public class GetEmployeeHandlerTests
         context.Employees.AddRange(reportOne, reportTwo, terminatedReport);
         await context.SaveChangesAsync();
 
-        var handler = new GetEmployeeHandler(context);
+        var handler = BuildHandler(context);
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = manager.Id },
             CancellationToken.None);
@@ -217,7 +229,7 @@ public class GetEmployeeHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new GetEmployeeHandler(context);
+        var handler = BuildHandler(context);
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
             CancellationToken.None);
@@ -264,7 +276,7 @@ public class GetEmployeeHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new GetEmployeeHandler(context);
+        var handler = BuildHandler(context);
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
             CancellationToken.None);
@@ -299,7 +311,7 @@ public class GetEmployeeHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new GetEmployeeHandler(context);
+        var handler = BuildHandler(context);
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
             CancellationToken.None);
@@ -308,6 +320,145 @@ public class GetEmployeeHandlerTests
         Assert.Equal(2, result.Value!.ReportingChain.Count);
         Assert.Equal("Ben B", result.Value.ReportingChain[0].Name);
         Assert.Equal("Amy A", result.Value.ReportingChain[1].Name);
+    }
+
+    // ── Lifecycle tab visibility ─────────────────────────────────────────────────
+    // ShowOnboardingTab/ShowProbationTab/ShowOffboardingTab are derived entirely from the
+    // fakes' summaries here — the readers' own query/ordering correctness is covered by each
+    // module's own Get*StatusReader tests (GetOnboardingStatusHandlerTests etc.); this class only
+    // needs to prove GetEmployeeHandler applies the right predicate to whatever a reader returns.
+
+    [Fact]
+    public async Task HandleAsync_LifecycleTabs_AllHidden_ForEmployeeWithNoLifecycleProcesses()
+    {
+        await using var context = BuildContext();
+        var employee = SeedEmployee(context, Guid.NewGuid());
+
+        var handler = BuildHandler(context);
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.ShowOnboardingTab);
+        Assert.False(result.Value.ShowProbationTab);
+        Assert.False(result.Value.ShowOffboardingTab);
+    }
+
+    [Theory]
+    [InlineData("NotStarted", true)]
+    [InlineData("InProgress", true)]
+    [InlineData("Completed", false)]
+    public async Task HandleAsync_ShowOnboardingTab_ReflectsPlanStatus(string status, bool expected)
+    {
+        await using var context = BuildContext();
+        var employee = SeedEmployee(context, Guid.NewGuid());
+
+        var handler = BuildHandler(context, onboardingStatus: new OnboardingStatusSummary(status));
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(expected, result.Value!.ShowOnboardingTab);
+        Assert.False(result.Value.ShowProbationTab);
+        Assert.False(result.Value.ShowOffboardingTab);
+    }
+
+    [Theory]
+    [InlineData("Active", true)]
+    [InlineData("ReviewDue", true)]
+    [InlineData("Extended", true)]
+    [InlineData("Passed", false)]
+    [InlineData("Failed", false)]
+    public async Task HandleAsync_ShowProbationTab_ReflectsRecordStatus(string status, bool expected)
+    {
+        await using var context = BuildContext();
+        var employee = SeedEmployee(context, Guid.NewGuid());
+
+        var handler = BuildHandler(context, probationStatus: new ProbationStatusSummary(status));
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.ShowOnboardingTab);
+        Assert.Equal(expected, result.Value.ShowProbationTab);
+        Assert.False(result.Value.ShowOffboardingTab);
+    }
+
+    [Theory]
+    [InlineData("NotStarted", true)]
+    [InlineData("InProgress", true)]
+    [InlineData("Completed", false)]
+    [InlineData("Cancelled", false)]
+    public async Task HandleAsync_ShowOffboardingTab_ReflectsPlanStatus(string status, bool expected)
+    {
+        await using var context = BuildContext();
+        var employee = SeedEmployee(context, Guid.NewGuid());
+
+        var handler = BuildHandler(context, offboardingStatus: new OffboardingStatusSummary(status));
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.ShowOnboardingTab);
+        Assert.False(result.Value.ShowProbationTab);
+        Assert.Equal(expected, result.Value.ShowOffboardingTab);
+    }
+
+    [Fact]
+    public async Task HandleAsync_LifecycleTabs_AllShown_ForEmployeeWithMultipleActiveLifecycleProcesses()
+    {
+        await using var context = BuildContext();
+        var employee = SeedEmployee(context, Guid.NewGuid());
+
+        var handler = BuildHandler(
+            context,
+            onboardingStatus: new OnboardingStatusSummary("InProgress"),
+            probationStatus: new ProbationStatusSummary("ReviewDue"),
+            offboardingStatus: new OffboardingStatusSummary("InProgress"));
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.ShowOnboardingTab);
+        Assert.True(result.Value.ShowProbationTab);
+        Assert.True(result.Value.ShowOffboardingTab);
+    }
+
+    [Fact]
+    public async Task HandleAsync_LifecycleTabs_AllHidden_WhenEveryProcessHasCompleted()
+    {
+        await using var context = BuildContext();
+        var employee = SeedEmployee(context, Guid.NewGuid());
+
+        var handler = BuildHandler(
+            context,
+            onboardingStatus: new OnboardingStatusSummary("Completed"),
+            probationStatus: new ProbationStatusSummary("Passed"),
+            offboardingStatus: new OffboardingStatusSummary("Completed"));
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.ShowOnboardingTab);
+        Assert.False(result.Value.ShowProbationTab);
+        Assert.False(result.Value.ShowOffboardingTab);
+    }
+
+    private static Employee SeedEmployee(EmployeesDbContext context, Guid companyId)
+    {
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        context.SaveChanges();
+        return employee;
     }
 
     private static EmployeesDbContext BuildContext()

@@ -12,7 +12,8 @@ internal sealed class CompleteOnboardingTaskFromTaskAction(
     IManagerReader managerReader,
     IEmployeeNameReader employeeNameReader,
     INotificationWriter notificationWriter,
-    ITaskCreator taskCreator) : ITaskCompletionAction
+    ITaskCreator taskCreator,
+    IAuditEventPublisher auditPublisher) : ITaskCompletionAction
 {
     private static readonly Guid SystemUserId = Guid.Empty;
 
@@ -68,7 +69,19 @@ internal sealed class CompleteOnboardingTaskFromTaskAction(
             await NotifyOnboardingStartedAsync(plan, now, cancellationToken);
 
         if (isCompleting)
+        {
             await CreateHrCompletionReviewTaskAsync(plan, cancellationToken);
+
+            await auditPublisher.PublishAsync(new OnboardingPlanCompletedAuditEvent(
+                plan.CompanyId,
+                plan.Id,
+                plan.EmployeeId,
+                plan.StartDate,
+                planTasks.Count,
+                planTasks.Count(t => t.Status == OnboardingTaskStatus.Completed),
+                planTasks.Count(t => t.Status == OnboardingTaskStatus.Skipped),
+                now), cancellationToken);
+        }
     }
 
     private async Task NotifyOnboardingStartedAsync(OnboardingPlan plan, DateTimeOffset now, CancellationToken cancellationToken)

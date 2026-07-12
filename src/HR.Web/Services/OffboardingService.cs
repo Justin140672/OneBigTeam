@@ -21,6 +21,19 @@ public sealed class OffboardingService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<OffboardingStatusModel?> GetStatusAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<OffboardingStatusModel>(
+                $"api/companies/{companyId}/employees/{employeeId}/offboarding-status", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     // Returns null on success, or an error message string on failure.
     public async Task<string?> StartOffboardingAsync(
         Guid companyId,

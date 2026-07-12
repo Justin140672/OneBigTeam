@@ -26,6 +26,22 @@ public sealed class ProbationService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<ProbationStatusModel?> GetStatusAsync(
+        Guid companyId,
+        Guid employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<ProbationStatusModel>(
+                $"api/companies/{companyId}/employees/{employeeId}/probation-status", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public async Task<ProbationReviewDetailModel?> GetProbationReviewAsync(
         Guid companyId,
         Guid reviewId,

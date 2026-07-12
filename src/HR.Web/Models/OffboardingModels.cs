@@ -1,5 +1,9 @@
 namespace HR.Web.Models;
 
+// Deliberately minimal — used only to decide whether the Employee Overview page should show its
+// Offboarding tab at all; see OffboardingService.GetStatusAsync.
+public sealed record OffboardingStatusModel(bool HasPlan, string? Status);
+
 public sealed record OffboardingOverviewModel(
     Guid EmployeeId,
     bool HasPlan,

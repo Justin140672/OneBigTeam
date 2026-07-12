@@ -156,6 +156,62 @@ public sealed class EmployeeOnboardingTabTests(AppFixture fixture) : E2ETestBase
     }
 
     [Fact]
+    public async Task OnboardingTab_IsHidden_AfterCompletion_ButHistoryStillVisibleInAuditTab()
+    {
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList   = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit   = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new DashboardPage(_page, _fixture.WebBaseUrl);
+        var inbox     = new HrInboxPage(_page, _fixture.WebBaseUrl);
+        var taskView  = new TaskViewPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        var employeeId = await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, "Hide");
+
+        Assert.True(
+            await _page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }).IsVisibleAsync(),
+            "Expected the Onboarding tab to be visible while the plan is not yet completed");
+
+        // Claim and complete all three default checklist tasks — the plan only transitions to
+        // Completed once every task is done (see CompleteOnboardingTaskFromTaskAction).
+        string[] taskFragments =
+        [
+            "Set up workstation",
+            "Send welcome email",
+            "Schedule welcome and induction meeting",
+        ];
+
+        foreach (var fragment in taskFragments)
+        {
+            await inbox.GoToAsync(AcmeId);
+            var titles = await inbox.GetTaskTitlesAsync();
+            var claimedTitle = titles.First(t => t.Contains(fragment, StringComparison.OrdinalIgnoreCase));
+            await inbox.ClaimAsync(claimedTitle);
+
+            await dashboard.GoToAsync();
+            await dashboard.ClickMyOnboardingTaskAsync(claimedTitle);
+            await taskView.WaitForLoadedAsync();
+            await taskView.CompleteGeneralTaskAsync();
+            await taskView.CloseAsync();
+        }
+
+        // Revisiting the employee's profile should no longer show an Onboarding tab at all.
+        await empEdit.GoToAsync(AcmeId, employeeId);
+
+        Assert.False(
+            await _page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }).IsVisibleAsync(),
+            "Expected the Onboarding tab to be hidden once the plan is Completed");
+
+        // The underlying data isn't deleted — HR can still find the completion in Audit history.
+        await empEdit.OpenAuditTabAsync();
+        Assert.True(
+            await empEdit.AuditHistoryRow("Onboarding completed").First.IsVisibleAsync(),
+            "Expected the Audit tab to show an 'Onboarding completed' history entry");
+    }
+
+    [Fact]
     public async Task DeepLink_TabOnboarding_LandsDirectlyOnOnboardingTab()
     {
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);

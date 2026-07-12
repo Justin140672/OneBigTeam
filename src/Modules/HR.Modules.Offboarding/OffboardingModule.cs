@@ -2,9 +2,11 @@ using FluentValidation;
 using Hangfire;
 using HR.Modules.Offboarding.Features.CompleteOffboardingTaskFromTask;
 using HR.Modules.Offboarding.Features.GetOffboardingOverview;
+using HR.Modules.Offboarding.Features.GetOffboardingStatus;
 using HR.Modules.Offboarding.Features.StartOffboarding;
 using HR.Modules.Offboarding.Jobs;
 using HR.Modules.Offboarding.Persistence;
+using HR.Modules.Offboarding.Services;
 using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +25,8 @@ public static class OffboardingModule
         services.AddScoped<ITaskCompletionAction, CompleteOffboardingTaskFromTaskAction>();
         services.AddScoped<StartOffboardingHandler>();
         services.AddScoped<GetOffboardingOverviewHandler>();
+        services.AddScoped<GetOffboardingStatusHandler>();
+        services.AddScoped<IOffboardingStatusReader, OffboardingStatusReader>();
         services.AddScoped<IValidator<StartOffboardingRequest>, StartOffboardingValidator>();
         services.AddScoped<OffboardingReminderJob>();
 

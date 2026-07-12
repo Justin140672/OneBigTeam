@@ -19,6 +19,19 @@ public sealed class OnboardingService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<OnboardingStatusModel?> GetStatusAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<OnboardingStatusModel>(
+                $"api/companies/{companyId}/employees/{employeeId}/onboarding-status", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public async Task<TeamOnboardingListModel?> GetTeamOnboardingAsync(Guid companyId, Guid managerId, CancellationToken cancellationToken = default)
     {
         try

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 
@@ -296,6 +297,284 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         Assert.Equal(ceo.Id, managerPayload.ReportingChain![0].EmployeeId);
     }
 
+    [Fact]
+    public async Task Get_Employee_LifecycleTabFlags_Reflect_Onboarding_Probation_And_Offboarding_State()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser1.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var deptResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/departments",
+            new { companyId, name = $"Dept-{Guid.NewGuid():N}" });
+        deptResponse.EnsureSuccessStatusCode();
+        var departmentId = (await deptResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locTypeResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/location-types",
+            new { companyId, name = $"LocType-{Guid.NewGuid():N}" });
+        locTypeResponse.EnsureSuccessStatusCode();
+        var locationTypeId = (await locTypeResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/locations",
+            new { companyId, name = $"Loc-{Guid.NewGuid():N}", locationTypeId });
+        locResponse.EnsureSuccessStatusCode();
+        var locationId = (await locResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var posResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles",
+            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}" });
+        posResponse.EnsureSuccessStatusCode();
+        var positionProfileId = (await posResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var etResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employment-types",
+            new { companyId, name = $"EmpType-{Guid.NewGuid():N}" });
+        etResponse.EnsureSuccessStatusCode();
+        var employmentTypeId = (await etResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        async Task<Guid> CreateEmployeeAsync(string firstName, string lastName, Guid? managerId)
+        {
+            var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
+            {
+                companyId,
+                firstName,
+                lastName,
+                workEmail = $"{firstName}.{lastName}.{Guid.NewGuid():N}@example.com".ToLowerInvariant(),
+                startDate = "2026-07-01",
+                dateOfBirth = "1990-01-01",
+                nationality = "British",
+                gender = "Female",
+                employeeNumber = $"EMP-{Guid.NewGuid():N}",
+                employmentTypeId,
+                departmentId,
+                locationId,
+                positionProfileId,
+                managerId,
+            });
+            response.EnsureSuccessStatusCode();
+            return (await response.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+        }
+
+        async Task<EmployeePayload> GetEmployeeAsync(Guid employeeId)
+        {
+            var response = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}");
+            response.EnsureSuccessStatusCode();
+            return (await response.Content.ReadFromJsonAsync<EmployeePayload>())!;
+        }
+
+        // A manager is required for a probation record to be auto-created on employee creation
+        // (CreateProbationOnEmployeeCreated.EmployeeCreatedHandler skips it when ManagerId is
+        // null) — an onboarding plan is always auto-created regardless.
+        var managerId = await CreateEmployeeAsync("Manager", "Person", managerId: null);
+        var employeeId = await CreateEmployeeAsync("Jamie", "Smith", managerId);
+
+        var initial = await GetEmployeeAsync(employeeId);
+        Assert.True(initial.ShowOnboardingTab);
+        Assert.True(initial.ShowProbationTab);
+        Assert.False(initial.ShowOffboardingTab);
+
+        // Start offboarding — should now show alongside the still-active onboarding/probation.
+        var startResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/offboarding/start",
+            new { companyId, employeeId, lastWorkingDay = "2026-12-01", notes = (string?)null });
+        startResponse.EnsureSuccessStatusCode();
+
+        var afterOffboardingStarted = await GetEmployeeAsync(employeeId);
+        Assert.True(afterOffboardingStarted.ShowOnboardingTab);
+        Assert.True(afterOffboardingStarted.ShowProbationTab);
+        Assert.True(afterOffboardingStarted.ShowOffboardingTab);
+
+        // Complete every generated onboarding task — the plan should transition to Completed and
+        // ShowOnboardingTab should flip to false, independently of the still-active probation and
+        // offboarding plans. Jamie has a manager, so of the 3 default checklist tasks, only "Set
+        // up workstation" is unassigned — "Send welcome email" and "Schedule induction meeting"
+        // are assigned directly to the manager (CreateOnboardingPlanOnEmployeeCreated's default
+        // fallback checklist). Task titles are suffixed with the employee's display name, so
+        // filter on "Jamie" to avoid also sweeping up the Manager employee's own onboarding tasks
+        // (onboarding auto-creates for every employee regardless of whether they have a manager).
+        var unassignedResponse = await client.GetAsync($"/api/companies/{companyId}/tasks/unassigned");
+        unassignedResponse.EnsureSuccessStatusCode();
+        var jamieUnassignedOnboardingTask = (await unassignedResponse.Content.ReadFromJsonAsync<UnassignedTasksPayload>())!.Items
+            .Single(t => t.Source == "Onboarding" && t.Title.Contains("Jamie"));
+
+        var managerOnboardingTasksResponse = await client.GetAsync($"/api/companies/{companyId}/employees/{managerId}/tasks");
+        managerOnboardingTasksResponse.EnsureSuccessStatusCode();
+        var jamieManagerAssignedOnboardingTasks = (await managerOnboardingTasksResponse.Content.ReadFromJsonAsync<EmployeeTasksPayload>())!.Items
+            .Where(t => t.Source == "Onboarding" && t.Title.Contains("Jamie"))
+            .ToList();
+        Assert.Equal(2, jamieManagerAssignedOnboardingTasks.Count);
+
+        var onboardingTaskIds = new[] { jamieUnassignedOnboardingTask.Id }
+            .Concat(jamieManagerAssignedOnboardingTasks.Select(t => t.Id));
+
+        foreach (var taskId in onboardingTaskIds)
+        {
+            var completeResponse = await client.PostAsync(
+                $"/api/companies/{companyId}/tasks/{taskId}/complete",
+                new StringContent("{}", Encoding.UTF8, "application/json"));
+            completeResponse.EnsureSuccessStatusCode();
+        }
+
+        var afterOnboardingCompleted = await GetEmployeeAsync(employeeId);
+        Assert.False(afterOnboardingCompleted.ShowOnboardingTab);
+        Assert.True(afterOnboardingCompleted.ShowProbationTab);
+        Assert.True(afterOnboardingCompleted.ShowOffboardingTab);
+
+        // Complete the probation record via a Passed FinalDecision review — ShowProbationTab
+        // should flip to false, independently of the already-completed onboarding and the
+        // still-active offboarding plan.
+        var probationRecordResponse = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/probation-record");
+        probationRecordResponse.EnsureSuccessStatusCode();
+        var probationRecordId = (await probationRecordResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var reviewResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
+        {
+            companyId,
+            probationRecordId,
+            reviewType = "FinalDecision",
+            dueDate = "2026-10-01",
+        });
+        reviewResponse.EnsureSuccessStatusCode();
+        var reviewId = (await reviewResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var completeReviewResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/probation-records/{probationRecordId}/reviews/{reviewId}/complete",
+            new
+            {
+                companyId,
+                probationRecordId,
+                reviewId,
+                completedByEmployeeId = managerId,
+                notes = "Passed probation.",
+                outcome = "Pass",
+                decisionDate = "2026-10-01",
+            });
+        completeReviewResponse.EnsureSuccessStatusCode();
+
+        var afterProbationCompleted = await GetEmployeeAsync(employeeId);
+        Assert.False(afterProbationCompleted.ShowOnboardingTab);
+        Assert.False(afterProbationCompleted.ShowProbationTab);
+        Assert.True(afterProbationCompleted.ShowOffboardingTab);
+
+        // Complete every remaining generated offboarding task — the plan should transition to
+        // Completed and ShowOffboardingTab should flip to false, leaving every lifecycle tab
+        // hidden. Jamie has a manager, so the 4 manager exit-checklist tasks are assigned
+        // directly to that manager (not unassigned) — only the 1 HR document-review task is
+        // unassigned (StartOffboardingHandler.CreateDocumentReviewTaskAsync always leaves it so).
+        var remainingUnassignedResponse = await client.GetAsync($"/api/companies/{companyId}/tasks/unassigned");
+        remainingUnassignedResponse.EnsureSuccessStatusCode();
+        var unassignedOffboardingTasks = (await remainingUnassignedResponse.Content.ReadFromJsonAsync<UnassignedTasksPayload>())!.Items
+            .Where(t => t.Source == "Offboarding")
+            .ToList();
+        Assert.Single(unassignedOffboardingTasks); // the HR document-review task
+
+        var managerTasksResponse = await client.GetAsync($"/api/companies/{companyId}/employees/{managerId}/tasks");
+        managerTasksResponse.EnsureSuccessStatusCode();
+        var managerOffboardingTasks = (await managerTasksResponse.Content.ReadFromJsonAsync<EmployeeTasksPayload>())!.Items
+            .Where(t => t.Source == "Offboarding")
+            .ToList();
+        Assert.Equal(4, managerOffboardingTasks.Count); // the manager exit-checklist tasks
+
+        var offboardingTaskIds = unassignedOffboardingTasks.Select(t => t.Id)
+            .Concat(managerOffboardingTasks.Select(t => t.Id));
+
+        foreach (var taskId in offboardingTaskIds)
+        {
+            var completeTaskResponse = await client.PostAsync(
+                $"/api/companies/{companyId}/tasks/{taskId}/complete",
+                new StringContent("{}", Encoding.UTF8, "application/json"));
+            completeTaskResponse.EnsureSuccessStatusCode();
+        }
+
+        var afterEverythingCompleted = await GetEmployeeAsync(employeeId);
+        Assert.False(afterEverythingCompleted.ShowOnboardingTab);
+        Assert.False(afterEverythingCompleted.ShowProbationTab);
+        Assert.False(afterEverythingCompleted.ShowOffboardingTab);
+    }
+
+    [Fact]
+    public async Task Get_Employee_LifecycleTabFlags_AllFalse_ForEmployeeCreatedWithoutAManager()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser2.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var deptResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/departments",
+            new { companyId, name = $"Dept-{Guid.NewGuid():N}" });
+        deptResponse.EnsureSuccessStatusCode();
+        var departmentId = (await deptResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locTypeResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/location-types",
+            new { companyId, name = $"LocType-{Guid.NewGuid():N}" });
+        locTypeResponse.EnsureSuccessStatusCode();
+        var locationTypeId = (await locTypeResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/locations",
+            new { companyId, name = $"Loc-{Guid.NewGuid():N}", locationTypeId });
+        locResponse.EnsureSuccessStatusCode();
+        var locationId = (await locResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var posResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles",
+            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}" });
+        posResponse.EnsureSuccessStatusCode();
+        var positionProfileId = (await posResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var etResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employment-types",
+            new { companyId, name = $"EmpType-{Guid.NewGuid():N}" });
+        etResponse.EnsureSuccessStatusCode();
+        var employmentTypeId = (await etResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        // No managerId supplied — CreateProbationOnEmployeeCreated.EmployeeCreatedHandler skips
+        // creating a probation record entirely when ManagerId is null, so ShowProbationTab starts
+        // (and stays) false without ever needing a Passed/Failed transition. Onboarding still
+        // auto-creates regardless of manager, so ShowOnboardingTab starts true here.
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
+        {
+            companyId,
+            firstName = "NoManager",
+            lastName = $"Employee{Guid.NewGuid():N}",
+            workEmail = $"nomanager.{Guid.NewGuid():N}@example.com",
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-01-01",
+            nationality = "British",
+            gender = "Male",
+            employeeNumber = $"EMP-{Guid.NewGuid():N}",
+            employmentTypeId,
+            departmentId,
+            locationId,
+            positionProfileId,
+        });
+        response.EnsureSuccessStatusCode();
+        var employeeId = (await response.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var payload = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}");
+        payload.EnsureSuccessStatusCode();
+        var employee = await payload.Content.ReadFromJsonAsync<EmployeePayload>();
+
+        Assert.NotNull(employee);
+        Assert.True(employee!.ShowOnboardingTab);
+        Assert.False(employee.ShowProbationTab);
+        Assert.False(employee.ShowOffboardingTab);
+    }
+
+    private sealed record UnassignedTasksPayload(IReadOnlyList<UnassignedTaskPayload> Items);
+
+    private sealed record UnassignedTaskPayload(Guid Id, string Title, string? Source);
+
+    private sealed record EmployeeTasksPayload(IReadOnlyList<EmployeeTaskItem> Items);
+
+    private sealed record EmployeeTaskItem(Guid Id, string Title, string? Source);
+
     private sealed record EmployeePayload(
         Guid Id,
         Guid CompanyId,
@@ -314,7 +593,10 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         DateOnly StartDate,
         string Status,
         DateTimeOffset CreatedAt,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        bool ShowOnboardingTab,
+        bool ShowProbationTab,
+        bool ShowOffboardingTab);
 
     private sealed record ReportingChainItemPayload(Guid EmployeeId, string Name, string? JobTitle);
 

@@ -89,7 +89,12 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     /// <summary>Closes the dialog via its Close button.</summary>
     public async Task CloseAsync()
     {
-        await Dialog.GetByRole(AriaRole.Button, new() { Name = "Close" }).ClickAsync();
+        // TaskViewDialog.razor renders both Syncfusion's built-in "X" close icon (ShowCloseIcon,
+        // which also carries aria-label="Close") and an explicit <SfButton>Close</SfButton> in
+        // the footer — both share the accessible name "Close", so GetByRole(Button, "Close")
+        // is ambiguous under Playwright's strict mode. GetByText targets only the labeled
+        // button, since the icon button has no text content.
+        await Dialog.GetByText("Close", new() { Exact = true }).ClickAsync();
         await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 

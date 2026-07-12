@@ -1,5 +1,6 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,10 +9,20 @@ namespace HR.Modules.Employees.Features.GetEmployee;
 internal sealed class GetEmployeeHandler
 {
     private readonly EmployeesDbContext _dbContext;
+    private readonly IOnboardingStatusReader _onboardingStatusReader;
+    private readonly IProbationStatusReader _probationStatusReader;
+    private readonly IOffboardingStatusReader _offboardingStatusReader;
 
-    public GetEmployeeHandler(EmployeesDbContext dbContext)
+    public GetEmployeeHandler(
+        EmployeesDbContext dbContext,
+        IOnboardingStatusReader onboardingStatusReader,
+        IProbationStatusReader probationStatusReader,
+        IOffboardingStatusReader offboardingStatusReader)
     {
         _dbContext = dbContext;
+        _onboardingStatusReader = onboardingStatusReader;
+        _probationStatusReader = probationStatusReader;
+        _offboardingStatusReader = offboardingStatusReader;
     }
 
     public async Task<Result<GetEmployeeResponse>> HandleAsync(
@@ -90,8 +101,30 @@ internal sealed class GetEmployeeHandler
                 Error.NotFound($"Employee with id '{request.Id}' was not found."));
         }
 
-        var reportingChain = await BuildReportingChainAsync(
+        var reportingChainTask = BuildReportingChainAsync(
             request.CompanyId, result.Id, result.ManagerId, cancellationToken);
+        var onboardingStatusTask = _onboardingStatusReader.GetStatusAsync(
+            request.CompanyId, result.Id, cancellationToken);
+        var probationStatusTask = _probationStatusReader.GetStatusAsync(
+            request.CompanyId, result.Id, cancellationToken);
+        var offboardingStatusTask = _offboardingStatusReader.GetStatusAsync(
+            request.CompanyId, result.Id, cancellationToken);
+
+        await Task.WhenAll(reportingChainTask, onboardingStatusTask, probationStatusTask, offboardingStatusTask);
+
+        var reportingChain = reportingChainTask.Result;
+        var onboardingStatus = onboardingStatusTask.Result;
+        var probationStatus = probationStatusTask.Result;
+        var offboardingStatus = offboardingStatusTask.Result;
+
+        // Single source of truth for "should the employee profile show this lifecycle tab" — the
+        // frontend reads these fields rather than re-deriving them from separately-fetched status
+        // calls, so these predicates must stay the only place this logic is expressed.
+        var showOnboardingTab = onboardingStatus is not null && onboardingStatus.Status != "Completed";
+        var showProbationTab = probationStatus is not null
+            && probationStatus.Status is "Active" or "ReviewDue" or "Extended";
+        var showOffboardingTab = offboardingStatus is not null
+            && offboardingStatus.Status is not ("Completed" or "Cancelled");
 
         return Result.Success(new GetEmployeeResponse(
             result.Id,
@@ -136,7 +169,10 @@ internal sealed class GetEmployeeHandler
             result.LeavingDate,
             result.Notes,
             result.CreatedAt,
-            result.UpdatedAt));
+            result.UpdatedAt,
+            showOnboardingTab,
+            showProbationTab,
+            showOffboardingTab));
     }
 
     // Walks the ManagerId chain from the employee's own manager up to the root, using an

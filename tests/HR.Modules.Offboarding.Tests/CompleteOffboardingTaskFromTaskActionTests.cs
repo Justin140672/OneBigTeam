@@ -72,18 +72,20 @@ public class CompleteOffboardingTaskFromTaskActionTests
             Now,
             sourceEntityId);
 
-    private static (CompleteOffboardingTaskFromTaskAction Action, FakeNotificationWriter Notifications, FakeTaskCreator TaskCreator)
+    private static (CompleteOffboardingTaskFromTaskAction Action, FakeNotificationWriter Notifications, FakeTaskCreator TaskCreator, FakeAuditPublisher AuditPublisher)
         BuildAction(OffboardingDbContext dbContext, Dictionary<Guid, string>? names = null)
     {
         var notifications = new FakeNotificationWriter();
         var taskCreator = new FakeTaskCreator();
+        var auditPublisher = new FakeAuditPublisher();
         var action = new CompleteOffboardingTaskFromTaskAction(
             dbContext,
             new FakeClock(FixedUtcNow),
             new FakeEmployeeNameReader(names),
             notifications,
-            taskCreator);
-        return (action, notifications, taskCreator);
+            taskCreator,
+            auditPublisher);
+        return (action, notifications, taskCreator, auditPublisher);
     }
 
     [Fact]
@@ -97,7 +99,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var task = SeedTask(dbContext, companyId, plan.Id, seedAt);
         await dbContext.SaveChangesAsync();
 
-        var (action, _, _) = BuildAction(dbContext);
+        var (action, _, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, task.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -120,7 +122,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B"); // still Pending afterwards
         await dbContext.SaveChangesAsync();
 
-        var (action, _, taskCreator) = BuildAction(dbContext);
+        var (action, _, taskCreator, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, taskToComplete.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -143,7 +145,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Completed, "Task B");
         await dbContext.SaveChangesAsync();
 
-        var (action, _, _) = BuildAction(dbContext);
+        var (action, _, _, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, taskToComplete.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -151,6 +153,51 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var savedPlan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
         Assert.Equal(OffboardingStatus.Completed, savedPlan.Status);
         Assert.Equal(Now, savedPlan.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_Final_Remaining_Task_Publishes_PlanCompletedAuditEvent()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
+        var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Completed, "Task B");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Skipped, "Task C");
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, _, auditPublisher) = BuildAction(dbContext);
+        var context = BuildTaskContext(companyId, taskToComplete.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var published = Assert.Single(auditPublisher.Published);
+        Assert.Equal("offboarding-plan.completed", published.EventType);
+        Assert.Equal("OffboardingPlan", published.EntityType);
+        Assert.Equal(plan.Id, published.EntityId);
+        Assert.Equal(plan.EmployeeId, published.EmployeeId);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_A_NonFinal_Task_Does_Not_Publish_PlanCompletedAuditEvent()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
+        var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B"); // still Pending afterwards
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, _, auditPublisher) = BuildAction(dbContext);
+        var context = BuildTaskContext(companyId, taskToComplete.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.Empty(auditPublisher.Published);
     }
 
     [Fact]
@@ -170,7 +217,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         await dbContext.SaveChangesAsync();
 
         var names = new Dictionary<Guid, string> { [employeeId] = employeeName };
-        var (action, notifications, taskCreator) = BuildAction(dbContext, names);
+        var (action, notifications, taskCreator, _) = BuildAction(dbContext, names);
         var context = BuildTaskContext(companyId, taskToComplete.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -200,7 +247,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Skipped, "Task C");
         await dbContext.SaveChangesAsync();
 
-        var (action, _, taskCreator) = BuildAction(dbContext);
+        var (action, _, taskCreator, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, taskToComplete.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -221,7 +268,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var task = SeedTask(dbContext, companyId, plan.Id, seedAt);
         await dbContext.SaveChangesAsync();
 
-        var (action, notifications, taskCreator) = BuildAction(dbContext);
+        var (action, notifications, taskCreator, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, sourceEntityId: null);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -248,7 +295,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var task = SeedTask(dbContext, companyId, plan.Id, seedAt);
         await dbContext.SaveChangesAsync();
 
-        var (action, _, taskCreator) = BuildAction(dbContext);
+        var (action, _, taskCreator, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, sourceEntityId: Guid.NewGuid());
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -275,7 +322,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Completed, "Task B");
         await dbContext.SaveChangesAsync();
 
-        var (action, _, taskCreator) = BuildAction(dbContext);
+        var (action, _, taskCreator, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, alreadyCompletedTask.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -303,7 +350,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var alreadySkippedTask = SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Skipped, "Task A");
         await dbContext.SaveChangesAsync();
 
-        var (action, _, taskCreator) = BuildAction(dbContext);
+        var (action, _, taskCreator, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, alreadySkippedTask.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);
@@ -325,7 +372,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var task = SeedTask(dbContext, otherCompanyId, plan.Id, seedAt);
         await dbContext.SaveChangesAsync();
 
-        var (action, _, taskCreator) = BuildAction(dbContext);
+        var (action, _, taskCreator, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, task.Id);
 
         await action.ExecuteAsync(context, CancellationToken.None);

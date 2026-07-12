@@ -16,6 +16,14 @@ public sealed class EmployeeProbationTabTests(AppFixture fixture) : E2ETestBase(
     private static readonly Guid AcmeId       = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid CarlosRivera = Guid.Parse("30000000-0000-0000-0000-000000000010");
 
+    // James Okafor: seeded with only a Passed probation record (ProbationModule.SeedProbationAsync's
+    // completed-records loop) — no active one, so the tab should be hidden for him.
+    private static readonly Guid JamesOkafor  = Guid.Parse("30000000-0000-0000-0000-000000000002");
+
+    // Sarah Chen: CTO with no manager — EmployeeCreatedHandler skips auto-creating a probation
+    // record when ManagerId is null, so she never had one at all.
+    private static readonly Guid SarahChen    = Guid.Parse("30000000-0000-0000-0000-000000000001");
+
     private const string LauraEmail = "laura.bennett@acme.example";
 
     [Fact]
@@ -82,5 +90,37 @@ public sealed class EmployeeProbationTabTests(AppFixture fixture) : E2ETestBase(
         Assert.True(
             status is "Active" or "Review Due" or "Extended",
             $"Expected an in-progress probation status, got '{status}'");
+    }
+
+    [Fact]
+    public async Task ProbationTab_IsHidden_ForEmployeeWithOnlyAPassedRecord()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empEdit.GoToAsync(AcmeId, JamesOkafor);
+
+        Assert.False(
+            await _page.GetByRole(AriaRole.Tab, new() { Name = "Probation" }).IsVisibleAsync(),
+            "Expected no 'Probation' tab for an employee whose only probation record is Passed");
+    }
+
+    [Fact]
+    public async Task ProbationTab_IsHidden_ForEmployeeWhoNeverHadARecord()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empEdit.GoToAsync(AcmeId, SarahChen);
+
+        Assert.False(
+            await _page.GetByRole(AriaRole.Tab, new() { Name = "Probation" }).IsVisibleAsync(),
+            "Expected no 'Probation' tab for an employee who never had a probation record");
     }
 }

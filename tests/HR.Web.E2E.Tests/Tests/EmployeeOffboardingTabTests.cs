@@ -6,16 +6,20 @@ using Microsoft.Playwright;
 namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
-/// Verifies the Offboarding tab on the employee edit page (empty state, the "Start Offboarding"
-/// dialog and its validation, the resulting progress panel / checklist, and deep-link tab
-/// activation).
+/// Verifies the Offboarding tab on the employee edit page: it's hidden entirely until an
+/// offboarding process exists (see EmployeeEdit.razor's _showOffboardingTab), the empty state,
+/// the "Start Offboarding" dialog and its validation, the resulting progress panel / checklist,
+/// and deep-link tab activation.
 ///
 /// Unlike Onboarding (auto-created via a domain event when an employee is created), an
 /// Offboarding plan is only ever created by explicitly submitting the "Start Offboarding"
-/// dialog — there is no seed data or auto-provisioning path. Every test below therefore creates
-/// a fresh employee through the standard New Employee form (mirroring
-/// EmployeeOnboardingTabTests.cs's CreateEmployeeWithFreshOnboardingPlanAsync), which reliably
-/// has zero assigned assets and no offboarding plan yet.
+/// dialog — there is no seed data or auto-provisioning path. Since the tab itself is hidden
+/// until a plan exists, that dialog is reached via the Employee Overview header's "Start
+/// Offboarding" button (EmployeeOffboardingTab page object's OpenAsync routes through it
+/// automatically). Every test below therefore creates a fresh employee through the standard New
+/// Employee form (mirroring EmployeeOnboardingTabTests.cs's
+/// CreateEmployeeWithFreshOnboardingPlanAsync), which reliably has zero assigned assets and no
+/// offboarding plan yet.
 /// </summary>
 [Collection("E2E")]
 public sealed class EmployeeOffboardingTabTests(AppFixture fixture) : E2ETestBase(fixture)
@@ -65,7 +69,7 @@ public sealed class EmployeeOffboardingTabTests(AppFixture fixture) : E2ETestBas
     }
 
     [Fact]
-    public async Task OffboardingTab_IsVisible_OnNewlyCreatedEmployee()
+    public async Task OffboardingTab_IsHidden_OnNewlyCreatedEmployee()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
@@ -74,11 +78,43 @@ public sealed class EmployeeOffboardingTabTests(AppFixture fixture) : E2ETestBas
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await CreateEmployeeAsync(empList, empEdit, "Vis");
+        await CreateEmployeeAsync(empList, empEdit, "Hidden");
+
+        Assert.False(
+            await _page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" }).IsVisibleAsync(),
+            "Expected no 'Offboarding' tab for an employee with no offboarding record");
+        Assert.True(
+            await _page.GetByRole(AriaRole.Button, new() { Name = "Start Offboarding" }).IsVisibleAsync(),
+            "Expected a 'Start Offboarding' button on the Employee Overview header instead");
+    }
+
+    [Fact]
+    public async Task StartOffboardingButton_Disappears_And_TabAppears_OnceOffboardingStarted()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var offboarding = new EmployeeOffboardingTab(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        var employeeId = await CreateEmployeeAsync(empList, empEdit, "Appear");
+        await offboarding.OpenAsync(); // no tab yet — routes through the header button
+        await offboarding.OpenStartDialogAsync();
+        await offboarding.FillLastWorkingDayAsync("01/12/2026");
+        await offboarding.SubmitStartAsync();
+
+        // Revisit the profile fresh (no query string) — the tab should now render on its own,
+        // and the header button should be gone since there's an active plan.
+        await empEdit.GoToAsync(AcmeId, employeeId);
 
         Assert.True(
             await _page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" }).IsVisibleAsync(),
-            "Expected an 'Offboarding' tab on the employee edit page");
+            "Expected the 'Offboarding' tab to appear now that a plan has been started");
+        Assert.False(
+            await _page.GetByRole(AriaRole.Button, new() { Name = "Start Offboarding" }).IsVisibleAsync(),
+            "Expected the header 'Start Offboarding' button to disappear once a plan is active");
     }
 
     [Fact]
@@ -173,7 +209,9 @@ public sealed class EmployeeOffboardingTabTests(AppFixture fixture) : E2ETestBas
 
         var employeeId = await CreateEmployeeAsync(empList, empEdit, "Deep");
 
-        // EmployeeEdit.razor's LoadAsync maps "?tab=offboarding" to tab index 12 (the last tab).
+        // EmployeeEdit.razor's LoadAsync forces _showOffboardingTab=true whenever "?tab=offboarding"
+        // is present, so the tab (and its empty state, since no plan exists yet) is reachable even
+        // for an employee with no active plan.
         await empEdit.GoToAsync(AcmeId, employeeId, "tab=offboarding");
 
         Assert.Equal("Offboarding", await employee.GetActiveTabNameAsync());

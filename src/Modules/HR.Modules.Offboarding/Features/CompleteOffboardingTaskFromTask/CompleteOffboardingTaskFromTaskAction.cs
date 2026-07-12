@@ -3,6 +3,7 @@ using HR.Modules.Offboarding.Persistence;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
+using HR.Modules.Offboarding;
 
 namespace HR.Modules.Offboarding.Features.CompleteOffboardingTaskFromTask;
 
@@ -11,7 +12,8 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
     IClock clock,
     IEmployeeNameReader employeeNameReader,
     INotificationWriter notificationWriter,
-    ITaskCreator taskCreator) : ITaskCompletionAction
+    ITaskCreator taskCreator,
+    IAuditEventPublisher auditPublisher) : ITaskCompletionAction
 {
     private static readonly Guid SystemUserId = Guid.Empty;
 
@@ -61,7 +63,19 @@ internal sealed class CompleteOffboardingTaskFromTaskAction(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         if (isCompleting)
+        {
             await CreateHrCompletionReviewTaskAsync(plan, cancellationToken);
+
+            await auditPublisher.PublishAsync(new OffboardingPlanCompletedAuditEvent(
+                plan.CompanyId,
+                plan.Id,
+                plan.EmployeeId,
+                plan.LastWorkingDay,
+                planTasks.Count,
+                planTasks.Count(t => t.Status == OffboardingTaskStatus.Completed),
+                planTasks.Count(t => t.Status == OffboardingTaskStatus.Skipped),
+                now), cancellationToken);
+        }
     }
 
     private async Task CreateHrCompletionReviewTaskAsync(OffboardingPlan plan, CancellationToken cancellationToken)
