@@ -144,8 +144,46 @@ public class ListEmployeesEndpointTests : IClassFixture<ApiWebApplicationFactory
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    private static async Task<(Guid DepartmentId, Guid LocationId, Guid PositionProfileId, Guid EmploymentTypeId)> CreateReferenceDataAsync(
+        HttpClient client, Guid companyId)
+    {
+        var deptResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/departments",
+            new { companyId, name = $"Dept {Guid.NewGuid():N}" });
+        deptResp.EnsureSuccessStatusCode();
+        var departmentId = (await deptResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locTypeResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/location-types",
+            new { companyId, name = $"LocType {Guid.NewGuid():N}" });
+        locTypeResp.EnsureSuccessStatusCode();
+        var locationTypeId = (await locTypeResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/locations",
+            new { companyId, name = $"Loc {Guid.NewGuid():N}", locationTypeId });
+        locResp.EnsureSuccessStatusCode();
+        var locationId = (await locResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var posResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles",
+            new { companyId, departmentId, locationId, title = $"Title {Guid.NewGuid():N}" });
+        posResp.EnsureSuccessStatusCode();
+        var positionProfileId = (await posResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var empTypeResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employment-types",
+            new { companyId, name = $"EmpType {Guid.NewGuid():N}" });
+        empTypeResp.EnsureSuccessStatusCode();
+        var employmentTypeId = (await empTypeResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        return (departmentId, locationId, positionProfileId, employmentTypeId);
+    }
+
     private static async Task CreateEmployeeAsync(HttpClient client, Guid companyId, string firstName, string lastName, string workEmail)
     {
+        var refData = await CreateReferenceDataAsync(client, companyId);
+
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {
             companyId,
@@ -155,10 +193,17 @@ public class ListEmployeesEndpointTests : IClassFixture<ApiWebApplicationFactory
             startDate = "2026-07-01",
             dateOfBirth = "1990-01-01",
             nationality = "British",
-            gender = "Male"
+            gender = "Male",
+            employeeNumber = $"EMP-{Guid.NewGuid():N}",
+            employmentTypeId = refData.EmploymentTypeId,
+            departmentId = refData.DepartmentId,
+            locationId = refData.LocationId,
+            positionProfileId = refData.PositionProfileId
         });
         response.EnsureSuccessStatusCode();
     }
+
+    private sealed record IdPayload(Guid Id);
 
     private sealed record ListPayload(
         IReadOnlyList<EmployeeItem> Items,

@@ -145,7 +145,12 @@ public class SetEmployeeWorkingPatternEndpointTests : IClassFixture<ApiWebApplic
                 startDate   = "2026-01-01",
                 dateOfBirth = "1990-01-01",
                 nationality = "British",
-                gender      = "Male"
+                gender      = "Male",
+                employeeNumber    = $"WP-{Guid.NewGuid():N}",
+                employmentTypeId  = Guid.Parse("40000000-0000-0000-0000-000000000001"),
+                departmentId      = Guid.Parse("10000000-0000-0000-0000-000000000001"),
+                locationId        = Guid.Parse("70000000-0000-0000-0000-000000000001"),
+                positionProfileId = Guid.Parse("20000000-0000-0000-0000-000000000002")
             });
         resp.EnsureSuccessStatusCode();
         return (await resp.Content.ReadFromJsonAsync<EmpPayload>())!;

@@ -124,9 +124,27 @@ public class AwardToilEndpointTests : IClassFixture<ApiWebApplicationFactory>
         setupClient.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
         setupClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
+        var (departmentId, locationId, positionProfileId, employmentTypeId) =
+            await CreateEmployeeReferenceDataAsync(setupClient, companyId);
+
         var empResp = await setupClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
-            new { companyId, firstName = "TOIL", lastName = "Tester", workEmail = $"toil.{Guid.NewGuid():N}@example.com", startDate = "2026-01-01", dateOfBirth = "1990-01-01", nationality = "British", gender = "Male" });
+            new
+            {
+                companyId,
+                firstName = "TOIL",
+                lastName = "Tester",
+                workEmail = $"toil.{Guid.NewGuid():N}@example.com",
+                startDate = "2026-01-01",
+                dateOfBirth = "1990-01-01",
+                nationality = "British",
+                gender = "Male",
+                employeeNumber = $"TOIL-{Guid.NewGuid():N}",
+                employmentTypeId,
+                departmentId,
+                locationId,
+                positionProfileId
+            });
         empResp.EnsureSuccessStatusCode();
         var employee = await empResp.Content.ReadFromJsonAsync<EmployeePayload>();
 
@@ -136,6 +154,42 @@ public class AwardToilEndpointTests : IClassFixture<ApiWebApplicationFactory>
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
         return (client, companyId, employee!.Id);
+    }
+
+    private static async Task<(Guid DepartmentId, Guid LocationId, Guid PositionProfileId, Guid EmploymentTypeId)>
+        CreateEmployeeReferenceDataAsync(HttpClient client, Guid companyId)
+    {
+        var deptResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/departments",
+            new { companyId, name = $"Dept-{Guid.NewGuid():N}" });
+        deptResp.EnsureSuccessStatusCode();
+        var departmentId = (await deptResp.Content.ReadFromJsonAsync<CompanyPayload>())!.Id;
+
+        var locTypeResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/location-types",
+            new { companyId, name = $"LocType-{Guid.NewGuid():N}" });
+        locTypeResp.EnsureSuccessStatusCode();
+        var locationTypeId = (await locTypeResp.Content.ReadFromJsonAsync<CompanyPayload>())!.Id;
+
+        var locResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/locations",
+            new { companyId, name = $"Loc-{Guid.NewGuid():N}", locationTypeId });
+        locResp.EnsureSuccessStatusCode();
+        var locationId = (await locResp.Content.ReadFromJsonAsync<CompanyPayload>())!.Id;
+
+        var ppResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles",
+            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}" });
+        ppResp.EnsureSuccessStatusCode();
+        var positionProfileId = (await ppResp.Content.ReadFromJsonAsync<CompanyPayload>())!.Id;
+
+        var etResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employment-types",
+            new { companyId, name = $"EmpType-{Guid.NewGuid():N}" });
+        etResp.EnsureSuccessStatusCode();
+        var employmentTypeId = (await etResp.Content.ReadFromJsonAsync<CompanyPayload>())!.Id;
+
+        return (departmentId, locationId, positionProfileId, employmentTypeId);
     }
 
     private async Task SeedToilLeaveTypeAsync(Guid companyId)

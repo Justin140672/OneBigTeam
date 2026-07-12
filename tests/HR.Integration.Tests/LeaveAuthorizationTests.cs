@@ -73,6 +73,42 @@ public class LeaveAuthorizationTests : IClassFixture<ApiWebApplicationFactory>
         return (hrAdminClient, companyAdminClient, companyId, leaveTypeId);
     }
 
+    private async Task<(Guid DepartmentId, Guid LocationId, Guid PositionProfileId, Guid EmploymentTypeId)> CreateReferenceDataAsync(
+        HttpClient client, Guid companyId)
+    {
+        var deptResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/departments",
+            new { companyId, name = $"Dept {Guid.NewGuid():N}" });
+        deptResp.EnsureSuccessStatusCode();
+        var departmentId = (await deptResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locTypeResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/location-types",
+            new { companyId, name = $"LocType {Guid.NewGuid():N}" });
+        locTypeResp.EnsureSuccessStatusCode();
+        var locationTypeId = (await locTypeResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/locations",
+            new { companyId, name = $"Loc {Guid.NewGuid():N}", locationTypeId });
+        locResp.EnsureSuccessStatusCode();
+        var locationId = (await locResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var posResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles",
+            new { companyId, departmentId, locationId, title = $"Title {Guid.NewGuid():N}" });
+        posResp.EnsureSuccessStatusCode();
+        var positionProfileId = (await posResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var empTypeResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employment-types",
+            new { companyId, name = $"EmpType {Guid.NewGuid():N}" });
+        empTypeResp.EnsureSuccessStatusCode();
+        var employmentTypeId = (await empTypeResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        return (departmentId, locationId, positionProfileId, employmentTypeId);
+    }
+
     private async Task<(Guid EmployeeId, Guid PolicyId)> CreateEmployeeWithPolicyAsync(HttpClient client, Guid companyId)
     {
         var policyResp = await client.PostAsJsonAsync(
@@ -80,6 +116,8 @@ public class LeaveAuthorizationTests : IClassFixture<ApiWebApplicationFactory>
             new { companyId, name = $"Policy {Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = true });
         policyResp.EnsureSuccessStatusCode();
         var policy = await policyResp.Content.ReadFromJsonAsync<PolicyPayload>();
+
+        var refData = await CreateReferenceDataAsync(client, companyId);
 
         var empResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
@@ -92,7 +130,12 @@ public class LeaveAuthorizationTests : IClassFixture<ApiWebApplicationFactory>
                 startDate = "2026-01-01",
                 dateOfBirth = "1990-01-01",
                 nationality = "British",
-                gender = "Male"
+                gender = "Male",
+                employeeNumber = $"EMP-{Guid.NewGuid():N}",
+                employmentTypeId = refData.EmploymentTypeId,
+                departmentId = refData.DepartmentId,
+                locationId = refData.LocationId,
+                positionProfileId = refData.PositionProfileId
             });
         empResp.EnsureSuccessStatusCode();
         var employee = await empResp.Content.ReadFromJsonAsync<EmployeePayload>();
@@ -183,4 +226,5 @@ public class LeaveAuthorizationTests : IClassFixture<ApiWebApplicationFactory>
     private sealed record PolicyPayload(Guid Id);
     private sealed record EmployeePayload(Guid Id);
     private sealed record LeaveRequestPayload(Guid Id, decimal TotalDays);
+    private sealed record IdPayload(Guid Id);
 }

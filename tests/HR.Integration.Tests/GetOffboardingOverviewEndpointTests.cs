@@ -68,7 +68,7 @@ public class GetOffboardingOverviewEndpointTests : IClassFixture<ApiWebApplicati
 
         // Complete the employee's asset-return task so we exercise a Completed status
         // alongside the still-Pending HR / manager checklist tasks.
-        var assetTaskId = await CompleteEmployeeTaskAsync(client, companyId, employeeId, "Return asset:");
+        await CompleteEmployeeTaskAsync(client, companyId, employeeId, "Return asset:");
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/offboarding-overview");
@@ -85,8 +85,10 @@ public class GetOffboardingOverviewEndpointTests : IClassFixture<ApiWebApplicati
         // 1 asset-return (Employee) task + 1 HR document-review task + 4 manager checklist tasks.
         Assert.Equal(6, payload.Tasks.Count);
 
-        var completedAssetTask = Assert.Single(payload.Tasks, t => t.Id == assetTaskId);
-        Assert.Equal("Employee", completedAssetTask.AssignTo);
+        // Matched by AssignTo rather than by the generic Tasks-module id returned from
+        // CompleteEmployeeTaskAsync — that id belongs to the Tasks module's own TaskItem, a
+        // different entity from the OffboardingTask this endpoint returns (linked, not identical).
+        var completedAssetTask = Assert.Single(payload.Tasks, t => t.AssignTo == "Employee");
         Assert.Equal("Completed", completedAssetTask.Status);
         Assert.NotNull(completedAssetTask.CompletedAt);
         Assert.Equal(completedAssetTask.CompletedAt, completedAssetTask.UpdatedAt);
@@ -143,6 +145,9 @@ public class GetOffboardingOverviewEndpointTests : IClassFixture<ApiWebApplicati
 
     private async Task<Guid> CreateEmployeeAsync(HttpClient client, Guid companyId)
     {
+        var (departmentId, locationId, positionProfileId, employmentTypeId) =
+            await CreateEmployeeReferenceDataAsync(client, companyId);
+
         var resp = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {
             companyId,
@@ -152,11 +157,52 @@ public class GetOffboardingOverviewEndpointTests : IClassFixture<ApiWebApplicati
             startDate = "2026-01-01",
             dateOfBirth = "1990-01-01",
             nationality = "British",
-            gender = "Male"
+            gender = "Male",
+            employeeNumber = $"OFB-{Guid.NewGuid():N}",
+            employmentTypeId,
+            departmentId,
+            locationId,
+            positionProfileId
         });
         resp.EnsureSuccessStatusCode();
         var payload = await resp.Content.ReadFromJsonAsync<IdPayload>();
         return payload!.Id;
+    }
+
+    private async Task<(Guid DepartmentId, Guid LocationId, Guid PositionProfileId, Guid EmploymentTypeId)>
+        CreateEmployeeReferenceDataAsync(HttpClient client, Guid companyId)
+    {
+        var deptResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/departments",
+            new { companyId, name = $"Dept-{Guid.NewGuid():N}" });
+        deptResp.EnsureSuccessStatusCode();
+        var departmentId = (await deptResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locTypeResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/location-types",
+            new { companyId, name = $"LocType-{Guid.NewGuid():N}" });
+        locTypeResp.EnsureSuccessStatusCode();
+        var locationTypeId = (await locTypeResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/locations",
+            new { companyId, name = $"Loc-{Guid.NewGuid():N}", locationTypeId });
+        locResp.EnsureSuccessStatusCode();
+        var locationId = (await locResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var ppResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles",
+            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}" });
+        ppResp.EnsureSuccessStatusCode();
+        var positionProfileId = (await ppResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var etResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employment-types",
+            new { companyId, name = $"EmpType-{Guid.NewGuid():N}" });
+        etResp.EnsureSuccessStatusCode();
+        var employmentTypeId = (await etResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        return (departmentId, locationId, positionProfileId, employmentTypeId);
     }
 
     private async Task<Guid> CreateAssetCategoryAsync(HttpClient client, Guid companyId, string name)

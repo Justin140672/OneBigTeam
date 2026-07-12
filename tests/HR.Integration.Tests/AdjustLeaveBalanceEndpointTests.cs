@@ -283,6 +283,9 @@ public class AdjustLeaveBalanceEndpointTests : IClassFixture<ApiWebApplicationFa
 
     private static async Task<Guid> CreateEmployeeAsync(HttpClient client, Guid companyId)
     {
+        var (departmentId, locationId, positionProfileId, employmentTypeId) =
+            await CreateEmployeeReferenceDataAsync(client, companyId);
+
         var resp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
             new
@@ -294,11 +297,52 @@ public class AdjustLeaveBalanceEndpointTests : IClassFixture<ApiWebApplicationFa
                 startDate = "2026-01-01",
                 dateOfBirth = "1990-01-01",
                 nationality = "British",
-                gender = "Male"
+                gender = "Male",
+                employeeNumber = $"BAL-{Guid.NewGuid():N}",
+                employmentTypeId,
+                departmentId,
+                locationId,
+                positionProfileId
             });
         resp.EnsureSuccessStatusCode();
         var payload = await resp.Content.ReadFromJsonAsync<IdPayload>();
         return payload!.Id;
+    }
+
+    private static async Task<(Guid DepartmentId, Guid LocationId, Guid PositionProfileId, Guid EmploymentTypeId)>
+        CreateEmployeeReferenceDataAsync(HttpClient client, Guid companyId)
+    {
+        var deptResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/departments",
+            new { companyId, name = $"Dept-{Guid.NewGuid():N}" });
+        deptResp.EnsureSuccessStatusCode();
+        var departmentId = (await deptResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locTypeResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/location-types",
+            new { companyId, name = $"LocType-{Guid.NewGuid():N}" });
+        locTypeResp.EnsureSuccessStatusCode();
+        var locationTypeId = (await locTypeResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/locations",
+            new { companyId, name = $"Loc-{Guid.NewGuid():N}", locationTypeId });
+        locResp.EnsureSuccessStatusCode();
+        var locationId = (await locResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var ppResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles",
+            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}" });
+        ppResp.EnsureSuccessStatusCode();
+        var positionProfileId = (await ppResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var etResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employment-types",
+            new { companyId, name = $"EmpType-{Guid.NewGuid():N}" });
+        etResp.EnsureSuccessStatusCode();
+        var employmentTypeId = (await etResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        return (departmentId, locationId, positionProfileId, employmentTypeId);
     }
 
     /// <summary>

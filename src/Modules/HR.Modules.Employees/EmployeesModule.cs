@@ -28,6 +28,7 @@ using HR.Modules.Employees.Features.GetMyPersonalDetails;
 using HR.Modules.Employees.Features.RequestPersonalDetailsChange;
 using HR.Modules.Employees.Features.ListDepartments;
 using HR.Modules.Employees.Features.ListEmployees;
+using HR.Modules.Employees.Features.GetOrganisationChart;
 using HR.Modules.Employees.Features.SetEmployeeWorkingPattern;
 using HR.Modules.Employees.Features.UpdateDepartment;
 using HR.Modules.Employees.Features.GetPositionProfile;
@@ -144,6 +145,8 @@ public static class EmployeesModule
 
         services.AddScoped<ListEmployeesHandler>();
         services.AddScoped<IValidator<ListEmployeesRequest>, ListEmployeesValidator>();
+
+        services.AddScoped<GetOrganisationChartHandler>();
 
         services.AddScoped<GetHeadcountSummaryHandler>();
         services.AddScoped<IValidator<GetHeadcountSummaryRequest>, GetHeadcountSummaryValidator>();

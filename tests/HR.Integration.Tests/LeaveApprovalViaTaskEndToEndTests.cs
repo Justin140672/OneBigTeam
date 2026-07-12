@@ -65,8 +65,9 @@ public class LeaveApprovalViaTaskEndToEndTests : IClassFixture<ApiWebApplication
         var policy = await policyResp.Content.ReadFromJsonAsync<IdPayload>();
 
         // ── Step 3: Create manager and employee ───────────────────────────────
-        var managerEmpId = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Manager");
-        var empId        = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Employee");
+        var refData      = await CreateReferenceDataAsync(adminClient, companyId);
+        var managerEmpId = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Manager", refData);
+        var empId        = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Employee", refData);
 
         // ── Step 4: Assign manager relationship ───────────────────────────────
         var managerAssignResp = await adminClient.PutAsJsonAsync(
@@ -157,8 +158,9 @@ public class LeaveApprovalViaTaskEndToEndTests : IClassFixture<ApiWebApplication
         policyResp.EnsureSuccessStatusCode();
         var policy = await policyResp.Content.ReadFromJsonAsync<IdPayload>();
 
-        var managerEmpId = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Manager");
-        var empId        = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Employee");
+        var refData2     = await CreateReferenceDataAsync(adminClient, companyId);
+        var managerEmpId = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Manager", refData2);
+        var empId        = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Employee", refData2);
 
         var managerAssignResp = await adminClient.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{empId}/manager",
@@ -224,7 +226,43 @@ public class LeaveApprovalViaTaskEndToEndTests : IClassFixture<ApiWebApplication
         return client;
     }
 
-    private static async Task<Guid> CreateEmployeeAsync(HttpClient client, Guid companyId, string firstName, string lastName)
+    private static async Task<ReferenceData> CreateReferenceDataAsync(HttpClient client, Guid companyId)
+    {
+        var deptResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/departments",
+            new { companyId, name = $"Dept {Guid.NewGuid():N}" });
+        deptResp.EnsureSuccessStatusCode();
+        var departmentId = (await deptResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locTypeResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/location-types",
+            new { companyId, name = $"LocType {Guid.NewGuid():N}" });
+        locTypeResp.EnsureSuccessStatusCode();
+        var locationTypeId = (await locTypeResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/locations",
+            new { companyId, name = $"Loc {Guid.NewGuid():N}", locationTypeId });
+        locResp.EnsureSuccessStatusCode();
+        var locationId = (await locResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var posResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles",
+            new { companyId, departmentId, locationId, title = $"Title {Guid.NewGuid():N}" });
+        posResp.EnsureSuccessStatusCode();
+        var positionProfileId = (await posResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var empTypeResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employment-types",
+            new { companyId, name = $"EmpType {Guid.NewGuid():N}" });
+        empTypeResp.EnsureSuccessStatusCode();
+        var employmentTypeId = (await empTypeResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        return new ReferenceData(departmentId, locationId, positionProfileId, employmentTypeId);
+    }
+
+    private static async Task<Guid> CreateEmployeeAsync(
+        HttpClient client, Guid companyId, string firstName, string lastName, ReferenceData refData)
     {
         var resp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
@@ -237,7 +275,12 @@ public class LeaveApprovalViaTaskEndToEndTests : IClassFixture<ApiWebApplication
                 startDate   = "2026-01-01",
                 dateOfBirth = "1990-01-01",
                 nationality = "British",
-                gender      = "Male"
+                gender      = "Male",
+                employeeNumber    = $"EMP-{Guid.NewGuid():N}",
+                employmentTypeId  = refData.EmploymentTypeId,
+                departmentId      = refData.DepartmentId,
+                locationId        = refData.LocationId,
+                positionProfileId = refData.PositionProfileId
             });
         resp.EnsureSuccessStatusCode();
         var payload = await resp.Content.ReadFromJsonAsync<IdPayload>();
@@ -275,6 +318,7 @@ public class LeaveApprovalViaTaskEndToEndTests : IClassFixture<ApiWebApplication
         new(System.Text.Json.JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
     private sealed record IdPayload(Guid Id);
+    private sealed record ReferenceData(Guid DepartmentId, Guid LocationId, Guid PositionProfileId, Guid EmploymentTypeId);
     private sealed record LeaveRequestPayload(Guid Id, string Status, decimal TotalDays);
     private sealed record TaskListPayload(IReadOnlyList<TaskItem> Items);
     private sealed record TaskItem(Guid Id, string Source, string ActionType, string Status, Guid? SourceEntityId);

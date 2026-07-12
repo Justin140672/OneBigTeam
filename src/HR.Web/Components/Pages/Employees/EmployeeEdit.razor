@@ -279,6 +279,9 @@
             {
                 <span class="badge rounded-pill px-3 py-2 fs-6 fw-normal @StatusBadgeClass(_employee.Status)">@StatusDisplayName(_employee.Status)</span>
             }
+            <a class="btn btn-outline-secondary btn-sm ms-auto" href="/companies/@CompanyId/organisation-chart?employeeId=@Id">
+                <i class="fa-solid fa-sitemap me-1"></i>View Org Chart
+            </a>
         </div>
         <p class="text-muted mb-3">View and manage this employee's profile, employment, leave, and documents.</p>
 

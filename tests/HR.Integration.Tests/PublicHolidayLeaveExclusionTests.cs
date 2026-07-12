@@ -143,6 +143,42 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
         return (hrAdminClient, companyId, leaveTypeId);
     }
 
+    private async Task<(Guid DepartmentId, Guid LocationId, Guid PositionProfileId, Guid EmploymentTypeId)> CreateReferenceDataAsync(
+        HttpClient client, Guid companyId)
+    {
+        var deptResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/departments",
+            new { companyId, name = $"Dept {Guid.NewGuid():N}" });
+        deptResp.EnsureSuccessStatusCode();
+        var departmentId = (await deptResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locTypeResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/location-types",
+            new { companyId, name = $"LocType {Guid.NewGuid():N}" });
+        locTypeResp.EnsureSuccessStatusCode();
+        var locationTypeId = (await locTypeResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/locations",
+            new { companyId, name = $"Loc {Guid.NewGuid():N}", locationTypeId });
+        locResp.EnsureSuccessStatusCode();
+        var locationId = (await locResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var posResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles",
+            new { companyId, departmentId, locationId, title = $"Title {Guid.NewGuid():N}" });
+        posResp.EnsureSuccessStatusCode();
+        var positionProfileId = (await posResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var empTypeResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employment-types",
+            new { companyId, name = $"EmpType {Guid.NewGuid():N}" });
+        empTypeResp.EnsureSuccessStatusCode();
+        var employmentTypeId = (await empTypeResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        return (departmentId, locationId, positionProfileId, employmentTypeId);
+    }
+
     private async Task<(Guid EmployeeId, Guid PolicyId)> CreateEmployeeWithPolicyAsync(HttpClient client, Guid companyId)
     {
         var policyResp = await client.PostAsJsonAsync(
@@ -151,9 +187,26 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
         policyResp.EnsureSuccessStatusCode();
         var policy = await policyResp.Content.ReadFromJsonAsync<PolicyPayload>();
 
+        var refData = await CreateReferenceDataAsync(client, companyId);
+
         var empResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
-            new { companyId, firstName = "Test", lastName = "User", workEmail = $"ph.test.{Guid.NewGuid():N}@example.com", startDate = "2026-01-01", dateOfBirth = "1990-01-01", nationality = "British", gender = "Male" });
+            new
+            {
+                companyId,
+                firstName = "Test",
+                lastName = "User",
+                workEmail = $"ph.test.{Guid.NewGuid():N}@example.com",
+                startDate = "2026-01-01",
+                dateOfBirth = "1990-01-01",
+                nationality = "British",
+                gender = "Male",
+                employeeNumber = $"EMP-{Guid.NewGuid():N}",
+                employmentTypeId = refData.EmploymentTypeId,
+                departmentId = refData.DepartmentId,
+                locationId = refData.LocationId,
+                positionProfileId = refData.PositionProfileId
+            });
         empResp.EnsureSuccessStatusCode();
         var employee = await empResp.Content.ReadFromJsonAsync<EmployeePayload>();
 
@@ -168,5 +221,6 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
     private sealed record CompanyPayload(Guid Id);
     private sealed record PolicyPayload(Guid Id);
     private sealed record EmployeePayload(Guid Id);
+    private sealed record IdPayload(Guid Id);
     private sealed record LeaveRequestPayload(Guid Id, decimal TotalDays);
 }

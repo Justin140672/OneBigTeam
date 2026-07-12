@@ -25,6 +25,42 @@ public class UpdateMyContactDetailsEndpointTests : IClassFixture<ApiWebApplicati
         }).GetAwaiter().GetResult();
     }
 
+    private async Task<(Guid DepartmentId, Guid LocationId, Guid PositionProfileId, Guid EmploymentTypeId)> CreateReferenceDataAsync(
+        HttpClient client, Guid companyId)
+    {
+        var deptResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/departments",
+            new { companyId, name = $"Dept {Guid.NewGuid():N}" });
+        deptResp.EnsureSuccessStatusCode();
+        var departmentId = (await deptResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locTypeResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/location-types",
+            new { companyId, name = $"LocType {Guid.NewGuid():N}" });
+        locTypeResp.EnsureSuccessStatusCode();
+        var locationTypeId = (await locTypeResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/locations",
+            new { companyId, name = $"Loc {Guid.NewGuid():N}", locationTypeId });
+        locResp.EnsureSuccessStatusCode();
+        var locationId = (await locResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var posResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles",
+            new { companyId, departmentId, locationId, title = $"Title {Guid.NewGuid():N}" });
+        posResp.EnsureSuccessStatusCode();
+        var positionProfileId = (await posResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var empTypeResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employment-types",
+            new { companyId, name = $"EmpType {Guid.NewGuid():N}" });
+        empTypeResp.EnsureSuccessStatusCode();
+        var employmentTypeId = (await empTypeResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        return (departmentId, locationId, positionProfileId, employmentTypeId);
+    }
+
     private async Task<(HttpClient Client, Guid CompanyId, Guid EmployeeId)> CreateEmployeeAsync(Guid adminUserId)
     {
         var companyId = Guid.NewGuid();
@@ -32,6 +68,8 @@ public class UpdateMyContactDetailsEndpointTests : IClassFixture<ApiWebApplicati
         using var adminClient = _factory.CreateClient();
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, adminUserId.ToString());
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var refData = await CreateReferenceDataAsync(adminClient, companyId);
 
         var createResponse = await adminClient.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {
@@ -42,7 +80,12 @@ public class UpdateMyContactDetailsEndpointTests : IClassFixture<ApiWebApplicati
             startDate = "2026-01-01",
             dateOfBirth = "1990-06-15",
             nationality = "British",
-            gender = "Male"
+            gender = "Male",
+            employeeNumber = $"EMP-{Guid.NewGuid():N}",
+            employmentTypeId = refData.EmploymentTypeId,
+            departmentId = refData.DepartmentId,
+            locationId = refData.LocationId,
+            positionProfileId = refData.PositionProfileId
         });
         createResponse.EnsureSuccessStatusCode();
 
@@ -222,6 +265,7 @@ public class UpdateMyContactDetailsEndpointTests : IClassFixture<ApiWebApplicati
     }
 
     private sealed record EmployeeIdPayload(Guid Id);
+    private sealed record IdPayload(Guid Id);
 
     private sealed record ContactDetailsPayload(
         string WorkEmail,

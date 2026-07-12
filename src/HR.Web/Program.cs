@@ -47,6 +47,8 @@ builder.Services.AddScoped<OnboardingService>();
 builder.Services.AddScoped<OffboardingService>();
 builder.Services.AddScoped<CompensationService>();
 builder.Services.AddScoped<AuditHistoryService>();
+builder.Services.AddScoped<OrganisationHierarchyBuilder>();
+builder.Services.AddScoped<OrganisationChartService>();
 builder.Services.AddScoped<SicknessService>();
 builder.Services.AddScoped<DevAuthService>();
 builder.Services.AddScoped<VacancyService>();

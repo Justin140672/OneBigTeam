@@ -1,0 +1,199 @@
+using HR.Modules.Employees.Domain;
+using HR.Modules.Employees.Features.GetOrganisationChart;
+using HR.Modules.Employees.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace HR.Modules.Employees.Tests;
+
+public class GetOrganisationChartHandlerTests
+{
+    private static readonly DateTime FixedUtcNow = new(2026, 6, 8, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateOnly StartDate = new(2026, 7, 1);
+    private static readonly DateOnly Dob = new(1990, 1, 1);
+
+    [Fact]
+    public async Task HandleAsync_Returns_Empty_When_No_Employees()
+    {
+        await using var context = BuildContext();
+        var handler = new GetOrganisationChartHandler(context);
+
+        var result = await handler.HandleAsync(
+            new GetOrganisationChartRequest { CompanyId = Guid.NewGuid() },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.Items);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Only_Employees_For_Requested_Company()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var mine = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate,
+            hasSystemAccess: true, Dob, "British", "Female", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        mine.Activate(now);
+
+        var other = Employee.Create(Guid.NewGuid(), Guid.NewGuid(), "Bob", "Jones", "bob@other.com", StartDate,
+            hasSystemAccess: true, Dob, "British", "Male", "EMP-0002", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        other.Activate(now);
+
+        context.Employees.AddRange(mine, other);
+        await context.SaveChangesAsync();
+
+        var handler = new GetOrganisationChartHandler(context);
+
+        var result = await handler.HandleAsync(
+            new GetOrganisationChartRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal(mine.Id, item.EmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Excludes_Draft_Employees()
+    {
+        // Freshly created employees start as Draft — no transition needed.
+        await AssertExcludedAsync(employee => { });
+    }
+
+    [Fact]
+    public async Task HandleAsync_Excludes_OnLeave_Employees()
+    {
+        await AssertExcludedAsync(employee =>
+        {
+            employee.Activate(default);
+            employee.SetOnLeave(default);
+        });
+    }
+
+    [Fact]
+    public async Task HandleAsync_Excludes_Suspended_Employees()
+    {
+        await AssertExcludedAsync(employee =>
+        {
+            employee.Activate(default);
+            employee.Suspend(default);
+        });
+    }
+
+    [Fact]
+    public async Task HandleAsync_Excludes_Terminated_Employees()
+    {
+        await AssertExcludedAsync(employee =>
+        {
+            employee.Activate(default);
+            employee.Terminate(default);
+        });
+    }
+
+    private static async Task AssertExcludedAsync(Action<Employee> transition)
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate,
+            hasSystemAccess: true, Dob, "British", "Female", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+
+        transition(employee);
+
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new GetOrganisationChartHandler(context);
+
+        var result = await handler.HandleAsync(
+            new GetOrganisationChartRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.Items);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Resolves_Department_Location_JobTitle_And_Includes_Manager_And_Photo()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
+        var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
+        var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "London Office", null, now);
+        var positionProfile = PositionProfile.Create(
+            Guid.NewGuid(), companyId, department.Id, location.Id, "Senior Software Engineer", null,
+            null, null, null, null, null, null, null, now);
+
+        var manager = Employee.Create(Guid.NewGuid(), companyId, "Mia", "Manager", "mia@example.com", StartDate,
+            hasSystemAccess: true, Dob, "British", "Female", "EMP-0000", Guid.NewGuid(), department.Id, location.Id, positionProfile.Id, now);
+        manager.Activate(now);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate,
+            hasSystemAccess: true, Dob, "British", "Female", "EMP-0001", Guid.NewGuid(), department.Id, location.Id, positionProfile.Id, now);
+        employee.Activate(now);
+        employee.Assign(department.Id, positionProfile.Id, location.Id, manager.Id, now);
+        employee.SetProfileImage("https://example.com/alice.jpg", now);
+
+        context.Departments.Add(department);
+        context.LocationTypes.Add(locationType);
+        context.Locations.Add(location);
+        context.PositionProfiles.Add(positionProfile);
+        context.Employees.AddRange(manager, employee);
+        await context.SaveChangesAsync();
+
+        var handler = new GetOrganisationChartHandler(context);
+
+        var result = await handler.HandleAsync(
+            new GetOrganisationChartRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items, i => i.EmployeeId == employee.Id);
+
+        Assert.Equal("Alice Smith", item.Name);
+        Assert.Equal("Senior Software Engineer", item.JobTitle);
+        Assert.Equal("Engineering", item.Department);
+        Assert.Equal("London Office", item.Location);
+        Assert.Equal(manager.Id, item.ManagerId);
+        Assert.Equal("https://example.com/alice.jpg", item.ProfilePhotoUrl);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ManagerId_Is_Null_For_Employee_With_No_Manager()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate,
+            hasSystemAccess: true, Dob, "British", "Female", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        employee.Activate(now);
+
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new GetOrganisationChartHandler(context);
+
+        var result = await handler.HandleAsync(
+            new GetOrganisationChartRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Null(item.ManagerId);
+    }
+
+    private static EmployeesDbContext BuildContext()
+    {
+        var options = new DbContextOptionsBuilder<EmployeesDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+
+        return new EmployeesDbContext(options);
+    }
+}

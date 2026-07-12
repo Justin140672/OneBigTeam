@@ -1,0 +1,298 @@
+@page "/companies/{CompanyId:guid}/organisation-chart"
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Diagram
+@using Microsoft.AspNetCore.WebUtilities
+@inject AppSession Session
+@inject NavigationManager Navigation
+@inject OrganisationChartService OrganisationChartService
+@inject OrganisationHierarchyBuilder HierarchyBuilder
+
+<PageTitle>Organisation Chart</PageTitle>
+
+<style>
+    .org-chart-card {
+        position: absolute;
+        width: 220px;
+        height: 76px;
+        border: 1px solid #D5D5D5;
+        border-radius: 6px;
+        background: var(--bs-body-bg, #FFFFFF);
+        box-sizing: border-box;
+        padding: 8px 12px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+    }
+
+    .org-chart-card.org-chart-card-highlighted {
+        border-color: var(--bs-primary, #0d6efd);
+        border-width: 2px;
+        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+    }
+
+    .org-chart-avatar {
+        flex: 0 0 auto;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: var(--bs-secondary-bg, #e9ecef);
+        color: var(--bs-secondary-color, #6b7280);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 13px;
+    }
+
+    .org-chart-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .org-chart-details {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .org-chart-card .org-chart-name {
+        font-weight: 600;
+        font-size: 13px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .org-chart-card .org-chart-title,
+    .org-chart-card .org-chart-department {
+        font-size: 11px;
+        color: var(--bs-secondary-color, #6b7280);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .org-chart-canvas {
+        width: 100%;
+        height: calc(100vh - 260px);
+        min-height: 420px;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <h1 class="mb-1">Organisation Chart</h1>
+    <p class="text-muted mb-4">Visualise reporting lines and team structure across the company.</p>
+
+    @if (_loading)
+    {
+        <HrLoadingIndicator Label="Loading organisation chart…" />
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else if (_diagramItems.Count == 0)
+    {
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <i class="fa-solid fa-sitemap fa-2x text-muted mb-3"></i>
+                <p class="text-muted mb-0">No active employees to display yet.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body p-0 org-chart-canvas">
+                <SfDiagramComponent @ref="_diagram" Height="100%" Width="100%"
+                                    NodeCreating="OnNodeCreating"
+                                    ConnectorCreating="OnConnectorCreating"
+                                    Click="OnDiagramClick"
+                                    DataLoaded="OnDataLoaded"
+                                    InteractionController="DiagramInteractions.Default | DiagramInteractions.ZoomPan">
+                    <DataSourceSettings ID="Id" ParentID="ManagerId" DataSource="_diagramItems"></DataSourceSettings>
+                    <Layout @bind-Type="_layoutType" @bind-Orientation="_orientation"
+                            HorizontalSpacing="30" VerticalSpacing="30" />
+                    <SnapSettings Constraints="SnapConstraints.None"></SnapSettings>
+                    <DiagramTemplates>
+                        <NodeTemplate>
+                            @{
+                                var node = (context as Node);
+                                var item = node?.Data as OrganisationChartDiagramItem;
+                            }
+                            @if (item is not null)
+                            {
+                                <div class="org-chart-card @(item.Id == _focusEmployeeId ? "org-chart-card-highlighted" : "")"
+                                     @onclick="() => NavigateToEmployee(item)">
+                                    <div class="org-chart-avatar">
+                                        @if (!string.IsNullOrWhiteSpace(item.ProfilePhotoUrl))
+                                        {
+                                            <img src="@item.ProfilePhotoUrl" alt="" />
+                                        }
+                                        else
+                                        {
+                                            @GetInitials(item.Name)
+                                        }
+                                    </div>
+                                    <div class="org-chart-details">
+                                        <div class="org-chart-name">@item.Name</div>
+                                        <div class="org-chart-title">@item.JobTitle</div>
+                                        <div class="org-chart-department">@item.Department</div>
+                                    </div>
+                                </div>
+                            }
+                        </NodeTemplate>
+                    </DiagramTemplates>
+                </SfDiagramComponent>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private bool _loading = true;
+    private string? _error;
+    private List<OrganisationChartDiagramItem> _diagramItems = [];
+
+    private LayoutType _layoutType = LayoutType.OrganizationalChart;
+    private LayoutOrientation _orientation = LayoutOrientation.TopToBottom;
+
+    private SfDiagramComponent? _diagram;
+
+    // Set from "?employeeId=" when arriving via the Employee Overview's "View Org Chart" button —
+    // drives both the highlighted card border (NodeTemplate above) and the auto-centering once
+    // the diagram finishes laying itself out (OnDataLoaded).
+    private string? _focusEmployeeId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.CanManageEmployees)
+        {
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            return;
+        }
+
+        var query = QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
+        if (query.TryGetValue("employeeId", out var employeeId) && Guid.TryParse(employeeId, out var parsed))
+            _focusEmployeeId = parsed.ToString();
+
+        _loading = true;
+
+        var response = await OrganisationChartService.GetOrganisationChartAsync(CompanyId);
+
+        if (response is null)
+        {
+            _error = "Failed to load the organisation chart.";
+        }
+        else
+        {
+            // Route the flat API data through the hierarchy builder first so the diagram only
+            // ever sees clean, acyclic parent links — dangling/self/circular manager references
+            // are already resolved there, not something the diagram itself has to cope with.
+            var tree = HierarchyBuilder.Build(response.Items);
+            _diagramItems = Flatten(tree, managerId: null);
+        }
+
+        _loading = false;
+    }
+
+    private static List<OrganisationChartDiagramItem> Flatten(
+        IReadOnlyList<OrganisationChartNode> nodes, string? managerId)
+    {
+        var items = new List<OrganisationChartDiagramItem>();
+
+        foreach (var node in nodes)
+        {
+            items.Add(new OrganisationChartDiagramItem
+            {
+                Id = node.EmployeeId.ToString(),
+                ManagerId = managerId,
+                Name = node.Name,
+                JobTitle = node.JobTitle,
+                Department = node.Department,
+                ProfilePhotoUrl = node.ProfilePhotoUrl,
+            });
+
+            items.AddRange(Flatten(node.DirectReports, node.EmployeeId.ToString()));
+        }
+
+        return items;
+    }
+
+    // Defines default rendering for each node — an HTML-shaped node so NodeTemplate above (the
+    // card markup) is what actually renders, rather than a default diagram shape.
+    private void OnNodeCreating(IDiagramObject obj)
+    {
+        if (obj is not Node node) return;
+
+        if (node.Data is System.Text.Json.JsonElement)
+            node.Data = System.Text.Json.JsonSerializer.Deserialize<OrganisationChartDiagramItem>(node.Data.ToString()!);
+
+        node.Width = 220;
+        node.Height = 76;
+        node.Shape = new Shape { Type = NodeShapes.HTML };
+    }
+
+    // Profile photos aren't wired up yet (ProfilePhotoUrl is always null today) — shown as a
+    // placeholder circle with the person's initials until real photo upload/serving exists.
+    private static string GetInitials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length switch
+        {
+            0 => "?",
+            1 => parts[0][..1].ToUpperInvariant(),
+            _ => $"{parts[0][..1]}{parts[^1][..1]}".ToUpperInvariant(),
+        };
+    }
+
+    // Clean orthogonal connector lines with no arrowheads, matching a typical org-chart look.
+    private void OnConnectorCreating(IDiagramObject obj)
+    {
+        if (obj is not Connector connector) return;
+
+        connector.Type = ConnectorSegmentType.Orthogonal;
+        connector.CornerRadius = 10;
+        connector.Style = new ShapeStyle { StrokeWidth = 1 };
+        connector.TargetDecorator!.Shape = DecoratorShape.None;
+        connector.SourceDecorator!.Shape = DecoratorShape.None;
+    }
+
+    // Clicking a card opens that employee's profile. Two paths to the same place: the Diagram's
+    // own Click event (ActualObject tells us which node/HTML-shape was hit) and a plain @onclick
+    // directly on the card markup in NodeTemplate above — HTML-shaped nodes are just regular
+    // Blazor-rendered DOM content, but the Diagram's own pan/zoom interaction layer can sit over
+    // that content and swallow the click before it bubbles, depending on version/interaction
+    // mode. Keeping both means whichever one the current interaction mode actually delivers is
+    // enough; NavigateTo-ing to the same URL twice in one render is harmless.
+    private void OnDiagramClick(Syncfusion.Blazor.Diagram.ClickEventArgs args)
+    {
+        if (args.ActualObject is Node node && node.Data is OrganisationChartDiagramItem item)
+            NavigateToEmployee(item);
+    }
+
+    private void NavigateToEmployee(OrganisationChartDiagramItem item) =>
+        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{item.Id}");
+
+    // Fires once the diagram has finished laying itself out from DataSourceSettings — the
+    // earliest safe point at which _diagram.Nodes is actually populated. Centers the viewport on
+    // the employee we arrived here to look at, if any.
+    private void OnDataLoaded(object args)
+    {
+        if (_diagram is null || _focusEmployeeId is null) return;
+
+        var node = _diagram.Nodes.FirstOrDefault(n => n.ID == _focusEmployeeId);
+        if (node is null) return;
+
+        _diagram.BringIntoCenter(new DiagramRect(
+            node.OffsetX - node.Width / 2,
+            node.OffsetY - node.Height / 2,
+            node.Width,
+            node.Height));
+    }
+}

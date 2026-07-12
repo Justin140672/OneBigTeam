@@ -57,6 +57,7 @@ else
                                     <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
                                     <MenuItem Text="Data Import" Url="@_menuItems["DataImport"]" />
                                     <MenuItem Text="Import History" Url="@_menuItems["ImportHistory"]" />
+                                    <MenuItem Text="Organisation Chart" Url="@_menuItems["OrganisationChart"]" />
                                 </MenuItems>
                             </MenuItem>
                             <MenuItem Text="Assets" IconCss="fa-solid fa-box">
@@ -296,6 +297,7 @@ else
         ["DataImport"] = "/",
         ["ImportHistory"] = "/",
         ["SicknessCategories"] = "/",
+        ["OrganisationChart"] = "/",
         ["Company"] = "/",
     };
 
@@ -322,6 +324,7 @@ else
         _menuItems["DataImport"] = $"/companies/{companyId}/data-import/employees";
         _menuItems["ImportHistory"] = $"/companies/{companyId}/data-import/history";
         _menuItems["SicknessCategories"] = $"/companies/{companyId}/sickness-categories";
+        _menuItems["OrganisationChart"] = $"/companies/{companyId}/organisation-chart";
         _menuItems["Company"] = $"/companies/{companyId}/edit";
 
         await LoadUnreadCountAsync();
