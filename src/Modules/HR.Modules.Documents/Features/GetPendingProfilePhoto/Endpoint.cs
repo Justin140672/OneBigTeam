@@ -3,23 +3,22 @@ using FastEndpoints;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
-namespace HR.Modules.Documents.Features.UploadEmployeeProfilePhoto;
+namespace HR.Modules.Documents.Features.GetPendingProfilePhoto;
 
-internal sealed class Endpoint(UploadEmployeeProfilePhotoHandler handler, IAuthorizationService authorizationService)
-    : Endpoint<UploadEmployeeProfilePhotoRequest, UploadEmployeeProfilePhotoResponse>
+internal sealed class Endpoint(GetPendingProfilePhotoHandler handler, IAuthorizationService authorizationService)
+    : Endpoint<GetPendingProfilePhotoRequest, GetPendingProfilePhotoResponse>
 {
     public override void Configure()
     {
-        Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/profile-photo");
+        Get("/api/companies/{companyId:guid}/employees/{employeeId:guid}/profile-photo/pending");
         Policies("authenticated");
-        AllowFileUploads();
     }
 
     public override async Task HandleAsync(
-        UploadEmployeeProfilePhotoRequest request,
+        GetPendingProfilePhotoRequest request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var callerId))
+        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out _))
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;
@@ -41,22 +40,14 @@ internal sealed class Endpoint(UploadEmployeeProfilePhotoHandler handler, IAutho
             return;
         }
 
-        var result = await handler.HandleAsync(request, callerId, cancellationToken);
+        var result = await handler.HandleAsync(request, cancellationToken);
 
         if (result.IsFailure)
         {
-            var error = new { error = result.Error.Message };
-
-            if (result.Error.Code == "not_found")
-            {
-                await Send.ResultAsync(TypedResults.NotFound(error));
-                return;
-            }
-
-            await Send.ResultAsync(TypedResults.UnprocessableEntity(error));
+            await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
             return;
         }
 
-        await Send.ResultAsync(TypedResults.Ok(result.Value));
+        await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }
 }

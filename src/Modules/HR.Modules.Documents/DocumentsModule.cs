@@ -18,6 +18,12 @@ using HR.Modules.Documents.Features.RequestAdditionalEmployeeDocument;
 using HR.Modules.Documents.Features.ListEmployeeDocuments;
 using HR.Modules.Documents.Features.UploadEmployeeDocument;
 using HR.Modules.Documents.Features.UploadEmployeeProfilePhoto;
+using HR.Modules.Documents.Features.UploadMyProfilePhoto;
+using HR.Modules.Documents.Features.CancelPendingProfilePhoto;
+using HR.Modules.Documents.Features.GetMyProfilePhoto;
+using HR.Modules.Documents.Features.GetPendingProfilePhoto;
+using HR.Modules.Documents.Features.ApproveProfilePhoto;
+using HR.Modules.Documents.Features.RejectProfilePhoto;
 using HR.Modules.Documents.Services;
 using HR.Modules.Documents.Features.ListDocumentTypes;
 using HR.Modules.Documents.Features.UpdateDocumentType;
@@ -89,6 +95,23 @@ public static class DocumentsModule
 
         services.AddScoped<UploadEmployeeProfilePhotoHandler>();
         services.AddScoped<IValidator<UploadEmployeeProfilePhotoRequest>, UploadEmployeeProfilePhotoValidator>();
+
+        services.AddScoped<UploadMyProfilePhotoHandler>();
+        services.AddScoped<IValidator<UploadMyProfilePhotoRequest>, UploadMyProfilePhotoValidator>();
+
+        services.AddScoped<CancelPendingProfilePhotoHandler>();
+        services.AddScoped<IValidator<CancelPendingProfilePhotoRequest>, CancelPendingProfilePhotoValidator>();
+
+        services.AddScoped<GetMyProfilePhotoHandler>();
+
+        services.AddScoped<GetPendingProfilePhotoHandler>();
+        services.AddScoped<IValidator<GetPendingProfilePhotoRequest>, GetPendingProfilePhotoValidator>();
+
+        services.AddScoped<ApproveProfilePhotoHandler>();
+        services.AddScoped<IValidator<ApproveProfilePhotoRequest>, ApproveProfilePhotoValidator>();
+
+        services.AddScoped<RejectProfilePhotoHandler>();
+        services.AddScoped<IValidator<RejectProfilePhotoRequest>, RejectProfilePhotoValidator>();
 
         services.AddScoped<GetEmployeeDocumentHandler>();
         services.AddScoped<IValidator<GetEmployeeDocumentRequest>, GetEmployeeDocumentValidator>();

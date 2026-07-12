@@ -30,4 +30,6 @@ public enum NotificationType
     OffboardingStarted           = 26,
     OffboardingTaskOverdue       = 27,
     OffboardingCompleted         = 28,
+    ProfilePhotoApproved         = 29,
+    ProfilePhotoRejected         = 30,
 }

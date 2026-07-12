@@ -189,3 +189,88 @@ internal sealed record ProfilePhotoUploadedAuditEvent(
     object? IAuditEvent.After          => new { FileName, FileSize, EmployeeId };
     object? IAuditEvent.Metadata       => new { IsManagerUpload, IsReplace };
 }
+
+internal sealed record ProfilePhotoSubmittedAuditEvent(
+    Guid CompanyId,
+    Guid PendingProfilePhotoId,
+    Guid EmployeeId,
+    string FileName,
+    long FileSize,
+    Guid SubmittedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "profile_photo.submitted";
+    string  IAuditEvent.EntityType      => "PendingProfilePhoto";
+    Guid    IAuditEvent.EntityId        => PendingProfilePhotoId;
+    Guid?   IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?   IAuditEvent.ActorUserId     => SubmittedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => EmployeeId;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Profile photo submitted for review for employee '{EmployeeId}'";
+    object? IAuditEvent.Before          => null;
+    object? IAuditEvent.After           => new { FileName, FileSize, EmployeeId };
+    object? IAuditEvent.Metadata        => null;
+}
+
+internal sealed record ProfilePhotoCancelledAuditEvent(
+    Guid CompanyId,
+    Guid PendingProfilePhotoId,
+    Guid EmployeeId,
+    Guid CancelledBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "profile_photo.cancelled";
+    string  IAuditEvent.EntityType      => "PendingProfilePhoto";
+    Guid    IAuditEvent.EntityId        => PendingProfilePhotoId;
+    Guid?   IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?   IAuditEvent.ActorUserId     => CancelledBy;
+    Guid?   IAuditEvent.ActorEmployeeId => EmployeeId;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Pending profile photo submission cancelled for employee '{EmployeeId}'";
+    object? IAuditEvent.Before          => new { Status = "Pending" };
+    object? IAuditEvent.After           => new { Status = "Cancelled" };
+    object? IAuditEvent.Metadata        => null;
+}
+
+internal sealed record ProfilePhotoApprovedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeProfilePhotoId,
+    Guid EmployeeId,
+    string FileName,
+    long FileSize,
+    Guid ReviewedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "profile_photo.approved";
+    string  IAuditEvent.EntityType      => "EmployeeProfilePhoto";
+    Guid    IAuditEvent.EntityId        => EmployeeProfilePhotoId;
+    Guid?   IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?   IAuditEvent.ActorUserId     => ReviewedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Profile photo approved for employee '{EmployeeId}'";
+    object? IAuditEvent.Before          => new { Status = "Pending" };
+    object? IAuditEvent.After           => new { Status = "Approved", FileName, FileSize };
+    object? IAuditEvent.Metadata        => new { ReviewedBy };
+}
+
+internal sealed record ProfilePhotoRejectedAuditEvent(
+    Guid CompanyId,
+    Guid PendingProfilePhotoId,
+    Guid EmployeeId,
+    Guid ReviewedBy,
+    string? RejectionReason,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "profile_photo.rejected";
+    string  IAuditEvent.EntityType      => "PendingProfilePhoto";
+    Guid    IAuditEvent.EntityId        => PendingProfilePhotoId;
+    Guid?   IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?   IAuditEvent.ActorUserId     => ReviewedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Profile photo rejected for employee '{EmployeeId}'";
+    object? IAuditEvent.Before          => new { Status = "Pending" };
+    object? IAuditEvent.After           => new { Status = "Rejected", RejectionReason };
+    object? IAuditEvent.Metadata        => new { ReviewedBy, RejectionReason };
+}

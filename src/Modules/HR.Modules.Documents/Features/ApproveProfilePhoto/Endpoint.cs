@@ -3,23 +3,22 @@ using FastEndpoints;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
-namespace HR.Modules.Documents.Features.UploadEmployeeProfilePhoto;
+namespace HR.Modules.Documents.Features.ApproveProfilePhoto;
 
-internal sealed class Endpoint(UploadEmployeeProfilePhotoHandler handler, IAuthorizationService authorizationService)
-    : Endpoint<UploadEmployeeProfilePhotoRequest, UploadEmployeeProfilePhotoResponse>
+internal sealed class Endpoint(ApproveProfilePhotoHandler handler, IAuthorizationService authorizationService)
+    : Endpoint<ApproveProfilePhotoRequest, ApproveProfilePhotoResponse>
 {
     public override void Configure()
     {
-        Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/profile-photo");
+        Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/profile-photo/pending/approve");
         Policies("authenticated");
-        AllowFileUploads();
     }
 
     public override async Task HandleAsync(
-        UploadEmployeeProfilePhotoRequest request,
+        ApproveProfilePhotoRequest request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var callerId))
+        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var reviewerId))
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;
@@ -41,7 +40,7 @@ internal sealed class Endpoint(UploadEmployeeProfilePhotoHandler handler, IAutho
             return;
         }
 
-        var result = await handler.HandleAsync(request, callerId, cancellationToken);
+        var result = await handler.HandleAsync(request, reviewerId, cancellationToken);
 
         if (result.IsFailure)
         {

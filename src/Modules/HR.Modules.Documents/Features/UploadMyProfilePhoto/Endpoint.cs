@@ -1,31 +1,30 @@
 using System.Security.Claims;
 using FastEndpoints;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
-namespace HR.Modules.Documents.Features.UploadEmployeeProfilePhoto;
+namespace HR.Modules.Documents.Features.UploadMyProfilePhoto;
 
-internal sealed class Endpoint(UploadEmployeeProfilePhotoHandler handler, IAuthorizationService authorizationService)
-    : Endpoint<UploadEmployeeProfilePhotoRequest, UploadEmployeeProfilePhotoResponse>
+internal sealed class Endpoint(UploadMyProfilePhotoHandler handler)
+    : Endpoint<UploadMyProfilePhotoRequest, UploadMyProfilePhotoResponse>
 {
     public override void Configure()
     {
-        Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/profile-photo");
+        Post("/api/companies/{companyId:guid}/employees/me/profile-photo");
         Policies("authenticated");
         AllowFileUploads();
     }
 
     public override async Task HandleAsync(
-        UploadEmployeeProfilePhotoRequest request,
+        UploadMyProfilePhotoRequest request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var callerId))
+        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var employeeId))
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;
         }
 
-        // Verify the caller belongs to the company in the route (applies to all callers).
+        // Verify the caller belongs to the company in the route.
         var companyClaim = User.FindFirstValue("company_id");
         if (!Guid.TryParse(companyClaim, out var callerCompanyId) || callerCompanyId != request.CompanyId)
         {
@@ -33,15 +32,7 @@ internal sealed class Endpoint(UploadEmployeeProfilePhotoHandler handler, IAutho
             return;
         }
 
-        var isManagerUpload = (await authorizationService.AuthorizeAsync(User, "employee:manage")).Succeeded;
-
-        if (!isManagerUpload)
-        {
-            await Send.ResultAsync(TypedResults.Forbid());
-            return;
-        }
-
-        var result = await handler.HandleAsync(request, callerId, cancellationToken);
+        var result = await handler.HandleAsync(request, employeeId, cancellationToken);
 
         if (result.IsFailure)
         {
