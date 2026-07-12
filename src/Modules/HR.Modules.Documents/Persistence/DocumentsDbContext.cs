@@ -14,6 +14,7 @@ internal class DocumentsDbContext : DbContext
     public DbSet<DocumentType> DocumentTypes => Set<DocumentType>();
     public DbSet<EmployeeDocument> EmployeeDocuments => Set<EmployeeDocument>();
     public DbSet<DocumentRequest> DocumentRequests => Set<DocumentRequest>();
+    public DbSet<EmployeeProfilePhoto> EmployeeProfilePhotos => Set<EmployeeProfilePhoto>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

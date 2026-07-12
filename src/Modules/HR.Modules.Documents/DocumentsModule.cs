@@ -17,6 +17,7 @@ using HR.Modules.Documents.Features.CancelDocumentRequest;
 using HR.Modules.Documents.Features.RequestAdditionalEmployeeDocument;
 using HR.Modules.Documents.Features.ListEmployeeDocuments;
 using HR.Modules.Documents.Features.UploadEmployeeDocument;
+using HR.Modules.Documents.Features.UploadEmployeeProfilePhoto;
 using HR.Modules.Documents.Services;
 using HR.Modules.Documents.Features.ListDocumentTypes;
 using HR.Modules.Documents.Features.UpdateDocumentType;
@@ -36,6 +37,7 @@ public static class DocumentsModule
     {
         AddFeatureServices(services);
         AddStorageService(services, configuration);
+        AddProfilePhotoServices(services, configuration);
 
         services.AddDbContext<DocumentsDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
@@ -63,6 +65,12 @@ public static class DocumentsModule
         }
     }
 
+    private static void AddProfilePhotoServices(IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<ImageUploadOptions>(configuration.GetSection("Documents:ProfilePhoto:Upload"));
+        services.AddScoped<IImageUploadValidator, ImageUploadValidator>();
+    }
+
     private static void AddFeatureServices(IServiceCollection services)
     {
         services.AddScoped<CreateDocumentTypeHandler>();
@@ -78,6 +86,9 @@ public static class DocumentsModule
 
         services.AddScoped<UploadEmployeeDocumentHandler>();
         services.AddScoped<IValidator<UploadEmployeeDocumentRequest>, UploadEmployeeDocumentValidator>();
+
+        services.AddScoped<UploadEmployeeProfilePhotoHandler>();
+        services.AddScoped<IValidator<UploadEmployeeProfilePhotoRequest>, UploadEmployeeProfilePhotoValidator>();
 
         services.AddScoped<GetEmployeeDocumentHandler>();
         services.AddScoped<IValidator<GetEmployeeDocumentRequest>, GetEmployeeDocumentValidator>();

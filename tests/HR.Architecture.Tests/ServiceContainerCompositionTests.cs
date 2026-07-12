@@ -7,6 +7,8 @@ using HR.Modules.Employees;
 using HR.Modules.Identity;
 using HR.Modules.Leave;
 using HR.Modules.Notifications;
+using HR.Modules.Offboarding;
+using HR.Modules.Onboarding;
 using HR.Modules.Probation;
 using HR.Modules.Recruitment;
 using HR.Modules.Sickness;
@@ -58,12 +60,14 @@ public class ServiceContainerCompositionTests
         services.AddIdentityModule(connectionString);
         services.AddLeaveModule(connectionString);
         services.AddNotificationsModule(connectionString);
+        services.AddOnboardingModule(connectionString);
+        services.AddOffboardingModule(connectionString);
         services.AddTasksModule(connectionString);
         services.AddProbationModule(connectionString);
         services.AddRecruitmentModule(connectionString, configuration);
         services.AddAssetsModule(connectionString);
         services.AddSicknessModule(connectionString);
-        services.AddInfrastructure(connectionString);
+        services.AddInfrastructure(connectionString, configuration);
         services.AddHangfireBackgroundJobs(connectionString);
 
         services.AddSingleton<IClock, SystemClock>();

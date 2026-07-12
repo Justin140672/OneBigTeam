@@ -165,3 +165,27 @@ internal sealed record DocumentUploadedAuditEvent(
     object? IAuditEvent.After          => new { Title, DocumentTypeName, FileName, FileSize, IssueDate, ExpiryDate, EmployeeId };
     object? IAuditEvent.Metadata       => new { IsManagerUpload };
 }
+
+internal sealed record ProfilePhotoUploadedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeProfilePhotoId,
+    Guid EmployeeId,
+    string FileName,
+    long FileSize,
+    Guid UploadedBy,
+    bool IsManagerUpload,
+    bool IsReplace,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType       => "profile_photo.uploaded";
+    string IAuditEvent.EntityType      => "EmployeeProfilePhoto";
+    Guid   IAuditEvent.EntityId        => EmployeeProfilePhotoId;
+    Guid?  IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?  IAuditEvent.ActorUserId     => UploadedBy;
+    Guid?  IAuditEvent.ActorEmployeeId => IsManagerUpload ? null : EmployeeId;
+    Guid?  IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary        => IsReplace ? $"Profile photo replaced for employee '{EmployeeId}'" : $"Profile photo uploaded for employee '{EmployeeId}'";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => new { FileName, FileSize, EmployeeId };
+    object? IAuditEvent.Metadata       => new { IsManagerUpload, IsReplace };
+}

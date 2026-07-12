@@ -1,12 +1,15 @@
 using Hangfire;
 using Hangfire.PostgreSql;
+using HR.Infrastructure.Abstractions;
 using HR.Infrastructure.BackgroundJobs;
 using HR.Infrastructure.Email;
 using HR.Infrastructure.Persistence;
+using HR.Infrastructure.Storage;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
@@ -16,7 +19,10 @@ namespace HR.Infrastructure;
 
 public static class InfrastructureModule
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, string connectionString)
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        string connectionString,
+        IConfiguration configuration)
     {
         services.AddSingleton<IEmailSender, LoggingEmailSender>();
         services.AddSingleton<IInviteLinkBuilder, ConfiguredInviteLinkBuilder>();
@@ -28,7 +34,25 @@ public static class InfrastructureModule
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "audit");
                 npgsql.MigrationsAssembly(typeof(AuditDbContext).Assembly.GetName().Name!);
             }));
+
+        AddProfilePhotoStorageService(services, configuration);
+
         return services;
+    }
+
+    private static void AddProfilePhotoStorageService(IServiceCollection services, IConfiguration configuration)
+    {
+        var supabaseSection = configuration.GetSection("Infrastructure:Supabase:ProfilePhotos");
+
+        if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
+        {
+            services.Configure<SupabaseProfilePhotoStorageOptions>(supabaseSection);
+            services.AddHttpClient<IProfilePhotoStorageService, SupabaseProfilePhotoStorageService>();
+        }
+        else
+        {
+            services.AddScoped<IProfilePhotoStorageService, LocalProfilePhotoStorageService>();
+        }
     }
 
     public static IServiceCollection AddHangfireBackgroundJobs(

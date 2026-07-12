@@ -40,7 +40,7 @@ builder.Services.AddProbationModule(connectionString);
 builder.Services.AddRecruitmentModule(connectionString, builder.Configuration);
 builder.Services.AddAssetsModule(connectionString);
 builder.Services.AddSicknessModule(connectionString);
-builder.Services.AddInfrastructure(connectionString);
+builder.Services.AddInfrastructure(connectionString, builder.Configuration);
 builder.Services.AddHangfireBackgroundJobs(connectionString);
 builder.Services.AddFastEndpoints(o => o.IncludeAbstractValidators = true);
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
