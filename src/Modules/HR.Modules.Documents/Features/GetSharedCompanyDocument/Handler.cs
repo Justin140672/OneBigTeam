@@ -102,6 +102,8 @@ internal sealed class GetSharedCompanyDocumentHandler(
             audiencePositionProfileIds,
             audienceEmployeeIds,
             document.RequiresAcknowledgement,
+            document.AcknowledgementDueDate,
+            document.AcknowledgementStatement,
             acknowledgementProgress,
             versionHistory,
             namesLookup.TryGetValue(document.CreatedBy, out var createdByName) ? createdByName : "Unknown",

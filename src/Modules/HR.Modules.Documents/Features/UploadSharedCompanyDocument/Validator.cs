@@ -20,5 +20,9 @@ internal sealed class UploadSharedCompanyDocumentValidator : AbstractValidator<U
         RuleFor(r => r.File)
             .NotNull()
             .WithMessage("A file must be provided.");
+
+        RuleFor(r => r.AcknowledgementStatement)
+            .MaximumLength(1000)
+            .When(r => !string.IsNullOrWhiteSpace(r.AcknowledgementStatement));
     }
 }

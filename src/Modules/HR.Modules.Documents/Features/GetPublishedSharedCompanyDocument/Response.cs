@@ -10,4 +10,6 @@ internal sealed record GetPublishedSharedCompanyDocumentResponse(
     string CategoryName,
     DateOnly? EffectiveDate,
     bool RequiresAcknowledgement,
+    DateOnly? AcknowledgementDueDate,
+    string? AcknowledgementStatement,
     DateTimeOffset? MyAcknowledgedAt);

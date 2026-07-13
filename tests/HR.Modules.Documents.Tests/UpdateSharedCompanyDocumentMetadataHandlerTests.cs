@@ -88,7 +88,7 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Title", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, true, Guid.NewGuid(), Now);
+            null, null, true, null, null, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAudienceRules.Add(SharedCompanyDocumentAudienceRule.Create(
             Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId));
@@ -270,7 +270,7 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
     private static SharedCompanyDocument CreateDoc(Guid companyId, string title, Guid categoryId, Guid createdBy) =>
         SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, title, null, categoryId, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, false, createdBy, Now);
+            null, null, false, null, null, createdBy, Now);
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

@@ -18,5 +18,7 @@ internal sealed record UploadSharedCompanyDocumentResponse(
     IReadOnlyList<Guid> AudiencePositionProfileIds,
     IReadOnlyList<Guid> AudienceEmployeeIds,
     bool RequiresAcknowledgement,
+    DateOnly? AcknowledgementDueDate,
+    string? AcknowledgementStatement,
     Guid CreatedBy,
     DateTimeOffset CreatedAt);

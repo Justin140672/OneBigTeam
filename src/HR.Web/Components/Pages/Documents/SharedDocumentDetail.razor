@@ -85,7 +85,7 @@
                     <div class="overview-card-header d-flex justify-content-between align-items-center">
                         <span>
                             <i class="fa-solid fa-users overview-card-icon"></i>
-                            <span class="overview-card-title">Audience &amp; Acknowledgement</span>
+                            <span class="overview-card-title">Audience</span>
                         </span>
                         <SfButton CssClass="e-small e-outline" OnClick="@(() => _editAudienceOpen = true)">
                             <i class="fa-solid fa-pen me-1"></i> Edit
@@ -94,8 +94,31 @@
                     <dl class="overview-dl">
                         <dt>Audience</dt>
                         <dd>@_detail.AudienceDescription</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="overview-card">
+                    <div class="overview-card-header d-flex justify-content-between align-items-center">
+                        <span>
+                            <i class="fa-solid fa-clipboard-check overview-card-icon"></i>
+                            <span class="overview-card-title">Acknowledgement</span>
+                        </span>
+                        <SfButton CssClass="e-small e-outline" OnClick="@(() => _editAcknowledgementOpen = true)">
+                            <i class="fa-solid fa-pen me-1"></i> Edit
+                        </SfButton>
+                    </div>
+                    <dl class="overview-dl">
                         <dt>Requires Acknowledgement</dt>
                         <dd>@(_detail.RequiresAcknowledgement ? "Yes" : "No")</dd>
+                        @if (_detail.RequiresAcknowledgement)
+                        {
+                            <dt>Due Date</dt>
+                            <dd>@(_detail.AcknowledgementDueDate?.ToString("d MMMM yyyy") ?? "Not set")</dd>
+                            <dt>Statement</dt>
+                            <dd>@(_detail.AcknowledgementStatement ?? "I confirm that I have read and understood this document.")</dd>
+                        }
                     </dl>
                     @if (_detail.RequiresAcknowledgement && _detail.AcknowledgementProgress is not null)
                     {
@@ -166,6 +189,12 @@
                                           OnSaved="OnAudienceSavedAsync"
                                           OnCancelled="@(() => _editAudienceOpen = false)" />
 
+<EditSharedCompanyDocumentAcknowledgementDialog CompanyId="CompanyId"
+                                                 Document="_detail"
+                                                 IsOpen="_editAcknowledgementOpen"
+                                                 OnSaved="OnAcknowledgementSavedAsync"
+                                                 OnCancelled="@(() => _editAcknowledgementOpen = false)" />
+
 <SfDialog Visible="_publishConfirmOpen" IsModal="true" Width="420px" ShowCloseIcon="false">
     <DialogTemplates>
         <Header>Publish Document</Header>
@@ -190,6 +219,7 @@
     private bool _loading = true;
     private bool _editOpen;
     private bool _editAudienceOpen;
+    private bool _editAcknowledgementOpen;
     private bool _publishConfirmOpen;
     private bool _publishing;
     private string? _publishError;
@@ -215,6 +245,12 @@
     private async Task OnAudienceSavedAsync()
     {
         _editAudienceOpen = false;
+        _detail = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, DocumentId);
+    }
+
+    private async Task OnAcknowledgementSavedAsync()
+    {
+        _editAcknowledgementOpen = false;
         _detail = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, DocumentId);
     }
 

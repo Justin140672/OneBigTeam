@@ -30,7 +30,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Remote Working Policy", "A description", category.Id,
             "key/p.pdf", "p.pdf", 500, "application/pdf",
-            new DateOnly(2026, 1, 1), new DateOnly(2027, 1, 1), false, createdBy, Now);
+            new DateOnly(2026, 1, 1), new DateOnly(2027, 1, 1), false, null, null, createdBy, Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -52,7 +52,33 @@ public class GetSharedCompanyDocumentHandlerTests
         Assert.Empty(result.Value.AudiencePositionProfileIds);
         Assert.Empty(result.Value.AudienceEmployeeIds);
         Assert.False(result.Value.RequiresAcknowledgement);
+        Assert.Null(result.Value.AcknowledgementDueDate);
+        Assert.Null(result.Value.AcknowledgementStatement);
         Assert.Null(result.Value.AcknowledgementProgress);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Raw_AcknowledgementDueDate_And_Statement()
+    {
+        // The HR detail view feeds the edit dialog, so it must return the raw stored statement
+        // (including null when HR hasn't written one) rather than a resolved default — only the
+        // employee-facing GetPublishedSharedCompanyDocument response applies the default fallback.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
+            acknowledgementStatement: null, createdBy: Guid.NewGuid(), now: Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new GetSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
+            CancellationToken.None);
+
+        Assert.Equal(new DateOnly(2027, 1, 1), result.Value!.AcknowledgementDueDate);
+        Assert.Null(result.Value.AcknowledgementStatement);
     }
 
     [Fact]
@@ -76,7 +102,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyA);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyA, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, false, Guid.NewGuid(), Now);
+            null, null, false, null, null, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -96,7 +122,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
-            null, null, false, Guid.NewGuid(), Now);
+            null, null, false, null, null, Guid.NewGuid(), Now);
         doc.ReplaceFile("key/v2.pdf", "v2.pdf", 200, "application/pdf", Guid.NewGuid(), Now.AddDays(1));
         db.SharedCompanyDocuments.Add(doc);
 
@@ -123,7 +149,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var departmentId = Guid.NewGuid();
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, false, Guid.NewGuid(), Now);
+            null, null, false, null, null, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAudienceRules.Add(SharedCompanyDocumentAudienceRule.Create(
             Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId));
@@ -152,7 +178,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var employeeId      = Guid.NewGuid();
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, false, Guid.NewGuid(), Now);
+            null, null, false, null, null, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAudienceRules.AddRange(
             SharedCompanyDocumentAudienceRule.Create(Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId),
@@ -188,7 +214,7 @@ public class GetSharedCompanyDocumentHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
+            null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
 
@@ -221,7 +247,7 @@ public class GetSharedCompanyDocumentHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
+            null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
         doc.Publish(Guid.NewGuid(), Now);
         doc.ReplaceFile("key/v2.pdf", "v2.pdf", 200, "application/pdf", Guid.NewGuid(), Now.AddDays(1));
         db.SharedCompanyDocuments.Add(doc);

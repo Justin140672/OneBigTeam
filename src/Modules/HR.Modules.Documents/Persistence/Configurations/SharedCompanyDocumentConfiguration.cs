@@ -72,6 +72,13 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
             .HasColumnName("requires_acknowledgement")
             .IsRequired();
 
+        builder.Property(d => d.AcknowledgementDueDate)
+            .HasColumnName("acknowledgement_due_date");
+
+        builder.Property(d => d.AcknowledgementStatement)
+            .HasColumnName("acknowledgement_statement")
+            .HasMaxLength(1000);
+
         builder.Property(d => d.CreatedBy)
             .HasColumnName("created_by")
             .IsRequired();

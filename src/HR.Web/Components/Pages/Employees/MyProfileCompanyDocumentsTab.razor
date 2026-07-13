@@ -83,7 +83,15 @@ else
                     {
                         <div class="alert alert-warning">
                             This document requires your acknowledgement.
+                            @if (_detail.AcknowledgementDueDate.HasValue)
+                            {
+                                <text> Please acknowledge by @_detail.AcknowledgementDueDate.Value.ToString("d MMMM yyyy").</text>
+                            }
                         </div>
+                        @if (!string.IsNullOrWhiteSpace(_detail.AcknowledgementStatement))
+                        {
+                            <p class="mb-3">@_detail.AcknowledgementStatement</p>
+                        }
                         @if (!string.IsNullOrEmpty(_acknowledgeError))
                         {
                             <div class="alert alert-danger">@_acknowledgeError</div>

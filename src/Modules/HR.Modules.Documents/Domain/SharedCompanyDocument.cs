@@ -30,6 +30,13 @@ internal sealed class SharedCompanyDocument
     // same way version history lives entirely in SharedCompanyDocumentVersion rows.
     public bool RequiresAcknowledgement { get; private set; }
 
+    // Only meaningful when RequiresAcknowledgement is true. AcknowledgementStatement is
+    // deliberately optional with no stored default — "I confirm that I have read and understood
+    // this document." is applied as a display-time fallback by callers, not written to the row,
+    // so a company can change the default sentence later without rewriting every document.
+    public DateOnly? AcknowledgementDueDate { get; private set; }
+    public string? AcknowledgementStatement { get; private set; }
+
     public Guid CreatedBy { get; private set; }
     public Guid UpdatedBy { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -54,27 +61,33 @@ internal sealed class SharedCompanyDocument
         DateOnly? effectiveDate,
         DateOnly? reviewDate,
         bool requiresAcknowledgement,
+        DateOnly? acknowledgementDueDate,
+        string? acknowledgementStatement,
         Guid createdBy,
         DateTimeOffset now) => new()
     {
-        Id                      = id,
-        CompanyId               = companyId,
-        Title                   = title.Trim(),
-        Description             = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
-        CategoryId              = categoryId,
-        CurrentFileReference    = currentFileReference.Trim(),
-        FileName                = fileName.Trim(),
-        FileSize                = fileSize,
-        ContentType             = contentType.Trim(),
-        VersionNumber           = 1,
-        Status                  = SharedCompanyDocumentStatus.Draft,
-        EffectiveDate           = effectiveDate,
-        ReviewDate              = reviewDate,
-        RequiresAcknowledgement = requiresAcknowledgement,
-        CreatedBy               = createdBy,
-        UpdatedBy               = createdBy,
-        CreatedAt               = now,
-        UpdatedAt               = now,
+        Id                       = id,
+        CompanyId                = companyId,
+        Title                    = title.Trim(),
+        Description              = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+        CategoryId               = categoryId,
+        CurrentFileReference     = currentFileReference.Trim(),
+        FileName                 = fileName.Trim(),
+        FileSize                 = fileSize,
+        ContentType              = contentType.Trim(),
+        VersionNumber            = 1,
+        Status                   = SharedCompanyDocumentStatus.Draft,
+        EffectiveDate            = effectiveDate,
+        ReviewDate               = reviewDate,
+        RequiresAcknowledgement  = requiresAcknowledgement,
+        AcknowledgementDueDate   = requiresAcknowledgement ? acknowledgementDueDate : null,
+        AcknowledgementStatement = requiresAcknowledgement && !string.IsNullOrWhiteSpace(acknowledgementStatement)
+            ? acknowledgementStatement.Trim()
+            : null,
+        CreatedBy                = createdBy,
+        UpdatedBy                = createdBy,
+        CreatedAt                = now,
+        UpdatedAt                = now,
     };
 
     public void UpdateDetails(
@@ -95,11 +108,25 @@ internal sealed class SharedCompanyDocument
         UpdatedAt               = now;
     }
 
-    public void SetRequiresAcknowledgement(bool requiresAcknowledgement, Guid updatedBy, DateTimeOffset now)
+    /// <summary>
+    /// Replaces all three acknowledgement settings together — due date and statement are only
+    /// ever meaningful alongside RequiresAcknowledgement, so this deliberately clears both when
+    /// acknowledgement is turned off rather than leaving stale values behind.
+    /// </summary>
+    public void SetAcknowledgementSettings(
+        bool requiresAcknowledgement,
+        DateOnly? acknowledgementDueDate,
+        string? acknowledgementStatement,
+        Guid updatedBy,
+        DateTimeOffset now)
     {
-        RequiresAcknowledgement = requiresAcknowledgement;
-        UpdatedBy               = updatedBy;
-        UpdatedAt               = now;
+        RequiresAcknowledgement  = requiresAcknowledgement;
+        AcknowledgementDueDate   = requiresAcknowledgement ? acknowledgementDueDate : null;
+        AcknowledgementStatement = requiresAcknowledgement && !string.IsNullOrWhiteSpace(acknowledgementStatement)
+            ? acknowledgementStatement.Trim()
+            : null;
+        UpdatedBy = updatedBy;
+        UpdatedAt = now;
     }
 
     /// <summary>

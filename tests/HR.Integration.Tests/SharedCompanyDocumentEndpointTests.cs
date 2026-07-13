@@ -664,6 +664,97 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Publish_Returns_Validation_When_Acknowledgement_Required_Without_DueDate()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId);
+
+        await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/acknowledgement-settings",
+            new { RequiresAcknowledgement = true });
+
+        var response = await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/publish", null);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    // ── UpdateSharedCompanyDocumentAcknowledgementSettings ──────────────────────
+
+    [Fact]
+    public async Task UpdateAcknowledgementSettings_Returns_Forbidden_For_Manager()
+    {
+        var companyId = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var managerId  = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+
+        using var managerClient = ClientAs(companyId, managerId);
+        var response = await managerClient.PutAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/acknowledgement-settings",
+            new { RequiresAcknowledgement = true, AcknowledgementDueDate = "2027-01-01" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateAcknowledgementSettings_Succeeds_For_HrAdministrator()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/acknowledgement-settings",
+            new
+            {
+                RequiresAcknowledgement = true,
+                AcknowledgementDueDate = "2027-01-01",
+                AcknowledgementStatement = "I confirm I have read the updated expenses policy.",
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<AcknowledgementSettingsPayload>();
+        Assert.True(payload!.RequiresAcknowledgement);
+        Assert.Equal(new DateOnly(2027, 1, 1), payload.AcknowledgementDueDate);
+        Assert.Equal("I confirm I have read the updated expenses policy.", payload.AcknowledgementStatement);
+
+        // Publish now succeeds, since the required due date has been set.
+        var publishResponse = await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/publish", null);
+        Assert.Equal(HttpStatusCode.OK, publishResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateAcknowledgementSettings_Returns_NotFound_For_Unknown_Document()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/acknowledgement-settings",
+            new { RequiresAcknowledgement = false });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    private sealed record AcknowledgementSettingsPayload(
+        Guid Id, Guid CompanyId, bool RequiresAcknowledgement,
+        DateOnly? AcknowledgementDueDate, string? AcknowledgementStatement);
+
     private sealed record PublishPayload(Guid Id, string Status, Guid PublishedBy, DateTimeOffset PublishedAt);
 
     // Seeds a Department directly via the Employees module's DbContext — there is no lighter-
@@ -678,9 +769,10 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         return department.Id;
     }
 
-    // Directly flips a document to Published via the DbContext — there is no Publish endpoint
-    // yet (a known, flagged gap), so integration tests that need a Published document have no
-    // way to get there through the API.
+    // Directly flips a document to Published via the DbContext, bypassing the real Publish
+    // endpoint's validation — used by tests that need a Published document in a state the real
+    // endpoint wouldn't allow reaching (e.g. requires-acknowledgement without going through the
+    // acknowledgement-settings endpoint first).
     private async Task PublishDirectlyAsync(Guid companyId, Guid documentId, bool requiresAcknowledgement = false)
     {
         using var scope = _factory.Services.CreateScope();
@@ -689,7 +781,7 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         doc.Publish(Guid.NewGuid(), DateTimeOffset.UtcNow);
         if (requiresAcknowledgement)
         {
-            doc.SetRequiresAcknowledgement(true, Guid.NewGuid(), DateTimeOffset.UtcNow);
+            doc.SetAcknowledgementSettings(true, DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)), null, Guid.NewGuid(), DateTimeOffset.UtcNow);
         }
         await db.SaveChangesAsync();
     }

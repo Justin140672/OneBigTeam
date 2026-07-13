@@ -120,11 +120,33 @@
                         </SfMultiSelect>
                     </div>
                     <div class="col-12">
+                        <hr class="my-1" />
                         <SfCheckBox TChecked="bool"
                                     Label="Requires employee acknowledgement"
                                     Checked="@Model.RequiresAcknowledgement"
                                     CheckedChanged="@((bool v) => Model.RequiresAcknowledgement = v)" />
                     </div>
+                    @if (Model.RequiresAcknowledgement)
+                    {
+                        <div class="col-md-6">
+                            <label class="form-label">Acknowledgement Due Date</label>
+                            <SfDatePicker TValue="DateOnly?"
+                                          @bind-Value="Model.AcknowledgementDueDate"
+                                          Format="dd/MM/yyyy"
+                                          Placeholder="dd/mm/yyyy"
+                                          ShowClearButton="true" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Acknowledgement Statement</label>
+                            <HrTextBox @bind-Value="Model.AcknowledgementStatement"
+                                       Placeholder="@AcknowledgementStatementPlaceholder"
+                                       Multiline="true" />
+                            <div class="form-text">
+                                Optional — shown to employees before they acknowledge. If left blank, they'll see:
+                                "@AcknowledgementStatementPlaceholder"
+                            </div>
+                        </div>
+                    }
                 </div>
             </EditForm>
         </Content>
@@ -160,8 +182,13 @@
         _employees          = employees?.Items.Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}")).ToList() ?? [];
     }
 
+    private const string AcknowledgementStatementPlaceholder = "I confirm that I have read and understood this document.";
+
     private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
 
+    // A due date isn't required here — acknowledgement settings only need to be complete by the
+    // time the document is published (enforced server-side by PublishSharedCompanyDocument), so
+    // HR can upload first and fill in the due date later via the Acknowledgement edit dialog.
     protected override string? ValidateExtra() =>
         _selectedFile is null ? "Please select a file." : null;
 
@@ -173,6 +200,7 @@
             Model.AudienceDepartmentIds, Model.AudienceLocationIds,
             Model.AudiencePositionProfileIds, Model.AudienceEmployeeIds,
             Model.RequiresAcknowledgement,
+            Model.AcknowledgementDueDate, Model.AcknowledgementStatement,
             _selectedFile!);
 
     protected override void ResetForm()
@@ -187,6 +215,8 @@
         Model.AudiencePositionProfileIds = [];
         Model.AudienceEmployeeIds = [];
         Model.RequiresAcknowledgement = false;
+        Model.AcknowledgementDueDate = null;
+        Model.AcknowledgementStatement = null;
         _selectedFile = null;
     }
 
@@ -206,5 +236,7 @@
         public List<Guid> AudiencePositionProfileIds { get; set; } = [];
         public List<Guid> AudienceEmployeeIds { get; set; } = [];
         public bool RequiresAcknowledgement { get; set; }
+        public DateOnly? AcknowledgementDueDate { get; set; }
+        public string? AcknowledgementStatement { get; set; }
     }
 }

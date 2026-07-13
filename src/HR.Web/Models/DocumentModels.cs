@@ -147,6 +147,8 @@ public sealed record SharedCompanyDocumentDetailResponse(
     IReadOnlyList<Guid> AudiencePositionProfileIds,
     IReadOnlyList<Guid> AudienceEmployeeIds,
     bool RequiresAcknowledgement,
+    DateOnly? AcknowledgementDueDate,
+    string? AcknowledgementStatement,
     AcknowledgementProgressModel? AcknowledgementProgress,
     IReadOnlyList<SharedCompanyDocumentVersionModel> VersionHistory,
     string CreatedByName,
@@ -177,6 +179,8 @@ public sealed record PublishedSharedCompanyDocumentDetailResponse(
     string CategoryName,
     DateOnly? EffectiveDate,
     bool RequiresAcknowledgement,
+    DateOnly? AcknowledgementDueDate,
+    string? AcknowledgementStatement,
     DateTimeOffset? MyAcknowledgedAt);
 
 public sealed record AcknowledgeSharedCompanyDocumentResponseModel(
@@ -231,6 +235,21 @@ public sealed record PublishSharedCompanyDocumentResponseModel(
     Guid PublishedBy,
     DateTimeOffset PublishedAt,
     int AcknowledgementTasksCreated);
+
+public sealed record UpdateSharedCompanyDocumentAcknowledgementSettingsRequest(
+    Guid CompanyId,
+    Guid DocumentId,
+    bool RequiresAcknowledgement,
+    DateOnly? AcknowledgementDueDate,
+    string? AcknowledgementStatement);
+
+public sealed record UpdateSharedCompanyDocumentAcknowledgementSettingsResponseModel(
+    Guid Id,
+    Guid CompanyId,
+    bool RequiresAcknowledgement,
+    DateOnly? AcknowledgementDueDate,
+    string? AcknowledgementStatement,
+    DateTimeOffset UpdatedAt);
 
 public enum DocumentExpiryStatus
 {

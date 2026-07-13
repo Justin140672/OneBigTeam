@@ -23,6 +23,8 @@ internal sealed record GetSharedCompanyDocumentResponse(
     IReadOnlyList<Guid> AudiencePositionProfileIds,
     IReadOnlyList<Guid> AudienceEmployeeIds,
     bool RequiresAcknowledgement,
+    DateOnly? AcknowledgementDueDate,
+    string? AcknowledgementStatement,
     AcknowledgementProgressInfo? AcknowledgementProgress,
     IReadOnlyList<SharedCompanyDocumentVersionItem> VersionHistory,
     string CreatedByName,

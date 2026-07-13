@@ -73,7 +73,9 @@ public class UploadSharedCompanyDocumentHandlerTests
         Guid[]? audienceLocationIds   = null,
         Guid[]? audiencePositionProfileIds = null,
         Guid[]? audienceEmployeeIds = null,
-        bool requiresAcknowledgement = false) =>
+        bool requiresAcknowledgement = false,
+        DateOnly? acknowledgementDueDate = null,
+        string? acknowledgementStatement = null) =>
         new()
         {
             CompanyId                  = companyId,
@@ -87,6 +89,8 @@ public class UploadSharedCompanyDocumentHandlerTests
             AudiencePositionProfileIds = audiencePositionProfileIds ?? [],
             AudienceEmployeeIds        = audienceEmployeeIds ?? [],
             RequiresAcknowledgement    = requiresAcknowledgement,
+            AcknowledgementDueDate     = acknowledgementDueDate,
+            AcknowledgementStatement   = acknowledgementStatement,
             File                       = file ?? FakePdfFile(),
         };
 
@@ -423,6 +427,57 @@ public class UploadSharedCompanyDocumentHandlerTests
         Assert.Single(savedRules);
         Assert.Equal(SharedCompanyDocumentAudienceRuleType.Department, savedRules[0].RuleType);
         Assert.Equal(departmentId, savedRules[0].TargetId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Stores_AcknowledgementDueDate_And_Statement_When_Required()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var handler   = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(
+                companyId, category.Id,
+                requiresAcknowledgement: true,
+                acknowledgementDueDate: new DateOnly(2027, 1, 1),
+                acknowledgementStatement: "Please confirm you have read the new expenses policy."),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new DateOnly(2027, 1, 1), result.Value!.AcknowledgementDueDate);
+        Assert.Equal("Please confirm you have read the new expenses policy.", result.Value.AcknowledgementStatement);
+
+        var saved = await db.SharedCompanyDocuments.SingleAsync();
+        Assert.Equal(new DateOnly(2027, 1, 1), saved.AcknowledgementDueDate);
+        Assert.Equal("Please confirm you have read the new expenses policy.", saved.AcknowledgementStatement);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Clears_AcknowledgementDueDate_And_Statement_When_Not_Required()
+    {
+        // Submitting a due date/statement alongside RequiresAcknowledgement=false is a client
+        // mistake, not a valid state — the handler must not persist settings that only make
+        // sense when acknowledgement is actually required.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var handler   = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(
+                companyId, category.Id,
+                requiresAcknowledgement: false,
+                acknowledgementDueDate: new DateOnly(2027, 1, 1),
+                acknowledgementStatement: "Some statement"),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.AcknowledgementDueDate);
+        Assert.Null(result.Value.AcknowledgementStatement);
     }
 
     [Fact]

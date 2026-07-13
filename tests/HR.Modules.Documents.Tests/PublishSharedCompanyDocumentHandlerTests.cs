@@ -163,7 +163,8 @@ public class PublishSharedCompanyDocumentHandlerTests
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
             effectiveDate: new DateOnly(2026, 9, 1), reviewDate: new DateOnly(2026, 1, 1),
-            requiresAcknowledgement: false, Guid.NewGuid(), Now);
+            requiresAcknowledgement: false, acknowledgementDueDate: null, acknowledgementStatement: null,
+            createdBy: Guid.NewGuid(), now: Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -173,6 +174,52 @@ public class PublishSharedCompanyDocumentHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_When_Acknowledgement_Required_But_No_DueDate_Set()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, requiresAcknowledgement: true, acknowledgementDueDate: null, acknowledgementStatement: null,
+            createdBy: Guid.NewGuid(), now: Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new PublishSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+
+        var stored = await db.SharedCompanyDocuments.AsNoTracking().SingleAsync(d => d.Id == doc.Id);
+        Assert.Equal(SharedCompanyDocumentStatus.Draft, stored.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_When_Acknowledgement_Required_And_DueDate_Set_But_No_Statement()
+    {
+        // The statement is explicitly optional — a missing statement must never block publishing,
+        // only a missing due date does.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1), acknowledgementStatement: null,
+            createdBy: Guid.NewGuid(), now: Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new PublishSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
@@ -187,7 +234,8 @@ public class PublishSharedCompanyDocumentHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Remote Working Policy", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, new DateOnly(2027, 1, 1), requiresAcknowledgement: true, Guid.NewGuid(), Now);
+            null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1), acknowledgementStatement: null,
+            createdBy: Guid.NewGuid(), now: Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -289,7 +337,7 @@ public class PublishSharedCompanyDocumentHandlerTests
     private static SharedCompanyDocument CreateDoc(Guid companyId, Guid categoryId, Guid createdBy) =>
         SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, categoryId, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, false, createdBy, Now);
+            null, null, false, null, null, createdBy, Now);
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

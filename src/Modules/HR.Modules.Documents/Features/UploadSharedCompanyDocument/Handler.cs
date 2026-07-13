@@ -113,6 +113,8 @@ internal sealed class UploadSharedCompanyDocumentHandler(
             request.EffectiveDate,
             request.ReviewDate,
             request.RequiresAcknowledgement,
+            request.AcknowledgementDueDate,
+            request.AcknowledgementStatement,
             uploadedBy,
             now);
 
@@ -163,6 +165,8 @@ internal sealed class UploadSharedCompanyDocumentHandler(
             request.AudiencePositionProfileIds,
             request.AudienceEmployeeIds,
             document.RequiresAcknowledgement,
+            document.AcknowledgementDueDate,
+            document.AcknowledgementStatement,
             document.CreatedBy,
             document.CreatedAt));
     }

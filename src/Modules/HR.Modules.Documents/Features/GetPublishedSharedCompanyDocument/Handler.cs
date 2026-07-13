@@ -63,6 +63,8 @@ internal sealed class GetPublishedSharedCompanyDocumentHandler(
             category ?? "Unknown",
             document.EffectiveDate,
             document.RequiresAcknowledgement,
+            document.AcknowledgementDueDate,
+            document.RequiresAcknowledgement ? AcknowledgementStatementDefaults.Resolve(document.AcknowledgementStatement) : null,
             myAcknowledgedAt));
     }
 }

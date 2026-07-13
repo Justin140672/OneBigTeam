@@ -15,5 +15,7 @@ internal sealed class UploadSharedCompanyDocumentRequest
     public Guid[] AudiencePositionProfileIds { get; init; } = [];
     public Guid[] AudienceEmployeeIds { get; init; } = [];
     public bool RequiresAcknowledgement { get; init; }
+    public DateOnly? AcknowledgementDueDate { get; init; }
+    public string? AcknowledgementStatement { get; init; }
     public IFormFile File { get; init; } = null!;
 }

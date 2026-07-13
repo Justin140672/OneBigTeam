@@ -277,6 +277,42 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    // Returns null on success, or an error message string on failure.
+    public async Task<string?> UpdateSharedCompanyDocumentAcknowledgementSettingsAsync(
+        Guid companyId,
+        Guid documentId,
+        bool requiresAcknowledgement,
+        DateOnly? acknowledgementDueDate,
+        string? acknowledgementStatement,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var request = new UpdateSharedCompanyDocumentAcknowledgementSettingsRequest(
+                companyId, documentId, requiresAcknowledgement, acknowledgementDueDate, acknowledgementStatement);
+
+            var response = await Http.PutAsJsonAsync(
+                $"api/companies/{companyId}/shared-documents/{documentId}/acknowledgement-settings", request, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return null;
+
+            try
+            {
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+                if (body.TryGetProperty("error", out var errorProp))
+                    return errorProp.GetString();
+            }
+            catch { }
+
+            return $"Update failed ({(int)response.StatusCode}).";
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+    }
+
     // Relative URL for the download redirect endpoint — bind directly to an <a href> so the
     // browser follows the server-side redirect (and its access check) itself.
     public string GetSharedCompanyDocumentDownloadUrl(Guid companyId, Guid documentId) =>
@@ -295,6 +331,8 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         IReadOnlyCollection<Guid> audiencePositionProfileIds,
         IReadOnlyCollection<Guid> audienceEmployeeIds,
         bool requiresAcknowledgement,
+        DateOnly? acknowledgementDueDate,
+        string? acknowledgementStatement,
         IBrowserFile file,
         CancellationToken cancellationToken = default)
     {
@@ -318,6 +356,10 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
             foreach (var id in audienceEmployeeIds)
                 content.Add(new StringContent(id.ToString()), "AudienceEmployeeIds");
             content.Add(new StringContent(requiresAcknowledgement.ToString()), "RequiresAcknowledgement");
+            if (acknowledgementDueDate.HasValue)
+                content.Add(new StringContent(acknowledgementDueDate.Value.ToString("yyyy-MM-dd")), "AcknowledgementDueDate");
+            if (!string.IsNullOrWhiteSpace(acknowledgementStatement))
+                content.Add(new StringContent(acknowledgementStatement), "AcknowledgementStatement");
 
             await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
             var fileContent = new StreamContent(stream);

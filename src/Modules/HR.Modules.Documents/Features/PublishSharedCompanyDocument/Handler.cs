@@ -62,8 +62,14 @@ internal sealed class PublishSharedCompanyDocumentHandler(
                 Error.Validation("The review date cannot be before the effective date."));
         }
 
-        // Acknowledgement settings complete — RequiresAcknowledgement is a plain, always-set bool
-        // with no further configuration in this system, so there is nothing else to validate.
+        // Acknowledgement settings complete — a due date is the one setting that genuinely can be
+        // missing; the statement is explicitly optional (falls back to a default sentence at
+        // display time) and never blocks publishing.
+        if (document.RequiresAcknowledgement && document.AcknowledgementDueDate is null)
+        {
+            return Result.Failure<PublishSharedCompanyDocumentResponse>(
+                Error.Validation("An acknowledgement due date is required before this document can be published."));
+        }
 
         var now = clock.UtcNowOffset();
         document.Publish(publishedBy, now);
@@ -85,7 +91,7 @@ internal sealed class PublishSharedCompanyDocumentHandler(
                     priority:           TaskPriority.Medium,
                     source:             TaskSource.Document,
                     actionType:         TaskActionType.Acknowledge,
-                    dueDate:            document.ReviewDate,
+                    dueDate:            document.AcknowledgementDueDate,
                     assignedEmployeeId: employeeId,
                     assignedUserId:     null,
                     sourceEntityId:     document.Id,

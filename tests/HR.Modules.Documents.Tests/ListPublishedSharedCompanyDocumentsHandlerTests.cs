@@ -218,7 +218,7 @@ public class ListPublishedSharedCompanyDocumentsHandlerTests
         Guid companyId, string title, Guid categoryId, string storageKey, string fileName, Guid createdBy) =>
         SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, title, null, categoryId, storageKey, fileName, 100, "application/pdf",
-            null, null, false, createdBy, Now);
+            null, null, false, null, null, createdBy, Now);
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

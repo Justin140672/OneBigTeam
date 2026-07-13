@@ -164,6 +164,28 @@ internal sealed record SharedCompanyDocumentPublishedAuditEvent(
     object? IAuditEvent.Metadata        => new { RequiresAcknowledgement, AcknowledgementTasksCreated };
 }
 
+internal sealed record SharedCompanyDocumentAcknowledgementSettingsUpdatedAuditEvent(
+    Guid CompanyId,
+    Guid SharedCompanyDocumentId,
+    string Title,
+    object Before,
+    object After,
+    Guid UpdatedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "shared_company_document.acknowledgement_settings_updated";
+    string  IAuditEvent.EntityType      => "SharedCompanyDocument";
+    Guid    IAuditEvent.EntityId        => SharedCompanyDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => null;
+    Guid?   IAuditEvent.ActorUserId     => UpdatedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => UpdatedBy;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Document '{Title}' acknowledgement settings changed";
+    object? IAuditEvent.Before          => Before;
+    object? IAuditEvent.After           => After;
+    object? IAuditEvent.Metadata        => null;
+}
+
 internal sealed record SharedCompanyDocumentAudienceUpdatedAuditEvent(
     Guid CompanyId,
     Guid SharedCompanyDocumentId,
