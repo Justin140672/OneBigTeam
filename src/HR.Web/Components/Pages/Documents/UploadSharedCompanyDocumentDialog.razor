@@ -63,47 +63,62 @@
                         <div class="form-text">PDF, Word, or image files up to 20 MB.</div>
                     </div>
                     <div class="col-12">
-                        <label class="form-label">Audience</label>
-                        <div class="btn-group btn-group-sm d-block" role="group">
-                            <input type="radio" class="btn-check" name="audience-type" id="audience-all"
-                                   checked="@(Model.AudienceType == "All")" @onchange="@(() => SetAudienceType("All"))" />
-                            <label class="btn btn-outline-primary" for="audience-all">All Employees</label>
-
-                            <input type="radio" class="btn-check" name="audience-type" id="audience-department"
-                                   checked="@(Model.AudienceType == "Department")" @onchange="@(() => SetAudienceType("Department"))" />
-                            <label class="btn btn-outline-primary" for="audience-department">Department</label>
-
-                            <input type="radio" class="btn-check" name="audience-type" id="audience-location"
-                                   checked="@(Model.AudienceType == "Location")" @onchange="@(() => SetAudienceType("Location"))" />
-                            <label class="btn btn-outline-primary" for="audience-location">Location</label>
+                        <hr class="my-1" />
+                        <label class="form-label mb-1">Audience</label>
+                        <div class="form-text mt-0 mb-2">
+                            Leave everything below empty for "All Employees". Otherwise, an employee can see
+                            this document if they match at least one department, location, position, or are
+                            individually selected.
                         </div>
                     </div>
-                    @if (Model.AudienceType == "Department")
-                    {
-                        <div class="col-12">
-                            <SfDropDownList TValue="Guid?"
-                                            TItem="DepartmentListItemModel"
-                                            DataSource="@_departments"
-                                            @bind-Value="Model.AudienceDepartmentId"
-                                            Placeholder="Select department…"
-                                            AllowFiltering="true">
-                                <DropDownListFieldSettings Value="Id" Text="Name" />
-                            </SfDropDownList>
-                        </div>
-                    }
-                    @if (Model.AudienceType == "Location")
-                    {
-                        <div class="col-12">
-                            <SfDropDownList TValue="Guid?"
-                                            TItem="LocationListItemModel"
-                                            DataSource="@_locations"
-                                            @bind-Value="Model.AudienceLocationId"
-                                            Placeholder="Select location…"
-                                            AllowFiltering="true">
-                                <DropDownListFieldSettings Value="Id" Text="Name" />
-                            </SfDropDownList>
-                        </div>
-                    }
+                    <div class="col-md-6">
+                        <label class="form-label">Departments</label>
+                        <SfMultiSelect TValue="List<Guid>"
+                                       TItem="DepartmentListItemModel"
+                                       DataSource="@_departments"
+                                       @bind-Value="Model.AudienceDepartmentIds"
+                                       Placeholder="Any department"
+                                       Mode="VisualMode.CheckBox"
+                                       AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                        </SfMultiSelect>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Locations</label>
+                        <SfMultiSelect TValue="List<Guid>"
+                                       TItem="LocationListItemModel"
+                                       DataSource="@_locations"
+                                       @bind-Value="Model.AudienceLocationIds"
+                                       Placeholder="Any location"
+                                       Mode="VisualMode.CheckBox"
+                                       AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                        </SfMultiSelect>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Positions</label>
+                        <SfMultiSelect TValue="List<Guid>"
+                                       TItem="PositionProfileListItemModel"
+                                       DataSource="@_positionProfiles"
+                                       @bind-Value="Model.AudiencePositionProfileIds"
+                                       Placeholder="Any position"
+                                       Mode="VisualMode.CheckBox"
+                                       AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="Title" />
+                        </SfMultiSelect>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Selected Employees</label>
+                        <SfMultiSelect TValue="List<Guid>"
+                                       TItem="EmployeeOption"
+                                       DataSource="@_employees"
+                                       @bind-Value="Model.AudienceEmployeeIds"
+                                       Placeholder="No individually selected employees"
+                                       Mode="VisualMode.CheckBox"
+                                       AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                        </SfMultiSelect>
+                    </div>
                     <div class="col-12">
                         <SfCheckBox TChecked="bool"
                                     Label="Requires employee acknowledgement"
@@ -122,45 +137,42 @@
 @code {
     [Inject] public DepartmentService DepartmentService { get; set; } = null!;
     [Inject] public LocationService LocationService { get; set; } = null!;
+    [Inject] public PositionProfileService PositionProfileService { get; set; } = null!;
+    [Inject] public EmployeeService EmployeeService { get; set; } = null!;
 
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
 
     private List<CompanyDocumentCategoryItem> _categories = [];
     private List<DepartmentListItemModel> _departments = [];
     private List<LocationListItemModel> _locations = [];
+    private List<PositionProfileListItemModel> _positionProfiles = [];
+    private List<EmployeeOption> _employees = [];
     private IBrowserFile? _selectedFile;
 
     protected override async Task OnOpenedAsync()
     {
         _selectedFile = null;
-        _categories  = (await DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId))?.Items.ToList() ?? [];
-        _departments = (await DepartmentService.ListDepartmentsAsync(CompanyId))?.Items ?? [];
-        _locations   = (await LocationService.ListLocationsAsync(CompanyId))?.Items ?? [];
+        _categories        = (await DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId))?.Items.ToList() ?? [];
+        _departments       = (await DepartmentService.ListDepartmentsAsync(CompanyId))?.Items ?? [];
+        _locations         = (await LocationService.ListLocationsAsync(CompanyId))?.Items ?? [];
+        _positionProfiles  = (await PositionProfileService.ListPositionProfilesAsync(CompanyId))?.Items.ToList() ?? [];
+        var employees      = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 500);
+        _employees          = employees?.Items.Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}")).ToList() ?? [];
     }
 
     private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
 
-    private void SetAudienceType(string type)
-    {
-        Model.AudienceType = type;
-        if (type != "Department") Model.AudienceDepartmentId = null;
-        if (type != "Location") Model.AudienceLocationId = null;
-    }
-
-    protected override string? ValidateExtra()
-    {
-        if (_selectedFile is null) return "Please select a file.";
-        if (Model.AudienceType == "Department" && Model.AudienceDepartmentId is null) return "Please select a department.";
-        if (Model.AudienceType == "Location" && Model.AudienceLocationId is null) return "Please select a location.";
-        return null;
-    }
+    protected override string? ValidateExtra() =>
+        _selectedFile is null ? "Please select a file." : null;
 
     protected override async Task<string?> SaveCoreAsync() =>
         await DocumentService.UploadSharedCompanyDocumentAsync(
             CompanyId,
             Model.Title, Model.Description, Model.CategoryId!.Value,
             Model.EffectiveDate, Model.ReviewDate,
-            Model.AudienceDepartmentId, Model.AudienceLocationId, Model.RequiresAcknowledgement,
+            Model.AudienceDepartmentIds, Model.AudienceLocationIds,
+            Model.AudiencePositionProfileIds, Model.AudienceEmployeeIds,
+            Model.RequiresAcknowledgement,
             _selectedFile!);
 
     protected override void ResetForm()
@@ -170,12 +182,15 @@
         Model.CategoryId = null;
         Model.EffectiveDate = null;
         Model.ReviewDate = null;
-        Model.AudienceType = "All";
-        Model.AudienceDepartmentId = null;
-        Model.AudienceLocationId = null;
+        Model.AudienceDepartmentIds = [];
+        Model.AudienceLocationIds = [];
+        Model.AudiencePositionProfileIds = [];
+        Model.AudienceEmployeeIds = [];
         Model.RequiresAcknowledgement = false;
         _selectedFile = null;
     }
+
+    public sealed record EmployeeOption(Guid Id, string Name);
 
     public sealed class UploadSharedCompanyDocumentFormModel
     {
@@ -186,9 +201,10 @@
         public Guid? CategoryId { get; set; }
         public DateOnly? EffectiveDate { get; set; }
         public DateOnly? ReviewDate { get; set; }
-        public string AudienceType { get; set; } = "All";
-        public Guid? AudienceDepartmentId { get; set; }
-        public Guid? AudienceLocationId { get; set; }
+        public List<Guid> AudienceDepartmentIds { get; set; } = [];
+        public List<Guid> AudienceLocationIds { get; set; } = [];
+        public List<Guid> AudiencePositionProfileIds { get; set; } = [];
+        public List<Guid> AudienceEmployeeIds { get; set; } = [];
         public bool RequiresAcknowledgement { get; set; }
     }
 }

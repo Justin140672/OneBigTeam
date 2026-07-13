@@ -25,12 +25,9 @@ internal sealed class SharedCompanyDocument
     public DateOnly? EffectiveDate { get; private set; }
     public DateOnly? ReviewDate { get; private set; }
 
-    // Audience — deliberately a single optional department-or-location scope, not a many-to-many
-    // targeting table: when both are null the document applies to every active employee in the
-    // company. Only one of the two should ever be set at once (enforced by the handler, not here).
-    public Guid? AudienceDepartmentId { get; private set; }
-    public Guid? AudienceLocationId { get; private set; }
-
+    // Audience is modelled as a separate set of SharedCompanyDocumentAudienceRule rows (see that
+    // type), not fields here — this aggregate has no in-memory audience state of its own, the
+    // same way version history lives entirely in SharedCompanyDocumentVersion rows.
     public bool RequiresAcknowledgement { get; private set; }
 
     public Guid CreatedBy { get; private set; }
@@ -50,8 +47,6 @@ internal sealed class SharedCompanyDocument
         string contentType,
         DateOnly? effectiveDate,
         DateOnly? reviewDate,
-        Guid? audienceDepartmentId,
-        Guid? audienceLocationId,
         bool requiresAcknowledgement,
         Guid createdBy,
         DateTimeOffset now) => new()
@@ -69,8 +64,6 @@ internal sealed class SharedCompanyDocument
         Status                  = SharedCompanyDocumentStatus.Draft,
         EffectiveDate           = effectiveDate,
         ReviewDate              = reviewDate,
-        AudienceDepartmentId    = audienceDepartmentId,
-        AudienceLocationId      = audienceLocationId,
         RequiresAcknowledgement = requiresAcknowledgement,
         CreatedBy               = createdBy,
         UpdatedBy               = createdBy,
@@ -84,9 +77,6 @@ internal sealed class SharedCompanyDocument
         Guid categoryId,
         DateOnly? effectiveDate,
         DateOnly? reviewDate,
-        Guid? audienceDepartmentId,
-        Guid? audienceLocationId,
-        bool requiresAcknowledgement,
         Guid updatedBy,
         DateTimeOffset now)
     {
@@ -95,11 +85,26 @@ internal sealed class SharedCompanyDocument
         CategoryId              = categoryId;
         EffectiveDate           = effectiveDate;
         ReviewDate              = reviewDate;
-        AudienceDepartmentId    = audienceDepartmentId;
-        AudienceLocationId      = audienceLocationId;
+        UpdatedBy               = updatedBy;
+        UpdatedAt               = now;
+    }
+
+    public void SetRequiresAcknowledgement(bool requiresAcknowledgement, Guid updatedBy, DateTimeOffset now)
+    {
         RequiresAcknowledgement = requiresAcknowledgement;
         UpdatedBy               = updatedBy;
         UpdatedAt               = now;
+    }
+
+    /// <summary>
+    /// Bumps UpdatedBy/UpdatedAt without changing any other field — used when something owned
+    /// outside this aggregate changes (e.g. its audience rule rows) but should still show up as
+    /// a "last updated" change on the document itself.
+    /// </summary>
+    public void Touch(Guid updatedBy, DateTimeOffset now)
+    {
+        UpdatedBy = updatedBy;
+        UpdatedAt = now;
     }
 
     /// <summary>Uploads a new version of the file, replacing the current one and incrementing VersionNumber.</summary>

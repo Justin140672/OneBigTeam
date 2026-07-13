@@ -10,8 +10,10 @@ internal sealed class UploadSharedCompanyDocumentRequest
     public Guid CategoryId { get; init; }
     public DateOnly? EffectiveDate { get; init; }
     public DateOnly? ReviewDate { get; init; }
-    public Guid? AudienceDepartmentId { get; init; }
-    public Guid? AudienceLocationId { get; init; }
+    public Guid[] AudienceDepartmentIds { get; init; } = [];
+    public Guid[] AudienceLocationIds { get; init; } = [];
+    public Guid[] AudiencePositionProfileIds { get; init; } = [];
+    public Guid[] AudienceEmployeeIds { get; init; } = [];
     public bool RequiresAcknowledgement { get; init; }
     public IFormFile File { get; init; } = null!;
 }

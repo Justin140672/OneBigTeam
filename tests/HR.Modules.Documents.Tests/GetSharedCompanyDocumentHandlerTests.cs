@@ -2,6 +2,7 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.GetSharedCompanyDocument;
 using HR.Modules.Documents.Persistence;
+using HR.Modules.Documents.Services;
 using HR.Modules.Documents.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,7 +30,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Remote Working Policy", "A description", category.Id,
             "key/p.pdf", "p.pdf", 500, "application/pdf",
-            new DateOnly(2026, 1, 1), new DateOnly(2027, 1, 1), null, null, false, createdBy, Now);
+            new DateOnly(2026, 1, 1), new DateOnly(2027, 1, 1), false, createdBy, Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -46,6 +47,10 @@ public class GetSharedCompanyDocumentHandlerTests
         Assert.Equal("Laura Bennett",         result.Value.CreatedByName);
         Assert.Equal("Laura Bennett",         result.Value.UpdatedByName);
         Assert.Equal("All Employees",         result.Value.AudienceDescription);
+        Assert.Empty(result.Value.AudienceDepartmentIds);
+        Assert.Empty(result.Value.AudienceLocationIds);
+        Assert.Empty(result.Value.AudiencePositionProfileIds);
+        Assert.Empty(result.Value.AudienceEmployeeIds);
         Assert.False(result.Value.RequiresAcknowledgement);
         Assert.Null(result.Value.AcknowledgementProgress);
     }
@@ -71,7 +76,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyA);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyA, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, null, null, false, Guid.NewGuid(), Now);
+            null, null, false, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -91,7 +96,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
-            null, null, null, null, false, Guid.NewGuid(), Now);
+            null, null, false, Guid.NewGuid(), Now);
         doc.ReplaceFile("key/v2.pdf", "v2.pdf", 200, "application/pdf", Guid.NewGuid(), Now.AddDays(1));
         db.SharedCompanyDocuments.Add(doc);
 
@@ -118,8 +123,10 @@ public class GetSharedCompanyDocumentHandlerTests
         var departmentId = Guid.NewGuid();
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, departmentId, null, false, Guid.NewGuid(), Now);
+            null, null, false, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
+        db.SharedCompanyDocumentAudienceRules.Add(SharedCompanyDocumentAudienceRule.Create(
+            Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId));
         await db.SaveChangesAsync();
 
         var audienceReader = new FakeEmployeeAudienceReader();
@@ -129,7 +136,44 @@ public class GetSharedCompanyDocumentHandlerTests
             new GetSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
             CancellationToken.None);
 
-        Assert.Equal("Department: Engineering", result.Value!.AudienceDescription);
+        Assert.Equal("Departments: Engineering", result.Value!.AudienceDescription);
+        Assert.Equal([departmentId], result.Value.AudienceDepartmentIds);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Describes_Multiple_Audience_Rule_Types_Together()
+    {
+        await using var db = BuildContext();
+        var companyId       = Guid.NewGuid();
+        var category        = await SeedCategory(db, companyId);
+        var departmentId    = Guid.NewGuid();
+        var locationId      = Guid.NewGuid();
+        var positionId      = Guid.NewGuid();
+        var employeeId      = Guid.NewGuid();
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, false, Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        db.SharedCompanyDocumentAudienceRules.AddRange(
+            SharedCompanyDocumentAudienceRule.Create(Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId),
+            SharedCompanyDocumentAudienceRule.Create(Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Location, locationId),
+            SharedCompanyDocumentAudienceRule.Create(Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Position, positionId),
+            SharedCompanyDocumentAudienceRule.Create(Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Employee, employeeId));
+        await db.SaveChangesAsync();
+
+        var audienceReader = new FakeEmployeeAudienceReader();
+        audienceReader.DepartmentNames[departmentId] = "Engineering";
+        audienceReader.LocationNames[locationId] = "London";
+        audienceReader.PositionProfileNames[positionId] = "Software Engineer";
+        var names = new Dictionary<Guid, string> { [employeeId] = "Tom Williams" };
+
+        var result = await Handler(db, audienceReader, names).HandleAsync(
+            new GetSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
+            CancellationToken.None);
+
+        Assert.Equal(
+            "Departments: Engineering; Locations: London; Positions: Software Engineer; Employees: Tom Williams",
+            result.Value!.AudienceDescription);
     }
 
     [Fact]
@@ -144,7 +188,7 @@ public class GetSharedCompanyDocumentHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, null, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
+            null, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
 
@@ -177,7 +221,7 @@ public class GetSharedCompanyDocumentHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
-            null, null, null, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
+            null, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
         doc.Publish(Guid.NewGuid(), Now);
         doc.ReplaceFile("key/v2.pdf", "v2.pdf", 200, "application/pdf", Guid.NewGuid(), Now.AddDays(1));
         db.SharedCompanyDocuments.Add(doc);
@@ -196,8 +240,16 @@ public class GetSharedCompanyDocumentHandlerTests
     }
 
     private static GetSharedCompanyDocumentHandler Handler(
-        DocumentsDbContext db, FakeEmployeeAudienceReader? audienceReader = null, Dictionary<Guid, string>? names = null) =>
-        new(db, new FakeEmployeeNameReader(names), audienceReader ?? new FakeEmployeeAudienceReader());
+        DocumentsDbContext db, FakeEmployeeAudienceReader? audienceReader = null, Dictionary<Guid, string>? names = null)
+    {
+        var reader = audienceReader ?? new FakeEmployeeAudienceReader();
+        var nameReader = new FakeEmployeeNameReader(names);
+        return new GetSharedCompanyDocumentHandler(
+            db,
+            nameReader,
+            new SharedCompanyDocumentAudienceMatcher(db, reader),
+            new SharedCompanyDocumentAudienceDescriber(reader, nameReader));
+    }
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

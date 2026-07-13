@@ -79,8 +79,8 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
     [Fact]
     public async Task HandleAsync_Does_Not_Change_Audience_Or_Acknowledgement()
     {
-        // Audience/RequiresAcknowledgement aren't in the "Editable fields" list — the handler
-        // must pass the document's existing values straight through, not clear them.
+        // Audience/RequiresAcknowledgement aren't in the "Editable fields" list — audience now
+        // has its own dedicated endpoint, so metadata updates must leave its rule rows untouched.
         await using var db = BuildContext();
         var companyId    = Guid.NewGuid();
         var category     = await SeedCategory(db, companyId);
@@ -88,8 +88,10 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Title", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, departmentId, null, true, Guid.NewGuid(), Now);
+            null, null, true, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
+        db.SharedCompanyDocumentAudienceRules.Add(SharedCompanyDocumentAudienceRule.Create(
+            Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId));
         await db.SaveChangesAsync();
 
         await Handler(db).HandleAsync(
@@ -103,8 +105,9 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
             Guid.NewGuid(), CancellationToken.None);
 
         var stored = await db.SharedCompanyDocuments.AsNoTracking().SingleAsync(d => d.Id == doc.Id);
-        Assert.Equal(departmentId, stored.AudienceDepartmentId);
-        Assert.Null(stored.AudienceLocationId);
+        var rule = await db.SharedCompanyDocumentAudienceRules.AsNoTracking().SingleAsync(r => r.SharedCompanyDocumentId == doc.Id);
+        Assert.Equal(SharedCompanyDocumentAudienceRuleType.Department, rule.RuleType);
+        Assert.Equal(departmentId, rule.TargetId);
         Assert.True(stored.RequiresAcknowledgement);
     }
 
@@ -267,7 +270,7 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
     private static SharedCompanyDocument CreateDoc(Guid companyId, string title, Guid categoryId, Guid createdBy) =>
         SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, title, null, categoryId, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, null, null, false, createdBy, Now);
+            null, null, false, createdBy, Now);
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

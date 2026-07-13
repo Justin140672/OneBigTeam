@@ -1,6 +1,7 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
+using HR.Modules.Documents.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,18 +16,24 @@ internal sealed class ListPublishedSharedCompanyDocumentsHandler(
         Guid callerEmployeeId,
         CancellationToken cancellationToken)
     {
-        var (myDepartmentId, myLocationId) = await audienceReader.GetEmployeeAudienceAsync(
-            request.CompanyId, callerEmployeeId, cancellationToken);
+        var myProfile = await audienceReader.GetEmployeeAudienceAsync(request.CompanyId, callerEmployeeId, cancellationToken);
 
-        var documents = await db.SharedCompanyDocuments
+        var publishedDocuments = await db.SharedCompanyDocuments
             .AsNoTracking()
             .Where(d => d.CompanyId == request.CompanyId && d.Status == SharedCompanyDocumentStatus.Published)
-            .Where(d =>
-                (d.AudienceDepartmentId == null && d.AudienceLocationId == null) ||
-                (d.AudienceDepartmentId != null && d.AudienceDepartmentId == myDepartmentId) ||
-                (d.AudienceLocationId != null && d.AudienceLocationId == myLocationId))
-            .OrderBy(d => d.Title)
             .ToListAsync(cancellationToken);
+
+        var documentIds = publishedDocuments.Select(d => d.Id).ToList();
+        var rulesByDocument = (await db.SharedCompanyDocumentAudienceRules
+                .AsNoTracking()
+                .Where(r => documentIds.Contains(r.SharedCompanyDocumentId))
+                .ToListAsync(cancellationToken))
+            .ToLookup(r => r.SharedCompanyDocumentId);
+
+        var documents = publishedDocuments
+            .Where(d => SharedCompanyDocumentAudienceMatcher.IsInAudience(rulesByDocument[d.Id], myProfile, callerEmployeeId))
+            .OrderBy(d => d.Title)
+            .ToList();
 
         var categoryIds = documents.Select(d => d.CategoryId).ToHashSet();
         var categoryNames = categoryIds.Count > 0

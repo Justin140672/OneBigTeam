@@ -1,0 +1,139 @@
+@inject DocumentService DocumentService
+@inherits EditDialogBase<EditSharedCompanyDocumentAudienceDialog.EditSharedCompanyDocumentAudienceFormModel>
+
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="640px" ShowCloseIcon="true">
+    <DialogEvents Closed="HandleDialogClosed" />
+    <DialogTemplates>
+        <Header>Edit Document Audience</Header>
+        <Content>
+            @if (!string.IsNullOrEmpty(GlobalError))
+            {
+                <div class="alert alert-danger alert-dismissible mb-3">
+                    @GlobalError
+                    <button type="button" class="btn-close" @onclick="@(() => GlobalError = null)"></button>
+                </div>
+            }
+            <p class="text-muted small mb-3">
+                Leave everything below empty for "All Employees". Otherwise, an employee can see this
+                document if they match at least one department, location, position, or are individually
+                selected.
+            </p>
+            <EditForm EditContext="EditContext">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Departments</label>
+                        <SfMultiSelect TValue="List<Guid>"
+                                       TItem="DepartmentListItemModel"
+                                       DataSource="@_departments"
+                                       @bind-Value="Model.AudienceDepartmentIds"
+                                       Placeholder="Any department"
+                                       Mode="VisualMode.CheckBox"
+                                       AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                        </SfMultiSelect>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Locations</label>
+                        <SfMultiSelect TValue="List<Guid>"
+                                       TItem="LocationListItemModel"
+                                       DataSource="@_locations"
+                                       @bind-Value="Model.AudienceLocationIds"
+                                       Placeholder="Any location"
+                                       Mode="VisualMode.CheckBox"
+                                       AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                        </SfMultiSelect>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Positions</label>
+                        <SfMultiSelect TValue="List<Guid>"
+                                       TItem="PositionProfileListItemModel"
+                                       DataSource="@_positionProfiles"
+                                       @bind-Value="Model.AudiencePositionProfileIds"
+                                       Placeholder="Any position"
+                                       Mode="VisualMode.CheckBox"
+                                       AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="Title" />
+                        </SfMultiSelect>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Selected Employees</label>
+                        <SfMultiSelect TValue="List<Guid>"
+                                       TItem="EmployeeOption"
+                                       DataSource="@_employees"
+                                       @bind-Value="Model.AudienceEmployeeIds"
+                                       Placeholder="No individually selected employees"
+                                       Mode="VisualMode.CheckBox"
+                                       AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                        </SfMultiSelect>
+                    </div>
+                </div>
+            </EditForm>
+        </Content>
+        <FooterTemplate>
+            <HrDialogButtonBar SaveLabel="Save" Saving="Saving" OnSave="SubmitAsync" OnCancel="CancelAsync" />
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Inject] public DepartmentService DepartmentService { get; set; } = null!;
+    [Inject] public LocationService LocationService { get; set; } = null!;
+    [Inject] public PositionProfileService PositionProfileService { get; set; } = null!;
+    [Inject] public EmployeeService EmployeeService { get; set; } = null!;
+
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter] public SharedCompanyDocumentDetailResponse? Document { get; set; }
+
+    private List<DepartmentListItemModel> _departments = [];
+    private List<LocationListItemModel> _locations = [];
+    private List<PositionProfileListItemModel> _positionProfiles = [];
+    private List<EmployeeOption> _employees = [];
+
+    protected override async Task OnOpenedAsync()
+    {
+        _departments      = (await DepartmentService.ListDepartmentsAsync(CompanyId))?.Items ?? [];
+        _locations        = (await LocationService.ListLocationsAsync(CompanyId))?.Items ?? [];
+        _positionProfiles = (await PositionProfileService.ListPositionProfilesAsync(CompanyId))?.Items.ToList() ?? [];
+        var employees     = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 500);
+        _employees         = employees?.Items.Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}")).ToList() ?? [];
+
+        if (Document is not null)
+        {
+            Model.AudienceDepartmentIds = Document.AudienceDepartmentIds.ToList();
+            Model.AudienceLocationIds = Document.AudienceLocationIds.ToList();
+            Model.AudiencePositionProfileIds = Document.AudiencePositionProfileIds.ToList();
+            Model.AudienceEmployeeIds = Document.AudienceEmployeeIds.ToList();
+        }
+    }
+
+    protected override async Task<string?> SaveCoreAsync()
+    {
+        if (Document is null)
+            return "No document selected.";
+
+        return await DocumentService.UpdateSharedCompanyDocumentAudienceAsync(
+            CompanyId, Document.Id,
+            Model.AudienceDepartmentIds, Model.AudienceLocationIds,
+            Model.AudiencePositionProfileIds, Model.AudienceEmployeeIds);
+    }
+
+    protected override void ResetForm()
+    {
+        Model.AudienceDepartmentIds = [];
+        Model.AudienceLocationIds = [];
+        Model.AudiencePositionProfileIds = [];
+        Model.AudienceEmployeeIds = [];
+    }
+
+    public sealed record EmployeeOption(Guid Id, string Name);
+
+    public sealed class EditSharedCompanyDocumentAudienceFormModel
+    {
+        public List<Guid> AudienceDepartmentIds { get; set; } = [];
+        public List<Guid> AudienceLocationIds { get; set; } = [];
+        public List<Guid> AudiencePositionProfileIds { get; set; } = [];
+        public List<Guid> AudienceEmployeeIds { get; set; } = [];
+    }
+}

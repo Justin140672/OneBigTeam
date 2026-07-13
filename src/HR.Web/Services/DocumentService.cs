@@ -212,6 +212,43 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    // Returns null on success, or an error message string on failure.
+    public async Task<string?> UpdateSharedCompanyDocumentAudienceAsync(
+        Guid companyId,
+        Guid documentId,
+        IReadOnlyList<Guid> audienceDepartmentIds,
+        IReadOnlyList<Guid> audienceLocationIds,
+        IReadOnlyList<Guid> audiencePositionProfileIds,
+        IReadOnlyList<Guid> audienceEmployeeIds,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var request = new UpdateSharedCompanyDocumentAudienceRequest(
+                companyId, documentId, audienceDepartmentIds, audienceLocationIds, audiencePositionProfileIds, audienceEmployeeIds);
+
+            var response = await Http.PutAsJsonAsync(
+                $"api/companies/{companyId}/shared-documents/{documentId}/audience", request, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return null;
+
+            try
+            {
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+                if (body.TryGetProperty("error", out var errorProp))
+                    return errorProp.GetString();
+            }
+            catch { }
+
+            return $"Update failed ({(int)response.StatusCode}).";
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+    }
+
     // Relative URL for the download redirect endpoint — bind directly to an <a href> so the
     // browser follows the server-side redirect (and its access check) itself.
     public string GetSharedCompanyDocumentDownloadUrl(Guid companyId, Guid documentId) =>
@@ -225,8 +262,10 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         Guid categoryId,
         DateOnly? effectiveDate,
         DateOnly? reviewDate,
-        Guid? audienceDepartmentId,
-        Guid? audienceLocationId,
+        IReadOnlyCollection<Guid> audienceDepartmentIds,
+        IReadOnlyCollection<Guid> audienceLocationIds,
+        IReadOnlyCollection<Guid> audiencePositionProfileIds,
+        IReadOnlyCollection<Guid> audienceEmployeeIds,
         bool requiresAcknowledgement,
         IBrowserFile file,
         CancellationToken cancellationToken = default)
@@ -242,10 +281,14 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
                 content.Add(new StringContent(effectiveDate.Value.ToString("yyyy-MM-dd")), "EffectiveDate");
             if (reviewDate.HasValue)
                 content.Add(new StringContent(reviewDate.Value.ToString("yyyy-MM-dd")), "ReviewDate");
-            if (audienceDepartmentId.HasValue)
-                content.Add(new StringContent(audienceDepartmentId.Value.ToString()), "AudienceDepartmentId");
-            if (audienceLocationId.HasValue)
-                content.Add(new StringContent(audienceLocationId.Value.ToString()), "AudienceLocationId");
+            foreach (var id in audienceDepartmentIds)
+                content.Add(new StringContent(id.ToString()), "AudienceDepartmentIds");
+            foreach (var id in audienceLocationIds)
+                content.Add(new StringContent(id.ToString()), "AudienceLocationIds");
+            foreach (var id in audiencePositionProfileIds)
+                content.Add(new StringContent(id.ToString()), "AudiencePositionProfileIds");
+            foreach (var id in audienceEmployeeIds)
+                content.Add(new StringContent(id.ToString()), "AudienceEmployeeIds");
             content.Add(new StringContent(requiresAcknowledgement.ToString()), "RequiresAcknowledgement");
 
             await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);

@@ -68,12 +68,6 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
         builder.Property(d => d.ReviewDate)
             .HasColumnName("review_date");
 
-        builder.Property(d => d.AudienceDepartmentId)
-            .HasColumnName("audience_department_id");
-
-        builder.Property(d => d.AudienceLocationId)
-            .HasColumnName("audience_location_id");
-
         builder.Property(d => d.RequiresAcknowledgement)
             .HasColumnName("requires_acknowledgement")
             .IsRequired();

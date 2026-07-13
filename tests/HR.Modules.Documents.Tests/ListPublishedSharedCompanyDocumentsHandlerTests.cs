@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.ListPublishedSharedCompanyDocuments;
 using HR.Modules.Documents.Persistence;
@@ -46,8 +47,7 @@ public class ListPublishedSharedCompanyDocumentsHandlerTests
         var category  = await SeedCategory(db, companyId);
         var caller     = Guid.NewGuid();
 
-        var doc = CreateDoc(companyId, "Published Doc", category.Id, "key/p.pdf", "p.pdf", Guid.NewGuid(),
-            audienceDepartmentId: null, audienceLocationId: null);
+        var doc = CreateDoc(companyId, "Published Doc", category.Id, "key/p.pdf", "p.pdf", Guid.NewGuid());
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
@@ -68,14 +68,15 @@ public class ListPublishedSharedCompanyDocumentsHandlerTests
         var caller       = Guid.NewGuid();
         var departmentId = Guid.NewGuid();
 
-        var doc = CreateDoc(companyId, "Engineering Policy", category.Id, "key/p.pdf", "p.pdf", Guid.NewGuid(),
-            audienceDepartmentId: departmentId);
+        var doc = CreateDoc(companyId, "Engineering Policy", category.Id, "key/p.pdf", "p.pdf", Guid.NewGuid());
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
+        db.SharedCompanyDocumentAudienceRules.Add(SharedCompanyDocumentAudienceRule.Create(
+            Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId));
         await db.SaveChangesAsync();
 
         var audienceReader = new FakeEmployeeAudienceReader();
-        audienceReader.EmployeeAudiences[caller] = (departmentId, null);
+        audienceReader.EmployeeAudiences[caller] = new EmployeeAudienceProfile(departmentId, null, null);
 
         var result = await Handler(db, audienceReader).HandleAsync(
             new ListPublishedSharedCompanyDocumentsRequest { CompanyId = companyId }, caller,
@@ -94,20 +95,70 @@ public class ListPublishedSharedCompanyDocumentsHandlerTests
         var engineeringId = Guid.NewGuid();
         var salesId       = Guid.NewGuid();
 
-        var doc = CreateDoc(companyId, "Engineering Policy", category.Id, "key/p.pdf", "p.pdf", Guid.NewGuid(),
-            audienceDepartmentId: engineeringId);
+        var doc = CreateDoc(companyId, "Engineering Policy", category.Id, "key/p.pdf", "p.pdf", Guid.NewGuid());
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
+        db.SharedCompanyDocumentAudienceRules.Add(SharedCompanyDocumentAudienceRule.Create(
+            Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, engineeringId));
         await db.SaveChangesAsync();
 
         var audienceReader = new FakeEmployeeAudienceReader();
-        audienceReader.EmployeeAudiences[caller] = (salesId, null);
+        audienceReader.EmployeeAudiences[caller] = new EmployeeAudienceProfile(salesId, null, null);
 
         var result = await Handler(db, audienceReader).HandleAsync(
             new ListPublishedSharedCompanyDocumentsRequest { CompanyId = companyId }, caller,
             CancellationToken.None);
 
         Assert.Empty(result.Value!.Items);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Includes_Position_Scoped_Document_For_Caller_In_That_Position()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var category   = await SeedCategory(db, companyId);
+        var caller      = Guid.NewGuid();
+        var positionId  = Guid.NewGuid();
+
+        var doc = CreateDoc(companyId, "Engineer Policy", category.Id, "key/p.pdf", "p.pdf", Guid.NewGuid());
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        db.SharedCompanyDocumentAudienceRules.Add(SharedCompanyDocumentAudienceRule.Create(
+            Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Position, positionId));
+        await db.SaveChangesAsync();
+
+        var audienceReader = new FakeEmployeeAudienceReader();
+        audienceReader.EmployeeAudiences[caller] = new EmployeeAudienceProfile(null, null, positionId);
+
+        var result = await Handler(db, audienceReader).HandleAsync(
+            new ListPublishedSharedCompanyDocumentsRequest { CompanyId = companyId }, caller,
+            CancellationToken.None);
+
+        Assert.Single(result.Value!.Items);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Includes_Document_Directly_Naming_The_Caller_As_Selected_Employee()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+
+        var doc = CreateDoc(companyId, "Just For You", category.Id, "key/p.pdf", "p.pdf", Guid.NewGuid());
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        db.SharedCompanyDocumentAudienceRules.Add(SharedCompanyDocumentAudienceRule.Create(
+            Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Employee, caller));
+        await db.SaveChangesAsync();
+
+        // No profile seeded for the caller at all — the employee-id rule must match regardless.
+        var result = await Handler(db).HandleAsync(
+            new ListPublishedSharedCompanyDocumentsRequest { CompanyId = companyId }, caller,
+            CancellationToken.None);
+
+        Assert.Single(result.Value!.Items);
     }
 
     [Fact]
@@ -164,11 +215,10 @@ public class ListPublishedSharedCompanyDocumentsHandlerTests
         new(db, audienceReader ?? new FakeEmployeeAudienceReader());
 
     private static SharedCompanyDocument CreateDoc(
-        Guid companyId, string title, Guid categoryId, string storageKey, string fileName, Guid createdBy,
-        Guid? audienceDepartmentId = null, Guid? audienceLocationId = null) =>
+        Guid companyId, string title, Guid categoryId, string storageKey, string fileName, Guid createdBy) =>
         SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, title, null, categoryId, storageKey, fileName, 100, "application/pdf",
-            null, null, audienceDepartmentId, audienceLocationId, false, createdBy, Now);
+            null, null, false, createdBy, Now);
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

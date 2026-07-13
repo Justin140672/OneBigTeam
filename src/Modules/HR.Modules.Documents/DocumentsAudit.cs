@@ -141,6 +141,28 @@ internal sealed record SharedCompanyDocumentMetadataUpdatedAuditEvent(
     object? IAuditEvent.Metadata        => null;
 }
 
+internal sealed record SharedCompanyDocumentAudienceUpdatedAuditEvent(
+    Guid CompanyId,
+    Guid SharedCompanyDocumentId,
+    string Title,
+    string BeforeDescription,
+    string AfterDescription,
+    Guid UpdatedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "shared_company_document.audience_updated";
+    string  IAuditEvent.EntityType      => "SharedCompanyDocument";
+    Guid    IAuditEvent.EntityId        => SharedCompanyDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => null;
+    Guid?   IAuditEvent.ActorUserId     => UpdatedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => UpdatedBy;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Document '{Title}' audience changed";
+    object? IAuditEvent.Before          => new { Audience = BeforeDescription };
+    object? IAuditEvent.After           => new { Audience = AfterDescription };
+    object? IAuditEvent.Metadata        => null;
+}
+
 internal sealed record DocumentRequestFulfilledAuditEvent(
     Guid CompanyId,
     Guid DocumentRequestId,

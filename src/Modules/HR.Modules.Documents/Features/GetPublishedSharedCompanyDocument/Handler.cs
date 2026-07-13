@@ -1,6 +1,6 @@
-using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
+using HR.Modules.Documents.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,7 +8,7 @@ namespace HR.Modules.Documents.Features.GetPublishedSharedCompanyDocument;
 
 internal sealed class GetPublishedSharedCompanyDocumentHandler(
     DocumentsDbContext db,
-    IEmployeeAudienceReader audienceReader)
+    SharedCompanyDocumentAudienceMatcher audienceMatcher)
 {
     public async Task<Result<GetPublishedSharedCompanyDocumentResponse>> HandleAsync(
         GetPublishedSharedCompanyDocumentRequest request,
@@ -30,13 +30,8 @@ internal sealed class GetPublishedSharedCompanyDocumentHandler(
             return Result.Failure<GetPublishedSharedCompanyDocumentResponse>(
                 Error.NotFound($"Shared document '{request.DocumentId}' was not found."));
 
-        var (myDepartmentId, myLocationId) = await audienceReader.GetEmployeeAudienceAsync(
-            request.CompanyId, callerEmployeeId, cancellationToken);
-
-        var inAudience =
-            (document.AudienceDepartmentId is null && document.AudienceLocationId is null) ||
-            (document.AudienceDepartmentId is not null && document.AudienceDepartmentId == myDepartmentId) ||
-            (document.AudienceLocationId is not null && document.AudienceLocationId == myLocationId);
+        var inAudience = await audienceMatcher.IsEmployeeInAudienceAsync(
+            request.CompanyId, document.Id, callerEmployeeId, cancellationToken);
 
         if (!inAudience)
             return Result.Failure<GetPublishedSharedCompanyDocumentResponse>(

@@ -1,4 +1,3 @@
-using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
@@ -10,7 +9,7 @@ namespace HR.Modules.Documents.Features.DownloadSharedCompanyDocument;
 internal sealed class DownloadSharedCompanyDocumentHandler(
     DocumentsDbContext db,
     IDocumentStorageService storage,
-    IEmployeeAudienceReader audienceReader,
+    SharedCompanyDocumentAudienceMatcher audienceMatcher,
     IAuditEventPublisher auditPublisher,
     IClock clock)
 {
@@ -35,13 +34,8 @@ internal sealed class DownloadSharedCompanyDocumentHandler(
             if (document.Status != SharedCompanyDocumentStatus.Published)
                 return Result.Failure<Uri>(Error.NotFound($"Shared document '{request.DocumentId}' was not found."));
 
-            var (myDepartmentId, myLocationId) = await audienceReader.GetEmployeeAudienceAsync(
-                request.CompanyId, callerEmployeeId, cancellationToken);
-
-            var inAudience =
-                (document.AudienceDepartmentId is null && document.AudienceLocationId is null) ||
-                (document.AudienceDepartmentId is not null && document.AudienceDepartmentId == myDepartmentId) ||
-                (document.AudienceLocationId is not null && document.AudienceLocationId == myLocationId);
+            var inAudience = await audienceMatcher.IsEmployeeInAudienceAsync(
+                request.CompanyId, document.Id, callerEmployeeId, cancellationToken);
 
             if (!inAudience)
                 return Result.Failure<Uri>(Error.NotFound($"Shared document '{request.DocumentId}' was not found."));

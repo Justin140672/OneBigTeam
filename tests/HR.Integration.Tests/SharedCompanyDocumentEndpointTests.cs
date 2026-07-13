@@ -519,6 +519,85 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
 
     private sealed record UpdatePayload(Guid Id, string Title, int VersionNumber, string Status);
 
+    // ── UpdateSharedCompanyDocumentAudience ─────────────────────────────────────
+
+    [Fact]
+    public async Task UpdateAudience_Returns_Forbidden_For_Manager()
+    {
+        var companyId = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var managerId  = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+
+        using var managerClient = ClientAs(companyId, managerId);
+        var response = await managerClient.PutAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/audience",
+            new { });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateAudience_Succeeds_For_HrAdministrator_And_Scopes_To_A_Department()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId);
+        var departmentId = await SeedDepartmentAsync(companyId, "Engineering");
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/audience",
+            new { AudienceDepartmentIds = new[] { departmentId } });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<AudiencePayload>();
+        Assert.Equal([departmentId], payload!.AudienceDepartmentIds);
+        Assert.Equal("Departments: Engineering", payload.AudienceDescription);
+    }
+
+    [Fact]
+    public async Task UpdateAudience_Returns_NotFound_When_Department_Does_Not_Exist()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/audience",
+            new { AudienceDepartmentIds = new[] { Guid.NewGuid() } });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    private sealed record AudiencePayload(
+        Guid Id, Guid CompanyId,
+        IReadOnlyList<Guid> AudienceDepartmentIds, IReadOnlyList<Guid> AudienceLocationIds,
+        IReadOnlyList<Guid> AudiencePositionProfileIds, IReadOnlyList<Guid> AudienceEmployeeIds,
+        string AudienceDescription);
+
+    // Seeds a Department directly via the Employees module's DbContext — there is no lighter-
+    // weight way to get a real, existence-checkable department id into an integration test.
+    private async Task<Guid> SeedDepartmentAsync(Guid companyId, string name)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Employees.Persistence.EmployeesDbContext>();
+        var department = HR.Modules.Employees.Domain.Department.Create(Guid.NewGuid(), companyId, name, null, DateTimeOffset.UtcNow);
+        db.Departments.Add(department);
+        await db.SaveChangesAsync();
+        return department.Id;
+    }
+
     // Directly flips a document to Published via the DbContext — there is no Publish endpoint
     // yet (a known, flagged gap), so integration tests that need a Published document have no
     // way to get there through the API.
@@ -530,8 +609,7 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         doc.Publish(Guid.NewGuid(), DateTimeOffset.UtcNow);
         if (requiresAcknowledgement)
         {
-            doc.UpdateDetails(doc.Title, doc.Description, doc.CategoryId, doc.EffectiveDate, doc.ReviewDate,
-                doc.AudienceDepartmentId, doc.AudienceLocationId, true, Guid.NewGuid(), DateTimeOffset.UtcNow);
+            doc.SetRequiresAcknowledgement(true, Guid.NewGuid(), DateTimeOffset.UtcNow);
         }
         await db.SaveChangesAsync();
     }

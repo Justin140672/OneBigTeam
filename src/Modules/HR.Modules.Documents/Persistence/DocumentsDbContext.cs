@@ -20,6 +20,7 @@ internal class DocumentsDbContext : DbContext
     public DbSet<CompanyDocumentCategory> CompanyDocumentCategories => Set<CompanyDocumentCategory>();
     public DbSet<SharedCompanyDocumentVersion> SharedCompanyDocumentVersions => Set<SharedCompanyDocumentVersion>();
     public DbSet<SharedCompanyDocumentAcknowledgement> SharedCompanyDocumentAcknowledgements => Set<SharedCompanyDocumentAcknowledgement>();
+    public DbSet<SharedCompanyDocumentAudienceRule> SharedCompanyDocumentAudienceRules => Set<SharedCompanyDocumentAudienceRule>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

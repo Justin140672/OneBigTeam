@@ -18,6 +18,7 @@ using HR.Modules.Documents.Features.GetPublishedSharedCompanyDocument;
 using HR.Modules.Documents.Features.DownloadSharedCompanyDocument;
 using HR.Modules.Documents.Features.AcknowledgeSharedCompanyDocument;
 using HR.Modules.Documents.Features.UpdateSharedCompanyDocumentMetadata;
+using HR.Modules.Documents.Features.UpdateSharedCompanyDocumentAudience;
 using HR.Modules.Documents.Features.DeleteEmployeeDocument;
 using HR.Modules.Documents.Features.DownloadEmployeeDocument;
 using HR.Modules.Documents.Features.GetEmployeeDocument;
@@ -127,6 +128,13 @@ public static class DocumentsModule
 
         services.AddScoped<UpdateSharedCompanyDocumentMetadataHandler>();
         services.AddScoped<IValidator<UpdateSharedCompanyDocumentMetadataRequest>, UpdateSharedCompanyDocumentMetadataValidator>();
+
+        services.AddScoped<UpdateSharedCompanyDocumentAudienceHandler>();
+        services.AddScoped<IValidator<UpdateSharedCompanyDocumentAudienceRequest>, UpdateSharedCompanyDocumentAudienceValidator>();
+
+        services.AddScoped<SharedCompanyDocumentAudienceRuleBuilder>();
+        services.AddScoped<SharedCompanyDocumentAudienceMatcher>();
+        services.AddScoped<SharedCompanyDocumentAudienceDescriber>();
 
         services.AddScoped<UploadEmployeeDocumentHandler>();
         services.AddScoped<IValidator<UploadEmployeeDocumentRequest>, UploadEmployeeDocumentValidator>();

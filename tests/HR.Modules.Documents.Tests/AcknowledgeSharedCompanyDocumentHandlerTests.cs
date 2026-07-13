@@ -1,6 +1,7 @@
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.AcknowledgeSharedCompanyDocument;
 using HR.Modules.Documents.Persistence;
+using HR.Modules.Documents.Services;
 using HR.Modules.Documents.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,7 +22,7 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, null, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
+            null, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
@@ -48,7 +49,7 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, null, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
+            null, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
@@ -73,7 +74,7 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, null, null, requiresAcknowledgement: false, Guid.NewGuid(), Now);
+            null, null, requiresAcknowledgement: false, Guid.NewGuid(), Now);
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
@@ -94,7 +95,7 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, null, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
+            null, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -117,11 +118,14 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, departmentId, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
+            null, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
+        db.SharedCompanyDocumentAudienceRules.Add(SharedCompanyDocumentAudienceRule.Create(
+            Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId));
         await db.SaveChangesAsync();
 
+        // Caller has no seeded audience entry, so their department is null — doesn't match.
         var result = await Handler(db).HandleAsync(
             new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id }, caller,
             CancellationToken.None);
@@ -140,7 +144,7 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
-            null, null, null, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
+            null, null, requiresAcknowledgement: true, Guid.NewGuid(), Now);
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
@@ -165,7 +169,7 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
 
     private static AcknowledgeSharedCompanyDocumentHandler Handler(
         DocumentsDbContext db, FakeEmployeeAudienceReader? audienceReader = null) =>
-        new(db, audienceReader ?? new FakeEmployeeAudienceReader(), new FakeClock(FixedUtcNow));
+        new(db, new SharedCompanyDocumentAudienceMatcher(db, audienceReader ?? new FakeEmployeeAudienceReader()), new FakeClock(FixedUtcNow));
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

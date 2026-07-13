@@ -39,8 +39,8 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
 
         // Snapshot the editable fields before mutating, so the audit event only fires — and only
         // describes — an actual change. Audience/acknowledgement are intentionally excluded from
-        // both the snapshot and the request: they aren't in the "Editable fields" list, so this
-        // handler passes the document's existing values straight back through UpdateDetails.
+        // the snapshot: they aren't in the "Editable fields" list — audience now has its own
+        // dedicated endpoint (UpdateSharedCompanyDocumentAudience).
         var before = new
         {
             document.Title,
@@ -65,9 +65,6 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
             request.CategoryId,
             request.EffectiveDate,
             request.ReviewDate,
-            document.AudienceDepartmentId,
-            document.AudienceLocationId,
-            document.RequiresAcknowledgement,
             updatedBy,
             now);
 

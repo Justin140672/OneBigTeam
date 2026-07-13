@@ -142,6 +142,10 @@ public sealed record SharedCompanyDocumentDetailResponse(
     DateOnly? EffectiveDate,
     DateOnly? ReviewDate,
     string AudienceDescription,
+    IReadOnlyList<Guid> AudienceDepartmentIds,
+    IReadOnlyList<Guid> AudienceLocationIds,
+    IReadOnlyList<Guid> AudiencePositionProfileIds,
+    IReadOnlyList<Guid> AudienceEmployeeIds,
     bool RequiresAcknowledgement,
     AcknowledgementProgressModel? AcknowledgementProgress,
     IReadOnlyList<SharedCompanyDocumentVersionModel> VersionHistory,
@@ -199,6 +203,23 @@ public sealed record UpdateSharedCompanyDocumentMetadataResponseModel(
     DateOnly? ReviewDate,
     Guid UpdatedBy,
     DateTimeOffset UpdatedAt);
+
+public sealed record UpdateSharedCompanyDocumentAudienceRequest(
+    Guid CompanyId,
+    Guid DocumentId,
+    IReadOnlyList<Guid> AudienceDepartmentIds,
+    IReadOnlyList<Guid> AudienceLocationIds,
+    IReadOnlyList<Guid> AudiencePositionProfileIds,
+    IReadOnlyList<Guid> AudienceEmployeeIds);
+
+public sealed record UpdateSharedCompanyDocumentAudienceResponseModel(
+    Guid Id,
+    Guid CompanyId,
+    IReadOnlyList<Guid> AudienceDepartmentIds,
+    IReadOnlyList<Guid> AudienceLocationIds,
+    IReadOnlyList<Guid> AudiencePositionProfileIds,
+    IReadOnlyList<Guid> AudienceEmployeeIds,
+    string AudienceDescription);
 
 public enum DocumentExpiryStatus
 {

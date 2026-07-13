@@ -12,7 +12,7 @@ internal sealed class UploadSharedCompanyDocumentHandler(
     IDocumentStorageService storage,
     IFileUploadValidator fileValidator,
     IVirusScanService virusScanner,
-    IEmployeeAudienceReader audienceReader,
+    SharedCompanyDocumentAudienceRuleBuilder audienceRuleBuilder,
     IClock clock)
 {
     public async Task<Result<UploadSharedCompanyDocumentResponse>> HandleAsync(
@@ -54,25 +54,21 @@ internal sealed class UploadSharedCompanyDocumentHandler(
                 Error.NotFound($"Document category '{request.CategoryId}' was not found."));
         }
 
-        if (request.AudienceDepartmentId is not null && request.AudienceLocationId is not null)
-        {
-            return Result.Failure<UploadSharedCompanyDocumentResponse>(
-                Error.Validation("A document's audience can be scoped to a department or a location, not both."));
-        }
+        // The document doesn't exist yet, but audience rules need its id as their foreign key —
+        // generate it up front rather than after SaveChanges.
+        var documentId = Guid.NewGuid();
 
-        if (request.AudienceDepartmentId is not null &&
-            !await audienceReader.DepartmentExistsAsync(request.CompanyId, request.AudienceDepartmentId.Value, cancellationToken))
-        {
-            return Result.Failure<UploadSharedCompanyDocumentResponse>(
-                Error.NotFound($"Department '{request.AudienceDepartmentId}' was not found."));
-        }
+        var ruleBuildResult = await audienceRuleBuilder.BuildAsync(
+            request.CompanyId,
+            documentId,
+            request.AudienceDepartmentIds,
+            request.AudienceLocationIds,
+            request.AudiencePositionProfileIds,
+            request.AudienceEmployeeIds,
+            cancellationToken);
 
-        if (request.AudienceLocationId is not null &&
-            !await audienceReader.LocationExistsAsync(request.CompanyId, request.AudienceLocationId.Value, cancellationToken))
-        {
-            return Result.Failure<UploadSharedCompanyDocumentResponse>(
-                Error.NotFound($"Location '{request.AudienceLocationId}' was not found."));
-        }
+        if (ruleBuildResult.IsFailure)
+            return Result.Failure<UploadSharedCompanyDocumentResponse>(ruleBuildResult.Error);
 
         await using var fileStream = file.OpenReadStream();
 
@@ -105,7 +101,7 @@ internal sealed class UploadSharedCompanyDocumentHandler(
         // Always created as a Draft — SharedCompanyDocument.Create hard-codes this, publishing
         // is a separate, explicit action (shared-document:publish).
         var document = SharedCompanyDocument.Create(
-            Guid.NewGuid(),
+            documentId,
             request.CompanyId,
             request.Title,
             request.Description,
@@ -116,8 +112,6 @@ internal sealed class UploadSharedCompanyDocumentHandler(
             file.ContentType,
             request.EffectiveDate,
             request.ReviewDate,
-            request.AudienceDepartmentId,
-            request.AudienceLocationId,
             request.RequiresAcknowledgement,
             uploadedBy,
             now);
@@ -138,6 +132,7 @@ internal sealed class UploadSharedCompanyDocumentHandler(
 
         db.SharedCompanyDocuments.Add(document);
         db.SharedCompanyDocumentVersions.Add(version);
+        db.SharedCompanyDocumentAudienceRules.AddRange(ruleBuildResult.Value!);
 
         try
         {
@@ -163,8 +158,10 @@ internal sealed class UploadSharedCompanyDocumentHandler(
             document.Status.ToString(),
             document.EffectiveDate,
             document.ReviewDate,
-            document.AudienceDepartmentId,
-            document.AudienceLocationId,
+            request.AudienceDepartmentIds,
+            request.AudienceLocationIds,
+            request.AudiencePositionProfileIds,
+            request.AudienceEmployeeIds,
             document.RequiresAcknowledgement,
             document.CreatedBy,
             document.CreatedAt));

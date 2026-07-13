@@ -1,6 +1,8 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.DownloadSharedCompanyDocument;
 using HR.Modules.Documents.Persistence;
+using HR.Modules.Documents.Services;
 using HR.Modules.Documents.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,7 +20,7 @@ public class DownloadSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, null, null, false, Guid.NewGuid(), Now);
+            null, null, false, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -38,7 +40,7 @@ public class DownloadSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, null, null, false, Guid.NewGuid(), Now);
+            null, null, false, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -57,14 +59,20 @@ public class DownloadSharedCompanyDocumentHandlerTests
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);
         var caller     = Guid.NewGuid();
+        var departmentId = Guid.NewGuid();
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, null, null, false, Guid.NewGuid(), Now);
+            null, null, false, Guid.NewGuid(), Now);
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
+        db.SharedCompanyDocumentAudienceRules.Add(SharedCompanyDocumentAudienceRule.Create(
+            Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId));
         await db.SaveChangesAsync();
 
-        var result = await Handler(db).HandleAsync(
+        var audienceReader = new FakeEmployeeAudienceReader();
+        audienceReader.EmployeeAudiences[caller] = new EmployeeAudienceProfile(departmentId, null, null);
+
+        var result = await Handler(db, audienceReader: audienceReader).HandleAsync(
             new DownloadSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
             caller, callerCanManage: false, CancellationToken.None);
 
@@ -81,9 +89,11 @@ public class DownloadSharedCompanyDocumentHandlerTests
         var departmentId  = Guid.NewGuid();
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, departmentId, null, false, Guid.NewGuid(), Now);
+            null, null, false, Guid.NewGuid(), Now);
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
+        db.SharedCompanyDocumentAudienceRules.Add(SharedCompanyDocumentAudienceRule.Create(
+            Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId));
         await db.SaveChangesAsync();
 
         // Caller has no seeded audience entry, so their department is null — doesn't match.
@@ -117,7 +127,7 @@ public class DownloadSharedCompanyDocumentHandlerTests
         var downloader = Guid.NewGuid();
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Remote Working Policy", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, null, null, false, Guid.NewGuid(), Now);
+            null, null, false, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -143,7 +153,7 @@ public class DownloadSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, null, null, false, Guid.NewGuid(), Now);
+            null, null, false, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -164,7 +174,7 @@ public class DownloadSharedCompanyDocumentHandlerTests
         FakeAuditPublisher? auditPublisher = null) =>
         new(db,
             storage ?? new FakeDocumentStorageService(),
-            audienceReader ?? new FakeEmployeeAudienceReader(),
+            new SharedCompanyDocumentAudienceMatcher(db, audienceReader ?? new FakeEmployeeAudienceReader()),
             auditPublisher ?? new FakeAuditPublisher(),
             new FakeClock(FixedUtcNow));
 

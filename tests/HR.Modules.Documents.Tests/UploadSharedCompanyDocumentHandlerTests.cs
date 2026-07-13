@@ -29,7 +29,7 @@ public class UploadSharedCompanyDocumentHandlerTests
             storage ?? new FakeDocumentStorageService(),
             new FileUploadValidator(Options.Create(options ?? new FileUploadOptions())),
             scanner ?? new FakeVirusScanService(),
-            audienceReader ?? new FakeEmployeeAudienceReader(),
+            new SharedCompanyDocumentAudienceRuleBuilder(audienceReader ?? new FakeEmployeeAudienceReader()),
             new FakeClock(FixedUtcNow));
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
@@ -69,21 +69,25 @@ public class UploadSharedCompanyDocumentHandlerTests
         string? description    = null,
         DateOnly? effectiveDate = null,
         DateOnly? reviewDate    = null,
-        Guid? audienceDepartmentId = null,
-        Guid? audienceLocationId   = null,
+        Guid[]? audienceDepartmentIds = null,
+        Guid[]? audienceLocationIds   = null,
+        Guid[]? audiencePositionProfileIds = null,
+        Guid[]? audienceEmployeeIds = null,
         bool requiresAcknowledgement = false) =>
         new()
         {
-            CompanyId               = companyId,
-            CategoryId              = categoryId,
-            Title                   = title,
-            Description             = description,
-            EffectiveDate           = effectiveDate,
-            ReviewDate              = reviewDate,
-            AudienceDepartmentId    = audienceDepartmentId,
-            AudienceLocationId      = audienceLocationId,
-            RequiresAcknowledgement = requiresAcknowledgement,
-            File                    = file ?? FakePdfFile(),
+            CompanyId                  = companyId,
+            CategoryId                 = categoryId,
+            Title                      = title,
+            Description                = description,
+            EffectiveDate              = effectiveDate,
+            ReviewDate                 = reviewDate,
+            AudienceDepartmentIds      = audienceDepartmentIds ?? [],
+            AudienceLocationIds        = audienceLocationIds ?? [],
+            AudiencePositionProfileIds = audiencePositionProfileIds ?? [],
+            AudienceEmployeeIds        = audienceEmployeeIds ?? [],
+            RequiresAcknowledgement    = requiresAcknowledgement,
+            File                       = file ?? FakePdfFile(),
         };
 
     [Fact]
@@ -404,36 +408,62 @@ public class UploadSharedCompanyDocumentHandlerTests
         var handler         = BuildHandler(db, audienceReader: audienceReader);
 
         var result = await handler.HandleAsync(
-            BuildRequest(companyId, category.Id, audienceDepartmentId: departmentId, requiresAcknowledgement: true),
+            BuildRequest(companyId, category.Id, audienceDepartmentIds: [departmentId], requiresAcknowledgement: true),
             Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(departmentId, result.Value!.AudienceDepartmentId);
-        Assert.Null(result.Value.AudienceLocationId);
+        Assert.Equal([departmentId], result.Value!.AudienceDepartmentIds);
+        Assert.Empty(result.Value.AudienceLocationIds);
+        Assert.Empty(result.Value.AudiencePositionProfileIds);
+        Assert.Empty(result.Value.AudienceEmployeeIds);
         Assert.True(result.Value.RequiresAcknowledgement);
+
+        var savedRules = await db.SharedCompanyDocumentAudienceRules.ToListAsync();
+        Assert.Single(savedRules);
+        Assert.Equal(SharedCompanyDocumentAudienceRuleType.Department, savedRules[0].RuleType);
+        Assert.Equal(departmentId, savedRules[0].TargetId);
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_Validation_When_Both_Department_And_Location_Audience_Set()
+    public async Task HandleAsync_Accepts_Multiple_Departments_Locations_Positions_And_Employees_Together()
     {
+        // The audience is OR'd, not exclusive — combining every rule type at once is valid.
         await using var db = BuildContext();
         var companyId      = Guid.NewGuid();
         var category       = await SeedCategory(db, companyId);
-        var departmentId   = Guid.NewGuid();
-        var locationId     = Guid.NewGuid();
+        var dept1 = Guid.NewGuid();
+        var dept2 = Guid.NewGuid();
+        var loc1  = Guid.NewGuid();
+        var pos1  = Guid.NewGuid();
+        var emp1  = Guid.NewGuid();
+
         var audienceReader = new FakeEmployeeAudienceReader();
-        audienceReader.ExistingDepartmentIds.Add(departmentId);
-        audienceReader.ExistingLocationIds.Add(locationId);
+        audienceReader.ExistingDepartmentIds.Add(dept1);
+        audienceReader.ExistingDepartmentIds.Add(dept2);
+        audienceReader.ExistingLocationIds.Add(loc1);
+        audienceReader.ExistingPositionProfileIds.Add(pos1);
+        audienceReader.ExistingEmployeeIds.Add(emp1);
         var handler = BuildHandler(db, audienceReader: audienceReader);
 
         var result = await handler.HandleAsync(
-            BuildRequest(companyId, category.Id, audienceDepartmentId: departmentId, audienceLocationId: locationId),
+            BuildRequest(
+                companyId, category.Id,
+                audienceDepartmentIds: [dept1, dept2],
+                audienceLocationIds: [loc1],
+                audiencePositionProfileIds: [pos1],
+                audienceEmployeeIds: [emp1]),
             Guid.NewGuid(),
             CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("validation", result.Error.Code);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value!.AudienceDepartmentIds.Count);
+        Assert.Single(result.Value.AudienceLocationIds);
+        Assert.Single(result.Value.AudiencePositionProfileIds);
+        Assert.Single(result.Value.AudienceEmployeeIds);
+
+        var savedRules = await db.SharedCompanyDocumentAudienceRules.ToListAsync();
+        Assert.Equal(5, savedRules.Count);
     }
 
     [Fact]
@@ -445,7 +475,41 @@ public class UploadSharedCompanyDocumentHandlerTests
         var handler        = BuildHandler(db, audienceReader: new FakeEmployeeAudienceReader());
 
         var result = await handler.HandleAsync(
-            BuildRequest(companyId, category.Id, audienceDepartmentId: Guid.NewGuid()),
+            BuildRequest(companyId, category.Id, audienceDepartmentIds: [Guid.NewGuid()]),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_AudiencePosition_Does_Not_Exist()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var handler        = BuildHandler(db, audienceReader: new FakeEmployeeAudienceReader());
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, category.Id, audiencePositionProfileIds: [Guid.NewGuid()]),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_AudienceEmployee_Does_Not_Exist()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var handler        = BuildHandler(db, audienceReader: new FakeEmployeeAudienceReader());
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, category.Id, audienceEmployeeIds: [Guid.NewGuid()]),
             Guid.NewGuid(),
             CancellationToken.None);
 

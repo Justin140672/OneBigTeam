@@ -1,5 +1,6 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Persistence;
+using HR.Modules.Documents.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,7 +9,8 @@ namespace HR.Modules.Documents.Features.GetSharedCompanyDocument;
 internal sealed class GetSharedCompanyDocumentHandler(
     DocumentsDbContext db,
     IEmployeeNameReader employeeNameReader,
-    IEmployeeAudienceReader audienceReader)
+    SharedCompanyDocumentAudienceMatcher audienceMatcher,
+    SharedCompanyDocumentAudienceDescriber audienceDescriber)
 {
     public async Task<Result<GetSharedCompanyDocumentResponse>> HandleAsync(
         GetSharedCompanyDocumentRequest request,
@@ -46,13 +48,16 @@ internal sealed class GetSharedCompanyDocumentHandler(
                 v.CreatedAt))
             .ToList();
 
-        var audienceDescription = await DescribeAudienceAsync(request.CompanyId, document.AudienceDepartmentId, document.AudienceLocationId, cancellationToken);
+        var (audienceDepartmentIds, audienceLocationIds, audiencePositionProfileIds, audienceEmployeeIds) =
+            await audienceMatcher.GetRuleTargetsByTypeAsync(document.Id, cancellationToken);
+
+        var audienceDescription = await audienceDescriber.DescribeAsync(
+            request.CompanyId, audienceDepartmentIds, audienceLocationIds, audiencePositionProfileIds, audienceEmployeeIds, cancellationToken);
 
         AcknowledgementProgressInfo? acknowledgementProgress = null;
         if (document.RequiresAcknowledgement)
         {
-            var eligibleIds = await audienceReader.GetEligibleEmployeeIdsAsync(
-                request.CompanyId, document.AudienceDepartmentId, document.AudienceLocationId, cancellationToken);
+            var eligibleIds = await audienceMatcher.GetEligibleEmployeeIdsAsync(request.CompanyId, document.Id, cancellationToken);
 
             var acknowledgedEmployeeIds = await db.SharedCompanyDocumentAcknowledgements
                 .AsNoTracking()
@@ -87,6 +92,10 @@ internal sealed class GetSharedCompanyDocumentHandler(
             document.EffectiveDate,
             document.ReviewDate,
             audienceDescription,
+            audienceDepartmentIds,
+            audienceLocationIds,
+            audiencePositionProfileIds,
+            audienceEmployeeIds,
             document.RequiresAcknowledgement,
             acknowledgementProgress,
             versionHistory,
@@ -94,23 +103,5 @@ internal sealed class GetSharedCompanyDocumentHandler(
             document.CreatedAt,
             namesLookup.TryGetValue(document.UpdatedBy, out var updatedByName) ? updatedByName : "Unknown",
             document.UpdatedAt));
-    }
-
-    private async Task<string> DescribeAudienceAsync(
-        Guid companyId, Guid? departmentId, Guid? locationId, CancellationToken cancellationToken)
-    {
-        if (departmentId is not null)
-        {
-            var name = await audienceReader.GetDepartmentNameAsync(companyId, departmentId.Value, cancellationToken);
-            return $"Department: {name ?? "Unknown"}";
-        }
-
-        if (locationId is not null)
-        {
-            var name = await audienceReader.GetLocationNameAsync(companyId, locationId.Value, cancellationToken);
-            return $"Location: {name ?? "Unknown"}";
-        }
-
-        return "All Employees";
     }
 }
