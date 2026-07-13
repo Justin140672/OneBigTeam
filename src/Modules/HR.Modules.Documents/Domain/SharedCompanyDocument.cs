@@ -35,6 +35,12 @@ internal sealed class SharedCompanyDocument
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    // Distinct from CreatedBy/CreatedAt and UpdatedBy/UpdatedAt: those change on every edit, so
+    // without a dedicated pair here "who published this and when" would be silently overwritten
+    // by the next metadata or audience change.
+    public Guid? PublishedBy { get; private set; }
+    public DateTimeOffset? PublishedAt { get; private set; }
+
     public static SharedCompanyDocument Create(
         Guid id,
         Guid companyId,
@@ -119,11 +125,13 @@ internal sealed class SharedCompanyDocument
         UpdatedAt = now;
     }
 
-    public void Publish(Guid updatedBy, DateTimeOffset now)
+    public void Publish(Guid publishedBy, DateTimeOffset now)
     {
-        Status    = SharedCompanyDocumentStatus.Published;
-        UpdatedBy = updatedBy;
-        UpdatedAt = now;
+        Status      = SharedCompanyDocumentStatus.Published;
+        PublishedBy = publishedBy;
+        PublishedAt = now;
+        UpdatedBy   = publishedBy;
+        UpdatedAt   = now;
     }
 
     public void Archive(Guid updatedBy, DateTimeOffset now)

@@ -586,6 +586,86 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         IReadOnlyList<Guid> AudiencePositionProfileIds, IReadOnlyList<Guid> AudienceEmployeeIds,
         string AudienceDescription);
 
+    // ── PublishSharedCompanyDocument ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task Publish_Returns_Forbidden_For_Manager()
+    {
+        var companyId = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var managerId  = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+
+        using var managerClient = ClientAs(companyId, managerId);
+        var response = await managerClient.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/publish", null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Publish_Succeeds_For_HrAdministrator_And_Changes_Status_To_Published()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Remote Working Policy");
+
+        var response = await client.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/publish", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<PublishPayload>();
+        Assert.Equal("Published", payload!.Status);
+        Assert.Equal(userId, payload.PublishedBy);
+
+        // A published document is now visible to employees via the published-list endpoint.
+        var employeeId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
+        using var employeeClient = ClientAs(companyId, employeeId);
+        var list = await employeeClient.GetFromJsonAsync<ListPayload>($"/api/companies/{companyId}/shared-documents/published");
+        Assert.Contains(list!.Items, i => i.Title == "Remote Working Policy");
+    }
+
+    [Fact]
+    public async Task Publish_Returns_Conflict_When_Document_Already_Published()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId);
+
+        await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}/publish", null);
+        var response = await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/publish", null);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Publish_Returns_NotFound_For_Unknown_Document()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        var response = await client.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/publish", null);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    private sealed record PublishPayload(Guid Id, string Status, Guid PublishedBy, DateTimeOffset PublishedAt);
+
     // Seeds a Department directly via the Employees module's DbContext — there is no lighter-
     // weight way to get a real, existence-checkable department id into an integration test.
     private async Task<Guid> SeedDepartmentAsync(Guid companyId, string name)

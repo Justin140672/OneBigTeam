@@ -28,7 +28,9 @@ internal sealed record GetSharedCompanyDocumentResponse(
     string CreatedByName,
     DateTimeOffset CreatedAt,
     string UpdatedByName,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? PublishedByName,
+    DateTimeOffset? PublishedAt);
 
 internal sealed record AcknowledgementProgressInfo(
     int AcknowledgedCount,

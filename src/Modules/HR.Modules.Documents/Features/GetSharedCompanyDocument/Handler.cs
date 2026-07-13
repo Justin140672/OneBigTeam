@@ -37,7 +37,12 @@ internal sealed class GetSharedCompanyDocumentHandler(
             .ToListAsync(cancellationToken);
 
         var uploaderIds = versions.Select(v => v.CreatedBy).Distinct().ToList();
-        var namesLookup = await employeeNameReader.GetNamesAsync(request.CompanyId, [document.CreatedBy, document.UpdatedBy, .. uploaderIds], cancellationToken);
+        var namesLookup = await employeeNameReader.GetNamesAsync(
+            request.CompanyId,
+            document.PublishedBy is { } publishedBy
+                ? [document.CreatedBy, document.UpdatedBy, publishedBy, .. uploaderIds]
+                : [document.CreatedBy, document.UpdatedBy, .. uploaderIds],
+            cancellationToken);
 
         var versionHistory = versions
             .Select(v => new SharedCompanyDocumentVersionItem(
@@ -102,6 +107,8 @@ internal sealed class GetSharedCompanyDocumentHandler(
             namesLookup.TryGetValue(document.CreatedBy, out var createdByName) ? createdByName : "Unknown",
             document.CreatedAt,
             namesLookup.TryGetValue(document.UpdatedBy, out var updatedByName) ? updatedByName : "Unknown",
-            document.UpdatedAt));
+            document.UpdatedAt,
+            document.PublishedBy is { } pubBy ? (namesLookup.TryGetValue(pubBy, out var publishedByName) ? publishedByName : "Unknown") : null,
+            document.PublishedAt));
     }
 }

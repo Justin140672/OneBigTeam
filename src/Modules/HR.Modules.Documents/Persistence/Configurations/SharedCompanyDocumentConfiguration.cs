@@ -88,6 +88,12 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
             .HasColumnName("updated_at")
             .IsRequired();
 
+        builder.Property(d => d.PublishedBy)
+            .HasColumnName("published_by");
+
+        builder.Property(d => d.PublishedAt)
+            .HasColumnName("published_at");
+
         builder.HasOne<CompanyDocumentCategory>()
             .WithMany()
             .HasForeignKey(d => d.CategoryId)

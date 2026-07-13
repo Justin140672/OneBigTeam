@@ -152,7 +152,9 @@ public sealed record SharedCompanyDocumentDetailResponse(
     string CreatedByName,
     DateTimeOffset CreatedAt,
     string UpdatedByName,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? PublishedByName,
+    DateTimeOffset? PublishedAt);
 
 public sealed record AcknowledgementProgressModel(
     int AcknowledgedCount,
@@ -220,6 +222,15 @@ public sealed record UpdateSharedCompanyDocumentAudienceResponseModel(
     IReadOnlyList<Guid> AudiencePositionProfileIds,
     IReadOnlyList<Guid> AudienceEmployeeIds,
     string AudienceDescription);
+
+public sealed record PublishSharedCompanyDocumentResponseModel(
+    Guid Id,
+    Guid CompanyId,
+    string Title,
+    string Status,
+    Guid PublishedBy,
+    DateTimeOffset PublishedAt,
+    int AcknowledgementTasksCreated);
 
 public enum DocumentExpiryStatus
 {
