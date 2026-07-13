@@ -9,7 +9,7 @@ internal sealed class Endpoint(UpdateCompanyDocumentCategoryHandler handler)
     public override void Configure()
     {
         Put("/api/companies/{companyId:guid}/document-categories/{categoryId:guid}");
-        Policies("employee:manage");
+        Policies("shared-document:manage");
     }
 
     public override async Task HandleAsync(

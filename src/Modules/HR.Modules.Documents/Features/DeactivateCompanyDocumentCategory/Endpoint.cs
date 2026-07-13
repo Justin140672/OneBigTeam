@@ -9,7 +9,7 @@ internal sealed class Endpoint(DeactivateCompanyDocumentCategoryHandler handler)
     public override void Configure()
     {
         Delete("/api/companies/{companyId:guid}/document-categories/{categoryId:guid}");
-        Policies("employee:manage");
+        Policies("shared-document:manage");
     }
 
     public override async Task HandleAsync(

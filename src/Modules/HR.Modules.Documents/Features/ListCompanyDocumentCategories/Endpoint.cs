@@ -9,7 +9,7 @@ internal sealed class Endpoint(ListCompanyDocumentCategoriesHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/document-categories");
-        Policies("authenticated");
+        Policies("shared-document:view-published");
     }
 
     public override async Task HandleAsync(

@@ -120,6 +120,34 @@ public static class IdentityModule
             SystemRoles.Recruiter,
             SystemRoles.HrAdministrator));
 
+        // Shared company document domain policies (documents owned by the company as a whole,
+        // e.g. policies/handbooks — distinct from an employee's own document records).
+        //
+        // Viewing published documents is broad by design, same reasoning as recruitment:view —
+        // any real employee should be able to read company policies. Managing/publishing/
+        // archiving/acknowledgement-status stay HR-only: Company Administrator does NOT
+        // automatically get access here (same non-overlap rule as employee:manage/company:manage
+        // above — a Company Administrator needs the HrAdministrator role too, not just
+        // CompanyAdministrator, to manage these), and Manager does not automatically get manage
+        // rights either, unlike leave:approve/probation:review/sickness:review.
+        builder.AddPolicy("shared-document:view-published", RolePolicy(
+            SystemRoles.Employee,
+            SystemRoles.Manager,
+            SystemRoles.Recruiter,
+            SystemRoles.HrAdministrator));
+
+        builder.AddPolicy("shared-document:manage", RolePolicy(
+            SystemRoles.HrAdministrator));
+
+        builder.AddPolicy("shared-document:publish", RolePolicy(
+            SystemRoles.HrAdministrator));
+
+        builder.AddPolicy("shared-document:archive", RolePolicy(
+            SystemRoles.HrAdministrator));
+
+        builder.AddPolicy("shared-document:view-acknowledgement-status", RolePolicy(
+            SystemRoles.HrAdministrator));
+
         return builder;
     }
 
