@@ -1,7 +1,7 @@
 @inject VacancyService VacancyService
 @inject AppSession Session
 
-@if (Session.CanManageEmployees)
+@if (Session.CanManageEmployees || Session.IsRecruiter)
 {
     <div class="widget-card chart-tile">
         <div class="widget-header">
@@ -76,7 +76,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (!Session.CanManageEmployees)
+        if (!Session.CanManageEmployees && !Session.IsRecruiter)
         {
             _loading = false;
             return;

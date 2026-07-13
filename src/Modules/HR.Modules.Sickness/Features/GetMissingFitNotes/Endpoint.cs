@@ -9,7 +9,10 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/sickness-evidence-requests/missing");
-        Policies("sickness:manage");
+        // "sickness:review" (Manager + HrAdministrator) rather than "sickness:manage"
+        // (HrAdministrator only) — this company-wide read is what backs
+        // MissingFitNotesWidget, shown on both the HR and Manager dashboards.
+        Policies("sickness:review");
     }
 
     public override async Task HandleAsync(

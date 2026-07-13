@@ -14,7 +14,8 @@ internal sealed class UploadMyProfilePhotoHandler(
     IVirusScanService virusScanner,
     ITaskCreator taskCreator,
     IClock clock,
-    IAuditEventPublisher auditPublisher)
+    IAuditEventPublisher auditPublisher,
+    IEmployeeNameReader employeeNameReader)
 {
     public async Task<Result<UploadMyProfilePhotoResponse>> HandleAsync(
         UploadMyProfilePhotoRequest request,
@@ -100,10 +101,13 @@ internal sealed class UploadMyProfilePhotoHandler(
             try { await storage.DeleteAsync(oldStorageKey, cancellationToken); } catch { }
         }
 
+        var names = await employeeNameReader.GetNamesAsync(request.CompanyId, [employeeId], cancellationToken);
+        var employeeName = names.TryGetValue(employeeId, out var name) ? name : "an employee";
+
         await taskCreator.CreateAsync(
             request.CompanyId,
             createdBy:          employeeId,
-            title:              $"Review profile photo — {employeeId}",
+            title:              $"Review profile photo — {employeeName}",
             description:        "An employee has submitted a new profile photo for review.",
             priority:           TaskPriority.Low,
             source:             TaskSource.Document,

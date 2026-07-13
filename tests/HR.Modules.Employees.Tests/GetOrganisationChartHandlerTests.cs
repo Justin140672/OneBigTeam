@@ -1,6 +1,7 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.GetOrganisationChart;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Tests;
@@ -15,7 +16,7 @@ public class GetOrganisationChartHandlerTests
     public async Task HandleAsync_Returns_Empty_When_No_Employees()
     {
         await using var context = BuildContext();
-        var handler = new GetOrganisationChartHandler(context);
+        var handler = new GetOrganisationChartHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new GetOrganisationChartRequest { CompanyId = Guid.NewGuid() },
@@ -43,7 +44,7 @@ public class GetOrganisationChartHandlerTests
         context.Employees.AddRange(mine, other);
         await context.SaveChangesAsync();
 
-        var handler = new GetOrganisationChartHandler(context);
+        var handler = new GetOrganisationChartHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new GetOrganisationChartRequest { CompanyId = companyId },
@@ -79,7 +80,7 @@ public class GetOrganisationChartHandlerTests
         context.Employees.AddRange(draft, active, terminated);
         await context.SaveChangesAsync();
 
-        var handler = new GetOrganisationChartHandler(context);
+        var handler = new GetOrganisationChartHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new GetOrganisationChartRequest { CompanyId = companyId },
@@ -141,7 +142,7 @@ public class GetOrganisationChartHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new GetOrganisationChartHandler(context);
+        var handler = new GetOrganisationChartHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new GetOrganisationChartRequest { CompanyId = companyId, Status = EmploymentStatus.Active },
@@ -173,7 +174,7 @@ public class GetOrganisationChartHandlerTests
         context.Employees.AddRange(engineer, salesperson);
         await context.SaveChangesAsync();
 
-        var handler = new GetOrganisationChartHandler(context);
+        var handler = new GetOrganisationChartHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new GetOrganisationChartRequest { CompanyId = companyId, DepartmentId = engineering.Id },
@@ -208,7 +209,7 @@ public class GetOrganisationChartHandlerTests
         context.Employees.AddRange(londonEmployee, manchesterEmployee);
         await context.SaveChangesAsync();
 
-        var handler = new GetOrganisationChartHandler(context);
+        var handler = new GetOrganisationChartHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new GetOrganisationChartRequest { CompanyId = companyId, LocationId = london.Id },
@@ -241,7 +242,6 @@ public class GetOrganisationChartHandlerTests
             hasSystemAccess: true, Dob, "British", "Female", "EMP-0001", Guid.NewGuid(), department.Id, location.Id, positionProfile.Id, now);
         employee.Activate(now);
         employee.Assign(department.Id, positionProfile.Id, location.Id, manager.Id, now);
-        employee.SetProfileImage("https://example.com/alice.jpg", now);
 
         context.Departments.Add(department);
         context.LocationTypes.Add(locationType);
@@ -250,7 +250,10 @@ public class GetOrganisationChartHandlerTests
         context.Employees.AddRange(manager, employee);
         await context.SaveChangesAsync();
 
-        var handler = new GetOrganisationChartHandler(context);
+        var photoReader = new FakeProfilePhotoReader();
+        photoReader.PhotoUrls[employee.Id] = "https://example.com/alice.jpg";
+
+        var handler = new GetOrganisationChartHandler(context, photoReader);
 
         var result = await handler.HandleAsync(
             new GetOrganisationChartRequest { CompanyId = companyId },
@@ -269,6 +272,33 @@ public class GetOrganisationChartHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_ProfilePhotoUrl_Is_Null_For_Employee_Without_Live_Photo()
+    {
+        // FakeProfilePhotoReader has no entry seeded for this employee — the reader's
+        // "not found = absent" convention must surface as a null ProfilePhotoUrl, not an exception.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate,
+            hasSystemAccess: true, Dob, "British", "Female", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        employee.Activate(now);
+
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new GetOrganisationChartHandler(context, new FakeProfilePhotoReader());
+
+        var result = await handler.HandleAsync(
+            new GetOrganisationChartRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Null(item.ProfilePhotoUrl);
+    }
+
+    [Fact]
     public async Task HandleAsync_ManagerId_Is_Null_For_Employee_With_No_Manager()
     {
         await using var context = BuildContext();
@@ -282,7 +312,7 @@ public class GetOrganisationChartHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new GetOrganisationChartHandler(context);
+        var handler = new GetOrganisationChartHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new GetOrganisationChartRequest { CompanyId = companyId },

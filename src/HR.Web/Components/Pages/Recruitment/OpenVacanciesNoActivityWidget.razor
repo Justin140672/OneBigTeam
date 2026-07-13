@@ -1,0 +1,75 @@
+@inject VacancyService VacancyService
+@inject NavigationManager Navigation
+@inject AppSession Session
+
+@if (Session.CanManageEmployees || Session.IsRecruiter)
+{
+    @if (_loading)
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-hourglass-half widget-icon"></i>
+                <span class="widget-title">Stale Vacancies</span>
+            </div>
+            <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
+                <HrLoadingIndicator />
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-hourglass-half widget-icon"></i>
+                <span class="widget-title">Stale Vacancies</span>
+                @if (_items.Count > 0)
+                {
+                    <span class="widget-count-badge">@_items.Count</span>
+                }
+            </div>
+
+            <div class="widget-body">
+                @if (_items.Count == 0)
+                {
+                    <div class="widget-empty">
+                        <i class="fa-solid fa-circle-check fa-lg mb-2"></i>
+                        <p class="mb-0">No stale vacancies</p>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var item in _items.Take(6))
+                    {
+                        var vacancy = item;
+                        var url = $"/companies/{Session.CompanyId}/vacancies/{vacancy.VacancyId}";
+                        <div class="task-widget-item" @onclick="() => Navigation.NavigateTo(url)">
+                            <span class="priority-pip priority-pip--medium"></span>
+                            <div class="task-widget-content">
+                                <span class="task-widget-title">@vacancy.Title</span>
+                                <span class="task-widget-meta">No activity in @vacancy.DaysSinceActivity days</span>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private IReadOnlyList<StaleVacancyItem> _items = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.CanManageEmployees && !Session.IsRecruiter)
+        {
+            _loading = false;
+            return;
+        }
+
+        var result = await VacancyService.GetStaleVacanciesAsync(Session.CompanyId);
+        _items = result?.Items ?? [];
+        _loading = false;
+    }
+}

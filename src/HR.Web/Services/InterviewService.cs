@@ -20,6 +20,20 @@ public sealed class InterviewService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<GetUpcomingInterviewsResponse?> GetUpcomingInterviewsAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetUpcomingInterviewsResponse>(
+                $"api/companies/{companyId}/interviews/upcoming", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
     public async Task<ListInterviewsForVacancyResponse?> ListInterviewsForVacancyAsync(Guid companyId, Guid vacancyId)
     {
         try

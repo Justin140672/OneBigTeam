@@ -35,6 +35,7 @@ public static class InfrastructureModule
                 npgsql.MigrationsAssembly(typeof(AuditDbContext).Assembly.GetName().Name!);
             }));
 
+        services.AddHttpContextAccessor();
         AddProfilePhotoStorageService(services, configuration);
 
         return services;

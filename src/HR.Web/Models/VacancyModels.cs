@@ -17,6 +17,17 @@ public record VacancyListItemModel(
     DateOnly? ClosedAt,
     DateTimeOffset CreatedAt);
 
+// ── DASHBOARD: STALE VACANCIES ──────────────────────────────────────────────────
+
+public record GetStaleVacanciesResponse(IReadOnlyList<StaleVacancyItem> Items);
+
+public record StaleVacancyItem(
+    Guid VacancyId,
+    string Title,
+    DateOnly? OpenedAt,
+    DateTimeOffset? LastActivityAt,
+    int DaysSinceActivity);
+
 // ── GET ───────────────────────────────────────────────────────────────────────
 
 public record GetVacancyResponse(

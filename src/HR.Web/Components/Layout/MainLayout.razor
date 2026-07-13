@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @using HR.Web.Components.Pages.Tasks
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
@@ -21,7 +22,7 @@ else
 
     <div class="app-shell">
 
-        @if (Session.CanManageEmployees)
+        @if (ShowSidebar)
         {
             <SfSidebar Width="280px"
                        Type="SidebarType.Push"
@@ -44,77 +45,57 @@ else
                             CssClass="app-nav-menu"
                             ShowItemOnClick="true">
                         <MenuItems>
-                            <MenuItem Text="Dashboard" IconCss="fa-solid fa-house" Url="/" />
-                            <MenuItem Text="People" IconCss="fa-solid fa-users">
-                                <MenuItems>
-                                    <MenuItem Text="Employees" Url="@_menuItems["Employees"]" />
-                                    <MenuItem Text="Position Profiles" Url="@_menuItems["PositionProfiles"]" />
-                                    <MenuItem Text="Departments" Url="@_menuItems["Departments"]" />
-                                    <MenuItem Text="Location Types" Url="@_menuItems["LocationTypes"]" />
-                                    <MenuItem Text="Locations" Url="@_menuItems["Locations"]" />
-                                    <MenuItem Text="Onboarding Templates" Url="@_menuItems["OnboardingTemplates"]" />
-                                    <MenuItem Text="Employment Types" Url="@_menuItems["EmploymentTypes"]" />
-                                    <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
-                                    <MenuItem Text="Data Import" Url="@_menuItems["DataImport"]" />
-                                    <MenuItem Text="Import History" Url="@_menuItems["ImportHistory"]" />
-                                    <MenuItem Text="Organisation Chart" Url="@_menuItems["OrganisationChart"]" />
-                                </MenuItems>
-                            </MenuItem>
-                            <MenuItem Text="Assets" IconCss="fa-solid fa-box">
-                                <MenuItems>
-                                    <MenuItem Text="Assets" Url="@_menuItems["Assets"]" />
-                                    <MenuItem Text="Asset Categories" Url="@_menuItems["AssetCategories"]" />
-                                </MenuItems>
-                            </MenuItem>
-                            <MenuItem Text="Recruitment" IconCss="fa-solid fa-user-tie">
-                                <MenuItems>
-                                    <MenuItem Text="Vacancies" Url="@_menuItems["Vacancies"]" />
-                                    <MenuItem Text="Candidates" Url="@_menuItems["Candidates"]" />
-                                </MenuItems>
-                            </MenuItem>
-                            <MenuItem Text="Leave" IconCss="fa-solid fa-calendar-days">
-                                <MenuItems>
-                                    <MenuItem Text="Leave Types" Url="@_menuItems["LeaveTypes"]" />
-                                    <MenuItem Text="Leave Policies" Url="@_menuItems["LeavePolicies"]" />
-                                    <MenuItem Text="Public Holidays" Url="@_menuItems["PublicHolidays"]" />
-                                    <MenuItem Text="Sickness Categories" Url="@_menuItems["SicknessCategories"]" />
-                                </MenuItems>
-                            </MenuItem>
+                            @if (Session.CanManageEmployees)
+                            {
+                                <MenuItem Text="People" IconCss="fa-solid fa-users">
+                                    <MenuItems>
+                                        <MenuItem Text="Employees" Url="@_menuItems["Employees"]" />
+                                        <MenuItem Text="Position Profiles" Url="@_menuItems["PositionProfiles"]" />
+                                        <MenuItem Text="Departments" Url="@_menuItems["Departments"]" />
+                                        <MenuItem Text="Location Types" Url="@_menuItems["LocationTypes"]" />
+                                        <MenuItem Text="Locations" Url="@_menuItems["Locations"]" />
+                                        <MenuItem Text="Onboarding Templates" Url="@_menuItems["OnboardingTemplates"]" />
+                                        <MenuItem Text="Employment Types" Url="@_menuItems["EmploymentTypes"]" />
+                                        <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
+                                        <MenuItem Text="Data Import" Url="@_menuItems["DataImport"]" />
+                                        <MenuItem Text="Import History" Url="@_menuItems["ImportHistory"]" />
+                                        <MenuItem Text="Organisation Chart" Url="@_menuItems["OrganisationChart"]" />
+                                    </MenuItems>
+                                </MenuItem>
+                                <MenuItem Text="Assets" IconCss="fa-solid fa-box">
+                                    <MenuItems>
+                                        <MenuItem Text="Assets" Url="@_menuItems["Assets"]" />
+                                        <MenuItem Text="Asset Categories" Url="@_menuItems["AssetCategories"]" />
+                                    </MenuItems>
+                                </MenuItem>
+                                <MenuItem Text="Leave" IconCss="fa-solid fa-calendar-days">
+                                    <MenuItems>
+                                        <MenuItem Text="Leave Types" Url="@_menuItems["LeaveTypes"]" />
+                                        <MenuItem Text="Leave Policies" Url="@_menuItems["LeavePolicies"]" />
+                                        <MenuItem Text="Public Holidays" Url="@_menuItems["PublicHolidays"]" />
+                                        <MenuItem Text="Sickness Categories" Url="@_menuItems["SicknessCategories"]" />
+                                    </MenuItems>
+                                </MenuItem>
+                            }
+                            @if (Session.IsRecruiter)
+                            {
+                                <MenuItem Text="Recruitment" IconCss="fa-solid fa-user-tie">
+                                    <MenuItems>
+                                        <MenuItem Text="Vacancies" Url="@_menuItems["Vacancies"]" />
+                                        <MenuItem Text="Candidates" Url="@_menuItems["Candidates"]" />
+                                    </MenuItems>
+                                </MenuItem>
+                            }
                             @if (Session.CanManageCompany)
                             {
+                                @if (!Session.CanManageEmployees)
+                                {
+                                    <!-- Only shown here for a Company-Admin-only user: CanManageEmployees users already
+                                         have "Import History" nested under People above, so this avoids a duplicate entry. -->
+                                    <MenuItem Text="Import History" IconCss="fa-solid fa-clock-rotate-left" Url="@_menuItems["ImportHistory"]" />
+                                }
                                 <MenuItem Text="Company" IconCss="fa-solid fa-building" Url="@_menuItems["Company"]" />
                             }
-                        </MenuItems>
-                    </SfMenu>
-
-                </ChildContent>
-
-            </SfSidebar>
-        }
-        else if (Session.CanManageCompany)
-        {
-            <SfSidebar Width="280px"
-                       Type="SidebarType.Push"
-                       @bind-IsOpen="SidebarOpen"
-                       CssClass="app-sidebar">
-
-                <ChildContent>
-                    <div class="sidebar-header">
-                        <button class="sidebar-toggle" @onclick="ToggleSidebar">
-                            <i class="fa-solid fa-bars"></i>
-                        </button>
-                        @if (SidebarOpen)
-                        {
-                            <img src="/images/one-big-team-logo.png" alt="One Big Team" class="sidebar-logo" />
-                        }
-                    </div>
-
-                    <SfMenu TValue="MenuItem"
-                            Orientation="Syncfusion.Blazor.Navigations.Orientation.Vertical"
-                            CssClass="app-nav-menu"
-                            ShowItemOnClick="true">
-                        <MenuItems>
-                            <MenuItem Text="Company" IconCss="fa-solid fa-building" Url="@_menuItems["Company"]" />
                         </MenuItems>
                     </SfMenu>
 
@@ -125,13 +106,13 @@ else
 
         <main class="main-content">
             <div class="top-bar">
-                @if ((Session.CanManageEmployees || Session.CanManageCompany) && !SidebarOpen)
+                @if (ShowSidebar && !SidebarOpen)
                 {
                     <button class="mobile-menu-button" @onclick="ToggleSidebar">
                         <i class="fa-solid fa-bars"></i>
                     </button>
                 }
-                <span class="page-title">@(Session.CanManageEmployees ? "Dashboard" : Session.CanManageCompany ? "Company" : "My Profile")</span>
+                <span class="page-title">@CurrentPageTitle</span>
                 <div class="top-bar-actions">
                     <button class="theme-toggle" @onclick="ToggleTheme" title="@(IsDark ? "Switch to light mode" : "Switch to dark mode")">
                         @if (IsDark)
@@ -268,6 +249,15 @@ else
     private bool SidebarOpen { get; set; } = true;
     private bool IsDark { get; set; }
 
+    // Shown whenever the signed-in user has a role with actual menu content below — a plain
+    // Employee, and a plain Manager (whose dashboard IS their home, with no separate admin
+    // sections), get no sidebar at all, same as pre-dashboards behavior for Employees. Individual
+    // menu sections inside the sidebar are independently role-gated so combined roles (e.g. an
+    // HR Administrator who is also a Manager) merge without duplicates.
+    private bool ShowSidebar =>
+        Session.CanManageEmployees || Session.CanManageCompany ||
+        Session.IsRecruiter || Session.IsHrAdministrator;
+
     private int _unreadCount;
     private List<NotificationDto> _notifications = [];
     private bool _notifOpen;
@@ -303,6 +293,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        NavigationManager.LocationChanged += OnLocationChanged;
+
         await Session.InitialiseAsync();
 
         var companyId = Session.CompanyId;
@@ -426,5 +418,38 @@ else
     {
         IsDark = !IsDark;
         await JS.InvokeVoidAsync("setTheme", IsDark);
+    }
+
+    // Top-bar title reacts to the current route rather than just the user's role, so it stays
+    // accurate as users move between their role dashboard(s) and the Company screen. Recomputed
+    // on every render; refreshed on client-side navigation via LocationChanged below.
+    private string CurrentPageTitle => GetPageTitle(NavigationManager.Uri, Session.CanManageEmployees);
+
+    private static string GetPageTitle(string uri, bool canManageEmployees)
+    {
+        var path = new Uri(uri).AbsolutePath.Trim('/').ToLowerInvariant();
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        return path switch
+        {
+            "dashboard/hr" => "HR Dashboard",
+            "dashboard/recruitment" => "Recruitment Dashboard",
+            "dashboard/manager" => "Manager Dashboard",
+            // Company edit/view routes are "/companies/{id}/edit" or "/companies/{id}/view" —
+            // exactly 3 segments, unlike every other companies/{id}/{resource}/... route.
+            _ when segments.Length == 3 && segments[0] == "companies" && (segments[2] == "edit" || segments[2] == "view") => "Company",
+            // Every other admin subpage (Employees, Departments, Vacancies, Leave Types, etc.) keeps
+            // the pre-dashboards generic "Dashboard" title for CanManageEmployees users; everyone else
+            // (a plain Employee browsing their own linked pages) sees "My Profile".
+            _ => canManageEmployees ? "Dashboard" : "My Profile",
+        };
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+        => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
     }
 }

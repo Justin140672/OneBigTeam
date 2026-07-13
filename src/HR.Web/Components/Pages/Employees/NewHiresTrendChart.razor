@@ -1,7 +1,7 @@
 @inject EmployeeService EmployeeService
 @inject AppSession Session
 
-@if (Session.CanManageEmployees)
+@if (Session.CanManageEmployees || Session.IsRecruiter)
 {
     <div class="widget-card chart-tile">
         <div class="widget-header">
@@ -24,8 +24,12 @@
             else
             {
                 <SfChart Title="" Height="280px">
-                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category"></ChartPrimaryXAxis>
-                    <ChartPrimaryYAxis Minimum="0"></ChartPrimaryYAxis>
+                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
+                        <ChartAxisLabelStyle FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif"></ChartAxisLabelStyle>
+                    </ChartPrimaryXAxis>
+                    <ChartPrimaryYAxis Minimum="0">
+                        <ChartAxisLabelStyle FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif"></ChartAxisLabelStyle>
+                    </ChartPrimaryYAxis>
                     <ChartTooltipSettings Enable="true"></ChartTooltipSettings>
                     <ChartSeriesCollection>
                         <ChartSeries DataSource="@_data"
@@ -47,7 +51,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (!Session.CanManageEmployees)
+        if (!Session.CanManageEmployees && !Session.IsRecruiter)
         {
             _loading = false;
             return;

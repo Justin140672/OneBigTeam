@@ -9,7 +9,10 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/probation-reviews/upcoming");
-        Policies("probation:manage");
+        // "probation:review" (Manager + HrAdministrator) rather than "probation:manage"
+        // (HrAdministrator only) — this company-wide read is what backs
+        // UpcomingProbationReviewsWidget, shown on both the HR and Manager dashboards.
+        Policies("probation:review");
     }
 
     public override async Task HandleAsync(

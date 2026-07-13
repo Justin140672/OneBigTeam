@@ -4,6 +4,20 @@ namespace HR.Web.Models;
 
 public record GetInterviewsTodayCountResponse(int Count);
 
+// ── DASHBOARD: UPCOMING INTERVIEWS ──────────────────────────────────────────────
+
+public record GetUpcomingInterviewsResponse(IReadOnlyList<UpcomingInterviewItem> Items);
+
+public record UpcomingInterviewItem(
+    Guid InterviewId,
+    Guid ApplicationId,
+    Guid CandidateId,
+    string CandidateName,
+    Guid VacancyId,
+    string VacancyTitle,
+    DateTimeOffset ScheduledAt,
+    string? Location);
+
 // ── LIST ──────────────────────────────────────────────────────────────────────
 
 public record ListInterviewsForVacancyResponse(List<InterviewListItemModel> Items);

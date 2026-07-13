@@ -8,6 +8,7 @@ using HR.Modules.Employees.Features.GetEmployeeEmergencyContacts;
 using HR.Modules.Employees.Features.GetCurrentCompensation;
 using HR.Modules.Employees.Features.GetCompensationHistory;
 using HR.Modules.Employees.Features.GetEmployeeAuditHistory;
+using HR.Modules.Employees.Features.GetRecentEmployeeChanges;
 using HR.Modules.Employees.Features.CreateCompensationRecord;
 using HR.Modules.Employees.Features.UpdateFutureCompensationRecord;
 using HR.Modules.Employees.Features.DeleteFutureCompensationRecord;
@@ -23,6 +24,7 @@ using HR.Modules.Employees.Features.GetDepartment;
 using HR.Modules.Employees.Features.GetEmployee;
 using HR.Modules.Employees.Features.GetHeadcountSummary;
 using HR.Modules.Employees.Features.GetMyEmployee;
+using HR.Modules.Employees.Features.GetMyTeam;
 using HR.Modules.Employees.Features.GetNewHiresTrend;
 using HR.Modules.Employees.Features.GetMyPersonalDetails;
 using HR.Modules.Employees.Features.RequestPersonalDetailsChange;
@@ -135,6 +137,7 @@ public static class EmployeesModule
 
         services.AddScoped<GetEmployeeHandler>();
         services.AddScoped<GetMyEmployeeHandler>();
+        services.AddScoped<GetMyTeamHandler>();
         services.AddScoped<GetMyPersonalDetailsHandler>();
         services.AddScoped<RequestPersonalDetailsChangeHandler>();
         services.AddScoped<IValidator<RequestPersonalDetailsChangeRequest>, RequestPersonalDetailsChangeValidator>();
@@ -183,6 +186,7 @@ public static class EmployeesModule
         services.AddScoped<GetCurrentCompensationHandler>();
         services.AddScoped<GetCompensationHistoryHandler>();
         services.AddScoped<GetEmployeeAuditHistoryHandler>();
+        services.AddScoped<GetRecentEmployeeChangesHandler>();
         services.AddScoped<CreateCompensationRecordHandler>();
         services.AddScoped<IValidator<CreateCompensationRecordRequest>, CreateCompensationRecordValidator>();
         services.AddScoped<UpdateFutureCompensationRecordHandler>();

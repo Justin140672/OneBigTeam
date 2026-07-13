@@ -40,6 +40,18 @@ public sealed record UpcomingProbationReviewItem(
 
 public sealed record UpcomingProbationReviewsResponse(IReadOnlyList<UpcomingProbationReviewItem> Items);
 
+// Self-scoped equivalent of ProbationRecordModel, backed by the "authenticated"-only
+// employees/me/probation-status endpoint — see ProbationService.GetMyProbationStatusAsync.
+// Used to fix the Probation badge silently 403ing for a real employee viewing their own profile.
+public sealed record MyProbationStatusModel(
+    bool HasRecord,
+    Guid? Id,
+    DateOnly? StartDate,
+    DateOnly? ExpectedEndDate,
+    string? Status,
+    DateOnly? DecisionDate,
+    string? OutcomeNotes);
+
 public sealed record ProbationReviewDetailModel(
     Guid Id,
     Guid CompanyId,

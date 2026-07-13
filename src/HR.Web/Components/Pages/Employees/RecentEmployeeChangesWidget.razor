@@ -1,0 +1,79 @@
+@inject EmployeeService EmployeeService
+@inject AppSession Session
+
+@if (Session.CanManageEmployees)
+{
+    @if (_loading)
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-clock-rotate-left widget-icon"></i>
+                <span class="widget-title">Recent Employee Changes</span>
+            </div>
+            <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
+                <HrLoadingIndicator />
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-clock-rotate-left widget-icon"></i>
+                <span class="widget-title">Recent Employee Changes</span>
+            </div>
+
+            <div class="widget-body">
+                @if (_items.Count == 0)
+                {
+                    <div class="widget-empty">
+                        <i class="fa-solid fa-circle-check fa-lg mb-2"></i>
+                        <p class="mb-0">No recent changes</p>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var item in _items.Take(8))
+                    {
+                        var change = item;
+                        <div class="task-widget-item task-widget-item--static">
+                            <div class="task-widget-content">
+                                <span class="task-widget-title">@change.EmployeeName</span>
+                                <span class="task-widget-meta">@change.Action · by @change.ActorName</span>
+                            </div>
+                            <span class="task-widget-meta ms-auto">@FormatTime(change.OccurredAt)</span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private IReadOnlyList<RecentEmployeeChangeItem> _items = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.CanManageEmployees)
+        {
+            _loading = false;
+            return;
+        }
+
+        var result = await EmployeeService.GetRecentEmployeeChangesAsync(Session.CompanyId);
+        _items = result?.Items ?? [];
+        _loading = false;
+    }
+
+    private static string FormatTime(DateTimeOffset dt)
+    {
+        var diff = DateTimeOffset.UtcNow - dt;
+        if (diff.TotalMinutes < 1) return "Just now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays < 7) return $"{(int)diff.TotalDays}d ago";
+        return dt.ToString("d MMM");
+    }
+}

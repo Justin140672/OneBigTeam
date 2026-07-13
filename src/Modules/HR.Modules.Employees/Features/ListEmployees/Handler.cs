@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -7,10 +8,12 @@ namespace HR.Modules.Employees.Features.ListEmployees;
 internal sealed class ListEmployeesHandler
 {
     private readonly EmployeesDbContext _dbContext;
+    private readonly IProfilePhotoReader _profilePhotoReader;
 
-    public ListEmployeesHandler(EmployeesDbContext dbContext)
+    public ListEmployeesHandler(EmployeesDbContext dbContext, IProfilePhotoReader profilePhotoReader)
     {
         _dbContext = dbContext;
+        _profilePhotoReader = profilePhotoReader;
     }
 
     public async Task<Result<ListEmployeesResponse>> HandleAsync(
@@ -95,6 +98,13 @@ internal sealed class ListEmployeesHandler
                 .ToDictionaryAsync(e => e.Id, e => $"{e.FirstName} {e.LastName}", cancellationToken)
             : new Dictionary<Guid, string>();
 
+        // Employee.ProfileImageUrl is a legacy field that nothing writes to any more — current
+        // profile photos live in the Documents module, resolved here via IProfilePhotoReader for
+        // just the current page of results (same bulk, no-N+1 lookup style as the dictionaries above).
+        var employeeIds = employees.Select(e => e.Id).ToList();
+        var photoUrls = await _profilePhotoReader.GetCurrentPhotoUrlsAsync(
+            request.CompanyId, employeeIds, cancellationToken);
+
         var items = employees
             .Select(e => new EmployeeListItem(
                 e.Id,
@@ -112,7 +122,8 @@ internal sealed class ListEmployeesHandler
                 e.WorkEmail,
                 e.StartDate,
                 e.Status,
-                e.CreatedAt))
+                e.CreatedAt,
+                photoUrls.TryGetValue(e.Id, out var photoUrl) ? photoUrl : null))
             .ToList();
 
         var totalPages = request.PageSize == 0 ? 0 : (int)Math.Ceiling((double)totalCount / request.PageSize);

@@ -10,6 +10,17 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
+    public async Task<GetExpiringDocumentsResponse?> GetExpiringDocumentsAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetExpiringDocumentsResponse>(
+                $"api/companies/{companyId}/documents/expiring", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch { return null; }
+    }
+
     public async Task<EmployeeDocumentListResponse?> ListEmployeeDocumentsAsync(
         Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
     {

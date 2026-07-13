@@ -101,6 +101,44 @@ public class ApproveProfilePhotoEndpointTests : IClassFixture<ApiWebApplicationF
     }
 
     [Fact]
+    public async Task Post_Returns_NotFound_When_EmployeeId_Belongs_To_Different_Company()
+    {
+        // The employee (and their pending photo) genuinely belong to Company B.
+        var companyB   = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        using (var selfClientB = SelfClient(companyB, employeeId))
+        {
+            var upload = await selfClientB.PostAsync(
+                $"/api/companies/{companyB}/employees/me/profile-photo",
+                BuildPngUpload("company-b.png"));
+            Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+        }
+
+        // An HR caller genuinely belonging to Company A (their own claim matches the route) tries
+        // to approve the employeeId that actually belongs to Company B — must 404, never leak,
+        // and must not touch Company B's pending photo.
+        var companyA = Guid.NewGuid();
+        using var clientA = ManagerClient(companyA);
+
+        var response = await clientA.PostAsync(
+            $"/api/companies/{companyA}/employees/{employeeId}/profile-photo/pending/approve",
+            EmptyJson());
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
+
+        var pendingRows = await db.PendingProfilePhotos.Where(p => p.EmployeeId == employeeId).ToListAsync();
+        Assert.Single(pendingRows);
+        Assert.Equal(companyB, pendingRows[0].CompanyId);
+
+        var liveRows = await db.EmployeeProfilePhotos.Where(p => p.EmployeeId == employeeId).ToListAsync();
+        Assert.Empty(liveRows);
+    }
+
+    [Fact]
     public async Task Post_Approve_Returns_Ok_Removes_Pending_And_Creates_Live_Photo()
     {
         var companyId  = Guid.NewGuid();

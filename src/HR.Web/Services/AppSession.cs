@@ -19,12 +19,45 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
     public bool CanManageEmployees => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000004"));
     public bool CanManageCompany { get; private set; }
 
+    // Role-derived flags, additive to CanManageCompany/CanManageEmployees above — these drive
+    // landing/nav/switcher decisions only. CanManageEmployees keeps gating existing widgets as-is.
+    public bool IsHrAdministrator { get; private set; }
+    public bool IsManager { get; private set; }
+    public bool IsRecruiter { get; private set; }
+
     // Where a plain employee (no manage permissions) should land when they're denied access to
     // an admin-only page, instead of the manager/HR-oriented dashboard. Falls back to the
     // dashboard for the rare case of a signed-in user with no linked employee record.
     public string MyProfileUrl => EmployeeId.HasValue
         ? $"/companies/{CompanyId}/employees/{EmployeeId}/profile"
         : "/";
+
+    // Priority order for where a signed-in user lands on "/": HR Administrator > Recruiter >
+    // Manager > Company Administrator (no HR role) > plain Employee's own profile. Consumed by
+    // Home.razor as the fallback when there's no (or no longer valid) localStorage selection.
+    public string LandingUrl =>
+        IsHrAdministrator ? "/dashboard/hr" :
+        IsRecruiter ? "/dashboard/recruitment" :
+        IsManager ? "/dashboard/manager" :
+        CanManageCompany ? $"/companies/{CompanyId}/edit" :
+        MyProfileUrl;
+
+    // Dashboard keys used by routing/localStorage: "hr", "recruitment", "manager".
+    public bool IsDashboardAvailable(string dashboardKey) => dashboardKey switch
+    {
+        "hr" => IsHrAdministrator,
+        "recruitment" => IsRecruiter,
+        "manager" => IsManager,
+        _ => false,
+    };
+
+    public static string? DashboardUrl(string dashboardKey) => dashboardKey switch
+    {
+        "hr" => "/dashboard/hr",
+        "recruitment" => "/dashboard/recruitment",
+        "manager" => "/dashboard/manager",
+        _ => null,
+    };
 
     // Employee (null if user has no linked employee record)
     public Guid? EmployeeId { get; private set; }
@@ -82,6 +115,9 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
         Email     = me.Email;
         PermissionIds = me.PermissionIds;
         CanManageCompany = me.CanManageCompany;
+        IsHrAdministrator = me.IsHrAdministrator;
+        IsManager = me.IsManager;
+        IsRecruiter = me.IsRecruiter;
 
         var companyTask  = Http.GetFromJsonAsync<GetCompanyResponse>($"api/companies/{me.CompanyId}", HrApiJsonOptions.Default);
         var settingsTask = Http.GetFromJsonAsync<GetCompanySettingsResponse>($"api/companies/{me.CompanyId}/settings", HrApiJsonOptions.Default);

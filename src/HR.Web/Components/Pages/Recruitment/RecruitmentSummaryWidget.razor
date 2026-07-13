@@ -5,7 +5,7 @@
 @inject NavigationManager Navigation
 @inject AppSession Session
 
-@if (Session.CanManageEmployees)
+@if (Session.CanManageEmployees || Session.IsRecruiter)
 {
     @if (_loading)
     {
@@ -56,12 +56,16 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (!Session.CanManageEmployees)
+        if (!Session.CanManageEmployees && !Session.IsRecruiter)
         {
             _loading = false;
             return;
         }
 
+        // "Outstanding Feedback Tasks" is gated server-side by employee:manage (HrAdministrator
+        // only) — a Recruiter-only viewer sees 0 here rather than the real count. Acceptable
+        // graceful degradation for this one KPI tile; the other two (vacancies/interviews) are
+        // scoped to recruitment:view/candidate:view and work fully for Recruiters.
         var vacanciesTask = VacancyService.ListVacanciesAsync(Session.CompanyId, status: "Open");
         var interviewsTask = InterviewService.GetInterviewsTodayCountAsync(Session.CompanyId);
         var feedbackTasksTask = TaskService.GetOutstandingTaskCountAsync(

@@ -8,7 +8,10 @@ public sealed record MeResponse(
     Guid CompanyId,
     string? Email,
     List<Guid> PermissionIds,
-    bool CanManageCompany);
+    bool CanManageCompany,
+    bool IsHrAdministrator,
+    bool IsManager,
+    bool IsRecruiter);
 
 public sealed record MyEmployeeResponse(
     Guid EmployeeId,

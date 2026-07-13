@@ -12,6 +12,8 @@ using HR.Modules.Recruitment.Features.GetApplicationsByStatus;
 using HR.Modules.Recruitment.Features.GetCandidate;
 using HR.Modules.Recruitment.Features.GetInterviewsTodayCount;
 using HR.Modules.Recruitment.Features.GetPipelineSummary;
+using HR.Modules.Recruitment.Features.GetStaleVacancies;
+using HR.Modules.Recruitment.Features.GetUpcomingInterviews;
 using HR.Modules.Recruitment.Features.GetVacancy;
 using HR.Modules.Recruitment.Features.HireCandidate;
 using HR.Modules.Recruitment.Features.ListApplicationsForVacancy;
@@ -131,6 +133,9 @@ public static class RecruitmentModule
 
         services.AddScoped<GetInterviewsTodayCountHandler>();
         services.AddScoped<IValidator<GetInterviewsTodayCountRequest>, GetInterviewsTodayCountValidator>();
+
+        services.AddScoped<GetUpcomingInterviewsHandler>();
+        services.AddScoped<GetStaleVacanciesHandler>();
 
         services.AddScoped<UploadCandidateDocumentHandler>();
         services.AddScoped<IValidator<UploadCandidateDocumentRequest>, UploadCandidateDocumentValidator>();

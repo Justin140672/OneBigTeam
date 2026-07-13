@@ -59,6 +59,33 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<GetRecentEmployeeChangesResponse?> GetRecentEmployeeChangesAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetRecentEmployeeChangesResponse>(
+                $"api/companies/{companyId}/employees/recent-changes", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<GetMyTeamResponse?> GetMyTeamAsync(Guid companyId, bool includeIndirect)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetMyTeamResponse>(
+                $"api/companies/{companyId}/employees/me/team?includeIndirect={includeIndirect}", HrApiJsonOptions.Default);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public async Task<GetEmployeeResponse?> GetEmployeeAsync(Guid companyId, Guid id)
     {
         try

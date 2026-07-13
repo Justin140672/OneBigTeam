@@ -23,9 +23,12 @@ public class AppSessionTests
     private static AppSession BuildSession(IHttpClientFactory factory) =>
         new(factory, new EmployeeService(factory), new SicknessCategoryService(factory));
 
-    private static RoutingHandler BuildHappyPathHandler(Guid userId, Guid companyId, Guid employeeId)
+    private static RoutingHandler BuildHappyPathHandler(
+        Guid userId, Guid companyId, Guid employeeId,
+        bool isHrAdministrator = false, bool isManager = false, bool isRecruiter = false)
     {
-        var me = new MeResponse(userId, companyId, "alice@example.com", [ManageEmployeesPermission], true);
+        var me = new MeResponse(userId, companyId, "alice@example.com", [ManageEmployeesPermission], true,
+            isHrAdministrator, isManager, isRecruiter);
         var company = new GetCompanyResponse(companyId, "Acme Corporation", true, DateTime.UtcNow, [],
             new GetCompanyBrandingResponse("logo.png", "small-logo.png", null));
         var settings = new GetCompanySettingsResponse(
@@ -142,6 +145,110 @@ public class AppSessionTests
         var session = BuildSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
 
         Assert.Equal("?", session.Initials);
+    }
+
+    [Fact]
+    public async Task LandingUrl_Prioritises_HrAdministrator_Over_Other_Roles()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var factory = BuildFactory(BuildHappyPathHandler(userId, companyId, employeeId,
+            isHrAdministrator: true, isManager: true, isRecruiter: true));
+        var session = BuildSession(factory);
+
+        await session.InitialiseAsync();
+
+        Assert.True(session.IsHrAdministrator);
+        Assert.Equal("/dashboard/hr", session.LandingUrl);
+    }
+
+    [Fact]
+    public async Task LandingUrl_Prioritises_Recruiter_Over_Manager_When_Not_HrAdministrator()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var factory = BuildFactory(BuildHappyPathHandler(userId, companyId, employeeId,
+            isManager: true, isRecruiter: true));
+        var session = BuildSession(factory);
+
+        await session.InitialiseAsync();
+
+        Assert.Equal("/dashboard/recruitment", session.LandingUrl);
+    }
+
+    [Fact]
+    public async Task LandingUrl_Falls_Back_To_Manager_Dashboard()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var factory = BuildFactory(BuildHappyPathHandler(userId, companyId, employeeId, isManager: true));
+        var session = BuildSession(factory);
+
+        await session.InitialiseAsync();
+
+        Assert.Equal("/dashboard/manager", session.LandingUrl);
+    }
+
+    [Fact]
+    public async Task LandingUrl_Falls_Back_To_CompanyEdit_When_CompanyAdmin_Without_Dashboard_Roles()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        // CanManageCompany=true is baked into BuildHappyPathHandler's MeResponse; no dashboard roles set.
+        var factory = BuildFactory(BuildHappyPathHandler(userId, companyId, employeeId));
+        var session = BuildSession(factory);
+
+        await session.InitialiseAsync();
+
+        Assert.Equal($"/companies/{companyId}/edit", session.LandingUrl);
+    }
+
+    [Fact]
+    public void LandingUrl_Falls_Back_To_MyProfileUrl_When_No_Roles_Or_Company_Admin()
+    {
+        var session = BuildSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
+
+        Assert.Equal(session.MyProfileUrl, session.LandingUrl);
+    }
+
+    [Theory]
+    [InlineData("hr", true, false, false, true)]
+    [InlineData("recruitment", false, false, true, true)]
+    [InlineData("manager", false, true, false, true)]
+    [InlineData("hr", false, false, false, false)]
+    [InlineData("unknown", true, true, true, false)]
+    public async Task IsDashboardAvailable_Reflects_Role_Flags(
+        string dashboardKey, bool isHrAdministrator, bool isManager, bool isRecruiter, bool expected)
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var factory = BuildFactory(BuildHappyPathHandler(userId, companyId, employeeId,
+            isHrAdministrator, isManager, isRecruiter));
+        var session = BuildSession(factory);
+
+        await session.InitialiseAsync();
+
+        Assert.Equal(expected, session.IsDashboardAvailable(dashboardKey));
+    }
+
+    [Theory]
+    [InlineData("hr", "/dashboard/hr")]
+    [InlineData("recruitment", "/dashboard/recruitment")]
+    [InlineData("manager", "/dashboard/manager")]
+    [InlineData("unknown", null)]
+    public void DashboardUrl_Maps_Known_Keys(string dashboardKey, string? expected)
+    {
+        Assert.Equal(expected, AppSession.DashboardUrl(dashboardKey));
     }
 
     // ── Fake handlers ────────────────────────────────────────────────────────────

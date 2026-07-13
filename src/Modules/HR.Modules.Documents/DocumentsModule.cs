@@ -23,6 +23,7 @@ using HR.Modules.Documents.Features.UploadMyProfilePhoto;
 using HR.Modules.Documents.Features.CancelPendingProfilePhoto;
 using HR.Modules.Documents.Features.GetMyProfilePhoto;
 using HR.Modules.Documents.Features.GetPendingProfilePhoto;
+using HR.Modules.Documents.Features.GetPendingProfilePhotoById;
 using HR.Modules.Documents.Features.ApproveProfilePhoto;
 using HR.Modules.Documents.Features.RejectProfilePhoto;
 using HR.Modules.Documents.Services;
@@ -108,6 +109,9 @@ public static class DocumentsModule
         services.AddScoped<GetPendingProfilePhotoHandler>();
         services.AddScoped<IValidator<GetPendingProfilePhotoRequest>, GetPendingProfilePhotoValidator>();
 
+        services.AddScoped<GetPendingProfilePhotoByIdHandler>();
+        services.AddScoped<IValidator<GetPendingProfilePhotoByIdRequest>, GetPendingProfilePhotoByIdValidator>();
+
         services.AddScoped<GetEmployeeProfilePhotoHandler>();
         services.AddScoped<IValidator<GetEmployeeProfilePhotoRequest>, GetEmployeeProfilePhotoValidator>();
 
@@ -138,6 +142,7 @@ public static class DocumentsModule
 
         services.AddScoped<IDocumentTypeReader, DocumentTypeReader>();
         services.AddScoped<IOutstandingDocumentRequestReader, OutstandingDocumentRequestReader>();
+        services.AddScoped<IProfilePhotoReader, ProfilePhotoReader>();
 
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
 

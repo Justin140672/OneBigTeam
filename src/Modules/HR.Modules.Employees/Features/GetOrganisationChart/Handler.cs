@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
@@ -8,10 +9,12 @@ namespace HR.Modules.Employees.Features.GetOrganisationChart;
 internal sealed class GetOrganisationChartHandler
 {
     private readonly EmployeesDbContext _dbContext;
+    private readonly IProfilePhotoReader _profilePhotoReader;
 
-    public GetOrganisationChartHandler(EmployeesDbContext dbContext)
+    public GetOrganisationChartHandler(EmployeesDbContext dbContext, IProfilePhotoReader profilePhotoReader)
     {
         _dbContext = dbContext;
+        _profilePhotoReader = profilePhotoReader;
     }
 
     public async Task<Result<GetOrganisationChartResponse>> HandleAsync(
@@ -65,6 +68,14 @@ internal sealed class GetOrganisationChartHandler
                 .ToDictionaryAsync(p => p.Id, p => p.Title, cancellationToken)
             : new Dictionary<Guid, string>();
 
+        // Employee.ProfileImageUrl is a legacy field that nothing writes to any more — current
+        // profile photos live in the Documents module, resolved here via IProfilePhotoReader
+        // (same cross-module bulk-lookup pattern as the department/location/position dictionaries
+        // above, just backed by another module instead of a local table).
+        var employeeIds = employees.Select(e => e.Id).ToList();
+        var photoUrls = await _profilePhotoReader.GetCurrentPhotoUrlsAsync(
+            request.CompanyId, employeeIds, cancellationToken);
+
         var items = employees
             .Select(e => new OrganisationChartEmployeeItem(
                 e.Id,
@@ -74,7 +85,7 @@ internal sealed class GetOrganisationChartHandler
                 departmentNames.TryGetValue(e.DepartmentId, out var deptName) ? deptName : string.Empty,
                 e.ManagerId,
                 locationNames.TryGetValue(e.LocationId, out var locName) ? locName : string.Empty,
-                e.ProfileImageUrl))
+                photoUrls.TryGetValue(e.Id, out var photoUrl) ? photoUrl : null))
             .ToList();
 
         return Result.Success(new GetOrganisationChartResponse(items));

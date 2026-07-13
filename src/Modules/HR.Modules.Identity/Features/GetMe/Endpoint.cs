@@ -37,12 +37,21 @@ internal sealed class Endpoint(
         var roles = await authorizationService.GetEffectiveRolesAsync(userId.Value, ct);
         var canManageCompany = roles.Contains(SystemRoles.CompanyAdministrator);
 
+        // Role-derived landing/nav flags, additive to CanManageCompany above — CanManageEmployees
+        // (computed client-side from PermissionIds) still drives all existing widget gates unchanged.
+        var isHrAdministrator = roles.Contains(SystemRoles.HrAdministrator);
+        var isManager = roles.Contains(SystemRoles.Manager);
+        var isRecruiter = roles.Contains(SystemRoles.Recruiter);
+
         await Send.ResultAsync(TypedResults.Ok(new GetMeResponse(
             userId.Value,
             companyId,
             currentUser.Email,
             permissions.ToList(),
-            canManageCompany)));
+            canManageCompany,
+            isHrAdministrator,
+            isManager,
+            isRecruiter)));
     }
 }
 
@@ -51,4 +60,7 @@ internal sealed record GetMeResponse(
     Guid CompanyId,
     string? Email,
     List<Guid> PermissionIds,
-    bool CanManageCompany);
+    bool CanManageCompany,
+    bool IsHrAdministrator,
+    bool IsManager,
+    bool IsRecruiter);

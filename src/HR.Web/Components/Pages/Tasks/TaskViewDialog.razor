@@ -1,3 +1,4 @@
+@using HR.Web.Components.Pages.Employees
 @inject TaskService TaskService
 @inject AppSession Session
 
@@ -58,6 +59,10 @@
                     else if (_task.ActionType == "Review" && _task.Source == "Sickness")
                     {
                         <ReturnToWorkReviewPanel CompanyId="CompanyId" Task="_task" OnCompleted="OnActionCompletedAsync" />
+                    }
+                    else if (_task.ActionType == "Review" && _task.Source == "Document")
+                    {
+                        <ProfilePhotoReviewPanel CompanyId="CompanyId" Task="_task" OnCompleted="OnActionCompletedAsync" />
                     }
                     else if (_task.ActionType == "Upload" && _task.Source == "Document")
                     {

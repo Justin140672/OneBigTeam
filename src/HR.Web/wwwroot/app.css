@@ -371,6 +371,28 @@ html[data-theme="dark"] .card-header {
     text-decoration: underline;
 }
 
+/* ── Team scope toggle (MyTeamWidget) ───────────────────── */
+
+.team-widget-scope {
+    padding: 10px 16px 0;
+}
+
+.team-widget-contact {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.team-widget-contact a {
+    color: var(--hr-gray-400);
+    font-size: 0.85rem;
+}
+
+.team-widget-contact a:hover {
+    color: var(--hr-color-primary);
+}
+
 /* ── Stats bar ───────────────────────────────────────── */
 
 .widget-stats {
@@ -777,6 +799,95 @@ html[data-theme="dark"] .due-badge--today    { background: rgba(234,88,12,0.18);
 html[data-theme="dark"] .due-badge--soon     { background: rgba(202,138,4,0.18);  color: #fbbf24; }
 html[data-theme="dark"] .due-badge--normal   { background: var(--hr-gray-700);    color: var(--hr-gray-300); }
 html[data-theme="dark"] .due-badge--approved { background: rgba(22,163,74,0.18);  color: #4ade80; }
+
+/* ── Dashboard shell (Home.razor redirect spinner + Dashboards/*.razor greeting) ── */
+/* Global copies of rules also scoped locally in MainLayout.razor.css/Home.razor.css —
+   needed here so Home.razor's redirect spinner and the new role dashboard pages
+   (which don't have their own scoped stylesheet) render consistently. */
+
+.app-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+.app-loading-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.app-loading-label {
+    font-size: 0.9rem;
+    color: var(--hr-gray-500);
+}
+
+.dashboard-greeting {
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.dashboard-heading {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 2px;
+}
+
+.dashboard-section + .dashboard-section {
+    margin-top: 2rem;
+}
+
+.dashboard-section-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--hr-gray-400);
+    margin-bottom: 1rem;
+}
+
+/* DashboardSwitcher — small row of buttons shown near the page heading when a user
+   qualifies for more than one role dashboard (HR / Recruitment / Manager). */
+.dashboard-switcher {
+    display: flex;
+    gap: 4px;
+}
+
+.dashboard-switcher-item {
+    border: 1px solid var(--hr-gray-200);
+    background: #fff;
+    color: var(--hr-gray-500);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: var(--hr-radius-md);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.dashboard-switcher-item:hover {
+    background: var(--hr-gray-100);
+}
+
+.dashboard-switcher-item--active {
+    background: var(--hr-color-primary);
+    border-color: var(--hr-color-primary);
+    color: #fff;
+}
+
+/* Sub-heading inside a single widget-card body that groups more than one list
+   (e.g. OffersAwaitingResponseWidget's "Offers Awaiting Response" / "Recently Hired"). */
+.task-widget-section-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--hr-gray-400);
+    padding: 8px 12px 4px;
+}
 
 /* ── Dashboard heading (Home.razor) ──────────────────── */
 

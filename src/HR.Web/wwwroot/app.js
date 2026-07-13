@@ -31,6 +31,14 @@ function getOrgChartZoom() {
     } catch { return null; }
 }
 
+function setLastDashboard(dashboardKey) {
+    try { localStorage.setItem('lastDashboard', dashboardKey); } catch {}
+}
+
+function getLastDashboard() {
+    try { return localStorage.getItem('lastDashboard') ?? ''; } catch { return ''; }
+}
+
 function downloadFileFromBase64(fileName, contentType, base64Content) {
     const link = document.createElement('a');
     link.href = `data:${contentType};base64,${base64Content}`;

@@ -1,86 +1,47 @@
 @page "/"
 @rendermode InteractiveServer
-@using HR.Web.Components.Pages.Tasks
-@using HR.Web.Components.Pages.Probation
-@using HR.Web.Components.Pages.Assets
-@using HR.Web.Components.Pages.Sickness
-@using HR.Web.Components.Pages.Recruitment
-@using HR.Web.Components.Pages.Leave
-@using HR.Web.Components.Pages.Employees
-@using HR.Web.Components.Pages.Onboarding
 @inject AppSession Session
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>Dashboard</PageTitle>
 
-@if (_ready)
-{
-    <div class="container-fluid py-4">
-        <div class="dashboard-greeting mb-4">
-            <h1 class="dashboard-heading">@Greeting(), @Session.FirstName</h1>
-            <p class="text-muted mb-0">@DateTime.Now.ToString("dddd, d MMMM yyyy")</p>
-        </div>
-
-        <div class="dashboard-overview-row">
-            <HeadcountByDepartmentChart />
-            <HiringPipelineChart />
-            <NewHiresTrendChart />
-        </div>
-
-        <section class="dashboard-section">
-            <h2 class="dashboard-section-title">Tasks &amp; Leave</h2>
-            <div class="dashboard-detail-grid">
-                <HrInboxWidget />
-                <MyTasksWidget />
-                <MyOnboardingTasksWidget />
-                <TeamTasksWidget />
-                <LeaveRequestsWidget />
-            </div>
-        </section>
-
-        <section class="dashboard-section">
-            <h2 class="dashboard-section-title">People &amp; Wellbeing</h2>
-            <div class="dashboard-detail-grid">
-                <UpcomingProbationReviewsWidget />
-                <TeamOnboardingWidget />
-                <RecruitmentSummaryWidget />
-                <MyAssetsWidget />
-                <CurrentSicknessAbsenceWidget />
-                <TeamSicknessTodayWidget />
-                <OverdueReturnToWorkReviewsWidget />
-                <MissingFitNotesWidget />
-            </div>
-        </section>
+<div class="app-loading">
+    <div class="app-loading-spinner">
+        <div class="spinner-border text-primary" role="status"></div>
+        <span class="app-loading-label">Loading…</span>
     </div>
-}
+</div>
 
 @code {
-    // Any authenticated employee lands on the dashboard — manager/HR-only widgets self-gate
-    // on Session.CanManageEmployees (see RecruitmentSummaryWidget, HrInboxWidget,
-    // UpcomingProbationReviewsWidget, and the overview charts). A signed-in user with no
-    // linked employee record has nowhere else to land — MyProfileUrl already falls back to
-    // "/" for that case, so no redirect is needed here.
-
-    private bool _ready;
-
+    // Pure redirect shim — this route must stay alive because several existing call sites
+    // hardcode NavigateTo("/") as "somewhere safe for any authenticated user":
+    // MainLayout.OnPersonaSwitchAsync, Login.razor, TaskView.GoBack, MyProfile.razor's
+    // cross-tenant guard, and AppSession.MyProfileUrl's own fallback for users with no
+    // linked employee. Session.LandingUrl already encodes the full priority order
+    // (HR Administrator > Recruiter > Manager > Company Administrator > own profile).
+    //
+    // The localStorage "last selected dashboard" override can only be read once JS interop is
+    // available, which isn't the case yet in OnInitializedAsync (mirrors how MainLayout reads
+    // the "theme" localStorage key in its own OnAfterRenderAsync) — so the redirect itself
+    // happens in OnAfterRenderAsync(firstRender) below, not here.
     protected override async Task OnInitializedAsync()
     {
         await Session.InitialiseAsync();
-
-        // Company-Administrator-only users have no HR permissions and no dashboard to see —
-        // send them straight to the Company edit screen instead.
-        if (Session.CanManageCompany && !Session.CanManageEmployees)
-        {
-            Navigation.NavigateTo($"/companies/{Session.CompanyId}/edit", replace: true);
-            return;
-        }
-
-        _ready = true;
     }
 
-    private static string Greeting()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        var hour = DateTime.Now.Hour;
-        return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+        if (!firstRender) return;
+
+        var lastDashboard = await JS.InvokeAsync<string>("getLastDashboard");
+
+        // Fall back to the priority-ordered LandingUrl when there's no stored preference, or the
+        // stored dashboard is no longer one the user is authorized for (e.g. a role was removed).
+        var targetUrl = !string.IsNullOrEmpty(lastDashboard) && Session.IsDashboardAvailable(lastDashboard)
+            ? AppSession.DashboardUrl(lastDashboard) ?? Session.LandingUrl
+            : Session.LandingUrl;
+
+        Navigation.NavigateTo(targetUrl, replace: true);
     }
 }

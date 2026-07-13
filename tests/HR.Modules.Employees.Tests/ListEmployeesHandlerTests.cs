@@ -1,6 +1,7 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.ListEmployees;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Tests;
@@ -14,7 +15,7 @@ public class ListEmployeesHandlerTests
     public async Task HandleAsync_Returns_Empty_When_No_Employees()
     {
         await using var context = BuildContext();
-        var handler = new ListEmployeesHandler(context);
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = Guid.NewGuid() },
@@ -39,7 +40,7 @@ public class ListEmployeesHandlerTests
             Employee.Create(Guid.NewGuid(), Guid.NewGuid(), "Carol", "Other", "carol@other.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context);
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId },
@@ -64,7 +65,7 @@ public class ListEmployeesHandlerTests
             Employee.Create(Guid.NewGuid(), companyId, "Carol", "Jones", "carol@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context);
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId },
@@ -89,7 +90,7 @@ public class ListEmployeesHandlerTests
             Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context);
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId, Search = "ali" },
@@ -112,7 +113,7 @@ public class ListEmployeesHandlerTests
             Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@globex.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context);
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId, Search = "acme" },
@@ -135,7 +136,7 @@ public class ListEmployeesHandlerTests
             Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0099", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context);
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId, Search = "0042" },
@@ -160,7 +161,7 @@ public class ListEmployeesHandlerTests
         context.Employees.AddRange(emp1, emp2);
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context);
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId, DepartmentId = departmentId },
@@ -195,7 +196,7 @@ public class ListEmployeesHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context);
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId, Search = "alice" },
@@ -223,7 +224,7 @@ public class ListEmployeesHandlerTests
         context.Employees.AddRange(active, draft);
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context);
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId, Status = EmploymentStatus.Active },
@@ -232,6 +233,35 @@ public class ListEmployeesHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(1, result.Value!.TotalCount);
         Assert.Equal(EmploymentStatus.Active, result.Value.Items[0].Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ProfilePhotoUrl_Populated_When_Present_And_Null_When_Absent()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var withPhoto = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        var withoutPhoto = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0002", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.AddRange(withPhoto, withoutPhoto);
+        await context.SaveChangesAsync();
+
+        var photoReader = new FakeProfilePhotoReader();
+        photoReader.PhotoUrls[withPhoto.Id] = "https://example.com/alice.jpg";
+
+        var handler = new ListEmployeesHandler(context, photoReader);
+
+        var result = await handler.HandleAsync(
+            new ListEmployeesRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var withPhotoItem = result.Value!.Items.Single(i => i.Id == withPhoto.Id);
+        var withoutPhotoItem = result.Value.Items.Single(i => i.Id == withoutPhoto.Id);
+
+        Assert.Equal("https://example.com/alice.jpg", withPhotoItem.ProfilePhotoUrl);
+        Assert.Null(withoutPhotoItem.ProfilePhotoUrl);
     }
 
     [Fact]
@@ -248,7 +278,7 @@ public class ListEmployeesHandlerTests
         }
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context);
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
 
         var page1 = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId, PageNumber = 1, PageSize = 2 },

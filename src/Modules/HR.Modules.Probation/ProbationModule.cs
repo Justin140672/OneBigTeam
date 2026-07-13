@@ -10,6 +10,7 @@ using HR.Modules.Probation.Features.GetProbationRecord;
 using HR.Modules.Probation.Features.GetProbationRecordByEmployee;
 using HR.Modules.Probation.Features.GetProbationReview;
 using HR.Modules.Probation.Features.GetProbationReviews;
+using HR.Modules.Probation.Features.GetMyProbationStatus;
 using HR.Modules.Probation.Features.GetProbationStatus;
 using HR.Modules.Probation.Features.GetUpcomingProbationReviews;
 using HR.Modules.Probation.Features.UpdateProbationRecord;
@@ -46,6 +47,7 @@ public static class ProbationModule
         services.AddScoped<GetProbationRecordHandler>();
         services.AddScoped<GetProbationRecordByEmployeeHandler>();
         services.AddScoped<GetProbationStatusHandler>();
+        services.AddScoped<GetMyProbationStatusHandler>();
         services.AddScoped<GetProbationReviewHandler>();
         services.AddScoped<UpdateProbationRecordHandler>();
         services.AddScoped<IValidator<UpdateProbationRecordRequest>, UpdateProbationRecordValidator>();

@@ -1,0 +1,75 @@
+@page "/dashboard/manager"
+@rendermode InteractiveServer
+@using HR.Web.Components.Pages.Tasks
+@using HR.Web.Components.Pages.Probation
+@using HR.Web.Components.Pages.Sickness
+@using HR.Web.Components.Pages.Leave
+@using HR.Web.Components.Pages.Onboarding
+@using HR.Web.Components.Pages.Employees
+@inject AppSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Manager Dashboard</PageTitle>
+
+@if (_ready)
+{
+    <div class="container-fluid py-4">
+        <div class="dashboard-greeting mb-4">
+            <h1 class="dashboard-heading">@Greeting(), @Session.FirstName</h1>
+            <p class="text-muted mb-0">@DateTime.Now.ToString("dddd, d MMMM yyyy")</p>
+        </div>
+
+        <DashboardSwitcher />
+
+        <section class="dashboard-section">
+            <h2 class="dashboard-section-title">Tasks &amp; Leave</h2>
+            <div class="dashboard-detail-grid">
+                <TeamTasksWidget />
+                <LeaveRequestsWidget />
+            </div>
+        </section>
+
+        <section class="dashboard-section">
+            <h2 class="dashboard-section-title">My Team</h2>
+            <div class="dashboard-detail-grid">
+                <MyTeamWidget />
+            </div>
+        </section>
+
+        <section class="dashboard-section">
+            <h2 class="dashboard-section-title">Team Wellbeing &amp; Onboarding</h2>
+            <div class="dashboard-detail-grid">
+                <UpcomingProbationReviewsWidget />
+                <TeamOnboardingWidget />
+                <TeamSicknessTodayWidget />
+                <OverdueReturnToWorkReviewsWidget />
+                <MissingFitNotesWidget />
+            </div>
+        </section>
+    </div>
+}
+
+@code {
+    // Guarded like CompanyEdit.razor: URL-typing into this dashboard without the
+    // Manager role bounces to MyProfileUrl. The switcher/redirect only pick a default.
+    private bool _ready;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.InitialiseAsync();
+
+        if (!Session.IsManager)
+        {
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            return;
+        }
+
+        _ready = true;
+    }
+
+    private static string Greeting()
+    {
+        var hour = DateTime.Now.Hour;
+        return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+    }
+}

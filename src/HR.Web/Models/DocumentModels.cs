@@ -80,3 +80,22 @@ public sealed record GetDocumentRequestResponse(
     Guid?     RequestedByEmployeeId,
     string?   RequestedByName,
     DateTimeOffset CreatedAt);
+
+// ── DASHBOARD: EXPIRING DOCUMENTS ────────────────────────────────────────────────
+
+public sealed record GetExpiringDocumentsResponse(IReadOnlyList<ExpiringDocumentItem> Items);
+
+public sealed record ExpiringDocumentItem(
+    Guid   EmployeeDocumentId,
+    Guid   EmployeeId,
+    string Title,
+    string DocumentTypeName,
+    DateOnly ExpiryDate,
+    DocumentExpiryStatus ExpiryStatus);
+
+public enum DocumentExpiryStatus
+{
+    Valid,
+    ExpiringSoon,
+    Expired,
+}

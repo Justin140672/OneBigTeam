@@ -1,0 +1,52 @@
+@inject AppSession Session
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+@if (_options.Count > 1)
+{
+    <div class="dashboard-switcher mb-3">
+        @foreach (var option in _options)
+        {
+            var opt = option;
+            <button type="button"
+                    class="dashboard-switcher-item @(IsCurrent(opt.Key) ? "dashboard-switcher-item--active" : "")"
+                    @onclick="() => SwitchToAsync(opt.Key, opt.Url)">
+                @opt.Label
+            </button>
+        }
+    </div>
+}
+
+@code {
+    private sealed record DashboardOption(string Key, string Label, string Url);
+
+    private List<DashboardOption> _options = [];
+
+    protected override void OnInitialized()
+    {
+        var options = new List<DashboardOption>();
+        if (Session.IsHrAdministrator) options.Add(new DashboardOption("hr", "HR", "/dashboard/hr"));
+        if (Session.IsRecruiter) options.Add(new DashboardOption("recruitment", "Recruitment", "/dashboard/recruitment"));
+        if (Session.IsManager) options.Add(new DashboardOption("manager", "My Team", "/dashboard/manager"));
+        _options = options;
+    }
+
+    private bool IsCurrent(string key) =>
+        Navigation.Uri.TrimEnd('/').EndsWith(AppSession.DashboardUrl(key) ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+
+    private async Task SwitchToAsync(string key, string url)
+    {
+        // Same try/catch-swallow style as the existing theme/orgChartZoom localStorage helpers —
+        // a failed write (e.g. storage disabled) should never block navigation.
+        try
+        {
+            await JS.InvokeVoidAsync("setLastDashboard", key);
+        }
+        catch
+        {
+            // ignore
+        }
+
+        Navigation.NavigateTo(url);
+    }
+}

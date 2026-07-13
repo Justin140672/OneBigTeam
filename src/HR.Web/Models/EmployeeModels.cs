@@ -29,7 +29,8 @@ public record EmployeeListItemModel(
     string WorkEmail,
     DateOnly StartDate,
     string Status,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? ProfilePhotoUrl);
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 
@@ -344,4 +345,26 @@ public sealed record NewHiresTrendItem(
     int Month,
     string MonthLabel,
     int NewHireCount);
+
+// ── DASHBOARD: RECENT EMPLOYEE CHANGES ──────────────────────────────────────────
+
+public sealed record GetRecentEmployeeChangesResponse(IReadOnlyList<RecentEmployeeChangeItem> Items);
+
+public sealed record RecentEmployeeChangeItem(
+    DateTimeOffset OccurredAt,
+    string EmployeeName,
+    string Action,
+    string ActorName);
+
+// ── DASHBOARD: MY TEAM ──────────────────────────────────────────────────────────
+
+public sealed record GetMyTeamResponse(IReadOnlyList<TeamMemberItem> Items);
+
+public sealed record TeamMemberItem(
+    Guid EmployeeId,
+    string FullName,
+    string? JobTitle,
+    string? PhoneNumber,
+    string WorkEmail,
+    string? ProfilePhotoUrl);
 

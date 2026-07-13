@@ -484,8 +484,8 @@
         node.Shape = new Shape { Type = NodeShapes.HTML };
     }
 
-    // Profile photos aren't wired up yet (ProfilePhotoUrl is always null today) — shown as a
-    // placeholder circle with the person's initials until real photo upload/serving exists.
+    // Fallback shown when an employee has no uploaded/approved profile photo (ProfilePhotoUrl
+    // is null) — the node renders an initials circle instead of the <img>.
     private static string GetInitials(string name)
     {
         var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);

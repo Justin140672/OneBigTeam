@@ -1,0 +1,123 @@
+@inject EmployeeService EmployeeService
+@inject AppSession Session
+
+@if (Session.IsManager)
+{
+    @if (_loading)
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-people-group widget-icon"></i>
+                <span class="widget-title">My Team</span>
+            </div>
+            <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
+                <HrLoadingIndicator Label="Loading team…" />
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-people-group widget-icon"></i>
+                <span class="widget-title">My Team</span>
+                @if (_items.Count > 0)
+                {
+                    <span class="widget-count-badge">@_items.Count</span>
+                }
+            </div>
+
+            <div class="team-widget-scope btn-group btn-group-sm" role="group" aria-label="Team scope">
+                <input type="radio" class="btn-check" name="team-scope" id="team-scope-direct"
+                       checked="@(!_includeIndirect)" @onchange="@(() => SetScopeAsync(false))" />
+                <label class="btn btn-outline-primary" for="team-scope-direct">Direct Reports</label>
+
+                <input type="radio" class="btn-check" name="team-scope" id="team-scope-all"
+                       checked="@_includeIndirect" @onchange="@(() => SetScopeAsync(true))" />
+                <label class="btn btn-outline-primary" for="team-scope-all">All Reports</label>
+            </div>
+
+            <div class="widget-body">
+                @if (_items.Count == 0)
+                {
+                    <div class="widget-empty">
+                        <i class="fa-solid fa-people-group fa-lg mb-2"></i>
+                        <p class="mb-0">@(_includeIndirect ? "No one reports up to you." : "You have no direct reports.")</p>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var member in _items.Take(8))
+                    {
+                        var m = member;
+                        <div class="task-widget-item task-widget-item--static">
+                            <ProfilePhotoAvatar PhotoUrl="@m.ProfilePhotoUrl" Initials="@Initials(m.FullName)" SizePx="36" />
+                            <div class="task-widget-content">
+                                <span class="task-widget-title">@m.FullName</span>
+                                <span class="task-widget-meta">@(m.JobTitle ?? "—")</span>
+                            </div>
+                            <div class="team-widget-contact">
+                                @if (!string.IsNullOrEmpty(m.PhoneNumber))
+                                {
+                                    <a href="tel:@m.PhoneNumber" title="@m.PhoneNumber" @onclick:stopPropagation="true">
+                                        <i class="fa-solid fa-phone"></i>
+                                    </a>
+                                }
+                                <a href="mailto:@m.WorkEmail" title="@m.WorkEmail" @onclick:stopPropagation="true">
+                                    <i class="fa-solid fa-envelope"></i>
+                                </a>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private bool _includeIndirect;
+    private List<TeamMemberItem> _items = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsManager)
+        {
+            _loading = false;
+            return;
+        }
+
+        await LoadTeamAsync();
+        _loading = false;
+    }
+
+    private async Task LoadTeamAsync()
+    {
+        var result = await EmployeeService.GetMyTeamAsync(Session.CompanyId, _includeIndirect);
+        _items = result?.Items.ToList() ?? [];
+    }
+
+    private async Task SetScopeAsync(bool includeIndirect)
+    {
+        if (_includeIndirect == includeIndirect) return;
+
+        _includeIndirect = includeIndirect;
+        _loading = true;
+        StateHasChanged();
+
+        await LoadTeamAsync();
+        _loading = false;
+    }
+
+    private static string Initials(string fullName)
+    {
+        var parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length switch
+        {
+            0 => "?",
+            1 => parts[0][..1].ToUpperInvariant(),
+            _ => (parts[0][..1] + parts[^1][..1]).ToUpperInvariant(),
+        };
+    }
+}

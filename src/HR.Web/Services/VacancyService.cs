@@ -26,6 +26,22 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
         }
     }
 
+    public async Task<GetStaleVacanciesResponse?> GetStaleVacanciesAsync(
+        Guid companyId, int? staleAfterDays = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = $"api/companies/{companyId}/vacancies/stale";
+            if (staleAfterDays is not null) url += $"?staleAfterDays={staleAfterDays}";
+
+            return await Http.GetFromJsonAsync<GetStaleVacanciesResponse>(url, HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public async Task<GetPipelineSummaryResponse?> GetPipelineSummaryAsync(
         Guid companyId, CancellationToken cancellationToken = default)
     {

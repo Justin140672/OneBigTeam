@@ -12,7 +12,19 @@ internal sealed class AuditHistoryReader(AuditDbContext context) : IAuditHistory
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId && e.EmployeeId == employeeId)
             .OrderByDescending(e => e.OccurredAt)
-            .Select(e => new AuditHistoryEntry(e.OccurredAt, e.EventType, e.EntityType, e.ActorUserId, e.ActorEmployeeId, e.Summary, e.BeforeJson, e.AfterJson))
+            .Select(e => new AuditHistoryEntry(e.OccurredAt, e.EventType, e.EntityType, e.ActorUserId, e.ActorEmployeeId, e.Summary, e.BeforeJson, e.AfterJson, e.EmployeeId))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<AuditHistoryEntry>> GetRecentCompanyAuditHistoryAsync(
+        Guid companyId, IReadOnlyCollection<string> entityTypes, int take, CancellationToken cancellationToken)
+    {
+        return await context.AuditEvents
+            .AsNoTracking()
+            .Where(e => e.CompanyId == companyId && entityTypes.Contains(e.EntityType))
+            .OrderByDescending(e => e.OccurredAt)
+            .Take(take)
+            .Select(e => new AuditHistoryEntry(e.OccurredAt, e.EventType, e.EntityType, e.ActorUserId, e.ActorEmployeeId, e.Summary, e.BeforeJson, e.AfterJson, e.EmployeeId))
             .ToListAsync(cancellationToken);
     }
 }

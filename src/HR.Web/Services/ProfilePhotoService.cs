@@ -111,6 +111,25 @@ public sealed class ProfilePhotoService(IHttpClientFactory httpClientFactory)
         catch { return null; }
     }
 
+    public async Task<GetPendingProfilePhotoByIdResponse?> GetPendingProfilePhotoByIdAsync(
+        Guid companyId, Guid pendingPhotoId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.GetAsync(
+                $"api/companies/{companyId}/profile-photo/pending/{pendingPhotoId}", cancellationToken);
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+                return null;
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            return await response.Content.ReadFromJsonAsync<GetPendingProfilePhotoByIdResponse>(HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch { return null; }
+    }
+
     public async Task<GetEmployeeProfilePhotoResponse?> GetEmployeeProfilePhotoAsync(
         Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
     {
@@ -136,9 +155,9 @@ public sealed class ProfilePhotoService(IHttpClientFactory httpClientFactory)
     {
         try
         {
-            var response = await Http.PostAsync(
+            var response = await Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/approve",
-                content: null, cancellationToken);
+                new { }, cancellationToken);
 
             if (response.IsSuccessStatusCode)
                 return null;

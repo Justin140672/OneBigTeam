@@ -5,6 +5,7 @@
 @inject TaskService TaskService
 @inject SicknessService SicknessService
 @inject ProbationService ProbationService
+@inject OnboardingService OnboardingService
 @inject CompensationService CompensationService
 @inject AppSession Session
 
@@ -82,17 +83,20 @@ else
                         <dt>Working Pattern</dt>
                         <dd>@WorkingPatternSummary()</dd>
 
-                        @if (_probationRecord is not null)
+                        @if (_probationStatus is { HasRecord: true })
                         {
                             <dt>Probation Status</dt>
                             <dd>
-                                <span class="badge @ProbationStatusBadgeClass(_probationRecord.Status)">
-                                    @ProbationStatusLabel(_probationRecord.Status)
+                                <span class="badge @ProbationStatusBadgeClass(_probationStatus.Status ?? "")">
+                                    @ProbationStatusLabel(_probationStatus.Status ?? "")
                                 </span>
                             </dd>
 
-                            <dt>Probation End Date</dt>
-                            <dd>@_probationRecord.ExpectedEndDate.ToString("d MMMM yyyy")</dd>
+                            @if (_probationStatus.ExpectedEndDate.HasValue)
+                            {
+                                <dt>Probation End Date</dt>
+                                <dd>@_probationStatus.ExpectedEndDate.Value.ToString("d MMMM yyyy")</dd>
+                            }
                         }
 
                         @if (Session.DisplaySalaryOnEmployeeProfile)
@@ -201,6 +205,38 @@ else
                 }
             </div>
 
+            @if (_onboardingStatus is { HasPlan: true })
+            {
+                <!-- Onboarding Progress -->
+                <div class="overview-card mt-3">
+                    <div class="overview-card-header">
+                        <i class="fa-solid fa-route overview-card-icon"></i>
+                        <span class="overview-card-title">Onboarding Progress</span>
+                    </div>
+                    <div class="px-1 py-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted small">@_onboardingStatus.CompletedTasks of @_onboardingStatus.TotalTasks tasks complete</span>
+                            <span class="fw-semibold">@OnboardingPercentComplete()%</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar" role="progressbar" style="width: @(OnboardingPercentComplete())%"></div>
+                        </div>
+                    </div>
+                    @if (_onboardingStatus.Tasks.Count > 0)
+                    {
+                        <ul class="upcoming-leave-list">
+                            @foreach (var task in _onboardingStatus.Tasks.Where(t => t.Status != "Completed" && t.Status != "Skipped").Take(5))
+                            {
+                                <li class="upcoming-leave-item">
+                                    <span class="upcoming-leave-type">@task.Title</span>
+                                    <span class="upcoming-leave-dates">@(task.DueDate.HasValue ? task.DueDate.Value.ToString("d MMM yyyy") : "No due date")</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+
         </div>
 
         <!-- Actions -->
@@ -271,7 +307,8 @@ else
     private int _pendingLeaveCount;
     private decimal? _sicknessDays;
     private List<LeaveRequestListItem> _upcomingLeave = [];
-    private ProbationRecordModel? _probationRecord;
+    private MyProbationStatusModel? _probationStatus;
+    private MyOnboardingStatusModel? _onboardingStatus;
     private CurrentCompensationModel? _currentCompensation;
 
     // Backing data for the "Request Leave" quick-action dialog, rendered directly on this tab
@@ -303,16 +340,21 @@ else
         var requestsTask   = LeaveService.ListLeaveRequestsAsync(CompanyId, EmployeeId);
         var tasksTask      = TaskService.GetMyTasksAsync(CompanyId);
         var sicknessTask   = SicknessService.GetMySicknessRecordsAsync(CompanyId, EmployeeId);
-        var probationTask  = ProbationService.GetProbationRecordByEmployeeAsync(CompanyId, EmployeeId);
+        // Self-scoped endpoint (employees/me/probation-status) — the HR-only
+        // GetProbationRecordByEmployee ("probation:manage") 403s for a real employee viewing
+        // their own profile, which used to be silently swallowed by a blanket catch{}.
+        var probationTask  = ProbationService.GetMyProbationStatusAsync(CompanyId);
+        var onboardingTask = OnboardingService.GetMyOnboardingStatusAsync(CompanyId);
         var holidaysTask   = PublicHolidayService.ListAsync(CompanyId);
         var compensationTask = Session.DisplaySalaryOnEmployeeProfile
             ? CompensationService.GetCurrentCompensationAsync(CompanyId, EmployeeId)
             : Task.FromResult<CurrentCompensationModel?>(null);
 
-        await Task.WhenAll(employeeTask, balanceTask, requestsTask, tasksTask, sicknessTask, probationTask, holidaysTask, compensationTask);
+        await Task.WhenAll(employeeTask, balanceTask, requestsTask, tasksTask, sicknessTask, probationTask, onboardingTask, holidaysTask, compensationTask);
 
         _employee = await employeeTask;
-        _probationRecord = await probationTask;
+        _probationStatus = await probationTask;
+        _onboardingStatus = await onboardingTask;
         _currentCompensation = await compensationTask;
         _publicHolidays = (await holidaysTask)?.Items.Select(h => h.Date).ToList() ?? [];
 
@@ -436,6 +478,11 @@ else
         "ReviewDue" => "Review Due",
         _           => status
     };
+
+    private int OnboardingPercentComplete() =>
+        _onboardingStatus is { TotalTasks: > 0 }
+            ? (int)Math.Round(_onboardingStatus.CompletedTasks * 100m / _onboardingStatus.TotalTasks)
+            : 0;
 
     private string SalarySummary() =>
         _currentCompensation is not null

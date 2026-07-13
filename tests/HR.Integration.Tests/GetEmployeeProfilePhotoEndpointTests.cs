@@ -91,6 +91,32 @@ public class GetEmployeeProfilePhotoEndpointTests : IClassFixture<ApiWebApplicat
     }
 
     [Fact]
+    public async Task Get_Returns_NotFound_When_EmployeeId_Belongs_To_Different_Company()
+    {
+        // The employee (and their live photo) genuinely belong to Company B.
+        var companyB   = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        using (var managerClientB = ManagerClient(companyB))
+        {
+            var upload = await managerClientB.PostAsync(
+                $"/api/companies/{companyB}/employees/{employeeId}/profile-photo",
+                BuildPngUpload("company-b.png"));
+            Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+        }
+
+        // An HR caller genuinely belonging to Company A (their own claim matches the route) tries
+        // to fetch the employeeId that actually belongs to Company B — must 404, never leak.
+        var companyA = Guid.NewGuid();
+        using var clientA = ManagerClient(companyA);
+
+        var response = await clientA.GetAsync(
+            $"/api/companies/{companyA}/employees/{employeeId}/profile-photo");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Get_Returns_Ok_With_Populated_Response()
     {
         var companyId  = Guid.NewGuid();

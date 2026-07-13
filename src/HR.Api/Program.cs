@@ -431,6 +431,42 @@ if (app.Environment.IsDevelopment())
 		store.Switch(userId);
 		return Results.NoContent();
 	}).AllowAnonymous();
+
+	// Every Local*StorageService (used whenever the corresponding Supabase config section is
+	// absent — the default in this dev environment) writes under one of these folders and used
+	// to hand back a raw file:// path, which a browser refuses to load in an <img> tag or follow
+	// via a redirect-based download endpoint. This streams the same local files back over HTTP
+	// instead. "bucket" identifies which Local*StorageService's root to serve from.
+	var localStorageBuckets = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+	{
+		["profile-photos"]      = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "onebigteam", "profile-photos")),
+		["documents"]            = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "onebigteam", "documents")),
+		["candidate-documents"] = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "onebigteam", "recruitment", "candidate-documents")),
+	};
+	var contentTypeProvider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+
+	app.MapGet("/api/dev/local-storage/{bucket}/{*key}", (string bucket, string key) =>
+	{
+		if (!localStorageBuckets.TryGetValue(bucket, out var basePath))
+			return Results.NotFound();
+
+		var relativePath = string.Join(
+			Path.DirectorySeparatorChar,
+			key.Split('/').Select(Uri.UnescapeDataString));
+		var fullPath = Path.GetFullPath(Path.Combine(basePath, relativePath));
+
+		// Guard against the resolved path escaping the storage root (path traversal via "..").
+		if (!fullPath.StartsWith(basePath, StringComparison.OrdinalIgnoreCase)
+			|| !File.Exists(fullPath))
+		{
+			return Results.NotFound();
+		}
+
+		if (!contentTypeProvider.TryGetContentType(fullPath, out var contentType))
+			contentType = "application/octet-stream";
+
+		return Results.File(fullPath, contentType);
+	}).AllowAnonymous();
 }
 
 app.UseHangfireBackgroundJobs();

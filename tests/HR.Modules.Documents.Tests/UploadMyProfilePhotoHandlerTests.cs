@@ -14,6 +14,13 @@ public class UploadMyProfilePhotoHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 7, 12, 10, 0, 0, DateTimeKind.Utc);
 
+    private sealed class FakeEmployeeNameReader(Dictionary<Guid, string>? names = null) : IEmployeeNameReader
+    {
+        public Task<IReadOnlyDictionary<Guid, string>> GetNamesAsync(
+            Guid companyId, IEnumerable<Guid> employeeIds, CancellationToken cancellationToken)
+            => Task.FromResult<IReadOnlyDictionary<Guid, string>>(names ?? new Dictionary<Guid, string>());
+    }
+
     private static DocumentsDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<DocumentsDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
@@ -25,14 +32,16 @@ public class UploadMyProfilePhotoHandlerTests
         FakeVirusScanService? scanner = null,
         ImageUploadOptions? options = null,
         FakeTaskCreator? taskCreator = null,
-        FakeAuditPublisher? auditPublisher = null) =>
+        FakeAuditPublisher? auditPublisher = null,
+        FakeEmployeeNameReader? employeeNameReader = null) =>
         new(db,
             storage ?? new FakeProfilePhotoStorageService(),
             new ImageUploadValidator(Options.Create(options ?? new ImageUploadOptions())),
             scanner ?? new FakeVirusScanService(),
             taskCreator ?? new FakeTaskCreator(),
             new FakeClock(FixedUtcNow),
-            auditPublisher ?? new FakeAuditPublisher());
+            auditPublisher ?? new FakeAuditPublisher(),
+            employeeNameReader ?? new FakeEmployeeNameReader());
 
     // Produces a valid PNG file with real IHDR dimensions so magic-byte and dimension
     // validation both pass by default.

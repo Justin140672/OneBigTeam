@@ -16,6 +16,8 @@ public class ProbationAuthorizationTests : IClassFixture<ApiWebApplicationFactor
     private readonly ApiWebApplicationFactory _factory;
 
     private static readonly Guid CompanyAdministratorUser = new("ff000001-0000-0000-0000-000000000001");
+    private static readonly Guid ManagerUser = new("ff000001-0000-0000-0000-000000000002");
+    private static readonly Guid PlainEmployeeUser = new("ff000001-0000-0000-0000-000000000003");
 
     public ProbationAuthorizationTests(ApiWebApplicationFactory factory)
     {
@@ -24,6 +26,8 @@ public class ProbationAuthorizationTests : IClassFixture<ApiWebApplicationFactor
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdministratorUser, SystemRoles.CompanyAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.Manager);
+            await TestRoleSeeder.AssignRoleAsync(factory, PlainEmployeeUser, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
 
@@ -64,6 +68,31 @@ public class ProbationAuthorizationTests : IClassFixture<ApiWebApplicationFactor
         using var client = ClientFor(companyId, CompanyAdministratorUser);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/probation-reviews/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    // --- probation:review — GetUpcomingProbationReviews now includes Manager (dashboard
+    // widening; was previously "probation:manage", HrAdministrator only) ---
+
+    [Fact]
+    public async Task Manager_Gets_Ok_Getting_Upcoming_Probation_Reviews()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = ClientFor(companyId, ManagerUser);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/probation-reviews/upcoming");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PlainEmployee_Gets_Forbidden_Getting_Upcoming_Probation_Reviews()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = ClientFor(companyId, PlainEmployeeUser);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/probation-reviews/upcoming");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }

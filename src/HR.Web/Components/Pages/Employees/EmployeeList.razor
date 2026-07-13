@@ -37,6 +37,14 @@
                         RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
             <GridPageSettings PageSize="20" />
             <GridColumns>
+                <GridColumn HeaderText="" Width="50" AllowSorting="false" AllowFiltering="false">
+                    <Template>
+                        @{
+                            var row = (context as EmployeeListItemModel)!;
+                            <ProfilePhotoAvatar PhotoUrl="@row.ProfilePhotoUrl" Initials="@GetInitials(row)" SizePx="32" />
+                        }
+                    </Template>
+                </GridColumn>
                 <GridColumn Field="@nameof(EmployeeListItemModel.LastName)" HeaderText="Last Name" Width="140">
                     <Template>
                         @{
@@ -93,6 +101,14 @@
 
     protected override string? GetViewUrl(EmployeeListItemModel item) =>
         $"/companies/{CompanyId}/employees/{item.Id}/view";
+
+    private static string GetInitials(EmployeeListItemModel row)
+    {
+        var first = row.FirstName.Length > 0 ? row.FirstName[..1] : string.Empty;
+        var last = row.LastName.Length > 0 ? row.LastName[..1] : string.Empty;
+        var initials = $"{first}{last}".ToUpperInvariant();
+        return string.IsNullOrEmpty(initials) ? "?" : initials;
+    }
 
     private static string StatusBadgeClass(string status) => status switch
     {

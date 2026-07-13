@@ -1,6 +1,7 @@
 using HR.Modules.Onboarding.Features.CompleteOnboardingTaskFromTask;
 using HR.Modules.Onboarding.Features.CreateOnboardingPlanOnEmployeeCreated;
 using HR.Modules.Onboarding.Features.GetOnboardingOverview;
+using HR.Modules.Onboarding.Features.GetMyOnboardingStatus;
 using HR.Modules.Onboarding.Features.GetOnboardingStatus;
 using HR.Modules.Onboarding.Features.GetTeamOnboarding;
 using HR.Modules.Onboarding.Jobs;
@@ -29,6 +30,7 @@ public static class OnboardingModule
         services.AddScoped<ITaskCompletionAction, CompleteOnboardingTaskFromTaskAction>();
         services.AddScoped<GetOnboardingOverviewHandler>();
         services.AddScoped<GetOnboardingStatusHandler>();
+        services.AddScoped<GetMyOnboardingStatusHandler>();
         services.AddScoped<IOnboardingStatusReader, OnboardingStatusReader>();
         services.AddScoped<GetTeamOnboardingHandler>();
         services.AddScoped<OnboardingReminderJob>();

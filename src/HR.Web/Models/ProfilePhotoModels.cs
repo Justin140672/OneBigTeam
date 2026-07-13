@@ -57,6 +57,17 @@ public sealed record GetPendingProfilePhotoResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
+public sealed record GetPendingProfilePhotoByIdResponse(
+    Guid Id,
+    Guid CompanyId,
+    Guid EmployeeId,
+    string FileName,
+    long FileSize,
+    string ContentType,
+    string DownloadUrl,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
+
 public sealed record GetEmployeeProfilePhotoResponse(
     Guid Id,
     Guid CompanyId,
