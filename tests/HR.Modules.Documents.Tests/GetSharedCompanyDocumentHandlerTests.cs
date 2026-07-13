@@ -219,7 +219,7 @@ public class GetSharedCompanyDocumentHandlerTests
         db.SharedCompanyDocuments.Add(doc);
 
         db.SharedCompanyDocumentAcknowledgements.Add(
-            SharedCompanyDocumentAcknowledgement.Create(Guid.NewGuid(), companyId, doc.Id, emp1, 1, Now));
+            SharedCompanyDocumentAcknowledgement.Create(Guid.NewGuid(), companyId, doc.Id, emp1, 1, "Statement", null, Now));
         await db.SaveChangesAsync();
 
         var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [emp1, emp2, emp3] };
@@ -253,7 +253,7 @@ public class GetSharedCompanyDocumentHandlerTests
         db.SharedCompanyDocuments.Add(doc);
 
         db.SharedCompanyDocumentAcknowledgements.Add(
-            SharedCompanyDocumentAcknowledgement.Create(Guid.NewGuid(), companyId, doc.Id, emp1, 1, Now));
+            SharedCompanyDocumentAcknowledgement.Create(Guid.NewGuid(), companyId, doc.Id, emp1, 1, "Statement", null, Now));
         await db.SaveChangesAsync();
 
         var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [emp1] };

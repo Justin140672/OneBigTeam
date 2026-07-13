@@ -1,0 +1,82 @@
+@using HR.Web.Models
+@inject DocumentService DocumentService
+@inject NavigationManager Navigation
+
+<div class="card" data-testid="shared-document-acknowledgement-panel">
+    <div class="card-header fw-medium">Document Acknowledgement</div>
+    <div class="card-body">
+        @if (_loading)
+        {
+            <HrLoadingIndicator Label="Loading document…" />
+        }
+        else if (_document is null)
+        {
+            <div class="alert alert-warning mb-0">
+                This document is no longer available to you. Please contact your HR administrator.
+            </div>
+        }
+        else
+        {
+            <dl class="row mb-3">
+                <dt class="col-sm-4 text-muted fw-normal">Title</dt>
+                <dd class="col-sm-8">@_document.Title</dd>
+
+                <dt class="col-sm-4 text-muted fw-normal">Category</dt>
+                <dd class="col-sm-8">@_document.CategoryName</dd>
+
+                @if (Task.DueDate.HasValue)
+                {
+                    <dt class="col-sm-4 text-muted fw-normal">Acknowledge By</dt>
+                    <dd class="col-sm-8">@Task.DueDate.Value.ToString("d MMMM yyyy")</dd>
+                }
+            </dl>
+
+            @if (_document.MyAcknowledgedAt.HasValue)
+            {
+                <div class="alert alert-success mb-0">
+                    <i class="fa-solid fa-circle-check me-1"></i>
+                    Acknowledged on @_document.MyAcknowledgedAt.Value.ToString("d MMM yyyy")
+                </div>
+            }
+            else
+            {
+                <p class="text-muted small">
+                    Open the document to view its full details, read the acknowledgement statement,
+                    and confirm you've read and understood it.
+                </p>
+                <button class="btn btn-primary" data-testid="view-document-btn" @onclick="OpenDocument">
+                    <i class="fa-solid fa-file-lines me-1"></i> View &amp; Acknowledge Document
+                </button>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public TaskDetailModel Task { get; set; } = null!;
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private PublishedSharedCompanyDocumentDetailResponse? _document;
+    private bool _loading = true;
+
+    protected override async System.Threading.Tasks.Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        if (Task.SourceEntityId.HasValue)
+            _document = await DocumentService.GetPublishedSharedCompanyDocumentAsync(CompanyId, Task.SourceEntityId.Value);
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    // The actual acknowledgement — reading the statement and explicitly confirming it, distinct
+    // from viewing/downloading — happens on the dedicated document screen, not in this panel.
+    // Passing the task id lets that screen complete this task once acknowledgement succeeds.
+    private void OpenDocument()
+    {
+        if (Task.SourceEntityId is not { } documentId) return;
+        Navigation.NavigateTo($"/companies/{CompanyId}/shared-documents/published/{documentId}?taskId={Task.Id}");
+    }
+}

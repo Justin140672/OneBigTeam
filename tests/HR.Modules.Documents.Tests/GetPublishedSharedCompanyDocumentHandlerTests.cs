@@ -131,7 +131,7 @@ public class GetPublishedSharedCompanyDocumentHandlerTests
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAcknowledgements.Add(
-            SharedCompanyDocumentAcknowledgement.Create(Guid.NewGuid(), companyId, doc.Id, caller, 1, Now));
+            SharedCompanyDocumentAcknowledgement.Create(Guid.NewGuid(), companyId, doc.Id, caller, 1, "Statement", null, Now));
         await db.SaveChangesAsync();
 
         var result = await Handler(db).HandleAsync(
@@ -205,7 +205,7 @@ public class GetPublishedSharedCompanyDocumentHandlerTests
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAcknowledgements.Add(
-            SharedCompanyDocumentAcknowledgement.Create(Guid.NewGuid(), companyId, doc.Id, someoneElse, 1, Now));
+            SharedCompanyDocumentAcknowledgement.Create(Guid.NewGuid(), companyId, doc.Id, someoneElse, 1, "Statement", null, Now));
         await db.SaveChangesAsync();
 
         var result = await Handler(db).HandleAsync(

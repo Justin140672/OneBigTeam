@@ -251,6 +251,8 @@ public class PublishSharedCompanyDocumentHandlerTests
         Assert.Equal(2, taskCreator.Created.Count);
         Assert.All(taskCreator.Created, t =>
         {
+            Assert.Equal("Acknowledge: Remote Working Policy", t.Title);
+            Assert.Equal("Please read and acknowledge 'Remote Working Policy'.", t.Description);
             Assert.Equal(TaskActionType.Acknowledge, t.ActionType);
             Assert.Equal(TaskSource.Document, t.Source);
             Assert.Equal(doc.Id, t.SourceEntityId);
@@ -259,6 +261,40 @@ public class PublishSharedCompanyDocumentHandlerTests
         });
         Assert.Contains(taskCreator.Created, t => t.AssignedEmployeeId == emp1);
         Assert.Contains(taskCreator.Created, t => t.AssignedEmployeeId == emp2);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Skips_Creating_A_Task_For_An_Employee_Who_Already_Acknowledged_This_Version()
+    {
+        // Guards against a duplicate reminder: if this exact version was already acknowledged
+        // (e.g. between an earlier publish and a metadata-only republish), the employee has
+        // already complied and doesn't need a task nagging them to do it again.
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var category   = await SeedCategory(db, companyId);
+        var alreadyAcknowledged = Guid.NewGuid();
+        var stillPending        = Guid.NewGuid();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Remote Working Policy", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1), acknowledgementStatement: null,
+            createdBy: Guid.NewGuid(), now: Now);
+        db.SharedCompanyDocuments.Add(doc);
+        db.SharedCompanyDocumentAcknowledgements.Add(SharedCompanyDocumentAcknowledgement.Create(
+            Guid.NewGuid(), companyId, doc.Id, alreadyAcknowledged, doc.VersionNumber, "Statement", null, Now));
+        await db.SaveChangesAsync();
+
+        var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [alreadyAcknowledged, stillPending] };
+        var taskCreator = new FakeTaskCreator();
+
+        var result = await Handler(db, audienceReader, taskCreator: taskCreator).HandleAsync(
+            new PublishSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value!.AcknowledgementTasksCreated);
+        Assert.Single(taskCreator.Created);
+        Assert.Equal(stillPending, taskCreator.Created[0].AssignedEmployeeId);
     }
 
     [Fact]

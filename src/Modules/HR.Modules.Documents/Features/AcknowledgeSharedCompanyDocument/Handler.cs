@@ -63,6 +63,8 @@ internal sealed class AcknowledgeSharedCompanyDocumentHandler(
             document.Id,
             callerEmployeeId,
             document.VersionNumber,
+            AcknowledgementStatementDefaults.Resolve(document.AcknowledgementStatement),
+            request.TaskId,
             now);
 
         db.SharedCompanyDocumentAcknowledgements.Add(acknowledgement);

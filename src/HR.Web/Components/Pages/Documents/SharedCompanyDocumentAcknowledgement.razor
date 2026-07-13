@@ -1,0 +1,147 @@
+@page "/companies/{CompanyId:guid}/shared-documents/published/{DocumentId:guid}"
+@rendermode InteractiveServer
+@inject DocumentService DocumentService
+@inject TaskService TaskService
+@inject AppSession Session
+@inject NavigationManager Navigation
+@using Microsoft.AspNetCore.WebUtilities
+
+<PageTitle>@(_detail?.Title ?? "Document")</PageTitle>
+
+<div class="container py-4" style="max-width: 720px;">
+    @if (_loading)
+    {
+        <HrLoadingIndicator Label="Loading document…" />
+    }
+    else if (_detail is null)
+    {
+        <div class="alert alert-danger">Document was not found.</div>
+    }
+    else
+    {
+        <a href="@($"{Session.MyProfileUrl}?tab=documents")" class="text-decoration-none text-muted small">← My Documents</a>
+        <h1 class="mb-3">@_detail.Title</h1>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger alert-dismissible mb-3">
+                @_error
+                <button type="button" class="btn-close" @onclick="@(() => _error = null)"></button>
+            </div>
+        }
+
+        <div class="overview-card mb-3">
+            <div class="overview-card-header">
+                <i class="fa-solid fa-file-lines overview-card-icon"></i>
+                <span class="overview-card-title">Document Details</span>
+            </div>
+            <dl class="overview-dl">
+                <dt>Category</dt>
+                <dd>@_detail.CategoryName</dd>
+                @if (_detail.EffectiveDate.HasValue)
+                {
+                    <dt>Effective Date</dt>
+                    <dd>@_detail.EffectiveDate.Value.ToString("d MMMM yyyy")</dd>
+                }
+                @if (!string.IsNullOrWhiteSpace(_detail.Description))
+                {
+                    <dt>Description</dt>
+                    <dd>@_detail.Description</dd>
+                }
+            </dl>
+            <a class="btn btn-outline-primary" href="@DocumentService.GetSharedCompanyDocumentDownloadUrl(CompanyId, DocumentId)" target="_blank">
+                <i class="fa-solid fa-download me-1"></i> Open / Download
+            </a>
+        </div>
+
+        @if (_detail.RequiresAcknowledgement)
+        {
+            <div class="overview-card">
+                <div class="overview-card-header">
+                    <i class="fa-solid fa-clipboard-check overview-card-icon"></i>
+                    <span class="overview-card-title">Acknowledgement</span>
+                </div>
+
+                @if (_detail.MyAcknowledgedAt.HasValue)
+                {
+                    <div class="alert alert-success mb-0">
+                        <i class="fa-solid fa-circle-check me-1"></i>
+                        You acknowledged this document on @_detail.MyAcknowledgedAt.Value.ToString("d MMMM yyyy, HH:mm").
+                    </div>
+                }
+                else
+                {
+                    @if (_detail.AcknowledgementDueDate.HasValue)
+                    {
+                        <p class="text-muted small">Please acknowledge by @_detail.AcknowledgementDueDate.Value.ToString("d MMMM yyyy").</p>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(_detail.AcknowledgementStatement))
+                    {
+                        <div class="alert alert-info">@_detail.AcknowledgementStatement</div>
+                    }
+
+                    <div class="mb-3">
+                        <SfCheckBox TChecked="bool"
+                                    Label="I confirm that I have read and understood this document."
+                                    Checked="@_confirmed"
+                                    CheckedChanged="@((bool v) => _confirmed = v)"
+                                    Disabled="@_acknowledging" />
+                    </div>
+
+                    <SfButton CssClass="e-primary" Disabled="@(!_confirmed || _acknowledging)" OnClick="AcknowledgeAsync">
+                        @(_acknowledging ? "Confirming…" : "Confirm Acknowledgement")
+                    </SfButton>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid DocumentId { get; set; }
+
+    private PublishedSharedCompanyDocumentDetailResponse? _detail;
+    private bool _loading = true;
+    private bool _confirmed;
+    private bool _acknowledging;
+    private string? _error;
+
+    // Set only when this page was reached from a task (via ?taskId=), so acknowledging can also
+    // complete that task — reached directly from My Documents, there's no task to complete.
+    private Guid? _taskId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var query = QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
+        if (query.TryGetValue("taskId", out var taskIdValue) && Guid.TryParse(taskIdValue, out var taskId))
+            _taskId = taskId;
+
+        _detail = await DocumentService.GetPublishedSharedCompanyDocumentAsync(CompanyId, DocumentId);
+        _loading = false;
+    }
+
+    private async Task AcknowledgeAsync()
+    {
+        if (_detail is null || !_confirmed) return;
+
+        _acknowledging = true;
+        _error = null;
+        StateHasChanged();
+
+        var error = await DocumentService.AcknowledgeSharedCompanyDocumentAsync(CompanyId, _detail.Id, _taskId);
+        if (error is not null)
+        {
+            _error = error;
+            _acknowledging = false;
+            return;
+        }
+
+        if (_taskId.HasValue)
+            await TaskService.CompleteTaskAsync(CompanyId, _taskId.Value);
+
+        _detail = await DocumentService.GetPublishedSharedCompanyDocumentAsync(CompanyId, DocumentId);
+        _acknowledging = false;
+    }
+}

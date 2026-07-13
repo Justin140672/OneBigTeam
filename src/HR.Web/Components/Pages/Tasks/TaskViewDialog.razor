@@ -77,6 +77,12 @@
                                                        Task="_task"
                                                        OnCompleted="OnActionCompletedAsync" />
                     }
+                    else if (_task.ActionType == "Acknowledge" && _task.Source == "Document")
+                    {
+                        <SharedCompanyDocumentAcknowledgementTaskPanel CompanyId="CompanyId"
+                                                                        Task="_task"
+                                                                        OnCompleted="OnActionCompletedAsync" />
+                    }
                     else if (_task.ActionType == "Return" && _task.Source == "Asset")
                     {
                         <AssetReturnTaskPanel CompanyId="CompanyId"

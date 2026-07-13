@@ -148,12 +148,13 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
 
     // Returns null on success, or an error message string on failure.
     public async Task<string?> AcknowledgeSharedCompanyDocumentAsync(
-        Guid companyId, Guid documentId, CancellationToken cancellationToken = default)
+        Guid companyId, Guid documentId, Guid? taskId = null, CancellationToken cancellationToken = default)
     {
         try
         {
-            var response = await Http.PostAsync(
-                $"api/companies/{companyId}/shared-documents/{documentId}/acknowledge", null, cancellationToken);
+            var response = await Http.PostAsJsonAsync(
+                $"api/companies/{companyId}/shared-documents/{documentId}/acknowledge",
+                new { TaskId = taskId }, cancellationToken);
 
             if (response.IsSuccessStatusCode)
                 return null;

@@ -135,8 +135,11 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Reacknowledging_After_A_New_Version_Creates_A_Second_Row()
+    public async Task HandleAsync_Reacknowledging_After_A_New_Version_Preserves_The_Old_Acknowledgement()
     {
+        // The core "version preservation" guarantee: replacing the file must never touch the
+        // acknowledgement row already recorded against the version the employee actually saw —
+        // it stays exactly as it was, at VersionNumber 1, alongside the new row at VersionNumber 2.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);
@@ -150,7 +153,7 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
         await db.SaveChangesAsync();
 
         var handler = Handler(db);
-        await handler.HandleAsync(
+        var first = await handler.HandleAsync(
             new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id }, caller,
             CancellationToken.None);
 
@@ -163,8 +166,148 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
             CancellationToken.None);
 
         Assert.True(second.IsSuccess);
+        Assert.Equal(1, first.Value!.VersionNumber);
         Assert.Equal(2, second.Value!.VersionNumber);
-        Assert.Equal(2, await db.SharedCompanyDocumentAcknowledgements.CountAsync());
+
+        var rows = await db.SharedCompanyDocumentAcknowledgements
+            .OrderBy(a => a.VersionNumber)
+            .ToListAsync();
+        Assert.Equal(2, rows.Count);
+        Assert.Equal(1, rows[0].VersionNumber);
+        Assert.Equal(caller, rows[0].EmployeeId);
+        Assert.Equal(2, rows[1].VersionNumber);
+        Assert.Equal(caller, rows[1].EmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Captures_The_Statement_As_Shown_At_Acknowledgement_Time()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, requiresAcknowledgement: true, acknowledgementDueDate: null,
+            acknowledgementStatement: "I confirm I have read the updated expenses policy.",
+            createdBy: Guid.NewGuid(), now: Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        await Handler(db).HandleAsync(
+            new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id }, caller,
+            CancellationToken.None);
+
+        var saved = await db.SharedCompanyDocumentAcknowledgements.SingleAsync();
+        Assert.Equal("I confirm I have read the updated expenses policy.", saved.AcknowledgementStatement);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Captures_The_Default_Statement_When_Document_Has_No_Custom_One()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        await Handler(db).HandleAsync(
+            new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id }, caller,
+            CancellationToken.None);
+
+        var saved = await db.SharedCompanyDocumentAcknowledgements.SingleAsync();
+        Assert.Equal("I confirm that I have read and understood this document.", saved.AcknowledgementStatement);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Captures_The_Related_TaskId_When_Provided()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+        var taskId     = Guid.NewGuid();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        await Handler(db).HandleAsync(
+            new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id, TaskId = taskId }, caller,
+            CancellationToken.None);
+
+        var saved = await db.SharedCompanyDocumentAcknowledgements.SingleAsync();
+        Assert.Equal(taskId, saved.TaskId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_TaskId_Is_Null_When_Not_Reached_Via_A_Task()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        await Handler(db).HandleAsync(
+            new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id }, caller,
+            CancellationToken.None);
+
+        var saved = await db.SharedCompanyDocumentAcknowledgements.SingleAsync();
+        Assert.Null(saved.TaskId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Overwrite_The_Recorded_Statement_When_Acknowledged_Again_Idempotently()
+    {
+        // Immutability in practice: the idempotent re-acknowledge path must return the existing
+        // row untouched, even if the document's statement has since been edited — the row keeps
+        // showing exactly what the employee agreed to at the time.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, requiresAcknowledgement: true, acknowledgementDueDate: null,
+            acknowledgementStatement: "Original statement.", createdBy: Guid.NewGuid(), now: Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var handler = Handler(db);
+        await handler.HandleAsync(
+            new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id }, caller,
+            CancellationToken.None);
+
+        var stored = await db.SharedCompanyDocuments.SingleAsync();
+        stored.SetAcknowledgementSettings(true, null, "Changed statement.", Guid.NewGuid(), Now.AddDays(1));
+        await db.SaveChangesAsync();
+
+        await handler.HandleAsync(
+            new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id }, caller,
+            CancellationToken.None);
+
+        var saved = await db.SharedCompanyDocumentAcknowledgements.SingleAsync();
+        Assert.Equal("Original statement.", saved.AcknowledgementStatement);
     }
 
     private static AcknowledgeSharedCompanyDocumentHandler Handler(

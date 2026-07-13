@@ -32,9 +32,17 @@ internal sealed class SharedCompanyDocumentAcknowledgementConfiguration : IEntit
             .HasColumnName("version_number")
             .IsRequired();
 
+        builder.Property(a => a.AcknowledgementStatement)
+            .HasColumnName("acknowledgement_statement")
+            .HasMaxLength(1000)
+            .IsRequired();
+
         builder.Property(a => a.AcknowledgedAt)
             .HasColumnName("acknowledged_at")
             .IsRequired();
+
+        builder.Property(a => a.TaskId)
+            .HasColumnName("task_id");
 
         builder.HasOne<SharedCompanyDocument>()
             .WithMany()

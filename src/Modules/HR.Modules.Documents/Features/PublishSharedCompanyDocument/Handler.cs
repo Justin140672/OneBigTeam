@@ -81,8 +81,25 @@ internal sealed class PublishSharedCompanyDocumentHandler(
             var eligibleEmployeeIds = await audienceMatcher.GetEligibleEmployeeIdsAsync(
                 request.CompanyId, document.Id, cancellationToken);
 
+            // Duplicate-task prevention: Publish only ever runs on a Draft document (the status
+            // check above rejects anything else, and there is no Republish/RevertToDraft
+            // endpoint), so a given (document, version) can only trigger this loop once — there
+            // is structurally no way to reach this code twice for the same version. The one
+            // remaining case worth guarding is an employee who already acknowledged this exact
+            // version (e.g. between an earlier publish and a since-fixed metadata edit); they
+            // don't need a reminder task.
+            var alreadyAcknowledgedIds = await db.SharedCompanyDocumentAcknowledgements
+                .Where(a => a.SharedCompanyDocumentId == document.Id && a.VersionNumber == document.VersionNumber)
+                .Select(a => a.EmployeeId)
+                .ToListAsync(cancellationToken);
+
+            var alreadyAcknowledged = new HashSet<Guid>(alreadyAcknowledgedIds);
+
             foreach (var employeeId in eligibleEmployeeIds)
             {
+                if (alreadyAcknowledged.Contains(employeeId))
+                    continue;
+
                 await taskCreator.CreateAsync(
                     request.CompanyId,
                     createdBy:          publishedBy,
