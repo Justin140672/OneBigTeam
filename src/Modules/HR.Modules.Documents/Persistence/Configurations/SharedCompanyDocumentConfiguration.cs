@@ -38,6 +38,20 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
             .HasMaxLength(500)
             .IsRequired();
 
+        builder.Property(d => d.FileName)
+            .HasColumnName("file_name")
+            .HasMaxLength(255)
+            .IsRequired();
+
+        builder.Property(d => d.FileSize)
+            .HasColumnName("file_size")
+            .IsRequired();
+
+        builder.Property(d => d.ContentType)
+            .HasColumnName("content_type")
+            .HasMaxLength(100)
+            .IsRequired();
+
         builder.Property(d => d.VersionNumber)
             .HasColumnName("version_number")
             .IsRequired();
@@ -56,6 +70,10 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
 
         builder.Property(d => d.CreatedBy)
             .HasColumnName("created_by")
+            .IsRequired();
+
+        builder.Property(d => d.UpdatedBy)
+            .HasColumnName("updated_by")
             .IsRequired();
 
         builder.Property(d => d.CreatedAt)

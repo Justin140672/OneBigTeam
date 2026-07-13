@@ -21,7 +21,7 @@
                         <MyProfileOverviewTab CompanyId="CompanyId"
                                              EmployeeId="EmployeeId"
                                              OnNavigateToDocuments="() => _activeTabIndex = 6"
-                                             OnNavigateToTasks="() => _activeTabIndex = 7" />
+                                             OnNavigateToTasks="() => _activeTabIndex = 8" />
                     </div>
                 </ContentTemplate>
             </TabItem>
@@ -59,6 +59,12 @@
                 <ChildContent><TabHeader Text="Documents" /></ChildContent>
                 <ContentTemplate>
                     <div class="mt-4"><MyProfileDocumentsTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
+                </ContentTemplate>
+            </TabItem>
+            <TabItem>
+                <ChildContent><TabHeader Text="Company Documents" /></ChildContent>
+                <ContentTemplate>
+                    <div class="mt-4"><MyProfileCompanyDocumentsTab CompanyId="CompanyId" /></div>
                 </ContentTemplate>
             </TabItem>
             <TabItem>
@@ -101,8 +107,8 @@
             _activeTabIndex = tab.ToString() switch
             {
                 "leave"  => 4,
-                "tasks"  => 7,
-                "assets" => 8,
+                "tasks"  => 8,
+                "assets" => 9,
                 _        => 0
             };
         }

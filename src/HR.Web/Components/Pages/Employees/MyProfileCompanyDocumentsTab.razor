@@ -1,0 +1,53 @@
+@inject DocumentService DocumentService
+
+@if (_loading)
+{
+    <HrLoadingIndicator Label="Loading documents…" />
+}
+else if (_documents.Count == 0)
+{
+    <p class="text-muted">No published company documents yet.</p>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var doc in _documents)
+        {
+            <div class="col-md-6">
+                <div class="overview-card">
+                    <div class="overview-card-header">
+                        <i class="fa-solid fa-file-lines overview-card-icon"></i>
+                        <span class="overview-card-title">@doc.Title</span>
+                    </div>
+                    <dl class="overview-dl">
+                        <dt>Category</dt>
+                        <dd>@doc.CategoryName</dd>
+                        @if (doc.EffectiveDate.HasValue)
+                        {
+                            <dt>Effective Date</dt>
+                            <dd>@doc.EffectiveDate.Value.ToString("d MMMM yyyy")</dd>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(doc.Description))
+                        {
+                            <dt>Description</dt>
+                            <dd>@doc.Description</dd>
+                        }
+                    </dl>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+
+    private List<PublishedSharedCompanyDocumentItem> _documents = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _documents = (await DocumentService.ListPublishedSharedCompanyDocumentsAsync(CompanyId))?.Items.ToList() ?? [];
+        _loading = false;
+    }
+}

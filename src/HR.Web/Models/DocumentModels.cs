@@ -93,6 +93,38 @@ public sealed record ExpiringDocumentItem(
     DateOnly ExpiryDate,
     DocumentExpiryStatus ExpiryStatus);
 
+// --- Shared Company Documents ---
+
+public sealed record CompanyDocumentCategoryListResponse(IReadOnlyList<CompanyDocumentCategoryItem> Items);
+
+public sealed record CompanyDocumentCategoryItem(Guid Id, string Name, bool IsActive);
+
+public sealed record SharedCompanyDocumentListResponse(IReadOnlyList<SharedCompanyDocumentListItem> Items);
+
+public sealed record SharedCompanyDocumentListItem(
+    Guid Id,
+    string Title,
+    string? Description,
+    Guid CategoryId,
+    string CategoryName,
+    string FileName,
+    int VersionNumber,
+    string Status,
+    DateOnly? EffectiveDate,
+    DateOnly? ReviewDate,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    string UpdatedByName);
+
+public sealed record PublishedSharedCompanyDocumentListResponse(IReadOnlyList<PublishedSharedCompanyDocumentItem> Items);
+
+public sealed record PublishedSharedCompanyDocumentItem(
+    Guid Id,
+    string Title,
+    string? Description,
+    string CategoryName,
+    DateOnly? EffectiveDate);
+
 public enum DocumentExpiryStatus
 {
     Valid,

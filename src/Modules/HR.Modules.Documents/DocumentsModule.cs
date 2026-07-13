@@ -10,6 +10,9 @@ using HR.Modules.Documents.Features.CreateCompanyDocumentCategory;
 using HR.Modules.Documents.Features.UpdateCompanyDocumentCategory;
 using HR.Modules.Documents.Features.DeactivateCompanyDocumentCategory;
 using HR.Modules.Documents.Features.ListCompanyDocumentCategories;
+using HR.Modules.Documents.Features.UploadSharedCompanyDocument;
+using HR.Modules.Documents.Features.ListSharedCompanyDocuments;
+using HR.Modules.Documents.Features.ListPublishedSharedCompanyDocuments;
 using HR.Modules.Documents.Features.DeleteEmployeeDocument;
 using HR.Modules.Documents.Features.DownloadEmployeeDocument;
 using HR.Modules.Documents.Features.GetEmployeeDocument;
@@ -106,6 +109,12 @@ public static class DocumentsModule
         services.AddScoped<IValidator<ListCompanyDocumentCategoriesRequest>, ListCompanyDocumentCategoriesValidator>();
 
         services.AddScoped<DeactivateCompanyDocumentCategoryHandler>();
+
+        services.AddScoped<UploadSharedCompanyDocumentHandler>();
+        services.AddScoped<IValidator<UploadSharedCompanyDocumentRequest>, UploadSharedCompanyDocumentValidator>();
+
+        services.AddScoped<ListSharedCompanyDocumentsHandler>();
+        services.AddScoped<ListPublishedSharedCompanyDocumentsHandler>();
 
         services.AddScoped<UploadEmployeeDocumentHandler>();
         services.AddScoped<IValidator<UploadEmployeeDocumentRequest>, UploadEmployeeDocumentValidator>();

@@ -68,6 +68,113 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         catch { return null; }
     }
 
+    public async Task<CompanyDocumentCategoryListResponse?> ListCompanyDocumentCategoriesAsync(
+        Guid companyId, bool includeInactive = false, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var url = includeInactive
+                ? $"api/companies/{companyId}/document-categories?includeInactive=true"
+                : $"api/companies/{companyId}/document-categories";
+            return await Http.GetFromJsonAsync<CompanyDocumentCategoryListResponse>(url, HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch { return null; }
+    }
+
+    public async Task<SharedCompanyDocumentListResponse?> ListSharedCompanyDocumentsAsync(
+        Guid companyId,
+        string? status = null,
+        Guid? categoryId = null,
+        DateOnly? reviewDateFrom = null,
+        DateOnly? reviewDateTo = null,
+        string? search = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var query = new List<string>();
+            if (!string.IsNullOrWhiteSpace(status))
+                query.Add($"status={Uri.EscapeDataString(status)}");
+            if (categoryId.HasValue)
+                query.Add($"categoryId={categoryId.Value}");
+            if (reviewDateFrom.HasValue)
+                query.Add($"reviewDateFrom={reviewDateFrom.Value:yyyy-MM-dd}");
+            if (reviewDateTo.HasValue)
+                query.Add($"reviewDateTo={reviewDateTo.Value:yyyy-MM-dd}");
+            if (!string.IsNullOrWhiteSpace(search))
+                query.Add($"search={Uri.EscapeDataString(search)}");
+
+            var url = $"api/companies/{companyId}/shared-documents";
+            if (query.Count > 0)
+                url += "?" + string.Join('&', query);
+
+            return await Http.GetFromJsonAsync<SharedCompanyDocumentListResponse>(url, HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch { return null; }
+    }
+
+    public async Task<PublishedSharedCompanyDocumentListResponse?> ListPublishedSharedCompanyDocumentsAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<PublishedSharedCompanyDocumentListResponse>(
+                $"api/companies/{companyId}/shared-documents/published", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch { return null; }
+    }
+
+    // Returns null on success, or an error message string on failure.
+    public async Task<string?> UploadSharedCompanyDocumentAsync(
+        Guid companyId,
+        string title,
+        string? description,
+        Guid categoryId,
+        DateOnly? effectiveDate,
+        DateOnly? reviewDate,
+        IBrowserFile file,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            content.Add(new StringContent(title), "Title");
+            if (!string.IsNullOrWhiteSpace(description))
+                content.Add(new StringContent(description), "Description");
+            content.Add(new StringContent(categoryId.ToString()), "CategoryId");
+            if (effectiveDate.HasValue)
+                content.Add(new StringContent(effectiveDate.Value.ToString("yyyy-MM-dd")), "EffectiveDate");
+            if (reviewDate.HasValue)
+                content.Add(new StringContent(reviewDate.Value.ToString("yyyy-MM-dd")), "ReviewDate");
+
+            await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+            content.Add(fileContent, "File", file.Name);
+
+            var response = await Http.PostAsync(
+                $"api/companies/{companyId}/shared-documents",
+                content, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return null;
+
+            try
+            {
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+                if (body.TryGetProperty("error", out var errorProp))
+                    return errorProp.GetString();
+            }
+            catch { }
+
+            return $"Upload failed ({(int)response.StatusCode}).";
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+    }
+
     // Returns null on success, or an error message string on failure.
     public async Task<string?> UploadEmployeeDocumentAsync(
         Guid companyId,

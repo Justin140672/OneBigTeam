@@ -57,6 +57,7 @@ else
                                         <MenuItem Text="Onboarding Templates" Url="@_menuItems["OnboardingTemplates"]" />
                                         <MenuItem Text="Employment Types" Url="@_menuItems["EmploymentTypes"]" />
                                         <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
+                                        <MenuItem Text="Shared Documents" Url="@_menuItems["SharedDocuments"]" />
                                         <MenuItem Text="Data Import" Url="@_menuItems["DataImport"]" />
                                         <MenuItem Text="Import History" Url="@_menuItems["ImportHistory"]" />
                                         <MenuItem Text="Organisation Chart" Url="@_menuItems["OrganisationChart"]" />
@@ -284,6 +285,7 @@ else
         ["LeavePolicies"] = "/",
         ["PublicHolidays"] = "/",
         ["DocumentTypes"] = "/",
+        ["SharedDocuments"] = "/",
         ["DataImport"] = "/",
         ["ImportHistory"] = "/",
         ["SicknessCategories"] = "/",
@@ -313,6 +315,7 @@ else
         _menuItems["LeavePolicies"] = $"/companies/{companyId}/leave-policies";
         _menuItems["PublicHolidays"] = $"/companies/{companyId}/public-holidays";
         _menuItems["DocumentTypes"] = $"/companies/{companyId}/document-types";
+        _menuItems["SharedDocuments"] = $"/companies/{companyId}/shared-documents";
         _menuItems["DataImport"] = $"/companies/{companyId}/data-import/employees";
         _menuItems["ImportHistory"] = $"/companies/{companyId}/data-import/history";
         _menuItems["SicknessCategories"] = $"/companies/{companyId}/sickness-categories";

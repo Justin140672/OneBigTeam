@@ -1,0 +1,157 @@
+@page "/companies/{CompanyId:guid}/shared-documents"
+@rendermode InteractiveServer
+@inject DocumentService DocumentService
+@inject AppSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Shared Documents</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+        <h1 class="mb-1">Shared Documents</h1>
+        <SfButton CssClass="e-primary" OnClick="@(() => _uploadOpen = true)">Upload Document</SfButton>
+    </div>
+    <p class="text-muted mb-4">Company-wide documents such as policies and handbooks.</p>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-3">
+            <label class="form-label">Search</label>
+            <HrTextBox Value="_search" ValueChanged="OnSearchChangedAsync" Placeholder="Search by title…" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Status</label>
+            <SfDropDownList TValue="string" TItem="string"
+                            DataSource="@_statusOptions"
+                            @bind-Value="_statusFilter"
+                            ValueChange="@(async () => await LoadDocumentsAsync())"
+                            Placeholder="All statuses" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Category</label>
+            <SfDropDownList TValue="Guid?" TItem="CompanyDocumentCategoryItem"
+                            DataSource="@_categories"
+                            @bind-Value="_categoryFilter"
+                            ValueChange="@(async () => await LoadDocumentsAsync())"
+                            Placeholder="All categories"
+                            AllowFiltering="true">
+                <DropDownListFieldSettings Value="Id" Text="Name" />
+            </SfDropDownList>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Review Date From</label>
+            <SfDatePicker TValue="DateOnly?" @bind-Value="_reviewDateFrom"
+                          ValueChange="@(async () => await LoadDocumentsAsync())"
+                          Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" ShowClearButton="true" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Review Date To</label>
+            <SfDatePicker TValue="DateOnly?" @bind-Value="_reviewDateTo"
+                          ValueChange="@(async () => await LoadDocumentsAsync())"
+                          Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" ShowClearButton="true" />
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <HrLoadingIndicator Label="Loading documents…" />
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else if (_documents.Count == 0)
+    {
+        <p class="text-muted">No shared documents match the current filters.</p>
+    }
+    else
+    {
+        <HrGrid TValue="SharedCompanyDocumentListItem" DataSource="@_documents" AllowPaging="true" AllowSorting="true">
+            <GridPageSettings PageSize="20" />
+            <GridColumns>
+                <GridColumn Field="@nameof(SharedCompanyDocumentListItem.Title)" HeaderText="Title" Width="200" />
+                <GridColumn Field="@nameof(SharedCompanyDocumentListItem.CategoryName)" HeaderText="Category" Width="130" />
+                <GridColumn Field="@nameof(SharedCompanyDocumentListItem.VersionNumber)" HeaderText="Version" Width="90" />
+                <GridColumn Field="@nameof(SharedCompanyDocumentListItem.Status)" HeaderText="Status" Width="100" />
+                <GridColumn Field="@nameof(SharedCompanyDocumentListItem.EffectiveDate)" HeaderText="Effective Date" Width="130" Format="d" />
+                <GridColumn Field="@nameof(SharedCompanyDocumentListItem.ReviewDate)" HeaderText="Review Date" Width="130" Format="d" />
+                <GridColumn Field="@nameof(SharedCompanyDocumentListItem.UpdatedAt)" HeaderText="Last Updated" Width="150" Format="g" />
+                <GridColumn Field="@nameof(SharedCompanyDocumentListItem.UpdatedByName)" HeaderText="Updated By" Width="150" />
+            </GridColumns>
+        </HrGrid>
+    }
+</div>
+
+<UploadSharedCompanyDocumentDialog CompanyId="CompanyId"
+                                    IsOpen="_uploadOpen"
+                                    OnSaved="OnDocumentUploadedAsync"
+                                    OnCancelled="@(() => _uploadOpen = false)" />
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private List<SharedCompanyDocumentListItem> _documents = [];
+    private List<CompanyDocumentCategoryItem> _categories = [];
+    private readonly List<string> _statusOptions = ["Draft", "Published", "Archived"];
+    private bool _loading = true;
+    private string? _error;
+    private bool _uploadOpen;
+
+    private string? _search;
+    private string? _statusFilter;
+    private Guid? _categoryFilter;
+    private DateOnly? _reviewDateFrom;
+    private DateOnly? _reviewDateTo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsHrAdministrator)
+        {
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            return;
+        }
+
+        _categories = (await DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId))?.Items.ToList() ?? [];
+        await LoadDocumentsAsync();
+    }
+
+    private async Task OnSearchChangedAsync(string? value)
+    {
+        _search = value;
+        await LoadDocumentsAsync();
+    }
+
+    private async Task LoadDocumentsAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            var result = await DocumentService.ListSharedCompanyDocumentsAsync(
+                CompanyId,
+                status: _statusFilter,
+                categoryId: _categoryFilter,
+                reviewDateFrom: _reviewDateFrom,
+                reviewDateTo: _reviewDateTo,
+                search: _search);
+
+            if (result is null)
+            {
+                _error = "Failed to load shared documents.";
+                return;
+            }
+
+            _error = null;
+            _documents = result.Items.ToList();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnDocumentUploadedAsync()
+    {
+        _uploadOpen = false;
+        await LoadDocumentsAsync();
+    }
+}
