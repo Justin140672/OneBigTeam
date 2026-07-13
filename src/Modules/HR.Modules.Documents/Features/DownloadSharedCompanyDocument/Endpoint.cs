@@ -26,6 +26,17 @@ internal sealed class Endpoint(DownloadSharedCompanyDocumentHandler handler, IAu
             return;
         }
 
+        // Explicit belt-and-suspenders check that the caller belongs to the company in the
+        // route, on top of the global TenantRouteAuthorizationMiddleware — same pattern as
+        // UploadSharedCompanyDocument, since this endpoint hands back a real (if time-limited)
+        // download URL and deserves the same care as a mutation.
+        var companyClaim = User.FindFirstValue("company_id");
+        if (!Guid.TryParse(companyClaim, out var callerCompanyId) || callerCompanyId != request.CompanyId)
+        {
+            await Send.ResultAsync(TypedResults.Forbid());
+            return;
+        }
+
         var canManage = (await authorizationService.AuthorizeAsync(User, "shared-document:manage")).Succeeded;
 
         var result = await handler.HandleAsync(request, callerEmployeeId, canManage, cancellationToken);

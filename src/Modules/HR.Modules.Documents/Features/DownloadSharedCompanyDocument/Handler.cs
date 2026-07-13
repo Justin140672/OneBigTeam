@@ -10,7 +10,9 @@ namespace HR.Modules.Documents.Features.DownloadSharedCompanyDocument;
 internal sealed class DownloadSharedCompanyDocumentHandler(
     DocumentsDbContext db,
     IDocumentStorageService storage,
-    IEmployeeAudienceReader audienceReader)
+    IEmployeeAudienceReader audienceReader,
+    IAuditEventPublisher auditPublisher,
+    IClock clock)
 {
     public async Task<Result<Uri>> HandleAsync(
         DownloadSharedCompanyDocumentRequest request,
@@ -46,6 +48,19 @@ internal sealed class DownloadSharedCompanyDocumentHandler(
         }
 
         var url = await storage.GetDownloadUrlAsync(document.CurrentFileReference, cancellationToken);
+
+        // Record the download regardless of whether the caller is HR or an in-audience employee
+        // — this is the audit trail for "who has accessed this document and when", not just who
+        // has acknowledged it.
+        await auditPublisher.PublishAsync(new SharedCompanyDocumentDownloadedAuditEvent(
+            document.CompanyId,
+            document.Id,
+            document.Title,
+            document.FileName,
+            document.VersionNumber,
+            callerEmployeeId,
+            clock.UtcNowOffset()), cancellationToken);
+
         return Result.Success(url);
     }
 }

@@ -380,6 +380,25 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
     }
 
     [Fact]
+    public async Task Download_Returns_Forbidden_When_Tenant_Claim_Does_Not_Match_Route()
+    {
+        var companyId       = Guid.NewGuid();
+        var differentCompany = Guid.NewGuid();
+        var userId          = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var uploadClient = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(uploadClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(uploadClient, companyId, categoryId);
+
+        // Same user, but the tenant header on this client claims a different company than the
+        // one in the route — must be rejected before the document lookup even runs.
+        using var mismatchedClient = ClientAs(differentCompany, userId, allowAutoRedirect: false);
+        var response = await mismatchedClient.GetAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}/download");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Download_Returns_NotFound_For_Employee_On_A_Draft_Document()
     {
         var companyId  = Guid.NewGuid();

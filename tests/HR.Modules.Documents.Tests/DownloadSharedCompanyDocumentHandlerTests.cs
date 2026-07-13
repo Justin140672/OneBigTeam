@@ -108,9 +108,65 @@ public class DownloadSharedCompanyDocumentHandlerTests
         Assert.Equal("not_found", result.Error.Code);
     }
 
+    [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_On_Successful_Download()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var category   = await SeedCategory(db, companyId);
+        var downloader = Guid.NewGuid();
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Remote Working Policy", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, null, null, false, Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var audit = new FakeAuditPublisher();
+        await Handler(db, auditPublisher: audit).HandleAsync(
+            new DownloadSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
+            downloader, callerCanManage: true, CancellationToken.None);
+
+        var evt = Assert.Single(audit.Published);
+        Assert.Equal("shared_company_document.downloaded", evt.EventType);
+        Assert.Equal("SharedCompanyDocument",               evt.EntityType);
+        Assert.Equal(doc.Id,                                evt.EntityId);
+        Assert.Equal(companyId,                              evt.CompanyId);
+        Assert.Equal(downloader,                             evt.ActorUserId);
+        Assert.Equal(downloader,                             evt.ActorEmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_Audit_Event_When_Access_Is_Denied()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, null, null, false, Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var audit = new FakeAuditPublisher();
+        await Handler(db, auditPublisher: audit).HandleAsync(
+            new DownloadSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
+            Guid.NewGuid(), callerCanManage: false, CancellationToken.None); // draft, not a manager
+
+        Assert.Empty(audit.Published);
+    }
+
+    private static readonly DateTime FixedUtcNow = new(2026, 7, 13, 10, 0, 0, DateTimeKind.Utc);
+
     private static DownloadSharedCompanyDocumentHandler Handler(
-        DocumentsDbContext db, FakeDocumentStorageService? storage = null, FakeEmployeeAudienceReader? audienceReader = null) =>
-        new(db, storage ?? new FakeDocumentStorageService(), audienceReader ?? new FakeEmployeeAudienceReader());
+        DocumentsDbContext db,
+        FakeDocumentStorageService? storage = null,
+        FakeEmployeeAudienceReader? audienceReader = null,
+        FakeAuditPublisher? auditPublisher = null) =>
+        new(db,
+            storage ?? new FakeDocumentStorageService(),
+            audienceReader ?? new FakeEmployeeAudienceReader(),
+            auditPublisher ?? new FakeAuditPublisher(),
+            new FakeClock(FixedUtcNow));
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")
