@@ -62,6 +62,54 @@
                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
                         <div class="form-text">PDF, Word, or image files up to 20 MB.</div>
                     </div>
+                    <div class="col-12">
+                        <label class="form-label">Audience</label>
+                        <div class="btn-group btn-group-sm d-block" role="group">
+                            <input type="radio" class="btn-check" name="audience-type" id="audience-all"
+                                   checked="@(Model.AudienceType == "All")" @onchange="@(() => SetAudienceType("All"))" />
+                            <label class="btn btn-outline-primary" for="audience-all">All Employees</label>
+
+                            <input type="radio" class="btn-check" name="audience-type" id="audience-department"
+                                   checked="@(Model.AudienceType == "Department")" @onchange="@(() => SetAudienceType("Department"))" />
+                            <label class="btn btn-outline-primary" for="audience-department">Department</label>
+
+                            <input type="radio" class="btn-check" name="audience-type" id="audience-location"
+                                   checked="@(Model.AudienceType == "Location")" @onchange="@(() => SetAudienceType("Location"))" />
+                            <label class="btn btn-outline-primary" for="audience-location">Location</label>
+                        </div>
+                    </div>
+                    @if (Model.AudienceType == "Department")
+                    {
+                        <div class="col-12">
+                            <SfDropDownList TValue="Guid?"
+                                            TItem="DepartmentListItemModel"
+                                            DataSource="@_departments"
+                                            @bind-Value="Model.AudienceDepartmentId"
+                                            Placeholder="Select department…"
+                                            AllowFiltering="true">
+                                <DropDownListFieldSettings Value="Id" Text="Name" />
+                            </SfDropDownList>
+                        </div>
+                    }
+                    @if (Model.AudienceType == "Location")
+                    {
+                        <div class="col-12">
+                            <SfDropDownList TValue="Guid?"
+                                            TItem="LocationListItemModel"
+                                            DataSource="@_locations"
+                                            @bind-Value="Model.AudienceLocationId"
+                                            Placeholder="Select location…"
+                                            AllowFiltering="true">
+                                <DropDownListFieldSettings Value="Id" Text="Name" />
+                            </SfDropDownList>
+                        </div>
+                    }
+                    <div class="col-12">
+                        <SfCheckBox TChecked="bool"
+                                    Label="Requires employee acknowledgement"
+                                    Checked="@Model.RequiresAcknowledgement"
+                                    CheckedChanged="@((bool v) => Model.RequiresAcknowledgement = v)" />
+                    </div>
                 </div>
             </EditForm>
         </Content>
@@ -72,27 +120,47 @@
 </SfDialog>
 
 @code {
+    [Inject] public DepartmentService DepartmentService { get; set; } = null!;
+    [Inject] public LocationService LocationService { get; set; } = null!;
+
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
 
     private List<CompanyDocumentCategoryItem> _categories = [];
+    private List<DepartmentListItemModel> _departments = [];
+    private List<LocationListItemModel> _locations = [];
     private IBrowserFile? _selectedFile;
 
     protected override async Task OnOpenedAsync()
     {
         _selectedFile = null;
-        _categories = (await DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId))?.Items.ToList() ?? [];
+        _categories  = (await DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId))?.Items.ToList() ?? [];
+        _departments = (await DepartmentService.ListDepartmentsAsync(CompanyId))?.Items ?? [];
+        _locations   = (await LocationService.ListLocationsAsync(CompanyId))?.Items ?? [];
     }
 
     private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
 
-    protected override string? ValidateExtra() =>
-        _selectedFile is null ? "Please select a file." : null;
+    private void SetAudienceType(string type)
+    {
+        Model.AudienceType = type;
+        if (type != "Department") Model.AudienceDepartmentId = null;
+        if (type != "Location") Model.AudienceLocationId = null;
+    }
+
+    protected override string? ValidateExtra()
+    {
+        if (_selectedFile is null) return "Please select a file.";
+        if (Model.AudienceType == "Department" && Model.AudienceDepartmentId is null) return "Please select a department.";
+        if (Model.AudienceType == "Location" && Model.AudienceLocationId is null) return "Please select a location.";
+        return null;
+    }
 
     protected override async Task<string?> SaveCoreAsync() =>
         await DocumentService.UploadSharedCompanyDocumentAsync(
             CompanyId,
             Model.Title, Model.Description, Model.CategoryId!.Value,
             Model.EffectiveDate, Model.ReviewDate,
+            Model.AudienceDepartmentId, Model.AudienceLocationId, Model.RequiresAcknowledgement,
             _selectedFile!);
 
     protected override void ResetForm()
@@ -102,6 +170,10 @@
         Model.CategoryId = null;
         Model.EffectiveDate = null;
         Model.ReviewDate = null;
+        Model.AudienceType = "All";
+        Model.AudienceDepartmentId = null;
+        Model.AudienceLocationId = null;
+        Model.RequiresAcknowledgement = false;
         _selectedFile = null;
     }
 
@@ -114,5 +186,9 @@
         public Guid? CategoryId { get; set; }
         public DateOnly? EffectiveDate { get; set; }
         public DateOnly? ReviewDate { get; set; }
+        public string AudienceType { get; set; } = "All";
+        public Guid? AudienceDepartmentId { get; set; }
+        public Guid? AudienceLocationId { get; set; }
+        public bool RequiresAcknowledgement { get; set; }
     }
 }

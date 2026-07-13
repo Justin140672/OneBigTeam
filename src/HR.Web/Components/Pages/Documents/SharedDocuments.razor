@@ -68,7 +68,14 @@
         <HrGrid TValue="SharedCompanyDocumentListItem" DataSource="@_documents" AllowPaging="true" AllowSorting="true">
             <GridPageSettings PageSize="20" />
             <GridColumns>
-                <GridColumn Field="@nameof(SharedCompanyDocumentListItem.Title)" HeaderText="Title" Width="200" />
+                <GridColumn Field="@nameof(SharedCompanyDocumentListItem.Title)" HeaderText="Title" Width="200">
+                    <Template>
+                        @{
+                            var row = (context as SharedCompanyDocumentListItem)!;
+                            <a href="/companies/@CompanyId/shared-documents/@row.Id">@row.Title</a>
+                        }
+                    </Template>
+                </GridColumn>
                 <GridColumn Field="@nameof(SharedCompanyDocumentListItem.CategoryName)" HeaderText="Category" Width="130" />
                 <GridColumn Field="@nameof(SharedCompanyDocumentListItem.VersionNumber)" HeaderText="Version" Width="90" />
                 <GridColumn Field="@nameof(SharedCompanyDocumentListItem.Status)" HeaderText="Status" Width="100" />

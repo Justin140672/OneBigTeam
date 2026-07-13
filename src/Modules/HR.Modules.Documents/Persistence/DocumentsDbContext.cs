@@ -18,6 +18,8 @@ internal class DocumentsDbContext : DbContext
     public DbSet<PendingProfilePhoto> PendingProfilePhotos => Set<PendingProfilePhoto>();
     public DbSet<SharedCompanyDocument> SharedCompanyDocuments => Set<SharedCompanyDocument>();
     public DbSet<CompanyDocumentCategory> CompanyDocumentCategories => Set<CompanyDocumentCategory>();
+    public DbSet<SharedCompanyDocumentVersion> SharedCompanyDocumentVersions => Set<SharedCompanyDocumentVersion>();
+    public DbSet<SharedCompanyDocumentAcknowledgement> SharedCompanyDocumentAcknowledgements => Set<SharedCompanyDocumentAcknowledgement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

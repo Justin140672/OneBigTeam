@@ -125,6 +125,59 @@ public sealed record PublishedSharedCompanyDocumentItem(
     string CategoryName,
     DateOnly? EffectiveDate);
 
+// --- Shared Company Document detail (HR full view) ---
+
+public sealed record SharedCompanyDocumentDetailResponse(
+    Guid Id,
+    Guid CompanyId,
+    string Title,
+    string? Description,
+    Guid CategoryId,
+    string CategoryName,
+    string FileName,
+    long FileSize,
+    string ContentType,
+    int VersionNumber,
+    string Status,
+    DateOnly? EffectiveDate,
+    DateOnly? ReviewDate,
+    string AudienceDescription,
+    bool RequiresAcknowledgement,
+    AcknowledgementProgressModel? AcknowledgementProgress,
+    IReadOnlyList<SharedCompanyDocumentVersionModel> VersionHistory,
+    string CreatedByName,
+    DateTimeOffset CreatedAt,
+    string UpdatedByName,
+    DateTimeOffset UpdatedAt);
+
+public sealed record AcknowledgementProgressModel(
+    int AcknowledgedCount,
+    int EligibleCount,
+    IReadOnlyList<string> AcknowledgedEmployeeNames);
+
+public sealed record SharedCompanyDocumentVersionModel(
+    int VersionNumber,
+    string FileName,
+    long FileSize,
+    string UploadedByName,
+    DateTimeOffset UploadedAt);
+
+// --- Shared Company Document detail (employee simplified view) ---
+
+public sealed record PublishedSharedCompanyDocumentDetailResponse(
+    Guid Id,
+    string Title,
+    string? Description,
+    string CategoryName,
+    DateOnly? EffectiveDate,
+    bool RequiresAcknowledgement,
+    DateTimeOffset? MyAcknowledgedAt);
+
+public sealed record AcknowledgeSharedCompanyDocumentResponseModel(
+    Guid SharedCompanyDocumentId,
+    int VersionNumber,
+    DateTimeOffset AcknowledgedAt);
+
 public enum DocumentExpiryStatus
 {
     Valid,

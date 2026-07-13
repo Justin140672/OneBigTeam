@@ -13,24 +13,25 @@ else
     <div class="row g-3">
         @foreach (var doc in _documents)
         {
+            var d = doc;
             <div class="col-md-6">
-                <div class="overview-card">
+                <div class="overview-card" style="cursor:pointer" @onclick="() => OpenDetailAsync(d.Id)">
                     <div class="overview-card-header">
                         <i class="fa-solid fa-file-lines overview-card-icon"></i>
-                        <span class="overview-card-title">@doc.Title</span>
+                        <span class="overview-card-title">@d.Title</span>
                     </div>
                     <dl class="overview-dl">
                         <dt>Category</dt>
-                        <dd>@doc.CategoryName</dd>
-                        @if (doc.EffectiveDate.HasValue)
+                        <dd>@d.CategoryName</dd>
+                        @if (d.EffectiveDate.HasValue)
                         {
                             <dt>Effective Date</dt>
-                            <dd>@doc.EffectiveDate.Value.ToString("d MMMM yyyy")</dd>
+                            <dd>@d.EffectiveDate.Value.ToString("d MMMM yyyy")</dd>
                         }
-                        @if (!string.IsNullOrWhiteSpace(doc.Description))
+                        @if (!string.IsNullOrWhiteSpace(d.Description))
                         {
                             <dt>Description</dt>
-                            <dd>@doc.Description</dd>
+                            <dd>@d.Description</dd>
                         }
                     </dl>
                 </div>
@@ -39,15 +40,111 @@ else
     </div>
 }
 
+<SfDialog @bind-Visible="_detailOpen" IsModal="true" Width="520px" ShowCloseIcon="true">
+    <DialogEvents Closed="@(() => _detailOpen = false)" />
+    <DialogTemplates>
+        <Header>@(_detail?.Title ?? "Document")</Header>
+        <Content>
+            @if (_detailLoading)
+            {
+                <HrLoadingIndicator Label="Loading…" />
+            }
+            else if (_detail is not null)
+            {
+                <dl class="overview-dl">
+                    <dt>Category</dt>
+                    <dd>@_detail.CategoryName</dd>
+                    @if (_detail.EffectiveDate.HasValue)
+                    {
+                        <dt>Effective Date</dt>
+                        <dd>@_detail.EffectiveDate.Value.ToString("d MMMM yyyy")</dd>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_detail.Description))
+                    {
+                        <dt>Description</dt>
+                        <dd>@_detail.Description</dd>
+                    }
+                </dl>
+
+                <a class="btn btn-outline-primary btn-sm mb-3" href="@DocumentService.GetSharedCompanyDocumentDownloadUrl(CompanyId, _detail.Id)" target="_blank">
+                    <i class="fa-solid fa-download me-1"></i> Download
+                </a>
+
+                @if (_detail.RequiresAcknowledgement)
+                {
+                    @if (_detail.MyAcknowledgedAt.HasValue)
+                    {
+                        <div class="alert alert-success mb-0">
+                            <i class="fa-solid fa-circle-check me-1"></i>
+                            Acknowledged on @_detail.MyAcknowledgedAt.Value.ToString("d MMM yyyy")
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">
+                            This document requires your acknowledgement.
+                        </div>
+                        @if (!string.IsNullOrEmpty(_acknowledgeError))
+                        {
+                            <div class="alert alert-danger">@_acknowledgeError</div>
+                        }
+                        <SfButton CssClass="e-primary" Disabled="_acknowledging" OnClick="AcknowledgeAsync">
+                            @(_acknowledging ? "Acknowledging…" : "I Acknowledge")
+                        </SfButton>
+                    }
+                }
+            }
+        </Content>
+    </DialogTemplates>
+</SfDialog>
+
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
 
     private List<PublishedSharedCompanyDocumentItem> _documents = [];
     private bool _loading = true;
 
+    private bool _detailOpen;
+    private bool _detailLoading;
+    private PublishedSharedCompanyDocumentDetailResponse? _detail;
+    private bool _acknowledging;
+    private string? _acknowledgeError;
+
     protected override async Task OnInitializedAsync()
     {
         _documents = (await DocumentService.ListPublishedSharedCompanyDocumentsAsync(CompanyId))?.Items.ToList() ?? [];
         _loading = false;
+    }
+
+    private async Task OpenDetailAsync(Guid documentId)
+    {
+        _detail = null;
+        _acknowledgeError = null;
+        _detailLoading = true;
+        _detailOpen = true;
+        StateHasChanged();
+
+        _detail = await DocumentService.GetPublishedSharedCompanyDocumentAsync(CompanyId, documentId);
+        _detailLoading = false;
+    }
+
+    private async Task AcknowledgeAsync()
+    {
+        if (_detail is null) return;
+
+        _acknowledging = true;
+        _acknowledgeError = null;
+        StateHasChanged();
+
+        var error = await DocumentService.AcknowledgeSharedCompanyDocumentAsync(CompanyId, _detail.Id);
+        _acknowledging = false;
+
+        if (error is not null)
+        {
+            _acknowledgeError = error;
+            return;
+        }
+
+        _detail = await DocumentService.GetPublishedSharedCompanyDocumentAsync(CompanyId, _detail.Id);
     }
 }

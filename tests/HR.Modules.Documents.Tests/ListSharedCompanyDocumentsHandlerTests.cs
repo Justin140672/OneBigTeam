@@ -24,12 +24,8 @@ public class ListSharedCompanyDocumentsHandlerTests
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);
 
-        var older = SharedCompanyDocument.Create(
-            Guid.NewGuid(), companyId, "Older Policy", null, category.Id,
-            "key/older.pdf", "older.pdf", 100, "application/pdf", null, null, Guid.NewGuid(), Now);
-        var newer = SharedCompanyDocument.Create(
-            Guid.NewGuid(), companyId, "Newer Policy", null, category.Id,
-            "key/newer.pdf", "newer.pdf", 100, "application/pdf", null, null, Guid.NewGuid(), Now.AddMinutes(5));
+        var older = CreateDoc(companyId, "Older Policy", category.Id, "key/older.pdf", "older.pdf", null, null, Guid.NewGuid(), Now);
+        var newer = CreateDoc(companyId, "Newer Policy", category.Id, "key/newer.pdf", "newer.pdf", null, null, Guid.NewGuid(), Now.AddMinutes(5));
 
         db.SharedCompanyDocuments.AddRange(older, newer);
         await db.SaveChangesAsync();
@@ -50,9 +46,7 @@ public class ListSharedCompanyDocumentsHandlerTests
         var category   = await SeedCategory(db, companyId, "Handbook");
         var uploadedBy = Guid.NewGuid();
 
-        var doc = SharedCompanyDocument.Create(
-            Guid.NewGuid(), companyId, "Employee Handbook", null, category.Id,
-            "key/handbook.pdf", "handbook.pdf", 100, "application/pdf", null, null, uploadedBy, Now);
+        var doc = CreateDoc(companyId, "Employee Handbook", category.Id, "key/handbook.pdf", "handbook.pdf", null, null, uploadedBy, Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -75,9 +69,7 @@ public class ListSharedCompanyDocumentsHandlerTests
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);
 
-        var draft = SharedCompanyDocument.Create(
-            Guid.NewGuid(), companyId, "Draft Policy", null, category.Id,
-            "key/draft.pdf", "draft.pdf", 100, "application/pdf", null, null, Guid.NewGuid(), Now);
+        var draft = CreateDoc(companyId, "Draft Policy", category.Id, "key/draft.pdf", "draft.pdf", null, null, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(draft);
         await db.SaveChangesAsync();
 
@@ -99,10 +91,8 @@ public class ListSharedCompanyDocumentsHandlerTests
         var categoryB = await SeedCategory(db, companyB);
 
         db.SharedCompanyDocuments.AddRange(
-            SharedCompanyDocument.Create(Guid.NewGuid(), companyA, "A Policy", null, categoryA.Id,
-                "key/a.pdf", "a.pdf", 100, "application/pdf", null, null, Guid.NewGuid(), Now),
-            SharedCompanyDocument.Create(Guid.NewGuid(), companyB, "B Policy", null, categoryB.Id,
-                "key/b.pdf", "b.pdf", 100, "application/pdf", null, null, Guid.NewGuid(), Now));
+            CreateDoc(companyA, "A Policy", categoryA.Id, "key/a.pdf", "a.pdf", null, null, Guid.NewGuid(), Now),
+            CreateDoc(companyB, "B Policy", categoryB.Id, "key/b.pdf", "b.pdf", null, null, Guid.NewGuid(), Now));
         await db.SaveChangesAsync();
 
         var result = await Handler(db).HandleAsync(
@@ -133,10 +123,8 @@ public class ListSharedCompanyDocumentsHandlerTests
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);
 
-        var draft     = SharedCompanyDocument.Create(Guid.NewGuid(), companyId, "Draft Doc", null, category.Id,
-            "key/d.pdf", "d.pdf", 100, "application/pdf", null, null, Guid.NewGuid(), Now);
-        var published = SharedCompanyDocument.Create(Guid.NewGuid(), companyId, "Published Doc", null, category.Id,
-            "key/p.pdf", "p.pdf", 100, "application/pdf", null, null, Guid.NewGuid(), Now);
+        var draft     = CreateDoc(companyId, "Draft Doc", category.Id, "key/d.pdf", "d.pdf", null, null, Guid.NewGuid(), Now);
+        var published = CreateDoc(companyId, "Published Doc", category.Id, "key/p.pdf", "p.pdf", null, null, Guid.NewGuid(), Now);
         published.Publish(Guid.NewGuid(), Now);
 
         db.SharedCompanyDocuments.AddRange(draft, published);
@@ -159,10 +147,8 @@ public class ListSharedCompanyDocumentsHandlerTests
         var handbook  = await SeedCategory(db, companyId, "Handbook");
 
         db.SharedCompanyDocuments.AddRange(
-            SharedCompanyDocument.Create(Guid.NewGuid(), companyId, "Policy Doc", null, policy.Id,
-                "key/p.pdf", "p.pdf", 100, "application/pdf", null, null, Guid.NewGuid(), Now),
-            SharedCompanyDocument.Create(Guid.NewGuid(), companyId, "Handbook Doc", null, handbook.Id,
-                "key/h.pdf", "h.pdf", 100, "application/pdf", null, null, Guid.NewGuid(), Now));
+            CreateDoc(companyId, "Policy Doc", policy.Id, "key/p.pdf", "p.pdf", null, null, Guid.NewGuid(), Now),
+            CreateDoc(companyId, "Handbook Doc", handbook.Id, "key/h.pdf", "h.pdf", null, null, Guid.NewGuid(), Now));
         await db.SaveChangesAsync();
 
         var result = await Handler(db).HandleAsync(
@@ -180,12 +166,9 @@ public class ListSharedCompanyDocumentsHandlerTests
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);
 
-        var dueSoon = SharedCompanyDocument.Create(Guid.NewGuid(), companyId, "Due Soon", null, category.Id,
-            "key/s.pdf", "s.pdf", 100, "application/pdf", null, new DateOnly(2026, 8, 1), Guid.NewGuid(), Now);
-        var dueLater = SharedCompanyDocument.Create(Guid.NewGuid(), companyId, "Due Later", null, category.Id,
-            "key/l.pdf", "l.pdf", 100, "application/pdf", null, new DateOnly(2027, 1, 1), Guid.NewGuid(), Now);
-        var noReviewDate = SharedCompanyDocument.Create(Guid.NewGuid(), companyId, "No Review Date", null, category.Id,
-            "key/n.pdf", "n.pdf", 100, "application/pdf", null, null, Guid.NewGuid(), Now);
+        var dueSoon      = CreateDoc(companyId, "Due Soon", category.Id, "key/s.pdf", "s.pdf", null, new DateOnly(2026, 8, 1), Guid.NewGuid(), Now);
+        var dueLater     = CreateDoc(companyId, "Due Later", category.Id, "key/l.pdf", "l.pdf", null, new DateOnly(2027, 1, 1), Guid.NewGuid(), Now);
+        var noReviewDate = CreateDoc(companyId, "No Review Date", category.Id, "key/n.pdf", "n.pdf", null, null, Guid.NewGuid(), Now);
 
         db.SharedCompanyDocuments.AddRange(dueSoon, dueLater, noReviewDate);
         await db.SaveChangesAsync();
@@ -211,10 +194,8 @@ public class ListSharedCompanyDocumentsHandlerTests
         var category  = await SeedCategory(db, companyId);
 
         db.SharedCompanyDocuments.AddRange(
-            SharedCompanyDocument.Create(Guid.NewGuid(), companyId, "Remote Working Policy", null, category.Id,
-                "key/r.pdf", "r.pdf", 100, "application/pdf", null, null, Guid.NewGuid(), Now),
-            SharedCompanyDocument.Create(Guid.NewGuid(), companyId, "Health and Safety Guide", null, category.Id,
-                "key/h.pdf", "h.pdf", 100, "application/pdf", null, null, Guid.NewGuid(), Now));
+            CreateDoc(companyId, "Remote Working Policy", category.Id, "key/r.pdf", "r.pdf", null, null, Guid.NewGuid(), Now),
+            CreateDoc(companyId, "Health and Safety Guide", category.Id, "key/h.pdf", "h.pdf", null, null, Guid.NewGuid(), Now));
         await db.SaveChangesAsync();
 
         var result = await Handler(db).HandleAsync(
@@ -227,6 +208,13 @@ public class ListSharedCompanyDocumentsHandlerTests
 
     private static ListSharedCompanyDocumentsHandler Handler(DocumentsDbContext db, Dictionary<Guid, string>? names = null) =>
         new(db, new FakeEmployeeNameReader(names));
+
+    private static SharedCompanyDocument CreateDoc(
+        Guid companyId, string title, Guid categoryId, string storageKey, string fileName,
+        DateOnly? effectiveDate, DateOnly? reviewDate, Guid createdBy, DateTimeOffset now) =>
+        SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, title, null, categoryId, storageKey, fileName, 100, "application/pdf",
+            effectiveDate, reviewDate, null, null, false, createdBy, now);
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

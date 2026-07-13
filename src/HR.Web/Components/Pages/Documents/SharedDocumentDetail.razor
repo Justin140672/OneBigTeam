@@ -1,0 +1,160 @@
+@page "/companies/{CompanyId:guid}/shared-documents/{DocumentId:guid}"
+@rendermode InteractiveServer
+@inject DocumentService DocumentService
+@inject AppSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>@(_detail?.Title ?? "Shared Document")</PageTitle>
+
+<div class="container py-4">
+    @if (_loading)
+    {
+        <HrLoadingIndicator Label="Loading document…" />
+    }
+    else if (_detail is null)
+    {
+        <div class="alert alert-danger">Document was not found.</div>
+    }
+    else
+    {
+        <div class="d-flex justify-content-between align-items-start mb-1">
+            <div>
+                <a href="/companies/@CompanyId/shared-documents" class="text-decoration-none text-muted small">← Shared Documents</a>
+                <h1 class="mb-1">@_detail.Title</h1>
+            </div>
+            <a class="btn btn-outline-primary" href="@DocumentService.GetSharedCompanyDocumentDownloadUrl(CompanyId, DocumentId)" target="_blank">
+                <i class="fa-solid fa-download me-1"></i> Download
+            </a>
+        </div>
+
+        <div class="row g-3 mt-1">
+            <div class="col-md-6">
+                <div class="overview-card">
+                    <div class="overview-card-header">
+                        <i class="fa-solid fa-file-lines overview-card-icon"></i>
+                        <span class="overview-card-title">Document Metadata</span>
+                    </div>
+                    <dl class="overview-dl">
+                        <dt>Category</dt>
+                        <dd>@_detail.CategoryName</dd>
+                        <dt>Status</dt>
+                        <dd><span class="badge @StatusBadgeClass(_detail.Status)">@_detail.Status</span></dd>
+                        <dt>Current Version</dt>
+                        <dd>v@(_detail.VersionNumber)</dd>
+                        <dt>File</dt>
+                        <dd>@_detail.FileName (@FormatBytes(_detail.FileSize))</dd>
+                        @if (_detail.EffectiveDate.HasValue)
+                        {
+                            <dt>Effective Date</dt>
+                            <dd>@_detail.EffectiveDate.Value.ToString("d MMMM yyyy")</dd>
+                        }
+                        @if (_detail.ReviewDate.HasValue)
+                        {
+                            <dt>Review Date</dt>
+                            <dd>@_detail.ReviewDate.Value.ToString("d MMMM yyyy")</dd>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_detail.Description))
+                        {
+                            <dt>Description</dt>
+                            <dd>@_detail.Description</dd>
+                        }
+                    </dl>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="overview-card">
+                    <div class="overview-card-header">
+                        <i class="fa-solid fa-users overview-card-icon"></i>
+                        <span class="overview-card-title">Audience &amp; Acknowledgement</span>
+                    </div>
+                    <dl class="overview-dl">
+                        <dt>Audience</dt>
+                        <dd>@_detail.AudienceDescription</dd>
+                        <dt>Requires Acknowledgement</dt>
+                        <dd>@(_detail.RequiresAcknowledgement ? "Yes" : "No")</dd>
+                    </dl>
+                    @if (_detail.RequiresAcknowledgement && _detail.AcknowledgementProgress is not null)
+                    {
+                        var progress = _detail.AcknowledgementProgress;
+                        var percent = progress.EligibleCount == 0 ? 0 : (int)Math.Round(progress.AcknowledgedCount * 100m / progress.EligibleCount);
+                        <div class="px-1 py-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="text-muted small">@progress.AcknowledgedCount of @progress.EligibleCount acknowledged</span>
+                                <span class="fw-semibold">@(percent)%</span>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar" role="progressbar" style="width: @(percent)%"></div>
+                            </div>
+                        </div>
+                        @if (progress.AcknowledgedEmployeeNames.Count > 0)
+                        {
+                            <ul class="upcoming-leave-list">
+                                @foreach (var name in progress.AcknowledgedEmployeeNames)
+                                {
+                                    <li class="upcoming-leave-item"><span class="upcoming-leave-type">@name</span></li>
+                                }
+                            </ul>
+                        }
+                    }
+                </div>
+            </div>
+
+            <div class="col-12">
+                <div class="overview-card">
+                    <div class="overview-card-header">
+                        <i class="fa-solid fa-clock-rotate-left overview-card-icon"></i>
+                        <span class="overview-card-title">Version History</span>
+                    </div>
+                    <HrGrid TValue="SharedCompanyDocumentVersionModel" DataSource="@_detail.VersionHistory" AllowPaging="false">
+                        <GridColumns>
+                            <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.VersionNumber)" HeaderText="Version" Width="90" />
+                            <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.FileName)" HeaderText="File Name" Width="180" />
+                            <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.UploadedByName)" HeaderText="Uploaded By" Width="150" />
+                            <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.UploadedAt)" HeaderText="Uploaded At" Width="170" Format="g" />
+                        </GridColumns>
+                    </HrGrid>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <p class="text-muted small mb-0">
+                    Created by @_detail.CreatedByName on @_detail.CreatedAt.ToString("d MMM yyyy, HH:mm")
+                    · Last updated by @_detail.UpdatedByName on @_detail.UpdatedAt.ToString("d MMM yyyy, HH:mm")
+                </p>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid DocumentId { get; set; }
+
+    private SharedCompanyDocumentDetailResponse? _detail;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsHrAdministrator)
+        {
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            return;
+        }
+
+        _detail = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, DocumentId);
+        _loading = false;
+    }
+
+    private static string StatusBadgeClass(string status) => status switch
+    {
+        "Published" => "bg-success",
+        "Archived"  => "bg-secondary",
+        _           => "bg-warning text-dark",
+    };
+
+    private static string FormatBytes(long bytes) =>
+        bytes < 1024 * 1024
+            ? $"{bytes / 1024.0:0.#} KB"
+            : $"{bytes / (1024.0 * 1024.0):0.#} MB";
+}

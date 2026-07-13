@@ -13,5 +13,8 @@ internal sealed record UploadSharedCompanyDocumentResponse(
     string Status,
     DateOnly? EffectiveDate,
     DateOnly? ReviewDate,
+    Guid? AudienceDepartmentId,
+    Guid? AudienceLocationId,
+    bool RequiresAcknowledgement,
     Guid CreatedBy,
     DateTimeOffset CreatedAt);

@@ -10,5 +10,8 @@ internal sealed class UploadSharedCompanyDocumentRequest
     public Guid CategoryId { get; init; }
     public DateOnly? EffectiveDate { get; init; }
     public DateOnly? ReviewDate { get; init; }
+    public Guid? AudienceDepartmentId { get; init; }
+    public Guid? AudienceLocationId { get; init; }
+    public bool RequiresAcknowledgement { get; init; }
     public IFormFile File { get; init; } = null!;
 }

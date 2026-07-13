@@ -24,6 +24,15 @@ internal sealed class SharedCompanyDocument
     public SharedCompanyDocumentStatus Status { get; private set; }
     public DateOnly? EffectiveDate { get; private set; }
     public DateOnly? ReviewDate { get; private set; }
+
+    // Audience — deliberately a single optional department-or-location scope, not a many-to-many
+    // targeting table: when both are null the document applies to every active employee in the
+    // company. Only one of the two should ever be set at once (enforced by the handler, not here).
+    public Guid? AudienceDepartmentId { get; private set; }
+    public Guid? AudienceLocationId { get; private set; }
+
+    public bool RequiresAcknowledgement { get; private set; }
+
     public Guid CreatedBy { get; private set; }
     public Guid UpdatedBy { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -41,26 +50,32 @@ internal sealed class SharedCompanyDocument
         string contentType,
         DateOnly? effectiveDate,
         DateOnly? reviewDate,
+        Guid? audienceDepartmentId,
+        Guid? audienceLocationId,
+        bool requiresAcknowledgement,
         Guid createdBy,
         DateTimeOffset now) => new()
     {
-        Id                   = id,
-        CompanyId            = companyId,
-        Title                = title.Trim(),
-        Description          = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
-        CategoryId           = categoryId,
-        CurrentFileReference = currentFileReference.Trim(),
-        FileName             = fileName.Trim(),
-        FileSize             = fileSize,
-        ContentType          = contentType.Trim(),
-        VersionNumber        = 1,
-        Status               = SharedCompanyDocumentStatus.Draft,
-        EffectiveDate        = effectiveDate,
-        ReviewDate           = reviewDate,
-        CreatedBy            = createdBy,
-        UpdatedBy            = createdBy,
-        CreatedAt            = now,
-        UpdatedAt            = now,
+        Id                      = id,
+        CompanyId               = companyId,
+        Title                   = title.Trim(),
+        Description             = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+        CategoryId              = categoryId,
+        CurrentFileReference    = currentFileReference.Trim(),
+        FileName                = fileName.Trim(),
+        FileSize                = fileSize,
+        ContentType             = contentType.Trim(),
+        VersionNumber           = 1,
+        Status                  = SharedCompanyDocumentStatus.Draft,
+        EffectiveDate           = effectiveDate,
+        ReviewDate              = reviewDate,
+        AudienceDepartmentId    = audienceDepartmentId,
+        AudienceLocationId      = audienceLocationId,
+        RequiresAcknowledgement = requiresAcknowledgement,
+        CreatedBy               = createdBy,
+        UpdatedBy               = createdBy,
+        CreatedAt               = now,
+        UpdatedAt               = now,
     };
 
     public void UpdateDetails(
@@ -69,16 +84,22 @@ internal sealed class SharedCompanyDocument
         Guid categoryId,
         DateOnly? effectiveDate,
         DateOnly? reviewDate,
+        Guid? audienceDepartmentId,
+        Guid? audienceLocationId,
+        bool requiresAcknowledgement,
         Guid updatedBy,
         DateTimeOffset now)
     {
-        Title         = title.Trim();
-        Description   = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
-        CategoryId    = categoryId;
-        EffectiveDate = effectiveDate;
-        ReviewDate    = reviewDate;
-        UpdatedBy     = updatedBy;
-        UpdatedAt     = now;
+        Title                   = title.Trim();
+        Description             = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        CategoryId              = categoryId;
+        EffectiveDate           = effectiveDate;
+        ReviewDate              = reviewDate;
+        AudienceDepartmentId    = audienceDepartmentId;
+        AudienceLocationId      = audienceLocationId;
+        RequiresAcknowledgement = requiresAcknowledgement;
+        UpdatedBy               = updatedBy;
+        UpdatedAt               = now;
     }
 
     /// <summary>Uploads a new version of the file, replacing the current one and incrementing VersionNumber.</summary>

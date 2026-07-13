@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 
@@ -16,7 +17,13 @@ internal sealed class Endpoint(ListPublishedSharedCompanyDocumentsHandler handle
         ListPublishedSharedCompanyDocumentsRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var callerEmployeeId))
+        {
+            await Send.ResultAsync(TypedResults.Unauthorized());
+            return;
+        }
+
+        var result = await handler.HandleAsync(request, callerEmployeeId, cancellationToken);
 
         await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }

@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
@@ -11,6 +12,7 @@ internal sealed class UploadSharedCompanyDocumentHandler(
     IDocumentStorageService storage,
     IFileUploadValidator fileValidator,
     IVirusScanService virusScanner,
+    IEmployeeAudienceReader audienceReader,
     IClock clock)
 {
     public async Task<Result<UploadSharedCompanyDocumentResponse>> HandleAsync(
@@ -50,6 +52,26 @@ internal sealed class UploadSharedCompanyDocumentHandler(
         {
             return Result.Failure<UploadSharedCompanyDocumentResponse>(
                 Error.NotFound($"Document category '{request.CategoryId}' was not found."));
+        }
+
+        if (request.AudienceDepartmentId is not null && request.AudienceLocationId is not null)
+        {
+            return Result.Failure<UploadSharedCompanyDocumentResponse>(
+                Error.Validation("A document's audience can be scoped to a department or a location, not both."));
+        }
+
+        if (request.AudienceDepartmentId is not null &&
+            !await audienceReader.DepartmentExistsAsync(request.CompanyId, request.AudienceDepartmentId.Value, cancellationToken))
+        {
+            return Result.Failure<UploadSharedCompanyDocumentResponse>(
+                Error.NotFound($"Department '{request.AudienceDepartmentId}' was not found."));
+        }
+
+        if (request.AudienceLocationId is not null &&
+            !await audienceReader.LocationExistsAsync(request.CompanyId, request.AudienceLocationId.Value, cancellationToken))
+        {
+            return Result.Failure<UploadSharedCompanyDocumentResponse>(
+                Error.NotFound($"Location '{request.AudienceLocationId}' was not found."));
         }
 
         await using var fileStream = file.OpenReadStream();
@@ -94,10 +116,28 @@ internal sealed class UploadSharedCompanyDocumentHandler(
             file.ContentType,
             request.EffectiveDate,
             request.ReviewDate,
+            request.AudienceDepartmentId,
+            request.AudienceLocationId,
+            request.RequiresAcknowledgement,
+            uploadedBy,
+            now);
+
+        // Every version (including this first one) gets its own history row — see
+        // SharedCompanyDocumentVersion's doc comment for why version 1 isn't a special case.
+        var version = SharedCompanyDocumentVersion.Create(
+            Guid.NewGuid(),
+            request.CompanyId,
+            document.Id,
+            document.VersionNumber,
+            storageKey,
+            safeFileName,
+            file.Length,
+            file.ContentType,
             uploadedBy,
             now);
 
         db.SharedCompanyDocuments.Add(document);
+        db.SharedCompanyDocumentVersions.Add(version);
 
         try
         {
@@ -123,6 +163,9 @@ internal sealed class UploadSharedCompanyDocumentHandler(
             document.Status.ToString(),
             document.EffectiveDate,
             document.ReviewDate,
+            document.AudienceDepartmentId,
+            document.AudienceLocationId,
+            document.RequiresAcknowledgement,
             document.CreatedBy,
             document.CreatedAt));
     }

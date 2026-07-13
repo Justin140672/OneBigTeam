@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
@@ -248,6 +250,175 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    // ── GetSharedCompanyDocument (HR full detail) ──────────────────────────────
+
+    [Fact]
+    public async Task GetDetail_Returns_Forbidden_For_Manager()
+    {
+        var companyId = Guid.NewGuid();
+        var hrUserId  = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+
+        using var managerClient = ClientAs(companyId, managerId);
+        var response = await managerClient.GetAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetDetail_Includes_VersionHistory_For_HrAdministrator()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Some Policy");
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var detail = await response.Content.ReadFromJsonAsync<HrDetailPayload>();
+        Assert.Single(detail!.VersionHistory);
+        Assert.Equal("All Employees", detail.AudienceDescription);
+    }
+
+    // ── GetPublishedSharedCompanyDocument (employee simplified detail) ────────
+
+    [Fact]
+    public async Task GetPublishedDetail_Response_Does_Not_Contain_Management_Only_Fields()
+    {
+        // The core assertion for "Only management information should be visible to users with
+        // document-management permission": read the raw JSON and confirm none of the
+        // HR-only field names ever appear in the employee-facing response body.
+        var companyId = Guid.NewGuid();
+        var hrUserId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId, title: "Some Policy");
+        await PublishDirectlyAsync(companyId, doc!.Id);
+
+        using var employeeClient = ClientAs(companyId, employeeId);
+        var response = await employeeClient.GetAsync($"/api/companies/{companyId}/shared-documents/published/{doc.Id}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("versionHistory", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("audienceDescription", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("acknowledgementProgress", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("createdBy", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("updatedBy", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetPublishedDetail_Returns_NotFound_For_Draft_Document()
+    {
+        var companyId  = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+
+        using var employeeClient = ClientAs(companyId, employeeId);
+        var response = await employeeClient.GetAsync($"/api/companies/{companyId}/shared-documents/published/{doc!.Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    // ── AcknowledgeSharedCompanyDocument ────────────────────────────────────────
+
+    [Fact]
+    public async Task Acknowledge_Succeeds_For_Employee_On_A_Published_Document()
+    {
+        var companyId  = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+        await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
+
+        using var employeeClient = ClientAs(companyId, employeeId);
+        var response = await employeeClient.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // ── DownloadSharedCompanyDocument ───────────────────────────────────────────
+
+    [Fact]
+    public async Task Download_Redirects_For_HrAdministrator_On_A_Draft_Document()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId, allowAutoRedirect: false);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}/download");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Download_Returns_NotFound_For_Employee_On_A_Draft_Document()
+    {
+        var companyId  = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+
+        using var employeeClient = ClientAs(companyId, employeeId, allowAutoRedirect: false);
+        var response = await employeeClient.GetAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}/download");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    // Directly flips a document to Published via the DbContext — there is no Publish endpoint
+    // yet (a known, flagged gap), so integration tests that need a Published document have no
+    // way to get there through the API.
+    private async Task PublishDirectlyAsync(Guid companyId, Guid documentId, bool requiresAcknowledgement = false)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
+        var doc = await db.SharedCompanyDocuments.SingleAsync(d => d.Id == documentId && d.CompanyId == companyId);
+        doc.Publish(Guid.NewGuid(), DateTimeOffset.UtcNow);
+        if (requiresAcknowledgement)
+        {
+            doc.UpdateDetails(doc.Title, doc.Description, doc.CategoryId, doc.EffectiveDate, doc.ReviewDate,
+                doc.AudienceDepartmentId, doc.AudienceLocationId, true, Guid.NewGuid(), DateTimeOffset.UtcNow);
+        }
+        await db.SaveChangesAsync();
+    }
+
+    private sealed record HrDetailPayload(
+        IReadOnlyList<object> VersionHistory,
+        string AudienceDescription);
+
     private async Task<Guid> CreateCategoryAsync(HttpClient client, Guid companyId, string name)
     {
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/document-categories", new { name });
@@ -287,9 +458,12 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         return bytes;
     }
 
-    private HttpClient ClientAs(Guid companyId, Guid userId)
+    private HttpClient ClientAs(Guid companyId, Guid userId, bool allowAutoRedirect = true)
     {
-        var client = _factory.CreateClient();
+        var client = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = allowAutoRedirect,
+        });
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         return client;

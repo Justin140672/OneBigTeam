@@ -23,11 +23,13 @@ public class UploadSharedCompanyDocumentHandlerTests
         DocumentsDbContext db,
         FakeDocumentStorageService? storage = null,
         FakeVirusScanService? scanner = null,
-        FileUploadOptions? options = null) =>
+        FileUploadOptions? options = null,
+        FakeEmployeeAudienceReader? audienceReader = null) =>
         new(db,
             storage ?? new FakeDocumentStorageService(),
             new FileUploadValidator(Options.Create(options ?? new FileUploadOptions())),
             scanner ?? new FakeVirusScanService(),
+            audienceReader ?? new FakeEmployeeAudienceReader(),
             new FakeClock(FixedUtcNow));
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
@@ -66,16 +68,22 @@ public class UploadSharedCompanyDocumentHandlerTests
         string title           = "Remote Working Policy",
         string? description    = null,
         DateOnly? effectiveDate = null,
-        DateOnly? reviewDate    = null) =>
+        DateOnly? reviewDate    = null,
+        Guid? audienceDepartmentId = null,
+        Guid? audienceLocationId   = null,
+        bool requiresAcknowledgement = false) =>
         new()
         {
-            CompanyId     = companyId,
-            CategoryId    = categoryId,
-            Title         = title,
-            Description   = description,
-            EffectiveDate = effectiveDate,
-            ReviewDate    = reviewDate,
-            File          = file ?? FakePdfFile(),
+            CompanyId               = companyId,
+            CategoryId              = categoryId,
+            Title                   = title,
+            Description             = description,
+            EffectiveDate           = effectiveDate,
+            ReviewDate              = reviewDate,
+            AudienceDepartmentId    = audienceDepartmentId,
+            AudienceLocationId      = audienceLocationId,
+            RequiresAcknowledgement = requiresAcknowledgement,
+            File                    = file ?? FakePdfFile(),
         };
 
     [Fact]
@@ -360,6 +368,89 @@ public class UploadSharedCompanyDocumentHandlerTests
         Assert.Null(result.Value!.Description);
         Assert.Null(result.Value.EffectiveDate);
         Assert.Null(result.Value.ReviewDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Writes_A_Version_History_Row_For_The_First_Version()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var uploadedBy     = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var handler        = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, category.Id),
+            uploadedBy,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var version = await db.SharedCompanyDocumentVersions.SingleAsync();
+        Assert.Equal(result.Value!.Id, version.SharedCompanyDocumentId);
+        Assert.Equal(1,                version.VersionNumber);
+        Assert.Equal("policy.pdf",     version.FileName);
+        Assert.Equal(uploadedBy,       version.CreatedBy);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Accepts_RequiresAcknowledgement_And_DepartmentAudience()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var departmentId   = Guid.NewGuid();
+        var audienceReader = new FakeEmployeeAudienceReader();
+        audienceReader.ExistingDepartmentIds.Add(departmentId);
+        var handler         = BuildHandler(db, audienceReader: audienceReader);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, category.Id, audienceDepartmentId: departmentId, requiresAcknowledgement: true),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(departmentId, result.Value!.AudienceDepartmentId);
+        Assert.Null(result.Value.AudienceLocationId);
+        Assert.True(result.Value.RequiresAcknowledgement);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_When_Both_Department_And_Location_Audience_Set()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var departmentId   = Guid.NewGuid();
+        var locationId     = Guid.NewGuid();
+        var audienceReader = new FakeEmployeeAudienceReader();
+        audienceReader.ExistingDepartmentIds.Add(departmentId);
+        audienceReader.ExistingLocationIds.Add(locationId);
+        var handler = BuildHandler(db, audienceReader: audienceReader);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, category.Id, audienceDepartmentId: departmentId, audienceLocationId: locationId),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_AudienceDepartment_Does_Not_Exist()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var handler        = BuildHandler(db, audienceReader: new FakeEmployeeAudienceReader());
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, category.Id, audienceDepartmentId: Guid.NewGuid()),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
     }
 
     // Subclass used only in the orphan-cleanup test to simulate a DB save failure.

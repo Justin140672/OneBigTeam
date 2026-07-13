@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.SharedKernel;
@@ -5,21 +6,25 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Features.ListPublishedSharedCompanyDocuments;
 
-// NOTE: there is currently no per-document audience/assignment concept in this codebase —
-// SharedCompanyDocument has no "who can see this" targeting beyond its Status. So "documents
-// [the employee is] allowed to access" is implemented here as "every Published document in the
-// company" — the broadest safe reading given the current schema. If per-document audience
-// targeting (e.g. by department/location) is wanted later, this handler is where it would filter
-// further.
-internal sealed class ListPublishedSharedCompanyDocumentsHandler(DocumentsDbContext db)
+internal sealed class ListPublishedSharedCompanyDocumentsHandler(
+    DocumentsDbContext db,
+    IEmployeeAudienceReader audienceReader)
 {
     public async Task<Result<ListPublishedSharedCompanyDocumentsResponse>> HandleAsync(
         ListPublishedSharedCompanyDocumentsRequest request,
+        Guid callerEmployeeId,
         CancellationToken cancellationToken)
     {
+        var (myDepartmentId, myLocationId) = await audienceReader.GetEmployeeAudienceAsync(
+            request.CompanyId, callerEmployeeId, cancellationToken);
+
         var documents = await db.SharedCompanyDocuments
             .AsNoTracking()
             .Where(d => d.CompanyId == request.CompanyId && d.Status == SharedCompanyDocumentStatus.Published)
+            .Where(d =>
+                (d.AudienceDepartmentId == null && d.AudienceLocationId == null) ||
+                (d.AudienceDepartmentId != null && d.AudienceDepartmentId == myDepartmentId) ||
+                (d.AudienceLocationId != null && d.AudienceLocationId == myLocationId))
             .OrderBy(d => d.Title)
             .ToListAsync(cancellationToken);
 
