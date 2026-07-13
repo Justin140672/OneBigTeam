@@ -174,6 +174,44 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    // Returns null on success, or an error message string on failure.
+    public async Task<string?> UpdateSharedCompanyDocumentMetadataAsync(
+        Guid companyId,
+        Guid documentId,
+        string title,
+        string? description,
+        Guid categoryId,
+        DateOnly? effectiveDate,
+        DateOnly? reviewDate,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var request = new UpdateSharedCompanyDocumentMetadataRequest(
+                companyId, documentId, title, description, categoryId, effectiveDate, reviewDate);
+
+            var response = await Http.PutAsJsonAsync(
+                $"api/companies/{companyId}/shared-documents/{documentId}", request, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return null;
+
+            try
+            {
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+                if (body.TryGetProperty("error", out var errorProp))
+                    return errorProp.GetString();
+            }
+            catch { }
+
+            return $"Update failed ({(int)response.StatusCode}).";
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+    }
+
     // Relative URL for the download redirect endpoint — bind directly to an <a href> so the
     // browser follows the server-side redirect (and its access check) itself.
     public string GetSharedCompanyDocumentDownloadUrl(Guid companyId, Guid documentId) =>

@@ -178,6 +178,28 @@ public sealed record AcknowledgeSharedCompanyDocumentResponseModel(
     int VersionNumber,
     DateTimeOffset AcknowledgedAt);
 
+public sealed record UpdateSharedCompanyDocumentMetadataRequest(
+    Guid CompanyId,
+    Guid DocumentId,
+    string Title,
+    string? Description,
+    Guid CategoryId,
+    DateOnly? EffectiveDate,
+    DateOnly? ReviewDate);
+
+public sealed record UpdateSharedCompanyDocumentMetadataResponseModel(
+    Guid Id,
+    Guid CompanyId,
+    string Title,
+    string? Description,
+    Guid CategoryId,
+    int VersionNumber,
+    string Status,
+    DateOnly? EffectiveDate,
+    DateOnly? ReviewDate,
+    Guid UpdatedBy,
+    DateTimeOffset UpdatedAt);
+
 public enum DocumentExpiryStatus
 {
     Valid,

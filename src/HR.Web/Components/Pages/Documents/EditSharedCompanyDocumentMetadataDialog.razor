@@ -1,0 +1,118 @@
+@using System.ComponentModel.DataAnnotations
+@inject DocumentService DocumentService
+@inherits EditDialogBase<EditSharedCompanyDocumentMetadataDialog.EditSharedCompanyDocumentMetadataFormModel>
+
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="640px" ShowCloseIcon="true">
+    <DialogEvents Closed="HandleDialogClosed" />
+    <DialogTemplates>
+        <Header>Edit Document Metadata</Header>
+        <Content>
+            @if (!string.IsNullOrEmpty(GlobalError))
+            {
+                <div class="alert alert-danger alert-dismissible mb-3">
+                    @GlobalError
+                    <button type="button" class="btn-close" @onclick="@(() => GlobalError = null)"></button>
+                </div>
+            }
+            <EditForm EditContext="EditContext">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Title <span class="text-danger">*</span></label>
+                        <HrTextBox @bind-Value="Model.Title" Placeholder="Document title" />
+                        <ValidationMessage For="@(() => Model.Title)" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Category <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="Guid?"
+                                        TItem="CompanyDocumentCategoryItem"
+                                        DataSource="@_categories"
+                                        @bind-Value="Model.CategoryId"
+                                        Placeholder="Select category…"
+                                        AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => Model.CategoryId)" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Description</label>
+                        <HrTextBox @bind-Value="Model.Description"
+                                   Placeholder="Optional description"
+                                   Multiline="true" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Effective Date</label>
+                        <SfDatePicker TValue="DateOnly?"
+                                      @bind-Value="Model.EffectiveDate"
+                                      Format="dd/MM/yyyy"
+                                      Placeholder="dd/mm/yyyy"
+                                      ShowClearButton="true" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Review Date</label>
+                        <SfDatePicker TValue="DateOnly?"
+                                      @bind-Value="Model.ReviewDate"
+                                      Format="dd/MM/yyyy"
+                                      Placeholder="dd/mm/yyyy"
+                                      ShowClearButton="true" />
+                    </div>
+                </div>
+            </EditForm>
+        </Content>
+        <FooterTemplate>
+            <HrDialogButtonBar SaveLabel="Save" Saving="Saving" OnSave="SubmitAsync" OnCancel="CancelAsync" />
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter] public SharedCompanyDocumentDetailResponse? Document { get; set; }
+
+    private List<CompanyDocumentCategoryItem> _categories = [];
+
+    protected override async Task OnOpenedAsync()
+    {
+        _categories = (await DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId))?.Items.ToList() ?? [];
+
+        if (Document is not null)
+        {
+            Model.Title = Document.Title;
+            Model.Description = Document.Description;
+            Model.CategoryId = Document.CategoryId;
+            Model.EffectiveDate = Document.EffectiveDate;
+            Model.ReviewDate = Document.ReviewDate;
+        }
+    }
+
+    protected override async Task<string?> SaveCoreAsync()
+    {
+        if (Document is null)
+            return "No document selected.";
+
+        return await DocumentService.UpdateSharedCompanyDocumentMetadataAsync(
+            CompanyId, Document.Id,
+            Model.Title, Model.Description, Model.CategoryId!.Value,
+            Model.EffectiveDate, Model.ReviewDate);
+    }
+
+    protected override void ResetForm()
+    {
+        Model.Title = string.Empty;
+        Model.Description = null;
+        Model.CategoryId = null;
+        Model.EffectiveDate = null;
+        Model.ReviewDate = null;
+    }
+
+    public sealed class EditSharedCompanyDocumentMetadataFormModel
+    {
+        [Required(ErrorMessage = "Title is required.")]
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        [Required(ErrorMessage = "Category is required.")]
+        public Guid? CategoryId { get; set; }
+        public DateOnly? EffectiveDate { get; set; }
+        public DateOnly? ReviewDate { get; set; }
+    }
+}

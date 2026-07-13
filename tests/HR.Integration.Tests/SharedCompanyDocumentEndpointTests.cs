@@ -417,6 +417,108 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    // ── UpdateSharedCompanyDocumentMetadata ─────────────────────────────────────
+
+    [Fact]
+    public async Task UpdateMetadata_Returns_Forbidden_For_Manager()
+    {
+        var companyId = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var managerId  = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+
+        using var managerClient = ClientAs(companyId, managerId);
+        var response = await managerClient.PutAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}",
+            new { Title = "New Title", CategoryId = categoryId });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateMetadata_Succeeds_For_HrAdministrator_And_Updates_Fields()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Old Title");
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}",
+            new
+            {
+                Title         = "Updated Policy Title",
+                Description   = "Updated description",
+                CategoryId    = categoryId,
+                EffectiveDate = new DateOnly(2026, 9, 1),
+                ReviewDate    = new DateOnly(2027, 9, 1),
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UpdatePayload>();
+        Assert.Equal("Updated Policy Title", payload!.Title);
+        Assert.Equal(1, payload.VersionNumber);
+    }
+
+    [Fact]
+    public async Task UpdateMetadata_Returns_NotFound_When_Category_Belongs_To_Different_Company()
+    {
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var hrInA     = Guid.NewGuid();
+        var hrInB     = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
+
+        using var clientA = ClientAs(companyA, hrInA);
+        var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
+        var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
+
+        using var clientB = ClientAs(companyB, hrInB);
+        var categoryInB = await CreateCategoryAsync(clientB, companyB, "Policy");
+
+        // Caller is HR in company A, editing a document in company A, but supplying a category
+        // id that belongs to company B.
+        var response = await clientA.PutAsJsonAsync(
+            $"/api/companies/{companyA}/shared-documents/{doc!.Id}",
+            new { Title = "Title", CategoryId = categoryInB });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateMetadata_Returns_NotFound_When_Document_Belongs_To_Different_Company()
+    {
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var hrInA     = Guid.NewGuid();
+        var hrInB     = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
+
+        using var clientA = ClientAs(companyA, hrInA);
+        var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
+        var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
+
+        using var clientB = ClientAs(companyB, hrInB);
+        var categoryInB = await CreateCategoryAsync(clientB, companyB, "Policy");
+
+        var response = await clientB.PutAsJsonAsync(
+            $"/api/companies/{companyB}/shared-documents/{doc!.Id}",
+            new { Title = "Title", CategoryId = categoryInB });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    private sealed record UpdatePayload(Guid Id, string Title, int VersionNumber, string Status);
+
     // Directly flips a document to Published via the DbContext — there is no Publish endpoint
     // yet (a known, flagged gap), so integration tests that need a Published document have no
     // way to get there through the API.

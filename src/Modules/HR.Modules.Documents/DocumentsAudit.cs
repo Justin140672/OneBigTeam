@@ -119,6 +119,28 @@ internal sealed record SharedCompanyDocumentDownloadedAuditEvent(
     object? IAuditEvent.Metadata        => new { FileName, VersionNumber };
 }
 
+internal sealed record SharedCompanyDocumentMetadataUpdatedAuditEvent(
+    Guid CompanyId,
+    Guid SharedCompanyDocumentId,
+    string Title,
+    object Before,
+    object After,
+    Guid UpdatedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "shared_company_document.metadata_updated";
+    string  IAuditEvent.EntityType      => "SharedCompanyDocument";
+    Guid    IAuditEvent.EntityId        => SharedCompanyDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => null;
+    Guid?   IAuditEvent.ActorUserId     => UpdatedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => UpdatedBy;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Document '{Title}' metadata updated";
+    object? IAuditEvent.Before          => Before;
+    object? IAuditEvent.After           => After;
+    object? IAuditEvent.Metadata        => null;
+}
+
 internal sealed record DocumentRequestFulfilledAuditEvent(
     Guid CompanyId,
     Guid DocumentRequestId,
