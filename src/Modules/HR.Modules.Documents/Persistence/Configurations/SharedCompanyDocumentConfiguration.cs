@@ -29,9 +29,8 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
             .HasColumnName("description")
             .HasMaxLength(2000);
 
-        builder.Property(d => d.Category)
-            .HasColumnName("category")
-            .HasMaxLength(100)
+        builder.Property(d => d.CategoryId)
+            .HasColumnName("category_id")
             .IsRequired();
 
         builder.Property(d => d.CurrentFileReference)
@@ -67,10 +66,15 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
             .HasColumnName("updated_at")
             .IsRequired();
 
+        builder.HasOne<CompanyDocumentCategory>()
+            .WithMany()
+            .HasForeignKey(d => d.CategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Every query against this table must filter by CompanyId (no EF global query filter
         // is used in this codebase — see the tenant-isolation note on the entity itself).
         builder.HasIndex(d => d.CompanyId);
         builder.HasIndex(d => new { d.CompanyId, d.Status });
-        builder.HasIndex(d => new { d.CompanyId, d.Category });
+        builder.HasIndex(d => new { d.CompanyId, d.CategoryId });
     }
 }

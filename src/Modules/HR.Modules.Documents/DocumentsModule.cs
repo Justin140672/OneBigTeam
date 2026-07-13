@@ -6,6 +6,10 @@ using HR.Modules.Documents.Features.CreateDocumentRequestsOnEmployeeCreated;
 using HR.Modules.Documents.Features.UploadRequestedDocument;
 using HR.Modules.Documents.Features.CreateDocumentType;
 using HR.Modules.Documents.Features.DeactivateDocumentType;
+using HR.Modules.Documents.Features.CreateCompanyDocumentCategory;
+using HR.Modules.Documents.Features.UpdateCompanyDocumentCategory;
+using HR.Modules.Documents.Features.DeactivateCompanyDocumentCategory;
+using HR.Modules.Documents.Features.ListCompanyDocumentCategories;
 using HR.Modules.Documents.Features.DeleteEmployeeDocument;
 using HR.Modules.Documents.Features.DownloadEmployeeDocument;
 using HR.Modules.Documents.Features.GetEmployeeDocument;
@@ -91,6 +95,17 @@ public static class DocumentsModule
         services.AddScoped<IValidator<ListDocumentTypesRequest>, ListDocumentTypesValidator>();
 
         services.AddScoped<DeactivateDocumentTypeHandler>();
+
+        services.AddScoped<CreateCompanyDocumentCategoryHandler>();
+        services.AddScoped<IValidator<CreateCompanyDocumentCategoryRequest>, CreateCompanyDocumentCategoryValidator>();
+
+        services.AddScoped<UpdateCompanyDocumentCategoryHandler>();
+        services.AddScoped<IValidator<UpdateCompanyDocumentCategoryRequest>, UpdateCompanyDocumentCategoryValidator>();
+
+        services.AddScoped<ListCompanyDocumentCategoriesHandler>();
+        services.AddScoped<IValidator<ListCompanyDocumentCategoriesRequest>, ListCompanyDocumentCategoriesValidator>();
+
+        services.AddScoped<DeactivateCompanyDocumentCategoryHandler>();
 
         services.AddScoped<UploadEmployeeDocumentHandler>();
         services.AddScoped<IValidator<UploadEmployeeDocumentRequest>, UploadEmployeeDocumentValidator>();
@@ -184,6 +199,20 @@ public static class DocumentsModule
                 DocumentType.Create(acmeRightToWork,    acmeId, "Right To Work",    null, now),
                 DocumentType.Create(acmeCertificate,    acmeId, "Certificate",      null, now),
                 DocumentType.Create(acmeOther,          acmeId, "Other",            null, now));
+
+            await db.SaveChangesAsync();
+        }
+
+        if (!await db.CompanyDocumentCategories.AnyAsync(c => c.CompanyId == acmeId))
+        {
+            db.CompanyDocumentCategories.AddRange(
+                CompanyDocumentCategory.Create(Guid.Parse("c0000000-0000-0000-0000-000000000001"), acmeId, "Policy",             now),
+                CompanyDocumentCategory.Create(Guid.Parse("c0000000-0000-0000-0000-000000000002"), acmeId, "Handbook",           now),
+                CompanyDocumentCategory.Create(Guid.Parse("c0000000-0000-0000-0000-000000000003"), acmeId, "Procedure",          now),
+                CompanyDocumentCategory.Create(Guid.Parse("c0000000-0000-0000-0000-000000000004"), acmeId, "Form",               now),
+                CompanyDocumentCategory.Create(Guid.Parse("c0000000-0000-0000-0000-000000000005"), acmeId, "Guidance",           now),
+                CompanyDocumentCategory.Create(Guid.Parse("c0000000-0000-0000-0000-000000000006"), acmeId, "Health and Safety",  now),
+                CompanyDocumentCategory.Create(Guid.Parse("c0000000-0000-0000-0000-000000000007"), acmeId, "Other",              now));
 
             await db.SaveChangesAsync();
         }
@@ -294,6 +323,20 @@ public static class DocumentsModule
                 DocumentType.Create(betaRightToWork,    betaCorpId, "Right To Work",   null, now),
                 DocumentType.Create(betaCertificate,    betaCorpId, "Certificate",     null, now),
                 DocumentType.Create(betaOther,          betaCorpId, "Other",           null, now));
+
+            await db.SaveChangesAsync();
+        }
+
+        if (!await db.CompanyDocumentCategories.AnyAsync(c => c.CompanyId == betaCorpId))
+        {
+            db.CompanyDocumentCategories.AddRange(
+                CompanyDocumentCategory.Create(Guid.Parse("c0000000-0000-0000-0000-000000000011"), betaCorpId, "Policy",             now),
+                CompanyDocumentCategory.Create(Guid.Parse("c0000000-0000-0000-0000-000000000012"), betaCorpId, "Handbook",           now),
+                CompanyDocumentCategory.Create(Guid.Parse("c0000000-0000-0000-0000-000000000013"), betaCorpId, "Procedure",          now),
+                CompanyDocumentCategory.Create(Guid.Parse("c0000000-0000-0000-0000-000000000014"), betaCorpId, "Form",               now),
+                CompanyDocumentCategory.Create(Guid.Parse("c0000000-0000-0000-0000-000000000015"), betaCorpId, "Guidance",           now),
+                CompanyDocumentCategory.Create(Guid.Parse("c0000000-0000-0000-0000-000000000016"), betaCorpId, "Health and Safety",  now),
+                CompanyDocumentCategory.Create(Guid.Parse("c0000000-0000-0000-0000-000000000017"), betaCorpId, "Other",              now));
 
             await db.SaveChangesAsync();
         }

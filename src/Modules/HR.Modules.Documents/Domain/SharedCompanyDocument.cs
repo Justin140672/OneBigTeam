@@ -15,7 +15,7 @@ internal sealed class SharedCompanyDocument
     public Guid CompanyId { get; private set; }
     public string Title { get; private set; } = string.Empty;
     public string? Description { get; private set; }
-    public string Category { get; private set; } = string.Empty;
+    public Guid CategoryId { get; private set; }
     public string CurrentFileReference { get; private set; } = string.Empty;
     public int VersionNumber { get; private set; }
     public SharedCompanyDocumentStatus Status { get; private set; }
@@ -30,7 +30,7 @@ internal sealed class SharedCompanyDocument
         Guid companyId,
         string title,
         string? description,
-        string category,
+        Guid categoryId,
         string currentFileReference,
         DateOnly? effectiveDate,
         DateOnly? reviewDate,
@@ -41,7 +41,7 @@ internal sealed class SharedCompanyDocument
         CompanyId            = companyId,
         Title                = title.Trim(),
         Description          = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
-        Category             = category.Trim(),
+        CategoryId           = categoryId,
         CurrentFileReference = currentFileReference.Trim(),
         VersionNumber        = 1,
         Status               = SharedCompanyDocumentStatus.Draft,
@@ -55,14 +55,14 @@ internal sealed class SharedCompanyDocument
     public void UpdateDetails(
         string title,
         string? description,
-        string category,
+        Guid categoryId,
         DateOnly? effectiveDate,
         DateOnly? reviewDate,
         DateTimeOffset now)
     {
         Title         = title.Trim();
         Description   = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
-        Category      = category.Trim();
+        CategoryId    = categoryId;
         EffectiveDate = effectiveDate;
         ReviewDate    = reviewDate;
         UpdatedAt     = now;
