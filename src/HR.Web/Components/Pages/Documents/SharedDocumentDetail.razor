@@ -85,6 +85,17 @@
                             <dt>Review Date</dt>
                             <dd>@_detail.ReviewDate.Value.ToString("d MMMM yyyy")</dd>
                         }
+                        @if (!string.IsNullOrWhiteSpace(_detail.ReviewFrequency) && _detail.ReviewFrequency != "None")
+                        {
+                            <dt>Review Frequency</dt>
+                            <dd>
+                                @ReviewFrequencyLabel(_detail.ReviewFrequency)
+                                @if (_detail.ReviewFrequency == "Custom" && _detail.CustomReviewFrequencyMonths.HasValue)
+                                {
+                                    <text> (every @(_detail.CustomReviewFrequencyMonths.Value) month@(_detail.CustomReviewFrequencyMonths.Value == 1 ? "" : "s"))</text>
+                                }
+                            </dd>
+                        }
                         @if (!string.IsNullOrWhiteSpace(_detail.Description))
                         {
                             <dt>Description</dt>
@@ -415,6 +426,9 @@
         "Superseded" => "bg-secondary",
         _            => "bg-warning text-dark",
     };
+
+    private static string ReviewFrequencyLabel(string value) =>
+        value == "SixMonthly" ? "Six Monthly" : value;
 
     private static string FormatBytes(long bytes) =>
         bytes < 1024 * 1024

@@ -48,14 +48,25 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
             document.CategoryId,
             document.EffectiveDate,
             document.ReviewDate,
+            document.ReviewFrequency,
+            document.CustomReviewFrequencyMonths,
         };
+
+        // CustomReviewFrequencyMonths is compared against what it will become post-clear (i.e.
+        // null whenever ReviewFrequency isn't Custom), not the raw request value, so a stray
+        // months value submitted alongside a non-Custom frequency doesn't register as a change.
+        var requestCustomReviewFrequencyMonths = request.ReviewFrequency == SharedCompanyDocumentReviewFrequency.Custom
+            ? request.CustomReviewFrequencyMonths
+            : null;
 
         var hasChanges =
             document.Title != request.Title.Trim() ||
             document.Description != (string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim()) ||
             document.CategoryId != request.CategoryId ||
             document.EffectiveDate != request.EffectiveDate ||
-            document.ReviewDate != request.ReviewDate;
+            document.ReviewDate != request.ReviewDate ||
+            document.ReviewFrequency != request.ReviewFrequency ||
+            document.CustomReviewFrequencyMonths != requestCustomReviewFrequencyMonths;
 
         var now = clock.UtcNowOffset();
 
@@ -65,6 +76,8 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
             request.CategoryId,
             request.EffectiveDate,
             request.ReviewDate,
+            request.ReviewFrequency,
+            request.CustomReviewFrequencyMonths,
             updatedBy,
             now);
 
@@ -79,6 +92,8 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
                 document.CategoryId,
                 document.EffectiveDate,
                 document.ReviewDate,
+                document.ReviewFrequency,
+                document.CustomReviewFrequencyMonths,
             };
 
             await auditPublisher.PublishAsync(new SharedCompanyDocumentMetadataUpdatedAuditEvent(
@@ -101,6 +116,8 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
             document.Status.ToString(),
             document.EffectiveDate,
             document.ReviewDate,
+            document.ReviewFrequency.ToString(),
+            document.CustomReviewFrequencyMonths,
             document.UpdatedBy,
             document.UpdatedAt));
     }

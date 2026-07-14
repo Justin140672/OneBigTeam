@@ -78,6 +78,27 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
     }
 
     [Fact]
+    public async Task Upload_With_ReviewFrequency_RoundTrips_Via_GetDetail()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, response) = await UploadAsync(
+            client, companyId, categoryId, title: "Remote Working Policy", reviewFrequency: "Monthly");
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var detailResponse = await client.GetAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}");
+        Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
+
+        var detail = await detailResponse.Content.ReadFromJsonAsync<ReviewFrequencyDetailPayload>();
+        Assert.Equal("Monthly", detail!.ReviewFrequency);
+    }
+
+    [Fact]
     public async Task Upload_Returns_NotFound_When_Category_Belongs_To_Different_Company()
     {
         var companyA = Guid.NewGuid();
@@ -600,6 +621,36 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         var payload = await response.Content.ReadFromJsonAsync<UpdatePayload>();
         Assert.Equal("Updated Policy Title", payload!.Title);
         Assert.Equal(1, payload.VersionNumber);
+    }
+
+    [Fact]
+    public async Task UpdateMetadata_With_Custom_ReviewFrequency_RoundTrips_Via_GetDetail()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Old Title");
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}",
+            new
+            {
+                Title                       = "Updated Policy Title",
+                CategoryId                  = categoryId,
+                ReviewFrequency             = "Custom",
+                CustomReviewFrequencyMonths = 6,
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var detailResponse = await client.GetAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}");
+        Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
+
+        var detail = await detailResponse.Content.ReadFromJsonAsync<ReviewFrequencyDetailPayload>();
+        Assert.Equal("Custom", detail!.ReviewFrequency);
+        Assert.Equal(6,        detail.CustomReviewFrequencyMonths);
     }
 
     [Fact]
@@ -1466,6 +1517,9 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         IReadOnlyList<object> VersionHistory,
         string AudienceDescription);
 
+    private sealed record ReviewFrequencyDetailPayload(
+        Guid Id, string ReviewFrequency, int? CustomReviewFrequencyMonths);
+
     private async Task<Guid> CreateCategoryAsync(HttpClient client, Guid companyId, string name)
     {
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/document-categories", new { name });
@@ -1475,20 +1529,29 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
     }
 
     private async Task<(DocumentPayload? Payload, HttpResponseMessage Response)> UploadAsync(
-        HttpClient client, Guid companyId, Guid categoryId, string title = "Test Document")
+        HttpClient client, Guid companyId, Guid categoryId, string title = "Test Document",
+        string? reviewFrequency = null, int? customReviewFrequencyMonths = null)
     {
-        var response = await client.PostAsync($"/api/companies/{companyId}/shared-documents", BuildUpload(title, categoryId));
+        var response = await client.PostAsync(
+            $"/api/companies/{companyId}/shared-documents",
+            BuildUpload(title, categoryId, reviewFrequency, customReviewFrequencyMonths));
         DocumentPayload? payload = null;
         if (response.IsSuccessStatusCode)
             payload = await response.Content.ReadFromJsonAsync<DocumentPayload>();
         return (payload, response);
     }
 
-    private static MultipartFormDataContent BuildUpload(string title = "Test Document", Guid? categoryId = null)
+    private static MultipartFormDataContent BuildUpload(
+        string title = "Test Document", Guid? categoryId = null,
+        string? reviewFrequency = null, int? customReviewFrequencyMonths = null)
     {
         var form = new MultipartFormDataContent();
         form.Add(new StringContent(title), "Title");
         form.Add(new StringContent((categoryId ?? Guid.NewGuid()).ToString()), "CategoryId");
+        if (reviewFrequency is not null)
+            form.Add(new StringContent(reviewFrequency), "ReviewFrequency");
+        if (customReviewFrequencyMonths is not null)
+            form.Add(new StringContent(customReviewFrequencyMonths.Value.ToString()), "CustomReviewFrequencyMonths");
 
         var fileContent = new ByteArrayContent(PdfBytes());
         fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");

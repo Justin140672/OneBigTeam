@@ -1,4 +1,5 @@
 using FluentValidation;
+using HR.Modules.Documents.Domain;
 
 namespace HR.Modules.Documents.Features.UpdateSharedCompanyDocumentMetadata;
 
@@ -14,6 +15,16 @@ internal sealed class UpdateSharedCompanyDocumentMetadataValidator : AbstractVal
 
         RuleFor(r => r.CategoryId)
             .NotEmpty();
+
+        RuleFor(r => r.CustomReviewFrequencyMonths)
+            .NotNull()
+            .When(r => r.ReviewFrequency == SharedCompanyDocumentReviewFrequency.Custom)
+            .WithMessage("CustomReviewFrequencyMonths is required when Review Frequency is Custom.");
+
+        RuleFor(r => r.CustomReviewFrequencyMonths)
+            .GreaterThan(0)
+            .When(r => r.ReviewFrequency == SharedCompanyDocumentReviewFrequency.Custom && r.CustomReviewFrequencyMonths.HasValue)
+            .WithMessage("CustomReviewFrequencyMonths must be greater than zero.");
 
         RuleFor(r => r.Title)
             .NotEmpty()

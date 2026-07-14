@@ -30,7 +30,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Remote Working Policy", "A description", category.Id,
             "key/p.pdf", "p.pdf", 500, "application/pdf",
-            new DateOnly(2026, 1, 1), new DateOnly(2027, 1, 1), false, null, null, createdBy, Now);
+            new DateOnly(2026, 1, 1), new DateOnly(2027, 1, 1), SharedCompanyDocumentReviewFrequency.None, null, false, null, null, createdBy, Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -68,7 +68,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
             acknowledgementStatement: null, createdBy: Guid.NewGuid(), now: Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
@@ -102,7 +102,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyA);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyA, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, false, null, null, Guid.NewGuid(), Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -122,7 +122,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
-            null, null, false, null, null, Guid.NewGuid(), Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, Guid.NewGuid(), Now);
         doc.ReplaceFile("key/v2.pdf", "v2.pdf", 200, "application/pdf", Guid.NewGuid(), Now.AddDays(1));
         db.SharedCompanyDocuments.Add(doc);
 
@@ -148,7 +148,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
-            new DateOnly(2026, 1, 1), null, false, null, null, Guid.NewGuid(), Now);
+            new DateOnly(2026, 1, 1), null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, Guid.NewGuid(), Now);
         doc.ReplaceFile("key/v2.pdf", "v2.pdf", 200, "application/pdf", Guid.NewGuid(), Now.AddDays(1));
         db.SharedCompanyDocuments.Add(doc);
 
@@ -178,7 +178,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, false, null, null, Guid.NewGuid(), Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, Guid.NewGuid(), Now);
 
         switch (expectedStatus)
         {
@@ -212,7 +212,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
-            null, null, false, null, null, Guid.NewGuid(), Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, Guid.NewGuid(), Now);
         doc.Publish(Guid.NewGuid(), Now);
         doc.ReplaceFile("key/v2.pdf", "v2.pdf", 200, "application/pdf", Guid.NewGuid(), Now.AddDays(1));
         db.SharedCompanyDocuments.Add(doc);
@@ -241,7 +241,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var departmentId = Guid.NewGuid();
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, false, null, null, Guid.NewGuid(), Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAudienceRules.Add(SharedCompanyDocumentAudienceRule.Create(
             Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId));
@@ -270,7 +270,7 @@ public class GetSharedCompanyDocumentHandlerTests
         var employeeId      = Guid.NewGuid();
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, false, null, null, Guid.NewGuid(), Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAudienceRules.AddRange(
             SharedCompanyDocumentAudienceRule.Create(Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId),
@@ -306,7 +306,7 @@ public class GetSharedCompanyDocumentHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
 
@@ -339,7 +339,7 @@ public class GetSharedCompanyDocumentHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
         doc.Publish(Guid.NewGuid(), Now);
         doc.ReplaceFile("key/v2.pdf", "v2.pdf", 200, "application/pdf", Guid.NewGuid(), Now.AddDays(1));
         db.SharedCompanyDocuments.Add(doc);

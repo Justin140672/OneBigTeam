@@ -49,7 +49,7 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
     {
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Employee Handbook", null, categoryId, "key/handbook.pdf",
-            "handbook.pdf", 100, "application/pdf", null, null,
+            "handbook.pdf", 100, "application/pdf", null, null, SharedCompanyDocumentReviewFrequency.None, null,
             requiresAcknowledgement, acknowledgementDueDate, null, Guid.NewGuid(), Now);
 
         if (status is SharedCompanyDocumentStatus.Published or SharedCompanyDocumentStatus.Archived)

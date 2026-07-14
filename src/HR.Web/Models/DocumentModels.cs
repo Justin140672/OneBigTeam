@@ -145,6 +145,8 @@ public sealed record SharedCompanyDocumentDetailResponse(
     string Status,
     DateOnly? EffectiveDate,
     DateOnly? ReviewDate,
+    string ReviewFrequency,
+    int? CustomReviewFrequencyMonths,
     string AudienceDescription,
     IReadOnlyList<Guid> AudienceDepartmentIds,
     IReadOnlyList<Guid> AudienceLocationIds,
@@ -229,7 +231,9 @@ public sealed record UpdateSharedCompanyDocumentMetadataRequest(
     string? Description,
     Guid CategoryId,
     DateOnly? EffectiveDate,
-    DateOnly? ReviewDate);
+    DateOnly? ReviewDate,
+    string ReviewFrequency,
+    int? CustomReviewFrequencyMonths);
 
 public sealed record UpdateSharedCompanyDocumentMetadataResponseModel(
     Guid Id,
@@ -241,6 +245,8 @@ public sealed record UpdateSharedCompanyDocumentMetadataResponseModel(
     string Status,
     DateOnly? EffectiveDate,
     DateOnly? ReviewDate,
+    string ReviewFrequency,
+    int? CustomReviewFrequencyMonths,
     Guid UpdatedBy,
     DateTimeOffset UpdatedAt);
 

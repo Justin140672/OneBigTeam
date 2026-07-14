@@ -7,9 +7,9 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// (/companies/{companyId}/shared-documents/{documentId}), scoped to the Version History grid,
 /// the Publish flow, the Archive flow, the Acknowledgement card's "Edit" flow (used by
 /// CompanyDocumentsTabTests to set up documents with acknowledgement requirements before
-/// publishing), the Audience card's summary/edit-dialog affordances, and navigation to the
-/// acknowledgement-progress screen. Metadata-edit affordances have their own coverage elsewhere
-/// and are intentionally not exposed here.
+/// publishing), the Audience card's summary/edit-dialog affordances, the Document Metadata
+/// card's "Edit" flow (currently scoped to Review Frequency only — see
+/// SharedDocumentReviewFrequencyTests), and navigation to the acknowledgement-progress screen.
 /// </summary>
 public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 {
@@ -19,6 +19,14 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     // dialog is open and both the header button and the dialog's footer button are on screen.
     private ILocator PublishHeaderButton => page.GetByRole(AriaRole.Button).Filter(new() { Has = page.Locator(".fa-paper-plane") });
     private ILocator ArchiveHeaderButton => page.GetByRole(AriaRole.Button).Filter(new() { Has = page.Locator(".fa-box-archive") });
+
+    // Unlike Publish/Archive, the page header's "Edit" button shares its icon (fa-pen) and text
+    // with the Audience and Acknowledgement cards' own "Edit" buttons, so icon/text filtering
+    // can't disambiguate it — it's the only one of the three that isn't inside an .overview-card,
+    // and it comes first in DOM order (the header renders before the cards row), so .First is the
+    // reliable way to target it specifically.
+    private ILocator EditMetadataHeaderButton => page.GetByRole(AriaRole.Button, new() { Name = "Edit" }).First;
+    private ILocator EditMetadataDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Edit Document Metadata" });
 
     private ILocator PublishDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Publish Document" });
     private ILocator ArchiveDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Archive Document" });
@@ -63,6 +71,57 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     public Task<bool> IsArchiveButtonVisibleAsync() => ArchiveHeaderButton.IsVisibleAsync();
 
     public Task<bool> IsPublishButtonVisibleAsync() => PublishHeaderButton.IsVisibleAsync();
+
+    /// <summary>
+    /// Text of the "Review Frequency" row in the Document Metadata card (e.g. "Quarterly" or
+    /// "Custom (every 6 months)"), or null when the row isn't rendered at all — SharedDocumentDetail.razor
+    /// only renders this row when the frequency isn't "None", so null is the expected result for
+    /// a document that has never had a frequency set.
+    /// </summary>
+    public async Task<string?> GetReviewFrequencyTextAsync()
+    {
+        var row = page.Locator("dt:has-text('Review Frequency') + dd");
+        if (!await row.IsVisibleAsync()) return null;
+        return (await row.InnerTextAsync()).Trim();
+    }
+
+    /// <summary>
+    /// Drives the page header's "Edit" button and EditSharedCompanyDocumentMetadataDialog.razor
+    /// to set the Review Frequency (and, when selecting "Custom", the custom months value), then
+    /// waits for the page to reload its detail data. <paramref name="frequencyLabel"/> is the
+    /// dropdown's display label ("None", "Monthly", "Quarterly", "Six Monthly", "Yearly", "Custom"),
+    /// not the underlying enum member name (e.g. "Six Monthly" not "SixMonthly").
+    /// </summary>
+    public async Task SetReviewFrequencyAsync(string frequencyLabel, int? customMonths = null)
+    {
+        await EditMetadataHeaderButton.ClickAsync();
+        await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
+        // Category is the first combobox in this dialog, Review Frequency the second — same
+        // click-open/wait-for-popup/click-item interaction pattern used for Category elsewhere
+        // in this test suite (see SharedDocumentUploadTests).
+        await EditMetadataDialog.Locator("span[role='combobox']").Nth(1).ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = frequencyLabel })
+            .First
+            .ClickAsync();
+
+        if (customMonths.HasValue)
+        {
+            var monthsInput = EditMetadataDialog.Locator(".col-md-6")
+                .Filter(new() { HasText = "Custom Frequency" })
+                .Locator("input");
+            await monthsInput.FillAsync(customMonths.Value.ToString());
+        }
+
+        await EditMetadataDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
 
     /// <summary>
     /// Drives the header "Publish" button and its confirmation dialog to completion, then waits

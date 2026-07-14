@@ -1,3 +1,4 @@
+using HR.Modules.Documents.Domain;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Documents.Features.UploadSharedCompanyDocument;
@@ -10,6 +11,8 @@ internal sealed class UploadSharedCompanyDocumentRequest
     public Guid CategoryId { get; init; }
     public DateOnly? EffectiveDate { get; init; }
     public DateOnly? ReviewDate { get; init; }
+    public SharedCompanyDocumentReviewFrequency ReviewFrequency { get; init; }
+    public int? CustomReviewFrequencyMonths { get; init; }
     public Guid[] AudienceDepartmentIds { get; init; } = [];
     public Guid[] AudienceLocationIds { get; init; } = [];
     public Guid[] AudiencePositionProfileIds { get; init; } = [];

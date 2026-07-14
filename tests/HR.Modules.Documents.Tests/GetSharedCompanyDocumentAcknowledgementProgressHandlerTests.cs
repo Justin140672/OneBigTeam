@@ -41,7 +41,7 @@ public class GetSharedCompanyDocumentAcknowledgementProgressHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: false, null, null, Guid.NewGuid(), Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, requiresAcknowledgement: false, null, null, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -65,7 +65,7 @@ public class GetSharedCompanyDocumentAcknowledgementProgressHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
             acknowledgementStatement: null, createdBy: Guid.NewGuid(), now: Now);
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
@@ -117,7 +117,7 @@ public class GetSharedCompanyDocumentAcknowledgementProgressHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2026, 7, 1),
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2026, 7, 1),
             acknowledgementStatement: null, createdBy: Guid.NewGuid(), now: Now);
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
@@ -155,7 +155,7 @@ public class GetSharedCompanyDocumentAcknowledgementProgressHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
             acknowledgementStatement: null, createdBy: Guid.NewGuid(), now: Now);
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
@@ -188,7 +188,7 @@ public class GetSharedCompanyDocumentAcknowledgementProgressHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
             acknowledgementStatement: null, createdBy: Guid.NewGuid(), now: Now);
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
@@ -227,7 +227,7 @@ public class GetSharedCompanyDocumentAcknowledgementProgressHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2026, 1, 1),
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2026, 1, 1),
             acknowledgementStatement: null, createdBy: Guid.NewGuid(), now: Now);
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);

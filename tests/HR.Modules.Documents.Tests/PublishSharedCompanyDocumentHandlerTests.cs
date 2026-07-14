@@ -162,7 +162,7 @@ public class PublishSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            effectiveDate: new DateOnly(2026, 9, 1), reviewDate: new DateOnly(2026, 1, 1),
+            effectiveDate: new DateOnly(2026, 9, 1), reviewDate: new DateOnly(2026, 1, 1), SharedCompanyDocumentReviewFrequency.None, null,
             requiresAcknowledgement: false, acknowledgementDueDate: null, acknowledgementStatement: null,
             createdBy: Guid.NewGuid(), now: Now);
         db.SharedCompanyDocuments.Add(doc);
@@ -184,7 +184,7 @@ public class PublishSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: true, acknowledgementDueDate: null, acknowledgementStatement: null,
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, requiresAcknowledgement: true, acknowledgementDueDate: null, acknowledgementStatement: null,
             createdBy: Guid.NewGuid(), now: Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
@@ -210,7 +210,7 @@ public class PublishSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1), acknowledgementStatement: null,
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1), acknowledgementStatement: null,
             createdBy: Guid.NewGuid(), now: Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
@@ -234,7 +234,7 @@ public class PublishSharedCompanyDocumentHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Remote Working Policy", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1), acknowledgementStatement: null,
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1), acknowledgementStatement: null,
             createdBy: Guid.NewGuid(), now: Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
@@ -275,7 +275,7 @@ public class PublishSharedCompanyDocumentHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Remote Working Policy", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1), acknowledgementStatement: null,
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1), acknowledgementStatement: null,
             createdBy: Guid.NewGuid(), now: Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
@@ -313,7 +313,7 @@ public class PublishSharedCompanyDocumentHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Remote Working Policy", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1), acknowledgementStatement: null,
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1), acknowledgementStatement: null,
             createdBy: Guid.NewGuid(), now: Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAcknowledgements.Add(SharedCompanyDocumentAcknowledgement.Create(
@@ -411,7 +411,7 @@ public class PublishSharedCompanyDocumentHandlerTests
     private static SharedCompanyDocument CreateDoc(Guid companyId, Guid categoryId, Guid createdBy) =>
         SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, categoryId, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, false, null, null, createdBy, Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, createdBy, Now);
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

@@ -20,7 +20,7 @@ public class DownloadSharedCompanyDocumentVersionHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
-            null, null, false, null, null, owner, Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, owner, Now);
         doc.ReplaceFile("key/v2.pdf", "v2.pdf", 200, "application/pdf", owner, Now.AddDays(1));
         db.SharedCompanyDocuments.Add(doc);
 
@@ -49,7 +49,7 @@ public class DownloadSharedCompanyDocumentVersionHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Remote Working Policy", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
-            null, null, false, null, null, owner, Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, owner, Now);
         doc.ReplaceFile("key/v2.pdf", "v2.pdf", 200, "application/pdf", owner, Now.AddDays(1));
         db.SharedCompanyDocuments.Add(doc);
 
@@ -95,7 +95,7 @@ public class DownloadSharedCompanyDocumentVersionHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
-            null, null, false, null, null, owner, Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, owner, Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentVersions.Add(
             SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 1, "key/v1.pdf", "v1.pdf", 100, "application/pdf", owner, Now, versionNote: null, requiresAcknowledgement: false, effectiveDate: null));
@@ -119,7 +119,7 @@ public class DownloadSharedCompanyDocumentVersionHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyA, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
-            null, null, false, null, null, owner, Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, owner, Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentVersions.Add(
             SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyA, doc.Id, 1, "key/v1.pdf", "v1.pdf", 100, "application/pdf", owner, Now, versionNote: null, requiresAcknowledgement: false, effectiveDate: null));

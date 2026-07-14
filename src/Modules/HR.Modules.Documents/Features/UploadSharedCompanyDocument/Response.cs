@@ -13,6 +13,8 @@ internal sealed record UploadSharedCompanyDocumentResponse(
     string Status,
     DateOnly? EffectiveDate,
     DateOnly? ReviewDate,
+    string ReviewFrequency,
+    int? CustomReviewFrequencyMonths,
     IReadOnlyList<Guid> AudienceDepartmentIds,
     IReadOnlyList<Guid> AudienceLocationIds,
     IReadOnlyList<Guid> AudiencePositionProfileIds,

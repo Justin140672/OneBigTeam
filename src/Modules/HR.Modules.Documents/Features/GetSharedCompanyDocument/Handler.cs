@@ -105,6 +105,8 @@ internal sealed class GetSharedCompanyDocumentHandler(
             document.Status.ToString(),
             document.EffectiveDate,
             document.ReviewDate,
+            document.ReviewFrequency.ToString(),
+            document.CustomReviewFrequencyMonths,
             audienceDescription,
             audienceDepartmentIds,
             audienceLocationIds,

@@ -24,6 +24,8 @@ internal sealed class SharedCompanyDocument
     public SharedCompanyDocumentStatus Status { get; private set; }
     public DateOnly? EffectiveDate { get; private set; }
     public DateOnly? ReviewDate { get; private set; }
+    public SharedCompanyDocumentReviewFrequency ReviewFrequency { get; private set; }
+    public int? CustomReviewFrequencyMonths { get; private set; }
 
     // Audience is modelled as a separate set of SharedCompanyDocumentAudienceRule rows (see that
     // type), not fields here — this aggregate has no in-memory audience state of its own, the
@@ -66,6 +68,8 @@ internal sealed class SharedCompanyDocument
         string contentType,
         DateOnly? effectiveDate,
         DateOnly? reviewDate,
+        SharedCompanyDocumentReviewFrequency reviewFrequency,
+        int? customReviewFrequencyMonths,
         bool requiresAcknowledgement,
         DateOnly? acknowledgementDueDate,
         string? acknowledgementStatement,
@@ -85,6 +89,8 @@ internal sealed class SharedCompanyDocument
         Status                   = SharedCompanyDocumentStatus.Draft,
         EffectiveDate            = effectiveDate,
         ReviewDate               = reviewDate,
+        ReviewFrequency             = reviewFrequency,
+        CustomReviewFrequencyMonths = reviewFrequency == SharedCompanyDocumentReviewFrequency.Custom ? customReviewFrequencyMonths : null,
         RequiresAcknowledgement  = requiresAcknowledgement,
         AcknowledgementDueDate   = requiresAcknowledgement ? acknowledgementDueDate : null,
         AcknowledgementStatement = requiresAcknowledgement && !string.IsNullOrWhiteSpace(acknowledgementStatement)
@@ -102,6 +108,8 @@ internal sealed class SharedCompanyDocument
         Guid categoryId,
         DateOnly? effectiveDate,
         DateOnly? reviewDate,
+        SharedCompanyDocumentReviewFrequency reviewFrequency,
+        int? customReviewFrequencyMonths,
         Guid updatedBy,
         DateTimeOffset now)
     {
@@ -110,6 +118,8 @@ internal sealed class SharedCompanyDocument
         CategoryId              = categoryId;
         EffectiveDate           = effectiveDate;
         ReviewDate              = reviewDate;
+        ReviewFrequency             = reviewFrequency;
+        CustomReviewFrequencyMonths = reviewFrequency == SharedCompanyDocumentReviewFrequency.Custom ? customReviewFrequencyMonths : null;
         UpdatedBy               = updatedBy;
         UpdatedAt               = now;
     }

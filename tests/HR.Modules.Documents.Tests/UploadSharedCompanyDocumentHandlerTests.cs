@@ -73,6 +73,8 @@ public class UploadSharedCompanyDocumentHandlerTests
         string? description    = null,
         DateOnly? effectiveDate = null,
         DateOnly? reviewDate    = null,
+        SharedCompanyDocumentReviewFrequency reviewFrequency = SharedCompanyDocumentReviewFrequency.None,
+        int? customReviewFrequencyMonths = null,
         Guid[]? audienceDepartmentIds = null,
         Guid[]? audienceLocationIds   = null,
         Guid[]? audiencePositionProfileIds = null,
@@ -82,20 +84,22 @@ public class UploadSharedCompanyDocumentHandlerTests
         string? acknowledgementStatement = null) =>
         new()
         {
-            CompanyId                  = companyId,
-            CategoryId                 = categoryId,
-            Title                      = title,
-            Description                = description,
-            EffectiveDate              = effectiveDate,
-            ReviewDate                 = reviewDate,
-            AudienceDepartmentIds      = audienceDepartmentIds ?? [],
-            AudienceLocationIds        = audienceLocationIds ?? [],
-            AudiencePositionProfileIds = audiencePositionProfileIds ?? [],
-            AudienceEmployeeIds        = audienceEmployeeIds ?? [],
-            RequiresAcknowledgement    = requiresAcknowledgement,
-            AcknowledgementDueDate     = acknowledgementDueDate,
-            AcknowledgementStatement   = acknowledgementStatement,
-            File                       = file ?? FakePdfFile(),
+            CompanyId                   = companyId,
+            CategoryId                  = categoryId,
+            Title                       = title,
+            Description                 = description,
+            EffectiveDate               = effectiveDate,
+            ReviewDate                  = reviewDate,
+            ReviewFrequency             = reviewFrequency,
+            CustomReviewFrequencyMonths = customReviewFrequencyMonths,
+            AudienceDepartmentIds       = audienceDepartmentIds ?? [],
+            AudienceLocationIds         = audienceLocationIds ?? [],
+            AudiencePositionProfileIds  = audiencePositionProfileIds ?? [],
+            AudienceEmployeeIds         = audienceEmployeeIds ?? [],
+            RequiresAcknowledgement     = requiresAcknowledgement,
+            AcknowledgementDueDate      = acknowledgementDueDate,
+            AcknowledgementStatement    = acknowledgementStatement,
+            File                        = file ?? FakePdfFile(),
         };
 
     [Fact]
@@ -380,6 +384,57 @@ public class UploadSharedCompanyDocumentHandlerTests
         Assert.Null(result.Value!.Description);
         Assert.Null(result.Value.EffectiveDate);
         Assert.Null(result.Value.ReviewDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Sets_Custom_ReviewFrequency_And_Months()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var handler        = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(
+                companyId, category.Id,
+                reviewFrequency: SharedCompanyDocumentReviewFrequency.Custom,
+                customReviewFrequencyMonths: 6),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Custom", result.Value!.ReviewFrequency);
+        Assert.Equal(6,        result.Value.CustomReviewFrequencyMonths);
+
+        var saved = await db.SharedCompanyDocuments.SingleAsync();
+        Assert.Equal(SharedCompanyDocumentReviewFrequency.Custom, saved.ReviewFrequency);
+        Assert.Equal(6, saved.CustomReviewFrequencyMonths);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Clears_CustomReviewFrequencyMonths_When_ReviewFrequency_Is_Not_Custom()
+    {
+        // Defensive domain-layer guarantee: even if a caller somehow submits a months value
+        // alongside a non-Custom frequency, the persisted entity must not carry it.
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var handler        = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(
+                companyId, category.Id,
+                reviewFrequency: SharedCompanyDocumentReviewFrequency.None,
+                customReviewFrequencyMonths: 6),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.CustomReviewFrequencyMonths);
+
+        var saved = await db.SharedCompanyDocuments.SingleAsync();
+        Assert.Equal(SharedCompanyDocumentReviewFrequency.None, saved.ReviewFrequency);
+        Assert.Null(saved.CustomReviewFrequencyMonths);
     }
 
     [Fact]

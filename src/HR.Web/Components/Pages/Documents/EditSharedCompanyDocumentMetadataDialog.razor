@@ -56,6 +56,23 @@
                                       Placeholder="dd/mm/yyyy"
                                       ShowClearButton="true" />
                     </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Review Frequency</label>
+                        <SfDropDownList TValue="string"
+                                        TItem="ReviewFrequencyOption"
+                                        DataSource="@_reviewFrequencyOptions"
+                                        @bind-Value="Model.ReviewFrequency">
+                            <DropDownListFieldSettings Value="Value" Text="Label" />
+                        </SfDropDownList>
+                    </div>
+                    @if (Model.ReviewFrequency == "Custom")
+                    {
+                        <div class="col-md-6">
+                            <label class="form-label">Custom Frequency (months)</label>
+                            <SfNumericTextBox TValue="int?" @bind-Value="Model.CustomReviewFrequencyMonths"
+                                              Min="1" Placeholder="e.g. 6" ShowSpinButton="false" />
+                        </div>
+                    }
                 </div>
             </EditForm>
         </Content>
@@ -71,6 +88,16 @@
 
     private List<CompanyDocumentCategoryItem> _categories = [];
 
+    private static readonly List<ReviewFrequencyOption> _reviewFrequencyOptions =
+    [
+        new("None", "None"),
+        new("Monthly", "Monthly"),
+        new("Quarterly", "Quarterly"),
+        new("SixMonthly", "Six Monthly"),
+        new("Yearly", "Yearly"),
+        new("Custom", "Custom"),
+    ];
+
     protected override async Task OnOpenedAsync()
     {
         _categories = (await DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId))?.Items.ToList() ?? [];
@@ -82,6 +109,8 @@
             Model.CategoryId = Document.CategoryId;
             Model.EffectiveDate = Document.EffectiveDate;
             Model.ReviewDate = Document.ReviewDate;
+            Model.ReviewFrequency = Document.ReviewFrequency;
+            Model.CustomReviewFrequencyMonths = Document.CustomReviewFrequencyMonths;
         }
     }
 
@@ -93,7 +122,8 @@
         return await DocumentService.UpdateSharedCompanyDocumentMetadataAsync(
             CompanyId, Document.Id,
             Model.Title, Model.Description, Model.CategoryId!.Value,
-            Model.EffectiveDate, Model.ReviewDate);
+            Model.EffectiveDate, Model.ReviewDate,
+            Model.ReviewFrequency, Model.CustomReviewFrequencyMonths);
     }
 
     protected override void ResetForm()
@@ -103,7 +133,11 @@
         Model.CategoryId = null;
         Model.EffectiveDate = null;
         Model.ReviewDate = null;
+        Model.ReviewFrequency = "None";
+        Model.CustomReviewFrequencyMonths = null;
     }
+
+    public sealed record ReviewFrequencyOption(string Value, string Label);
 
     public sealed class EditSharedCompanyDocumentMetadataFormModel
     {
@@ -114,5 +148,7 @@
         public Guid? CategoryId { get; set; }
         public DateOnly? EffectiveDate { get; set; }
         public DateOnly? ReviewDate { get; set; }
+        public string ReviewFrequency { get; set; } = "None";
+        public int? CustomReviewFrequencyMonths { get; set; }
     }
 }

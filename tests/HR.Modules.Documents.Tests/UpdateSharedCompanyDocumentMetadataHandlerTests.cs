@@ -88,7 +88,7 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Title", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, true, null, null, Guid.NewGuid(), Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, true, null, null, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAudienceRules.Add(SharedCompanyDocumentAudienceRule.Create(
             Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId));
@@ -263,6 +263,65 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
         Assert.Empty(audit.Published);
     }
 
+    [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_When_Only_ReviewFrequency_Changes()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = CreateDoc(companyId, "Same Title", category.Id, Guid.NewGuid());
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var audit = new FakeAuditPublisher();
+        await Handler(db, audit).HandleAsync(
+            new UpdateSharedCompanyDocumentMetadataRequest
+            {
+                CompanyId       = companyId,
+                DocumentId      = doc.Id,
+                Title           = "Same Title",
+                Description     = doc.Description,
+                CategoryId      = category.Id,
+                EffectiveDate   = doc.EffectiveDate,
+                ReviewDate      = doc.ReviewDate,
+                ReviewFrequency = SharedCompanyDocumentReviewFrequency.Monthly,
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        var evt = Assert.Single(audit.Published);
+        Assert.Equal("shared_company_document.metadata_updated", evt.EventType);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Clears_CustomReviewFrequencyMonths_When_ReviewFrequency_Changes_Away_From_Custom()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var category   = await SeedCategory(db, companyId);
+        var createdBy  = Guid.NewGuid();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Title", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.Custom, 6, false, null, null, createdBy, Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        await Handler(db).HandleAsync(
+            new UpdateSharedCompanyDocumentMetadataRequest
+            {
+                CompanyId       = companyId,
+                DocumentId      = doc.Id,
+                Title           = "Title",
+                CategoryId      = category.Id,
+                ReviewFrequency = SharedCompanyDocumentReviewFrequency.None,
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        var stored = await db.SharedCompanyDocuments.AsNoTracking().SingleAsync(d => d.Id == doc.Id);
+        Assert.Equal(SharedCompanyDocumentReviewFrequency.None, stored.ReviewFrequency);
+        Assert.Null(stored.CustomReviewFrequencyMonths);
+    }
+
     private static UpdateSharedCompanyDocumentMetadataHandler Handler(
         DocumentsDbContext db, FakeAuditPublisher? auditPublisher = null) =>
         new(db, auditPublisher ?? new FakeAuditPublisher(), new FakeClock(FixedUtcNow));
@@ -270,7 +329,7 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
     private static SharedCompanyDocument CreateDoc(Guid companyId, string title, Guid categoryId, Guid createdBy) =>
         SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, title, null, categoryId, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, false, null, null, createdBy, Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, createdBy, Now);
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

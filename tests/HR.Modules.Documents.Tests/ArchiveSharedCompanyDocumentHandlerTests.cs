@@ -239,7 +239,7 @@ public class ArchiveSharedCompanyDocumentHandlerTests
     private static SharedCompanyDocument CreateDoc(Guid companyId, Guid categoryId, Guid createdBy) =>
         SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, categoryId, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, false, null, null, createdBy, Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, createdBy, Now);
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

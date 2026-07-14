@@ -68,6 +68,15 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
         builder.Property(d => d.ReviewDate)
             .HasColumnName("review_date");
 
+        builder.Property(d => d.ReviewFrequency)
+            .HasColumnName("review_frequency")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(d => d.CustomReviewFrequencyMonths)
+            .HasColumnName("custom_review_frequency_months");
+
         builder.Property(d => d.RequiresAcknowledgement)
             .HasColumnName("requires_acknowledgement")
             .IsRequired();
