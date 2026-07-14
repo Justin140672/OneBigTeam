@@ -18,6 +18,16 @@ internal sealed class FakeEmployeeAudienceReader : IEmployeeAudienceReader
         Guid companyId, Guid employeeId, CancellationToken cancellationToken) =>
         Task.FromResult(EmployeeAudiences.TryGetValue(employeeId, out var profile) ? profile : null);
 
+    public Task<IReadOnlyList<EmployeeAudienceDetail>> GetEmployeeAudienceDetailsAsync(
+        Guid companyId, IReadOnlyCollection<Guid> employeeIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<EmployeeAudienceDetail>>(employeeIds.Select(id =>
+        {
+            EmployeeAudiences.TryGetValue(id, out var profile);
+            var departmentName = profile?.DepartmentId is { } deptId && DepartmentNames.TryGetValue(deptId, out var dn) ? dn : null;
+            var locationName = profile?.LocationId is { } locId && LocationNames.TryGetValue(locId, out var ln) ? ln : null;
+            return new EmployeeAudienceDetail(id, profile?.DepartmentId, departmentName, profile?.LocationId, locationName);
+        }).ToList());
+
     public Task<bool> DepartmentExistsAsync(Guid companyId, Guid departmentId, CancellationToken cancellationToken) =>
         Task.FromResult(ExistingDepartmentIds.Contains(departmentId));
 

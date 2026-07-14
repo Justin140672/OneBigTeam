@@ -49,10 +49,13 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
         // Second data row is missing a required "Last Name" value. One row is still valid, so
         // per ImportSession.Validate() the session lands on Validated (ready to confirm the
         // valid subset) rather than CompletedWithErrors (which is reserved for "every row failed").
+        // Every other required field (including the mandatory Department/Location/Employment
+        // Type/Position Profile lookups) is present on both rows so "Last Name" is the only
+        // reason the second row fails.
         const string csv =
-            "First Name,Last Name,Work Email,Start Date,Employee Number\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001\n" +
-            "Jane,,jane.doe@example.com,2026-01-02,EMP002\n";
+            "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n" +
+            "Jane,,jane.doe@example.com,2026-01-02,EMP002,1991-02-02,British,Female,Sales,London,Permanent,Software Developer\n";
 
         var sessionId = await UploadAsync(client, companyId, csv);
 
@@ -73,10 +76,13 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
         var companyId = Guid.NewGuid();
         using var client = AdminClient(companyId);
 
+        // Department, Location, Employment Type and Position Profile are all mandatory lookups
+        // now — Location/Employment Type/Position Profile use pre-existing values here so the
+        // only *new* reference data this row creates is the Department itself.
         const string csv =
-            "First Name,Last Name,Work Email,Start Date,Employee Number,Department\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001,Sales\n" +
-            "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002,Sales\n";
+            "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n" +
+            "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002,1991-02-02,British,Female,Sales,London,Permanent,Software Developer\n";
 
         var sessionId = await UploadAsync(client, companyId, csv);
 
@@ -97,9 +103,12 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
         var companyId = Guid.NewGuid();
         using var client = AdminClient(companyId);
 
+        // Every other required field is present (including Employment Type) — Department and
+        // Location are the only ones deliberately missing, so the row's single failure is
+        // attributable to the Position Profile requiring both to be resolvable.
         const string csv =
-            "First Name,Last Name,Work Email,Start Date,Employee Number,Position Profile\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001,Software Developer\n";
+            "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Employment Type,Position Profile\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Permanent,Software Developer\n";
 
         var sessionId = await UploadAsync(client, companyId, csv);
 
@@ -121,8 +130,8 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
         using var client = AdminClient(companyId);
 
         const string csv =
-            "First Name,Last Name,Work Email,Start Date,Employee Number,Department,Location,Position Profile\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001,Sales,London,Software Developer\n";
+            "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n";
 
         var sessionId = await UploadAsync(client, companyId, csv);
 
@@ -145,10 +154,11 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
 
         // Headers don't match the standard template ("Given Name"/"Family Name" instead of
         // "First Name"/"Last Name") — without a mapping override this would fail to populate
-        // the required FirstName/LastName fields.
+        // the required FirstName/LastName fields. Every other column uses its standard header
+        // name (no override needed for those targets).
         const string csv =
-            "Given Name,Family Name,Work Email,Start Date,Employee Number\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001\n";
+            "Given Name,Family Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n";
 
         var sessionId = await UploadAsync(client, companyId, csv);
 
@@ -176,8 +186,8 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
         // Same non-standard headers as the mapping-override test above, but posted with no
         // override — proves the override in that test is actually doing something, not a no-op.
         const string csv =
-            "Given Name,Family Name,Work Email,Start Date,Employee Number\n" +
-            "John,Doe,john.doe@example.com,2026-01-01,EMP001\n";
+            "Given Name,Family Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n";
 
         var sessionId = await UploadAsync(client, companyId, csv);
 
@@ -266,9 +276,9 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
         $"/api/companies/{companyId}/data-import/sessions/{sessionId}/validate";
 
     private static string ValidCsv() =>
-        "First Name,Last Name,Work Email,Start Date,Employee Number\n" +
-        "John,Doe,john.doe@example.com,2026-01-01,EMP001\n" +
-        "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002\n";
+        "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
+        "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n" +
+        "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002,1991-02-02,British,Female,Sales,London,Permanent,Software Developer\n";
 
     private static async Task<Guid> UploadAsync(HttpClient client, Guid companyId, string csvContent)
     {

@@ -113,9 +113,9 @@ public class GetImportPreviewEndpointTests : IClassFixture<ApiWebApplicationFact
         $"/api/companies/{companyId}/data-import/sessions/{sessionId}/preview";
 
     private static string ValidCsv() =>
-        "First Name,Last Name,Work Email,Start Date,Employee Number\n" +
-        "John,Doe,john.doe@example.com,2026-01-01,EMP001\n" +
-        "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002\n";
+        "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
+        "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n" +
+        "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002,1991-02-02,British,Female,Sales,London,Permanent,Software Developer\n";
 
     private static async Task<Guid> UploadAsync(HttpClient client, Guid companyId, string csvContent)
     {

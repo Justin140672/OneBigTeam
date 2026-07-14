@@ -156,7 +156,10 @@ public sealed record SharedCompanyDocumentDetailResponse(
     string UpdatedByName,
     DateTimeOffset UpdatedAt,
     string? PublishedByName,
-    DateTimeOffset? PublishedAt);
+    DateTimeOffset? PublishedAt,
+    string? ArchivedByName,
+    DateTimeOffset? ArchivedAt,
+    string? ArchiveReason);
 
 public sealed record AcknowledgementProgressModel(
     int AcknowledgedCount,
@@ -168,7 +171,34 @@ public sealed record SharedCompanyDocumentVersionModel(
     string FileName,
     long FileSize,
     string UploadedByName,
-    DateTimeOffset UploadedAt);
+    DateTimeOffset UploadedAt,
+    string? VersionNote,
+    bool RequiresAcknowledgement,
+    DateOnly? EffectiveDate,
+    string PublicationStatus);
+
+// --- Shared Company Document acknowledgement progress (HR full view) ---
+
+public sealed record SharedCompanyDocumentAcknowledgementProgressResponse(
+    Guid DocumentId,
+    string DocumentTitle,
+    int TotalAssigned,
+    int AcknowledgedCount,
+    int OutstandingCount,
+    int OverdueCount,
+    decimal AcknowledgementPercentage,
+    IReadOnlyList<SharedCompanyDocumentAcknowledgementProgressItem> Items);
+
+public sealed record SharedCompanyDocumentAcknowledgementProgressItem(
+    Guid EmployeeId,
+    string EmployeeName,
+    Guid? DepartmentId,
+    string? DepartmentName,
+    Guid? LocationId,
+    string? LocationName,
+    string Status,
+    DateOnly? DueDate,
+    DateTimeOffset? AcknowledgedAt);
 
 // --- Shared Company Document detail (employee simplified view) ---
 
@@ -242,6 +272,11 @@ public sealed record UpdateSharedCompanyDocumentAcknowledgementSettingsRequest(
     bool RequiresAcknowledgement,
     DateOnly? AcknowledgementDueDate,
     string? AcknowledgementStatement);
+
+public sealed record ArchiveSharedCompanyDocumentRequest(
+    Guid CompanyId,
+    Guid DocumentId,
+    string Reason);
 
 public sealed record UpdateSharedCompanyDocumentAcknowledgementSettingsResponseModel(
     Guid Id,

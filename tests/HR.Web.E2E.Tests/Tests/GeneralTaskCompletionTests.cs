@@ -27,6 +27,7 @@ public sealed class GeneralTaskCompletionTests(AppFixture fixture) : E2ETestBase
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid SarahId = Guid.Parse("30000000-0000-0000-0000-000000000001");
+    private static readonly Guid LauraId = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
     // Seeded task assigned to Sarah Chen (TaskSource.Workflow).
     private static readonly Guid TaskQ2ReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000027");
@@ -61,28 +62,33 @@ public sealed class GeneralTaskCompletionTests(AppFixture fixture) : E2ETestBase
     }
 
     [Fact]
-    public async Task Dashboard_ShowsGeneralTasksForEmployee()
+    public async Task ProfileTasksTab_ShowsGeneralTasksForEmployee()
     {
         // Sarah Chen is seeded as CompanyAdministrator-only and is redirected away from "/"
-        // (see Home.razor), so this dashboard-widget check uses Laura Bennett instead.
+        // (see Home.razor), so this check uses Laura Bennett instead.
         // Laura's previous "Review Q2 performance reports" / "Prepare board meeting agenda"
         // tasks (TaskSource.Manual) were removed along with that source; her remaining seeded
         // tasks — "Update annual leave policy documentation" (Leave) and "Acknowledge receipt
         // of asset" (Asset) — are real, domain-sourced tasks that already existed for other
         // purposes, so no new seed data was needed here.
-        var login = new LoginPage(_page, _fixture.WebBaseUrl);
-        var dash  = new DashboardPage(_page, _fixture.WebBaseUrl);
+        //
+        // The old dashboard "My Tasks" widget (MyTasksWidget.razor) this used to check is dead
+        // code — no longer rendered anywhere. Laura's own profile Tasks tab is the current,
+        // role-agnostic place to find her full assigned-task list.
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await dash.GoToAsync();
+        await profile.GoToAsync(AcmeId, LauraId);
+        await profile.OpenTasksTabAsync();
 
-        var taskTitles = await dash.GetTaskTitlesAsync();
+        var taskTitles = await profile.GetTaskTitlesAsync();
 
-        // Laura has several seeded tasks; at least one should appear on the dashboard.
+        // Laura has several seeded tasks; at least one should appear in her task list.
         Assert.True(taskTitles.Count > 0,
-            "Expected Laura to have tasks in the My Tasks dashboard widget");
+            "Expected Laura to have tasks in her Tasks tab");
 
         Assert.Contains(taskTitles, t =>
             t.Contains("leave policy", StringComparison.OrdinalIgnoreCase) ||

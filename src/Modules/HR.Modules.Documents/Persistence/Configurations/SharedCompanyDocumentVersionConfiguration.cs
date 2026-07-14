@@ -55,6 +55,17 @@ internal sealed class SharedCompanyDocumentVersionConfiguration : IEntityTypeCon
             .HasColumnName("created_at")
             .IsRequired();
 
+        builder.Property(v => v.VersionNote)
+            .HasColumnName("version_note")
+            .HasMaxLength(1000);
+
+        builder.Property(v => v.RequiresAcknowledgement)
+            .HasColumnName("requires_acknowledgement")
+            .IsRequired();
+
+        builder.Property(v => v.EffectiveDate)
+            .HasColumnName("effective_date");
+
         builder.HasOne<SharedCompanyDocument>()
             .WithMany()
             .HasForeignKey(v => v.SharedCompanyDocumentId)

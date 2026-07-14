@@ -1,0 +1,207 @@
+@page "/companies/{CompanyId:guid}/shared-documents/{DocumentId:guid}/acknowledgement-progress"
+@rendermode InteractiveServer
+@inject DocumentService DocumentService
+@inject DepartmentService DepartmentService
+@inject LocationService LocationService
+@inject AppSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>@(_progress?.DocumentTitle ?? "Acknowledgement Progress")</PageTitle>
+
+<div class="container-fluid py-4">
+    <a href="/companies/@CompanyId/shared-documents/@DocumentId" class="text-decoration-none text-muted small">← @(_progress?.DocumentTitle ?? "Document")</a>
+    <h1 class="mb-1">Acknowledgement Progress</h1>
+    <p class="text-muted mb-4">@_progress?.DocumentTitle</p>
+
+    @if (_loading)
+    {
+        <HrLoadingIndicator Label="Loading acknowledgement progress…" />
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else if (_progress is not null)
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-md-2 col-sm-4 col-6">
+                <div class="overview-card text-center py-3">
+                    <div class="fs-4 fw-semibold">@_progress.TotalAssigned</div>
+                    <div class="text-muted small">Total Assigned</div>
+                </div>
+            </div>
+            <div class="col-md-2 col-sm-4 col-6">
+                <div class="overview-card text-center py-3">
+                    <div class="fs-4 fw-semibold text-success">@_progress.AcknowledgedCount</div>
+                    <div class="text-muted small">Acknowledged</div>
+                </div>
+            </div>
+            <div class="col-md-2 col-sm-4 col-6">
+                <div class="overview-card text-center py-3">
+                    <div class="fs-4 fw-semibold text-warning">@_progress.OutstandingCount</div>
+                    <div class="text-muted small">Outstanding</div>
+                </div>
+            </div>
+            <div class="col-md-2 col-sm-4 col-6">
+                <div class="overview-card text-center py-3">
+                    <div class="fs-4 fw-semibold text-danger">@_progress.OverdueCount</div>
+                    <div class="text-muted small">Overdue</div>
+                </div>
+            </div>
+            <div class="col-md-4 col-sm-8 col-12">
+                <div class="overview-card py-3 px-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-muted small">Acknowledgement Rate</span>
+                        <span class="fw-semibold">@(_progress.AcknowledgementPercentage)%</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar" role="progressbar" style="width: @(_progress.AcknowledgementPercentage)%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-3">
+                <label class="form-label">Department</label>
+                <SfDropDownList TValue="Guid?" TItem="DepartmentListItemModel"
+                                DataSource="@_departments"
+                                @bind-Value="_departmentFilter"
+                                ValueChange="@(async () => await LoadProgressAsync())"
+                                Placeholder="All departments"
+                                AllowFiltering="true">
+                    <DropDownListFieldSettings Value="Id" Text="Name" />
+                </SfDropDownList>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Location</label>
+                <SfDropDownList TValue="Guid?" TItem="LocationListItemModel"
+                                DataSource="@_locations"
+                                @bind-Value="_locationFilter"
+                                ValueChange="@(async () => await LoadProgressAsync())"
+                                Placeholder="All locations"
+                                AllowFiltering="true">
+                    <DropDownListFieldSettings Value="Id" Text="Name" />
+                </SfDropDownList>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Acknowledgement Status</label>
+                <SfDropDownList TValue="bool?" TItem="FilterOption"
+                                DataSource="@_acknowledgedOptions"
+                                @bind-Value="_isAcknowledgedFilter"
+                                ValueChange="@(async () => await LoadProgressAsync())"
+                                Placeholder="Any">
+                    <DropDownListFieldSettings Value="Value" Text="Label" />
+                </SfDropDownList>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Overdue Status</label>
+                <SfDropDownList TValue="bool?" TItem="FilterOption"
+                                DataSource="@_overdueOptions"
+                                @bind-Value="_isOverdueFilter"
+                                ValueChange="@(async () => await LoadProgressAsync())"
+                                Placeholder="Any">
+                    <DropDownListFieldSettings Value="Value" Text="Label" />
+                </SfDropDownList>
+            </div>
+        </div>
+
+        @if (_progress.Items.Count == 0)
+        {
+            <p class="text-muted">No employees match the current filters.</p>
+        }
+        else
+        {
+            <HrGrid TValue="SharedCompanyDocumentAcknowledgementProgressItem" DataSource="@_progress.Items" AllowPaging="true" AllowSorting="true">
+                <GridPageSettings PageSize="20" />
+                <GridColumns>
+                    <GridColumn Field="@nameof(SharedCompanyDocumentAcknowledgementProgressItem.EmployeeName)" HeaderText="Employee" Width="180" />
+                    <GridColumn Field="@nameof(SharedCompanyDocumentAcknowledgementProgressItem.DepartmentName)" HeaderText="Department" Width="150" />
+                    <GridColumn Field="@nameof(SharedCompanyDocumentAcknowledgementProgressItem.LocationName)" HeaderText="Location" Width="150" />
+                    <GridColumn Field="@nameof(SharedCompanyDocumentAcknowledgementProgressItem.Status)" HeaderText="Status" Width="120">
+                        <Template>
+                            @{
+                                var row = (context as SharedCompanyDocumentAcknowledgementProgressItem)!;
+                                <span class="badge @StatusBadgeClass(row.Status)">@row.Status</span>
+                            }
+                        </Template>
+                    </GridColumn>
+                    <GridColumn Field="@nameof(SharedCompanyDocumentAcknowledgementProgressItem.DueDate)" HeaderText="Due Date" Width="120" Format="d" />
+                    <GridColumn Field="@nameof(SharedCompanyDocumentAcknowledgementProgressItem.AcknowledgedAt)" HeaderText="Acknowledged Date" Width="160" Format="g" />
+                </GridColumns>
+            </HrGrid>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid DocumentId { get; set; }
+
+    private SharedCompanyDocumentAcknowledgementProgressResponse? _progress;
+    private List<DepartmentListItemModel> _departments = [];
+    private List<LocationListItemModel> _locations = [];
+    private bool _loading = true;
+    private string? _error;
+
+    private Guid? _departmentFilter;
+    private Guid? _locationFilter;
+    private bool? _isAcknowledgedFilter;
+    private bool? _isOverdueFilter;
+
+    private readonly List<FilterOption> _acknowledgedOptions =
+        [new("Acknowledged", true), new("Not Acknowledged", false)];
+    private readonly List<FilterOption> _overdueOptions =
+        [new("Overdue", true), new("Not Overdue", false)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsHrAdministrator)
+        {
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            return;
+        }
+
+        _departments = (await DepartmentService.ListDepartmentsAsync(CompanyId))?.Items ?? [];
+        _locations   = (await LocationService.ListLocationsAsync(CompanyId))?.Items ?? [];
+
+        await LoadProgressAsync();
+    }
+
+    private async Task LoadProgressAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            var result = await DocumentService.GetSharedCompanyDocumentAcknowledgementProgressAsync(
+                CompanyId, DocumentId,
+                departmentId: _departmentFilter,
+                locationId: _locationFilter,
+                isAcknowledged: _isAcknowledgedFilter,
+                isOverdue: _isOverdueFilter);
+
+            if (result is null)
+            {
+                _error = "Failed to load acknowledgement progress.";
+                return;
+            }
+
+            _error = null;
+            _progress = result;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string StatusBadgeClass(string status) => status switch
+    {
+        "Acknowledged" => "bg-success",
+        "Overdue"      => "bg-danger",
+        _              => "bg-warning text-dark",
+    };
+
+    public sealed record FilterOption(string Label, bool? Value);
+}

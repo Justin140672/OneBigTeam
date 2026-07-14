@@ -22,7 +22,8 @@ namespace HR.Web.E2E.Tests.Tests;
 [Collection("E2E")]
 public sealed class EmployeeOnboardingTabTests(AppFixture fixture) : E2ETestBase(fixture)
 {
-    private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid LauraId = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
     private const string LauraEmail = "laura.bennett@acme.example";
 
@@ -161,7 +162,7 @@ public sealed class EmployeeOnboardingTabTests(AppFixture fixture) : E2ETestBase
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList   = new EmployeeListPage(_page, _fixture.WebBaseUrl);
         var empEdit   = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
-        var dashboard = new DashboardPage(_page, _fixture.WebBaseUrl);
+        var profile   = new MyProfilePage(_page, _fixture.WebBaseUrl);
         var inbox     = new HrInboxPage(_page, _fixture.WebBaseUrl);
         var taskView  = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
@@ -190,8 +191,12 @@ public sealed class EmployeeOnboardingTabTests(AppFixture fixture) : E2ETestBase
             var claimedTitle = titles.First(t => t.Contains(fragment, StringComparison.OrdinalIgnoreCase));
             await inbox.ClaimAsync(claimedTitle);
 
-            await dashboard.GoToAsync();
-            await dashboard.ClickMyOnboardingTaskAsync(claimedTitle);
+            // MyOnboardingTasksWidget (the old dashboard widget this used to click through) is
+            // dead code — no longer rendered anywhere. Laura's own profile Tasks tab is the
+            // current, role-agnostic place to find and open a task she has claimed.
+            await profile.GoToAsync(AcmeId, LauraId);
+            await profile.OpenTasksTabAsync();
+            await profile.ClickTaskAsync(claimedTitle);
             await taskView.WaitForLoadedAsync();
             await taskView.CompleteGeneralTaskAsync();
             await taskView.CloseAsync();

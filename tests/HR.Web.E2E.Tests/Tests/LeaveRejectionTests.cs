@@ -9,6 +9,7 @@ public sealed class LeaveRejectionTests(AppFixture fixture) : E2ETestBase(fixtur
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId   = Guid.Parse("30000000-0000-0000-0000-000000000004");
+    private static readonly Guid JamesId = Guid.Parse("30000000-0000-0000-0000-000000000002");
 
     private const string TomEmail   = "tom.williams@acme.example";
     private const string JamesEmail = "james.okafor@acme.example";
@@ -26,7 +27,6 @@ public sealed class LeaveRejectionTests(AppFixture fixture) : E2ETestBase(fixtur
 
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
-        var dash    = new DashboardPage(_page, _fixture.WebBaseUrl);
         var notif   = new NotificationPanel(_page);
         var task    = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
@@ -52,9 +52,13 @@ public sealed class LeaveRejectionTests(AppFixture fixture) : E2ETestBase(fixtur
         // ── Step 4: Switch to James ───────────────────────────────────────────
         await login.SwitchAccountAsync(JamesEmail);
 
-        // ── Step 5: Dashboard shows the task ─────────────────────────────────
-        await dash.GoToAsync();
-        var taskTitles = await dash.GetTaskTitlesAsync();
+        // ── Step 5: James's own Tasks tab shows the task ──────────────────────
+        // The old dashboard "My Tasks" widget (MyTasksWidget.razor) this used to check is dead
+        // code — no longer rendered anywhere. James's own profile Tasks tab is the current,
+        // role-agnostic place to find his full assigned-task list.
+        await profile.GoToAsync(AcmeId, JamesId);
+        await profile.OpenTasksTabAsync();
+        var taskTitles = await profile.GetTaskTitlesAsync();
         Assert.Contains(taskTitles, t => t.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase)
                                       || t.Contains("leave", StringComparison.OrdinalIgnoreCase));
 

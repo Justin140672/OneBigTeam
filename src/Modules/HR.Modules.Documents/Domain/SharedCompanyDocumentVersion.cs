@@ -20,6 +20,17 @@ internal sealed class SharedCompanyDocumentVersion
     public Guid CreatedBy { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
+    // Distinct from SharedCompanyDocument.RequiresAcknowledgement (the document-level, current
+    // setting) — this records whether THIS SPECIFIC version required (re-)acknowledgement at the
+    // time it was uploaded, for audit/history display.
+    public string? VersionNote { get; private set; }
+    public bool RequiresAcknowledgement { get; private set; }
+
+    // Snapshot of SharedCompanyDocument.EffectiveDate at the moment this version was created —
+    // like VersionNote/RequiresAcknowledgement above, this is point-in-time history, not a
+    // user-editable field of the version itself.
+    public DateOnly? EffectiveDate { get; private set; }
+
     public static SharedCompanyDocumentVersion Create(
         Guid id,
         Guid companyId,
@@ -30,7 +41,10 @@ internal sealed class SharedCompanyDocumentVersion
         long fileSize,
         string contentType,
         Guid createdBy,
-        DateTimeOffset now) => new()
+        DateTimeOffset now,
+        string? versionNote,
+        bool requiresAcknowledgement,
+        DateOnly? effectiveDate) => new()
     {
         Id                      = id,
         CompanyId               = companyId,
@@ -42,5 +56,8 @@ internal sealed class SharedCompanyDocumentVersion
         ContentType             = contentType.Trim(),
         CreatedBy               = createdBy,
         CreatedAt               = now,
+        VersionNote             = string.IsNullOrWhiteSpace(versionNote) ? null : versionNote.Trim(),
+        RequiresAcknowledgement = requiresAcknowledgement,
+        EffectiveDate           = effectiveDate,
     };
 }

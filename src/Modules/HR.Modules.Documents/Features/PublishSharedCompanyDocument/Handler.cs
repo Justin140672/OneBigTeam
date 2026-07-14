@@ -11,6 +11,7 @@ internal sealed class PublishSharedCompanyDocumentHandler(
     DocumentsDbContext db,
     SharedCompanyDocumentAudienceMatcher audienceMatcher,
     ITaskCreator taskCreator,
+    INotificationWriter notificationWriter,
     IAuditEventPublisher auditPublisher,
     IClock clock)
 {
@@ -103,7 +104,7 @@ internal sealed class PublishSharedCompanyDocumentHandler(
                 await taskCreator.CreateAsync(
                     request.CompanyId,
                     createdBy:          publishedBy,
-                    title:              $"Acknowledge: {document.Title}",
+                    title:              $"Acknowledge: {document.Title} (v{document.VersionNumber})",
                     description:        $"Please read and acknowledge '{document.Title}'.",
                     priority:           TaskPriority.Medium,
                     source:             TaskSource.Document,
@@ -112,6 +113,18 @@ internal sealed class PublishSharedCompanyDocumentHandler(
                     assignedEmployeeId: employeeId,
                     assignedUserId:     null,
                     sourceEntityId:     document.Id,
+                    cancellationToken);
+
+                await notificationWriter.WriteAsync(
+                    Guid.NewGuid(),
+                    document.CompanyId,
+                    employeeId,
+                    "Acknowledgement required",
+                    $"Please read and acknowledge '{document.Title}' (version {document.VersionNumber}).",
+                    document.Id,
+                    NotificationType.SharedCompanyDocumentAcknowledgementReminder,
+                    NotificationPriority.Normal,
+                    now,
                     cancellationToken);
 
                 acknowledgementTasksCreated++;

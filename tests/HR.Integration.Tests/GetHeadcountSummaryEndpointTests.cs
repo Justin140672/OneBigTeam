@@ -68,18 +68,20 @@ public class GetHeadcountSummaryEndpointTests : IClassFixture<ApiWebApplicationF
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
 
-        var departmentId = await SeedAsync(companyId, db =>
+        var departmentId = await SeedAsync(companyId, (db, refData) =>
         {
             var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, DateTimeOffset.UtcNow);
             db.Departments.Add(department);
 
-            AddEmployee(db, companyId, department.Id, EmploymentStatus.Active);
-            AddEmployee(db, companyId, department.Id, EmploymentStatus.Active);
-            AddEmployee(db, companyId, department.Id, EmploymentStatus.OnLeave);
-            AddEmployee(db, companyId, department.Id, EmploymentStatus.Draft);
-            AddEmployee(db, companyId, department.Id, EmploymentStatus.Suspended);
-            AddEmployee(db, companyId, department.Id, EmploymentStatus.Terminated);
-            AddEmployee(db, companyId, null, EmploymentStatus.Active); // Unassigned
+            AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Active);
+            AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Active);
+            AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.OnLeave);
+            AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Draft);
+            AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Suspended);
+            AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Terminated);
+            AddEmployee(db, companyId, null, refData, EmploymentStatus.Active); // Unassigned — a
+            // department id that was never seeded as a real Department row, so the handler's
+            // "Unassigned" fallback (no matching Departments row) kicks in.
 
             return department.Id;
         });
@@ -95,8 +97,9 @@ public class GetHeadcountSummaryEndpointTests : IClassFixture<ApiWebApplicationF
         Assert.Equal("Engineering", engineering.DepartmentName);
         Assert.Equal(3, engineering.EmployeeCount); // 2 Active + 1 OnLeave
 
-        var unassigned = Assert.Single(payload.Items, i => i.DepartmentId == null);
-        Assert.Equal("Unassigned", unassigned.DepartmentName);
+        // DepartmentId is mandatory on Employee now, so a "no real department" row still carries
+        // a real (orphan) Guid rather than null — "Unassigned" is signaled by DepartmentName only.
+        var unassigned = Assert.Single(payload.Items, i => i.DepartmentName == "Unassigned");
         Assert.Equal(1, unassigned.EmployeeCount);
     }
 
@@ -107,10 +110,10 @@ public class GetHeadcountSummaryEndpointTests : IClassFixture<ApiWebApplicationF
         var otherCompanyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
 
-        await SeedAsync(companyId, db =>
+        await SeedAsync(companyId, (db, refData) =>
         {
-            AddEmployee(db, companyId, null, EmploymentStatus.Active);
-            AddEmployee(db, otherCompanyId, null, EmploymentStatus.Active);
+            AddEmployee(db, companyId, null, refData, EmploymentStatus.Active);
+            AddEmployee(db, otherCompanyId, null, refData, EmploymentStatus.Active);
             return Guid.Empty;
         });
 
@@ -123,15 +126,20 @@ public class GetHeadcountSummaryEndpointTests : IClassFixture<ApiWebApplicationF
         Assert.Equal(1, item.EmployeeCount);
     }
 
-    private static void AddEmployee(EmployeesDbContext context, Guid companyId, Guid? departmentId, EmploymentStatus status)
+    private static void AddEmployee(
+        EmployeesDbContext context, Guid companyId, Guid? departmentId,
+        EmployeeReferenceDataSeeder.ReferenceData refData, EmploymentStatus status)
     {
         var now = DateTimeOffset.UtcNow;
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "First", "Last", $"employee.{Guid.NewGuid():N}@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
 
-        if (departmentId is not null)
-        {
-            employee.Assign(departmentId.Value, Guid.NewGuid(), Guid.NewGuid(), null, now);
-        }
+        // A null departmentId here means "Unassigned" — a fresh Guid that was never seeded as a
+        // real Department row, so the handler's "no matching department" fallback groups it
+        // under "Unassigned" (DepartmentId itself is a mandatory, non-nullable Employee column).
+        var employee = Employee.Create(
+            Guid.NewGuid(), companyId, "First", "Last", $"employee.{Guid.NewGuid():N}@example.com", StartDate,
+            hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say",
+            $"EMP-{Guid.NewGuid():N}", refData.EmploymentTypeId,
+            departmentId ?? Guid.NewGuid(), refData.LocationId, refData.PositionProfileId, now);
 
         switch (status)
         {
@@ -157,11 +165,13 @@ public class GetHeadcountSummaryEndpointTests : IClassFixture<ApiWebApplicationF
         context.Employees.Add(employee);
     }
 
-    private async Task<Guid> SeedAsync(Guid companyId, Func<EmployeesDbContext, Guid> seed)
+    private async Task<Guid> SeedAsync(
+        Guid companyId, Func<EmployeesDbContext, EmployeeReferenceDataSeeder.ReferenceData, Guid> seed)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
-        var result = seed(db);
+        var refData = await EmployeeReferenceDataSeeder.SeedAsync(db, companyId);
+        var result = seed(db, refData);
         await db.SaveChangesAsync();
         return result;
     }

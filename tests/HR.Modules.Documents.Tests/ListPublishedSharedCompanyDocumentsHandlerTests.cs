@@ -23,7 +23,7 @@ public class ListPublishedSharedCompanyDocumentsHandlerTests
 
         var archived = CreateDoc(companyId, "Archived Doc", category.Id, "key/a.pdf", "a.pdf", Guid.NewGuid());
         archived.Publish(Guid.NewGuid(), Now);
-        archived.Archive(Guid.NewGuid(), Now);
+        archived.Archive(Guid.NewGuid(), "Superseded", Now);
 
         var published = CreateDoc(companyId, "Published Doc", category.Id, "key/p.pdf", "p.pdf", Guid.NewGuid());
         published.Publish(Guid.NewGuid(), Now);

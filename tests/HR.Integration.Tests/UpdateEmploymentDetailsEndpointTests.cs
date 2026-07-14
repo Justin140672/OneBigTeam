@@ -148,17 +148,13 @@ public class UpdateEmploymentDetailsEndpointTests : IClassFixture<ApiWebApplicat
 
     private static async Task<EmployeeRef> CreateEmployeeAsync(HttpClient client, Guid companyId)
     {
-        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
-        {
-            companyId,
-            firstName = "Test",
-            lastName = "Employee",
-            workEmail = $"test.{Guid.NewGuid():N}@example.com",
-            startDate = "2026-01-15",
-            dateOfBirth = "1990-01-01",
-            nationality = "British",
-            gender = "Male"
-        });
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Test", "Employee", $"test.{Guid.NewGuid():N}@example.com",
+                startDate: new DateOnly(2026, 1, 15), gender: "Male"));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<EmployeeRef>())!;
     }

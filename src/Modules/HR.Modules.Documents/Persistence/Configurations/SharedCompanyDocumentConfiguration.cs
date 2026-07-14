@@ -101,6 +101,16 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
         builder.Property(d => d.PublishedAt)
             .HasColumnName("published_at");
 
+        builder.Property(d => d.ArchivedBy)
+            .HasColumnName("archived_by");
+
+        builder.Property(d => d.ArchivedAt)
+            .HasColumnName("archived_at");
+
+        builder.Property(d => d.ArchiveReason)
+            .HasColumnName("archive_reason")
+            .HasMaxLength(500);
+
         builder.HasOne<CompanyDocumentCategory>()
             .WithMany()
             .HasForeignKey(d => d.CategoryId)

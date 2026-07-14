@@ -130,7 +130,10 @@ internal sealed class UploadSharedCompanyDocumentHandler(
             file.Length,
             file.ContentType,
             uploadedBy,
-            now);
+            now,
+            versionNote: null,
+            requiresAcknowledgement: document.RequiresAcknowledgement,
+            effectiveDate: document.EffectiveDate);
 
         db.SharedCompanyDocuments.Add(document);
         db.SharedCompanyDocumentVersions.Add(version);

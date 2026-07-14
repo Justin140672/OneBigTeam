@@ -34,7 +34,6 @@ public sealed class TenantIsolationTests(AppFixture fixture) : E2ETestBase(fixtu
         var login       = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile     = new MyProfilePage(_page, _fixture.WebBaseUrl);
         var aliceProfile = new MyProfilePage(_page, _fixture.WebBaseUrl);
-        var dash        = new DashboardPage(_page, _fixture.WebBaseUrl);
         var notif       = new NotificationPanel(_page);
         var taskView    = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
@@ -52,17 +51,20 @@ public sealed class TenantIsolationTests(AppFixture fixture) : E2ETestBase(fixtu
         Assert.Equal("Pending", await profile.GetLeaveRequestStatusAsync(reason));
 
         // ── Step 2: Login as Alice (Beta Corp manager) and open the task ──────
+        // Uses Alice's own profile Tasks tab — the role-agnostic replacement for the old
+        // dashboard "My Tasks" widget (MyTasksWidget.razor), which is dead code now.
         await login.SwitchAccountAsync(AliceEmail);
 
-        await dash.GoToAsync();
-        var aliceTasks = await dash.GetTaskTitlesAsync();
+        await aliceProfile.GoToAsync(BetaCorpId, AliceId);
+        await aliceProfile.OpenTasksTabAsync();
+        var aliceTasks = await aliceProfile.GetTaskTitlesAsync();
         Assert.Contains(aliceTasks, t => t.Contains("Bob Taylor", StringComparison.OrdinalIgnoreCase)
                                       || t.Contains("leave", StringComparison.OrdinalIgnoreCase));
 
         // Open the task dialog — there is no longer a standalone task URL to capture
         // (TaskViewDialog opens in place), so the cross-tenant check below (step 6)
         // instead targets Bob's profile URL directly.
-        await dash.ClickTaskAsync("Bob Taylor");
+        await aliceProfile.ClickTaskAsync("Bob Taylor");
         await taskView.WaitForLoadedAsync();
 
         Assert.Contains("Bob Taylor", await taskView.GetTitleAsync(), StringComparison.OrdinalIgnoreCase);
@@ -71,9 +73,10 @@ public sealed class TenantIsolationTests(AppFixture fixture) : E2ETestBase(fixtu
         // ── Step 3: Login as James (Acme manager) ────────────────────────────
         await login.SwitchAccountAsync(JamesEmail);
 
-        // ── Step 4: James's My Tasks widget must NOT contain Bob's task ───────
-        await dash.GoToAsync();
-        var jamesTasks = await dash.GetTaskTitlesAsync();
+        // ── Step 4: James's own task list must NOT contain Bob's task ─────────
+        await profile.GoToAsync(AcmeId, JamesId);
+        await profile.OpenTasksTabAsync();
+        var jamesTasks = await profile.GetTaskTitlesAsync();
         Assert.DoesNotContain(jamesTasks,
             t => t.Contains("Bob Taylor", StringComparison.OrdinalIgnoreCase));
 

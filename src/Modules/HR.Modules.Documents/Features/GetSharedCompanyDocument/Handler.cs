@@ -37,11 +37,16 @@ internal sealed class GetSharedCompanyDocumentHandler(
             .ToListAsync(cancellationToken);
 
         var uploaderIds = versions.Select(v => v.CreatedBy).Distinct().ToList();
+        var idsToResolve = new List<Guid> { document.CreatedBy, document.UpdatedBy };
+        if (document.PublishedBy is { } publishedBy)
+            idsToResolve.Add(publishedBy);
+        if (document.ArchivedBy is { } archivedBy)
+            idsToResolve.Add(archivedBy);
+        idsToResolve.AddRange(uploaderIds);
+
         var namesLookup = await employeeNameReader.GetNamesAsync(
             request.CompanyId,
-            document.PublishedBy is { } publishedBy
-                ? [document.CreatedBy, document.UpdatedBy, publishedBy, .. uploaderIds]
-                : [document.CreatedBy, document.UpdatedBy, .. uploaderIds],
+            idsToResolve,
             cancellationToken);
 
         var versionHistory = versions
@@ -50,7 +55,11 @@ internal sealed class GetSharedCompanyDocumentHandler(
                 v.FileName,
                 v.FileSize,
                 namesLookup.TryGetValue(v.CreatedBy, out var uploaderName) ? uploaderName : "Unknown",
-                v.CreatedAt))
+                v.CreatedAt,
+                v.VersionNote,
+                v.RequiresAcknowledgement,
+                v.EffectiveDate,
+                v.VersionNumber == document.VersionNumber ? document.Status.ToString() : "Superseded"))
             .ToList();
 
         var (audienceDepartmentIds, audienceLocationIds, audiencePositionProfileIds, audienceEmployeeIds) =
@@ -111,6 +120,9 @@ internal sealed class GetSharedCompanyDocumentHandler(
             namesLookup.TryGetValue(document.UpdatedBy, out var updatedByName) ? updatedByName : "Unknown",
             document.UpdatedAt,
             document.PublishedBy is { } pubBy ? (namesLookup.TryGetValue(pubBy, out var publishedByName) ? publishedByName : "Unknown") : null,
-            document.PublishedAt));
+            document.PublishedAt,
+            document.ArchivedBy is { } archBy ? (namesLookup.TryGetValue(archBy, out var archivedByName) ? archivedByName : "Unknown") : null,
+            document.ArchivedAt,
+            document.ArchiveReason));
     }
 }

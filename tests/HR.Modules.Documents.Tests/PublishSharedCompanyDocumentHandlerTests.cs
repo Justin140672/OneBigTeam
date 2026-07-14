@@ -117,7 +117,7 @@ public class PublishSharedCompanyDocumentHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = CreateDoc(companyId, category.Id, Guid.NewGuid());
         doc.Publish(Guid.NewGuid(), Now);
-        doc.Archive(Guid.NewGuid(), Now);
+        doc.Archive(Guid.NewGuid(), "Superseded", Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -251,7 +251,7 @@ public class PublishSharedCompanyDocumentHandlerTests
         Assert.Equal(2, taskCreator.Created.Count);
         Assert.All(taskCreator.Created, t =>
         {
-            Assert.Equal("Acknowledge: Remote Working Policy", t.Title);
+            Assert.Equal("Acknowledge: Remote Working Policy (v1)", t.Title);
             Assert.Equal("Please read and acknowledge 'Remote Working Policy'.", t.Description);
             Assert.Equal(TaskActionType.Acknowledge, t.ActionType);
             Assert.Equal(TaskSource.Document, t.Source);
@@ -261,6 +261,42 @@ public class PublishSharedCompanyDocumentHandlerTests
         });
         Assert.Contains(taskCreator.Created, t => t.AssignedEmployeeId == emp1);
         Assert.Contains(taskCreator.Created, t => t.AssignedEmployeeId == emp2);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Writes_Acknowledgement_Reminder_Notifications_For_Eligible_Employees_When_Required()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var category   = await SeedCategory(db, companyId);
+        var publishedBy = Guid.NewGuid();
+        var emp1 = Guid.NewGuid();
+        var emp2 = Guid.NewGuid();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Remote Working Policy", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1), acknowledgementStatement: null,
+            createdBy: Guid.NewGuid(), now: Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [emp1, emp2] };
+        var notificationWriter = new FakeNotificationWriter();
+
+        var result = await Handler(db, audienceReader, notificationWriter: notificationWriter).HandleAsync(
+            new PublishSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
+            publishedBy, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, notificationWriter.Written.Count);
+        Assert.All(notificationWriter.Written, n =>
+        {
+            Assert.Equal(NotificationType.SharedCompanyDocumentAcknowledgementReminder, n.Type);
+            Assert.Equal(doc.Id, n.SourceEntityId);
+            Assert.Equal(companyId, n.CompanyId);
+        });
+        Assert.Contains(notificationWriter.Written, n => n.EmployeeId == emp1);
+        Assert.Contains(notificationWriter.Written, n => n.EmployeeId == emp2);
     }
 
     [Fact]
@@ -359,13 +395,15 @@ public class PublishSharedCompanyDocumentHandlerTests
         DocumentsDbContext db,
         FakeEmployeeAudienceReader? audienceReader = null,
         FakeAuditPublisher? auditPublisher = null,
-        FakeTaskCreator? taskCreator = null)
+        FakeTaskCreator? taskCreator = null,
+        FakeNotificationWriter? notificationWriter = null)
     {
         var reader = audienceReader ?? new FakeEmployeeAudienceReader();
         return new PublishSharedCompanyDocumentHandler(
             db,
             new SharedCompanyDocumentAudienceMatcher(db, reader),
             taskCreator ?? new FakeTaskCreator(),
+            notificationWriter ?? new FakeNotificationWriter(),
             auditPublisher ?? new FakeAuditPublisher(),
             new FakeClock(FixedUtcNow));
     }

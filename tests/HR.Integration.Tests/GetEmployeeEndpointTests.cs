@@ -44,17 +44,12 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
-        var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
-        {
-            companyId,
-            firstName = "Alice",
-            lastName = "Smith",
-            workEmail = $"alice.{Guid.NewGuid():N}@example.com",
-            startDate = "2026-07-01",
-            dateOfBirth = "1990-05-20",
-            nationality = "British",
-            gender = "Female"
-        });
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+
+        var createResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com"));
         createResponse.EnsureSuccessStatusCode();
 
         var created = await createResponse.Content.ReadFromJsonAsync<EmployeePayload>();
@@ -97,17 +92,13 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyA.ToString());
 
-        var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyA}/employees", new
-        {
-            companyId = companyA,
-            firstName = "Bob",
-            lastName = "Jones",
-            workEmail = $"bob.{Guid.NewGuid():N}@example.com",
-            startDate = "2026-07-01",
-            dateOfBirth = "1988-11-03",
-            nationality = "British",
-            gender = "Male"
-        });
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyA);
+
+        var createResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyA}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyA, refData, "Bob", "Jones", $"bob.{Guid.NewGuid():N}@example.com",
+                dateOfBirth: new DateOnly(1988, 11, 3), gender: "Male"));
         createResponse.EnsureSuccessStatusCode();
         var created = await createResponse.Content.ReadFromJsonAsync<EmployeePayload>();
         Assert.NotNull(created);
@@ -125,6 +116,8 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
         // Create department
         var deptResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
@@ -146,17 +139,11 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         var pos = await posResponse.Content.ReadFromJsonAsync<PosPayload>();
 
         // Create manager employee
-        var mgrResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
-        {
-            companyId,
-            firstName = "Jane",
-            lastName = "Manager",
-            workEmail = $"jane.mgr.{Guid.NewGuid():N}@example.com",
-            startDate = "2025-01-01",
-            dateOfBirth = "1980-06-15",
-            nationality = "British",
-            gender = "Female"
-        });
+        var mgrResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Jane", "Manager", $"jane.mgr.{Guid.NewGuid():N}@example.com",
+                startDate: new DateOnly(2025, 1, 1), dateOfBirth: new DateOnly(1980, 6, 15)));
         mgrResponse.EnsureSuccessStatusCode();
         var mgr = await mgrResponse.Content.ReadFromJsonAsync<EmployeePayload>();
 
@@ -169,7 +156,10 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
             workEmail = $"alice.{Guid.NewGuid():N}@example.com",
             startDate = "2026-01-01",
             departmentId = dept!.Id,
+            locationId = refData.LocationId,
             positionProfileId = pos!.Id,
+            employmentTypeId = refData.EmploymentTypeId,
+            employeeNumber = $"EMP-{Guid.NewGuid():N}",
             dateOfBirth = "1990-05-20",
             nationality = "British",
             gender = "Female"

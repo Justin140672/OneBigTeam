@@ -26,7 +26,6 @@ public sealed class LeaveApprovalTests(AppFixture fixture) : E2ETestBase(fixture
 
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
-        var dash    = new DashboardPage(_page, _fixture.WebBaseUrl);
         var notif   = new NotificationPanel(_page);
         var task    = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
@@ -58,9 +57,13 @@ public sealed class LeaveApprovalTests(AppFixture fixture) : E2ETestBase(fixture
         // ── Step 4: Switch to James (Tom's manager) ───────────────────────────
         await login.SwitchAccountAsync(JamesEmail);
 
-        // ── Step 5: Dashboard — My Tasks widget shows the leave review task ───
-        await dash.GoToAsync();
-        var taskTitles = await dash.GetTaskTitlesAsync();
+        // ── Step 5: James's own Tasks tab shows the leave review task ─────────
+        // The old dashboard "My Tasks" widget (MyTasksWidget.razor) this used to check is dead
+        // code — no longer rendered anywhere. James's own profile Tasks tab is the current,
+        // role-agnostic place to find his full assigned-task list.
+        await profile.GoToAsync(AcmeId, JamesId);
+        await profile.OpenTasksTabAsync();
+        var taskTitles = await profile.GetTaskTitlesAsync();
         Assert.Contains(taskTitles, t => t.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase)
                                       || t.Contains("leave", StringComparison.OrdinalIgnoreCase));
 

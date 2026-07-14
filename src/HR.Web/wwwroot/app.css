@@ -292,7 +292,7 @@ html[data-theme="dark"] .card-header {
 }
 
 /* ── Dashboard widgets ───────────────────────────────────────────
-   Shared by MyTasksWidget, TeamTasksWidget, UpcomingProbationReviewsWidget,
+   Shared by TeamTasksWidget, UpcomingProbationReviewsWidget,
    HrInboxWidget and any future dashboard card.
    ──────────────────────────────────────────────────────────────── */
 

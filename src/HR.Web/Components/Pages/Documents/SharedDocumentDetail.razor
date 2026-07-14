@@ -42,15 +42,29 @@
                 <a class="btn btn-outline-primary" href="@DocumentService.GetSharedCompanyDocumentDownloadUrl(CompanyId, DocumentId)" target="_blank">
                     <i class="fa-solid fa-download me-1"></i> Download
                 </a>
+                @if (_detail.Status != "Archived")
+                {
+                    <SfButton CssClass="e-outline e-danger" OnClick="@(() => _archiveConfirmOpen = true)">
+                        <i class="fa-solid fa-box-archive me-1"></i> Archive
+                    </SfButton>
+                }
             </div>
         </div>
 
         <div class="row g-3 mt-1">
             <div class="col-md-6">
                 <div class="overview-card">
-                    <div class="overview-card-header">
-                        <i class="fa-solid fa-file-lines overview-card-icon"></i>
-                        <span class="overview-card-title">Document Metadata</span>
+                    <div class="overview-card-header d-flex justify-content-between align-items-center">
+                        <span>
+                            <i class="fa-solid fa-file-lines overview-card-icon"></i>
+                            <span class="overview-card-title">Document Metadata</span>
+                        </span>
+                        @if (_detail.Status != "Archived")
+                        {
+                            <SfButton CssClass="e-small e-outline" OnClick="@(() => _uploadVersionOpen = true)">
+                                <i class="fa-solid fa-upload me-1"></i> Upload New Version
+                            </SfButton>
+                        }
                     </div>
                     <dl class="overview-dl">
                         <dt>Category</dt>
@@ -105,9 +119,17 @@
                             <i class="fa-solid fa-clipboard-check overview-card-icon"></i>
                             <span class="overview-card-title">Acknowledgement</span>
                         </span>
-                        <SfButton CssClass="e-small e-outline" OnClick="@(() => _editAcknowledgementOpen = true)">
-                            <i class="fa-solid fa-pen me-1"></i> Edit
-                        </SfButton>
+                        <div>
+                            @if (_detail.RequiresAcknowledgement)
+                            {
+                                <a class="btn e-small e-outline btn-outline-secondary btn-sm me-1" href="/companies/@CompanyId/shared-documents/@DocumentId/acknowledgement-progress">
+                                    <i class="fa-solid fa-chart-simple me-1"></i> View Progress
+                                </a>
+                            }
+                            <SfButton CssClass="e-small e-outline" OnClick="@(() => _editAcknowledgementOpen = true)">
+                                <i class="fa-solid fa-pen me-1"></i> Edit
+                            </SfButton>
+                        </div>
                     </div>
                     <dl class="overview-dl">
                         <dt>Requires Acknowledgement</dt>
@@ -155,9 +177,37 @@
                     <HrGrid TValue="SharedCompanyDocumentVersionModel" DataSource="@_detail.VersionHistory" AllowPaging="false">
                         <GridColumns>
                             <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.VersionNumber)" HeaderText="Version" Width="90" />
+                            <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.PublicationStatus)" HeaderText="Publication Status" Width="130">
+                                <Template>
+                                    @{
+                                        var row = (context as SharedCompanyDocumentVersionModel)!;
+                                    }
+                                    <span class="badge @StatusBadgeClass(row.PublicationStatus)">@row.PublicationStatus</span>
+                                </Template>
+                            </GridColumn>
                             <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.FileName)" HeaderText="File Name" Width="180" />
+                            <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.VersionNote)" HeaderText="Note" Width="200" />
+                            <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.RequiresAcknowledgement)" HeaderText="Required Ack" Width="120">
+                                <Template>
+                                    @{
+                                        var row = (context as SharedCompanyDocumentVersionModel)!;
+                                    }
+                                    @(row.RequiresAcknowledgement ? "Yes" : "No")
+                                </Template>
+                            </GridColumn>
+                            <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.EffectiveDate)" HeaderText="Effective Date" Width="130" Format="d" />
                             <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.UploadedByName)" HeaderText="Uploaded By" Width="150" />
                             <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.UploadedAt)" HeaderText="Uploaded At" Width="170" Format="g" />
+                            <GridColumn HeaderText="Download" Width="100">
+                                <Template>
+                                    @{
+                                        var row = (context as SharedCompanyDocumentVersionModel)!;
+                                    }
+                                    <a href="@DocumentService.GetSharedCompanyDocumentVersionDownloadUrl(CompanyId, DocumentId, row.VersionNumber)" target="_blank" title="Download this version">
+                                        <i class="fa-solid fa-download"></i>
+                                    </a>
+                                </Template>
+                            </GridColumn>
                         </GridColumns>
                     </HrGrid>
                 </div>
@@ -170,6 +220,10 @@
                     @if (_detail.PublishedAt.HasValue)
                     {
                         <text> · Published by @_detail.PublishedByName on @_detail.PublishedAt.Value.ToString("d MMM yyyy, HH:mm")</text>
+                    }
+                    @if (_detail.ArchivedAt.HasValue)
+                    {
+                        <text> · Archived by @_detail.ArchivedByName on @_detail.ArchivedAt.Value.ToString("d MMM yyyy, HH:mm") — reason: @_detail.ArchiveReason</text>
                     }
                 </p>
             </div>
@@ -195,6 +249,13 @@
                                                  OnSaved="OnAcknowledgementSavedAsync"
                                                  OnCancelled="@(() => _editAcknowledgementOpen = false)" />
 
+<UploadSharedCompanyDocumentVersionDialog CompanyId="CompanyId"
+                                           DocumentId="DocumentId"
+                                           Document="_detail"
+                                           IsOpen="_uploadVersionOpen"
+                                           OnSaved="OnVersionUploadedAsync"
+                                           OnCancelled="@(() => _uploadVersionOpen = false)" />
+
 <SfDialog Visible="_publishConfirmOpen" IsModal="true" Width="420px" ShowCloseIcon="false">
     <DialogTemplates>
         <Header>Publish Document</Header>
@@ -211,6 +272,33 @@
     </DialogTemplates>
 </SfDialog>
 
+<SfDialog Visible="_archiveConfirmOpen" IsModal="true" Width="420px" ShowCloseIcon="false">
+    <DialogTemplates>
+        <Header>Archive Document</Header>
+        <Content>
+            <p>
+                Archiving "@_detail?.Title" will remove it from the employee document list, prevent new
+                acknowledgement tasks, and cancel any outstanding acknowledgement tasks. The document, its
+                versions, and completed acknowledgements are retained. This cannot be undone from here.
+            </p>
+            <div class="mb-2">
+                <label class="form-label" for="archive-reason">Reason <span class="text-danger">*</span></label>
+                <textarea id="archive-reason" class="form-control" rows="3" maxlength="500" @bind="_archiveReason"></textarea>
+            </div>
+            @if (!string.IsNullOrEmpty(_archiveError))
+            {
+                <div class="alert alert-danger py-2 mb-0">@_archiveError</div>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton CssClass="e-danger" Disabled="_archiving" OnClick="ConfirmArchiveAsync">
+                @(_archiving ? "Archiving…" : "Archive")
+            </SfButton>
+            <SfButton Disabled="_archiving" OnClick="CancelArchive">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
 @code {
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid DocumentId { get; set; }
@@ -220,9 +308,14 @@
     private bool _editOpen;
     private bool _editAudienceOpen;
     private bool _editAcknowledgementOpen;
+    private bool _uploadVersionOpen;
     private bool _publishConfirmOpen;
     private bool _publishing;
     private string? _publishError;
+    private bool _archiveConfirmOpen;
+    private bool _archiving;
+    private string _archiveReason = string.Empty;
+    private string? _archiveError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -254,6 +347,12 @@
         _detail = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, DocumentId);
     }
 
+    private async Task OnVersionUploadedAsync()
+    {
+        _uploadVersionOpen = false;
+        _detail = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, DocumentId);
+    }
+
     private async Task ConfirmPublishAsync()
     {
         _publishing = true;
@@ -274,11 +373,47 @@
         _detail = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, DocumentId);
     }
 
+    private void CancelArchive()
+    {
+        _archiveConfirmOpen = false;
+        _archiveReason = string.Empty;
+        _archiveError = null;
+    }
+
+    private async Task ConfirmArchiveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_archiveReason))
+        {
+            _archiveError = "A reason is required.";
+            return;
+        }
+
+        _archiving = true;
+        _archiveError = null;
+        StateHasChanged();
+
+        var error = await DocumentService.ArchiveSharedCompanyDocumentAsync(CompanyId, DocumentId, _archiveReason);
+
+        _archiving = false;
+
+        if (error is not null)
+        {
+            _archiveError = error;
+            return;
+        }
+
+        _archiveConfirmOpen = false;
+        _archiveReason = string.Empty;
+        _archiveError = null;
+        _detail = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, DocumentId);
+    }
+
     private static string StatusBadgeClass(string status) => status switch
     {
-        "Published" => "bg-success",
-        "Archived"  => "bg-secondary",
-        _           => "bg-warning text-dark",
+        "Published"  => "bg-success",
+        "Archived"   => "bg-secondary",
+        "Superseded" => "bg-secondary",
+        _            => "bg-warning text-dark",
     };
 
     private static string FormatBytes(long bytes) =>

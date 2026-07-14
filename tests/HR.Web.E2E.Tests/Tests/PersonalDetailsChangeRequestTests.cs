@@ -13,8 +13,9 @@ namespace HR.Web.E2E.Tests.Tests;
 [Collection("E2E")]
 public sealed class PersonalDetailsChangeRequestTests(AppFixture fixture) : E2ETestBase(fixture)
 {
-    private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");
+    private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid TomId   = Guid.Parse("30000000-0000-0000-0000-000000000004");
+    private static readonly Guid LauraId = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
     private const string TomEmail   = "tom.williams@acme.example";
     private const string LauraEmail = "laura.bennett@acme.example";
@@ -28,7 +29,6 @@ public sealed class PersonalDetailsChangeRequestTests(AppFixture fixture) : E2ET
         var profile        = new MyProfilePage(_page, _fixture.WebBaseUrl);
         var personalDetails = new PersonalDetailsTab(_page);
         var inbox          = new HrInboxPage(_page, _fixture.WebBaseUrl);
-        var dash           = new DashboardPage(_page, _fixture.WebBaseUrl);
 
         // ── Step 1: Login as Tom ──────────────────────────────────────────────
         await login.GoToAsync();
@@ -63,10 +63,17 @@ public sealed class PersonalDetailsChangeRequestTests(AppFixture fixture) : E2ET
         // ── Step 9: Switch to Laura and verify the task appeared in HR Inbox ──
         await login.SwitchAccountAsync(LauraEmail);
 
-        // The change request creates a task. It should appear in Laura's dashboard
-        // or in the HR Inbox (it is routed as an unassigned HR task).
-        await dash.GoToAsync();
-        var taskTitles = await dash.GetTaskTitlesAsync();
+        // The change request creates a task. It should appear in Laura's own Tasks tab
+        // or in the HR Inbox (it is routed as an unassigned HR task, so it will normally only
+        // show up in the Inbox until someone claims it — the primary check below is a
+        // best-effort fallback in case that ever changes).
+        //
+        // The old dashboard "My Tasks" widget (MyTasksWidget.razor) this used to check is dead
+        // code — no longer rendered anywhere. Laura's own profile Tasks tab is the current,
+        // role-agnostic place to find her full assigned-task list.
+        await profile.GoToAsync(AcmeId, LauraId);
+        await profile.OpenTasksTabAsync();
+        var taskTitles = await profile.GetTaskTitlesAsync();
 
         // The task title should reference either "personal details" or Tom's name.
         var taskVisible = taskTitles.Any(t =>

@@ -12,4 +12,17 @@ public interface ITaskCanceller
         TaskSource source,
         TaskActionType actionType,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Cancels every open task linked to <paramref name="sourceEntityId"/> — unlike
+    /// <see cref="CancelBySourceEntityAsync"/>, which only cancels the first match, this is for
+    /// source entities that fan out to one task per recipient (e.g. one Acknowledge task per
+    /// eligible employee on a shared document). Returns the number of tasks cancelled.
+    /// </summary>
+    Task<int> CancelAllBySourceEntityAsync(
+        Guid companyId,
+        Guid sourceEntityId,
+        TaskSource source,
+        TaskActionType actionType,
+        CancellationToken cancellationToken);
 }

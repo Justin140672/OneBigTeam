@@ -164,6 +164,28 @@ internal sealed record SharedCompanyDocumentPublishedAuditEvent(
     object? IAuditEvent.Metadata        => new { RequiresAcknowledgement, AcknowledgementTasksCreated };
 }
 
+internal sealed record SharedCompanyDocumentArchivedAuditEvent(
+    Guid CompanyId,
+    Guid SharedCompanyDocumentId,
+    string Title,
+    string Reason,
+    int AcknowledgementTasksCancelled,
+    Guid ArchivedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "shared_company_document.archived";
+    string  IAuditEvent.EntityType      => "SharedCompanyDocument";
+    Guid    IAuditEvent.EntityId        => SharedCompanyDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => null;
+    Guid?   IAuditEvent.ActorUserId     => ArchivedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => ArchivedBy;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Document '{Title}' archived";
+    object? IAuditEvent.Before          => null;
+    object? IAuditEvent.After           => new { Status = "Archived", Reason };
+    object? IAuditEvent.Metadata        => new { AcknowledgementTasksCancelled };
+}
+
 internal sealed record SharedCompanyDocumentAcknowledgementSettingsUpdatedAuditEvent(
     Guid CompanyId,
     Guid SharedCompanyDocumentId,

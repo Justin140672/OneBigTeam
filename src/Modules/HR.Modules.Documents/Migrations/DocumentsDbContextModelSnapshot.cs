@@ -453,6 +453,19 @@ namespace HR.Modules.Documents.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("acknowledgement_statement");
 
+                    b.Property<string>("ArchiveReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("archive_reason");
+
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<Guid?>("ArchivedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("archived_by");
+
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uuid")
                         .HasColumnName("category_id");
@@ -657,6 +670,10 @@ namespace HR.Modules.Documents.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
 
+                    b.Property<DateOnly?>("EffectiveDate")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_date");
+
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -673,9 +690,18 @@ namespace HR.Modules.Documents.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("file_size");
 
+                    b.Property<bool>("RequiresAcknowledgement")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_acknowledgement");
+
                     b.Property<Guid>("SharedCompanyDocumentId")
                         .HasColumnType("uuid")
                         .HasColumnName("shared_company_document_id");
+
+                    b.Property<string>("VersionNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("version_note");
 
                     b.Property<int>("VersionNumber")
                         .HasColumnType("integer")

@@ -68,4 +68,23 @@ public sealed class OverviewTab(IPage page)
             titles.Add((await card.TextContentAsync())?.Trim() ?? "");
         return titles;
     }
+
+    /// <summary>
+    /// Returns the numeric value (".stat-value") of the stats-row card whose label
+    /// (".stat-label") matches <paramref name="label"/> exactly (e.g. "Open Tasks").
+    /// </summary>
+    public async Task<string?> GetStatValueAsync(string label)
+    {
+        var card = page.Locator(".stat-card").Filter(new() { HasText = label }).First;
+        if (!await card.IsVisibleAsync()) return null;
+        return (await card.Locator(".stat-value").TextContentAsync())?.Trim();
+    }
+
+    /// <summary>
+    /// Returns true if the "Onboarding Progress" card is rendered — only present when the
+    /// current employee has an in-progress onboarding plan (Session.EmployeeId's
+    /// MyOnboardingStatusModel.HasPlan is true). See MyProfileOverviewTab.razor.
+    /// </summary>
+    public Task<bool> HasOnboardingProgressCardAsync() =>
+        page.Locator(".overview-card-title").Filter(new() { HasText = "Onboarding Progress" }).IsVisibleAsync();
 }

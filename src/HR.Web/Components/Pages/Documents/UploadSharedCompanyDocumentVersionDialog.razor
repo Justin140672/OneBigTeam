@@ -1,0 +1,90 @@
+@using System.ComponentModel.DataAnnotations
+@inject DocumentService DocumentService
+@inherits EditDialogBase<UploadSharedCompanyDocumentVersionDialog.UploadSharedCompanyDocumentVersionFormModel>
+
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="560px" ShowCloseIcon="true">
+    <DialogEvents Closed="HandleDialogClosed" />
+    <DialogTemplates>
+        <Header>Upload New Version</Header>
+        <Content>
+            @if (!string.IsNullOrEmpty(GlobalError))
+            {
+                <div class="alert alert-danger alert-dismissible mb-3">
+                    @GlobalError
+                    <button type="button" class="btn-close" @onclick="@(() => GlobalError = null)"></button>
+                </div>
+            }
+            <EditForm EditContext="EditContext">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">File <span class="text-danger">*</span></label>
+                        <InputFile class="form-control" OnChange="OnFileSelected"
+                                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
+                        <div class="form-text">PDF, Word, or image files up to 20 MB.</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Version Note <span class="text-danger">*</span></label>
+                        <HrTextBox @bind-Value="Model.VersionNote"
+                                   Placeholder="What changed in this version?"
+                                   Multiline="true" />
+                        <ValidationMessage For="@(() => Model.VersionNote)" />
+                    </div>
+                    @if (Document?.RequiresAcknowledgement == true)
+                    {
+                        <div class="col-12">
+                            <hr class="my-1" />
+                            <SfCheckBox TChecked="bool"
+                                        Label="Requires employees to acknowledge this version again"
+                                        Checked="@Model.RequiresReacknowledgement"
+                                        CheckedChanged="@((bool v) => Model.RequiresReacknowledgement = v)" />
+                        </div>
+                    }
+                </div>
+            </EditForm>
+        </Content>
+        <FooterTemplate>
+            <HrDialogButtonBar SaveLabel="Upload" Saving="Saving" OnSave="SubmitAsync" OnCancel="CancelAsync" />
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid DocumentId { get; set; }
+    [Parameter] public SharedCompanyDocumentDetailResponse? Document { get; set; }
+
+    private IBrowserFile? _selectedFile;
+
+    protected override Task OnOpenedAsync()
+    {
+        _selectedFile = null;
+        return Task.CompletedTask;
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
+
+    protected override string? ValidateExtra() =>
+        _selectedFile is null ? "Please select a file." : null;
+
+    protected override async Task<string?> SaveCoreAsync() =>
+        await DocumentService.UploadSharedCompanyDocumentVersionAsync(
+            CompanyId, DocumentId,
+            Model.VersionNote,
+            Document?.RequiresAcknowledgement == true && Model.RequiresReacknowledgement,
+            _selectedFile!);
+
+    protected override void ResetForm()
+    {
+        Model.VersionNote = string.Empty;
+        Model.RequiresReacknowledgement = true;
+        _selectedFile = null;
+    }
+
+    public sealed class UploadSharedCompanyDocumentVersionFormModel
+    {
+        [Required(ErrorMessage = "A version note is required.")]
+        public string VersionNote { get; set; } = string.Empty;
+        public bool RequiresReacknowledgement { get; set; } = true;
+    }
+}

@@ -48,6 +48,12 @@ internal sealed class SharedCompanyDocument
     public Guid? PublishedBy { get; private set; }
     public DateTimeOffset? PublishedAt { get; private set; }
 
+    // Same rationale as PublishedBy/PublishedAt: a permanent record of who archived this document,
+    // when, and why — must not be overwritten by later metadata/audience edits.
+    public Guid? ArchivedBy { get; private set; }
+    public DateTimeOffset? ArchivedAt { get; private set; }
+    public string? ArchiveReason { get; private set; }
+
     public static SharedCompanyDocument Create(
         Guid id,
         Guid companyId,
@@ -161,11 +167,14 @@ internal sealed class SharedCompanyDocument
         UpdatedAt   = now;
     }
 
-    public void Archive(Guid updatedBy, DateTimeOffset now)
+    public void Archive(Guid archivedBy, string reason, DateTimeOffset now)
     {
-        Status    = SharedCompanyDocumentStatus.Archived;
-        UpdatedBy = updatedBy;
-        UpdatedAt = now;
+        Status        = SharedCompanyDocumentStatus.Archived;
+        ArchivedBy    = archivedBy;
+        ArchivedAt    = now;
+        ArchiveReason = reason.Trim();
+        UpdatedBy     = archivedBy;
+        UpdatedAt     = now;
     }
 
     /// <summary>Moves a Published document back to Draft (e.g. to correct a mistake before republishing).</summary>

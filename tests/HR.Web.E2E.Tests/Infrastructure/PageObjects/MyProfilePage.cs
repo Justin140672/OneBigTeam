@@ -103,6 +103,32 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-grid, p", new() { Timeout = 15_000 });
     }
 
+    /// <summary>
+    /// Returns the task titles currently shown in the Tasks tab grid
+    /// (src/HR.Web/Components/Pages/Tasks/TaskList.razor). Call <see cref="OpenTasksTabAsync"/>
+    /// first. This is the role-agnostic replacement for the old dashboard "My Tasks" widget
+    /// (MyTasksWidget.razor), which is no longer rendered anywhere in the app — every employee's
+    /// full assigned-task list is only reachable via their own profile Tasks tab now.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetTaskTitlesAsync()
+    {
+        var titles = await page.Locator(".task-title").AllAsync();
+        var names  = new List<string>();
+        foreach (var t in titles)
+            names.Add((await t.TextContentAsync())?.Trim() ?? "");
+        return names;
+    }
+
+    /// <summary>
+    /// Clicks the task row whose title contains <paramref name="titleFragment"/>, opening
+    /// TaskViewDialog in place (no navigation). Call <see cref="OpenTasksTabAsync"/> first.
+    /// </summary>
+    public async Task ClickTaskAsync(string titleFragment)
+    {
+        await page.Locator(".task-title").Filter(new() { HasText = titleFragment }).First.ClickAsync();
+        await page.WaitForSelectorAsync("[role='dialog'].task-view-dialog", new() { Timeout = 15_000 });
+    }
+
     public async Task OpenAssetsTabAsync()
     {
         await page.GetByRole(AriaRole.Tab, new() { Name = "Assets" }).ClickAsync();

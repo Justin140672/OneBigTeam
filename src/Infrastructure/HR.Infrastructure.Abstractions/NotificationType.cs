@@ -32,4 +32,6 @@ public enum NotificationType
     OffboardingCompleted         = 28,
     ProfilePhotoApproved         = 29,
     ProfilePhotoRejected         = 30,
+    SharedCompanyDocumentAcknowledgementReminder = 31,
+    SharedCompanyDocumentAcknowledgementOverdue  = 32,
 }

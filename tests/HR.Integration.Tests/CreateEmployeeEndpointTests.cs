@@ -82,17 +82,15 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
-        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
-        {
-            companyId,
-            firstName = "Alice",
-            lastName = "Smith",
-            workEmail = $"alice.smith.{Guid.NewGuid():N}@example.com",
-            startDate = "2026-07-01",
-            dateOfBirth = "1990-05-20",
-            nationality = "British",
-            gender = "Female"
-        });
+        // Department, Location, Position Profile, Employment Type and Employee Number are all
+        // mandatory on employee creation — seed the minimum real reference data required for any
+        // employee to be created at all (see EmployeeReferenceDataSeeder for why).
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Alice", "Smith", $"alice.smith.{Guid.NewGuid():N}@example.com"));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.NotNull(response.Headers.Location);
@@ -104,8 +102,9 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         Assert.Equal("Alice", payload.FirstName);
         Assert.Equal("Smith", payload.LastName);
         Assert.Equal("Draft", payload.Status);
-        Assert.Null(payload.DepartmentId);
-        Assert.Null(payload.PositionProfileId);
+        Assert.Equal(refData.DepartmentId, payload.DepartmentId);
+        Assert.Equal(refData.LocationId, payload.LocationId);
+        Assert.Equal(refData.PositionProfileId, payload.PositionProfileId);
         Assert.Null(payload.ManagerId);
     }
 
@@ -116,6 +115,19 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        // Base reference data used for the manager (whose own department/position-profile isn't
+        // under test here); a distinct department + position profile are created afterwards to
+        // verify the employee-under-test picks up its own explicitly-assigned values.
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+
+        var managerResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Jane", "Manager", $"jane.manager.{Guid.NewGuid():N}@example.com",
+                startDate: new DateOnly(2026, 1, 1), dateOfBirth: new DateOnly(1985, 3, 10)));
+        managerResponse.EnsureSuccessStatusCode();
+        var manager = await managerResponse.Content.ReadFromJsonAsync<EmployeePayload>();
 
         var deptResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
         {
@@ -133,25 +145,14 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         ppResponse.EnsureSuccessStatusCode();
         var pp = await ppResponse.Content.ReadFromJsonAsync<PositionProfilePayload>();
 
-        var managerResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
-        {
-            companyId,
-            firstName = "Jane",
-            lastName = "Manager",
-            workEmail = $"jane.manager.{Guid.NewGuid():N}@example.com",
-            startDate = "2026-01-01",
-            dateOfBirth = "1985-03-10",
-            nationality = "British",
-            gender = "Female"
-        });
-        managerResponse.EnsureSuccessStatusCode();
-        var manager = await managerResponse.Content.ReadFromJsonAsync<EmployeePayload>();
-
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {
             companyId,
             departmentId = dept!.Id,
+            locationId = refData.LocationId,
             positionProfileId = pp!.Id,
+            employmentTypeId = refData.EmploymentTypeId,
+            employeeNumber = $"EMP-{Guid.NewGuid():N}",
             managerId = manager!.Id,
             firstName = "Alice",
             lastName = "Smith",
@@ -180,30 +181,16 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
-        var first = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
-        {
-            companyId,
-            firstName = "Alice",
-            lastName = "Smith",
-            workEmail = email,
-            startDate = "2026-07-01",
-            dateOfBirth = "1990-05-20",
-            nationality = "British",
-            gender = "Female"
-        });
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+
+        var first = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(companyId, refData, "Alice", "Smith", email));
         first.EnsureSuccessStatusCode();
 
-        var second = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
-        {
-            companyId,
-            firstName = "Alice",
-            lastName = "Smith",
-            workEmail = email,
-            startDate = "2026-07-01",
-            dateOfBirth = "1990-05-20",
-            nationality = "British",
-            gender = "Female"
-        });
+        var second = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(companyId, refData, "Alice", "Smith", email));
 
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
     }
@@ -216,10 +203,18 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User4.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
+        // Location/PositionProfile/EmploymentType are real (seeded) so the NotFound is
+        // attributable specifically to the unknown DepartmentId, not some other missing lookup.
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {
             companyId,
             departmentId = Guid.NewGuid(),
+            locationId = refData.LocationId,
+            positionProfileId = refData.PositionProfileId,
+            employmentTypeId = refData.EmploymentTypeId,
+            employeeNumber = $"EMP-{Guid.NewGuid():N}",
             firstName = "Alice",
             lastName = "Smith",
             workEmail = $"alice.{Guid.NewGuid():N}@example.com",
@@ -240,12 +235,17 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User6.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
         var locationId = await CreateLocationAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {
             companyId,
+            departmentId = refData.DepartmentId,
             locationId,
+            positionProfileId = refData.PositionProfileId,
+            employmentTypeId = refData.EmploymentTypeId,
+            employeeNumber = $"EMP-{Guid.NewGuid():N}",
             firstName = "Alice",
             lastName = "Smith",
             workEmail = $"alice.smith.{Guid.NewGuid():N}@example.com",
@@ -270,10 +270,16 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User7.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {
             companyId,
+            departmentId = refData.DepartmentId,
             locationId = Guid.NewGuid(),
+            positionProfileId = refData.PositionProfileId,
+            employmentTypeId = refData.EmploymentTypeId,
+            employeeNumber = $"EMP-{Guid.NewGuid():N}",
             firstName = "Alice",
             lastName = "Smith",
             workEmail = $"alice.{Guid.NewGuid():N}@example.com",
@@ -294,9 +300,16 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User5.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {
             companyId,
+            departmentId = refData.DepartmentId,
+            locationId = refData.LocationId,
+            positionProfileId = refData.PositionProfileId,
+            employmentTypeId = refData.EmploymentTypeId,
+            employeeNumber = $"EMP-{Guid.NewGuid():N}",
             managerId = Guid.NewGuid(),
             firstName = "Alice",
             lastName = "Smith",

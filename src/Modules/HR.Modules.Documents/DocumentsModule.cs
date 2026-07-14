@@ -1,5 +1,7 @@
 using FluentValidation;
+using Hangfire;
 using HR.Modules.Documents.Domain;
+using HR.Modules.Documents.Jobs;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Features.CreateDocumentRequestsOnEmployeeCreated;
@@ -11,15 +13,19 @@ using HR.Modules.Documents.Features.UpdateCompanyDocumentCategory;
 using HR.Modules.Documents.Features.DeactivateCompanyDocumentCategory;
 using HR.Modules.Documents.Features.ListCompanyDocumentCategories;
 using HR.Modules.Documents.Features.UploadSharedCompanyDocument;
+using HR.Modules.Documents.Features.UploadSharedCompanyDocumentVersion;
 using HR.Modules.Documents.Features.ListSharedCompanyDocuments;
 using HR.Modules.Documents.Features.ListPublishedSharedCompanyDocuments;
 using HR.Modules.Documents.Features.GetSharedCompanyDocument;
+using HR.Modules.Documents.Features.GetSharedCompanyDocumentAcknowledgementProgress;
 using HR.Modules.Documents.Features.GetPublishedSharedCompanyDocument;
 using HR.Modules.Documents.Features.DownloadSharedCompanyDocument;
+using HR.Modules.Documents.Features.DownloadSharedCompanyDocumentVersion;
 using HR.Modules.Documents.Features.AcknowledgeSharedCompanyDocument;
 using HR.Modules.Documents.Features.UpdateSharedCompanyDocumentMetadata;
 using HR.Modules.Documents.Features.UpdateSharedCompanyDocumentAudience;
 using HR.Modules.Documents.Features.PublishSharedCompanyDocument;
+using HR.Modules.Documents.Features.ArchiveSharedCompanyDocument;
 using HR.Modules.Documents.Features.UpdateSharedCompanyDocumentAcknowledgementSettings;
 using HR.Modules.Documents.Features.DeleteEmployeeDocument;
 using HR.Modules.Documents.Features.DownloadEmployeeDocument;
@@ -45,6 +51,7 @@ using HR.Modules.Documents.Services;
 using HR.Modules.Documents.Features.ListDocumentTypes;
 using HR.Modules.Documents.Features.UpdateDocumentType;
 using HR.Modules.Documents.Persistence;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -121,11 +128,16 @@ public static class DocumentsModule
         services.AddScoped<UploadSharedCompanyDocumentHandler>();
         services.AddScoped<IValidator<UploadSharedCompanyDocumentRequest>, UploadSharedCompanyDocumentValidator>();
 
+        services.AddScoped<UploadSharedCompanyDocumentVersionHandler>();
+        services.AddScoped<IValidator<UploadSharedCompanyDocumentVersionRequest>, UploadSharedCompanyDocumentVersionValidator>();
+
         services.AddScoped<ListSharedCompanyDocumentsHandler>();
         services.AddScoped<ListPublishedSharedCompanyDocumentsHandler>();
         services.AddScoped<GetSharedCompanyDocumentHandler>();
+        services.AddScoped<GetSharedCompanyDocumentAcknowledgementProgressHandler>();
         services.AddScoped<GetPublishedSharedCompanyDocumentHandler>();
         services.AddScoped<DownloadSharedCompanyDocumentHandler>();
+        services.AddScoped<DownloadSharedCompanyDocumentVersionHandler>();
         services.AddScoped<AcknowledgeSharedCompanyDocumentHandler>();
 
         services.AddScoped<UpdateSharedCompanyDocumentMetadataHandler>();
@@ -135,6 +147,9 @@ public static class DocumentsModule
         services.AddScoped<IValidator<UpdateSharedCompanyDocumentAudienceRequest>, UpdateSharedCompanyDocumentAudienceValidator>();
 
         services.AddScoped<PublishSharedCompanyDocumentHandler>();
+
+        services.AddScoped<ArchiveSharedCompanyDocumentHandler>();
+        services.AddScoped<IValidator<ArchiveSharedCompanyDocumentRequest>, ArchiveSharedCompanyDocumentValidator>();
 
         services.AddScoped<UpdateSharedCompanyDocumentAcknowledgementSettingsHandler>();
         services.AddScoped<IValidator<UpdateSharedCompanyDocumentAcknowledgementSettingsRequest>, UpdateSharedCompanyDocumentAcknowledgementSettingsValidator>();
@@ -199,6 +214,18 @@ public static class DocumentsModule
 
         services.AddScoped<UploadRequestedDocumentHandler>();
         services.AddScoped<IValidator<UploadRequestedDocumentRequest>, UploadRequestedDocumentValidator>();
+
+        services.AddScoped<SharedCompanyDocumentAcknowledgementReminderJob>();
+    }
+
+    public static WebApplication UseDocumentsRecurringJobs(this WebApplication app)
+    {
+        var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+        jobManager.AddOrUpdate<SharedCompanyDocumentAcknowledgementReminderJob>(
+            "shared-company-document-acknowledgement-reminders",
+            job => job.ExecuteAsync(),
+            Cron.Daily(9));
+        return app;
     }
 
     public static async Task MigrateDocumentsAsync(this IServiceProvider services)

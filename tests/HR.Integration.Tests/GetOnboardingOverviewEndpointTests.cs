@@ -59,7 +59,7 @@ public class GetOnboardingOverviewEndpointTests : IClassFixture<ApiWebApplicatio
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
 
-        var employeeId = await CreateEmployeeAsync(client, companyId, positionProfileId: null);
+        var employeeId = await CreateEmployeeAsync(client, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/onboarding-overview");
@@ -149,16 +149,25 @@ public class GetOnboardingOverviewEndpointTests : IClassFixture<ApiWebApplicatio
         return client;
     }
 
-    private async Task<Guid> CreateEmployeeAsync(HttpClient client, Guid companyId, Guid? positionProfileId)
+    // Department/Location/EmploymentType/EmployeeNumber are all mandatory on employee creation —
+    // seed fresh reference data per call. A null positionProfileId means "use a fresh, bare
+    // position profile with no onboarding template/required documents of its own" (no employee
+    // can be created without a real PositionProfileId any more).
+    private async Task<Guid> CreateEmployeeAsync(HttpClient client, Guid companyId, Guid? positionProfileId = null)
     {
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+        var effectiveProfileId = positionProfileId ?? refData.PositionProfileId;
+
         var resp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
-            BuildEmployeeBody(companyId, "Onboard", $"Employee{Guid.NewGuid():N}", positionProfileId));
+            BuildEmployeeBody(companyId, "Onboard", $"Employee{Guid.NewGuid():N}", effectiveProfileId, refData));
         resp.EnsureSuccessStatusCode();
         return (await resp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
     }
 
-    private static object BuildEmployeeBody(Guid companyId, string firstName, string lastName, Guid? positionProfileId) =>
+    private static object BuildEmployeeBody(
+        Guid companyId, string firstName, string lastName, Guid positionProfileId,
+        EmployeeReferenceDataSeeder.ReferenceData refData) =>
         new
         {
             companyId,
@@ -169,6 +178,10 @@ public class GetOnboardingOverviewEndpointTests : IClassFixture<ApiWebApplicatio
             dateOfBirth = "1990-01-01",
             nationality = "British",
             gender = "Male",
+            employeeNumber = $"EMP-{Guid.NewGuid():N}",
+            departmentId = refData.DepartmentId,
+            locationId = refData.LocationId,
+            employmentTypeId = refData.EmploymentTypeId,
             positionProfileId,
         };
 

@@ -80,15 +80,20 @@ If any criterion is marked **Violation**, halt and report the specific violation
 ### 3. Final checks
 After both handoffs complete, verify the repository state yourself:
 - Run a full build for the workspace: `dotnet build`
-- Run tests by specifying each test project path **individually**, omitting `HR.Web.E2E.Tests` entirely. Do not use a solution-level `dotnet test` — it will pick up the E2E project. Run the following commands:
+- Run unit/module test projects by specifying each test project path **individually**, omitting `HR.Web.E2E.Tests` entirely. Do not use a solution-level `dotnet test` — it will pick up the E2E project. Run the following commands:
   ```
   dotnet test tests/HR.Architecture.Tests/HR.Architecture.Tests.csproj
   dotnet test tests/HR.Modules.Assets.Tests/HR.Modules.Assets.Tests.csproj
   dotnet test tests/HR.Modules.Sickness.Tests/HR.Modules.Sickness.Tests.csproj
-  dotnet test tests/HR.Integration.Tests/HR.Integration.Tests.csproj
   ```
-  Add any other non-E2E test projects that exist in the solution. Never run `tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj` — it requires a live browser and full environment.
-- Confirm that build and all test projects passed before reporting completion.
+  Add any other non-E2E unit/module test projects that exist in the solution.
+- For `HR.Integration.Tests`, do **not** run the whole project — it is large and slow (1000+ tests, several minutes). Instead, scope the run with `--filter` to only the test classes the test agent just created or modified for this task, e.g.:
+  ```
+  dotnet test tests/HR.Integration.Tests/HR.Integration.Tests.csproj --filter "FullyQualifiedName~NewClassA|FullyQualifiedName~NewClassB"
+  ```
+  Identify the in-scope classes from the test agent's Step 2 report of files it created/modified and from `git status`/`git diff`. Never invoke `dotnet test` against the full `HR.Integration.Tests` project unfiltered as part of this workflow.
+- Never run `tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj` — it requires a live browser and full environment.
+- Confirm that build, all unit/module test projects, and the filtered integration test run passed before reporting completion.
 
 If the user request does not include a UI component, skip Steps 4 and 5 entirely and omit the post-UI reconfirmation fields from the final summary.
 

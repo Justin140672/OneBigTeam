@@ -127,8 +127,8 @@ public class GetSharedCompanyDocumentHandlerTests
         db.SharedCompanyDocuments.Add(doc);
 
         db.SharedCompanyDocumentVersions.AddRange(
-            SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 1, "key/v1.pdf", "v1.pdf", 100, "application/pdf", Guid.NewGuid(), Now),
-            SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 2, "key/v2.pdf", "v2.pdf", 200, "application/pdf", Guid.NewGuid(), Now.AddDays(1)));
+            SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 1, "key/v1.pdf", "v1.pdf", 100, "application/pdf", Guid.NewGuid(), Now, versionNote: null, requiresAcknowledgement: false, effectiveDate: null),
+            SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 2, "key/v2.pdf", "v2.pdf", 200, "application/pdf", Guid.NewGuid(), Now.AddDays(1), versionNote: "Updated section 3", requiresAcknowledgement: true, effectiveDate: null));
         await db.SaveChangesAsync();
 
         var result = await Handler(db).HandleAsync(
@@ -138,6 +138,98 @@ public class GetSharedCompanyDocumentHandlerTests
         Assert.Equal(2, result.Value!.VersionHistory.Count);
         Assert.Equal(2, result.Value.VersionHistory[0].VersionNumber);
         Assert.Equal(1, result.Value.VersionHistory[1].VersionNumber);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_EffectiveDate_Snapshot_Per_Version()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
+            new DateOnly(2026, 1, 1), null, false, null, null, Guid.NewGuid(), Now);
+        doc.ReplaceFile("key/v2.pdf", "v2.pdf", 200, "application/pdf", Guid.NewGuid(), Now.AddDays(1));
+        db.SharedCompanyDocuments.Add(doc);
+
+        db.SharedCompanyDocumentVersions.AddRange(
+            SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 1, "key/v1.pdf", "v1.pdf", 100, "application/pdf", Guid.NewGuid(), Now, versionNote: null, requiresAcknowledgement: false, effectiveDate: new DateOnly(2026, 1, 1)),
+            SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 2, "key/v2.pdf", "v2.pdf", 200, "application/pdf", Guid.NewGuid(), Now.AddDays(1), versionNote: "Updated section 3", requiresAcknowledgement: true, effectiveDate: new DateOnly(2026, 6, 1)));
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new GetSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
+            CancellationToken.None);
+
+        var v2 = Assert.Single(result.Value!.VersionHistory, v => v.VersionNumber == 2);
+        var v1 = Assert.Single(result.Value.VersionHistory, v => v.VersionNumber == 1);
+        Assert.Equal(new DateOnly(2026, 6, 1), v2.EffectiveDate);
+        Assert.Equal(new DateOnly(2026, 1, 1), v1.EffectiveDate);
+    }
+
+    [Theory]
+    [InlineData("Draft")]
+    [InlineData("Published")]
+    [InlineData("Archived")]
+    public async Task HandleAsync_Current_Version_PublicationStatus_Reflects_Document_Status(string expectedStatus)
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, false, null, null, Guid.NewGuid(), Now);
+
+        switch (expectedStatus)
+        {
+            case "Published":
+                doc.Publish(Guid.NewGuid(), Now);
+                break;
+            case "Archived":
+                doc.Publish(Guid.NewGuid(), Now);
+                doc.Archive(Guid.NewGuid(), "Superseded", Now.AddDays(1));
+                break;
+        }
+
+        db.SharedCompanyDocuments.Add(doc);
+        db.SharedCompanyDocumentVersions.Add(
+            SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 1, "key/p.pdf", "p.pdf", 100, "application/pdf", Guid.NewGuid(), Now, versionNote: null, requiresAcknowledgement: false, effectiveDate: null));
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new GetSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
+            CancellationToken.None);
+
+        var current = Assert.Single(result.Value!.VersionHistory, v => v.VersionNumber == doc.VersionNumber);
+        Assert.Equal(expectedStatus, current.PublicationStatus);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Older_Version_PublicationStatus_Is_Superseded()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
+            null, null, false, null, null, Guid.NewGuid(), Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        doc.ReplaceFile("key/v2.pdf", "v2.pdf", 200, "application/pdf", Guid.NewGuid(), Now.AddDays(1));
+        db.SharedCompanyDocuments.Add(doc);
+
+        db.SharedCompanyDocumentVersions.AddRange(
+            SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 1, "key/v1.pdf", "v1.pdf", 100, "application/pdf", Guid.NewGuid(), Now, versionNote: null, requiresAcknowledgement: false, effectiveDate: null),
+            SharedCompanyDocumentVersion.Create(Guid.NewGuid(), companyId, doc.Id, 2, "key/v2.pdf", "v2.pdf", 200, "application/pdf", Guid.NewGuid(), Now.AddDays(1), versionNote: "Updated section 3", requiresAcknowledgement: true, effectiveDate: null));
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new GetSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
+            CancellationToken.None);
+
+        var v1 = Assert.Single(result.Value!.VersionHistory, v => v.VersionNumber == 1);
+        var v2 = Assert.Single(result.Value.VersionHistory, v => v.VersionNumber == 2);
+        Assert.Equal("Superseded", v1.PublicationStatus);
+        Assert.Equal("Published", v2.PublicationStatus);
     }
 
     [Fact]

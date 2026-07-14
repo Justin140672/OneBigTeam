@@ -13,8 +13,9 @@ namespace HR.Web.E2E.Tests.Tests;
 [Collection("E2E")]
 public sealed class HrInboxTests(AppFixture fixture) : E2ETestBase(fixture)
 {
-    private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");
+    private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid TomId   = Guid.Parse("30000000-0000-0000-0000-000000000004");
+    private static readonly Guid LauraId = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
     private const string TomEmail   = "tom.williams@acme.example";
     private const string LauraEmail = "laura.bennett@acme.example";
@@ -28,7 +29,6 @@ public sealed class HrInboxTests(AppFixture fixture) : E2ETestBase(fixture)
         var profile         = new MyProfilePage(_page, _fixture.WebBaseUrl);
         var personalDetails = new PersonalDetailsTab(_page);
         var inbox           = new HrInboxPage(_page, _fixture.WebBaseUrl);
-        var dash            = new DashboardPage(_page, _fixture.WebBaseUrl);
 
         // ── Step 1: Login as Tom and submit a personal-details change request ──
         // This creates an unassigned HR task that appears in the inbox.
@@ -67,9 +67,13 @@ public sealed class HrInboxTests(AppFixture fixture) : E2ETestBase(fixture)
         Assert.False(await inbox.HasTaskAsync(taskTitle),
             "Task should be removed from inbox after being claimed");
 
-        // ── Step 6: The claimed task appears in Laura's dashboard task widget ──
-        await dash.GoToAsync();
-        var taskTitles = await dash.GetTaskTitlesAsync();
+        // ── Step 6: The claimed task appears in Laura's own Tasks tab ──────────
+        // The old dashboard "My Tasks" widget (MyTasksWidget.razor) this used to check is dead
+        // code — no longer rendered anywhere. Laura's own profile Tasks tab is the current,
+        // role-agnostic place to find her full assigned-task list.
+        await profile.GoToAsync(AcmeId, LauraId);
+        await profile.OpenTasksTabAsync();
+        var taskTitles = await profile.GetTaskTitlesAsync();
         Assert.Contains(taskTitles,
             t => t.Contains("Tom Williams",    StringComparison.OrdinalIgnoreCase) ||
                  t.Contains("Personal Details",StringComparison.OrdinalIgnoreCase));

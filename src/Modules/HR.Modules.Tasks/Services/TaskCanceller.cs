@@ -30,4 +30,31 @@ internal sealed class TaskCanceller(TasksDbContext dbContext, IClock clock) : IT
         task.Cancel(clock.UtcNowOffset());
         await dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<int> CancelAllBySourceEntityAsync(
+        Guid companyId,
+        Guid sourceEntityId,
+        TaskSource source,
+        TaskActionType actionType,
+        CancellationToken cancellationToken)
+    {
+        var tasks = await dbContext.TaskItems
+            .Where(t => t.CompanyId == companyId
+                     && t.SourceEntityId == sourceEntityId
+                     && t.Source == source
+                     && t.ActionType == actionType
+                     && t.Status != TaskItemStatus.Completed
+                     && t.Status != TaskItemStatus.Cancelled)
+            .ToListAsync(cancellationToken);
+
+        if (tasks.Count == 0)
+            return 0;
+
+        var now = clock.UtcNowOffset();
+        foreach (var task in tasks)
+            task.Cancel(now);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return tasks.Count;
+    }
 }

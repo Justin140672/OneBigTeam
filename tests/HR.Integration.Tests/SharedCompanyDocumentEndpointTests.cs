@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -357,7 +358,7 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
 
         using var employeeClient = ClientAs(companyId, employeeId);
         var response = await employeeClient.PostAsync(
-            $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", null);
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", EmptyJson());
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -603,7 +604,7 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
 
         using var managerClient = ClientAs(companyId, managerId);
         var response = await managerClient.PostAsync(
-            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/publish", null);
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/publish", EmptyJson());
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -619,7 +620,7 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Remote Working Policy");
 
         var response = await client.PostAsync(
-            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/publish", null);
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/publish", EmptyJson());
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<PublishPayload>();
@@ -644,8 +645,8 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
 
-        await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}/publish", null);
-        var response = await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/publish", null);
+        await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}/publish", EmptyJson());
+        var response = await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/publish", EmptyJson());
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -659,7 +660,7 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         using var client = ClientAs(companyId, userId);
 
         var response = await client.PostAsync(
-            $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/publish", null);
+            $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/publish", EmptyJson());
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -678,7 +679,7 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/acknowledgement-settings",
             new { RequiresAcknowledgement = true });
 
-        var response = await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/publish", null);
+        var response = await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/publish", EmptyJson());
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -732,7 +733,7 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal("I confirm I have read the updated expenses policy.", payload.AcknowledgementStatement);
 
         // Publish now succeeds, since the required due date has been set.
-        var publishResponse = await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/publish", null);
+        var publishResponse = await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/publish", EmptyJson());
         Assert.Equal(HttpStatusCode.OK, publishResponse.StatusCode);
     }
 
@@ -755,7 +756,375 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         Guid Id, Guid CompanyId, bool RequiresAcknowledgement,
         DateOnly? AcknowledgementDueDate, string? AcknowledgementStatement);
 
+    // ── GetSharedCompanyDocumentAcknowledgementProgress ─────────────────────────
+
+    [Fact]
+    public async Task AcknowledgementProgress_Returns_Forbidden_For_Manager()
+    {
+        var companyId = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var managerId  = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+        await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
+
+        using var managerClient = ClientAs(companyId, managerId);
+        var response = await managerClient.GetAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledgement-progress");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AcknowledgementProgress_Succeeds_For_HrAdministrator_With_Summary_Counts()
+    {
+        var companyId  = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId, title: "Remote Working Policy");
+        await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
+
+        // GetSharedCompanyDocumentAcknowledgementProgress's eligible-employee lookup
+        // (EmployeeAudienceReader.GetEligibleEmployeeIdsAsync) queries real, Active rows in the
+        // Employees module — a bare role/claims assignment via TestRoleSeeder isn't enough for
+        // this employee to show up in the progress report, unlike the simpler per-employee
+        // audience check used when viewing published documents. Seed a real Active Employee with
+        // Id == employeeId so they're counted as eligible.
+        await CreateActiveEmployeeAsync(companyId, employeeId);
+
+        using var employeeClient = ClientAs(companyId, employeeId);
+        await employeeClient.PostAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", EmptyJson());
+
+        var response = await hrClient.GetAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledgement-progress");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<AcknowledgementProgressPayload>();
+        Assert.Equal("Remote Working Policy", payload!.DocumentTitle);
+        Assert.True(payload.TotalAssigned >= payload.AcknowledgedCount);
+        Assert.Equal(payload.TotalAssigned, payload.AcknowledgedCount + payload.OutstandingCount + payload.OverdueCount);
+        Assert.Contains(payload.Items, i => i.EmployeeId == employeeId && i.Status == "Acknowledged");
+    }
+
+    [Fact]
+    public async Task AcknowledgementProgress_Filters_By_Department()
+    {
+        var companyId  = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        using var hrClient = ClientAs(companyId, hrUserId);
+
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+        await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
+        var departmentId = await SeedDepartmentAsync(companyId, "Engineering");
+
+        var response = await hrClient.GetAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledgement-progress?departmentId={departmentId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AcknowledgementProgress_Returns_UnprocessableEntity_When_Document_Does_Not_Require_Acknowledgement()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId);
+        await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: false);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledgement-progress");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AcknowledgementProgress_Returns_NotFound_For_Unknown_Document()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/acknowledgement-progress");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    private sealed record AcknowledgementProgressPayload(
+        Guid DocumentId, string DocumentTitle, int TotalAssigned, int AcknowledgedCount,
+        int OutstandingCount, int OverdueCount, decimal AcknowledgementPercentage,
+        IReadOnlyList<AcknowledgementProgressItemPayload> Items);
+
+    private sealed record AcknowledgementProgressItemPayload(
+        Guid EmployeeId, string EmployeeName, Guid? DepartmentId, string? DepartmentName,
+        Guid? LocationId, string? LocationName, string Status, DateOnly? DueDate, DateTimeOffset? AcknowledgedAt);
+
     private sealed record PublishPayload(Guid Id, string Status, Guid PublishedBy, DateTimeOffset PublishedAt);
+
+    // ── UploadSharedCompanyDocumentVersion ──────────────────────────────────────
+
+    [Fact]
+    public async Task UploadVersion_Returns_Forbidden_For_Manager()
+    {
+        var companyId = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var managerId  = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+
+        using var managerClient = ClientAs(companyId, managerId);
+        var response = await managerClient.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/versions", BuildVersionUpload());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadVersion_Succeeds_For_HrAdministrator()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Remote Working Policy");
+
+        var response = await client.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/versions", BuildVersionUpload());
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<VersionUploadPayload>();
+        Assert.Equal(2, payload!.VersionNumber);
+    }
+
+    [Fact]
+    public async Task UploadVersion_Returns_NotFound_For_Unknown_Document()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        var response = await client.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/versions", BuildVersionUpload());
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    private sealed record VersionUploadPayload(Guid Id, Guid CompanyId, int VersionNumber, string FileName, string VersionNote);
+
+    private static MultipartFormDataContent BuildVersionUpload(
+        string versionNote = "Updated section 3", bool requiresReacknowledgement = false)
+    {
+        var form = new MultipartFormDataContent();
+        form.Add(new StringContent(versionNote), "VersionNote");
+        form.Add(new StringContent(requiresReacknowledgement.ToString()), "RequiresReacknowledgement");
+
+        var fileContent = new ByteArrayContent(PdfBytes());
+        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
+        form.Add(fileContent, "File", "policy-v2.pdf");
+        return form;
+    }
+
+    // ── DownloadSharedCompanyDocumentVersion ────────────────────────────────────
+
+    [Fact]
+    public async Task DownloadVersion_Returns_Forbidden_For_Manager()
+    {
+        var companyId = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var managerId  = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+
+        using var managerClient = ClientAs(companyId, managerId, allowAutoRedirect: false);
+        var response = await managerClient.GetAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/versions/1/download");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DownloadVersion_Redirects_For_HrAdministrator()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId, allowAutoRedirect: false);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/versions/1/download");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DownloadVersion_Returns_NotFound_For_Unknown_VersionNumber()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId, allowAutoRedirect: false);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/versions/99/download");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    // ── ArchiveSharedCompanyDocument ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task Archive_Returns_Forbidden_For_Manager()
+    {
+        var companyId = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var managerId  = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+
+        using var managerClient = ClientAs(companyId, managerId);
+        var response = await managerClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/archive",
+            new { Reason = "No longer needed" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Archive_Succeeds_For_HrAdministrator_On_Draft_Document()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Draft Policy");
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/archive",
+            new { Reason = "Draft was never needed" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ArchivePayload>();
+        Assert.Equal("Archived", payload!.Status);
+        Assert.Equal(userId, payload.ArchivedBy);
+        Assert.Equal("Draft was never needed", payload.ArchiveReason);
+    }
+
+    [Fact]
+    public async Task Archive_Succeeds_For_HrAdministrator_On_Published_Document_And_Removes_From_PublishedList()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Remote Working Policy");
+        await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}/publish", EmptyJson());
+
+        var employeeId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
+        using var employeeClient = ClientAs(companyId, employeeId);
+        var beforeArchive = await employeeClient.GetFromJsonAsync<ListPayload>($"/api/companies/{companyId}/shared-documents/published");
+        Assert.Contains(beforeArchive!.Items, i => i.Title == "Remote Working Policy");
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/archive",
+            new { Reason = "Superseded by a newer policy" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ArchivePayload>();
+        Assert.Equal("Archived", payload!.Status);
+
+        var afterArchive = await employeeClient.GetFromJsonAsync<ListPayload>($"/api/companies/{companyId}/shared-documents/published");
+        Assert.DoesNotContain(afterArchive!.Items, i => i.Title == "Remote Working Policy");
+    }
+
+    [Fact]
+    public async Task Archive_Returns_Conflict_When_Document_Already_Archived()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId);
+
+        await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/archive", new { Reason = "First reason" });
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/archive", new { Reason = "Second reason" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Archive_Returns_NotFound_For_Unknown_Document()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/archive",
+            new { Reason = "Reason" });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Archive_Returns_Validation_Error_When_Reason_Missing()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/archive",
+            new { Reason = "" });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    private sealed record ArchivePayload(
+        Guid Id, Guid CompanyId, string Status, Guid ArchivedBy, DateTimeOffset ArchivedAt,
+        string ArchiveReason, int AcknowledgementTasksCancelled);
 
     // Seeds a Department directly via the Employees module's DbContext — there is no lighter-
     // weight way to get a real, existence-checkable department id into an integration test.
@@ -767,6 +1136,28 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         db.Departments.Add(department);
         await db.SaveChangesAsync();
         return department.Id;
+    }
+
+    // Seeds a real, Active Employee row with Id == employeeId — needed for tests whose caller
+    // must be found by EmployeeAudienceReader.GetEligibleEmployeeIdsAsync (which queries real
+    // Active Employees rows), unlike simpler per-employee audience checks elsewhere that only
+    // need a role/claims assignment via TestRoleSeeder.
+    private async Task CreateActiveEmployeeAsync(Guid companyId, Guid employeeId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Employees.Persistence.EmployeesDbContext>();
+        var refData = await EmployeeReferenceDataSeeder.SeedAsync(db, companyId);
+
+        var now = DateTimeOffset.UtcNow;
+        var employee = HR.Modules.Employees.Domain.Employee.Create(
+            employeeId, companyId, "Ada", "Acknowledger", $"ada.{Guid.NewGuid():N}@example.com",
+            new DateOnly(2026, 1, 1), hasSystemAccess: true, new DateOnly(1990, 1, 1), "British",
+            "Prefer not to say", $"EMP-{Guid.NewGuid():N}", refData.EmploymentTypeId,
+            refData.DepartmentId, refData.LocationId, refData.PositionProfileId, now);
+        employee.Activate(now);
+
+        db.Employees.Add(employee);
+        await db.SaveChangesAsync();
     }
 
     // Directly flips a document to Published via the DbContext, bypassing the real Publish
@@ -839,6 +1230,12 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         return client;
     }
+
+    // Passing null as HttpContent to PostAsync omits the Content-Type header entirely, which
+    // FastEndpoints rejects with 415 Unsupported Media Type once past authorization — an empty
+    // JSON body is the minimal content that satisfies model binding for these no-payload actions.
+    private static StringContent EmptyJson() =>
+        new("{}", Encoding.UTF8, "application/json");
 
     private sealed record CategoryPayload(Guid Id, Guid CompanyId, string Name, bool IsActive);
     private sealed record DocumentPayload(Guid Id, string Title, string Status, int VersionNumber);

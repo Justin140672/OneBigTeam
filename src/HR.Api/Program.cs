@@ -476,6 +476,7 @@ app.UseSicknessRecurringJobs();
 app.UseRecruitmentRecurringJobs();
 app.UseOnboardingRecurringJobs();
 app.UseOffboardingRecurringJobs();
+app.UseDocumentsRecurringJobs();
 app.UseLoggingMiddleware();
 app.UseRouting();
 app.UseAuthentication();

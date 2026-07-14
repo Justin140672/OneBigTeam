@@ -31,6 +31,7 @@ public sealed class TaskReassignmentTests(AppFixture fixture) : E2ETestBase(fixt
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid LauraId = Guid.Parse("30000000-0000-0000-0000-000000000005");
+    private static readonly Guid JamesId = Guid.Parse("30000000-0000-0000-0000-000000000002");
 
     // Laura's seeded task — "Prepare board meeting agenda" (TaskSource.Workflow).
     private static readonly Guid BoardAgendaTaskId = Guid.Parse("a0000000-0000-0000-0000-000000000029");
@@ -44,7 +45,7 @@ public sealed class TaskReassignmentTests(AppFixture fixture) : E2ETestBase(fixt
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);
         var taskView = new TaskViewPage(_page, _fixture.WebBaseUrl);
         var empEdit  = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
-        var dash     = new DashboardPage(_page, _fixture.WebBaseUrl);
+        var profile  = new MyProfilePage(_page, _fixture.WebBaseUrl);
 
         // ── Step 1: Login as Laura (HR Admin) ─────────────────────────────────
         await login.GoToAsync();
@@ -97,19 +98,21 @@ public sealed class TaskReassignmentTests(AppFixture fixture) : E2ETestBase(fixt
             return;
         }
 
-        // ── Step 4: Switch to James and verify the task is in his dashboard ───
+        // ── Step 4: Switch to James and verify the task is in his own task list ───
         await login.SwitchAccountAsync(JamesEmail);
-        await dash.GoToAsync();
+        await profile.GoToAsync(AcmeId, JamesId);
+        await profile.OpenTasksTabAsync();
 
-        var jamesTasks = await dash.GetTaskTitlesAsync();
+        var jamesTasks = await profile.GetTaskTitlesAsync();
         Assert.Contains(jamesTasks, t =>
             t.Contains("board meeting", StringComparison.OrdinalIgnoreCase));
 
-        // ── Step 5: Laura's dashboard should no longer show the task ──────────
+        // ── Step 5: Laura's own task list should no longer show the task ──────
         await login.SwitchAccountAsync(LauraEmail);
-        await dash.GoToAsync();
+        await profile.GoToAsync(AcmeId, LauraId);
+        await profile.OpenTasksTabAsync();
 
-        var lauraTasks = await dash.GetTaskTitlesAsync();
+        var lauraTasks = await profile.GetTaskTitlesAsync();
         Assert.DoesNotContain(lauraTasks, t =>
             t.Contains("board meeting", StringComparison.OrdinalIgnoreCase));
     }

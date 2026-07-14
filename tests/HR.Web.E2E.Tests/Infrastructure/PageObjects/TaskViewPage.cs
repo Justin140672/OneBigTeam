@@ -8,8 +8,9 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// a URL that opens a specific task directly — the dialog must be opened by clicking a task
 /// row somewhere in the UI. GoToAsync uses the employee's own "My Profile" Tasks tab
 /// (TaskList.razor), which renders a stable data-testid per row keyed by task id; other entry
-/// points (dashboard widget, notification bell) are handled by DashboardPage/NotificationPanel,
-/// which open the same dialog and hand control back here for reading its content.
+/// points (dashboard widget, notification bell) are handled by HrDashboardPage/
+/// RecruitmentDashboardPage/ManagerDashboardPage/NotificationPanel, which open the same dialog
+/// and hand control back here for reading its content.
 /// </summary>
 public sealed class TaskViewPage(IPage page, string baseUrl)
 {

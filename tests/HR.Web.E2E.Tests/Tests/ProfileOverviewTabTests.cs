@@ -223,6 +223,37 @@ public sealed class ProfileOverviewTabTests(AppFixture fixture) : E2ETestBase(fi
     }
 
     [Fact]
+    public async Task OverviewTab_ShowsOpenTasksStatCard()
+    {
+        // Tom has no onboarding plan (see EmployeeOnboardingTabTests remarks — only employees
+        // created via the CreateEmployee handler get one, and no seeded employee has one), so
+        // the "Onboarding Progress" card should also be absent for him; the Open Tasks stat
+        // card, however, always renders regardless of onboarding state.
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile  = new MyProfilePage(_page, _fixture.WebBaseUrl);
+        var overview = new OverviewTab(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await profile.GoToAsync(AcmeId, TomId);
+
+        if (!await overview.IsVisibleAsync())
+            await profile.OpenOverviewTabAsync();
+
+        await overview.WaitForLoadAsync();
+
+        var openTasks = await overview.GetStatValueAsync("Open Tasks");
+        Assert.False(string.IsNullOrWhiteSpace(openTasks),
+            "Expected an Open Tasks stat card to be displayed in the overview");
+        Assert.True(int.TryParse(openTasks, out var count) && count >= 0,
+            $"Expected the Open Tasks stat value to be a non-negative integer, got '{openTasks}'");
+
+        Assert.False(await overview.HasOnboardingProgressCardAsync(),
+            "Expected no Onboarding Progress card for Tom, who has no onboarding plan");
+    }
+
+    [Fact]
     public async Task OverviewTab_NotifySicknessButton_OpensSicknessDialog()
     {
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);

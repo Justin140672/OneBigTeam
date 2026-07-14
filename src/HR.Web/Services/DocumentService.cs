@@ -135,6 +135,37 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         catch { return null; }
     }
 
+    public async Task<SharedCompanyDocumentAcknowledgementProgressResponse?> GetSharedCompanyDocumentAcknowledgementProgressAsync(
+        Guid companyId,
+        Guid documentId,
+        Guid? departmentId = null,
+        Guid? locationId = null,
+        bool? isAcknowledged = null,
+        bool? isOverdue = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var query = new List<string>();
+            if (departmentId.HasValue)
+                query.Add($"departmentId={departmentId.Value}");
+            if (locationId.HasValue)
+                query.Add($"locationId={locationId.Value}");
+            if (isAcknowledged.HasValue)
+                query.Add($"isAcknowledged={isAcknowledged.Value}");
+            if (isOverdue.HasValue)
+                query.Add($"isOverdue={isOverdue.Value}");
+
+            var url = $"api/companies/{companyId}/shared-documents/{documentId}/acknowledgement-progress";
+            if (query.Count > 0)
+                url += "?" + string.Join('&', query);
+
+            return await Http.GetFromJsonAsync<SharedCompanyDocumentAcknowledgementProgressResponse>(
+                url, HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch { return null; }
+    }
+
     public async Task<PublishedSharedCompanyDocumentDetailResponse?> GetPublishedSharedCompanyDocumentAsync(
         Guid companyId, Guid documentId, CancellationToken cancellationToken = default)
     {
@@ -279,6 +310,36 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
     }
 
     // Returns null on success, or an error message string on failure.
+    public async Task<string?> ArchiveSharedCompanyDocumentAsync(
+        Guid companyId, Guid documentId, string reason, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var request = new ArchiveSharedCompanyDocumentRequest(companyId, documentId, reason);
+
+            var response = await Http.PostAsJsonAsync(
+                $"api/companies/{companyId}/shared-documents/{documentId}/archive", request, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return null;
+
+            try
+            {
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+                if (body.TryGetProperty("error", out var errorProp))
+                    return errorProp.GetString();
+            }
+            catch { }
+
+            return $"Archive failed ({(int)response.StatusCode}).";
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+    }
+
+    // Returns null on success, or an error message string on failure.
     public async Task<string?> UpdateSharedCompanyDocumentAcknowledgementSettingsAsync(
         Guid companyId,
         Guid documentId,
@@ -314,10 +375,58 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    // Returns null on success, or an error message string on failure.
+    public async Task<string?> UploadSharedCompanyDocumentVersionAsync(
+        Guid companyId,
+        Guid documentId,
+        string versionNote,
+        bool requiresReacknowledgement,
+        IBrowserFile file,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            content.Add(new StringContent(versionNote), "VersionNote");
+            content.Add(new StringContent(requiresReacknowledgement.ToString()), "RequiresReacknowledgement");
+
+            await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+            content.Add(fileContent, "File", file.Name);
+
+            var response = await Http.PostAsync(
+                $"api/companies/{companyId}/shared-documents/{documentId}/versions",
+                content, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return null;
+
+            try
+            {
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+                if (body.TryGetProperty("error", out var errorProp))
+                    return errorProp.GetString();
+            }
+            catch { }
+
+            return $"Upload failed ({(int)response.StatusCode}).";
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+    }
+
     // Relative URL for the download redirect endpoint — bind directly to an <a href> so the
     // browser follows the server-side redirect (and its access check) itself.
     public string GetSharedCompanyDocumentDownloadUrl(Guid companyId, Guid documentId) =>
         $"api/companies/{companyId}/shared-documents/{documentId}/download";
+
+    // Relative URL for the past-version download redirect endpoint — bind directly to an <a href> so the
+    // browser follows the server-side redirect (and its access check) itself.
+    public string GetSharedCompanyDocumentVersionDownloadUrl(Guid companyId, Guid documentId, int versionNumber) =>
+        $"api/companies/{companyId}/shared-documents/{documentId}/versions/{versionNumber}/download";
 
     // Returns null on success, or an error message string on failure.
     public async Task<string?> UploadSharedCompanyDocumentAsync(

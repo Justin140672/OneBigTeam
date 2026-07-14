@@ -53,7 +53,10 @@ public class GetOrganisationChartEndpointTests : IClassFixture<ApiWebApplication
         await CreateEmployeeAsync(
             otherClient, otherCompanyId, "Olivia", "Other", otherDeptId, otherLocId, otherProfileId, otherTypeId, "ORG-OTHER");
 
-        var response = await client.GetAsync($"/api/companies/{companyId}/organisation-chart");
+        // Status is an optional filter on this endpoint (defaults to showing every status) —
+        // ?status=Active mirrors what the Organisation Chart page itself defaults to, and is
+        // needed here so the never-activated Draft employee below is excluded as intended.
+        var response = await client.GetAsync($"/api/companies/{companyId}/organisation-chart?status=Active");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<OrganisationChartPayload>();

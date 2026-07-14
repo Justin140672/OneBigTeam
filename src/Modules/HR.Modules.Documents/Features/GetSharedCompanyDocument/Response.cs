@@ -32,7 +32,10 @@ internal sealed record GetSharedCompanyDocumentResponse(
     string UpdatedByName,
     DateTimeOffset UpdatedAt,
     string? PublishedByName,
-    DateTimeOffset? PublishedAt);
+    DateTimeOffset? PublishedAt,
+    string? ArchivedByName,
+    DateTimeOffset? ArchivedAt,
+    string? ArchiveReason);
 
 internal sealed record AcknowledgementProgressInfo(
     int AcknowledgedCount,
@@ -44,4 +47,8 @@ internal sealed record SharedCompanyDocumentVersionItem(
     string FileName,
     long FileSize,
     string UploadedByName,
-    DateTimeOffset UploadedAt);
+    DateTimeOffset UploadedAt,
+    string? VersionNote,
+    bool RequiresAcknowledgement,
+    DateOnly? EffectiveDate,
+    string PublicationStatus);
