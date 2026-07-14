@@ -53,11 +53,12 @@ internal sealed class SharedCompanyDocumentAcknowledgementReminderJob(
             foreach (var employeeId in outstandingEmployeeIds)
             {
                 // An employee who was never engaged via either notification type for this document's
-                // current version has not yet been given an acknowledgement task — this covers anyone
-                // added to the audience after Publish/UploadSharedCompanyDocumentVersion already ran
-                // their one-time task-creation loop (new hire, audience-rule change, etc). Checking
-                // both types (not just the one about to fire below) avoids creating a second task once
-                // a due-soon reminder recipient later becomes overdue.
+                // current version has not yet been given an acknowledgement task — this is the
+                // reconciliation path: it covers anyone whose department/location/position change (or
+                // an audience-rule edit, or being newly hired) brought them into the audience after
+                // Publish/UploadSharedCompanyDocumentVersion already ran their one-time task-creation
+                // loop. They get their task and first notice on this run, regardless of how far the
+                // due date is — not deferred until the due-soon window below.
                 var alreadyEngaged =
                     await notificationWriter.ExistsAsync(employeeId, document.Id, NotificationType.SharedCompanyDocumentAcknowledgementReminder) ||
                     await notificationWriter.ExistsAsync(employeeId, document.Id, NotificationType.SharedCompanyDocumentAcknowledgementOverdue);
@@ -79,6 +80,12 @@ internal sealed class SharedCompanyDocumentAcknowledgementReminderJob(
                         CancellationToken.None);
                 }
 
+                // Overdue always fires once the due date has passed. The reminder fires immediately
+                // for a never-before-engaged employee (rather than waiting for the window below) —
+                // this both gives prompt notice to anyone newly brought into the audience (department/
+                // location/position change, new hire, or an audience-rule edit) and closes a
+                // duplicate-task hole: without it, "alreadyEngaged" would stay false and a task would
+                // be created again on every subsequent run until the window was finally reached.
                 if (dueDate < today)
                 {
                     await SendIfNotAlreadySentAsync(
@@ -90,7 +97,7 @@ internal sealed class SharedCompanyDocumentAcknowledgementReminderJob(
                         NotificationPriority.High,
                         now);
                 }
-                else if (dueDate <= today.AddDays(ReminderWindowDays))
+                else if (!alreadyEngaged || dueDate <= today.AddDays(ReminderWindowDays))
                 {
                     await SendIfNotAlreadySentAsync(
                         document,

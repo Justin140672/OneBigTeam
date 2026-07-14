@@ -15,6 +15,7 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
     SharedCompanyDocumentAudienceMatcher audienceMatcher,
     ITaskCreator taskCreator,
     INotificationWriter notificationWriter,
+    IAuditEventPublisher auditPublisher,
     IClock clock)
 {
     public async Task<Result<UploadSharedCompanyDocumentVersionResponse>> HandleAsync(
@@ -166,6 +167,10 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
             try { await storage.DeleteAsync(storageKey, cancellationToken); } catch { }
             throw;
         }
+
+        await auditPublisher.PublishAsync(new SharedCompanyDocumentVersionUploadedAuditEvent(
+            document.CompanyId, document.Id, document.Title, safeFileName, file.Length, document.VersionNumber,
+            versionNote, request.RequiresReacknowledgement, uploadedBy, now), cancellationToken);
 
         return Result.Success(new UploadSharedCompanyDocumentVersionResponse(
             document.Id,

@@ -1,8 +1,10 @@
+using System.Text.Json;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.UploadSharedCompanyDocument;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
 using HR.Modules.Documents.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -24,12 +26,14 @@ public class UploadSharedCompanyDocumentHandlerTests
         FakeDocumentStorageService? storage = null,
         FakeVirusScanService? scanner = null,
         FileUploadOptions? options = null,
-        FakeEmployeeAudienceReader? audienceReader = null) =>
+        FakeEmployeeAudienceReader? audienceReader = null,
+        FakeAuditPublisher? auditPublisher = null) =>
         new(db,
             storage ?? new FakeDocumentStorageService(),
             new FileUploadValidator(Options.Create(options ?? new FileUploadOptions())),
             scanner ?? new FakeVirusScanService(),
             new SharedCompanyDocumentAudienceRuleBuilder(audienceReader ?? new FakeEmployeeAudienceReader()),
+            auditPublisher ?? new FakeAuditPublisher(),
             new FakeClock(FixedUtcNow));
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
@@ -570,6 +574,54 @@ public class UploadSharedCompanyDocumentHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_Created_And_FileUploaded_Audit_Events_On_Success()
+    {
+        await using var db = BuildContext();
+        var storage        = new FakeDocumentStorageService();
+        var auditPublisher = new FakeAuditPublisher();
+        var companyId      = Guid.NewGuid();
+        var uploadedBy     = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var handler        = BuildHandler(db, storage, auditPublisher: auditPublisher);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, category.Id),
+            uploadedBy,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, auditPublisher.Published.Count);
+
+        var created = Assert.Single(auditPublisher.Published.OfType<SharedCompanyDocumentCreatedAuditEvent>());
+        Assert.Equal(companyId,               created.CompanyId);
+        Assert.Equal(result.Value!.Id,        created.SharedCompanyDocumentId);
+        Assert.Equal("Remote Working Policy", created.Title);
+        Assert.Equal(category.Id,             created.CategoryId);
+        Assert.Equal(uploadedBy,              created.CreatedBy);
+
+        var fileUploaded = Assert.Single(auditPublisher.Published.OfType<SharedCompanyDocumentFileUploadedAuditEvent>());
+        Assert.Equal(companyId,               fileUploaded.CompanyId);
+        Assert.Equal(result.Value.Id,         fileUploaded.SharedCompanyDocumentId);
+        Assert.Equal("Remote Working Policy", fileUploaded.Title);
+        Assert.Equal("policy.pdf",            fileUploaded.FileName);
+        Assert.Equal(result.Value.FileSize,   fileUploaded.FileSize);
+        Assert.Equal(1,                       fileUploaded.VersionNumber);
+        Assert.Equal(uploadedBy,              fileUploaded.UploadedBy);
+
+        // Safety: the raw storage key (which can be used to derive a signed download URL) must
+        // never appear in any audit event's field values — only FileName, FileSize,
+        // VersionNumber and identifiers are recorded.
+        var storageKey = storage.Uploads[0].StorageKey;
+        Assert.NotEqual(storageKey, created.Title);
+        Assert.NotEqual(storageKey, fileUploaded.FileName);
+        Assert.All(auditPublisher.Published, evt =>
+        {
+            var afterJson = JsonSerializer.Serialize(evt.After);
+            Assert.DoesNotContain(storageKey, afterJson, StringComparison.Ordinal);
+        });
     }
 
     // Subclass used only in the orphan-cleanup test to simulate a DB save failure.

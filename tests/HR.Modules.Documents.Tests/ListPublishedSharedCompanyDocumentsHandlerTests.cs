@@ -210,6 +210,140 @@ public class ListPublishedSharedCompanyDocumentsHandlerTests
         Assert.Equal("A Policy", result.Value.Items[0].Title);
     }
 
+    [Fact]
+    public async Task HandleAsync_Maps_Acknowledgement_Requirement_And_Due_Date_From_Document()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+        var publisher  = Guid.NewGuid();
+        var dueDate    = DateOnly.FromDateTime(Now.AddDays(30).DateTime);
+
+        var doc = CreateDoc(companyId, "Ack Policy", category.Id, "key/p.pdf", "p.pdf", Guid.NewGuid());
+        doc.SetAcknowledgementSettings(true, dueDate, "I confirm that I have read this.", publisher, Now);
+        doc.Publish(publisher, Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new ListPublishedSharedCompanyDocumentsRequest { CompanyId = companyId }, caller,
+            CancellationToken.None);
+
+        var item = Assert.Single(result.Value!.Items);
+        Assert.True(item.RequiresAcknowledgement);
+        Assert.Equal(dueDate, item.AcknowledgementDueDate);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Sets_MyAcknowledgedAt_When_Caller_Acknowledged_Current_Version()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+        var publisher  = Guid.NewGuid();
+
+        var doc = CreateDoc(companyId, "Ack Policy", category.Id, "key/p.pdf", "p.pdf", Guid.NewGuid());
+        doc.Publish(publisher, Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var ackAt = Now.AddHours(1);
+        db.SharedCompanyDocumentAcknowledgements.Add(SharedCompanyDocumentAcknowledgement.Create(
+            Guid.NewGuid(), companyId, doc.Id, caller, doc.VersionNumber, "I confirm that I have read this.",
+            null, ackAt));
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new ListPublishedSharedCompanyDocumentsRequest { CompanyId = companyId }, caller,
+            CancellationToken.None);
+
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal(ackAt, item.MyAcknowledgedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Leaves_MyAcknowledgedAt_Null_When_Caller_Has_Not_Acknowledged()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+        var publisher  = Guid.NewGuid();
+
+        var doc = CreateDoc(companyId, "Ack Policy", category.Id, "key/p.pdf", "p.pdf", Guid.NewGuid());
+        doc.Publish(publisher, Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new ListPublishedSharedCompanyDocumentsRequest { CompanyId = companyId }, caller,
+            CancellationToken.None);
+
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Null(item.MyAcknowledgedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Ignores_Acknowledgement_Of_A_Superseded_Version()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+        var publisher  = Guid.NewGuid();
+
+        var doc = CreateDoc(companyId, "Ack Policy", category.Id, "key/p.pdf", "p.pdf", Guid.NewGuid());
+        doc.Publish(publisher, Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        // Caller acknowledged version 1; the file is then replaced, bumping the document to
+        // version 2 — the stale version-1 acknowledgement must not count towards version 2.
+        var staleVersion = doc.VersionNumber;
+        db.SharedCompanyDocumentAcknowledgements.Add(SharedCompanyDocumentAcknowledgement.Create(
+            Guid.NewGuid(), companyId, doc.Id, caller, staleVersion, "I confirm that I have read this.",
+            null, Now));
+        doc.ReplaceFile("key/p-v2.pdf", "p-v2.pdf", 200, "application/pdf", publisher, Now);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new ListPublishedSharedCompanyDocumentsRequest { CompanyId = companyId }, caller,
+            CancellationToken.None);
+
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Null(item.MyAcknowledgedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Orders_By_PublishedAt_Descending_Before_Title()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+        var yesterday  = Now.AddDays(-1);
+        var today      = Now;
+
+        // Titles are chosen so that alphabetical order disagrees with publish-date order — this
+        // proves PublishedAt is the primary sort key, not merely a tiebreaker for Title.
+        var publishedYesterday = CreateDoc(companyId, "A Policy", category.Id, "key/a.pdf", "a.pdf", Guid.NewGuid());
+        publishedYesterday.Publish(Guid.NewGuid(), yesterday);
+
+        var publishedToday = CreateDoc(companyId, "Z Policy", category.Id, "key/z.pdf", "z.pdf", Guid.NewGuid());
+        publishedToday.Publish(Guid.NewGuid(), today);
+
+        db.SharedCompanyDocuments.AddRange(publishedYesterday, publishedToday);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new ListPublishedSharedCompanyDocumentsRequest { CompanyId = companyId }, caller,
+            CancellationToken.None);
+
+        Assert.Equal(["Z Policy", "A Policy"], result.Value!.Items.Select(i => i.Title));
+    }
+
     private static ListPublishedSharedCompanyDocumentsHandler Handler(
         DocumentsDbContext db, FakeEmployeeAudienceReader? audienceReader = null) =>
         new(db, audienceReader ?? new FakeEmployeeAudienceReader());

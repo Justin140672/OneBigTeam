@@ -230,6 +230,96 @@ internal sealed record SharedCompanyDocumentAudienceUpdatedAuditEvent(
     object? IAuditEvent.Metadata        => null;
 }
 
+internal sealed record SharedCompanyDocumentAcknowledgedAuditEvent(
+    Guid CompanyId,
+    Guid SharedCompanyDocumentId,
+    string Title,
+    int VersionNumber,
+    Guid AcknowledgedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "shared_company_document.acknowledged";
+    string  IAuditEvent.EntityType      => "SharedCompanyDocument";
+    Guid    IAuditEvent.EntityId        => SharedCompanyDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => null;
+    Guid?   IAuditEvent.ActorUserId     => AcknowledgedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => AcknowledgedBy;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Document '{Title}' acknowledged (v{VersionNumber})";
+    object? IAuditEvent.Before          => null;
+    object? IAuditEvent.After           => new { VersionNumber };
+    object? IAuditEvent.Metadata        => null;
+}
+
+internal sealed record SharedCompanyDocumentCreatedAuditEvent(
+    Guid CompanyId,
+    Guid SharedCompanyDocumentId,
+    string Title,
+    Guid CategoryId,
+    Guid CreatedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "shared_company_document.created";
+    string  IAuditEvent.EntityType      => "SharedCompanyDocument";
+    Guid    IAuditEvent.EntityId        => SharedCompanyDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => null;
+    Guid?   IAuditEvent.ActorUserId     => CreatedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => CreatedBy;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Document '{Title}' created";
+    object? IAuditEvent.Before          => null;
+    object? IAuditEvent.After           => new { Title, CategoryId, Status = "Draft" };
+    object? IAuditEvent.Metadata        => null;
+}
+
+internal sealed record SharedCompanyDocumentFileUploadedAuditEvent(
+    Guid CompanyId,
+    Guid SharedCompanyDocumentId,
+    string Title,
+    string FileName,
+    long FileSize,
+    int VersionNumber,
+    Guid UploadedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "shared_company_document.file_uploaded";
+    string  IAuditEvent.EntityType      => "SharedCompanyDocument";
+    Guid    IAuditEvent.EntityId        => SharedCompanyDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => null;
+    Guid?   IAuditEvent.ActorUserId     => UploadedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => UploadedBy;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"File uploaded for document '{Title}'";
+    object? IAuditEvent.Before          => null;
+    object? IAuditEvent.After           => new { FileName, FileSize, VersionNumber };
+    object? IAuditEvent.Metadata        => null;
+}
+
+internal sealed record SharedCompanyDocumentVersionUploadedAuditEvent(
+    Guid CompanyId,
+    Guid SharedCompanyDocumentId,
+    string Title,
+    string FileName,
+    long FileSize,
+    int VersionNumber,
+    string VersionNote,
+    bool RequiresReacknowledgement,
+    Guid UploadedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "shared_company_document.version_uploaded";
+    string  IAuditEvent.EntityType      => "SharedCompanyDocument";
+    Guid    IAuditEvent.EntityId        => SharedCompanyDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => null;
+    Guid?   IAuditEvent.ActorUserId     => UploadedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => UploadedBy;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"New version uploaded for document '{Title}' (v{VersionNumber})";
+    object? IAuditEvent.Before          => null;
+    object? IAuditEvent.After           => new { FileName, FileSize, VersionNumber, VersionNote, RequiresReacknowledgement };
+    object? IAuditEvent.Metadata        => null;
+}
+
 internal sealed record DocumentRequestFulfilledAuditEvent(
     Guid CompanyId,
     Guid DocumentRequestId,

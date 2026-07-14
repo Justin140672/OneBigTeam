@@ -204,6 +204,29 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.NotNull(list!.Items[0].UpdatedByName);
     }
 
+    [Fact]
+    public async Task List_Excludes_Documents_From_Other_Companies()
+    {
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var hrInA     = Guid.NewGuid();
+        var hrInB     = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
+
+        using var clientA = ClientAs(companyA, hrInA);
+        var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
+        await UploadAsync(clientA, companyA, categoryInA, title: "Company A Only Policy");
+
+        // Company B's HR administrator lists documents scoped to company B — company A's
+        // document must not leak into the results even though no filter would otherwise
+        // exclude it by title/category.
+        using var clientB = ClientAs(companyB, hrInB);
+        var list = await clientB.GetFromJsonAsync<ListPayload>($"/api/companies/{companyB}/shared-documents");
+
+        Assert.DoesNotContain(list!.Items, i => i.Title == "Company A Only Policy");
+    }
+
     // ── ListPublishedSharedCompanyDocuments (employee-facing simplified view) ─────
 
     [Fact]
@@ -251,6 +274,27 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task PublishedList_Excludes_Documents_From_Other_Companies()
+    {
+        var companyA    = Guid.NewGuid();
+        var companyB    = Guid.NewGuid();
+        var hrInA       = Guid.NewGuid();
+        var employeeInB = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeInB, SystemRoles.Employee);
+
+        using var clientA = ClientAs(companyA, hrInA);
+        var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
+        var (doc, _) = await UploadAsync(clientA, companyA, categoryInA, title: "Company A Published Policy");
+        await PublishDirectlyAsync(companyA, doc!.Id);
+
+        using var clientB = ClientAs(companyB, employeeInB);
+        var list = await clientB.GetFromJsonAsync<ListPayload>($"/api/companies/{companyB}/shared-documents/published");
+
+        Assert.DoesNotContain(list!.Items, i => i.Title == "Company A Published Policy");
+    }
+
     // ── GetSharedCompanyDocument (HR full detail) ──────────────────────────────
 
     [Fact]
@@ -288,6 +332,26 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         var detail = await response.Content.ReadFromJsonAsync<HrDetailPayload>();
         Assert.Single(detail!.VersionHistory);
         Assert.Equal("All Employees", detail.AudienceDescription);
+    }
+
+    [Fact]
+    public async Task GetDetail_Returns_NotFound_When_Document_Belongs_To_Different_Company()
+    {
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var hrInA     = Guid.NewGuid();
+        var hrInB     = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
+
+        using var clientA = ClientAs(companyA, hrInA);
+        var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
+        var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
+
+        using var clientB = ClientAs(companyB, hrInB);
+        var response = await clientB.GetAsync($"/api/companies/{companyB}/shared-documents/{doc!.Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     // ── GetPublishedSharedCompanyDocument (employee simplified detail) ────────
@@ -340,6 +404,40 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task GetPublishedDetail_Returns_NotFound_When_Document_Belongs_To_Different_Company()
+    {
+        var companyA    = Guid.NewGuid();
+        var companyB    = Guid.NewGuid();
+        var hrInA       = Guid.NewGuid();
+        var employeeInB = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeInB, SystemRoles.Employee);
+
+        using var clientA = ClientAs(companyA, hrInA);
+        var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
+        var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
+        await PublishDirectlyAsync(companyA, doc!.Id);
+
+        using var clientB = ClientAs(companyB, employeeInB);
+        var response = await clientB.GetAsync($"/api/companies/{companyB}/shared-documents/published/{doc.Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetPublishedDetail_Returns_Forbidden_For_CompanyAdministrator_Without_HrAdministrator()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.CompanyAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/shared-documents/published/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     // ── AcknowledgeSharedCompanyDocument ────────────────────────────────────────
 
     [Fact]
@@ -361,6 +459,42 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
             $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", EmptyJson());
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Acknowledge_Returns_Forbidden_For_CompanyAdministrator_Without_HrAdministrator()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.CompanyAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        var response = await client.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/acknowledge", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Acknowledge_Returns_NotFound_When_Document_Belongs_To_Different_Company()
+    {
+        var companyA    = Guid.NewGuid();
+        var companyB    = Guid.NewGuid();
+        var hrInA       = Guid.NewGuid();
+        var employeeInB = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeInB, SystemRoles.Employee);
+
+        using var clientA = ClientAs(companyA, hrInA);
+        var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
+        var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
+        await PublishDirectlyAsync(companyA, doc!.Id, requiresAcknowledgement: true);
+
+        using var clientB = ClientAs(companyB, employeeInB);
+        var response = await clientB.PostAsync(
+            $"/api/companies/{companyB}/shared-documents/{doc.Id}/acknowledge", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     // ── DownloadSharedCompanyDocument ───────────────────────────────────────────
@@ -581,6 +715,28 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task UpdateAudience_Returns_NotFound_When_Document_Belongs_To_Different_Company()
+    {
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var hrInA     = Guid.NewGuid();
+        var hrInB     = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
+
+        using var clientA = ClientAs(companyA, hrInA);
+        var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
+        var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
+
+        using var clientB = ClientAs(companyB, hrInB);
+        var response = await clientB.PutAsJsonAsync(
+            $"/api/companies/{companyB}/shared-documents/{doc!.Id}/audience",
+            new { });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private sealed record AudiencePayload(
         Guid Id, Guid CompanyId,
         IReadOnlyList<Guid> AudienceDepartmentIds, IReadOnlyList<Guid> AudienceLocationIds,
@@ -684,6 +840,27 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Publish_Returns_NotFound_When_Document_Belongs_To_Different_Company()
+    {
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var hrInA     = Guid.NewGuid();
+        var hrInB     = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
+
+        using var clientA = ClientAs(companyA, hrInA);
+        var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
+        var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
+
+        using var clientB = ClientAs(companyB, hrInB);
+        var response = await clientB.PostAsync(
+            $"/api/companies/{companyB}/shared-documents/{doc!.Id}/publish", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     // ── UpdateSharedCompanyDocumentAcknowledgementSettings ──────────────────────
 
     [Fact]
@@ -747,6 +924,28 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/acknowledgement-settings",
+            new { RequiresAcknowledgement = false });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateAcknowledgementSettings_Returns_NotFound_When_Document_Belongs_To_Different_Company()
+    {
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var hrInA     = Guid.NewGuid();
+        var hrInB     = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
+
+        using var clientA = ClientAs(companyA, hrInA);
+        var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
+        var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
+
+        using var clientB = ClientAs(companyB, hrInB);
+        var response = await clientB.PutAsJsonAsync(
+            $"/api/companies/{companyB}/shared-documents/{doc!.Id}/acknowledgement-settings",
             new { RequiresAcknowledgement = false });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -865,6 +1064,28 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task AcknowledgementProgress_Returns_NotFound_When_Document_Belongs_To_Different_Company()
+    {
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var hrInA     = Guid.NewGuid();
+        var hrInB     = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
+
+        using var clientA = ClientAs(companyA, hrInA);
+        var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
+        var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
+        await PublishDirectlyAsync(companyA, doc!.Id, requiresAcknowledgement: true);
+
+        using var clientB = ClientAs(companyB, hrInB);
+        var response = await clientB.GetAsync(
+            $"/api/companies/{companyB}/shared-documents/{doc.Id}/acknowledgement-progress");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private sealed record AcknowledgementProgressPayload(
         Guid DocumentId, string DocumentTitle, int TotalAssigned, int AcknowledgedCount,
         int OutstandingCount, int OverdueCount, decimal AcknowledgementPercentage,
@@ -926,6 +1147,27 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/versions", BuildVersionUpload());
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadVersion_Returns_NotFound_When_Document_Belongs_To_Different_Company()
+    {
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var hrInA     = Guid.NewGuid();
+        var hrInB     = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
+
+        using var clientA = ClientAs(companyA, hrInA);
+        var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
+        var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
+
+        using var clientB = ClientAs(companyB, hrInB);
+        var response = await clientB.PostAsync(
+            $"/api/companies/{companyB}/shared-documents/{doc!.Id}/versions", BuildVersionUpload());
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -995,6 +1237,27 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/versions/99/download");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DownloadVersion_Returns_NotFound_When_Document_Belongs_To_Different_Company()
+    {
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var hrInA     = Guid.NewGuid();
+        var hrInB     = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
+
+        using var clientA = ClientAs(companyA, hrInA);
+        var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
+        var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
+
+        using var clientB = ClientAs(companyB, hrInB, allowAutoRedirect: false);
+        var response = await clientB.GetAsync(
+            $"/api/companies/{companyB}/shared-documents/{doc!.Id}/versions/1/download");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -1101,6 +1364,28 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/archive",
             new { Reason = "Reason" });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Archive_Returns_NotFound_When_Document_Belongs_To_Different_Company()
+    {
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var hrInA     = Guid.NewGuid();
+        var hrInB     = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
+
+        using var clientA = ClientAs(companyA, hrInA);
+        var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
+        var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
+
+        using var clientB = ClientAs(companyB, hrInB);
+        var response = await clientB.PostAsJsonAsync(
+            $"/api/companies/{companyB}/shared-documents/{doc!.Id}/archive",
+            new { Reason = "No longer needed" });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }

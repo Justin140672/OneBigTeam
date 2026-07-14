@@ -123,7 +123,11 @@ public sealed record PublishedSharedCompanyDocumentItem(
     string Title,
     string? Description,
     string CategoryName,
-    DateOnly? EffectiveDate);
+    DateOnly? EffectiveDate,
+    bool RequiresAcknowledgement,
+    DateOnly? AcknowledgementDueDate,
+    DateTimeOffset? MyAcknowledgedAt,
+    DateTimeOffset? PublishedAt);
 
 // --- Shared Company Document detail (HR full view) ---
 

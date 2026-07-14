@@ -5,7 +5,12 @@ var isE2ETesting = string.Equals(
 	"true",
 	StringComparison.OrdinalIgnoreCase);
 
-var postgres = builder.AddPostgres("postgres");
+// Pinned to the standard Postgres port rather than Aspire's dynamic port allocation — on this
+// machine, Windows/Hyper-V reserves large chunks of the ephemeral port range (see
+// `netsh interface ipv4 show excludedportrange protocol=tcp`), and Aspire's dynamic picker
+// occasionally lands in one of those excluded ranges, causing "Unable to allocate a network
+// port for service 'postgres'" and leaving the whole app without a working DB connection.
+var postgres = builder.AddPostgres("postgres").WithHostPort(5432);
 var hrDatabase = postgres.AddDatabase("hr");
 
 var api = isE2ETesting

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.UploadSharedCompanyDocumentVersion;
@@ -28,7 +29,8 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
         FakeEmployeeAudienceReader? audienceReader = null,
         FakeTaskCreator? taskCreator = null,
         FakeNotificationWriter? notificationWriter = null,
-        FileUploadOptions? options = null) =>
+        FileUploadOptions? options = null,
+        FakeAuditPublisher? auditPublisher = null) =>
         new(db,
             storage ?? new FakeDocumentStorageService(),
             new FileUploadValidator(Options.Create(options ?? new FileUploadOptions())),
@@ -36,6 +38,7 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
             new SharedCompanyDocumentAudienceMatcher(db, audienceReader ?? new FakeEmployeeAudienceReader()),
             taskCreator ?? new FakeTaskCreator(),
             notificationWriter ?? new FakeNotificationWriter(),
+            auditPublisher ?? new FakeAuditPublisher(),
             new FakeClock(FixedUtcNow));
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
@@ -445,6 +448,52 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
         Assert.Single(storage.Uploads);
         Assert.Single(storage.Deletions);
         Assert.Equal(storage.Uploads[0].StorageKey, storage.Deletions[0]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_VersionUploaded_Audit_Event_On_Success()
+    {
+        await using var db = BuildContext();
+        var companyId       = Guid.NewGuid();
+        var category        = await SeedCategory(db, companyId);
+        var doc              = await SeedDocument(db, companyId, category.Id);
+        var uploadedBy       = Guid.NewGuid();
+        var storage          = new FakeDocumentStorageService();
+        var auditPublisher   = new FakeAuditPublisher();
+        var handler          = BuildHandler(db, storage: storage, auditPublisher: auditPublisher);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(
+                companyId, doc.Id,
+                file: FakePdfFile("policy-v2.pdf"),
+                versionNote: "Updated section 3",
+                requiresReacknowledgement: true),
+            uploadedBy,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var published = Assert.Single(auditPublisher.Published.OfType<SharedCompanyDocumentVersionUploadedAuditEvent>());
+        Assert.Equal(companyId,               published.CompanyId);
+        Assert.Equal(doc.Id,                  published.SharedCompanyDocumentId);
+        Assert.Equal("Remote Working Policy", published.Title);
+        Assert.Equal("policy-v2.pdf",         published.FileName);
+        Assert.Equal(result.Value!.FileSize,  published.FileSize);
+        Assert.Equal(2,                       published.VersionNumber);
+        Assert.Equal("Updated section 3",     published.VersionNote);
+        Assert.True(published.RequiresReacknowledgement);
+        Assert.Equal(uploadedBy,              published.UploadedBy);
+
+        // Safety: the raw storage key must never appear in any published audit event's field
+        // values — only FileName, FileSize, VersionNumber, VersionNote and identifiers are
+        // recorded, never the storage key or a signed download URL.
+        var storageKey = storage.Uploads[0].StorageKey;
+        Assert.NotEqual(storageKey, published.FileName);
+        Assert.All(auditPublisher.Published, evt =>
+        {
+            var afterJson = JsonSerializer.Serialize(evt.After);
+            Assert.DoesNotContain(storageKey, afterJson, StringComparison.Ordinal);
+        });
     }
 
     // Subclass used only in the orphan-cleanup test to simulate a DB save failure.

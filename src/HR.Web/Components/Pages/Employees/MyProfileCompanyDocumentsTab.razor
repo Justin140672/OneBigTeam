@@ -11,34 +11,88 @@ else if (_documents.Count == 0)
 }
 else
 {
-    <div class="row g-3">
-        @foreach (var doc in _documents)
-        {
-            var d = doc;
-            <div class="col-md-6">
-                <div class="overview-card" style="cursor:pointer" @onclick="() => OpenDocument(d.Id)">
-                    <div class="overview-card-header">
-                        <i class="fa-solid fa-file-lines overview-card-icon"></i>
-                        <span class="overview-card-title">@d.Title</span>
-                    </div>
-                    <dl class="overview-dl">
-                        <dt>Category</dt>
-                        <dd>@d.CategoryName</dd>
-                        @if (d.EffectiveDate.HasValue)
-                        {
-                            <dt>Effective Date</dt>
-                            <dd>@d.EffectiveDate.Value.ToString("d MMMM yyyy")</dd>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(d.Description))
-                        {
-                            <dt>Description</dt>
-                            <dd>@d.Description</dd>
-                        }
-                    </dl>
-                </div>
+    <div class="row g-3 mb-4">
+        <div class="col-md-2 col-sm-4 col-6">
+            <div class="overview-card text-center py-3">
+                <div class="fs-4 fw-semibold">@_documents.Count</div>
+                <div class="text-muted small">Total Available</div>
             </div>
-        }
+        </div>
+        <div class="col-md-2 col-sm-4 col-6">
+            <div class="overview-card text-center py-3">
+                <div class="fs-4 fw-semibold">@_requiresAcknowledgementCount</div>
+                <div class="text-muted small">Requires Acknowledgement</div>
+            </div>
+        </div>
+        <div class="col-md-2 col-sm-4 col-6">
+            <div class="overview-card text-center py-3">
+                <div class="fs-4 fw-semibold text-warning">@_outstandingCount</div>
+                <div class="text-muted small">Outstanding</div>
+            </div>
+        </div>
+        <div class="col-md-2 col-sm-4 col-6">
+            <div class="overview-card text-center py-3">
+                <div class="fs-4 fw-semibold text-success">@_completedCount</div>
+                <div class="text-muted small">Completed</div>
+            </div>
+        </div>
     </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-3">
+            <label class="form-label">Status</label>
+            <SfDropDownList TValue="string" TItem="string"
+                            DataSource="@_statusOptions"
+                            @bind-Value="_statusFilter"
+                            Placeholder="All" />
+        </div>
+    </div>
+
+    @if (_filteredDocuments.Count == 0)
+    {
+        <p class="text-muted">No documents match the current filter.</p>
+    }
+    else
+    {
+        <div class="row g-3">
+            @foreach (var doc in _filteredDocuments)
+            {
+                var d = doc;
+                <div class="col-md-6">
+                    <div class="overview-card" style="cursor:pointer" @onclick="() => OpenDocument(d.Id)">
+                        <div class="overview-card-header">
+                            <i class="fa-solid fa-file-lines overview-card-icon"></i>
+                            <span class="overview-card-title">@d.Title</span>
+                            @if (IsNew(d))
+                            {
+                                <span class="badge bg-info ms-2">New</span>
+                            }
+                        </div>
+                        @if (d.RequiresAcknowledgement)
+                        {
+                            <div class="mb-2">
+                                <span class="badge @AcknowledgementBadgeClass(d)">@AcknowledgementBadgeText(d)</span>
+                            </div>
+                        }
+                        <dl class="overview-dl">
+                            <dt>Category</dt>
+                            <dd>@d.CategoryName</dd>
+                            @if (d.EffectiveDate.HasValue)
+                            {
+                                <dt>Effective Date</dt>
+                                <dd>@d.EffectiveDate.Value.ToString("d MMMM yyyy")</dd>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(d.Description))
+                            {
+                                <dt>Description</dt>
+                                <dd>@d.Description</dd>
+                            }
+                        </dl>
+                    </div>
+                </div>
+            }
+        </div>
+    }
 }
 
 @code {
@@ -47,10 +101,63 @@ else
     private List<PublishedSharedCompanyDocumentItem> _documents = [];
     private bool _loading = true;
 
+    private readonly List<string> _statusOptions = ["All", "Requires Action", "Completed"];
+    private string _statusFilter = "All";
+
+    private int _requiresAcknowledgementCount;
+    private int _outstandingCount;
+    private int _completedCount;
+
+    private List<PublishedSharedCompanyDocumentItem> _filteredDocuments => _statusFilter switch
+    {
+        "Requires Action" => _documents.Where(IsOutstanding).ToList(),
+        "Completed" => _documents.Where(IsCompleted).ToList(),
+        _ => _documents,
+    };
+
     protected override async Task OnInitializedAsync()
     {
         _documents = (await DocumentService.ListPublishedSharedCompanyDocumentsAsync(CompanyId))?.Items.ToList() ?? [];
+
+        _requiresAcknowledgementCount = _documents.Count(d => d.RequiresAcknowledgement);
+        _outstandingCount = _documents.Count(IsOutstanding);
+        _completedCount = _documents.Count(IsCompleted);
+
         _loading = false;
+    }
+
+    private static bool IsOutstanding(PublishedSharedCompanyDocumentItem d) =>
+        d.RequiresAcknowledgement && d.MyAcknowledgedAt is null;
+
+    private static bool IsCompleted(PublishedSharedCompanyDocumentItem d) =>
+        d.RequiresAcknowledgement && d.MyAcknowledgedAt is not null;
+
+    private static bool IsNew(PublishedSharedCompanyDocumentItem d) =>
+        d.PublishedAt.HasValue && DateTimeOffset.UtcNow - d.PublishedAt.Value <= TimeSpan.FromDays(14);
+
+    private static string AcknowledgementBadgeClass(PublishedSharedCompanyDocumentItem d)
+    {
+        if (!IsOutstanding(d))
+        {
+            return "bg-success";
+        }
+
+        var isOverdue = d.AcknowledgementDueDate.HasValue &&
+            d.AcknowledgementDueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow);
+        return isOverdue ? "bg-danger" : "bg-warning text-dark";
+    }
+
+    private static string AcknowledgementBadgeText(PublishedSharedCompanyDocumentItem d)
+    {
+        if (IsOutstanding(d))
+        {
+            var due = d.AcknowledgementDueDate.HasValue
+                ? $" · Due {d.AcknowledgementDueDate.Value.ToString("d MMMM yyyy")}"
+                : string.Empty;
+            return $"Acknowledgement Required{due}";
+        }
+
+        return $"Acknowledged {d.MyAcknowledgedAt!.Value.ToString("d MMM yyyy")}";
     }
 
     private void OpenDocument(Guid documentId) =>

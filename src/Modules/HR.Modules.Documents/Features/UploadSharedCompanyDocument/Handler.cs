@@ -13,6 +13,7 @@ internal sealed class UploadSharedCompanyDocumentHandler(
     IFileUploadValidator fileValidator,
     IVirusScanService virusScanner,
     SharedCompanyDocumentAudienceRuleBuilder audienceRuleBuilder,
+    IAuditEventPublisher auditPublisher,
     IClock clock)
 {
     public async Task<Result<UploadSharedCompanyDocumentResponse>> HandleAsync(
@@ -149,6 +150,12 @@ internal sealed class UploadSharedCompanyDocumentHandler(
             try { await storage.DeleteAsync(storageKey, cancellationToken); } catch { }
             throw;
         }
+
+        await auditPublisher.PublishAsync(new SharedCompanyDocumentCreatedAuditEvent(
+            document.CompanyId, document.Id, document.Title, document.CategoryId, uploadedBy, now), cancellationToken);
+
+        await auditPublisher.PublishAsync(new SharedCompanyDocumentFileUploadedAuditEvent(
+            document.CompanyId, document.Id, document.Title, safeFileName, file.Length, document.VersionNumber, uploadedBy, now), cancellationToken);
 
         return Result.Success(new UploadSharedCompanyDocumentResponse(
             document.Id,

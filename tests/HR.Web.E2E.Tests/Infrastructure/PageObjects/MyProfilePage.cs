@@ -97,6 +97,84 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".card", new() { Timeout = 15_000 });
     }
 
+    // ── Company Documents tab (MyProfileCompanyDocumentsTab — published shared company
+    // documents visible to the employee; distinct from the personal "Documents" tab above) ──
+
+    public async Task OpenCompanyDocumentsTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Company Documents" }).ClickAsync();
+        await page.WaitForSelectorAsync(".overview-card, .spinner-border, p.text-muted",
+            new() { Timeout = 15_000 });
+        // Wait for the spinner to disappear before asserting tile/card content (same pattern as
+        // OpenAssetsTabAsync — the async document fetch runs after the initial render).
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border')",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// Reads the number on one of the four summary tiles at the top of the Company Documents tab
+    /// ("Total Available", "Requires Acknowledgement", "Outstanding", "Completed"). Call
+    /// <see cref="OpenCompanyDocumentsTabAsync"/> first. Returns -1 if the tile's value can't be
+    /// parsed as an integer.
+    /// </summary>
+    public async Task<int> GetCompanyDocumentsSummaryTileValueAsync(string label)
+    {
+        var tile = page.Locator(".overview-card.text-center").Filter(new() { HasText = label }).First;
+        var text = (await tile.Locator(".fs-4").InnerTextAsync()).Trim();
+        return int.TryParse(text, out var value) ? value : -1;
+    }
+
+    /// <summary>
+    /// Selects an option ("All" / "Requires Action" / "Completed") in the Company Documents tab's
+    /// status filter (a Syncfusion SfDropDownList — same combobox-click-then-list-item-click
+    /// interaction used throughout this suite, e.g. FillLeaveRequestAsync below).
+    /// </summary>
+    public async Task SetCompanyDocumentsStatusFilterAsync(string option)
+    {
+        var combobox = page.Locator(".col-md-3").Filter(new() { HasText = "Status" })
+            .Locator("span[role='combobox']").First;
+        await combobox.ClickAsync();
+
+        var item = page.Locator(".e-popup.e-ddl .e-list-item").Filter(new() { HasText = option }).First;
+        await item.WaitForAsync(new() { Timeout = 10_000 });
+        await item.ClickAsync();
+
+        // Wait for the popup to close before returning — a later action elsewhere on the page
+        // could otherwise get blocked by the still-present overlay.
+        await page.WaitForSelectorAsync(".e-popup.e-ddl", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    /// <summary>
+    /// Returns true if a document card with the given title is currently shown on the Company
+    /// Documents tab (i.e. it matches the active status filter). Call
+    /// <see cref="OpenCompanyDocumentsTabAsync"/> first.
+    /// </summary>
+    public async Task<bool> HasCompanyDocumentCardAsync(string title) =>
+        await page.Locator(".overview-card").Filter(new() { HasText = title }).CountAsync() > 0;
+
+    /// <summary>
+    /// The acknowledgement-status badge text (e.g. "Acknowledgement Required · Due 28 July 2026"
+    /// or "Acknowledged 14 Jul 2026") shown on the document card with the given title, or null if
+    /// that card currently has no such badge (not shown on screen, or the document requires no
+    /// acknowledgement). Distinguishes this badge from the separate "New" badge on the same card.
+    /// </summary>
+    public async Task<string?> GetCompanyDocumentAcknowledgementBadgeTextAsync(string title)
+    {
+        var card = page.Locator(".overview-card").Filter(new() { HasText = title }).First;
+        var badge = card.Locator(".badge").Filter(new() { HasText = "Acknowledg" });
+        if (await badge.CountAsync() == 0) return null;
+        return (await badge.First.InnerTextAsync()).Trim();
+    }
+
+    /// <summary>
+    /// Clicks the document card with the given title on the Company Documents tab, triggering its
+    /// navigation to the published-document detail page. Call
+    /// <see cref="OpenCompanyDocumentsTabAsync"/> first.
+    /// </summary>
+    public Task ClickCompanyDocumentCardAsync(string title) =>
+        page.Locator(".overview-card").Filter(new() { HasText = title }).First.ClickAsync();
+
     public async Task OpenTasksTabAsync()
     {
         await page.GetByRole(AriaRole.Tab, new() { Name = "Tasks" }).ClickAsync();

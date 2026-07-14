@@ -108,8 +108,40 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_Does_Not_Send_DueSoon_Reminder_When_Due_Date_Is_Outside_The_Window()
+    public async Task ExecuteAsync_Creates_Task_And_Sends_Immediate_Reminder_For_NeverEngaged_Employee_Even_Outside_The_Window()
     {
+        // A never-engaged, eligible-and-outstanding employee gets their task and first notice on
+        // this run regardless of how far the due date is — this is the reconciliation behaviour:
+        // it's what lets an employee who is newly brought into the audience (department/location/
+        // position change, new hire, or an audience-rule edit) get assigned promptly rather than
+        // waiting until the due-soon window. The due-soon *window* still governs re-engagement
+        // nagging for employees who were already engaged earlier — see the "does not duplicate"
+        // and "already engaged" tests below.
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var category   = await SeedCategoryAsync(db, companyId);
+        var doc        = await SeedDocumentAsync(db, companyId, category.Id, Today.AddDays(10));
+
+        var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [employeeId] };
+        var writer = new FakeNotificationWriter();
+        var taskCreator = new FakeTaskCreator();
+
+        await BuildJob(db, audienceReader, writer, taskCreator).ExecuteAsync();
+
+        Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == employeeId);
+        var reminder = Assert.Single(writer.Written,
+            n => n.Type == NotificationType.SharedCompanyDocumentAcknowledgementReminder);
+        Assert.Equal(doc.Id, reminder.SourceEntityId);
+        Assert.Equal(NotificationPriority.Normal, reminder.Priority);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Does_Not_Recreate_A_Task_On_A_Later_Run_For_An_Employee_Already_Engaged_Outside_The_Window()
+    {
+        // Regression guard for the duplicate-task hole: once a never-engaged employee outside the
+        // window has been handled by one run, a second run (still outside the window) must not
+        // create a second task or send a second reminder.
         await using var db = BuildContext();
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -118,9 +150,86 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
 
         var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [employeeId] };
         var writer = new FakeNotificationWriter();
+        var taskCreator = new FakeTaskCreator();
+        var job = BuildJob(db, audienceReader, writer, taskCreator);
 
-        await BuildJob(db, audienceReader, writer).ExecuteAsync();
+        await job.ExecuteAsync();
+        await job.ExecuteAsync();
 
+        Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == employeeId);
+        Assert.Single(writer.Written, n => n.Type == NotificationType.SharedCompanyDocumentAcknowledgementReminder);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Assigns_Task_To_An_Employee_Who_Enters_The_Audience_Between_Runs()
+    {
+        // Simulates an employee whose department/location/position change brings them into the
+        // audience after an earlier run already processed everyone else — the reconciliation job
+        // picks them up on the very next run, without needing to re-touch anyone already handled.
+        await using var db = BuildContext();
+        var companyId       = Guid.NewGuid();
+        var existingEmployee = Guid.NewGuid();
+        var movedEmployee    = Guid.NewGuid();
+        var category         = await SeedCategoryAsync(db, companyId);
+        var doc               = await SeedDocumentAsync(db, companyId, category.Id, Today.AddDays(10));
+
+        var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [existingEmployee] };
+        var writer = new FakeNotificationWriter();
+        var taskCreator = new FakeTaskCreator();
+        var job = BuildJob(db, audienceReader, writer, taskCreator);
+
+        await job.ExecuteAsync();
+
+        Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == existingEmployee);
+        Assert.DoesNotContain(taskCreator.Created, t => t.AssignedEmployeeId == movedEmployee);
+
+        // The employee's department change lands — they now match the audience.
+        audienceReader.EligibleEmployeeIds = [existingEmployee, movedEmployee];
+
+        await job.ExecuteAsync();
+
+        Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == movedEmployee);
+        var newHireTask = taskCreator.Created.Single(t => t.AssignedEmployeeId == movedEmployee);
+        Assert.Equal(doc.Id, newHireTask.SourceEntityId);
+        // The existing employee is untouched by the second run — still exactly one task for them.
+        Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == existingEmployee);
+
+        await job.ExecuteAsync();
+
+        // A third run doesn't duplicate anything for either employee.
+        Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == existingEmployee);
+        Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == movedEmployee);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Does_Not_Delete_A_Completed_Acknowledgement_For_An_Employee_Who_Has_Since_Left_The_Audience()
+    {
+        // "Employees leaving the audience lose normal access, but completed acknowledgement
+        // history is never deleted" — the job has no delete/remove statement anywhere, so this is
+        // really just confirming that guarantee explicitly for the case that matters here: an
+        // employee acknowledges, then a department/location/position change takes them out of the
+        // audience, and a later run must leave their historical acknowledgement row untouched.
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var category   = await SeedCategoryAsync(db, companyId);
+        var doc        = await SeedDocumentAsync(db, companyId, category.Id, Today.AddDays(10));
+
+        db.SharedCompanyDocumentAcknowledgements.Add(
+            SharedCompanyDocumentAcknowledgement.Create(
+                Guid.NewGuid(), companyId, doc.Id, employeeId, doc.VersionNumber, "Statement", null, Now));
+        await db.SaveChangesAsync();
+
+        var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [] };
+        var writer = new FakeNotificationWriter();
+        var taskCreator = new FakeTaskCreator();
+
+        await BuildJob(db, audienceReader, writer, taskCreator).ExecuteAsync();
+
+        var acknowledgement = await db.SharedCompanyDocumentAcknowledgements
+            .SingleAsync(a => a.SharedCompanyDocumentId == doc.Id && a.EmployeeId == employeeId);
+        Assert.Equal(doc.VersionNumber, acknowledgement.VersionNumber);
+        Assert.Empty(taskCreator.Created);
         Assert.Empty(writer.Written);
     }
 

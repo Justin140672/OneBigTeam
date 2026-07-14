@@ -5,11 +5,11 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// <summary>
 /// Page object for the shared company document detail page
 /// (/companies/{companyId}/shared-documents/{documentId}), scoped to the Version History grid,
-/// the Publish flow, and the Archive flow. Its "Publication Status" / "Effective Date" /
-/// "Download" columns, and the "Upload New Version" flow
-/// (UploadSharedCompanyDocumentVersionDialog.razor) that adds rows to it, are covered here too.
-/// Metadata and audience/acknowledgement-edit affordances on this page have their own coverage
-/// elsewhere and are intentionally not exposed here.
+/// the Publish flow, the Archive flow, the Acknowledgement card's "Edit" flow (used by
+/// CompanyDocumentsTabTests to set up documents with acknowledgement requirements before
+/// publishing), the Audience card's summary/edit-dialog affordances, and navigation to the
+/// acknowledgement-progress screen. Metadata-edit affordances have their own coverage elsewhere
+/// and are intentionally not exposed here.
 /// </summary>
 public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 {
@@ -23,10 +23,34 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     private ILocator PublishDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Publish Document" });
     private ILocator ArchiveDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Archive Document" });
 
+    // Scoped to the "Acknowledgement" overview-card so its "Edit" button doesn't collide with the
+    // page header's metadata "Edit" button or the "Audience" card's own "Edit" button.
+    private ILocator AcknowledgementCard => page.Locator(".overview-card").Filter(new() { HasText = "Acknowledgement" }).First;
+    private ILocator EditAcknowledgementDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Edit Acknowledgement Settings" });
+
+    // Scoped to the "Audience" overview-card so its "Edit" button doesn't collide with the page
+    // header's metadata "Edit" button or the "Acknowledgement" card's own "Edit" button.
+    private ILocator AudienceCard => page.Locator(".overview-card").Filter(new() { HasText = "Audience" }).First;
+
     public async Task GoToAsync(Guid companyId, Guid documentId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/shared-documents/{documentId}");
         await page.WaitForSelectorAsync(".e-grid, .alert-danger", new() { Timeout = 20_000 });
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// Navigates to the acknowledgement-progress screen
+    /// (SharedDocumentAcknowledgementProgress.razor), reached from this page via the
+    /// "Acknowledgement" overview-card's "View Progress" link (only rendered when the document
+    /// requires acknowledgement).
+    /// </summary>
+    public async Task GoToAcknowledgementProgressAsync(Guid companyId, Guid documentId)
+    {
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/shared-documents/{documentId}/acknowledgement-progress");
+        await page.WaitForSelectorAsync(".overview-card, .alert-danger", new() { Timeout = 20_000 });
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
@@ -56,6 +80,48 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
     }
+
+    /// <summary>
+    /// Drives the "Acknowledgement" card's "Edit" button and
+    /// EditSharedCompanyDocumentAcknowledgementDialog.razor to turn on "Requires employee
+    /// acknowledgement" with the given due date, then waits for the page to reload its detail
+    /// data. A due date is required — PublishSharedCompanyDocumentHandler rejects publishing a
+    /// document that requires acknowledgement but has no due date set, so callers needing
+    /// RequiresAcknowledgement=true must call this before <see cref="PublishAsync"/>.
+    /// </summary>
+    public async Task RequireAcknowledgementAsync(DateOnly dueDate)
+    {
+        await AcknowledgementCard.GetByRole(AriaRole.Button, new() { Name = "Edit" }).ClickAsync();
+        await EditAcknowledgementDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
+        var checkboxWrapper = EditAcknowledgementDialog.Locator(".e-checkbox-wrapper")
+            .Filter(new() { HasText = "Requires employee acknowledgement" });
+        await checkboxWrapper.Locator("label").ClickAsync();
+
+        var dateInput = EditAcknowledgementDialog.Locator(".e-date-wrapper input.e-input");
+        await dateInput.ClickAsync();
+        await dateInput.FillAsync(dueDate.ToString("dd/MM/yyyy"));
+        await page.Keyboard.PressAsync("Tab");
+
+        await EditAcknowledgementDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await EditAcknowledgementDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
+    /// <summary>Opens the Publish confirmation dialog via the header "Publish" button, without confirming or cancelling it.</summary>
+    public async Task OpenPublishDialogAsync()
+    {
+        await PublishHeaderButton.ClickAsync();
+        await PublishDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+    }
+
+    public Task<bool> IsPublishDialogOpenAsync() => PublishDialog.IsVisibleAsync();
+
+    public Task ClickPublishCancelAsync() =>
+        PublishDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
 
     /// <summary>Opens the Archive confirmation dialog via the header "Archive" button.</summary>
     public async Task OpenArchiveDialogAsync()
@@ -111,6 +177,18 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
     }
+
+    /// <summary>Opens the Audience-edit dialog (EditSharedCompanyDocumentAudienceDialog.razor) via the "Audience" overview-card's "Edit" button.</summary>
+    public async Task OpenEditAudienceDialogAsync()
+    {
+        await AudienceCard.GetByRole(AriaRole.Button, new() { Name = "Edit" }).ClickAsync();
+        await page.GetByRole(AriaRole.Dialog, new() { Name = "Edit Document Audience" })
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+    }
+
+    /// <summary>Text of the "Audience" overview-card's summary line (e.g. "All Employees" or "Departments: Engineering").</summary>
+    public async Task<string> GetAudienceSummaryAsync() =>
+        (await page.Locator("dt:has-text('Audience') + dd").InnerTextAsync()).Trim();
 
     /// <summary>The "Created by / Last updated by / Published by / Archived by" summary line at the bottom of the page.</summary>
     public async Task<string> GetFooterSummaryTextAsync() =>

@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
@@ -9,6 +10,7 @@ namespace HR.Modules.Documents.Features.AcknowledgeSharedCompanyDocument;
 internal sealed class AcknowledgeSharedCompanyDocumentHandler(
     DocumentsDbContext db,
     SharedCompanyDocumentAudienceMatcher audienceMatcher,
+    IAuditEventPublisher auditPublisher,
     IClock clock)
 {
     public async Task<Result<AcknowledgeSharedCompanyDocumentResponse>> HandleAsync(
@@ -69,6 +71,14 @@ internal sealed class AcknowledgeSharedCompanyDocumentHandler(
 
         db.SharedCompanyDocumentAcknowledgements.Add(acknowledgement);
         await db.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new SharedCompanyDocumentAcknowledgedAuditEvent(
+            document.CompanyId,
+            document.Id,
+            document.Title,
+            document.VersionNumber,
+            callerEmployeeId,
+            now), cancellationToken);
 
         return Result.Success(new AcknowledgeSharedCompanyDocumentResponse(
             document.Id, document.VersionNumber, acknowledgement.AcknowledgedAt));

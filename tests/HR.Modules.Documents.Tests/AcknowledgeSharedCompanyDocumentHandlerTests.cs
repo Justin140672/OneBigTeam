@@ -40,6 +40,58 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Publishes_An_Acknowledged_Audit_Event_For_A_New_Acknowledgement()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+        var auditPublisher = new FakeAuditPublisher();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        await Handler(db, auditPublisher: auditPublisher).HandleAsync(
+            new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id }, caller,
+            CancellationToken.None);
+
+        var published = Assert.Single(auditPublisher.Published.OfType<SharedCompanyDocumentAcknowledgedAuditEvent>());
+        Assert.Equal(1, published.VersionNumber);
+        Assert.Equal(caller, published.AcknowledgedBy);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_A_Second_Audit_Event_When_Acknowledging_Idempotently()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+        var auditPublisher = new FakeAuditPublisher();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var handler = Handler(db, auditPublisher: auditPublisher);
+        await handler.HandleAsync(
+            new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id }, caller,
+            CancellationToken.None);
+        await handler.HandleAsync(
+            new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id }, caller,
+            CancellationToken.None);
+
+        Assert.Single(auditPublisher.Published.OfType<SharedCompanyDocumentAcknowledgedAuditEvent>());
+    }
+
+    [Fact]
     public async Task HandleAsync_Is_Idempotent_For_The_Same_Version()
     {
         await using var db = BuildContext();
@@ -311,8 +363,9 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
     }
 
     private static AcknowledgeSharedCompanyDocumentHandler Handler(
-        DocumentsDbContext db, FakeEmployeeAudienceReader? audienceReader = null) =>
-        new(db, new SharedCompanyDocumentAudienceMatcher(db, audienceReader ?? new FakeEmployeeAudienceReader()), new FakeClock(FixedUtcNow));
+        DocumentsDbContext db, FakeEmployeeAudienceReader? audienceReader = null, FakeAuditPublisher? auditPublisher = null) =>
+        new(db, new SharedCompanyDocumentAudienceMatcher(db, audienceReader ?? new FakeEmployeeAudienceReader()),
+            auditPublisher ?? new FakeAuditPublisher(), new FakeClock(FixedUtcNow));
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

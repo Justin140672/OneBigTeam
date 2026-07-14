@@ -227,4 +227,26 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
         await Dialog.GetByRole(AriaRole.Button, new() { Name = "Done" }).ClickAsync();
         await WaitForCompletedAsync();
     }
+
+    // ── Shared document acknowledgement panel ────────────────────────────────
+    // Unlike the other panels above, this one never completes the task inline — its button
+    // navigates away to SharedCompanyDocumentAcknowledgement.razor (see
+    // SharedCompanyDocumentAcknowledgementPage), where the employee actually checks the
+    // confirmation checkbox and confirms. Once acknowledged, the panel itself just shows an
+    // "Acknowledged on …" alert instead of the button.
+
+    /// <summary>Returns true if the shared document acknowledgement panel is present and visible.</summary>
+    public async Task<bool> HasSharedDocumentAcknowledgementPanelAsync() =>
+        await Dialog.Locator("[data-testid='shared-document-acknowledgement-panel']").IsVisibleAsync();
+
+    /// <summary>
+    /// Clicks "View & Acknowledge Document" and waits for the browser to navigate away to the
+    /// document's acknowledgement page — this panel does not complete the task itself, so
+    /// callers must drive the rest of the flow via SharedCompanyDocumentAcknowledgementPage.
+    /// </summary>
+    public async Task ClickViewAndAcknowledgeDocumentAsync()
+    {
+        await Dialog.Locator("[data-testid='view-document-btn']").ClickAsync();
+        await page.WaitForURLAsync(url => url.Contains("/shared-documents/published/"), new() { Timeout = 15_000 });
+    }
 }

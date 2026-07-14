@@ -32,7 +32,8 @@ internal sealed class ListPublishedSharedCompanyDocumentsHandler(
 
         var documents = publishedDocuments
             .Where(d => SharedCompanyDocumentAudienceMatcher.IsInAudience(rulesByDocument[d.Id], myProfile, callerEmployeeId))
-            .OrderBy(d => d.Title)
+            .OrderByDescending(d => d.PublishedAt)
+            .ThenBy(d => d.Title)
             .ToList();
 
         var categoryIds = documents.Select(d => d.CategoryId).ToHashSet();
@@ -43,13 +44,30 @@ internal sealed class ListPublishedSharedCompanyDocumentsHandler(
                 .ToDictionaryAsync(c => c.Id, c => c.Name, cancellationToken)
             : new Dictionary<Guid, string>();
 
+        var myAcknowledgements = await db.SharedCompanyDocumentAcknowledgements
+            .AsNoTracking()
+            .Where(a => a.EmployeeId == callerEmployeeId && documentIds.Contains(a.SharedCompanyDocumentId))
+            .ToListAsync(cancellationToken);
+
+        // Only an acknowledgement of the document's CURRENT version counts — an acknowledgement
+        // of a superseded version must not surface as "acknowledged" for the current one.
+        var currentVersionByDocument = documents.ToDictionary(d => d.Id, d => d.VersionNumber);
+        var myAcknowledgedAtByDocument = myAcknowledgements
+            .Where(a => currentVersionByDocument.TryGetValue(a.SharedCompanyDocumentId, out var currentVersion)
+                        && a.VersionNumber == currentVersion)
+            .ToDictionary(a => a.SharedCompanyDocumentId, a => (DateTimeOffset?)a.AcknowledgedAt);
+
         var items = documents
             .Select(d => new PublishedSharedCompanyDocumentItem(
                 d.Id,
                 d.Title,
                 d.Description,
                 categoryNames.TryGetValue(d.CategoryId, out var name) ? name : "Unknown",
-                d.EffectiveDate))
+                d.EffectiveDate,
+                d.RequiresAcknowledgement,
+                d.AcknowledgementDueDate,
+                myAcknowledgedAtByDocument.TryGetValue(d.Id, out var ackAt) ? ackAt : null,
+                d.PublishedAt))
             .ToList();
 
         return Result.Success(new ListPublishedSharedCompanyDocumentsResponse(items));
