@@ -221,4 +221,5 @@ public sealed record RecentLeaveRequestItem(
     DateOnly StartDate,
     DateOnly EndDate,
     decimal TotalDays,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    Guid? TaskId = null);

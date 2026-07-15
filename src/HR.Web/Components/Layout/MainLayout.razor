@@ -45,6 +45,18 @@ else
                             CssClass="app-nav-menu"
                             ShowItemOnClick="true">
                         <MenuItems>
+                            @if (Session.IsHrAdministrator)
+                            {
+                                <MenuItem Text="Dashboard" IconCss="fa-solid fa-house" Url="/dashboard/hr" />
+                            }
+                            @if (Session.IsManager)
+                            {
+                                <MenuItem Text="Manager Dashboard" IconCss="fa-solid fa-gauge" Url="/dashboard/manager" />
+                            }
+                            @if (Session.IsRecruiter)
+                            {
+                                <MenuItem Text="Recruitment Dashboard" IconCss="fa-solid fa-chart-line" Url="/dashboard/recruitment" />
+                            }
                             @if (Session.CanManageEmployees)
                             {
                                 <MenuItem Text="People" IconCss="fa-solid fa-users">
@@ -80,12 +92,8 @@ else
                             }
                             @if (Session.IsRecruiter)
                             {
-                                <MenuItem Text="Recruitment" IconCss="fa-solid fa-user-tie">
-                                    <MenuItems>
-                                        <MenuItem Text="Vacancies" Url="@_menuItems["Vacancies"]" />
-                                        <MenuItem Text="Candidates" Url="@_menuItems["Candidates"]" />
-                                    </MenuItems>
-                                </MenuItem>
+                                <MenuItem Text="Vacancies" Url="@_menuItems["Vacancies"]" IconCss="fa-solid fa-briefcase" />
+                                <MenuItem Text="Candidates" Url="@_menuItems["Candidates"]" IconCss="fa-solid fa-user-tie" />
                             }
                             @if (Session.CanManageCompany)
                             {
@@ -226,6 +234,7 @@ else
                                     <h5 class="mb-1">Something went wrong</h5>
                                     <p class="mb-2">An unexpected error occurred. You can try refreshing the page or navigating away.</p>
                                     <a href="." class="btn btn-sm btn-outline-danger me-2">Refresh</a>
+                                    @ex
                                     <button class="btn btn-sm btn-outline-secondary" @onclick="ClearError">Try again</button>
                                 </div>
                             </div>

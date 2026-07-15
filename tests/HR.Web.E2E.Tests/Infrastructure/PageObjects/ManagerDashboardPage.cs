@@ -70,6 +70,19 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
         return names;
     }
 
+    /// <summary>
+    /// Clicks the Leave Requests widget row whose employee name contains
+    /// <paramref name="nameFragment"/> (LeaveRequestsWidget.razor's NavigateToRequest). If the
+    /// request still has an open leave-approval task, this opens TaskViewDialog in place (use
+    /// TaskViewPage to interact with it); otherwise it navigates away to that employee's profile
+    /// Leave tab. Callers should assert on whichever outcome they expect.
+    /// </summary>
+    public async Task ClickLeaveRequestItemAsync(string nameFragment) =>
+        await LeaveRequestsWidget.Locator(".task-widget-item")
+            .Filter(new() { HasText = nameFragment })
+            .First
+            .ClickAsync();
+
     // ── My Team Widget ────────────────────────────────────────────────────────
 
     private ILocator MyTeamWidget =>
@@ -84,6 +97,23 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
         foreach (var t in titles)
             names.Add((await t.TextContentAsync())?.Trim() ?? "");
         return names;
+    }
+
+    /// <summary>
+    /// Returns the visible phone/email contact text (MyTeamWidget.razor's
+    /// ".team-widget-contact-text" spans) for the team-member row whose name contains
+    /// <paramref name="nameFragment"/> — proves the phone number/email are rendered as visible
+    /// text next to their icons, not just present in a hidden "title" tooltip attribute.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetTeamMemberContactTextAsync(string nameFragment)
+    {
+        var row = MyTeamWidget.Locator(".task-widget-item").Filter(new() { HasText = nameFragment }).First;
+        var spans = await row.Locator(".team-widget-contact-text").AllAsync();
+
+        var values = new List<string>();
+        foreach (var s in spans)
+            values.Add((await s.TextContentAsync())?.Trim() ?? "");
+        return values;
     }
 
     // ── Upcoming Probation Reviews Widget ─────────────────────────────────────

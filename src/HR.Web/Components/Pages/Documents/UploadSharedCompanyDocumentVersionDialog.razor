@@ -58,6 +58,7 @@
 
     protected override Task OnOpenedAsync()
     {
+        GlobalError = null;
         _selectedFile = null;
         return Task.CompletedTask;
     }

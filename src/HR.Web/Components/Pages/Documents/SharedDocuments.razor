@@ -16,7 +16,7 @@
     <div class="row g-3 mb-3">
         <div class="col-md-3">
             <label class="form-label">Search</label>
-            <HrTextBox Value="_search" ValueChanged="OnSearchChangedAsync" Placeholder="Search by title…" />
+            <HrTextBox Value="@_search" ValueChanged="OnSearchChangedAsync" Placeholder="Search by title…" />
         </div>
         <div class="col-md-2">
             <label class="form-label">Status</label>
@@ -38,13 +38,13 @@
             </SfDropDownList>
         </div>
         <div class="col-md-2">
-            <label class="form-label">Review Date From</label>
+            <label class="form-label">Next Review Date From</label>
             <SfDatePicker TValue="DateOnly?" @bind-Value="_reviewDateFrom"
                           ValueChange="@(async () => await LoadDocumentsAsync())"
                           Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" ShowClearButton="true" />
         </div>
         <div class="col-md-2">
-            <label class="form-label">Review Date To</label>
+            <label class="form-label">Next Review Date To</label>
             <SfDatePicker TValue="DateOnly?" @bind-Value="_reviewDateTo"
                           ValueChange="@(async () => await LoadDocumentsAsync())"
                           Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" ShowClearButton="true" />
@@ -80,7 +80,7 @@
                 <GridColumn Field="@nameof(SharedCompanyDocumentListItem.VersionNumber)" HeaderText="Version" Width="90" />
                 <GridColumn Field="@nameof(SharedCompanyDocumentListItem.Status)" HeaderText="Status" Width="100" />
                 <GridColumn Field="@nameof(SharedCompanyDocumentListItem.EffectiveDate)" HeaderText="Effective Date" Width="130" Format="d" />
-                <GridColumn Field="@nameof(SharedCompanyDocumentListItem.ReviewDate)" HeaderText="Review Date" Width="130" Format="d" />
+                <GridColumn Field="@nameof(SharedCompanyDocumentListItem.ReviewDate)" HeaderText="Next Review Date" Width="150" Format="d" />
                 <GridColumn Field="@nameof(SharedCompanyDocumentListItem.UpdatedAt)" HeaderText="Last Updated" Width="150" Format="g" />
                 <GridColumn Field="@nameof(SharedCompanyDocumentListItem.UpdatedByName)" HeaderText="Updated By" Width="150" />
             </GridColumns>

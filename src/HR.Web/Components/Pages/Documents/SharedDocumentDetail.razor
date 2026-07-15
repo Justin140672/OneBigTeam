@@ -82,7 +82,7 @@
                         }
                         @if (_detail.ReviewDate.HasValue)
                         {
-                            <dt>Review Date</dt>
+                            <dt>Next Review Date</dt>
                             <dd>@_detail.ReviewDate.Value.ToString("d MMMM yyyy")</dd>
                         }
                         @if (!string.IsNullOrWhiteSpace(_detail.ReviewFrequency) && _detail.ReviewFrequency != "None")

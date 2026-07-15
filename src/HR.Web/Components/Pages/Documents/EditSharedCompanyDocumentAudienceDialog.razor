@@ -20,54 +20,63 @@
             </p>
             <EditForm EditContext="EditContext">
                 <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Departments</label>
-                        <SfMultiSelect TValue="List<Guid>"
-                                       TItem="DepartmentListItemModel"
-                                       DataSource="@_departments"
-                                       @bind-Value="Model.AudienceDepartmentIds"
-                                       Placeholder="Any department"
-                                       Mode="VisualMode.CheckBox"
-                                       AllowFiltering="true">
-                            <DropDownListFieldSettings Value="Id" Text="Name" />
-                        </SfMultiSelect>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Locations</label>
-                        <SfMultiSelect TValue="List<Guid>"
-                                       TItem="LocationListItemModel"
-                                       DataSource="@_locations"
-                                       @bind-Value="Model.AudienceLocationIds"
-                                       Placeholder="Any location"
-                                       Mode="VisualMode.CheckBox"
-                                       AllowFiltering="true">
-                            <DropDownListFieldSettings Value="Id" Text="Name" />
-                        </SfMultiSelect>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Positions</label>
-                        <SfMultiSelect TValue="List<Guid>"
-                                       TItem="PositionProfileListItemModel"
-                                       DataSource="@_positionProfiles"
-                                       @bind-Value="Model.AudiencePositionProfileIds"
-                                       Placeholder="Any position"
-                                       Mode="VisualMode.CheckBox"
-                                       AllowFiltering="true">
-                            <DropDownListFieldSettings Value="Id" Text="Title" />
-                        </SfMultiSelect>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Selected Employees</label>
-                        <SfMultiSelect TValue="List<Guid>"
-                                       TItem="EmployeeOption"
-                                       DataSource="@_employees"
-                                       @bind-Value="Model.AudienceEmployeeIds"
-                                       Placeholder="No individually selected employees"
-                                       Mode="VisualMode.CheckBox"
-                                       AllowFiltering="true">
-                            <DropDownListFieldSettings Value="Id" Text="Name" />
-                        </SfMultiSelect>
-                    </div>
+                    @if (_audienceDataLoaded)
+                    {
+                        <div class="col-md-6">
+                            <label class="form-label">Departments</label>
+                            <SfMultiSelect TValue="List<Guid>"
+                                           TItem="DepartmentListItemModel"
+                                           DataSource="@_departments"
+                                           @bind-Value="Model.AudienceDepartmentIds"
+                                           Placeholder="Any department"
+                                           Mode="VisualMode.CheckBox"
+                                           AllowFiltering="true">
+                                <MultiSelectFieldSettings Value="Id" Text="Name" />
+                            </SfMultiSelect>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Locations</label>
+                            <SfMultiSelect TValue="List<Guid>"
+                                           TItem="LocationListItemModel"
+                                           DataSource="@_locations"
+                                           @bind-Value="Model.AudienceLocationIds"
+                                           Placeholder="Any location"
+                                           Mode="VisualMode.CheckBox"
+                                           AllowFiltering="true">
+                                <MultiSelectFieldSettings Value="Id" Text="Name" />
+                            </SfMultiSelect>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Positions</label>
+                            <SfMultiSelect TValue="List<Guid>"
+                                           TItem="PositionProfileListItemModel"
+                                           DataSource="@_positionProfiles"
+                                           @bind-Value="Model.AudiencePositionProfileIds"
+                                           Placeholder="Any position"
+                                           Mode="VisualMode.CheckBox"
+                                           AllowFiltering="true">
+                                <MultiSelectFieldSettings Value="Id" Text="Title" />
+                            </SfMultiSelect>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Selected Employees</label>
+                            <SfMultiSelect TValue="List<Guid>"
+                                           TItem="EmployeeOption"
+                                           DataSource="@_employees"
+                                           @bind-Value="Model.AudienceEmployeeIds"
+                                           Placeholder="No individually selected employees"
+                                           Mode="VisualMode.CheckBox"
+                                           AllowFiltering="true">
+                                <MultiSelectFieldSettings Value="Id" Text="Name" />
+                            </SfMultiSelect>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="col-12">
+                            <HrLoadingIndicator Label="Loading audience options…" />
+                        </div>
+                    }
                 </div>
             </EditForm>
         </Content>
@@ -91,8 +100,17 @@
     private List<PositionProfileListItemModel> _positionProfiles = [];
     private List<EmployeeOption> _employees = [];
 
+    // The SfMultiSelect audience fields aren't mounted until their DataSource is already
+    // populated — Syncfusion's SfMultiSelect (unlike SfDropDownList) can hit a JS interop
+    // "tracked object disposed" error if its DataSource is reassigned from an empty list to a
+    // populated one shortly after its first render, which is exactly what happens if these are
+    // rendered immediately and then backed by the lists this method loads.
+    private bool _audienceDataLoaded;
+
     protected override async Task OnOpenedAsync()
     {
+        GlobalError = null;
+        _audienceDataLoaded = false;
         _departments      = (await DepartmentService.ListDepartmentsAsync(CompanyId))?.Items ?? [];
         _locations        = (await LocationService.ListLocationsAsync(CompanyId))?.Items ?? [];
         _positionProfiles = (await PositionProfileService.ListPositionProfilesAsync(CompanyId))?.Items.ToList() ?? [];
@@ -106,6 +124,8 @@
             Model.AudiencePositionProfileIds = Document.AudiencePositionProfileIds.ToList();
             Model.AudienceEmployeeIds = Document.AudienceEmployeeIds.ToList();
         }
+
+        _audienceDataLoaded = true;
     }
 
     protected override async Task<string?> SaveCoreAsync()

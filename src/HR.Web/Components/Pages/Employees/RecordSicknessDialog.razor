@@ -104,6 +104,8 @@
 
     protected override async Task OnOpenedAsync()
     {
+        GlobalError = null;
+
         if (_categories.Count == 0)
         {
             var result = await SicknessCategoryService.ListSicknessCategoriesAsync(CompanyId);

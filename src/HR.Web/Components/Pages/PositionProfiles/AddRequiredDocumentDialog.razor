@@ -58,6 +58,7 @@
 
     protected override async Task OnOpenedAsync()
     {
+        GlobalError = null;
         _documentTypes = (await DocumentService.ListDocumentTypesAsync(CompanyId))?.Items.ToList() ?? [];
     }
 

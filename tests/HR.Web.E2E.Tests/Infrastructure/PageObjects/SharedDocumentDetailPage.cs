@@ -90,7 +90,9 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// to set the Review Frequency (and, when selecting "Custom", the custom months value), then
     /// waits for the page to reload its detail data. <paramref name="frequencyLabel"/> is the
     /// dropdown's display label ("None", "Monthly", "Quarterly", "Six Monthly", "Yearly", "Custom"),
-    /// not the underlying enum member name (e.g. "Six Monthly" not "SixMonthly").
+    /// not the underlying enum member name (e.g. "Six Monthly" not "SixMonthly"). Whenever
+    /// <paramref name="frequencyLabel"/> isn't "None", a Next Review Date is also filled in — the
+    /// dialog requires one whenever the frequency isn't "None", otherwise Save is a no-op client-side.
     /// </summary>
     public async Task SetReviewFrequencyAsync(string frequencyLabel, int? customMonths = null)
     {
@@ -106,6 +108,16 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             .Filter(new() { HasText = frequencyLabel })
             .First
             .ClickAsync();
+
+        if (frequencyLabel != "None")
+        {
+            var reviewDateInput = EditMetadataDialog.Locator(".col-md-6")
+                .Filter(new() { HasText = "Next Review Date" })
+                .Locator(".e-date-wrapper input.e-input");
+            await reviewDateInput.ClickAsync();
+            await reviewDateInput.FillAsync(DateOnly.FromDateTime(DateTime.Today.AddYears(1)).ToString("dd/MM/yyyy"));
+            await page.Keyboard.PressAsync("Tab");
+        }
 
         if (customMonths.HasValue)
         {

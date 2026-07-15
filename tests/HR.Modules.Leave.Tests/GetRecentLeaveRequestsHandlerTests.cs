@@ -14,10 +14,13 @@ public class GetRecentLeaveRequestsHandlerTests
     public async Task HandleAsync_Returns_Empty_When_No_Requests_Exist()
     {
         await using var context = BuildContext();
-        var handler = new GetRecentLeaveRequestsHandler(context, new FakeEmployeeNameReader());
+        var handler = new GetRecentLeaveRequestsHandler(
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
 
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(Guid.NewGuid(), null),
+            Guid.NewGuid(),
+            isHrAdministrator: true,
             CancellationToken.None);
 
         Assert.Empty(result.Items);
@@ -37,9 +40,12 @@ public class GetRecentLeaveRequestsHandlerTests
         context.LeaveRequests.AddRange(middle, earliest, latest);
         await context.SaveChangesAsync();
 
-        var handler = new GetRecentLeaveRequestsHandler(context, new FakeEmployeeNameReader());
+        var handler = new GetRecentLeaveRequestsHandler(
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
+            Guid.NewGuid(),
+            isHrAdministrator: true,
             CancellationToken.None);
 
         Assert.Equal(
@@ -61,9 +67,12 @@ public class GetRecentLeaveRequestsHandlerTests
         }
         await context.SaveChangesAsync();
 
-        var handler = new GetRecentLeaveRequestsHandler(context, new FakeEmployeeNameReader());
+        var handler = new GetRecentLeaveRequestsHandler(
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
+            Guid.NewGuid(),
+            isHrAdministrator: true,
             CancellationToken.None);
 
         Assert.Equal(10, result.Items.Count);
@@ -86,9 +95,12 @@ public class GetRecentLeaveRequestsHandlerTests
         }
         await context.SaveChangesAsync();
 
-        var handler = new GetRecentLeaveRequestsHandler(context, new FakeEmployeeNameReader());
+        var handler = new GetRecentLeaveRequestsHandler(
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, 3),
+            Guid.NewGuid(),
+            isHrAdministrator: true,
             CancellationToken.None);
 
         Assert.Equal(3, result.Items.Count);
@@ -106,10 +118,13 @@ public class GetRecentLeaveRequestsHandlerTests
         await context.SaveChangesAsync();
 
         var names = new Dictionary<Guid, string> { [employeeId] = "Jane Doe" };
-        var handler = new GetRecentLeaveRequestsHandler(context, new FakeEmployeeNameReader(names));
+        var handler = new GetRecentLeaveRequestsHandler(
+            context, new FakeEmployeeNameReader(names), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
 
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
+            Guid.NewGuid(),
+            isHrAdministrator: true,
             CancellationToken.None);
 
         var item = Assert.Single(result.Items);
@@ -128,9 +143,12 @@ public class GetRecentLeaveRequestsHandlerTests
         context.LeaveRequests.Add(CreateRequest(companyId, employeeId, leaveType.Id, Now));
         await context.SaveChangesAsync();
 
-        var handler = new GetRecentLeaveRequestsHandler(context, new FakeEmployeeNameReader());
+        var handler = new GetRecentLeaveRequestsHandler(
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
+            Guid.NewGuid(),
+            isHrAdministrator: true,
             CancellationToken.None);
 
         var item = Assert.Single(result.Items);
@@ -151,12 +169,178 @@ public class GetRecentLeaveRequestsHandlerTests
         context.LeaveRequests.Add(CreateRequest(otherCompanyId, employeeId, otherLeaveType.Id, Now));
         await context.SaveChangesAsync();
 
-        var handler = new GetRecentLeaveRequestsHandler(context, new FakeEmployeeNameReader());
+        var handler = new GetRecentLeaveRequestsHandler(
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
+            Guid.NewGuid(),
+            isHrAdministrator: true,
             CancellationToken.None);
 
         Assert.Single(result.Items);
+    }
+
+    // ── HR-admin vs. manager scoping ──────────────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_NonHrViewer_Sees_Only_Direct_Reports_Requests()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var viewerId = Guid.NewGuid();
+        var directReportId = Guid.NewGuid();
+        var otherEmployeeId = Guid.NewGuid();
+        var leaveType = SeedLeaveType(context, companyId);
+
+        var reportRequest = CreateRequest(companyId, directReportId, leaveType.Id, Now);
+        var otherRequest = CreateRequest(companyId, otherEmployeeId, leaveType.Id, Now);
+        context.LeaveRequests.AddRange(reportRequest, otherRequest);
+        await context.SaveChangesAsync();
+
+        var handler = new GetRecentLeaveRequestsHandler(
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(directReportId), new FakeOpenTaskBySourceEntityReader());
+
+        var result = await handler.HandleAsync(
+            new GetRecentLeaveRequestsRequest(companyId, null),
+            viewerId,
+            isHrAdministrator: false,
+            CancellationToken.None);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(reportRequest.Id, item.LeaveRequestId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NonHrViewer_With_No_Direct_Reports_Gets_Empty_List()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var viewerId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var leaveType = SeedLeaveType(context, companyId);
+
+        context.LeaveRequests.Add(CreateRequest(companyId, employeeId, leaveType.Id, Now));
+        await context.SaveChangesAsync();
+
+        var handler = new GetRecentLeaveRequestsHandler(
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
+
+        var result = await handler.HandleAsync(
+            new GetRecentLeaveRequestsRequest(companyId, null),
+            viewerId,
+            isHrAdministrator: false,
+            CancellationToken.None);
+
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NonHrViewer_Only_Sees_Pending_Requests()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var viewerId = Guid.NewGuid();
+        var directReportId = Guid.NewGuid();
+        var leaveType = SeedLeaveType(context, companyId);
+
+        var pending = CreateRequest(companyId, directReportId, leaveType.Id, Now);
+        var approved = CreateRequest(companyId, directReportId, leaveType.Id, Now.AddDays(-1));
+        approved.Approve(Guid.NewGuid(), Now);
+        context.LeaveRequests.AddRange(pending, approved);
+        await context.SaveChangesAsync();
+
+        var handler = new GetRecentLeaveRequestsHandler(
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(directReportId), new FakeOpenTaskBySourceEntityReader());
+
+        var result = await handler.HandleAsync(
+            new GetRecentLeaveRequestsRequest(companyId, null),
+            viewerId,
+            isHrAdministrator: false,
+            CancellationToken.None);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(pending.Id, item.LeaveRequestId);
+        Assert.Equal("Pending", item.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_HrAdministrator_Sees_All_Requests_Regardless_Of_Status_Or_Manager()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var viewerId = Guid.NewGuid();
+        var unrelatedEmployeeId = Guid.NewGuid();
+        var leaveType = SeedLeaveType(context, companyId);
+
+        var pending = CreateRequest(companyId, unrelatedEmployeeId, leaveType.Id, Now);
+        var approved = CreateRequest(companyId, unrelatedEmployeeId, leaveType.Id, Now.AddDays(-1));
+        approved.Approve(Guid.NewGuid(), Now);
+        context.LeaveRequests.AddRange(pending, approved);
+        await context.SaveChangesAsync();
+
+        // Viewer has no direct reports at all — HR admins must still see everything.
+        var handler = new GetRecentLeaveRequestsHandler(
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
+
+        var result = await handler.HandleAsync(
+            new GetRecentLeaveRequestsRequest(companyId, null),
+            viewerId,
+            isHrAdministrator: true,
+            CancellationToken.None);
+
+        Assert.Equal(2, result.Items.Count);
+    }
+
+    // ── TaskId ─────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_TaskId_Is_Null_When_No_Open_Task_Exists()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var leaveType = SeedLeaveType(context, companyId);
+        var request = CreateRequest(companyId, employeeId, leaveType.Id, Now);
+        context.LeaveRequests.Add(request);
+        await context.SaveChangesAsync();
+
+        var handler = new GetRecentLeaveRequestsHandler(
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
+
+        var result = await handler.HandleAsync(
+            new GetRecentLeaveRequestsRequest(companyId, null),
+            Guid.NewGuid(),
+            isHrAdministrator: true,
+            CancellationToken.None);
+
+        var item = Assert.Single(result.Items);
+        Assert.Null(item.TaskId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_TaskId_Is_Populated_When_Open_Task_Exists()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var leaveType = SeedLeaveType(context, companyId);
+        var request = CreateRequest(companyId, employeeId, leaveType.Id, Now);
+        context.LeaveRequests.Add(request);
+        await context.SaveChangesAsync();
+
+        var taskId = Guid.NewGuid();
+        var openTaskReader = new FakeOpenTaskBySourceEntityReader(new Dictionary<Guid, Guid> { [request.Id] = taskId });
+        var handler = new GetRecentLeaveRequestsHandler(
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), openTaskReader);
+
+        var result = await handler.HandleAsync(
+            new GetRecentLeaveRequestsRequest(companyId, null),
+            Guid.NewGuid(),
+            isHrAdministrator: true,
+            CancellationToken.None);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(taskId, item.TaskId);
     }
 
     private static LeaveType SeedLeaveType(LeaveDbContext context, Guid companyId)

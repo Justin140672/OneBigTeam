@@ -71,6 +71,12 @@
         return success ? null : error;
     }
 
+    protected override Task OnOpenedAsync()
+    {
+        GlobalError = null;
+        return Task.CompletedTask;
+    }
+
     protected override void ResetForm()
     {
         Model.EndDate = null;

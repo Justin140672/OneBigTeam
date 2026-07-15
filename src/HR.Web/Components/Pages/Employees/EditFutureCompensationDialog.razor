@@ -74,6 +74,8 @@
 
     protected override Task OnOpenedAsync()
     {
+        GlobalError = null;
+
         if (Record is not null)
         {
             Model.SalaryType = Record.SalaryType;

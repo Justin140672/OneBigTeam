@@ -61,6 +61,7 @@
 
     protected override async Task OnOpenedAsync()
     {
+        GlobalError = null;
         _allTemplates = (await OnboardingTemplateService.ListOnboardingTemplatesAsync(CompanyId))?.Items.ToList() ?? [];
         _availableTemplates = ExistingTemplateIds is null
             ? _allTemplates

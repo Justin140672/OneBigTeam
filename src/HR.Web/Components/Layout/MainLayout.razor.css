@@ -357,12 +357,13 @@
     color: var(--hr-gray-400);
 }
 
-/* SfMenu — transparent background inside sidebar */
+/* SfMenu — transparent background inside sidebar, with a little breathing room below the header */
 ::deep .app-nav-menu.e-menu-wrapper,
 ::deep .app-nav-menu.e-menu-container {
     background: transparent;
     border: none;
     box-shadow: none;
+    margin-top: 10px;
 }
 
 

@@ -97,6 +97,12 @@
         return created is not null ? null : error ?? "Failed to create compensation record.";
     }
 
+    protected override Task OnOpenedAsync()
+    {
+        GlobalError = null;
+        return Task.CompletedTask;
+    }
+
     protected override void ResetForm()
     {
         Model.EffectiveFrom = null;

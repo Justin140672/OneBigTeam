@@ -111,11 +111,69 @@ public sealed class SharedDocumentReviewFrequencyTests(AppFixture fixture) : E2E
         }
     }
 
+    [Fact]
+    public async Task UploadDocument_WithReviewFrequency_AndNoReviewDate_ShowsValidationError_AndKeepsDialogOpen()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(HrEmail);
+
+        var title    = $"Test Policy {Guid.NewGuid():N}";
+        var tempFile = Path.Combine(Path.GetTempPath(), $"shared-doc-{Guid.NewGuid():N}.pdf");
+        try
+        {
+            await _page.GotoAsync(_fixture.WebBaseUrl + $"/companies/{AcmeId}/shared-documents");
+            await _page.WaitForSelectorAsync("h1:has-text('Shared Documents')", new() { Timeout = 15_000 });
+
+            await _page.GetByRole(AriaRole.Button, new() { Name = "Upload Document" }).ClickAsync();
+
+            var dialog = _page.GetByRole(AriaRole.Dialog, new() { Name = "Upload Document" });
+            await dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
+            await dialog.GetByPlaceholder("Document title").FillAsync(title);
+
+            await dialog.Locator("span[role='combobox']").First.ClickAsync();
+            await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+            await _page.Locator(".e-popup.e-ddl .e-list-item")
+                .Filter(new() { HasText = "Policy" })
+                .First
+                .ClickAsync();
+
+            // Selects a Review Frequency without filling in a Next Review Date.
+            await dialog.Locator("span[role='combobox']").Nth(1).ClickAsync();
+            await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+            await _page.Locator(".e-popup.e-ddl .e-list-item")
+                .Filter(new() { HasText = "Monthly" })
+                .First
+                .ClickAsync();
+
+            await File.WriteAllBytesAsync(tempFile, BuildTestPdf());
+            await dialog.Locator("input[type='file']").SetInputFilesAsync(tempFile);
+
+            await dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
+
+            await dialog.Locator(".alert-danger")
+                .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+            var error = (await dialog.Locator(".alert-danger").InnerTextAsync()).Trim();
+            Assert.Contains("next review date", error, StringComparison.OrdinalIgnoreCase);
+
+            // The dialog stays open — no submission was made.
+            Assert.True(await dialog.IsVisibleAsync());
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+    }
+
     // Uploads a shared document from the Shared Documents list page (same flow as
     // SharedDocumentUploadTests / SharedDocumentArchiveTests), optionally selecting a Review
     // Frequency before submitting. Category is the first combobox in the dialog, Review Frequency
     // the second — same click-open/wait-for-popup/click-item interaction pattern used throughout
-    // this test suite for Syncfusion dropdowns.
+    // this test suite for Syncfusion dropdowns. Whenever reviewFrequencyLabel isn't null (and thus
+    // isn't "None"), a Next Review Date is also filled in — the dialog requires one whenever the
+    // frequency isn't "None", otherwise Upload is a no-op client-side.
     private async Task UploadDocumentAsync(
         string title, string filePath, string? reviewFrequencyLabel = null, int? customMonths = null)
     {
@@ -144,6 +202,13 @@ public sealed class SharedDocumentReviewFrequencyTests(AppFixture fixture) : E2E
                 .Filter(new() { HasText = reviewFrequencyLabel })
                 .First
                 .ClickAsync();
+
+            var reviewDateInput = dialog.Locator(".col-md-6")
+                .Filter(new() { HasText = "Next Review Date" })
+                .Locator(".e-date-wrapper input.e-input");
+            await reviewDateInput.ClickAsync();
+            await reviewDateInput.FillAsync(DateOnly.FromDateTime(DateTime.Today.AddYears(1)).ToString("dd/MM/yyyy"));
+            await _page.Keyboard.PressAsync("Tab");
 
             if (customMonths.HasValue)
             {

@@ -81,6 +81,19 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
         return names;
     }
 
+    /// <summary>
+    /// Clicks the Leave Requests widget row whose employee name contains
+    /// <paramref name="nameFragment"/> (LeaveRequestsWidget.razor's NavigateToRequest). If the
+    /// request still has an open leave-approval task, this opens TaskViewDialog in place (use
+    /// TaskViewPage to interact with it); otherwise it navigates away to that employee's profile
+    /// Leave tab. Callers should assert on whichever outcome they expect.
+    /// </summary>
+    public async Task ClickLeaveRequestItemAsync(string nameFragment) =>
+        await LeaveRequestsWidget.Locator(".task-widget-item")
+            .Filter(new() { HasText = nameFragment })
+            .First
+            .ClickAsync();
+
     // ── Upcoming Probation Reviews Widget ─────────────────────────────────────
 
     private ILocator UpcomingProbationWidget =>

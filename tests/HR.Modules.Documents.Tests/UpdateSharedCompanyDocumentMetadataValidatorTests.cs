@@ -9,7 +9,8 @@ public class UpdateSharedCompanyDocumentMetadataValidatorTests
 
     private static UpdateSharedCompanyDocumentMetadataRequest BuildRequest(
         SharedCompanyDocumentReviewFrequency reviewFrequency = SharedCompanyDocumentReviewFrequency.None,
-        int? customReviewFrequencyMonths = null) =>
+        int? customReviewFrequencyMonths = null,
+        DateOnly? reviewDate = null) =>
         new()
         {
             CompanyId                   = Guid.NewGuid(),
@@ -18,6 +19,7 @@ public class UpdateSharedCompanyDocumentMetadataValidatorTests
             CategoryId                  = Guid.NewGuid(),
             ReviewFrequency             = reviewFrequency,
             CustomReviewFrequencyMonths = customReviewFrequencyMonths,
+            ReviewDate                  = reviewDate,
         };
 
     [Fact]
@@ -66,7 +68,8 @@ public class UpdateSharedCompanyDocumentMetadataValidatorTests
     {
         var result = Validator.Validate(BuildRequest(
             reviewFrequency: SharedCompanyDocumentReviewFrequency.Custom,
-            customReviewFrequencyMonths: 6));
+            customReviewFrequencyMonths: 6,
+            reviewDate: new DateOnly(2027, 1, 1)));
 
         Assert.True(result.IsValid);
     }
@@ -83,8 +86,9 @@ public class UpdateSharedCompanyDocumentMetadataValidatorTests
     public void Validate_NonCustom_ReviewFrequency_Passes_Regardless_Of_CustomReviewFrequencyMonths_Being_Null(int reviewFrequencyValue)
     {
         var reviewFrequency = (SharedCompanyDocumentReviewFrequency)reviewFrequencyValue;
+        DateOnly? reviewDate = reviewFrequency == SharedCompanyDocumentReviewFrequency.None ? null : new DateOnly(2027, 1, 1);
 
-        var result = Validator.Validate(BuildRequest(reviewFrequency: reviewFrequency, customReviewFrequencyMonths: null));
+        var result = Validator.Validate(BuildRequest(reviewFrequency: reviewFrequency, customReviewFrequencyMonths: null, reviewDate: reviewDate));
 
         Assert.True(result.IsValid);
     }
@@ -98,8 +102,40 @@ public class UpdateSharedCompanyDocumentMetadataValidatorTests
     public void Validate_NonCustom_ReviewFrequency_Passes_Regardless_Of_CustomReviewFrequencyMonths_Having_A_Value(int reviewFrequencyValue)
     {
         var reviewFrequency = (SharedCompanyDocumentReviewFrequency)reviewFrequencyValue;
+        DateOnly? reviewDate = reviewFrequency == SharedCompanyDocumentReviewFrequency.None ? null : new DateOnly(2027, 1, 1);
 
-        var result = Validator.Validate(BuildRequest(reviewFrequency: reviewFrequency, customReviewFrequencyMonths: 6));
+        var result = Validator.Validate(BuildRequest(reviewFrequency: reviewFrequency, customReviewFrequencyMonths: 6, reviewDate: reviewDate));
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_ReviewFrequency_Not_None_With_Null_ReviewDate_Fails()
+    {
+        var result = Validator.Validate(BuildRequest(
+            reviewFrequency: SharedCompanyDocumentReviewFrequency.Monthly,
+            reviewDate: null));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateSharedCompanyDocumentMetadataRequest.ReviewDate));
+    }
+
+    [Fact]
+    public void Validate_ReviewFrequency_Not_None_With_ReviewDate_Set_Passes()
+    {
+        var result = Validator.Validate(BuildRequest(
+            reviewFrequency: SharedCompanyDocumentReviewFrequency.Monthly,
+            reviewDate: new DateOnly(2027, 1, 1)));
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_ReviewFrequency_None_With_Null_ReviewDate_Passes()
+    {
+        var result = Validator.Validate(BuildRequest(
+            reviewFrequency: SharedCompanyDocumentReviewFrequency.None,
+            reviewDate: null));
 
         Assert.True(result.IsValid);
     }

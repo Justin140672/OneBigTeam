@@ -199,6 +199,49 @@ public class AuditHistoryIntegrationTests : IClassFixture<ApiWebApplicationFacto
     }
 
     [Fact]
+    public async Task UpdateEmployeeProfile_Changing_Department_Resolves_Department_Name_In_AuditHistory()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = AuthenticatedClient(companyId);
+
+        var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
+
+        var newDeptResp = await hrAdminClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/departments",
+            new { companyId, name = $"NewDept-{Guid.NewGuid():N}" });
+        newDeptResp.EnsureSuccessStatusCode();
+        var newDepartment = await newDeptResp.Content.ReadFromJsonAsync<DepartmentPayload>();
+
+        var updateResp = await hrAdminClient.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/profile",
+            new
+            {
+                companyId,
+                id = employeeId,
+                departmentId = newDepartment!.Id,
+                firstName = "Audrey",
+                lastName = "Tester",
+                workEmail = $"audit.tester.{Guid.NewGuid():N}@example.com",
+                startDate = "2026-01-01",
+                gender = "Female",
+                hasSystemAccess = true
+            });
+        updateResp.EnsureSuccessStatusCode();
+
+        var historyResp = await hrAdminClient.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/audit-history");
+        historyResp.EnsureSuccessStatusCode();
+
+        var history = await historyResp.Content.ReadFromJsonAsync<AuditHistoryPayload>();
+        Assert.NotNull(history);
+
+        var entry = Assert.Single(history!.Items, i => i.Action == "Employee profile updated");
+        Assert.Equal("Employees", entry.Module);
+
+        var departmentChange = Assert.Single(entry.Changes, c => c.Field == "Department Id");
+        Assert.Equal(newDepartment.Name, departmentChange.After);
+    }
+
+    [Fact]
     public async Task UpdateCompanySettings_Persists_Audit_Record()
     {
         // No API surface exposes company-level audit events (GetEmployeeAuditHistory is scoped to
@@ -338,6 +381,8 @@ public class AuditHistoryIntegrationTests : IClassFixture<ApiWebApplicationFacto
     }
 
     private sealed record IdPayload(Guid Id);
+
+    private sealed record DepartmentPayload(Guid Id, string Name);
 
     private sealed record AuditFieldChangePayload(string Field, string Before, string After);
 

@@ -11,4 +11,7 @@ internal sealed record RecentLeaveRequestItem(
     DateOnly StartDate,
     DateOnly EndDate,
     decimal TotalDays,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    // Null when there's no open (Open/InProgress) leave-approval task for this request — e.g.
+    // it's already been approved/rejected and its task completed, or predates task creation.
+    Guid? TaskId = null);

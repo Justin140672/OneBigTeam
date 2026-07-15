@@ -24,14 +24,21 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Category <span class="text-danger">*</span></label>
-                        <SfDropDownList TValue="Guid?"
-                                        TItem="CompanyDocumentCategoryItem"
-                                        DataSource="@_categories"
-                                        @bind-Value="Model.CategoryId"
-                                        Placeholder="Select category…"
-                                        AllowFiltering="true">
-                            <DropDownListFieldSettings Value="Id" Text="Name" />
-                        </SfDropDownList>
+                        @if (_dataLoaded)
+                        {
+                            <SfDropDownList TValue="Guid?"
+                                            TItem="CompanyDocumentCategoryItem"
+                                            DataSource="@_categories"
+                                            @bind-Value="Model.CategoryId"
+                                            Placeholder="Select category…"
+                                            AllowFiltering="true">
+                                <DropDownListFieldSettings Value="Id" Text="Name" />
+                            </SfDropDownList>
+                        }
+                        else
+                        {
+                            <HrLoadingIndicator Label="Loading categories…" />
+                        }
                         <ValidationMessage For="@(() => Model.CategoryId)" />
                     </div>
                     <div class="col-12">
@@ -49,7 +56,13 @@
                                       ShowClearButton="true" />
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Review Date</label>
+                        <label class="form-label">
+                            Next Review Date
+                            @if (Model.ReviewFrequency != "None")
+                            {
+                                <span class="text-danger">*</span>
+                            }
+                        </label>
                         <SfDatePicker TValue="DateOnly?"
                                       @bind-Value="Model.ReviewDate"
                                       Format="dd/MM/yyyy"
@@ -88,6 +101,12 @@
 
     private List<CompanyDocumentCategoryItem> _categories = [];
 
+    // Category is rendered once _categories has actually loaded rather than immediately with an
+    // empty DataSource — Blazor renders this dialog as soon as it becomes visible, before the
+    // await below completes, so an ungated dropdown would briefly look interactive but have
+    // nothing to show in its popup.
+    private bool _dataLoaded;
+
     private static readonly List<ReviewFrequencyOption> _reviewFrequencyOptions =
     [
         new("None", "None"),
@@ -100,6 +119,8 @@
 
     protected override async Task OnOpenedAsync()
     {
+        GlobalError = null;
+        _dataLoaded = false;
         _categories = (await DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId))?.Items.ToList() ?? [];
 
         if (Document is not null)
@@ -112,7 +133,18 @@
             Model.ReviewFrequency = Document.ReviewFrequency;
             Model.CustomReviewFrequencyMonths = Document.CustomReviewFrequencyMonths;
         }
+
+        _dataLoaded = true;
     }
+
+    // Mirrors UploadSharedCompanyDocumentDialog's ValidateExtra hook — DataAnnotations can't
+    // express "required only when another field has a certain value", so this cross-field check
+    // lives here instead, giving immediate client-side feedback ahead of the matching
+    // server-side rule in UpdateSharedCompanyDocumentMetadataValidator.
+    protected override string? ValidateExtra() =>
+        Model.ReviewFrequency != "None" && Model.ReviewDate is null
+            ? "A next review date is required when a review frequency is set."
+            : null;
 
     protected override async Task<string?> SaveCoreAsync()
     {

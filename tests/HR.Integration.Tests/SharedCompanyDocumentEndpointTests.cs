@@ -87,7 +87,8 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
 
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, response) = await UploadAsync(
-            client, companyId, categoryId, title: "Remote Working Policy", reviewFrequency: "Monthly");
+            client, companyId, categoryId, title: "Remote Working Policy",
+            reviewFrequency: "Monthly", reviewDate: new DateOnly(2027, 1, 1));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
@@ -96,6 +97,21 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
 
         var detail = await detailResponse.Content.ReadFromJsonAsync<ReviewFrequencyDetailPayload>();
         Assert.Equal("Monthly", detail!.ReviewFrequency);
+    }
+
+    [Fact]
+    public async Task Upload_With_ReviewFrequency_And_No_ReviewDate_Returns_BadRequest()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (_, response) = await UploadAsync(
+            client, companyId, categoryId, title: "Remote Working Policy", reviewFrequency: "Monthly");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
     [Fact]
@@ -641,6 +657,7 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
                 CategoryId                  = categoryId,
                 ReviewFrequency             = "Custom",
                 CustomReviewFrequencyMonths = 6,
+                ReviewDate                  = new DateOnly(2027, 1, 1),
             });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -651,6 +668,28 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         var detail = await detailResponse.Content.ReadFromJsonAsync<ReviewFrequencyDetailPayload>();
         Assert.Equal("Custom", detail!.ReviewFrequency);
         Assert.Equal(6,        detail.CustomReviewFrequencyMonths);
+    }
+
+    [Fact]
+    public async Task UpdateMetadata_With_ReviewFrequency_And_No_ReviewDate_Returns_BadRequest()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Old Title");
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}",
+            new
+            {
+                Title           = "Updated Policy Title",
+                CategoryId      = categoryId,
+                ReviewFrequency = "Monthly",
+            });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
     [Fact]
@@ -1530,11 +1569,11 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
 
     private async Task<(DocumentPayload? Payload, HttpResponseMessage Response)> UploadAsync(
         HttpClient client, Guid companyId, Guid categoryId, string title = "Test Document",
-        string? reviewFrequency = null, int? customReviewFrequencyMonths = null)
+        string? reviewFrequency = null, int? customReviewFrequencyMonths = null, DateOnly? reviewDate = null)
     {
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/shared-documents",
-            BuildUpload(title, categoryId, reviewFrequency, customReviewFrequencyMonths));
+            BuildUpload(title, categoryId, reviewFrequency, customReviewFrequencyMonths, reviewDate));
         DocumentPayload? payload = null;
         if (response.IsSuccessStatusCode)
             payload = await response.Content.ReadFromJsonAsync<DocumentPayload>();
@@ -1543,7 +1582,7 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
 
     private static MultipartFormDataContent BuildUpload(
         string title = "Test Document", Guid? categoryId = null,
-        string? reviewFrequency = null, int? customReviewFrequencyMonths = null)
+        string? reviewFrequency = null, int? customReviewFrequencyMonths = null, DateOnly? reviewDate = null)
     {
         var form = new MultipartFormDataContent();
         form.Add(new StringContent(title), "Title");
@@ -1552,6 +1591,8 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
             form.Add(new StringContent(reviewFrequency), "ReviewFrequency");
         if (customReviewFrequencyMonths is not null)
             form.Add(new StringContent(customReviewFrequencyMonths.Value.ToString()), "CustomReviewFrequencyMonths");
+        if (reviewDate is not null)
+            form.Add(new StringContent(reviewDate.Value.ToString("yyyy-MM-dd")), "ReviewDate");
 
         var fileContent = new ByteArrayContent(PdfBytes());
         fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");

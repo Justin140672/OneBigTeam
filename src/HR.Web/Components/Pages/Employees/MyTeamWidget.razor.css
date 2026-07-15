@@ -1,0 +1,24 @@
+/* Show phone/email as visible text next to their icons, stacked to stay compact
+   in the team-member row. Overrides the icon-only layout from app.css's shared
+   .team-widget-contact rule (higher specificity via the scoped attribute). */
+.team-widget-contact {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.team-widget-contact-link {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 170px;
+    overflow: hidden;
+    text-decoration: none;
+}
+
+.team-widget-contact-text {
+    font-size: 0.72rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

@@ -1,6 +1,9 @@
+using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.GetEmployeeAuditHistory;
+using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Tests.Infrastructure;
 using HR.SharedKernel;
+using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Tests;
 
@@ -11,6 +14,7 @@ public class GetEmployeeAuditHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_Resolves_Known_ActorEmployeeId_To_Full_Name()
     {
+        await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var actorId = Guid.NewGuid();
@@ -19,7 +23,7 @@ public class GetEmployeeAuditHistoryHandlerTests
             new AuditHistoryEntry(Now, "employee.compensation.created", "Compensation", null, actorId, "Compensation record created", null, null)
         ]);
         var names = new FakeEmployeeNameReader(new Dictionary<Guid, string> { [actorId] = "Alice Smith" });
-        var handler = new GetEmployeeAuditHistoryHandler(reader, names);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, names, context);
 
         var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
 
@@ -31,13 +35,14 @@ public class GetEmployeeAuditHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_System_When_ActorEmployeeId_Is_Null()
     {
+        await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
         var reader = new FakeAuditHistoryReader([
             new AuditHistoryEntry(Now, "document.expired", "EmployeeDocument", null, null, "Document expired", null, null)
         ]);
-        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader());
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
         var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
 
@@ -49,6 +54,7 @@ public class GetEmployeeAuditHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Unknown_When_ActorEmployeeId_Not_Found_In_Name_Reader()
     {
+        await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var actorId = Guid.NewGuid();
@@ -57,7 +63,7 @@ public class GetEmployeeAuditHistoryHandlerTests
             new AuditHistoryEntry(Now, "leave.approved", "LeaveRequest", null, actorId, "Leave request approved", null, null)
         ]);
         // No names configured — actorId will not resolve.
-        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader());
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
         var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
 
@@ -76,13 +82,14 @@ public class GetEmployeeAuditHistoryHandlerTests
     [InlineData("Candidate", "Recruitment")]
     public async Task HandleAsync_Maps_EntityType_To_Expected_Module(string entityType, string expectedModule)
     {
+        await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
         var reader = new FakeAuditHistoryReader([
             new AuditHistoryEntry(Now, "some.event", entityType, null, null, "Something happened", null, null)
         ]);
-        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader());
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
         var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
 
@@ -94,13 +101,14 @@ public class GetEmployeeAuditHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_Falls_Back_To_Raw_EntityType_When_Unmapped()
     {
+        await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
         var reader = new FakeAuditHistoryReader([
             new AuditHistoryEntry(Now, "notification.sent", "Notification", null, null, "Notification sent", null, null)
         ]);
-        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader());
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
         var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
 
@@ -112,13 +120,14 @@ public class GetEmployeeAuditHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_Uses_Summary_As_Action_When_Present()
     {
+        await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
         var reader = new FakeAuditHistoryReader([
             new AuditHistoryEntry(Now, "employee.compensation.created", "Compensation", null, null, "Compensation record created", null, null)
         ]);
-        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader());
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
         var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
 
@@ -130,13 +139,14 @@ public class GetEmployeeAuditHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_Falls_Back_To_EventType_As_Action_When_Summary_Is_Null()
     {
+        await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
         var reader = new FakeAuditHistoryReader([
             new AuditHistoryEntry(Now, "employee.compensation.created", "Compensation", null, null, null, null, null)
         ]);
-        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader());
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
         var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
 
@@ -148,6 +158,7 @@ public class GetEmployeeAuditHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_Builds_Changes_From_AfterJson_Only_When_BeforeJson_Is_Null()
     {
+        await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
@@ -156,7 +167,7 @@ public class GetEmployeeAuditHistoryHandlerTests
                 Now, "employee.compensation.created", "Compensation", null, null, "Compensation record created",
                 null, """{"EffectiveFrom":"2027-01-01","Salary":45000}""")
         ]);
-        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader());
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
         var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
 
@@ -176,6 +187,7 @@ public class GetEmployeeAuditHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_Builds_Changes_Capturing_Distinct_Before_And_After_Values_For_Same_Field()
     {
+        await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
@@ -184,7 +196,7 @@ public class GetEmployeeAuditHistoryHandlerTests
                 Now, "employee.compensation.reopened", "Compensation", null, null, "Compensation record reopened",
                 """{"EffectiveTo":"2026-12-31"}""", """{"EffectiveTo":null}""")
         ]);
-        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader());
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
         var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
 
@@ -200,13 +212,14 @@ public class GetEmployeeAuditHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Empty_Changes_When_BeforeJson_And_AfterJson_Are_Both_Null()
     {
+        await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
         var reader = new FakeAuditHistoryReader([
             new AuditHistoryEntry(Now, "notification.sent", "Notification", null, null, "Notification sent", null, null)
         ]);
-        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader());
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
         var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
 
@@ -218,15 +231,232 @@ public class GetEmployeeAuditHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Empty_Response_When_Reader_Returns_No_Entries()
     {
+        await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
         var reader = new FakeAuditHistoryReader([]);
-        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader());
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
         var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value!.Items);
+    }
+
+    // ── DepartmentId / PositionProfileId / LocationId resolution ────────────────
+
+    [Fact]
+    public async Task HandleAsync_Resolves_DepartmentId_To_Department_Name()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, Now);
+        context.Departments.Add(department);
+        await context.SaveChangesAsync();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.profile.updated", "Employee", null, null, "Employee profile updated",
+                null, $$"""{"DepartmentId":"{{department.Id}}"}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        var change = Assert.Single(item.Changes);
+        Assert.Equal("Department Id", change.Field);
+        Assert.Equal("Engineering", change.After);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Resolves_PositionProfileId_To_PositionProfile_Title()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var positionProfile = PositionProfile.Create(
+            Guid.NewGuid(), companyId, null, null, "Engineering Manager", null, null, null, null, null, null, null, null, Now);
+        context.PositionProfiles.Add(positionProfile);
+        await context.SaveChangesAsync();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.profile.updated", "Employee", null, null, "Employee profile updated",
+                null, $$"""{"PositionProfileId":"{{positionProfile.Id}}"}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        var change = Assert.Single(item.Changes);
+        Assert.Equal("Position Profile Id", change.Field);
+        Assert.Equal("Engineering Manager", change.After);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Resolves_LocationId_To_Location_Name()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var location = Location.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "London Office", null, Now);
+        context.Locations.Add(location);
+        await context.SaveChangesAsync();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.profile.updated", "Employee", null, null, "Employee profile updated",
+                null, $$"""{"LocationId":"{{location.Id}}"}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        var change = Assert.Single(item.Changes);
+        Assert.Equal("Location Id", change.Field);
+        Assert.Equal("London Office", change.After);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Resolves_Unmatched_DepartmentId_To_Unknown()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var unknownDepartmentId = Guid.NewGuid();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.profile.updated", "Employee", null, null, "Employee profile updated",
+                null, $$"""{"DepartmentId":"{{unknownDepartmentId}}"}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        var change = Assert.Single(item.Changes);
+        Assert.Equal("Unknown", change.After);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Resolve_DepartmentId_From_A_Different_Company()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var department = Department.Create(Guid.NewGuid(), otherCompanyId, "Engineering", null, Now);
+        context.Departments.Add(department);
+        await context.SaveChangesAsync();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.profile.updated", "Employee", null, null, "Employee profile updated",
+                null, $$"""{"DepartmentId":"{{department.Id}}"}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        var change = Assert.Single(item.Changes);
+        Assert.Equal("Unknown", change.After);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Resolve_Guid_Values_For_Other_Field_Names()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, Now);
+        context.Departments.Add(department);
+        await context.SaveChangesAsync();
+
+        // "ManagerId" is not one of the three resolved field names, even though its value is a
+        // Department id and happens to be GUID-shaped — it must render as the raw guid string.
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.profile.updated", "Employee", null, null, "Employee profile updated",
+                null, $$"""{"ManagerId":"{{department.Id}}"}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        var change = Assert.Single(item.Changes);
+        Assert.Equal("Manager Id", change.Field);
+        Assert.Equal(department.Id.ToString(), change.After);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Handles_NonGuid_Values_For_Resolved_Field_Names_Without_Throwing()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.profile.updated", "Employee", null, null, "Employee profile updated",
+                null, """{"DepartmentId":"not-a-guid"}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        var change = Assert.Single(item.Changes);
+        Assert.Equal("not-a-guid", change.After);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Handles_Null_Value_For_Resolved_Field_Names_Without_Throwing()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.profile.updated", "Employee", null, null, "Employee profile updated",
+                null, """{"DepartmentId":null}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        var change = Assert.Single(item.Changes);
+        Assert.Equal("—", change.After);
+    }
+
+    private static EmployeesDbContext BuildContext()
+    {
+        var options = new DbContextOptionsBuilder<EmployeesDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+
+        return new EmployeesDbContext(options);
     }
 }

@@ -25,7 +25,7 @@
             <h2 class="dashboard-section-title">Tasks &amp; Leave</h2>
             <div class="dashboard-detail-grid">
                 <TeamTasksWidget />
-                <LeaveRequestsWidget />
+                <LeaveRequestsWidget OnOpenTask="OpenTask" />
             </div>
         </section>
 
@@ -47,9 +47,23 @@
             </div>
         </section>
     </div>
+
+    <TaskViewDialog CompanyId="Session.CompanyId"
+                    TaskId="_openTaskId"
+                    IsOpen="_taskDialogOpen"
+                    OnClosed="@(() => _taskDialogOpen = false)" />
 }
 
 @code {
+    private Guid? _openTaskId;
+    private bool _taskDialogOpen;
+
+    private void OpenTask(Guid taskId)
+    {
+        _openTaskId = taskId;
+        _taskDialogOpen = true;
+    }
+
     // Guarded like CompanyEdit.razor: URL-typing into this dashboard without the
     // Manager role bounces to MyProfileUrl. The switcher/redirect only pick a default.
     private bool _ready;

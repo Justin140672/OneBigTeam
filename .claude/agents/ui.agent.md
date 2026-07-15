@@ -48,6 +48,13 @@ Your job is to do exactly these things when requested:
 - Show a count summary below the grid: `@_items.Count resource(s)`.
 - Place the primary action button (e.g. "+ Add …") right-aligned in the page header.
 
+## Styling
+- Never write `<style>` blocks inside `.razor` files, and never write inline `style="..."` attributes for anything beyond a genuinely dynamic, per-instance value (e.g. a computed width from a bound variable).
+- All component-specific CSS belongs in that component's isolated CSS file: `{ComponentName}.razor.css` next to the `.razor` file (e.g. `MyProfilePhotoHeader.razor` → `MyProfilePhotoHeader.razor.css`). Create this file if it doesn't exist yet for a component you're touching.
+- Only put CSS in the shared `src/HR.Web/wwwroot/app.css` when the rule is a genuinely cross-cutting, reusable pattern (e.g. a shared card style used by many unrelated components) — not for something scoped to one page or widget.
+- When fixing a visual/layout bug (alignment, spacing, sizing), prefer adding or correcting a rule in the component's own `.razor.css` over reaching for Bootstrap utility classes in the markup, unless the existing surrounding markup already relies on utility classes for that exact concern.
+- If you find existing inline styles or embedded `<style>` blocks while touching a component for an unrelated change, do not do a drive-by refactor of them — leave a note in your Output Format summary that they exist, but only migrate them if the task at hand is specifically about styling.
+
 ## Playwright E2E Tests
 When the lead developer requests Playwright tests alongside UI work, create them in `tests/HR.Web.E2E.Tests/`. Follow the existing patterns:
 - Page objects go in `tests/HR.Web.E2E.Tests/Infrastructure/PageObjects/`
@@ -64,6 +71,7 @@ When the lead developer requests Playwright tests alongside UI work, create them
 - Prefer the repository's existing Blazor component structure, routing patterns, and service-registration style.
 - Use typed request and response models in the service — no anonymous objects or inline `HttpClient` calls in page components.
 - Keep changes minimal and limited to the files needed for the UI feature.
+- Follow the Styling rules above — no `<style>` blocks or inline `style="..."` attributes in `.razor` markup.
 - If the web project or target API contract does not exist, stop and report the missing prerequisite.
 
 ## Approach

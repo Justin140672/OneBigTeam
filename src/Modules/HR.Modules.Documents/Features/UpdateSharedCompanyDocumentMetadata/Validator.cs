@@ -26,6 +26,11 @@ internal sealed class UpdateSharedCompanyDocumentMetadataValidator : AbstractVal
             .When(r => r.ReviewFrequency == SharedCompanyDocumentReviewFrequency.Custom && r.CustomReviewFrequencyMonths.HasValue)
             .WithMessage("CustomReviewFrequencyMonths must be greater than zero.");
 
+        RuleFor(r => r.ReviewDate)
+            .NotNull()
+            .When(r => r.ReviewFrequency != SharedCompanyDocumentReviewFrequency.None)
+            .WithMessage("A next review date is required when a review frequency is set.");
+
         RuleFor(r => r.Title)
             .NotEmpty()
             .MaximumLength(200);

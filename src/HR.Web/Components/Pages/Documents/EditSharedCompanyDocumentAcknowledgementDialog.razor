@@ -60,6 +60,8 @@
 
     protected override Task OnOpenedAsync()
     {
+        GlobalError = null;
+
         if (Document is not null)
         {
             Model.RequiresAcknowledgement = Document.RequiresAcknowledgement;

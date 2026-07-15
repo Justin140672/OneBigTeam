@@ -53,6 +53,8 @@ else
 }
 
 @code {
+    [Parameter] public EventCallback<Guid> OnOpenTask { get; set; }
+
     private bool _loading = true;
     private List<RecentLeaveRequestItem> _items = [];
 
@@ -72,6 +74,14 @@ else
         _          => "normal",
     };
 
-    private void NavigateToRequest(RecentLeaveRequestItem item) =>
+    private async Task NavigateToRequest(RecentLeaveRequestItem item)
+    {
+        if (item.TaskId.HasValue && OnOpenTask.HasDelegate)
+        {
+            await OnOpenTask.InvokeAsync(item.TaskId.Value);
+            return;
+        }
+
         Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/{item.EmployeeId}/profile?tab=leave");
+    }
 }

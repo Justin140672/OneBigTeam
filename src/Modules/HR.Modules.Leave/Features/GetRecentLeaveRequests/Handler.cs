@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,19 +7,41 @@ namespace HR.Modules.Leave.Features.GetRecentLeaveRequests;
 
 internal sealed class GetRecentLeaveRequestsHandler(
     LeaveDbContext dbContext,
-    IEmployeeNameReader employeeNameReader)
+    IEmployeeNameReader employeeNameReader,
+    IDirectReportsReader directReportsReader,
+    IOpenTaskBySourceEntityReader openTaskReader)
 {
     private const int DefaultTake = 10;
 
     public async Task<GetRecentLeaveRequestsResponse> HandleAsync(
         GetRecentLeaveRequestsRequest request,
+        Guid viewerEmployeeId,
+        bool isHrAdministrator,
         CancellationToken cancellationToken)
     {
         var take = request.Take ?? DefaultTake;
 
-        var rows = await dbContext.LeaveRequests
+        var query = dbContext.LeaveRequests
             .AsNoTracking()
-            .Where(r => r.CompanyId == request.CompanyId)
+            .Where(r => r.CompanyId == request.CompanyId);
+
+        // HR administrators keep the original company-wide, all-statuses view. Everyone else
+        // (managers) is scoped to their own direct reports and pending requests only — mirrors
+        // the IDirectReportsReader scoping pattern used by GetTeamTasksHandler/
+        // GetTeamSicknessTodayHandler. The HR/non-HR split itself is resolved server-side by
+        // the endpoint (User claims + IAuthorizationService), never trusted from the client.
+        if (!isHrAdministrator)
+        {
+            var directReportIds = await directReportsReader.GetDirectReportIdsAsync(
+                request.CompanyId, viewerEmployeeId, cancellationToken);
+
+            if (directReportIds.Count == 0)
+                return new GetRecentLeaveRequestsResponse([]);
+
+            query = query.Where(r => directReportIds.Contains(r.EmployeeId) && r.Status == LeaveRequestStatus.Pending);
+        }
+
+        var rows = await query
             .OrderByDescending(r => r.CreatedAt)
             .Take(take)
             .Join(
@@ -41,6 +64,9 @@ internal sealed class GetRecentLeaveRequestsHandler(
         var employeeIds = rows.Select(r => r.EmployeeId).Distinct().ToList();
         var names = await employeeNameReader.GetNamesAsync(request.CompanyId, employeeIds, cancellationToken);
 
+        var leaveRequestIds = rows.Select(r => r.Id).ToList();
+        var openTaskIds = await openTaskReader.GetOpenTaskIdsAsync(request.CompanyId, leaveRequestIds, cancellationToken);
+
         var items = rows
             .Select(r => new RecentLeaveRequestItem(
                 r.Id,
@@ -51,7 +77,8 @@ internal sealed class GetRecentLeaveRequestsHandler(
                 r.StartDate,
                 r.EndDate,
                 r.TotalDays,
-                r.CreatedAt))
+                r.CreatedAt,
+                openTaskIds.TryGetValue(r.Id, out var taskId) ? taskId : (Guid?)null))
             .ToList();
 
         return new GetRecentLeaveRequestsResponse(items);

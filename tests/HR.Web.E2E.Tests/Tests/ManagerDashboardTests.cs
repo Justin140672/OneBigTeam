@@ -162,6 +162,28 @@ public sealed class ManagerDashboardTests(AppFixture fixture) : E2ETestBase(fixt
     }
 
     [Fact]
+    public async Task MyTeamWidget_ShowsDirectReportsPhoneAndEmail_AsVisibleText()
+    {
+        // Tom Williams is seeded with phone "07700 900004" and work email
+        // "tom.williams@acme.example" (see EmployeesModule.SeedEmployeesAsync's MakeAcme call for
+        // empDev1Id). MyTeamWidget.razor used to render these as icon-only mailto:/tel: links with
+        // the value hidden in a "title" tooltip — they're now visible ".team-widget-contact-text"
+        // spans next to each icon.
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(JamesEmail);
+        await dashboard.GoToAsync();
+
+        await dashboard.GetMyTeamMemberNamesAsync();
+        var contactText = await dashboard.GetTeamMemberContactTextAsync("Tom Williams");
+
+        Assert.Contains(contactText, t => t.Contains("07700 900004"));
+        Assert.Contains(contactText, t => t.Contains("tom.williams@acme.example", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task UpcomingProbationReviewsWidget_IsVisible_ForManager()
     {
         // Full regression coverage (including the click-through navigation) for this widget
