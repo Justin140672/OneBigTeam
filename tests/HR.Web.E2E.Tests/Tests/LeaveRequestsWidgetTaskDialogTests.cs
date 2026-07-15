@@ -130,8 +130,11 @@ public sealed class LeaveRequestsWidgetTaskDialogTests(AppFixture fixture) : E2E
         Assert.Contains(names, n => n.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase));
 
         // ── Step 4: Clicking the row now falls back to navigating to Tom's profile Leave
-        // tab, since there is no longer an open task to open a dialog for. ───────────────
-        await hrDash.ClickLeaveRequestItemAsync("Tom Williams");
+        // tab, since there is no longer an open task to open a dialog for. Disambiguate by
+        // date ("14 Sep") — the sibling ClickingPendingLeaveRequest_... test deliberately
+        // leaves its own Tom Williams request with an open task, so a name-only match could
+        // land on that row instead and open a dialog rather than navigate. ─────────────────
+        await hrDash.ClickLeaveRequestItemAsync("Tom Williams", "14 Sep");
 
         await _page.WaitForURLAsync(
             new Regex($@"/companies/{AcmeId}/employees/{TomId}/profile\?tab=leave"),

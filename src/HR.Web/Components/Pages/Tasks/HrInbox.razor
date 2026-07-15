@@ -44,7 +44,7 @@
             {
                 var t = item;
                 var (dueCss, dueLabel) = DueBadge(t.DueDate);
-                <div class="inbox-card @(_claiming == t.Id ? "inbox-card--claiming" : "")">
+                <div @key="t.Id" class="inbox-card @(_claiming == t.Id ? "inbox-card--claiming" : "")">
                     <span class="priority-pip priority-pip--@DuePip(t.DueDate)" title="@t.Priority priority"></span>
                     <div class="inbox-card-body">
                         <div class="inbox-card-top">

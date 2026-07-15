@@ -22,9 +22,17 @@ public sealed class ImportHistoryTests(AppFixture fixture) : E2ETestBase(fixture
         var employeeNumber = $"E2EH{suffix}";
         var fileName = $"e2e-history-{suffix}.csv";
 
+        // Date Of Birth, Nationality, Gender, Department, Location, Employment Type, and Position
+        // Profile are all required by EmployeeStagingRowValidator.RequiredFields/
+        // RequiredLookupFields alongside First Name/Last Name/Work Email/Start Date/Employee
+        // Number — omitting any of them fails the row before it ever reaches
+        // ConfirmImportSessionHandler. Department/Location/Employment Type/Position Profile are
+        // resolved by name (auto-created if they don't already exist), so using the seeded
+        // "Engineering"/"London Office"/"Senior Software Engineer" values (see
+        // CreateEmployeeTests) avoids an unnecessary auto-create warning.
         var csvContent =
-            "First Name,Last Name,Work Email,Start Date,Employee Number\n" +
-            $"History,Employee,{workEmail},2026-01-01,{employeeNumber}\n";
+            "First Name,Last Name,Work Email,Date Of Birth,Nationality,Gender,Start Date,Employee Number,Department,Location,Employment Type,Position Profile\n" +
+            $"History,Employee,{workEmail},1990-06-15,British,Male,2026-01-01,{employeeNumber},Engineering,London Office,Permanent,Senior Software Engineer\n";
 
         var tempFile = Path.Combine(Path.GetTempPath(), fileName);
         await File.WriteAllTextAsync(tempFile, csvContent);
@@ -86,11 +94,14 @@ public sealed class ImportHistoryTests(AppFixture fixture) : E2ETestBase(fixture
         var employeeNumber = $"E2EHF{suffix}";
         var fileName = $"e2e-history-fail-{suffix}.csv";
 
-        // Second row is missing the required Last Name — one valid row, one failed row.
+        // Second row is missing the required Last Name — one valid row, one failed row. Date Of
+        // Birth/Nationality/Gender/Department/Location/Employment Type/Position Profile are also
+        // required (see EmployeeStagingRowValidator.RequiredFields/RequiredLookupFields) and are
+        // included on both rows so Last Name is the only thing that fails the second one.
         var csvContent =
-            "First Name,Last Name,Work Email,Start Date,Employee Number\n" +
-            $"Valid,Employee,{workEmail},2026-01-01,{employeeNumber}\n" +
-            $"Invalid,,invalid.{suffix}@example.com,2026-01-02,E2EHFX{suffix}\n";
+            "First Name,Last Name,Work Email,Date Of Birth,Nationality,Gender,Start Date,Employee Number,Department,Location,Employment Type,Position Profile\n" +
+            $"Valid,Employee,{workEmail},1990-06-15,British,Male,2026-01-01,{employeeNumber},Engineering,London Office,Permanent,Senior Software Engineer\n" +
+            $"Invalid,,invalid.{suffix}@example.com,1990-06-15,British,Male,2026-01-02,E2EHFX{suffix},Engineering,London Office,Permanent,Senior Software Engineer\n";
 
         var tempFile = Path.Combine(Path.GetTempPath(), fileName);
         await File.WriteAllTextAsync(tempFile, csvContent);

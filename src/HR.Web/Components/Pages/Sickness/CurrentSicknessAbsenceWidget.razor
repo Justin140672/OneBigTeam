@@ -53,7 +53,7 @@
                     {
                         var i = item;
                         var url = $"/companies/{Session.CompanyId}/employees/{i.EmployeeId}";
-                        <div class="task-widget-item" @onclick="() => Navigation.NavigateTo(url)">
+                        <div @key="i.RecordId" class="task-widget-item" @onclick="() => Navigation.NavigateTo(url)">
                             <span class="priority-pip priority-pip--@(i.EvidenceStatus == "Pending" ? "high" : "low")"></span>
                             <div class="task-widget-content">
                                 <span class="task-widget-title">@EmployeeName(i.EmployeeId)</span>

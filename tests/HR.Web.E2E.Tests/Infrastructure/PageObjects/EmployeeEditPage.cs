@@ -112,6 +112,16 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             .Filter(new() { HasText = managerNameFragment })
             .First
             .ClickAsync();
+        // Popup-hidden alone can be a purely client-side JS close animation and isn't proof that
+        // Blazor's ValueChanged round-trip to the server actually committed Model.ManagerId yet.
+        // Wait for that too, but the decisive signal is the combobox itself re-rendering to show
+        // the selected name — that can only happen once the server-side bound value has updated.
+        // Without this, a caller that immediately clicks Save can race the round-trip and save
+        // with the old (null) ManagerId — the employee never shows up as anyone's direct report.
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
+            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        await managerGroup.Filter(new() { HasText = managerNameFragment })
+            .WaitForAsync(new() { Timeout = 10_000 });
     }
 
     /// <summary>
@@ -133,8 +143,11 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         // Navigates to the employee list on success.
         await page.WaitForURLAsync("**/employees", new() { Timeout = 20_000 });
-        // With prerender:false the circuit connects after navigation, wait for the grid.
-        await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
+        // With prerender:false the circuit connects after navigation, wait for the grid. ".e-grid"
+        // alone isn't enough — Syncfusion populates ".e-row"/".e-rowcell" on a separate JS tick
+        // after the grid element mounts, so callers that immediately click the new row (e.g.
+        // ManagerDashboardTests.CreateEmployeeReportingToDavidAsync) can race an empty grid.
+        await page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 20_000 });
     }
 
     public async Task<bool> HasProbationSummaryAsync() =>
@@ -513,6 +526,8 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     /// <summary>Clicks the "Close" action button on the grid row matching the given start date.</summary>
     public async Task StartCloseSicknessRecordAsync(string startDateddMMMyyyy)
     {
+        await page.WaitForSelectorAsync(".e-grid .e-row", new() { Timeout = 10_000 });
+
         var row = page.Locator(".e-grid .e-row")
             .Filter(new() { HasText = startDateddMMMyyyy })
             .First;

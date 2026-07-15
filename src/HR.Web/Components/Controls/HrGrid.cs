@@ -21,6 +21,9 @@ public class HrGrid<TValue> : SfGrid<TValue>
         if (!parameters.TryGetValue<bool>(nameof(AllowFiltering), out _))
             AllowFiltering = true;
 
+        if (!parameters.TryGetValue<GridFilterSettings>(nameof(FilterSettings), out _))
+            FilterSettings = new GridFilterSettings { Type = FilterType.Excel };
+
         if (!parameters.TryGetValue<bool>(nameof(AllowExcelExport), out _))
             AllowExcelExport = true;
 

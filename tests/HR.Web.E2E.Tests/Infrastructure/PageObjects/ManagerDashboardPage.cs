@@ -77,11 +77,16 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
     /// TaskViewPage to interact with it); otherwise it navigates away to that employee's profile
     /// Leave tab. Callers should assert on whichever outcome they expect.
     /// </summary>
-    public async Task ClickLeaveRequestItemAsync(string nameFragment) =>
+    public async Task ClickLeaveRequestItemAsync(string nameFragment)
+    {
+        await LeaveRequestsWidget.Locator(".task-widget-item, .widget-empty").First
+            .WaitForAsync(new() { Timeout = 15_000 });
+
         await LeaveRequestsWidget.Locator(".task-widget-item")
             .Filter(new() { HasText = nameFragment })
             .First
             .ClickAsync();
+    }
 
     // ── My Team Widget ────────────────────────────────────────────────────────
 
@@ -161,6 +166,9 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
     /// </summary>
     public async Task ClickTeamOnboardingItemAsync(string nameFragment)
     {
+        await TeamOnboardingWidget.Locator(".task-widget-item, .widget-empty").First
+            .WaitForAsync(new() { Timeout = 15_000 });
+
         await TeamOnboardingWidget.Locator(".task-widget-item")
             .Filter(new() { HasText = nameFragment })
             .First

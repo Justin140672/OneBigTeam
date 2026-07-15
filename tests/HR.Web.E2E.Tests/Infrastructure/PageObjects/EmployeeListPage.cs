@@ -7,6 +7,13 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// </summary>
 public sealed class EmployeeListPage(IPage page, string baseUrl)
 {
+    // Waiting for ".e-grid" alone is NOT sufficient to guarantee rows are queryable: Syncfusion's
+    // EJ2 grid does its own JS render pass to populate ".e-row"/".e-rowcell" into the DOM on a
+    // separate tick after the Blazor component itself has mounted. Waiting for the row selector
+    // (or its empty-state sibling) directly is the only wait that's actually tied to data being
+    // present — see the same pattern in VacancyListPage etc.
+    private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow";
+
     public async Task GoToAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees");
@@ -32,6 +39,7 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         await page.WaitForFunctionAsync(
             "window._listReady === true",
             null, new PageWaitForFunctionOptions { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 20_000 });
     }
 
     public async Task ClickNewEmployeeAsync()
@@ -40,11 +48,15 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         await page.WaitForURLAsync("**/employees/new", new() { Timeout = 15_000 });
     }
 
-    public async Task<bool> HasEmployeeAsync(string nameFragment) =>
-        await page.Locator(".e-rowcell")
+    public async Task<bool> HasEmployeeAsync(string nameFragment)
+    {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+
+        return await page.Locator(".e-rowcell")
             .Filter(new() { HasText = nameFragment })
             .First
             .IsVisibleAsync();
+    }
 
     public async Task<IReadOnlyList<string>> GetEmployeeNamesAsync()
     {
@@ -57,6 +69,8 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
 
     public async Task ClickEmployeeAsync(string nameFragment)
     {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+
         var link = page.Locator(".e-rowcell a")
             .Filter(new() { HasText = nameFragment })
             .First;

@@ -93,7 +93,7 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
 
     public async Task OpenDocumentsTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Documents" }).ClickAsync();
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Documents", Exact = true }).ClickAsync();
         await page.WaitForSelectorAsync(".card", new() { Timeout = 15_000 });
     }
 
@@ -205,6 +205,21 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     {
         await page.Locator(".task-title").Filter(new() { HasText = titleFragment }).First.ClickAsync();
         await page.WaitForSelectorAsync("[role='dialog'].task-view-dialog", new() { Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// Returns the status badge text (e.g. "Open", "In Progress", "Completed") for the task row
+    /// whose title contains <paramref name="titleFragment"/>. TaskList.razor has no status filter
+    /// — a completed task stays in this grid rather than disappearing, so callers verifying a
+    /// completion should assert on this rather than on the task's absence from
+    /// <see cref="GetTaskTitlesAsync"/>. Call <see cref="OpenTasksTabAsync"/> first.
+    /// </summary>
+    public async Task<string> GetTaskStatusAsync(string titleFragment)
+    {
+        var row = page.Locator(".e-row").Filter(new() { HasText = titleFragment }).First;
+        var badge = row.Locator(".task-status-badge");
+        await badge.WaitForAsync(new() { Timeout = 15_000 });
+        return (await badge.InnerTextAsync()).Trim();
     }
 
     public async Task OpenAssetsTabAsync()

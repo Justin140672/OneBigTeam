@@ -36,7 +36,7 @@
                     @foreach (var item in _items.Take(8))
                     {
                         var change = item;
-                        <div class="task-widget-item task-widget-item--static">
+                        <div @key="change" class="task-widget-item task-widget-item--static">
                             <div class="task-widget-content">
                                 <span class="task-widget-title">@change.EmployeeName</span>
                                 <span class="task-widget-meta">@change.Action · by @change.ActorName</span>

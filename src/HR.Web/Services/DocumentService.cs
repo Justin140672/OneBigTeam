@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using HR.Web.Models;
 using Microsoft.AspNetCore.Components.Forms;
@@ -290,8 +291,13 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
     {
         try
         {
+            // FastEndpoints rejects a bodyless POST with 415 Unsupported Media Type once it has
+            // no Content-Type to bind against — an empty JSON object is the minimal body that
+            // satisfies model binding for this action, same as the integration tests' EmptyJson().
             var response = await Http.PostAsync(
-                $"api/companies/{companyId}/shared-documents/{documentId}/publish", null, cancellationToken);
+                $"api/companies/{companyId}/shared-documents/{documentId}/publish",
+                new StringContent("{}", Encoding.UTF8, "application/json"),
+                cancellationToken);
 
             if (response.IsSuccessStatusCode)
                 return null;

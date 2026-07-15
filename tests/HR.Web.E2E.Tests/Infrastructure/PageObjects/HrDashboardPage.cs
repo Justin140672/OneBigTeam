@@ -38,7 +38,10 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
     public async Task WaitForHeadcountChartLoadedAsync()
     {
         var widget = page.Locator(".widget-card").Filter(new() { HasText = "Headcount by Department" });
-        await widget.Locator(".e-accumulationchart-series, .widget-empty").First
+        // SfAccumulationChart renders its pie as an <svg>, not a ".e-accumulationchart-series"
+        // element (that class doesn't exist in Syncfusion's actual DOM output) — "svg" is a
+        // reliable signal the chart itself has rendered, regardless of its internal series markup.
+        await widget.Locator("svg, .widget-empty").First
             .WaitForAsync(new() { Timeout = 15_000 });
     }
 
@@ -87,12 +90,26 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
     /// request still has an open leave-approval task, this opens TaskViewDialog in place (use
     /// TaskViewPage to interact with it); otherwise it navigates away to that employee's profile
     /// Leave tab. Callers should assert on whichever outcome they expect.
+    ///
+    /// <paramref name="dateFragment"/> optionally narrows further by the row's rendered date
+    /// range text (e.g. "14 Sep"). Several tests in this suite create more than one leave
+    /// request for the same employee against the shared dev database (some deliberately left
+    /// with an open task), so a name-only match can land on the wrong row — pass this whenever
+    /// more than one request for the same employee might be visible.
     /// </summary>
-    public async Task ClickLeaveRequestItemAsync(string nameFragment) =>
-        await LeaveRequestsWidget.Locator(".task-widget-item")
-            .Filter(new() { HasText = nameFragment })
-            .First
-            .ClickAsync();
+    public async Task ClickLeaveRequestItemAsync(string nameFragment, string? dateFragment = null)
+    {
+        await LeaveRequestsWidget.Locator(".task-widget-item, .widget-empty").First
+            .WaitForAsync(new() { Timeout = 15_000 });
+
+        var locator = LeaveRequestsWidget.Locator(".task-widget-item")
+            .Filter(new() { HasText = nameFragment });
+
+        if (dateFragment is not null)
+            locator = locator.Filter(new() { HasText = dateFragment });
+
+        await locator.First.ClickAsync();
+    }
 
     // ── Upcoming Probation Reviews Widget ─────────────────────────────────────
 
@@ -115,6 +132,9 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
     /// <summary>Clicks the first item in the Upcoming Probation Reviews widget and waits for navigation.</summary>
     public async Task ClickFirstUpcomingProbationReviewAsync()
     {
+        await UpcomingProbationWidget.Locator(".task-widget-item, .widget-empty").First
+            .WaitForAsync(new() { Timeout = 15_000 });
+
         await UpcomingProbationWidget.Locator(".task-widget-item").First.ClickAsync();
         await page.WaitForURLAsync(new Regex(@"/employees/[0-9a-f-]{36}\?tab=probation"), new() { Timeout = 15_000 });
     }

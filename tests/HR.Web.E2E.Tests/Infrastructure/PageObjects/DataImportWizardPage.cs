@@ -69,11 +69,19 @@ public sealed class DataImportWizardPage(IPage page, string baseUrl)
             .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
     }
 
-    public async Task<bool> HasValidRowAsync(string workEmailFragment) =>
-        await page.Locator(".e-rowcell")
+    public async Task<bool> HasValidRowAsync(string workEmailFragment)
+    {
+        // The "4. Preview & Confirm" heading (waited for in ViewPreviewAsync) only proves the
+        // Blazor component has mounted, not that Syncfusion's EJ2 grid has finished its own JS
+        // render pass to populate ".e-row"/".e-rowcell" — wait for the row selector itself
+        // (or its empty-state sibling) before querying it.
+        await page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 15_000 });
+
+        return await page.Locator(".e-rowcell")
             .Filter(new() { HasText = workEmailFragment })
             .First
             .IsVisibleAsync();
+    }
 
     public async Task ConfirmImportAsync()
     {

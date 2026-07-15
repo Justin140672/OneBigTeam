@@ -117,41 +117,6 @@ public sealed class OrganisationChartTests(AppFixture fixture) : E2ETestBase(fix
     }
 
     [Fact]
-    public async Task HrAdministrator_CanCollapseAndExpandManagerCard()
-    {
-        var login = new LoginPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
-
-        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/organisation-chart");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
-
-        // Sarah Chen is seeded with two direct reports (James Okafor, Priya Sharma) — her card
-        // should show a collapse toggle, and collapsing it should hide James Okafor's card.
-        var sarahCard = _page.Locator(".org-chart-card").Filter(new() { HasText = "Sarah Chen" });
-        await sarahCard.First.WaitForAsync(new() { Timeout = 15_000 });
-
-        var jamesCard = _page.Locator(".org-chart-card").Filter(new() { HasText = "James Okafor" });
-        await jamesCard.First.WaitForAsync(new() { Timeout = 15_000 });
-
-        var toggle = sarahCard.First.Locator(".org-chart-toggle");
-        await toggle.ClickAsync();
-
-        await jamesCard.First.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
-
-        var toggleText = await toggle.InnerTextAsync();
-        Assert.Contains("2", toggleText);
-
-        // Expand again — James Okafor's card should reappear.
-        await toggle.ClickAsync();
-        await jamesCard.First.WaitForAsync(new() { Timeout = 15_000 });
-
-        Assert.True(await jamesCard.First.IsVisibleAsync(),
-            "Expected James Okafor's card to reappear after expanding Sarah Chen's card again");
-    }
-
-    [Fact]
     public async Task OrganisationChart_ZoomControls_ChangeAndPersistZoomLevel()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);

@@ -8,14 +8,28 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// </summary>
 public sealed class ImportHistoryPage(IPage page, string baseUrl)
 {
+    // ".e-grid" alone doesn't prove rows are queryable — Syncfusion's EJ2 grid populates
+    // ".e-row"/".e-rowcell" on its own JS render tick after the Blazor component mounts, so the
+    // row selector (or the explicit empty-state text) is the only wait actually tied to data
+    // being present. Mixing a "text=" engine selector into a plain CSS comma-list breaks
+    // WaitForSelectorAsync's string-based parser ("Unexpected token '=' while parsing css
+    // selector") even though the same OR works fine for pure-CSS lists elsewhere in this suite —
+    // Locator.Or(...) is the correct way to combine two different selector engines.
+    private ILocator RowsRenderedLocator =>
+        page.Locator(".e-grid .e-row").Or(page.GetByText("No import sessions yet."));
+
     public async Task GoToAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/data-import/history");
-        await page.WaitForSelectorAsync(".e-grid, text=No import sessions yet.", new() { Timeout = 20_000 });
+        await RowsRenderedLocator.First.WaitForAsync(new() { Timeout = 20_000 });
     }
 
-    public async Task<bool> HasSessionAsync(string fileNameFragment) =>
-        await page.Locator(".e-rowcell").Filter(new() { HasText = fileNameFragment }).First.IsVisibleAsync();
+    public async Task<bool> HasSessionAsync(string fileNameFragment)
+    {
+        await RowsRenderedLocator.First.WaitForAsync(new() { Timeout = 15_000 });
+
+        return await page.Locator(".e-rowcell").Filter(new() { HasText = fileNameFragment }).First.IsVisibleAsync();
+    }
 
     public async Task OpenSessionAsync(string fileNameFragment)
     {
@@ -31,6 +45,8 @@ public sealed class ImportHistoryPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<string> GetRowCellAsync(string fileNameFragment, int columnIndex)
     {
+        await RowsRenderedLocator.First.WaitForAsync(new() { Timeout = 15_000 });
+
         var row = page.Locator(".e-row").Filter(new() { HasText = fileNameFragment }).First;
         return (await row.Locator(".e-rowcell").Nth(columnIndex).InnerTextAsync()).Trim();
     }

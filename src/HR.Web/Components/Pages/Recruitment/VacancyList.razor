@@ -64,7 +64,7 @@
 @code {
     protected override Task OnBeforeLoadAsync()
     {
-        if (!Session.CanManageEmployees)
+        if (!Session.CanManageEmployees && !Session.IsRecruiter)
             Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
         return Task.CompletedTask;
     }

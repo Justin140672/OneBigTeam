@@ -34,6 +34,4 @@ public sealed class OrganisationChartDiagramItem
     public string JobTitle { get; set; } = string.Empty;
     public string Department { get; set; } = string.Empty;
     public string? ProfilePhotoUrl { get; set; }
-    public int DirectReportCount { get; set; }
-    public bool IsCollapsed { get; set; }
 }

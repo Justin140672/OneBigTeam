@@ -16,7 +16,6 @@ public sealed class ToilBalanceDisplayTests(AppFixture fixture) : E2ETestBase(fi
     private static readonly Guid SarahId = Guid.Parse("30000000-0000-0000-0000-000000000001");
 
     private const string LauraEmail = "laura.bennett@acme.example";
-    private const string SarahEmail = "sarah.chen@acme.example";
 
     [Fact]
     public async Task AdminLeaveTab_ShowsAllBalanceSections_IncludingToil()

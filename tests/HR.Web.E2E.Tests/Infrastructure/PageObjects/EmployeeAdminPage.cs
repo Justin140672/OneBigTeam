@@ -28,7 +28,7 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
 
     public async Task OpenDocumentsTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Documents" }).ClickAsync();
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Documents", Exact = true }).ClickAsync();
         // Spinner appears while loading, then grid renders
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",

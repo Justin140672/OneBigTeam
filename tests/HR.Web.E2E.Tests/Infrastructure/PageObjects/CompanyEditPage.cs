@@ -336,28 +336,31 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
         UnsavedChangesDialog.IsVisibleAsync();
 
     /// <summary>
-    /// Close navigates to the dashboard ("/") — CompanyEdit has no dedicated list page.
+    /// Close navigates to "/" (CompanyEdit has no dedicated list page) — but Home.razor's
+    /// role-based landing redirect immediately bounces a CompanyAdministrator-only user (who has
+    /// no HR/Recruitment/Manager dashboard) straight back to this same Company edit page, so
+    /// that's the URL that actually settles. See AppSession.LandingUrl.
     /// </summary>
-    public async Task CloseAndWaitForDashboardAsync(string baseUrl)
+    public async Task CloseAndWaitForDashboardAsync(string baseUrl, Guid companyId)
     {
         await ClickCloseAsync();
-        await page.WaitForURLAsync($"{baseUrl}/", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync($"{baseUrl}/companies/{companyId}/edit", new() { Timeout = 15_000 });
     }
 
-    public async Task ConfirmDiscardChangesAsync(string baseUrl)
+    public async Task ConfirmDiscardChangesAsync(string baseUrl, Guid companyId)
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
-        await page.WaitForURLAsync($"{baseUrl}/", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync($"{baseUrl}/companies/{companyId}/edit", new() { Timeout = 15_000 });
     }
 
     /// <summary>
     /// Choosing "Save" from the unsaved-changes prompt always navigates away on success — unlike
     /// the page's own Save button, which stays put and shows an inline success banner instead.
     /// </summary>
-    public async Task ConfirmSaveFromUnsavedChangesDialogAsync(string baseUrl)
+    public async Task ConfirmSaveFromUnsavedChangesDialogAsync(string baseUrl, Guid companyId)
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
-        await page.WaitForURLAsync($"{baseUrl}/", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync($"{baseUrl}/companies/{companyId}/edit", new() { Timeout = 15_000 });
     }
 
     public Task CancelUnsavedChangesDialogAsync() =>

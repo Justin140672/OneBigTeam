@@ -65,7 +65,7 @@
                         var (dueLabel, dueCss) = StatusBadge(doc.ExpiryStatus, doc.ExpiryDate);
                         var name = EmployeeName(doc.EmployeeId);
                         var url  = $"/companies/{Session.CompanyId}/employees/{doc.EmployeeId}?tab=documents";
-                        <div class="task-widget-item"
+                        <div @key="doc.EmployeeDocumentId" class="task-widget-item"
                              @onclick="() => Navigation.NavigateTo(url)">
                             <span class="priority-pip priority-pip--@(doc.ExpiryStatus == DocumentExpiryStatus.Expired ? "critical" : "medium")"></span>
                             <div class="task-widget-content">

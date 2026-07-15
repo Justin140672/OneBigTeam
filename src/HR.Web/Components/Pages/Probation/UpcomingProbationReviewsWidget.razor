@@ -65,7 +65,7 @@
                         var (dueLabel, dueCss) = DueBadge(r.DueDate);
                         var name = EmployeeName(r.EmployeeId);
                         var url  = $"/companies/{Session.CompanyId}/employees/{r.EmployeeId}?tab=probation";
-                        <div class="task-widget-item"
+                        <div @key="r.ReviewId" class="task-widget-item"
                              @onclick="() => Navigation.NavigateTo(url)">
                             <span class="priority-pip priority-pip--@DuePip(r.DueDate)"></span>
                             <div class="task-widget-content">

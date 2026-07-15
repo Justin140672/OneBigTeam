@@ -144,14 +144,25 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
+    // Waiting for the Add button/empty-state text (OpenRequiredDocumentsTabAsync) only proves the
+    // Blazor component has mounted, not that Syncfusion's EJ2 grid has finished its own JS render
+    // pass to populate ".e-row" — wait for the row selector itself (or the empty-state text) here
+    // too, since these methods are also called after adding/removing a row, which re-fetches.
+    private const string RequiredDocumentsRowsRenderedSelector =
+        ".e-grid .e-row, .text-muted:has-text('No required documents')";
+
     public async Task<bool> HasRequiredDocumentInGridAsync(string documentTypeName)
     {
+        await page.WaitForSelectorAsync(RequiredDocumentsRowsRenderedSelector, new() { Timeout = 15_000 });
+
         var rows = page.Locator(".e-grid .e-row").Filter(new() { HasText = documentTypeName });
         return await rows.CountAsync() > 0;
     }
 
     public async Task ClickRemoveRequiredDocumentAsync(string documentTypeName)
     {
+        await page.WaitForSelectorAsync(RequiredDocumentsRowsRenderedSelector, new() { Timeout = 15_000 });
+
         var row = page.Locator(".e-grid .e-row").Filter(new() { HasText = documentTypeName }).First;
         await row.GetByTitle("Remove").ClickAsync();
     }

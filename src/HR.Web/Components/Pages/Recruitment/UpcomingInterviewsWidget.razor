@@ -42,7 +42,7 @@
                     {
                         var interview = item;
                         var url = $"/companies/{Session.CompanyId}/vacancies/{interview.VacancyId}";
-                        <div class="task-widget-item" @onclick="() => Navigation.NavigateTo(url)">
+                        <div @key="interview.InterviewId" class="task-widget-item" @onclick="() => Navigation.NavigateTo(url)">
                             <div class="task-widget-content">
                                 <span class="task-widget-title">@interview.CandidateName</span>
                                 <span class="task-widget-meta">@interview.VacancyTitle@(interview.Location is null ? "" : $" · {interview.Location}")</span>

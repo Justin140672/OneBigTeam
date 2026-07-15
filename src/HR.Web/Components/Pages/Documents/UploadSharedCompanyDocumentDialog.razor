@@ -235,12 +235,25 @@
         GlobalError = null;
         _selectedFile = null;
         _dataLoaded = false;
-        _categories        = (await DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId))?.Items.ToList() ?? [];
-        _departments       = (await DepartmentService.ListDepartmentsAsync(CompanyId))?.Items ?? [];
-        _locations         = (await LocationService.ListLocationsAsync(CompanyId))?.Items ?? [];
-        _positionProfiles  = (await PositionProfileService.ListPositionProfilesAsync(CompanyId))?.Items.ToList() ?? [];
-        var employees      = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 500);
-        _employees          = employees?.Items.Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}")).ToList() ?? [];
+
+        // These five calls are independent of each other, so they're fired concurrently rather
+        // than awaited one at a time — halves the time _dataLoaded stays false versus the
+        // previous sequential-await version, shrinking the window where Category and the
+        // audience SfMultiSelect fields are stuck showing their loading placeholder.
+        var categoriesTask       = DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId);
+        var departmentsTask      = DepartmentService.ListDepartmentsAsync(CompanyId);
+        var locationsTask        = LocationService.ListLocationsAsync(CompanyId);
+        var positionProfilesTask = PositionProfileService.ListPositionProfilesAsync(CompanyId);
+        var employeesTask        = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 500);
+
+        await Task.WhenAll(categoriesTask, departmentsTask, locationsTask, positionProfilesTask, employeesTask);
+
+        _categories       = categoriesTask.Result?.Items.ToList() ?? [];
+        _departments       = departmentsTask.Result?.Items ?? [];
+        _locations         = locationsTask.Result?.Items ?? [];
+        _positionProfiles  = positionProfilesTask.Result?.Items.ToList() ?? [];
+        _employees          = employeesTask.Result?.Items.Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}")).ToList() ?? [];
+
         _dataLoaded = true;
     }
 

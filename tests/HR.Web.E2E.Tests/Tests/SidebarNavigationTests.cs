@@ -15,7 +15,12 @@ namespace HR.Web.E2E.Tests.Tests;
 ///    submenu's children into the DOM at all until the parent is clicked).
 /// 2. New top-level role-gated dashboard links: "Dashboard" (Session.IsHrAdministrator, points to
 ///    "/dashboard/hr"), "Manager Dashboard" (Session.IsManager, "/dashboard/manager") and
-///    "Recruitment Dashboard" (Session.IsRecruiter, "/dashboard/recruitment").
+///    "Recruitment Dashboard" (Session.IsRecruiter, "/dashboard/recruitment"). Note that
+///    MainLayout.razor's ShowSidebar deliberately excludes IsManager on its own — a Manager-only
+///    persona's dashboard IS their home, with no separate admin section to reach, so they get no
+///    sidebar at all (see ManagerOnly_SeesNoSidebar_AndLandsDirectlyOnManagerDashboard below). The
+///    "Manager Dashboard" link only ever appears for a Manager who *also* holds a role that
+///    independently qualifies for the sidebar (e.g. an HR Administrator who is also a Manager).
 ///
 /// Uses seeded personas:
 ///   - Marcus Diallo (marcus.diallo@acme.example) — Recruiter only (see RecruitmentDashboardTests).
@@ -105,7 +110,7 @@ public sealed class SidebarNavigationTests(AppFixture fixture) : E2ETestBase(fix
     }
 
     [Fact]
-    public async Task ManagerOnly_SeesManagerDashboardLink_ButNotHrDashboardLink()
+    public async Task ManagerOnly_SeesNoSidebar_AndLandsDirectlyOnManagerDashboard()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var sidebar = new SidebarPage(_page);
@@ -113,17 +118,15 @@ public sealed class SidebarNavigationTests(AppFixture fixture) : E2ETestBase(fix
         await login.GoToAsync();
         await login.LoginAsync(JamesEmail);
 
-        // James has the Manager role only — Session.IsHrAdministrator is false, so the
-        // HR-only "Dashboard" link must not appear at all, even though he does get his own
-        // "Manager Dashboard" link.
-        Assert.False(await sidebar.HasTopLevelMenuItemAsync("Dashboard"),
-            "Expected a Manager-only persona (not also an HrAdministrator) to NOT see the HR 'Dashboard' link");
-        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Manager Dashboard"),
-            "Expected a Manager to see the 'Manager Dashboard' link in the sidebar");
-
-        await sidebar.ClickTopLevelMenuItemAsync("Manager Dashboard");
-
+        // A Manager-only persona's dashboard IS their home — there's no separate admin section
+        // to reach, so MainLayout.razor's ShowSidebar deliberately excludes IsManager on its own
+        // (it only renders the sidebar when combined with another qualifying role). Home.razor's
+        // post-login redirect already lands James on /dashboard/manager without him ever needing
+        // to click anything, so there's nothing for a sidebar to do here.
         await _page.WaitForURLAsync(new Regex("/dashboard/manager"), new() { Timeout = 15_000 });
         Assert.Contains("/dashboard/manager", _page.Url);
+
+        Assert.False(await sidebar.IsSidebarVisibleAsync(),
+            "Expected a Manager-only persona (no other qualifying role) to see no sidebar at all");
     }
 }

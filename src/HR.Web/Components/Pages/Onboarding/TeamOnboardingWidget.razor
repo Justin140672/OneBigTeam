@@ -52,7 +52,7 @@
                     {
                         var r = item;
                         var url = $"/companies/{Session.CompanyId}/employees/{r.EmployeeId}?tab=onboarding";
-                        <div class="task-widget-item"
+                        <div @key="r.EmployeeId" class="task-widget-item"
                              @onclick="() => Navigation.NavigateTo(url)">
                             <span class="priority-pip priority-pip--@StatusPip(r.PlanStatus)"></span>
                             <div class="task-widget-content">

@@ -14,7 +14,8 @@ namespace HR.Web.E2E.Tests.Tests;
 ///   the narrowing isn't just a hidden UI affordance.
 ///
 /// Contrasted against an HrAdministrator (CanManageEmployees true), who should still see the
-/// full sidebar and land on the normal dashboard — unaffected by this change.
+/// full sidebar and land on her role-specific dashboard ("/dashboard/hr") rather than the
+/// Company edit screen — unaffected by this change.
 /// </summary>
 [Collection("E2E")]
 public sealed class CompanyAdministratorAccessTests(AppFixture fixture) : E2ETestBase(fixture)
@@ -111,8 +112,9 @@ public sealed class CompanyAdministratorAccessTests(AppFixture fixture) : E2ETes
         var navText = (await navMenu.TextContentAsync())?.Trim() ?? "";
         Assert.Contains("People", navText);
 
-        // ── Step 3: No Home.razor redirect for the full-HR persona — she stays on the
-        // dashboard rather than being sent to a Company edit URL.
-        Assert.Equal($"{_fixture.WebBaseUrl}/".TrimEnd('/'), _page.Url.TrimEnd('/'));
+        // ── Step 3: Home.razor redirects the full-HR persona to her role-specific dashboard
+        // (see AppSession.LandingUrl) rather than to a Company edit URL.
+        await _page.WaitForURLAsync(new Regex(@"/dashboard/hr"), new() { Timeout = 15_000 });
+        Assert.Equal($"{_fixture.WebBaseUrl}/dashboard/hr".TrimEnd('/'), _page.Url.TrimEnd('/'));
     }
 }

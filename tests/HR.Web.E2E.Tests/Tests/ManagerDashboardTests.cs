@@ -328,11 +328,12 @@ public sealed class ManagerDashboardTests(AppFixture fixture) : E2ETestBase(fixt
         await taskView.CompleteGeneralTaskAsync();
         await taskView.CloseAsync();
 
-        // ── Step 5: it disappears from David's Tasks tab. ───────────────────────────────────
+        // ── Step 5: it shows as Completed in David's Tasks tab. TaskList.razor has no status
+        // filter, so a completed task stays in the grid rather than disappearing — assert on the
+        // status badge, not on absence from the list (see MyProfilePage.GetTaskStatusAsync). ───
         await profile.GoToAsync(AcmeId, davidId);
         await profile.OpenTasksTabAsync();
-        var tabTitlesAfter = await profile.GetTaskTitlesAsync();
-        Assert.DoesNotContain(tabTitlesAfter, t => t.Contains(claimedTitle, StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("Completed", await profile.GetTaskStatusAsync(claimedTitle));
 
         // ── Step 6: progress on the employee's Onboarding tab reflects the completion. ──────
         await empEdit.GoToAsync(AcmeId, employeeId);

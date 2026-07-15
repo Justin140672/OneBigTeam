@@ -4,11 +4,16 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 public sealed class LeaveTypeListPage(IPage page, string baseUrl)
 {
+    // ".e-grid" alone doesn't prove rows are queryable — Syncfusion's EJ2 grid populates
+    // ".e-row"/".e-rowcell" on its own JS render tick after the Blazor component mounts, so the
+    // row selector (or its empty-state/error siblings) is the only wait actually tied to data
+    // being present.
+    private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow, .alert-danger";
+
     public async Task GoToAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/leave-types");
-        // Grid renders only when IsLoading=false; spinner and grid are mutually exclusive branches.
-        await page.WaitForSelectorAsync(".e-grid, .alert-danger", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 20_000 });
     }
 
     public async Task ClickNewAsync()
@@ -17,14 +22,20 @@ public sealed class LeaveTypeListPage(IPage page, string baseUrl)
         await page.WaitForURLAsync("**/leave-types/new", new() { Timeout = 15_000 });
     }
 
-    public async Task<bool> HasItemAsync(string nameFragment) =>
-        await page.Locator(".e-rowcell")
+    public async Task<bool> HasItemAsync(string nameFragment)
+    {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+
+        return await page.Locator(".e-rowcell")
             .Filter(new() { HasText = nameFragment })
             .First
             .IsVisibleAsync();
+    }
 
     public async Task DeactivateAsync(string nameFragment)
     {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+
         var row = page.Locator(".e-row")
             .Filter(new() { HasText = nameFragment })
             .First;
@@ -40,6 +51,8 @@ public sealed class LeaveTypeListPage(IPage page, string baseUrl)
 
     public async Task<bool> IsActiveAsync(string nameFragment)
     {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+
         var row = page.Locator(".e-row")
             .Filter(new() { HasText = nameFragment })
             .First;
@@ -49,8 +62,6 @@ public sealed class LeaveTypeListPage(IPage page, string baseUrl)
     public async Task ShowInactiveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Show Inactive" }).ClickAsync();
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 }

@@ -64,7 +64,7 @@
                         var i = item;
                         var (dueLabel, dueCss) = DueBadge(i.DueDate, i.Status);
                         var url = $"/companies/{Session.CompanyId}/employees/{i.EmployeeId}";
-                        <div class="task-widget-item" @onclick="() => Navigation.NavigateTo(url)">
+                        <div @key="i.RequestId" class="task-widget-item" @onclick="() => Navigation.NavigateTo(url)">
                             <span class="priority-pip priority-pip--@(i.Status == "Overdue" ? "critical" : "medium")"></span>
                             <div class="task-widget-content">
                                 <span class="task-widget-title">@EmployeeName(i.EmployeeId)</span>

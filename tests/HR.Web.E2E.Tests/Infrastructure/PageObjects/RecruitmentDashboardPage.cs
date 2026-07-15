@@ -38,7 +38,10 @@ public sealed class RecruitmentDashboardPage(IPage page, string baseUrl)
     public async Task WaitForHiringPipelineChartLoadedAsync()
     {
         var widget = page.Locator(".widget-card").Filter(new() { HasText = "Hiring Pipeline" });
-        await widget.Locator(".e-accumulationchart-series, .widget-empty").First
+        // SfAccumulationChart renders its funnel as an <svg>, not a ".e-accumulationchart-series"
+        // element (that class doesn't exist in Syncfusion's actual DOM output) — "svg" is a
+        // reliable signal the chart itself has rendered, regardless of its internal series markup.
+        await widget.Locator("svg, .widget-empty").First
             .WaitForAsync(new() { Timeout = 15_000 });
     }
 

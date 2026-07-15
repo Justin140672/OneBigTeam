@@ -58,8 +58,16 @@ internal sealed class ConfirmImportSessionHandler(
                 Error.Conflict($"Import session '{request.ImportSessionId}' has no valid rows to confirm."));
         }
 
+        // Rows that failed the earlier Validate step never enter the loop below (only IsValid
+        // staging rows do), so they'd otherwise vanish from this step's own failedCount entirely
+        // — session.Confirm below overwrites FailedRows rather than adding to it, so without this
+        // a file with some already-invalid rows would incorrectly report ImportStatus.Imported
+        // (0 failures) once every row that WAS valid is confirmed successfully.
+        var alreadyInvalidRowCount = await db.ImportStagingEmployees
+            .CountAsync(s => s.ImportSessionId == session.Id && s.CompanyId == request.CompanyId && !s.IsValid, cancellationToken);
+
         var createdCount = 0;
-        var failedCount = 0;
+        var failedCount = alreadyInvalidRowCount;
         var createdByRow = new Dictionary<int, (Guid EmployeeId, string? ManagerReference)>();
 
         foreach (var row in stagingRows)

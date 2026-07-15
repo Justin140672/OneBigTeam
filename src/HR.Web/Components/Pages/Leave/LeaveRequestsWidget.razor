@@ -39,7 +39,7 @@ else
                 @foreach (var item in _items.Take(5))
                 {
                     var i = item;
-                    <div class="task-widget-item" @onclick="() => NavigateToRequest(i)">
+                    <div @key="i.LeaveRequestId" class="task-widget-item" @onclick="() => NavigateToRequest(i)">
                         <div class="task-widget-content">
                             <span class="task-widget-title">@i.EmployeeName</span>
                             <span class="task-widget-meta">@i.LeaveTypeName · @i.StartDate.ToString("d MMM") – @i.EndDate.ToString("d MMM")</span>

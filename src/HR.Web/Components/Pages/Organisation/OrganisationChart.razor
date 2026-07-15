@@ -85,46 +85,6 @@
         min-height: 420px;
     }
 
-    .org-chart-toggle {
-        position: absolute;
-        bottom: -12px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        border: 1px solid #D5D5D5;
-        background: var(--bs-body-bg, #FFFFFF);
-        color: var(--bs-secondary-color, #6b7280);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        line-height: 1;
-        padding: 0;
-        cursor: pointer;
-        z-index: 2;
-    }
-
-    .org-chart-toggle:hover {
-        border-color: var(--bs-primary, #0d6efd);
-        color: var(--bs-primary, #0d6efd);
-    }
-
-    .org-chart-toggle-count {
-        position: absolute;
-        top: -7px;
-        right: -7px;
-        min-width: 15px;
-        padding: 1px 4px;
-        border-radius: 999px;
-        background: var(--bs-primary, #0d6efd);
-        color: #fff;
-        font-size: 9px;
-        line-height: 1.2;
-        text-align: center;
-    }
-
     .org-chart-zoom-toolbar {
         position: absolute;
         top: 12px;
@@ -268,19 +228,6 @@
                                         <div class="org-chart-title">@item.JobTitle</div>
                                         <div class="org-chart-department">@item.Department</div>
                                     </div>
-                                    @if (item.DirectReportCount > 0)
-                                    {
-                                        <button type="button" class="org-chart-toggle"
-                                                @onclick="() => ToggleCollapse(item.Id)"
-                                                @onclick:stopPropagation="true"
-                                                title="@(item.IsCollapsed ? $"Expand ({item.DirectReportCount} direct reports)" : "Collapse")">
-                                            <i class="fa-solid @(item.IsCollapsed ? "fa-chevron-down" : "fa-chevron-up")"></i>
-                                            @if (item.IsCollapsed)
-                                            {
-                                                <span class="org-chart-toggle-count">@item.DirectReportCount</span>
-                                            }
-                                        </button>
-                                    }
                                 </div>
                             }
                         </NodeTemplate>
@@ -334,10 +281,7 @@
     // the diagram finishes laying itself out (OnDataLoaded).
     private string? _focusEmployeeId;
 
-    // Full hierarchy from the last load, kept around so toggling a manager's expand/collapse
-    // state can re-flatten in memory (ToggleCollapse) instead of re-fetching from the API.
     private IReadOnlyList<OrganisationChartNode> _tree = [];
-    private readonly HashSet<Guid> _collapsedManagerIds = [];
 
     // Absolute zoom scale (1.0 = 100%), two-way bound to <ScrollSettings> so it also picks up
     // zoom changes from mouse-wheel/pinch, not just our own toolbar buttons. Restored from
@@ -402,49 +346,10 @@
             // ever sees clean, acyclic parent links — dangling/self/circular manager references
             // are already resolved there, not something the diagram itself has to cope with.
             _tree = HierarchyBuilder.Build(response.Items);
-            _diagramItems = Flatten(_tree, managerId: null, _collapsedManagerIds);
+            _diagramItems = Flatten(_tree, managerId: null);
         }
 
         _loading = false;
-    }
-
-    // Toggles a manager's collapsed state and re-flattens the already-loaded tree in memory —
-    // no API round-trip needed, since collapsing/expanding doesn't change what data exists, only
-    // how much of it the diagram currently renders.
-    //
-    // The re-flattened list is applied to the live diagram via InsertDataAsync/DeleteDataAsync/
-    // UpdateDataAsync (Syncfusion's documented runtime CRUD API) rather than by reassigning
-    // _diagramItems and letting <DataSourceSettings DataSource="_diagramItems"> pick up a new
-    // list reference — swapping that reference on an already-rendered diagram is what throws a
-    // NullReferenceException out of Syncfusion's internal DataSourceSettings.OnAfterRenderAsync
-    // -> RefreshingDataSource() when nodes disappear/reappear.
-    private async Task ToggleCollapse(string employeeId)
-    {
-        if (!Guid.TryParse(employeeId, out var id)) return;
-
-        if (!_collapsedManagerIds.Remove(id))
-            _collapsedManagerIds.Add(id);
-
-        var newItems = Flatten(_tree, managerId: null, _collapsedManagerIds);
-
-        if (_diagram is not null)
-        {
-            var oldIds = _diagramItems.Select(i => i.Id).ToHashSet();
-            var newById = newItems.ToDictionary(i => i.Id);
-
-            foreach (var removedId in oldIds.Except(newById.Keys))
-                await _diagram.DeleteDataAsync("Id", removedId);
-
-            foreach (var addedId in newById.Keys.Except(oldIds))
-                await _diagram.InsertDataAsync(newById[addedId]);
-
-            // The toggled manager's own card stays on-diagram either way — its collapse
-            // icon/direct-report-count badge still needs updating in place.
-            if (newById.TryGetValue(employeeId, out var toggledItem))
-                await _diagram.UpdateDataAsync("Id", toggledItem);
-        }
-
-        _diagramItems = newItems;
     }
 
     private async Task OnDepartmentFilterChanged(Guid? value)
@@ -466,14 +371,12 @@
     }
 
     private static List<OrganisationChartDiagramItem> Flatten(
-        IReadOnlyList<OrganisationChartNode> nodes, string? managerId, HashSet<Guid> collapsedManagerIds)
+        IReadOnlyList<OrganisationChartNode> nodes, string? managerId)
     {
         var items = new List<OrganisationChartDiagramItem>();
 
         foreach (var node in nodes)
         {
-            var isCollapsed = collapsedManagerIds.Contains(node.EmployeeId);
-
             items.Add(new OrganisationChartDiagramItem
             {
                 Id = node.EmployeeId.ToString(),
@@ -482,15 +385,9 @@
                 JobTitle = node.JobTitle,
                 Department = node.Department,
                 ProfilePhotoUrl = node.ProfilePhotoUrl,
-                DirectReportCount = node.DirectReports.Count,
-                IsCollapsed = isCollapsed,
             });
 
-            // A collapsed manager's own card still renders, but its subtree is omitted entirely —
-            // removing those descendants (and their connectors) from the diagram's data source is
-            // what actually hides them, rather than any Diagram-side expand/collapse feature.
-            if (!isCollapsed)
-                items.AddRange(Flatten(node.DirectReports, node.EmployeeId.ToString(), collapsedManagerIds));
+            items.AddRange(Flatten(node.DirectReports, node.EmployeeId.ToString()));
         }
 
         return items;

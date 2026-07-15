@@ -42,7 +42,7 @@
                     {
                         var vacancy = item;
                         var url = $"/companies/{Session.CompanyId}/vacancies/{vacancy.VacancyId}";
-                        <div class="task-widget-item" @onclick="() => Navigation.NavigateTo(url)">
+                        <div @key="vacancy.VacancyId" class="task-widget-item" @onclick="() => Navigation.NavigateTo(url)">
                             <span class="priority-pip priority-pip--medium"></span>
                             <div class="task-widget-content">
                                 <span class="task-widget-title">@vacancy.Title</span>

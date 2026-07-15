@@ -111,11 +111,20 @@
     {
         GlobalError = null;
         _audienceDataLoaded = false;
-        _departments      = (await DepartmentService.ListDepartmentsAsync(CompanyId))?.Items ?? [];
-        _locations        = (await LocationService.ListLocationsAsync(CompanyId))?.Items ?? [];
-        _positionProfiles = (await PositionProfileService.ListPositionProfilesAsync(CompanyId))?.Items.ToList() ?? [];
-        var employees     = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 500);
-        _employees         = employees?.Items.Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}")).ToList() ?? [];
+
+        // Independent calls fired concurrently rather than awaited one at a time — see
+        // UploadSharedCompanyDocumentDialog.OnOpenedAsync for the same pattern and reasoning.
+        var departmentsTask      = DepartmentService.ListDepartmentsAsync(CompanyId);
+        var locationsTask        = LocationService.ListLocationsAsync(CompanyId);
+        var positionProfilesTask = PositionProfileService.ListPositionProfilesAsync(CompanyId);
+        var employeesTask        = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 500);
+
+        await Task.WhenAll(departmentsTask, locationsTask, positionProfilesTask, employeesTask);
+
+        _departments      = departmentsTask.Result?.Items ?? [];
+        _locations        = locationsTask.Result?.Items ?? [];
+        _positionProfiles = positionProfilesTask.Result?.Items.ToList() ?? [];
+        _employees         = employeesTask.Result?.Items.Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}")).ToList() ?? [];
 
         if (Document is not null)
         {

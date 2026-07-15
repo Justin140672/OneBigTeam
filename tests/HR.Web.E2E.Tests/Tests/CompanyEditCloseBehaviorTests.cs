@@ -34,9 +34,9 @@ public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
 
         await companyEdit.GoToAsync(AcmeId);
 
-        await companyEdit.CloseAndWaitForDashboardAsync(_fixture.WebBaseUrl);
+        await companyEdit.CloseAndWaitForDashboardAsync(_fixture.WebBaseUrl, AcmeId);
 
-        Assert.Equal($"{_fixture.WebBaseUrl}/", _page.Url);
+        Assert.Equal($"{_fixture.WebBaseUrl}/companies/{AcmeId}/edit", _page.Url);
     }
 
     [Fact]
@@ -101,8 +101,8 @@ public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         await companyEdit.ClickCloseAsync();
         Assert.True(await companyEdit.IsUnsavedChangesDialogVisibleAsync());
 
-        await companyEdit.ConfirmDiscardChangesAsync(_fixture.WebBaseUrl);
-        Assert.Equal($"{_fixture.WebBaseUrl}/", _page.Url);
+        await companyEdit.ConfirmDiscardChangesAsync(_fixture.WebBaseUrl, AcmeId);
+        Assert.Equal($"{_fixture.WebBaseUrl}/companies/{AcmeId}/edit", _page.Url);
 
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenSettingsTabAsync();
@@ -130,8 +130,8 @@ public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
 
         // Choosing Save from the prompt should persist the change AND navigate away — unlike
         // the page's own Save button, which stays put and shows an inline success banner.
-        await companyEdit.ConfirmSaveFromUnsavedChangesDialogAsync(_fixture.WebBaseUrl);
-        Assert.Equal($"{_fixture.WebBaseUrl}/", _page.Url);
+        await companyEdit.ConfirmSaveFromUnsavedChangesDialogAsync(_fixture.WebBaseUrl, AcmeId);
+        Assert.Equal($"{_fixture.WebBaseUrl}/companies/{AcmeId}/edit", _page.Url);
 
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenSettingsTabAsync();

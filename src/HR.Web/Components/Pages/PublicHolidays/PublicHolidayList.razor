@@ -31,16 +31,15 @@
             <GridColumns>
                 <GridColumn Field="@nameof(PublicHolidayListItemModel.Year)" HeaderText="Year" Width="90" />
                 <GridColumn Field="@nameof(PublicHolidayListItemModel.Date)" HeaderText="Date" Width="140" Format="d" />
-                <GridColumn Field="@nameof(PublicHolidayListItemModel.Name)" HeaderText="Name" Width="260" />
-                <GridColumn Field="@nameof(PublicHolidayListItemModel.CountryCode)" HeaderText="Country" Width="110" />
-                <GridColumn HeaderText="" Width="100" AllowSorting="false">
+                <GridColumn Field="@nameof(PublicHolidayListItemModel.Name)" HeaderText="Name" Width="260">
                     <Template>
                         @{
                             var row = (context as PublicHolidayListItemModel)!;
-                            <a href="/companies/@CompanyId/public-holidays/@row.Id">Edit</a>
+                            <a href="/companies/@CompanyId/public-holidays/@row.Id">@row.Name</a>
                         }
                     </Template>
                 </GridColumn>
+                <GridColumn Field="@nameof(PublicHolidayListItemModel.CountryCode)" HeaderText="Country" Width="110" />
             </GridColumns>
         </HrGrid>
     }

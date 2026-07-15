@@ -252,6 +252,42 @@ public class ConfirmImportSessionHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Marks_Session_CompletedWithErrors_When_Session_Has_An_Already_Invalid_Row()
+    {
+        // A row that failed the earlier Validate step never enters ConfirmImportSessionHandler's
+        // own creation loop (only IsValid staging rows do) — this proves that pre-existing
+        // failure still surfaces in the final status/FailedCount rather than vanishing once every
+        // row that WAS valid confirms successfully.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var session = SeedSession(db, companyId, ImportStatus.Validated, totalRows: 2);
+        AddValidRow(db, companyId, session.Id, 2, workEmail: "alice@example.com");
+
+        var invalidRow = ImportStagingEmployee.Create(
+            Guid.NewGuid(), companyId, session.Id, 3, employeeNumber: null, workEmail: null,
+            managerReference: null, departmentId: null, locationId: null, employmentTypeId: null,
+            positionProfileId: null, rawData: BuildRawData(lastName: ""), isValid: false, FixedNowOffset);
+        db.ImportStagingEmployees.Add(invalidRow);
+        db.SaveChanges();
+
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            new ConfirmImportSessionRequest { CompanyId = companyId, ImportSessionId = session.Id },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value!.CreatedCount);
+        Assert.Equal(1, result.Value.FailedCount);
+        Assert.Equal(nameof(ImportStatus.CompletedWithErrors), result.Value.Status);
+
+        var savedSession = await db.ImportSessions.SingleAsync(s => s.Id == session.Id);
+        Assert.Equal(ImportStatus.CompletedWithErrors, savedSession.Status);
+        Assert.Equal(1, savedSession.FailedRows);
+    }
+
+    [Fact]
     public async Task HandleAsync_Records_Row_Error_And_Continues_When_A_Row_Throws()
     {
         await using var db = BuildContext();
