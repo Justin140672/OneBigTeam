@@ -8,8 +8,9 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// the Publish flow, the Archive flow, the Acknowledgement card's "Edit" flow (used by
 /// CompanyDocumentsTabTests to set up documents with acknowledgement requirements before
 /// publishing), the Audience card's summary/edit-dialog affordances, the Document Metadata
-/// card's "Edit" flow (currently scoped to Review Frequency only — see
-/// SharedDocumentReviewFrequencyTests), and navigation to the acknowledgement-progress screen.
+/// card's "Edit" flow (covering Review Frequency — see SharedDocumentReviewFrequencyTests — and
+/// Review Owner — see SharedDocumentReviewOwnerTests), and navigation to the
+/// acknowledgement-progress screen.
 /// </summary>
 public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 {
@@ -126,6 +127,88 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
                 .Locator("input");
             await monthsInput.FillAsync(customMonths.Value.ToString());
         }
+
+        await EditMetadataDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// Text of the "Review Owner" row in the Document Metadata card (e.g. "Marcus Diallo"), or
+    /// null when the row isn't rendered at all — SharedDocumentDetail.razor only renders this row
+    /// once ReviewOwnerEmployeeId is set, so null is the expected result for a document that has
+    /// never had a review owner assigned.
+    /// </summary>
+    public async Task<string?> GetReviewOwnerTextAsync()
+    {
+        var row = page.Locator("dt:has-text('Review Owner') + dd");
+        if (!await row.IsVisibleAsync()) return null;
+        return (await row.InnerTextAsync()).Trim();
+    }
+
+    /// <summary>
+    /// Drives the page header's "Edit" button and EditSharedCompanyDocumentMetadataDialog.razor
+    /// to set (or change) the Review Owner via its filterable employee picker, then waits for the
+    /// page to reload its detail data. <paramref name="employeeNameFragment"/> is typed into the
+    /// dropdown's filter input to trigger the dialog's server-side search (same
+    /// OnReviewOwnerFilteringAsync pattern as the Employment tab's Manager picker — see
+    /// EmployeeEditPage.SelectManagerAsync) and must match the full display name exactly enough
+    /// to resolve to a single result and to assert against the combobox's resulting input value.
+    /// </summary>
+    public async Task SetReviewOwnerAsync(string employeeNameFragment)
+    {
+        await EditMetadataHeaderButton.ClickAsync();
+        await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
+        var reviewOwnerGroup = EditMetadataDialog.Locator(".col-md-6").Filter(new() { HasText = "Review Owner" });
+        await reviewOwnerGroup.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+
+        // Type into the filter input — required for AllowFiltering dropdowns (same pattern as
+        // EmployeeEditPage.SelectManagerAsync).
+        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
+        await filterInput.FillAsync(employeeNameFragment);
+        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
+            .Filter(new() { HasText = employeeNameFragment })
+            .First
+            .ClickAsync();
+
+        // Popup-hidden alone can be a purely client-side JS close animation and isn't proof that
+        // Blazor's ValueChanged round-trip to the server actually committed
+        // Model.ReviewOwnerEmployeeId yet — wait for the combobox's own input value too (same
+        // reasoning as EmployeeEditPage.SelectManagerAsync).
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
+            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        await Assertions.Expect(reviewOwnerGroup.Locator(".e-input-group input").First)
+            .ToHaveValueAsync(employeeNameFragment, new() { Timeout = 10_000 });
+
+        await EditMetadataDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// Drives the page header's "Edit" button and EditSharedCompanyDocumentMetadataDialog.razor
+    /// to clear the Review Owner via its dropdown's clear ("x") button (ShowClearButton="true"),
+    /// then waits for the page to reload its detail data. Assumes a Review Owner is currently set
+    /// — the clear button only renders once the dropdown has a value.
+    /// </summary>
+    public async Task ClearReviewOwnerAsync()
+    {
+        await EditMetadataHeaderButton.ClickAsync();
+        await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
+        var reviewOwnerGroup = EditMetadataDialog.Locator(".col-md-6").Filter(new() { HasText = "Review Owner" });
+        await reviewOwnerGroup.Locator(".e-clear-icon").ClickAsync();
+        await Assertions.Expect(reviewOwnerGroup.Locator(".e-input-group input").First)
+            .ToHaveValueAsync("", new() { Timeout = 10_000 });
 
         await EditMetadataDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });

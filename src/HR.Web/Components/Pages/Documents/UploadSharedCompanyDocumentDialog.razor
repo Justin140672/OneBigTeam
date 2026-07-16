@@ -1,4 +1,5 @@
 @using System.ComponentModel.DataAnnotations
+@using Syncfusion.Blazor.Data
 @inject DocumentService DocumentService
 @inherits EditDialogBase<UploadSharedCompanyDocumentDialog.UploadSharedCompanyDocumentFormModel>
 
@@ -86,6 +87,27 @@
                                               Min="1" Placeholder="e.g. 6" ShowSpinButton="false" />
                         </div>
                     }
+                    <div class="col-md-6">
+                        <label class="form-label">Review Owner</label>
+                        @if (_dataLoaded)
+                        {
+                            <SfDropDownList @ref="_reviewOwnerDropdown"
+                                            TValue="Guid?"
+                                            TItem="ReviewOwnerOption"
+                                            DataSource="@_reviewOwnerOptions"
+                                            @bind-Value="Model.ReviewOwnerEmployeeId"
+                                            Placeholder="None"
+                                            AllowFiltering="true"
+                                            ShowClearButton="true">
+                                <DropDownListFieldSettings Value="Id" Text="Name" />
+                                <DropDownListEvents TValue="Guid?" TItem="ReviewOwnerOption" Filtering="OnReviewOwnerFilteringAsync" />
+                            </SfDropDownList>
+                        }
+                        else
+                        {
+                            <HrLoadingIndicator Label="Loading employees…" />
+                        }
+                    </div>
                     <div class="col-12">
                         <label class="form-label">File <span class="text-danger">*</span></label>
                         <InputFile class="form-control" OnChange="OnFileSelected"
@@ -208,6 +230,8 @@
     private List<LocationListItemModel> _locations = [];
     private List<PositionProfileListItemModel> _positionProfiles = [];
     private List<EmployeeOption> _employees = [];
+    private SfDropDownList<Guid?, ReviewOwnerOption> _reviewOwnerDropdown = default!;
+    private List<ReviewOwnerOption> _reviewOwnerOptions = [];
     private IBrowserFile? _selectedFile;
 
     // OnOpenedAsync below awaits five HTTP calls sequentially with no intermediate
@@ -245,16 +269,38 @@
         var locationsTask        = LocationService.ListLocationsAsync(CompanyId);
         var positionProfilesTask = PositionProfileService.ListPositionProfilesAsync(CompanyId);
         var employeesTask        = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 500);
+        // A separate, bounded first page for the review-owner picker — kept independent of the
+        // audience "Selected Employees" list above (which intentionally loads up to 500 for that
+        // multiselect), since the review owner picker follows the bounded-page + server-side-filter
+        // pattern used by EmployeeEmploymentTab's manager picker instead.
+        var reviewOwnersTask     = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
 
-        await Task.WhenAll(categoriesTask, departmentsTask, locationsTask, positionProfilesTask, employeesTask);
+        await Task.WhenAll(categoriesTask, departmentsTask, locationsTask, positionProfilesTask, employeesTask, reviewOwnersTask);
 
         _categories       = categoriesTask.Result?.Items.ToList() ?? [];
         _departments       = departmentsTask.Result?.Items ?? [];
         _locations         = locationsTask.Result?.Items ?? [];
         _positionProfiles  = positionProfilesTask.Result?.Items.ToList() ?? [];
         _employees          = employeesTask.Result?.Items.Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}")).ToList() ?? [];
+        _reviewOwnerOptions = (reviewOwnersTask.Result?.Items ?? [])
+            .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(e => e.Name)
+            .ToList();
 
         _dataLoaded = true;
+    }
+
+    // The review owner list can't be preloaded exhaustively — search server-side as the user
+    // types instead, same pattern as EmployeeEmploymentTab's manager picker.
+    private async Task OnReviewOwnerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        _reviewOwnerOptions = (result?.Items ?? [])
+            .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(e => e.Name)
+            .ToList();
+        await _reviewOwnerDropdown.FilterAsync(_reviewOwnerOptions, new Query());
     }
 
     private const string AcknowledgementStatementPlaceholder = "I confirm that I have read and understood this document.";
@@ -282,7 +328,8 @@
             Model.RequiresAcknowledgement,
             Model.AcknowledgementDueDate, Model.AcknowledgementStatement,
             _selectedFile!,
-            Model.ReviewFrequency, Model.CustomReviewFrequencyMonths);
+            Model.ReviewFrequency, Model.CustomReviewFrequencyMonths,
+            Model.ReviewOwnerEmployeeId);
 
     protected override void ResetForm()
     {
@@ -300,10 +347,12 @@
         Model.AcknowledgementStatement = null;
         Model.ReviewFrequency = "None";
         Model.CustomReviewFrequencyMonths = null;
+        Model.ReviewOwnerEmployeeId = null;
         _selectedFile = null;
     }
 
     public sealed record EmployeeOption(Guid Id, string Name);
+    private sealed record ReviewOwnerOption(Guid Id, string Name);
 
     public sealed record ReviewFrequencyOption(string Value, string Label);
 
@@ -318,6 +367,7 @@
         public DateOnly? ReviewDate { get; set; }
         public string ReviewFrequency { get; set; } = "None";
         public int? CustomReviewFrequencyMonths { get; set; }
+        public Guid? ReviewOwnerEmployeeId { get; set; }
         public List<Guid> AudienceDepartmentIds { get; set; } = [];
         public List<Guid> AudienceLocationIds { get; set; } = [];
         public List<Guid> AudiencePositionProfileIds { get; set; } = [];

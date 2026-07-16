@@ -19,6 +19,8 @@ internal sealed record GetSharedCompanyDocumentResponse(
     DateOnly? ReviewDate,
     string ReviewFrequency,
     int? CustomReviewFrequencyMonths,
+    Guid? ReviewOwnerEmployeeId,
+    string? ReviewOwnerName,
     string AudienceDescription,
     IReadOnlyList<Guid> AudienceDepartmentIds,
     IReadOnlyList<Guid> AudienceLocationIds,

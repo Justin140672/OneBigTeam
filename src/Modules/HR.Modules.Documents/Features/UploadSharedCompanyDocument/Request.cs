@@ -13,6 +13,7 @@ internal sealed class UploadSharedCompanyDocumentRequest
     public DateOnly? ReviewDate { get; init; }
     public SharedCompanyDocumentReviewFrequency ReviewFrequency { get; init; }
     public int? CustomReviewFrequencyMonths { get; init; }
+    public Guid? ReviewOwnerEmployeeId { get; init; }
     public Guid[] AudienceDepartmentIds { get; init; } = [];
     public Guid[] AudienceLocationIds { get; init; } = [];
     public Guid[] AudiencePositionProfileIds { get; init; } = [];

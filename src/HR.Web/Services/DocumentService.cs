@@ -218,13 +218,14 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         DateOnly? reviewDate,
         string reviewFrequency = "None",
         int? customReviewFrequencyMonths = null,
+        Guid? reviewOwnerEmployeeId = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
             var request = new UpdateSharedCompanyDocumentMetadataRequest(
                 companyId, documentId, title, description, categoryId, effectiveDate, reviewDate,
-                reviewFrequency, customReviewFrequencyMonths);
+                reviewFrequency, customReviewFrequencyMonths, reviewOwnerEmployeeId);
 
             var response = await Http.PutAsJsonAsync(
                 $"api/companies/{companyId}/shared-documents/{documentId}", request, cancellationToken);
@@ -455,6 +456,7 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         IBrowserFile file,
         string reviewFrequency = "None",
         int? customReviewFrequencyMonths = null,
+        Guid? reviewOwnerEmployeeId = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -471,6 +473,8 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
             content.Add(new StringContent(reviewFrequency), "ReviewFrequency");
             if (customReviewFrequencyMonths.HasValue)
                 content.Add(new StringContent(customReviewFrequencyMonths.Value.ToString()), "CustomReviewFrequencyMonths");
+            if (reviewOwnerEmployeeId.HasValue)
+                content.Add(new StringContent(reviewOwnerEmployeeId.Value.ToString()), "ReviewOwnerEmployeeId");
             foreach (var id in audienceDepartmentIds)
                 content.Add(new StringContent(id.ToString()), "AudienceDepartmentIds");
             foreach (var id in audienceLocationIds)

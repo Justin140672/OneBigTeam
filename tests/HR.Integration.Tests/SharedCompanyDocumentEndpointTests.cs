@@ -115,6 +115,48 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
     }
 
     [Fact]
+    public async Task Upload_With_ReviewOwnerEmployeeId_RoundTrips_Via_GetDetail()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        var reviewOwnerId = Guid.NewGuid();
+        await CreateActiveEmployeeAsync(companyId, reviewOwnerId);
+
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, response) = await UploadAsync(
+            client, companyId, categoryId, title: "Remote Working Policy",
+            reviewOwnerEmployeeId: reviewOwnerId);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var detailResponse = await client.GetAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}");
+        Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
+
+        var detail = await detailResponse.Content.ReadFromJsonAsync<ReviewFrequencyDetailPayload>();
+        Assert.Equal(reviewOwnerId,        detail!.ReviewOwnerEmployeeId);
+        Assert.Equal("Ada Acknowledger",   detail.ReviewOwnerName);
+    }
+
+    [Fact]
+    public async Task Upload_With_Unknown_ReviewOwnerEmployeeId_Returns_NotFound()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (_, response) = await UploadAsync(
+            client, companyId, categoryId, title: "Remote Working Policy",
+            reviewOwnerEmployeeId: Guid.NewGuid());
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Upload_Returns_NotFound_When_Category_Belongs_To_Different_Company()
     {
         var companyA = Guid.NewGuid();
@@ -668,6 +710,28 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         var detail = await detailResponse.Content.ReadFromJsonAsync<ReviewFrequencyDetailPayload>();
         Assert.Equal("Custom", detail!.ReviewFrequency);
         Assert.Equal(6,        detail.CustomReviewFrequencyMonths);
+    }
+
+    [Fact]
+    public async Task UpdateMetadata_With_Unknown_ReviewOwnerEmployeeId_Returns_NotFound()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Old Title");
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}",
+            new
+            {
+                Title                 = "Updated Policy Title",
+                CategoryId            = categoryId,
+                ReviewOwnerEmployeeId = Guid.NewGuid(),
+            });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -1557,7 +1621,8 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         string AudienceDescription);
 
     private sealed record ReviewFrequencyDetailPayload(
-        Guid Id, string ReviewFrequency, int? CustomReviewFrequencyMonths);
+        Guid Id, string ReviewFrequency, int? CustomReviewFrequencyMonths,
+        Guid? ReviewOwnerEmployeeId, string? ReviewOwnerName);
 
     private async Task<Guid> CreateCategoryAsync(HttpClient client, Guid companyId, string name)
     {
@@ -1569,11 +1634,12 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
 
     private async Task<(DocumentPayload? Payload, HttpResponseMessage Response)> UploadAsync(
         HttpClient client, Guid companyId, Guid categoryId, string title = "Test Document",
-        string? reviewFrequency = null, int? customReviewFrequencyMonths = null, DateOnly? reviewDate = null)
+        string? reviewFrequency = null, int? customReviewFrequencyMonths = null, DateOnly? reviewDate = null,
+        Guid? reviewOwnerEmployeeId = null)
     {
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/shared-documents",
-            BuildUpload(title, categoryId, reviewFrequency, customReviewFrequencyMonths, reviewDate));
+            BuildUpload(title, categoryId, reviewFrequency, customReviewFrequencyMonths, reviewDate, reviewOwnerEmployeeId));
         DocumentPayload? payload = null;
         if (response.IsSuccessStatusCode)
             payload = await response.Content.ReadFromJsonAsync<DocumentPayload>();
@@ -1582,7 +1648,8 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
 
     private static MultipartFormDataContent BuildUpload(
         string title = "Test Document", Guid? categoryId = null,
-        string? reviewFrequency = null, int? customReviewFrequencyMonths = null, DateOnly? reviewDate = null)
+        string? reviewFrequency = null, int? customReviewFrequencyMonths = null, DateOnly? reviewDate = null,
+        Guid? reviewOwnerEmployeeId = null)
     {
         var form = new MultipartFormDataContent();
         form.Add(new StringContent(title), "Title");
@@ -1593,6 +1660,8 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
             form.Add(new StringContent(customReviewFrequencyMonths.Value.ToString()), "CustomReviewFrequencyMonths");
         if (reviewDate is not null)
             form.Add(new StringContent(reviewDate.Value.ToString("yyyy-MM-dd")), "ReviewDate");
+        if (reviewOwnerEmployeeId is not null)
+            form.Add(new StringContent(reviewOwnerEmployeeId.Value.ToString()), "ReviewOwnerEmployeeId");
 
         var fileContent = new ByteArrayContent(PdfBytes());
         fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");

@@ -17,4 +17,5 @@ internal sealed record UpdateSharedCompanyDocumentMetadataRequest
     public DateOnly? ReviewDate { get; init; }
     public SharedCompanyDocumentReviewFrequency ReviewFrequency { get; init; }
     public int? CustomReviewFrequencyMonths { get; init; }
+    public Guid? ReviewOwnerEmployeeId { get; init; }
 }

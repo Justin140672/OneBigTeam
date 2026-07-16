@@ -52,7 +52,7 @@ public class UpdateSharedCompanyDocumentAcknowledgementSettingsHandlerTests
         var category  = await SeedCategory(db, companyId);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, SharedCompanyDocumentReviewFrequency.None, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
             acknowledgementStatement: "Old statement", createdBy: Guid.NewGuid(), now: Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
@@ -162,7 +162,7 @@ public class UpdateSharedCompanyDocumentAcknowledgementSettingsHandlerTests
     private static SharedCompanyDocument CreateDoc(Guid companyId, Guid categoryId, Guid createdBy) =>
         SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, categoryId, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, createdBy, Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, createdBy, Now);
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

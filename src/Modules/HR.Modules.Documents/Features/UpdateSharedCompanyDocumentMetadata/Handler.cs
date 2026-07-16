@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.SharedKernel;
@@ -7,6 +8,7 @@ namespace HR.Modules.Documents.Features.UpdateSharedCompanyDocumentMetadata;
 
 internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
     DocumentsDbContext db,
+    IEmployeeAudienceReader employeeAudienceReader,
     IAuditEventPublisher auditPublisher,
     IClock clock)
 {
@@ -37,6 +39,14 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
                 Error.NotFound($"Document category '{request.CategoryId}' was not found."));
         }
 
+        // Same existence check the audience employee ids get via SharedCompanyDocumentAudienceRuleBuilder.
+        if (request.ReviewOwnerEmployeeId is { } reviewOwnerEmployeeId &&
+            !await employeeAudienceReader.EmployeeExistsAsync(request.CompanyId, reviewOwnerEmployeeId, cancellationToken))
+        {
+            return Result.Failure<UpdateSharedCompanyDocumentMetadataResponse>(
+                Error.NotFound($"Employee '{reviewOwnerEmployeeId}' was not found."));
+        }
+
         // Snapshot the editable fields before mutating, so the audit event only fires — and only
         // describes — an actual change. Audience/acknowledgement are intentionally excluded from
         // the snapshot: they aren't in the "Editable fields" list — audience now has its own
@@ -50,6 +60,7 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
             document.ReviewDate,
             document.ReviewFrequency,
             document.CustomReviewFrequencyMonths,
+            document.ReviewOwnerEmployeeId,
         };
 
         // CustomReviewFrequencyMonths is compared against what it will become post-clear (i.e.
@@ -66,7 +77,8 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
             document.EffectiveDate != request.EffectiveDate ||
             document.ReviewDate != request.ReviewDate ||
             document.ReviewFrequency != request.ReviewFrequency ||
-            document.CustomReviewFrequencyMonths != requestCustomReviewFrequencyMonths;
+            document.CustomReviewFrequencyMonths != requestCustomReviewFrequencyMonths ||
+            document.ReviewOwnerEmployeeId != request.ReviewOwnerEmployeeId;
 
         var now = clock.UtcNowOffset();
 
@@ -78,6 +90,7 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
             request.ReviewDate,
             request.ReviewFrequency,
             request.CustomReviewFrequencyMonths,
+            request.ReviewOwnerEmployeeId,
             updatedBy,
             now);
 
@@ -94,6 +107,7 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
                 document.ReviewDate,
                 document.ReviewFrequency,
                 document.CustomReviewFrequencyMonths,
+                document.ReviewOwnerEmployeeId,
             };
 
             await auditPublisher.PublishAsync(new SharedCompanyDocumentMetadataUpdatedAuditEvent(
@@ -118,6 +132,7 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
             document.ReviewDate,
             document.ReviewFrequency.ToString(),
             document.CustomReviewFrequencyMonths,
+            document.ReviewOwnerEmployeeId,
             document.UpdatedBy,
             document.UpdatedAt));
     }

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.UpdateSharedCompanyDocumentMetadata;
 using HR.Modules.Documents.Persistence;
@@ -88,7 +89,7 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Title", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, SharedCompanyDocumentReviewFrequency.None, null, true, null, null, Guid.NewGuid(), Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, true, null, null, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAudienceRules.Add(SharedCompanyDocumentAudienceRule.Create(
             Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId));
@@ -293,6 +294,137 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Updates_ReviewOwnerEmployeeId_To_Valid_Employee()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var reviewOwnerId  = Guid.NewGuid();
+        var audienceReader = new FakeEmployeeAudienceReader();
+        audienceReader.ExistingEmployeeIds.Add(reviewOwnerId);
+
+        var doc = CreateDoc(companyId, "Title", category.Id, Guid.NewGuid());
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db, audienceReader: audienceReader).HandleAsync(
+            new UpdateSharedCompanyDocumentMetadataRequest
+            {
+                CompanyId             = companyId,
+                DocumentId            = doc.Id,
+                Title                 = "Title",
+                CategoryId            = category.Id,
+                ReviewOwnerEmployeeId = reviewOwnerId,
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(reviewOwnerId, result.Value!.ReviewOwnerEmployeeId);
+
+        var stored = await db.SharedCompanyDocuments.AsNoTracking().SingleAsync(d => d.Id == doc.Id);
+        Assert.Equal(reviewOwnerId, stored.ReviewOwnerEmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Clears_ReviewOwnerEmployeeId_To_Null()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var reviewOwnerId  = Guid.NewGuid();
+        var createdBy      = Guid.NewGuid();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Title", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, reviewOwnerId, false, null, null, createdBy, Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new UpdateSharedCompanyDocumentMetadataRequest
+            {
+                CompanyId             = companyId,
+                DocumentId            = doc.Id,
+                Title                 = "Title",
+                CategoryId            = category.Id,
+                ReviewOwnerEmployeeId = null,
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.ReviewOwnerEmployeeId);
+
+        var stored = await db.SharedCompanyDocuments.AsNoTracking().SingleAsync(d => d.Id == doc.Id);
+        Assert.Null(stored.ReviewOwnerEmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_ReviewOwnerEmployee_Does_Not_Exist()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = CreateDoc(companyId, "Title", category.Id, Guid.NewGuid());
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db, audienceReader: new FakeEmployeeAudienceReader()).HandleAsync(
+            new UpdateSharedCompanyDocumentMetadataRequest
+            {
+                CompanyId             = companyId,
+                DocumentId            = doc.Id,
+                Title                 = "Title",
+                CategoryId            = category.Id,
+                ReviewOwnerEmployeeId = Guid.NewGuid(),
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_When_Only_ReviewOwnerEmployeeId_Changes()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var reviewOwnerId  = Guid.NewGuid();
+        var audienceReader = new FakeEmployeeAudienceReader();
+        audienceReader.ExistingEmployeeIds.Add(reviewOwnerId);
+
+        var doc = CreateDoc(companyId, "Same Title", category.Id, Guid.NewGuid());
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var audit = new FakeAuditPublisher();
+        await Handler(db, audit, audienceReader).HandleAsync(
+            new UpdateSharedCompanyDocumentMetadataRequest
+            {
+                CompanyId             = companyId,
+                DocumentId            = doc.Id,
+                Title                 = "Same Title",
+                Description           = doc.Description,
+                CategoryId            = category.Id,
+                EffectiveDate         = doc.EffectiveDate,
+                ReviewDate            = doc.ReviewDate,
+                ReviewOwnerEmployeeId = reviewOwnerId,
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        var evt = Assert.Single(audit.Published);
+        Assert.Equal("shared_company_document.metadata_updated", evt.EventType);
+
+        // The before/after snapshot must actually carry the ReviewOwnerEmployeeId change, not
+        // just trigger publication — serialize both and confirm the new id is only present in
+        // "after".
+        var beforeJson = JsonSerializer.Serialize(evt.Before);
+        var afterJson  = JsonSerializer.Serialize(evt.After);
+        Assert.DoesNotContain(reviewOwnerId.ToString(), beforeJson, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(reviewOwnerId.ToString(), afterJson, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task HandleAsync_Clears_CustomReviewFrequencyMonths_When_ReviewFrequency_Changes_Away_From_Custom()
     {
         await using var db = BuildContext();
@@ -302,7 +434,7 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
 
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Title", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, SharedCompanyDocumentReviewFrequency.Custom, 6, false, null, null, createdBy, Now);
+            null, null, SharedCompanyDocumentReviewFrequency.Custom, 6, null, false, null, null, createdBy, Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -323,13 +455,15 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
     }
 
     private static UpdateSharedCompanyDocumentMetadataHandler Handler(
-        DocumentsDbContext db, FakeAuditPublisher? auditPublisher = null) =>
-        new(db, auditPublisher ?? new FakeAuditPublisher(), new FakeClock(FixedUtcNow));
+        DocumentsDbContext db,
+        FakeAuditPublisher? auditPublisher = null,
+        FakeEmployeeAudienceReader? audienceReader = null) =>
+        new(db, audienceReader ?? new FakeEmployeeAudienceReader(), auditPublisher ?? new FakeAuditPublisher(), new FakeClock(FixedUtcNow));
 
     private static SharedCompanyDocument CreateDoc(Guid companyId, string title, Guid categoryId, Guid createdBy) =>
         SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, title, null, categoryId, "key/p.pdf", "p.pdf", 100, "application/pdf",
-            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, createdBy, Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, createdBy, Now);
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

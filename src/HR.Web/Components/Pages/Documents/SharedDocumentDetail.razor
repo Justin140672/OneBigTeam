@@ -96,6 +96,11 @@
                                 }
                             </dd>
                         }
+                        @if (_detail.ReviewOwnerEmployeeId.HasValue)
+                        {
+                            <dt>Review Owner</dt>
+                            <dd>@_detail.ReviewOwnerName</dd>
+                        }
                         @if (!string.IsNullOrWhiteSpace(_detail.Description))
                         {
                             <dt>Description</dt>

@@ -27,6 +27,12 @@ internal sealed class SharedCompanyDocument
     public SharedCompanyDocumentReviewFrequency ReviewFrequency { get; private set; }
     public int? CustomReviewFrequencyMonths { get; private set; }
 
+    // A company document may not have a review owner assigned — this is a plain Guid reference
+    // to an Employee in the Employees module (no navigation property, same as
+    // SharedCompanyDocumentAudienceRule.TargetId and Document.EmployeeId elsewhere in this
+    // module), resolved to a display name only at the read side via IEmployeeNameReader.
+    public Guid? ReviewOwnerEmployeeId { get; private set; }
+
     // Audience is modelled as a separate set of SharedCompanyDocumentAudienceRule rows (see that
     // type), not fields here — this aggregate has no in-memory audience state of its own, the
     // same way version history lives entirely in SharedCompanyDocumentVersion rows.
@@ -70,6 +76,7 @@ internal sealed class SharedCompanyDocument
         DateOnly? reviewDate,
         SharedCompanyDocumentReviewFrequency reviewFrequency,
         int? customReviewFrequencyMonths,
+        Guid? reviewOwnerEmployeeId,
         bool requiresAcknowledgement,
         DateOnly? acknowledgementDueDate,
         string? acknowledgementStatement,
@@ -91,6 +98,7 @@ internal sealed class SharedCompanyDocument
         ReviewDate               = reviewDate,
         ReviewFrequency             = reviewFrequency,
         CustomReviewFrequencyMonths = reviewFrequency == SharedCompanyDocumentReviewFrequency.Custom ? customReviewFrequencyMonths : null,
+        ReviewOwnerEmployeeId    = reviewOwnerEmployeeId,
         RequiresAcknowledgement  = requiresAcknowledgement,
         AcknowledgementDueDate   = requiresAcknowledgement ? acknowledgementDueDate : null,
         AcknowledgementStatement = requiresAcknowledgement && !string.IsNullOrWhiteSpace(acknowledgementStatement)
@@ -110,6 +118,7 @@ internal sealed class SharedCompanyDocument
         DateOnly? reviewDate,
         SharedCompanyDocumentReviewFrequency reviewFrequency,
         int? customReviewFrequencyMonths,
+        Guid? reviewOwnerEmployeeId,
         Guid updatedBy,
         DateTimeOffset now)
     {
@@ -120,6 +129,7 @@ internal sealed class SharedCompanyDocument
         ReviewDate              = reviewDate;
         ReviewFrequency             = reviewFrequency;
         CustomReviewFrequencyMonths = reviewFrequency == SharedCompanyDocumentReviewFrequency.Custom ? customReviewFrequencyMonths : null;
+        ReviewOwnerEmployeeId   = reviewOwnerEmployeeId;
         UpdatedBy               = updatedBy;
         UpdatedAt               = now;
     }

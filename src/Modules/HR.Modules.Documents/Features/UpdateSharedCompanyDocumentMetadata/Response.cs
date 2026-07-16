@@ -12,5 +12,6 @@ internal sealed record UpdateSharedCompanyDocumentMetadataResponse(
     DateOnly? ReviewDate,
     string ReviewFrequency,
     int? CustomReviewFrequencyMonths,
+    Guid? ReviewOwnerEmployeeId,
     Guid UpdatedBy,
     DateTimeOffset UpdatedAt);

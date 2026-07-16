@@ -15,6 +15,7 @@ internal sealed record UploadSharedCompanyDocumentResponse(
     DateOnly? ReviewDate,
     string ReviewFrequency,
     int? CustomReviewFrequencyMonths,
+    Guid? ReviewOwnerEmployeeId,
     IReadOnlyList<Guid> AudienceDepartmentIds,
     IReadOnlyList<Guid> AudienceLocationIds,
     IReadOnlyList<Guid> AudiencePositionProfileIds,

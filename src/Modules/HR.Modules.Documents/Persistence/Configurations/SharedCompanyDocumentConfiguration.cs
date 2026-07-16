@@ -77,6 +77,12 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
         builder.Property(d => d.CustomReviewFrequencyMonths)
             .HasColumnName("custom_review_frequency_months");
 
+        // Plain Guid column, no FK — Employee lives in the Employees module, resolved only via
+        // IEmployeeNameReader/IEmployeeAudienceReader at read time, same as
+        // SharedCompanyDocumentAudienceRule.TargetId.
+        builder.Property(d => d.ReviewOwnerEmployeeId)
+            .HasColumnName("review_owner_employee_id");
+
         builder.Property(d => d.RequiresAcknowledgement)
             .HasColumnName("requires_acknowledgement")
             .IsRequired();

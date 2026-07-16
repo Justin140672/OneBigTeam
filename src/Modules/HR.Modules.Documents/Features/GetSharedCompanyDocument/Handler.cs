@@ -42,6 +42,8 @@ internal sealed class GetSharedCompanyDocumentHandler(
             idsToResolve.Add(publishedBy);
         if (document.ArchivedBy is { } archivedBy)
             idsToResolve.Add(archivedBy);
+        if (document.ReviewOwnerEmployeeId is { } reviewOwnerEmployeeId)
+            idsToResolve.Add(reviewOwnerEmployeeId);
         idsToResolve.AddRange(uploaderIds);
 
         var namesLookup = await employeeNameReader.GetNamesAsync(
@@ -107,6 +109,10 @@ internal sealed class GetSharedCompanyDocumentHandler(
             document.ReviewDate,
             document.ReviewFrequency.ToString(),
             document.CustomReviewFrequencyMonths,
+            document.ReviewOwnerEmployeeId,
+            document.ReviewOwnerEmployeeId is { } ownerEmployeeId
+                ? (namesLookup.TryGetValue(ownerEmployeeId, out var reviewOwnerName) ? reviewOwnerName : "Unknown")
+                : null,
             audienceDescription,
             audienceDepartmentIds,
             audienceLocationIds,

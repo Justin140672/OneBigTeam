@@ -13,6 +13,7 @@ internal sealed class UploadSharedCompanyDocumentHandler(
     IFileUploadValidator fileValidator,
     IVirusScanService virusScanner,
     SharedCompanyDocumentAudienceRuleBuilder audienceRuleBuilder,
+    IEmployeeAudienceReader employeeAudienceReader,
     IAuditEventPublisher auditPublisher,
     IClock clock)
 {
@@ -53,6 +54,14 @@ internal sealed class UploadSharedCompanyDocumentHandler(
         {
             return Result.Failure<UploadSharedCompanyDocumentResponse>(
                 Error.NotFound($"Document category '{request.CategoryId}' was not found."));
+        }
+
+        // Same existence check the audience employee ids get via SharedCompanyDocumentAudienceRuleBuilder.
+        if (request.ReviewOwnerEmployeeId is { } reviewOwnerEmployeeId &&
+            !await employeeAudienceReader.EmployeeExistsAsync(request.CompanyId, reviewOwnerEmployeeId, cancellationToken))
+        {
+            return Result.Failure<UploadSharedCompanyDocumentResponse>(
+                Error.NotFound($"Employee '{reviewOwnerEmployeeId}' was not found."));
         }
 
         // The document doesn't exist yet, but audience rules need its id as their foreign key —
@@ -115,6 +124,7 @@ internal sealed class UploadSharedCompanyDocumentHandler(
             request.ReviewDate,
             request.ReviewFrequency,
             request.CustomReviewFrequencyMonths,
+            request.ReviewOwnerEmployeeId,
             request.RequiresAcknowledgement,
             request.AcknowledgementDueDate,
             request.AcknowledgementStatement,
@@ -174,6 +184,7 @@ internal sealed class UploadSharedCompanyDocumentHandler(
             document.ReviewDate,
             document.ReviewFrequency.ToString(),
             document.CustomReviewFrequencyMonths,
+            document.ReviewOwnerEmployeeId,
             request.AudienceDepartmentIds,
             request.AudienceLocationIds,
             request.AudiencePositionProfileIds,

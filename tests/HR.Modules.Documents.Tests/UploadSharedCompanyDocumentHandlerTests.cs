@@ -27,14 +27,21 @@ public class UploadSharedCompanyDocumentHandlerTests
         FakeVirusScanService? scanner = null,
         FileUploadOptions? options = null,
         FakeEmployeeAudienceReader? audienceReader = null,
-        FakeAuditPublisher? auditPublisher = null) =>
-        new(db,
+        FakeAuditPublisher? auditPublisher = null)
+    {
+        // Same fake instance backs both the audience rule builder and the direct
+        // ReviewOwnerEmployeeId existence check, so a test that registers an employee id in one
+        // place sees it recognised in both.
+        var reader = audienceReader ?? new FakeEmployeeAudienceReader();
+        return new(db,
             storage ?? new FakeDocumentStorageService(),
             new FileUploadValidator(Options.Create(options ?? new FileUploadOptions())),
             scanner ?? new FakeVirusScanService(),
-            new SharedCompanyDocumentAudienceRuleBuilder(audienceReader ?? new FakeEmployeeAudienceReader()),
+            new SharedCompanyDocumentAudienceRuleBuilder(reader),
+            reader,
             auditPublisher ?? new FakeAuditPublisher(),
             new FakeClock(FixedUtcNow));
+    }
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")
@@ -75,6 +82,7 @@ public class UploadSharedCompanyDocumentHandlerTests
         DateOnly? reviewDate    = null,
         SharedCompanyDocumentReviewFrequency reviewFrequency = SharedCompanyDocumentReviewFrequency.None,
         int? customReviewFrequencyMonths = null,
+        Guid? reviewOwnerEmployeeId = null,
         Guid[]? audienceDepartmentIds = null,
         Guid[]? audienceLocationIds   = null,
         Guid[]? audiencePositionProfileIds = null,
@@ -92,6 +100,7 @@ public class UploadSharedCompanyDocumentHandlerTests
             ReviewDate                  = reviewDate,
             ReviewFrequency             = reviewFrequency,
             CustomReviewFrequencyMonths = customReviewFrequencyMonths,
+            ReviewOwnerEmployeeId       = reviewOwnerEmployeeId,
             AudienceDepartmentIds       = audienceDepartmentIds ?? [],
             AudienceLocationIds         = audienceLocationIds ?? [],
             AudiencePositionProfileIds  = audiencePositionProfileIds ?? [],
@@ -435,6 +444,66 @@ public class UploadSharedCompanyDocumentHandlerTests
         var saved = await db.SharedCompanyDocuments.SingleAsync();
         Assert.Equal(SharedCompanyDocumentReviewFrequency.None, saved.ReviewFrequency);
         Assert.Null(saved.CustomReviewFrequencyMonths);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Sets_ReviewOwnerEmployeeId_When_Employee_Exists()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var reviewOwnerId  = Guid.NewGuid();
+        var audienceReader = new FakeEmployeeAudienceReader();
+        audienceReader.ExistingEmployeeIds.Add(reviewOwnerId);
+        var handler = BuildHandler(db, audienceReader: audienceReader);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, category.Id, reviewOwnerEmployeeId: reviewOwnerId),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(reviewOwnerId, result.Value!.ReviewOwnerEmployeeId);
+
+        var saved = await db.SharedCompanyDocuments.SingleAsync();
+        Assert.Equal(reviewOwnerId, saved.ReviewOwnerEmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Sets_Null_ReviewOwnerEmployeeId_When_Not_Provided()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var handler        = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, category.Id, reviewOwnerEmployeeId: null),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.ReviewOwnerEmployeeId);
+
+        var saved = await db.SharedCompanyDocuments.SingleAsync();
+        Assert.Null(saved.ReviewOwnerEmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_ReviewOwnerEmployee_Does_Not_Exist()
+    {
+        await using var db = BuildContext();
+        var companyId      = Guid.NewGuid();
+        var category       = await SeedCategory(db, companyId);
+        var handler        = BuildHandler(db, audienceReader: new FakeEmployeeAudienceReader());
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, category.Id, reviewOwnerEmployeeId: Guid.NewGuid()),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
     }
 
     [Fact]

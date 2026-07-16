@@ -1,5 +1,7 @@
 @using System.ComponentModel.DataAnnotations
+@using Syncfusion.Blazor.Data
 @inject DocumentService DocumentService
+@inject EmployeeService EmployeeService
 @inherits EditDialogBase<EditSharedCompanyDocumentMetadataDialog.EditSharedCompanyDocumentMetadataFormModel>
 
 <SfDialog @bind-Visible="Visible" IsModal="true" Width="640px" ShowCloseIcon="true">
@@ -86,6 +88,27 @@
                                               Min="1" Placeholder="e.g. 6" ShowSpinButton="false" />
                         </div>
                     }
+                    <div class="col-md-6">
+                        <label class="form-label">Review Owner</label>
+                        @if (_dataLoaded)
+                        {
+                            <SfDropDownList @ref="_reviewOwnerDropdown"
+                                            TValue="Guid?"
+                                            TItem="ReviewOwnerOption"
+                                            DataSource="@_reviewOwnerOptions"
+                                            @bind-Value="Model.ReviewOwnerEmployeeId"
+                                            Placeholder="None"
+                                            AllowFiltering="true"
+                                            ShowClearButton="true">
+                                <DropDownListFieldSettings Value="Id" Text="Name" />
+                                <DropDownListEvents TValue="Guid?" TItem="ReviewOwnerOption" Filtering="OnReviewOwnerFilteringAsync" />
+                            </SfDropDownList>
+                        }
+                        else
+                        {
+                            <HrLoadingIndicator Label="Loading employees…" />
+                        }
+                    </div>
                 </div>
             </EditForm>
         </Content>
@@ -100,6 +123,8 @@
     [Parameter] public SharedCompanyDocumentDetailResponse? Document { get; set; }
 
     private List<CompanyDocumentCategoryItem> _categories = [];
+    private SfDropDownList<Guid?, ReviewOwnerOption> _reviewOwnerDropdown = default!;
+    private List<ReviewOwnerOption> _reviewOwnerOptions = [];
 
     // Category is rendered once _categories has actually loaded rather than immediately with an
     // empty DataSource — Blazor renders this dialog as soon as it becomes visible, before the
@@ -123,6 +148,13 @@
         _dataLoaded = false;
         _categories = (await DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId))?.Items.ToList() ?? [];
 
+        // A first page (browsable without typing anything) — same pattern as
+        // EmployeeEmploymentTab's manager picker. The rest of the company is reached by typing,
+        // see OnReviewOwnerFilteringAsync, so this page doesn't need to be exhaustive.
+        _reviewOwnerOptions = ((await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50))?.Items ?? [])
+            .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .ToList();
+
         if (Document is not null)
         {
             Model.Title = Document.Title;
@@ -132,9 +164,32 @@
             Model.ReviewDate = Document.ReviewDate;
             Model.ReviewFrequency = Document.ReviewFrequency;
             Model.CustomReviewFrequencyMonths = Document.CustomReviewFrequencyMonths;
+            Model.ReviewOwnerEmployeeId = Document.ReviewOwnerEmployeeId;
+
+            // The current review owner might not fall within the first page above — merge them in
+            // explicitly so their name always renders rather than blank, same as the manager
+            // picker's handling of employee.ManagerFullName.
+            if (Document.ReviewOwnerEmployeeId is { } reviewOwnerId && _reviewOwnerOptions.All(o => o.Id != reviewOwnerId))
+                _reviewOwnerOptions.Add(new ReviewOwnerOption(reviewOwnerId, Document.ReviewOwnerName ?? ""));
         }
 
+        _reviewOwnerOptions = _reviewOwnerOptions.OrderBy(o => o.Name).ToList();
+
         _dataLoaded = true;
+    }
+
+    // The review owner list can't be preloaded in one bounded page the way _categories is — a
+    // company can have far more employees than any reasonable page size. Search server-side as
+    // the user types instead, same pattern as EmployeeEmploymentTab's manager picker.
+    private async Task OnReviewOwnerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        _reviewOwnerOptions = (result?.Items ?? [])
+            .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(e => e.Name)
+            .ToList();
+        await _reviewOwnerDropdown.FilterAsync(_reviewOwnerOptions, new Query());
     }
 
     // Mirrors UploadSharedCompanyDocumentDialog's ValidateExtra hook — DataAnnotations can't
@@ -155,7 +210,8 @@
             CompanyId, Document.Id,
             Model.Title, Model.Description, Model.CategoryId!.Value,
             Model.EffectiveDate, Model.ReviewDate,
-            Model.ReviewFrequency, Model.CustomReviewFrequencyMonths);
+            Model.ReviewFrequency, Model.CustomReviewFrequencyMonths,
+            Model.ReviewOwnerEmployeeId);
     }
 
     protected override void ResetForm()
@@ -167,9 +223,11 @@
         Model.ReviewDate = null;
         Model.ReviewFrequency = "None";
         Model.CustomReviewFrequencyMonths = null;
+        Model.ReviewOwnerEmployeeId = null;
     }
 
     public sealed record ReviewFrequencyOption(string Value, string Label);
+    private sealed record ReviewOwnerOption(Guid Id, string Name);
 
     public sealed class EditSharedCompanyDocumentMetadataFormModel
     {
@@ -182,5 +240,6 @@
         public DateOnly? ReviewDate { get; set; }
         public string ReviewFrequency { get; set; } = "None";
         public int? CustomReviewFrequencyMonths { get; set; }
+        public Guid? ReviewOwnerEmployeeId { get; set; }
     }
 }

@@ -62,7 +62,7 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Remote Working Policy", null, categoryId,
             "key/v1.pdf", "v1.pdf", 100, "application/pdf",
-            null, null, SharedCompanyDocumentReviewFrequency.None, null,
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null,
             requiresAcknowledgement,
             requiresAcknowledgement ? new DateOnly(2027, 1, 1) : null,
             null,
@@ -432,7 +432,7 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
         db.CompanyDocumentCategories.Add(category);
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
-            null, null, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, Guid.NewGuid(), Now);
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.BaseSaveChangesAsync(); // seed without throwing
 

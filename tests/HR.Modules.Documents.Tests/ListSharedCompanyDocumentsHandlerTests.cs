@@ -214,7 +214,7 @@ public class ListSharedCompanyDocumentsHandlerTests
         DateOnly? effectiveDate, DateOnly? reviewDate, Guid createdBy, DateTimeOffset now) =>
         SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, title, null, categoryId, storageKey, fileName, 100, "application/pdf",
-            effectiveDate, reviewDate, SharedCompanyDocumentReviewFrequency.None, null, false, null, null, createdBy, now);
+            effectiveDate, reviewDate, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, createdBy, now);
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")
