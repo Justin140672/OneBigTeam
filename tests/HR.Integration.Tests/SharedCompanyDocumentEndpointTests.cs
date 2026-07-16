@@ -284,6 +284,32 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
     }
 
     [Fact]
+    public async Task List_Includes_ReviewFrequency_And_ReviewOwner_Name()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+
+        var reviewOwnerId = Guid.NewGuid();
+        await CreateActiveEmployeeAsync(companyId, reviewOwnerId);
+
+        var (doc, response) = await UploadAsync(
+            client, companyId, categoryId, title: "Quarterly Reviewed Policy",
+            reviewFrequency: "Quarterly", reviewDate: new DateOnly(2027, 1, 1),
+            reviewOwnerEmployeeId: reviewOwnerId);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var list = await client.GetFromJsonAsync<ListPayload>($"/api/companies/{companyId}/shared-documents");
+        var item = Assert.Single(list!.Items, i => i.Id == doc!.Id);
+
+        Assert.Equal("Quarterly",       item.ReviewFrequency);
+        Assert.Equal(reviewOwnerId,     item.ReviewOwnerEmployeeId);
+        Assert.Equal("Ada Acknowledger", item.ReviewOwnerName);
+    }
+
+    [Fact]
     public async Task List_Excludes_Documents_From_Other_Companies()
     {
         var companyA = Guid.NewGuid();
@@ -1698,5 +1724,7 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
     private sealed record CategoryPayload(Guid Id, Guid CompanyId, string Name, bool IsActive);
     private sealed record DocumentPayload(Guid Id, string Title, string Status, int VersionNumber);
     private sealed record ListPayload(IReadOnlyList<ListItem> Items);
-    private sealed record ListItem(Guid Id, string Title, string CategoryName, string Status, string UpdatedByName);
+    private sealed record ListItem(
+        Guid Id, string Title, string CategoryName, string Status, string UpdatedByName,
+        string ReviewFrequency, Guid? ReviewOwnerEmployeeId, string? ReviewOwnerName);
 }

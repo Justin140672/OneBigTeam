@@ -13,6 +13,9 @@ internal sealed record SharedCompanyDocumentListItem(
     string Status,
     DateOnly? EffectiveDate,
     DateOnly? ReviewDate,
+    string ReviewFrequency,
+    Guid? ReviewOwnerEmployeeId,
+    string? ReviewOwnerName,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     string UpdatedByName);

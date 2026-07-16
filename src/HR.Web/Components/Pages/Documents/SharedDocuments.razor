@@ -81,6 +81,15 @@
                 <GridColumn Field="@nameof(SharedCompanyDocumentListItem.Status)" HeaderText="Status" Width="100" />
                 <GridColumn Field="@nameof(SharedCompanyDocumentListItem.EffectiveDate)" HeaderText="Effective Date" Width="130" Format="d" />
                 <GridColumn Field="@nameof(SharedCompanyDocumentListItem.ReviewDate)" HeaderText="Next Review Date" Width="150" Format="d" />
+                <GridColumn Field="@nameof(SharedCompanyDocumentListItem.ReviewFrequency)" HeaderText="Review Frequency" Width="140">
+                    <Template>
+                        @{
+                            var row = (context as SharedCompanyDocumentListItem)!;
+                            @(row.ReviewFrequency != "None" ? ReviewFrequencyDisplay.Label(row.ReviewFrequency) : "")
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(SharedCompanyDocumentListItem.ReviewOwnerName)" HeaderText="Review Owner" Width="150" />
                 <GridColumn Field="@nameof(SharedCompanyDocumentListItem.UpdatedAt)" HeaderText="Last Updated" Width="150" Format="g" />
                 <GridColumn Field="@nameof(SharedCompanyDocumentListItem.UpdatedByName)" HeaderText="Updated By" Width="150" />
             </GridColumns>

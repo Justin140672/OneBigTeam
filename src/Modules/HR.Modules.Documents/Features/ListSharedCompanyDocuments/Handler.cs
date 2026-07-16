@@ -45,8 +45,12 @@ internal sealed class ListSharedCompanyDocumentsHandler(DocumentsDbContext db, I
                 .ToDictionaryAsync(c => c.Id, c => c.Name, cancellationToken)
             : new Dictionary<Guid, string>();
 
-        var updatedByIds = documents.Select(d => d.UpdatedBy).Distinct().ToList();
-        var updatedByNames = await employeeNameReader.GetNamesAsync(request.CompanyId, updatedByIds, cancellationToken);
+        var idsToResolve = documents.Select(d => d.UpdatedBy).Distinct().ToList();
+        idsToResolve.AddRange(documents
+            .Where(d => d.ReviewOwnerEmployeeId is not null)
+            .Select(d => d.ReviewOwnerEmployeeId!.Value)
+            .Distinct());
+        var namesLookup = await employeeNameReader.GetNamesAsync(request.CompanyId, idsToResolve.Distinct(), cancellationToken);
 
         var items = documents
             .Select(d => new SharedCompanyDocumentListItem(
@@ -60,9 +64,14 @@ internal sealed class ListSharedCompanyDocumentsHandler(DocumentsDbContext db, I
                 d.Status.ToString(),
                 d.EffectiveDate,
                 d.ReviewDate,
+                d.ReviewFrequency.ToString(),
+                d.ReviewOwnerEmployeeId,
+                d.ReviewOwnerEmployeeId is { } reviewOwnerEmployeeId
+                    ? (namesLookup.TryGetValue(reviewOwnerEmployeeId, out var reviewOwnerName) ? reviewOwnerName : "Unknown")
+                    : null,
                 d.CreatedAt,
                 d.UpdatedAt,
-                updatedByNames.TryGetValue(d.UpdatedBy, out var updatedByName) ? updatedByName : "Unknown"))
+                namesLookup.TryGetValue(d.UpdatedBy, out var updatedByName) ? updatedByName : "Unknown"))
             .ToList();
 
         return Result.Success(new ListSharedCompanyDocumentsResponse(items));

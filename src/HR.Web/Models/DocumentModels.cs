@@ -112,9 +112,17 @@ public sealed record SharedCompanyDocumentListItem(
     string Status,
     DateOnly? EffectiveDate,
     DateOnly? ReviewDate,
+    string ReviewFrequency,
+    Guid? ReviewOwnerEmployeeId,
+    string? ReviewOwnerName,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     string UpdatedByName);
+
+public static class ReviewFrequencyDisplay
+{
+    public static string Label(string value) => value == "SixMonthly" ? "Six Monthly" : value;
+}
 
 public sealed record PublishedSharedCompanyDocumentListResponse(IReadOnlyList<PublishedSharedCompanyDocumentItem> Items);
 

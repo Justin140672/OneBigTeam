@@ -133,7 +133,8 @@ public sealed class SharedDocumentReviewFrequencyTests(AppFixture fixture) : E2E
 
             await dialog.GetByPlaceholder("Document title").FillAsync(title);
 
-            await dialog.Locator("span[role='combobox']").First.ClickAsync();
+            var categoryGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
+            await categoryGroup.Locator("span[role='combobox']").First.ClickAsync();
             await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
             await _page.Locator(".e-popup.e-ddl .e-list-item")
                 .Filter(new() { HasText = "Policy" })
@@ -141,7 +142,8 @@ public sealed class SharedDocumentReviewFrequencyTests(AppFixture fixture) : E2E
                 .ClickAsync();
 
             // Selects a Review Frequency without filling in a Next Review Date.
-            await dialog.Locator("span[role='combobox']").Nth(1).ClickAsync();
+            var reviewFrequencyGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Review Frequency" });
+            await reviewFrequencyGroup.Locator("span[role='combobox']").First.ClickAsync();
             await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
             await _page.Locator(".e-popup.e-ddl .e-list-item")
                 .Filter(new() { HasText = "Monthly" })
@@ -169,11 +171,13 @@ public sealed class SharedDocumentReviewFrequencyTests(AppFixture fixture) : E2E
 
     // Uploads a shared document from the Shared Documents list page (same flow as
     // SharedDocumentUploadTests / SharedDocumentArchiveTests), optionally selecting a Review
-    // Frequency before submitting. Category is the first combobox in the dialog, Review Frequency
-    // the second — same click-open/wait-for-popup/click-item interaction pattern used throughout
-    // this test suite for Syncfusion dropdowns. Whenever reviewFrequencyLabel isn't null (and thus
-    // isn't "None"), a Next Review Date is also filled in — the dialog requires one whenever the
-    // frequency isn't "None", otherwise Upload is a no-op client-side.
+    // Frequency before submitting. Category and Review Frequency are each reached by scoping to
+    // their own ".col-md-6" field group (rather than by combobox index) since Review Frequency's
+    // combobox can render before Category's — Category's is gated behind an async data load while
+    // Review Frequency's isn't — same click-open/wait-for-popup/click-item interaction pattern
+    // used throughout this test suite for Syncfusion dropdowns. Whenever reviewFrequencyLabel
+    // isn't null (and thus isn't "None"), a Next Review Date is also filled in — the dialog
+    // requires one whenever the frequency isn't "None", otherwise Upload is a no-op client-side.
     private async Task UploadDocumentAsync(
         string title, string filePath, string? reviewFrequencyLabel = null, int? customMonths = null)
     {
@@ -187,7 +191,8 @@ public sealed class SharedDocumentReviewFrequencyTests(AppFixture fixture) : E2E
 
         await dialog.GetByPlaceholder("Document title").FillAsync(title);
 
-        await dialog.Locator("span[role='combobox']").First.ClickAsync();
+        var categoryGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
+        await categoryGroup.Locator("span[role='combobox']").First.ClickAsync();
         await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
         await _page.Locator(".e-popup.e-ddl .e-list-item")
             .Filter(new() { HasText = "Policy" })
@@ -196,7 +201,8 @@ public sealed class SharedDocumentReviewFrequencyTests(AppFixture fixture) : E2E
 
         if (reviewFrequencyLabel is not null)
         {
-            await dialog.Locator("span[role='combobox']").Nth(1).ClickAsync();
+            var reviewFrequencyGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Review Frequency" });
+            await reviewFrequencyGroup.Locator("span[role='combobox']").First.ClickAsync();
             await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
             await _page.Locator(".e-popup.e-ddl .e-list-item")
                 .Filter(new() { HasText = reviewFrequencyLabel })

@@ -100,10 +100,13 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await EditMetadataHeaderButton.ClickAsync();
         await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
-        // Category is the first combobox in this dialog, Review Frequency the second — same
-        // click-open/wait-for-popup/click-item interaction pattern used for Category elsewhere
-        // in this test suite (see SharedDocumentUploadTests).
-        await EditMetadataDialog.Locator("span[role='combobox']").Nth(1).ClickAsync();
+        // Scoped to the "Review Frequency" field's own ".col-md-6" group (rather than by combobox
+        // index) since its combobox can render before Category's — Category's is gated behind an
+        // async data load while Review Frequency's isn't — same click-open/wait-for-popup/
+        // click-item interaction pattern used for Category elsewhere in this test suite (see
+        // SharedDocumentUploadTests).
+        var reviewFrequencyGroup = EditMetadataDialog.Locator(".col-md-6").Filter(new() { HasText = "Review Frequency" });
+        await reviewFrequencyGroup.Locator("span[role='combobox']").First.ClickAsync();
         await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
         await page.Locator(".e-popup.e-ddl .e-list-item")
             .Filter(new() { HasText = frequencyLabel })
@@ -186,6 +189,17 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await Assertions.Expect(reviewOwnerGroup.Locator(".e-input-group input").First)
             .ToHaveValueAsync(employeeNameFragment, new() { Timeout = 10_000 });
 
+        // Even the displayed input value isn't a fully reliable proof of the server-side commit
+        // here: Syncfusion's SfDropDownList JS widget updates its own visible <input> (and clear
+        // icon) as part of its own client-side selection handling, which can complete slightly
+        // ahead of the separate interop call that carries the selection back to Blazor and
+        // actually sets Model.ReviewOwnerEmployeeId server-side. Clicking Save in that narrow
+        // window submits with the *previous* (still null, on a first-time assignment) value —
+        // this is the same class of "visually filled but not yet round-tripped" issue documented
+        // on CompanyEditPage.FillNumericAndVerifyAsync, mitigated there with a short buffer before
+        // trusting the field's value; do the same here before Save.
+        await page.WaitForTimeoutAsync(300);
+
         await EditMetadataDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
 
@@ -209,6 +223,10 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await reviewOwnerGroup.Locator(".e-clear-icon").ClickAsync();
         await Assertions.Expect(reviewOwnerGroup.Locator(".e-input-group input").First)
             .ToHaveValueAsync("", new() { Timeout = 10_000 });
+
+        // Same "visually cleared but not yet round-tripped" concern as SetReviewOwnerAsync above —
+        // give the pending ValueChanged interop call a moment to land before Save reads the model.
+        await page.WaitForTimeoutAsync(300);
 
         await EditMetadataDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
@@ -350,6 +368,23 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 
     public async Task<int> GetVersionRowCountAsync() =>
         await page.Locator(".e-grid .e-row").CountAsync();
+
+    /// <summary>
+    /// Waits for the Version History grid to show exactly <paramref name="expectedCount"/> rows,
+    /// then returns that count. Unlike <see cref="GetVersionRowCountAsync"/> (a one-shot,
+    /// non-retrying <c>CountAsync()</c> snapshot), this polls via Playwright's own
+    /// <c>ToHaveCountAsync</c> assertion — necessary because neither
+    /// <see cref="UploadNewVersionAsync"/>'s "dialog hidden" nor its "spinner gone" wait guarantees
+    /// the Blazor Server render carrying the new row has actually been flushed over SignalR and
+    /// painted into the DOM by the time control returns to the caller; an immediate one-shot count
+    /// can catch the grid mid-update and read one row short.
+    /// </summary>
+    public async Task<int> WaitForVersionRowCountAsync(int expectedCount)
+    {
+        var rows = page.Locator(".e-grid .e-row");
+        await Assertions.Expect(rows).ToHaveCountAsync(expectedCount, new() { Timeout = 15_000 });
+        return await rows.CountAsync();
+    }
 
     /// <summary>Header text of every column currently rendered on the Version History grid.</summary>
     public async Task<IReadOnlyList<string>> GetVersionColumnHeadersAsync()

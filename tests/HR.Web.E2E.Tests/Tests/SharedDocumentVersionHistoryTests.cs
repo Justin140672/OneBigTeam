@@ -48,7 +48,7 @@ public sealed class SharedDocumentVersionHistoryTests(AppFixture fixture) : E2ET
             Assert.Contains(headers, h => h.Contains("Effective Date"));
             Assert.Contains(headers, h => h.Contains("Download"));
 
-            Assert.Equal(1, await detail.GetVersionRowCountAsync());
+            Assert.Equal(1, await detail.WaitForVersionRowCountAsync(1));
 
             var fileNameFragment = Path.GetFileName(tempFile);
 
@@ -91,12 +91,12 @@ public sealed class SharedDocumentVersionHistoryTests(AppFixture fixture) : E2ET
 
             var documentId = await GetUploadedDocumentIdAsync(title);
             await detail.GoToAsync(AcmeId, documentId);
-            Assert.Equal(1, await detail.GetVersionRowCountAsync());
+            Assert.Equal(1, await detail.WaitForVersionRowCountAsync(1));
 
             await File.WriteAllBytesAsync(secondFile, BuildTestPdf());
             await detail.UploadNewVersionAsync("Second version content", secondFile);
 
-            Assert.Equal(2, await detail.GetVersionRowCountAsync());
+            Assert.Equal(2, await detail.WaitForVersionRowCountAsync(2));
 
             var firstFileNameFragment  = Path.GetFileName(firstFile);
             var secondFileNameFragment = Path.GetFileName(secondFile);
@@ -143,7 +143,8 @@ public sealed class SharedDocumentVersionHistoryTests(AppFixture fixture) : E2ET
 
         // Select a category via the Syncfusion SfDropDownList (same interaction pattern used
         // throughout this test suite — click the combobox, wait for the popup, click the item).
-        await dialog.Locator("span[role='combobox']").First.ClickAsync();
+        var categoryGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
+        await categoryGroup.Locator("span[role='combobox']").First.ClickAsync();
         await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
         await _page.Locator(".e-popup.e-ddl .e-list-item")
             .Filter(new() { HasText = "Policy" })

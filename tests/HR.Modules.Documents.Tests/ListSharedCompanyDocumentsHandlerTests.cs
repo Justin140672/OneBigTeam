@@ -206,15 +206,131 @@ public class ListSharedCompanyDocumentsHandlerTests
         Assert.Equal("Remote Working Policy", result.Value.Items[0].Title);
     }
 
+    [Fact]
+    public async Task HandleAsync_Maps_ReviewFrequency()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+
+        var doc = CreateDoc(
+            companyId, "Monthly Reviewed Policy", category.Id, "key/monthly.pdf", "monthly.pdf", null, null, Guid.NewGuid(), Now,
+            reviewFrequency: SharedCompanyDocumentReviewFrequency.Monthly);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new ListSharedCompanyDocumentsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.Equal("Monthly", result.Value!.Items[0].ReviewFrequency);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Maps_ReviewOwner_Name_When_Present_In_Lookup()
+    {
+        await using var db = BuildContext();
+        var companyId       = Guid.NewGuid();
+        var category        = await SeedCategory(db, companyId);
+        var reviewOwnerId   = Guid.NewGuid();
+
+        var doc = CreateDoc(
+            companyId, "Policy With Owner", category.Id, "key/owner.pdf", "owner.pdf", null, null, Guid.NewGuid(), Now,
+            reviewOwnerEmployeeId: reviewOwnerId);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var names  = new Dictionary<Guid, string> { [reviewOwnerId] = "Priya Shah" };
+        var result = await Handler(db, names).HandleAsync(
+            new ListSharedCompanyDocumentsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.Equal(reviewOwnerId,   result.Value!.Items[0].ReviewOwnerEmployeeId);
+        Assert.Equal("Priya Shah",    result.Value.Items[0].ReviewOwnerName);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReviewOwnerName_Is_Null_When_No_ReviewOwnerEmployeeId()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+
+        var doc = CreateDoc(companyId, "Policy Without Owner", category.Id, "key/noowner.pdf", "noowner.pdf", null, null, Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new ListSharedCompanyDocumentsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.Null(result.Value!.Items[0].ReviewOwnerEmployeeId);
+        Assert.Null(result.Value.Items[0].ReviewOwnerName);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReviewOwnerName_Falls_Back_To_Unknown_When_Not_In_Lookup()
+    {
+        await using var db = BuildContext();
+        var companyId     = Guid.NewGuid();
+        var category      = await SeedCategory(db, companyId);
+        var reviewOwnerId = Guid.NewGuid();
+
+        var doc = CreateDoc(
+            companyId, "Policy With Unresolvable Owner", category.Id, "key/unresolved.pdf", "unresolved.pdf", null, null, Guid.NewGuid(), Now,
+            reviewOwnerEmployeeId: reviewOwnerId);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        // No entry for reviewOwnerId in the lookup dictionary.
+        var result = await Handler(db, new Dictionary<Guid, string>()).HandleAsync(
+            new ListSharedCompanyDocumentsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.Equal(reviewOwnerId, result.Value!.Items[0].ReviewOwnerEmployeeId);
+        Assert.Equal("Unknown",     result.Value.Items[0].ReviewOwnerName);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Resolves_UpdatedBy_And_ReviewOwner_Names_From_Single_Shared_Lookup()
+    {
+        await using var db = BuildContext();
+        var companyId     = Guid.NewGuid();
+        var category      = await SeedCategory(db, companyId);
+        var updatedBy     = Guid.NewGuid();
+        var reviewOwnerId = Guid.NewGuid();
+
+        var doc = CreateDoc(
+            companyId, "Policy With Both Names", category.Id, "key/both.pdf", "both.pdf", null, null, updatedBy, Now,
+            reviewOwnerEmployeeId: reviewOwnerId);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var names = new Dictionary<Guid, string>
+        {
+            [updatedBy]     = "Laura Bennett",
+            [reviewOwnerId] = "Priya Shah",
+        };
+        var result = await Handler(db, names).HandleAsync(
+            new ListSharedCompanyDocumentsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.Equal("Laura Bennett", result.Value!.Items[0].UpdatedByName);
+        Assert.Equal("Priya Shah",    result.Value.Items[0].ReviewOwnerName);
+        Assert.Equal(reviewOwnerId,   result.Value.Items[0].ReviewOwnerEmployeeId);
+    }
+
     private static ListSharedCompanyDocumentsHandler Handler(DocumentsDbContext db, Dictionary<Guid, string>? names = null) =>
         new(db, new FakeEmployeeNameReader(names));
 
     private static SharedCompanyDocument CreateDoc(
         Guid companyId, string title, Guid categoryId, string storageKey, string fileName,
-        DateOnly? effectiveDate, DateOnly? reviewDate, Guid createdBy, DateTimeOffset now) =>
+        DateOnly? effectiveDate, DateOnly? reviewDate, Guid createdBy, DateTimeOffset now,
+        SharedCompanyDocumentReviewFrequency reviewFrequency = SharedCompanyDocumentReviewFrequency.None,
+        Guid? reviewOwnerEmployeeId = null) =>
         SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, title, null, categoryId, storageKey, fileName, 100, "application/pdf",
-            effectiveDate, reviewDate, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, createdBy, now);
+            effectiveDate, reviewDate, reviewFrequency, null, reviewOwnerEmployeeId, false, null, null, createdBy, now);
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")
