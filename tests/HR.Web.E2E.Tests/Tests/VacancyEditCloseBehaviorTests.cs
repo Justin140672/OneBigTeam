@@ -8,13 +8,17 @@ namespace HR.Web.E2E.Tests.Tests;
 /// provides to every edit page (see EditPageBase.cs / UnsavedChangesDialog.razor). Exercised
 /// via the Vacancy detail page as a representative host — the behavior under test lives in
 /// the shared base class, not in VacancyDetail itself.
+///
+/// Uses Marcus Diallo (Recruiter role) rather than Laura Bennett (HR Administrator) —
+/// recruitment:manage (vacancy creation) is Recruiter-only (see IdentityModule.AddRolePolicies);
+/// an HR Administrator does not automatically get recruitment access.
 /// </summary>
 [Collection("E2E")]
 public sealed class VacancyEditCloseBehaviorTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example";
+    private const string MarcusEmail = "marcus.diallo@acme.example";
 
     [Fact]
     public async Task Close_ExistingRecordWithNoChanges_NavigatesDirectlyToList()
@@ -24,7 +28,7 @@ public sealed class VacancyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         // Create a vacancy first so we have an existing, unmodified record to reopen.
         var vacancyTitle = $"E2E Close {Guid.NewGuid().ToString("N")[..8]}";
@@ -54,7 +58,7 @@ public sealed class VacancyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await vacancyDetail.GoToNewAsync(AcmeId);
         await vacancyDetail.FillTitleAsync("Unsaved Vacancy Title");
@@ -76,7 +80,7 @@ public sealed class VacancyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await vacancyDetail.GoToNewAsync(AcmeId);
         await vacancyDetail.FillTitleAsync(vacancyTitle);
@@ -103,7 +107,7 @@ public sealed class VacancyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await vacancyDetail.GoToNewAsync(AcmeId);
         await vacancyDetail.FillTitleAsync(vacancyTitle);
@@ -129,7 +133,7 @@ public sealed class VacancyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await vacancyDetail.GoToNewAsync(AcmeId);
         await vacancyDetail.FillTitleAsync(vacancyTitle);

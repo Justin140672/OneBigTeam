@@ -8,7 +8,8 @@ internal sealed class FakeTaskCreator : ITaskCreator
     public record CreatedTask(
         Guid CompanyId, Guid CreatedBy, string Title, string? Description,
         TaskPriority Priority, TaskSource Source, TaskActionType ActionType,
-        DateOnly? DueDate, Guid? AssignedEmployeeId, Guid? AssignedUserId, Guid? SourceEntityId);
+        DateOnly? DueDate, Guid? AssignedEmployeeId, Guid? AssignedUserId, Guid? SourceEntityId,
+        bool NotifyAssignee = true);
 
     public List<CreatedTask> Created { get; } = [];
 
@@ -16,11 +17,13 @@ internal sealed class FakeTaskCreator : ITaskCreator
         Guid companyId, Guid createdBy, string title, string? description,
         TaskPriority priority, TaskSource source, TaskActionType actionType,
         DateOnly? dueDate, Guid? assignedEmployeeId, Guid? assignedUserId,
-        Guid? sourceEntityId, CancellationToken cancellationToken)
+        Guid? sourceEntityId, CancellationToken cancellationToken,
+        bool notifyAssignee = true)
     {
         Created.Add(new CreatedTask(
             companyId, createdBy, title, description,
-            priority, source, actionType, dueDate, assignedEmployeeId, assignedUserId, sourceEntityId));
+            priority, source, actionType, dueDate, assignedEmployeeId, assignedUserId, sourceEntityId,
+            notifyAssignee));
 
         return Task.FromResult(Guid.NewGuid());
     }

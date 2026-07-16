@@ -15,7 +15,7 @@
                 @foreach (var entry in _entries)
                 {
                     <li class="list-group-item d-flex align-items-start gap-3">
-                        <span class="badge text-bg-light border text-muted flex-shrink-0" style="min-width: 100px;">
+                        <span class="badge text-bg-light border text-muted flex-shrink-0 timeline-date-badge">
                             @entry.Timestamp.LocalDateTime.ToString("d MMM yyyy")
                         </span>
                         <div>

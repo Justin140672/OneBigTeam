@@ -75,9 +75,10 @@ internal sealed class SharedCompanyDocumentAcknowledgementReminderJob(
                         actionType:         TaskActionType.Acknowledge,
                         dueDate:            document.AcknowledgementDueDate,
                         assignedEmployeeId: employeeId,
-                        assignedUserId:     null,
+                        assignedUserId:     employeeId,
                         sourceEntityId:     document.Id,
-                        CancellationToken.None);
+                        CancellationToken.None,
+                        notifyAssignee:     false);
                 }
 
                 // Overdue always fires once the due date has passed. The reminder fires immediately

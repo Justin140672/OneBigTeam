@@ -20,19 +20,23 @@ public sealed class ToilBalanceDisplayTests(AppFixture fixture) : E2ETestBase(fi
     [Fact]
     public async Task AdminLeaveTab_ShowsAllBalanceSections_IncludingToil()
     {
-        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
 
         // ── Step 1: Login as Laura (HR Administrator) ─────────────────────────
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
         // ── Step 2: Navigate to Tom's admin employee profile ──────────────────
-        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees/{TomId}");
-        await _page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
+        await empAdmin.GoToAsync(AcmeId, TomId);
 
         // ── Step 3: Open the Leave tab (admin view) ───────────────────────────
-        await _page.GetByRole(AriaRole.Tab, new() { Name = "Leave" }).ClickAsync();
-        await _page.WaitForSelectorAsync(".card", new() { Timeout = 15_000 });
+        // EmployeeEdit.razor always renders a ".card" above the tab strip (e.g. the "Reporting
+        // Chain" card), so waiting on a bare ".card" selector after clicking the tab resolves
+        // immediately against that pre-existing card instead of the Leave tab's own async-loaded
+        // content — a race that made this test flaky. OpenLeaveTabAsync waits for the loading
+        // spinner to clear and for actual balance content to render, not just a card shell.
+        await empAdmin.OpenLeaveTabAsync();
 
         // ── Step 4: Verify the Current Balance card is visible ────────────────
         Assert.True(
@@ -52,19 +56,18 @@ public sealed class ToilBalanceDisplayTests(AppFixture fixture) : E2ETestBase(fi
     [Fact]
     public async Task AdminLeaveTab_ShowsPendingAndApprovedRequestSections()
     {
-        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
 
         // ── Step 1: Login as Laura ─────────────────────────────────────────────
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
         // ── Step 2: Navigate to Sarah's admin profile (she has seeded requests) ─
-        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees/{SarahId}");
-        await _page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
+        await empAdmin.GoToAsync(AcmeId, SarahId);
 
         // ── Step 3: Open the admin Leave tab ─────────────────────────────────
-        await _page.GetByRole(AriaRole.Tab, new() { Name = "Leave" }).ClickAsync();
-        await _page.WaitForSelectorAsync(".card", new() { Timeout = 15_000 });
+        await empAdmin.OpenLeaveTabAsync();
 
         var content = await _page.ContentAsync();
 

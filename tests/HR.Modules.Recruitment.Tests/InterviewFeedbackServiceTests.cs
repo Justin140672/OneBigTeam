@@ -20,6 +20,7 @@ public class InterviewFeedbackServiceTests
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Senior Software Engineer", null, null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        application.ScheduleInterview(Now);
         var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(2), 30, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -37,6 +38,9 @@ public class InterviewFeedbackServiceTests
         var saved = await db.Interviews.SingleAsync();
         Assert.Equal(InterviewOutcome.Passed, saved.Outcome);
         Assert.Equal("Strong technical skills.", saved.Notes);
+
+        var savedApplication = await db.Applications.SingleAsync();
+        Assert.Equal(ApplicationStatus.Interviewed, savedApplication.Status);
     }
 
     [Fact]

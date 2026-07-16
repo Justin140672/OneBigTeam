@@ -10,6 +10,18 @@ namespace HR.Web.Components.Controls;
 /// </summary>
 public class HrGrid<TValue> : SfGrid<TValue>
 {
+    // Lazily created once per grid *instance* and reused across every subsequent
+    // SetParametersAsync call on that instance. AllowPaging/AllowSorting/etc. are value types, so
+    // re-assigning the same bool each render is a no-op as far as Blazor/Syncfusion's parameter
+    // diffing is concerned. FilterSettings is a reference type — handing it a *new* instance on
+    // every render (e.g. every time a row is selected and the parent calls StateHasChanged) made
+    // the grid see a "changed" parameter on every single render and re-run filter/grid
+    // initialization, which was clobbering row-selection state and left the Edit/View toolbar
+    // buttons stuck disabled. Must NOT be static: this class is shared by every grid on every
+    // page for every concurrent Blazor Server circuit, so a static instance would leak one
+    // user's/grid's filter state into everyone else's.
+    private GridFilterSettings? _defaultFilterSettings;
+
     public override Task SetParametersAsync(ParameterView parameters)
     {
         if (!parameters.TryGetValue<bool>(nameof(AllowPaging), out _))
@@ -22,7 +34,7 @@ public class HrGrid<TValue> : SfGrid<TValue>
             AllowFiltering = true;
 
         if (!parameters.TryGetValue<GridFilterSettings>(nameof(FilterSettings), out _))
-            FilterSettings = new GridFilterSettings { Type = FilterType.Excel };
+            FilterSettings = _defaultFilterSettings ??= new GridFilterSettings { Type = FilterType.Excel };
 
         if (!parameters.TryGetValue<bool>(nameof(AllowExcelExport), out _))
             AllowExcelExport = true;

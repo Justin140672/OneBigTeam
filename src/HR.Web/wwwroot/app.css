@@ -208,6 +208,12 @@ html[data-theme="dark"] .hr-toolbar-export-btn.e-btn.e-flat {
     user-select: text;
 }
 
+/* Thin progress bars — used by every status/percent-complete indicator across
+   probation, onboarding, offboarding, and document acknowledgement panels. */
+.progress {
+    height: 8px;
+}
+
 /* Give labels breathing room above Syncfusion controls that have no bottom margin */
 .form-label {
     margin-top: 0.5rem;

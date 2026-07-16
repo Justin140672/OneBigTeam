@@ -21,12 +21,13 @@ internal sealed class FakeTaskCreator : ITaskCreator
         Guid? assignedEmployeeId,
         Guid? assignedUserId,
         Guid? sourceEntityId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool notifyAssignee = true)
     {
         var id = Guid.NewGuid();
         _created.Add(new CreatedTask(
             id, companyId, createdBy, title, description, priority, source, actionType,
-            dueDate, assignedEmployeeId, assignedUserId, sourceEntityId));
+            dueDate, assignedEmployeeId, assignedUserId, sourceEntityId, notifyAssignee));
         return Task.FromResult(id);
     }
 
@@ -42,5 +43,6 @@ internal sealed class FakeTaskCreator : ITaskCreator
         DateOnly? DueDate,
         Guid? AssignedEmployeeId,
         Guid? AssignedUserId,
-        Guid? SourceEntityId);
+        Guid? SourceEntityId,
+        bool NotifyAssignee = true);
 }

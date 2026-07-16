@@ -23,7 +23,8 @@ internal sealed class TaskCreator(
         Guid? assignedEmployeeId,
         Guid? assignedUserId,
         Guid? sourceEntityId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool notifyAssignee = true)
     {
         var task = TaskItem.Create(
             Guid.NewGuid(), companyId, createdBy,
@@ -35,7 +36,7 @@ internal sealed class TaskCreator(
         dbContext.TaskItems.Add(task);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        if (assignedEmployeeId.HasValue)
+        if (assignedEmployeeId.HasValue && notifyAssignee)
         {
             await notificationWriter.WriteAsync(
                 Guid.NewGuid(), companyId, assignedEmployeeId.Value,

@@ -54,7 +54,8 @@ internal sealed class CreateAssetAssignmentHandler(AssetsDbContext db, IClock cl
             assignedEmployeeId: request.EmployeeId,
             assignedUserId:     null,
             sourceEntityId:     assignment.Id,
-            cancellationToken);
+            cancellationToken,
+            notifyAssignee:     false);
 
         await notificationWriter.WriteAsync(
             Guid.NewGuid(),

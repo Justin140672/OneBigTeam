@@ -19,7 +19,7 @@
                 <span>@ElapsedDays days elapsed</span>
                 <span>@DaysRemaining days remaining</span>
             </div>
-            <div class="progress" style="height: 8px;">
+            <div class="progress">
                 <div class="progress-bar @ProgressBarClass(Record.Status)"
                      role="progressbar"
                      style="width: @ProgressPercent%"
@@ -31,10 +31,9 @@
         }
         else
         {
-            <div class="progress" style="height: 8px;">
-                <div class="progress-bar @ProgressBarClass(Record.Status)"
+            <div class="progress">
+                <div class="progress-bar @ProgressBarClass(Record.Status) w-100"
                      role="progressbar"
-                     style="width: 100%"
                      aria-valuenow="100"
                      aria-valuemin="0"
                      aria-valuemax="100">

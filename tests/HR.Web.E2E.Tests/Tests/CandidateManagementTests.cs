@@ -5,18 +5,23 @@ using Microsoft.Playwright;
 namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
-/// Verifies HR Administrator CRUD workflows for candidates:
+/// Verifies Recruiter CRUD workflows for candidates:
 /// - Seeded candidates appear in the list.
 /// - A new candidate can be created and appears in the list.
 /// - Validation errors surface when required fields are missing.
-/// - Plain employees cannot reach the candidates page.
+/// - Plain employees and HR Administrators (who lack the Recruiter role) cannot reach the
+///   candidates page.
+///
+/// Uses Marcus Diallo (Recruiter role) rather than Laura Bennett (HR Administrator) — candidate:view
+/// and recruitment:manage are Recruiter-only (see IdentityModule.AddRolePolicies); an HR
+/// Administrator does not automatically get recruitment access.
 /// </summary>
 [Collection("E2E")]
 public sealed class CandidateManagementTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example";
+    private const string MarcusEmail = "marcus.diallo@acme.example";
 
     [Fact]
     public async Task CandidateList_ShowsSeededCandidates()
@@ -25,7 +30,7 @@ public sealed class CandidateManagementTests(AppFixture fixture) : E2ETestBase(f
         var candidateList = new CandidateListPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await candidateList.GoToAsync(AcmeId);
 
@@ -51,7 +56,7 @@ public sealed class CandidateManagementTests(AppFixture fixture) : E2ETestBase(f
         var candidateEdit = new CandidateEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await candidateList.GoToAsync(AcmeId);
         await candidateList.ClickNewCandidateAsync();
@@ -72,7 +77,7 @@ public sealed class CandidateManagementTests(AppFixture fixture) : E2ETestBase(f
         var candidateEdit = new CandidateEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await candidateEdit.GoToNewAsync(AcmeId);
 
@@ -105,5 +110,27 @@ public sealed class CandidateManagementTests(AppFixture fixture) : E2ETestBase(f
         var finalUrl = _page.Url;
         Assert.False(finalUrl.Contains("/candidates"),
             $"Expected a plain employee to be redirected away from the candidates page, but ended up at: {finalUrl}");
+    }
+
+    // HR Administrator (Laura) no longer holds the Recruiter role, so the candidates list page
+    // guard (CandidateList.razor OnBeforeLoadAsync) redirects her away the same as a plain
+    // employee, matching candidate:view being Recruiter-only at the API layer too (see
+    // HrAdministrator_Gets_Forbidden_Listing_Candidates in RecruitmentAuthorizationTests).
+    [Fact]
+    public async Task HrAdministrator_IsRedirectedAway_FromCandidatesPage()
+    {
+        const string lauraEmail = "laura.bennett@acme.example";
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(lauraEmail);
+
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/candidates");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        var finalUrl = _page.Url;
+        Assert.False(finalUrl.Contains("/candidates"),
+            $"Expected an HR Administrator without the Recruiter role to be redirected away from the candidates page, but ended up at: {finalUrl}");
     }
 }

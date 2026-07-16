@@ -18,11 +18,11 @@
             <ErrorContent Context="ex">
                 @if (Env.IsDevelopment())
                 {
-                    <div style="padding:2rem;font-family:monospace;background:#fee;border:2px solid red;margin:1rem">
+                    <div class="dev-error-boundary">
                         <h2>Unhandled exception (dev only)</h2>
                         <p><strong>@ex.GetType().FullName</strong></p>
-                        <pre style="white-space:pre-wrap">@ex.Message</pre>
-                        <pre style="white-space:pre-wrap;font-size:.8em;color:#666">@ex.StackTrace</pre>
+                        <pre class="dev-error-message">@ex.Message</pre>
+                        <pre class="dev-error-stacktrace">@ex.StackTrace</pre>
                         <button @onclick="() => _errorBoundary?.Recover()">Recover</button>
                     </div>
                 }

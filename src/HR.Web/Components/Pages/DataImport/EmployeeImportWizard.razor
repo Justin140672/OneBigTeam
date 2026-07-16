@@ -132,7 +132,7 @@
                                     <tr>
                                         <td>@field.StandardHeaderName</td>
                                         <td>
-                                            <select class="form-select form-select-sm" style="max-width: 320px;"
+                                            <select class="form-select form-select-sm mapping-select"
                                                     value="@_mappingSelections.GetValueOrDefault(field.TargetField)"
                                                     @onchange="@(e => OnMappingChanged(field.TargetField, e))">
                                                 <option value="">Not mapped</option>

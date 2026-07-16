@@ -101,24 +101,29 @@ public static class IdentityModule
             SystemRoles.HrAdministrator));
 
         // Recruitment domain policies
+        // Recruiter-only: HR Administrator does NOT automatically get recruitment access — unlike
+        // employee:manage-adjacent domains elsewhere in this file, recruitment is a distinct
+        // function with its own role, and an HR Administrator needs the Recruiter role too (same
+        // non-overlap principle as company:manage/shared-document management below).
         builder.AddPolicy("recruitment:manage", RolePolicy(
-            SystemRoles.Recruiter,
-            SystemRoles.HrAdministrator));
+            SystemRoles.Recruiter));
 
         // Recruitment domain — vacancy-only reads (internal job board visibility).
-        // Broad by design: seeing what roles are open is general visibility, not sensitive.
+        // Broad by design: seeing what roles are open is general visibility, not sensitive —
+        // unlike recruitment:manage/candidate:view above, this one deliberately keeps
+        // HrAdministrator (and every other role) able to read published vacancies.
         builder.AddPolicy("recruitment:view", RolePolicy(
             SystemRoles.Employee,
             SystemRoles.Manager,
             SystemRoles.Recruiter,
             SystemRoles.HrAdministrator));
 
-        // Recruitment domain — candidate/application/interview/document reads.
-        // Restricted to the same role set as recruitment:manage: candidate PII, resumes,
-        // and interview notes must not be visible to plain Employees/Managers.
+        // Recruitment domain — candidate/application/interview/document reads. Recruiter-only,
+        // same non-overlap reasoning as recruitment:manage above: candidate PII, resumes, and
+        // interview notes must not be visible to plain Employees/Managers, nor automatically to
+        // HR Administrators who lack the Recruiter role.
         builder.AddPolicy("candidate:view", RolePolicy(
-            SystemRoles.Recruiter,
-            SystemRoles.HrAdministrator));
+            SystemRoles.Recruiter));
 
         // Shared company document domain policies (documents owned by the company as a whole,
         // e.g. policies/handbooks — distinct from an employee's own document records).

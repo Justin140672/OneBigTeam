@@ -419,39 +419,6 @@
                                                     <label class="form-label">Start Date <span class="text-danger">*</span></label>
                                                     <SfDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" />
                                                 </div>
-                                                <div class="col-md-4">
-                                                    <label class="form-label">Department</label>
-                                                    <SfDropDownList TValue="Guid?"
-                                                                    TItem="DepartmentListItemModel"
-                                                                    DataSource="@_departments"
-                                                                    @bind-Value="Model.DepartmentId"
-                                                                    Placeholder="None"
-                                                                    AllowFiltering="true">
-                                                        <DropDownListFieldSettings Value="Id" Text="Name" />
-                                                    </SfDropDownList>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="form-label">Position Profile</label>
-                                                    <SfDropDownList TValue="Guid?"
-                                                                    TItem="PositionProfileListItemModel"
-                                                                    DataSource="@_positionProfiles"
-                                                                    @bind-Value="Model.PositionProfileId"
-                                                                    Placeholder="None"
-                                                                    AllowFiltering="true">
-                                                        <DropDownListFieldSettings Value="Id" Text="Title" />
-                                                    </SfDropDownList>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="form-label">Location</label>
-                                                    <SfDropDownList TValue="Guid?"
-                                                                    TItem="LocationListItemModel"
-                                                                    DataSource="@_locations"
-                                                                    @bind-Value="Model.LocationId"
-                                                                    Placeholder="None"
-                                                                    AllowFiltering="true">
-                                                        <DropDownListFieldSettings Value="Id" Text="Name" />
-                                                    </SfDropDownList>
-                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -734,6 +701,10 @@
     private bool _showProbationTab;
     private int ProbationOffset => _showProbationTab ? 0 : -1;
 
+    // Leave is always rendered (not conditional like Probation/Onboarding/Offboarding), but its
+    // own index still shifts by ProbationOffset since it sits after Probation in this markup.
+    private int LeaveTabIndex => 5 + ProbationOffset;
+
     // Onboarding only gets a tab once a plan exists, and loses it again once that plan is
     // Completed — completed history remains visible via the Audit tab instead (see
     // OnboardingPlanCompletedAuditEvent). Offboarding's tab index shifts whenever Onboarding's (or
@@ -800,9 +771,6 @@
                 Model.County         = _employee.County         ?? string.Empty;
                 Model.PostCode       = _employee.PostCode       ?? string.Empty;
                 Model.Country        = _employee.Country        ?? string.Empty;
-                Model.DepartmentId = _employee.DepartmentId;
-                Model.LocationId = _employee.LocationId;
-                Model.PositionProfileId = _employee.PositionProfileId;
                 Model.HasSystemAccess = _employee.HasSystemAccess;
                 // Not shown on this tab (owned by the Employment tab's own model/form), but
                 // EmployeeProfileEditModel is validated as a whole via the shared EditContext, so
@@ -810,6 +778,9 @@
                 // DataAnnotations validation for an existing employee.
                 Model.EmployeeNumber = _employee.EmployeeNumber ?? string.Empty;
                 Model.EmploymentTypeId = _employee.EmploymentTypeId;
+                Model.DepartmentId = _employee.DepartmentId;
+                Model.LocationId = _employee.LocationId;
+                Model.PositionProfileId = _employee.PositionProfileId;
 
                 // The employee profile response is the single source of truth for lifecycle tab
                 // visibility — these rules live server-side (GetEmployeeHandler) precisely so
@@ -847,6 +818,7 @@
             _activeTabIndex = tabValue switch
             {
                 "probation" => _showProbationTab ? 3 : 0,
+                "leave" => LeaveTabIndex,
                 "onboarding" => _showOnboardingTab ? OnboardingTabIndex : 0,
                 "offboarding" => OffboardingTabIndex,
                 _ => 0

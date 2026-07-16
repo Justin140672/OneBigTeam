@@ -184,9 +184,21 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             .ClickAsync();
     }
 
+    /// <param name="ddMMyyyyHHmm">
+    /// Must match the "Scheduled At" SfDateTimePicker's explicit Format="dd/MM/yyyy HH:mm" in
+    /// VacancyApplicationsTab.razor — 24-hour, no AM/PM suffix (e.g. "01/09/2026 10:00"). A string
+    /// the picker can't parse against that format silently leaves the bound value null rather than
+    /// erroring, which then fails ConfirmScheduleAsync's "select an interviewer and a scheduled
+    /// time" check and leaves the dialog open.
+    /// </param>
     public async Task FillScheduledAtAsync(string ddMMyyyyHHmm)
     {
-        var input = page.Locator(".schedule-interview-dialog input.e-input").First;
+        // ".schedule-interview-dialog input.e-input" alone also matches the Interviewer
+        // dropdown's own readonly input, which comes first in DOM order — its wrapping
+        // span[role='combobox'] intercepts pointer events on that input, so a bare .First there
+        // can never actually be clicked. Scope to the "Scheduled At" field's own container.
+        var group = page.Locator(".schedule-interview-dialog .mb-3").Filter(new() { HasText = "Scheduled At" });
+        var input = group.Locator("input.e-input").First;
         await input.ClickAsync();
         await input.FillAsync(ddMMyyyyHHmm);
         await page.Keyboard.PressAsync("Tab");

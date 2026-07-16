@@ -1,0 +1,93 @@
+.org-chart-card {
+    position: absolute;
+    width: 220px;
+    height: 76px;
+    border: 1px solid #D5D5D5;
+    border-radius: 6px;
+    background: var(--bs-body-bg, #FFFFFF);
+    box-sizing: border-box;
+    padding: 8px 12px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.org-chart-card.org-chart-card-highlighted {
+    border-color: var(--bs-primary, #0d6efd);
+    border-width: 2px;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+}
+
+.org-chart-avatar {
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--bs-secondary-bg, #e9ecef);
+    color: var(--bs-secondary-color, #6b7280);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.org-chart-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.org-chart-details {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.org-chart-card .org-chart-name {
+    font-weight: 600;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.org-chart-card .org-chart-title,
+.org-chart-card .org-chart-department {
+    font-size: 11px;
+    color: var(--bs-secondary-color, #6b7280);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.org-chart-canvas {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 260px);
+    min-height: 420px;
+}
+
+.org-chart-zoom-toolbar {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bs-body-bg, #FFFFFF);
+    border: 1px solid #D5D5D5;
+    border-radius: 6px;
+    padding: 4px 6px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.org-chart-zoom-level {
+    min-width: 42px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--bs-secondary-color, #6b7280);
+}

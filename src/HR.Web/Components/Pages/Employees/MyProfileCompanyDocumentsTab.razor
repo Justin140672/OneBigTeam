@@ -59,7 +59,7 @@ else
             {
                 var d = doc;
                 <div class="col-md-6">
-                    <div class="overview-card" style="cursor:pointer" @onclick="() => OpenDocument(d.Id)">
+                    <div class="overview-card" @onclick="() => OpenDocument(d.Id)">
                         <div class="overview-card-header">
                             <i class="fa-solid fa-file-lines overview-card-icon"></i>
                             <span class="overview-card-title">@d.Title</span>

@@ -146,7 +146,7 @@
             </div>
             <div class="mb-3">
                 <label class="form-label">Scheduled At</label>
-                <SfDateTimePicker TValue="DateTime?" @bind-Value="_scheduledAt" />
+                <SfDateTimePicker TValue="DateTime?" @bind-Value="_scheduledAt" Format="dd/MM/yyyy HH:mm" />
             </div>
             <div class="mb-3">
                 <label class="form-label">Duration (minutes)</label>
@@ -350,13 +350,17 @@
         _dialogError = null;
         _selectedCandidateId = null;
         _addNotes = null;
-        var result = await CandidateService.ListCandidatesAsync(CompanyId, pageSize: 200);
+        // ListCandidatesValidator caps PageSize at 100 (InclusiveBetween(1, 100)) — requesting
+        // more than that fails FluentValidation validation, and CandidateService.ListCandidatesAsync
+        // swallows that failure (catch (HttpRequestException) { return null; }), so this silently
+        // returned zero candidates on every single open regardless of how many actually exist.
+        var result = await CandidateService.ListCandidatesAsync(CompanyId, pageSize: 100);
         _candidates = result?.Items ?? [];
         _showAddDialog = true;
     }
 
     // Candidates are searched server-side as the user types rather than filtered against the
-    // initial 200-row page above — otherwise a candidate outside that first page (e.g. sorted
+    // initial 100-row page above — otherwise a candidate outside that first page (e.g. sorted
     // later alphabetically once the table grows) could never be found no matter what's typed.
     private async Task OnCandidateFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
     {
@@ -434,7 +438,13 @@
             CompanyId, VacancyId, _activeApplication!.Id,
             new ScheduleInterviewRequest(
                 CompanyId, VacancyId, _activeApplication.Id, _interviewerId!.Value,
-                new DateTimeOffset(_scheduledAt!.Value), _durationMinutes,
+                // _scheduledAt is Kind=Unspecified (bound straight from the picker), so
+                // `new DateTimeOffset(_scheduledAt)` resolves its offset from the server's local
+                // time zone — +01:00 for any date in BST. Postgres's timestamptz columns only
+                // accept offset-zero DateTimeOffsets (Npgsql rejects anything else outright), so
+                // normalize to UTC here. ToUniversalTime() keeps the same absolute instant — it
+                // only changes the offset, not the wall-clock moment being saved.
+                new DateTimeOffset(_scheduledAt!.Value).ToUniversalTime(), _durationMinutes,
                 string.IsNullOrWhiteSpace(_location) ? null : _location.Trim()));
 
     private void OpenRejectDialog(ApplicationListItemModel row)

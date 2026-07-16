@@ -1,0 +1,11 @@
+.photo-header-alert {
+    max-width: 480px;
+}
+
+.pending-photo-thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}

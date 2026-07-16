@@ -7,15 +7,14 @@
 
         @if (!string.IsNullOrEmpty(_uploadSuccessMsg))
         {
-            <div class="alert alert-success py-1 px-2 mt-2 mb-0 small" style="max-width: 480px;">@_uploadSuccessMsg</div>
+            <div class="alert alert-success py-1 px-2 mt-2 mb-0 small photo-header-alert">@_uploadSuccessMsg</div>
         }
 
         @if (_pending is not null)
         {
-            <div class="alert alert-info py-2 px-3 mt-2 mb-0" style="max-width: 480px;">
+            <div class="alert alert-info py-2 px-3 mt-2 mb-0 photo-header-alert">
                 <div class="d-flex align-items-center gap-2 mb-2">
-                    <img src="@_pending.DownloadUrl" alt="Pending photo"
-                         style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;" />
+                    <img src="@_pending.DownloadUrl" alt="Pending photo" class="pending-photo-thumb" />
                     <div class="flex-grow-1">
                         <div class="fw-semibold small">Pending Review</div>
                         <div class="small text-muted">Submitted @_pending.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div>
@@ -48,7 +47,7 @@
 
         @if (!string.IsNullOrEmpty(_error))
         {
-            <div class="alert alert-danger py-1 px-2 mt-2 mb-0 small" style="max-width: 480px;">@_error</div>
+            <div class="alert alert-danger py-1 px-2 mt-2 mb-0 small photo-header-alert">@_error</div>
         }
     </div>
 </div>

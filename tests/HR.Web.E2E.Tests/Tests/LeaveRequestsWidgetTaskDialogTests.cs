@@ -10,7 +10,9 @@ namespace HR.Web.E2E.Tests.Tests;
 /// dashboards: clicking a leave request row opens TaskViewDialog in place when the request still
 /// has an open (not yet approved/rejected) leave-approval task — the same dialog already used by
 /// the notification bell (see LeaveApprovalTests, NotificationMarkAllReadTests) — and otherwise
-/// falls back to navigating to the employee's profile Leave tab exactly as before.
+/// falls back to navigating to the employee's admin profile with the Leave tab active
+/// (EmployeeEdit.razor's "?tab=leave", not the self-service "/profile" route — MyProfile.razor
+/// redirects away from any EmployeeId that isn't the signed-in user's own).
 ///
 /// Submitting leave via Tom's own profile (MyProfilePage) fires LeaveRequestedIntegrationEvent,
 /// which HR.Modules.Tasks.Features.LeaveRequested.LeaveRequestedHandler turns into an open
@@ -129,18 +131,23 @@ public sealed class LeaveRequestsWidgetTaskDialogTests(AppFixture fixture) : E2E
         var names = await hrDash.GetLeaveRequestEmployeeNamesAsync();
         Assert.Contains(names, n => n.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase));
 
-        // ── Step 4: Clicking the row now falls back to navigating to Tom's profile Leave
-        // tab, since there is no longer an open task to open a dialog for. Disambiguate by
-        // date ("14 Sep") — the sibling ClickingPendingLeaveRequest_... test deliberately
-        // leaves its own Tom Williams request with an open task, so a name-only match could
-        // land on that row instead and open a dialog rather than navigate. ─────────────────
+        // ── Step 4: Clicking the row now falls back to navigating to Tom's admin employee
+        // view with the Leave tab active, since there is no longer an open task to open a
+        // dialog for. Not the self-service "/profile" route — MyProfile.razor hard-redirects
+        // to "/" for any EmployeeId other than the signed-in user's own (Laura viewing Tom's),
+        // which is exactly why this fell back to reloading the HR dashboard instead of
+        // navigating anywhere. Disambiguate by date ("14 Sep") — the sibling
+        // ClickingPendingLeaveRequest_... test deliberately leaves its own Tom Williams request
+        // with an open task, so a name-only match could land on that row instead and open a
+        // dialog rather than navigate. ─────────────────────────────────────────────────────
         await hrDash.ClickLeaveRequestItemAsync("Tom Williams", "14 Sep");
 
         await _page.WaitForURLAsync(
-            new Regex($@"/companies/{AcmeId}/employees/{TomId}/profile\?tab=leave"),
+            new Regex($@"/companies/{AcmeId}/employees/{TomId}\?tab=leave"),
             new() { Timeout = 15_000 });
 
-        Assert.Contains($"/employees/{TomId}/profile", _page.Url);
+        Assert.Contains($"/employees/{TomId}", _page.Url);
+        Assert.DoesNotContain("/profile", _page.Url);
         Assert.Contains("tab=leave", _page.Url);
     }
 }

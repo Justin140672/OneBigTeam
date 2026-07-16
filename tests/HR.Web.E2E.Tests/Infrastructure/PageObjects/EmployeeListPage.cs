@@ -48,8 +48,23 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         await page.WaitForURLAsync("**/employees/new", new() { Timeout = 15_000 });
     }
 
+    /// <summary>
+    /// Returns true if an employee matching <paramref name="nameFragment"/> exists, searching for
+    /// it via the page's own search box rather than scanning whatever's on the current unfiltered
+    /// page. EmployeeList.razor loads an unfiltered page capped at 100 rows sorted by last name —
+    /// on this shared, long-lived E2E database that cap is easy to exceed, so a specific employee
+    /// (e.g. one a test just created) can silently fall outside it with no indication why. The
+    /// search box round-trips to the server (SearchPageBase.OnSearchChanged), so it finds the
+    /// employee regardless of how many others sort before them.
+    /// </summary>
     public async Task<bool> HasEmployeeAsync(string nameFragment)
     {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+
+        await page.GetByPlaceholder("Search by name, email or employee number").FillAsync(nameFragment);
+        // OnSearchChanged debounces 300ms before reloading — wait past that, then for the grid to
+        // settle on the filtered result (row or empty state) rather than the pre-search rows.
+        await page.WaitForTimeoutAsync(400);
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
         return await page.Locator(".e-rowcell")

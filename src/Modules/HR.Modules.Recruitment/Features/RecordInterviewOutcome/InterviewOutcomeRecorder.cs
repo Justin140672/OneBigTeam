@@ -52,6 +52,7 @@ internal sealed class InterviewOutcomeRecorder(RecruitmentDbContext db, IClock c
         var now = clock.UtcNowOffset();
 
         interview.RecordOutcome(request.Outcome, request.Notes, now);
+        application.RecordInterviewOutcome(request.Outcome, now);
         await db.SaveChangesAsync(cancellationToken);
 
         await auditPublisher.PublishAsync(

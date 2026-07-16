@@ -118,22 +118,43 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         // the selected name — that can only happen once the server-side bound value has updated.
         // Without this, a caller that immediately clicks Save can race the round-trip and save
         // with the old (null) ManagerId — the employee never shows up as anyone's direct report.
+        //
+        // The selected text lives in the dropdown's own <input> VALUE, not as plain DOM text —
+        // Locator.Filter(HasText:...) matches against textContent, which never includes an
+        // <input>'s value attribute, so it can never see the update (same reason
+        // GetSelectedDepartmentTextAsync/GetSelectedLocationTextAsync below read via
+        // InputValueAsync() rather than text matching). Assert on the input's value instead.
         await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
             new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
-        await managerGroup.Filter(new() { HasText = managerNameFragment })
-            .WaitForAsync(new() { Timeout = 10_000 });
+        await Assertions.Expect(managerGroup.Locator(".e-input-group input").First)
+            .ToHaveValueAsync(managerNameFragment, new() { Timeout = 10_000 });
     }
 
     /// <summary>
     /// Clicks the single page-level Save button (persistent across all tabs, below the SfTab).
     /// Saves both the Details and Employment tabs together and navigates to the employee list on success.
     /// </summary>
+    /// <remarks>
+    /// Previously this only waited for the spinner to clear, which is true whether the save
+    /// succeeded OR failed validation (e.g. EmployeeEmploymentTab.SaveCoreAsync's
+    /// EditContext.Validate() failing, or UpdateEmploymentDetailsHandler returning a Conflict) —
+    /// a failed save leaves the caller on the same edit page with stale/unsaved field values and
+    /// no exception, so any later assertion about what got saved fails far from the actual cause.
+    /// Explicitly checking for the error banner here turns that into an immediate, specific failure.
+    /// </remarks>
     public async Task ClickSaveChangesAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+
+        var errorBanner = page.Locator(".alert-danger").First;
+        if (await errorBanner.IsVisibleAsync())
+        {
+            var message = (await errorBanner.TextContentAsync())?.Trim();
+            throw new Exception($"Save failed: {message}");
+        }
     }
 
     // ── Save (new employee form) ───────────────────────────────────────────────
@@ -171,6 +192,13 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task<string?> GetSelectedLocationTextAsync()
     {
         var group = page.Locator(".col-md-4").Filter(new() { HasText = "Location" }).First;
+        return await group.Locator(".e-input-group input").First.InputValueAsync();
+    }
+
+    /// <summary>Reads the current value of the Manager dropdown's visible text on the Employment tab.</summary>
+    public async Task<string?> GetSelectedManagerTextAsync()
+    {
+        var group = page.Locator(".col-md-4, .col-12").Filter(new() { HasText = "Manager" }).First;
         return await group.Locator(".e-input-group input").First.InputValueAsync();
     }
 
@@ -391,8 +419,17 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task OpenProbationTabAsync()
     {
         await page.GetByRole(AriaRole.Tab, new() { Name = "Probation" }).ClickAsync();
-        // Wait for the tab content to render — either a card or "No probation record" alert.
-        await page.WaitForSelectorAsync(".card, .alert-secondary", new() { Timeout = 15_000 });
+        // EmployeeEdit.razor always renders a ".card" above the tab strip (e.g. the "Reporting
+        // Chain" card, for any employee who has a manager) — waiting on a bare
+        // ".card, .alert-secondary" selector resolves immediately against that pre-existing card
+        // instead of EmployeeProbationTab's own async-loaded content, so callers that immediately
+        // read the status badge can catch it while the tab's own spinner is still showing. Wait
+        // for the spinner to clear first, then for the tab's own content specifically (the
+        // period-summary progress bar, or the "no record" empty state).
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        await page.WaitForSelectorAsync(".progress, .alert-secondary", new() { Timeout = 15_000 });
     }
 
     /// <summary>Returns true if the probation period summary panel (progress bar card) is visible.</summary>
@@ -406,7 +443,13 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     /// <summary>Returns the text of the probation status badge on the Probation tab summary panel.</summary>
     public async Task<string?> GetProbationStatusBadgeTextAsync()
     {
-        var badge = page.Locator(".card .badge").First;
+        // ".card .badge" alone also matches the "Current Employee" badge in EmployeeEdit.razor's
+        // Reporting Chain card, which sits above the tab strip and comes first in DOM order — for
+        // any employee who has a manager, .First landed on that badge instead of the Probation
+        // Record card's own status badge. Scope to the card whose header says "Probation Record"
+        // specifically (see EmployeeProbationTab.razor).
+        var badge = page.Locator(".card").Filter(new() { Has = page.Locator(".card-header:has-text('Probation Record')") })
+            .Locator(".badge").First;
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
 

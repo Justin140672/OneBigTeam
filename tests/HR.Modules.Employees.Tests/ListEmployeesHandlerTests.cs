@@ -102,6 +102,29 @@ public class ListEmployeesHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Filters_By_Search_On_FullName()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        context.Employees.AddRange(
+            Employee.Create(Guid.NewGuid(), companyId, "David", "Park", "david@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now),
+            Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
+        await context.SaveChangesAsync();
+
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
+
+        var result = await handler.HandleAsync(
+            new ListEmployeesRequest { CompanyId = companyId, Search = "David Park" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value!.TotalCount);
+        Assert.Equal("David", result.Value.Items[0].FirstName);
+    }
+
+    [Fact]
     public async Task HandleAsync_Filters_By_Search_On_WorkEmail()
     {
         await using var context = BuildContext();

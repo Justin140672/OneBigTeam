@@ -14,12 +14,20 @@ namespace HR.Web.E2E.Tests.Tests;
 /// (30000000-0000-0000-0000-000000000002) as the hiring manager / interviewer, but creates a
 /// fresh Vacancy and Candidate each run (unique names) so the test can be re-run against the
 /// same database without colliding with a previous run's data.
+///
+/// Runs as Marcus Diallo (Recruiter role) throughout the recruitment steps — recruitment:manage/
+/// candidate:view are Recruiter-only (see IdentityModule.AddRolePolicies), and an HR Administrator
+/// does not automatically get recruitment access. The final "employee now exists" check is a
+/// genuinely separate permission (employee:manage, HR-Administrator-only) that a Recruiter does
+/// not hold, so that one step switches to Laura Bennett (HR Administrator) — mirroring the real
+/// handoff: a Recruiter hires someone, an HR Administrator manages their employee record after.
 /// </summary>
 [Collection("E2E")]
 public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
+    private const string MarcusEmail = "marcus.diallo@acme.example";
     private const string LauraEmail = "laura.bennett@acme.example";
 
     [Fact]
@@ -39,7 +47,7 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         var employeeList   = new EmployeeListPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         // ── Step 1: Create the candidate ──────────────────────────────────────────
         await candidateList.GoToAsync(AcmeId);
@@ -76,7 +84,7 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         await vacancyDetail.ClickScheduleInterviewForAsync(candidateLast);
         await vacancyDetail.WaitForScheduleDialogAsync();
         await vacancyDetail.SelectInterviewerAsync("James");
-        await vacancyDetail.FillScheduledAtAsync("01/09/2026 10:00 AM");
+        await vacancyDetail.FillScheduledAtAsync("01/09/2026 10:00");
         await vacancyDetail.SubmitScheduleInterviewAsync();
 
         Assert.Equal("InterviewScheduled", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
@@ -127,6 +135,10 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
             "Expected the candidate detail page to show the 'hired and linked to employee' banner");
 
         // ── Step 9: A real Employee should now exist and appear in the employee list ─
+        // The employee list page requires employee:manage, which Marcus (Recruiter) doesn't
+        // hold — switch to Laura (HR Administrator) for this one check, matching the real
+        // handoff between the two roles.
+        await login.SwitchAccountAsync(LauraEmail);
         await employeeList.GoToAsync(AcmeId);
         Assert.True(await employeeList.HasEmployeeAsync(candidateLast),
             $"Expected an employee named '{candidateLast}' to appear in the employee list after hiring");
@@ -182,7 +194,7 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await candidateList.GoToAsync(AcmeId);
         await candidateList.ClickNewCandidateAsync();
@@ -207,7 +219,7 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         await vacancyDetail.ClickScheduleInterviewForAsync(candidateLast);
         await vacancyDetail.WaitForScheduleDialogAsync();
         await vacancyDetail.SelectInterviewerAsync("James");
-        await vacancyDetail.FillScheduledAtAsync("01/09/2026 10:00 AM");
+        await vacancyDetail.FillScheduledAtAsync("01/09/2026 10:00");
         await vacancyDetail.SubmitScheduleInterviewAsync();
 
         await vacancyDetail.OpenInterviewsTabAsync();

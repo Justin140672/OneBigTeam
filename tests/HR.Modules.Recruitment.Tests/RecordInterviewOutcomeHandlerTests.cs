@@ -21,6 +21,7 @@ public class RecordInterviewOutcomeHandlerTests
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Senior Software Engineer", null, null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        application.ScheduleInterview(Now);
         var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(2), 30, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -48,10 +49,13 @@ public class RecordInterviewOutcomeHandlerTests
         Assert.Equal(InterviewOutcome.Passed, result.Value!.Outcome);
         Assert.Equal("Strong technical skills.", result.Value.Notes);
 
-        // The Application's own summary outcome stays untouched by design.
+        // Recording the interview outcome also moves the Application itself from
+        // InterviewScheduled to Interviewed (Application.RecordInterviewOutcome) — previously
+        // this call was missing entirely, leaving the application stuck on InterviewScheduled
+        // forever with no way to reach Offer/Hire.
         var savedApplication = await db.Applications.SingleAsync();
-        Assert.Equal(ApplicationStatus.Applied, savedApplication.Status);
-        Assert.Null(savedApplication.InterviewOutcome);
+        Assert.Equal(ApplicationStatus.Interviewed, savedApplication.Status);
+        Assert.Equal(InterviewOutcome.Passed, savedApplication.InterviewOutcome);
 
         var published = Assert.Single(auditPublisher.Published);
         var auditEvent = Assert.IsType<InterviewOutcomeRecordedAuditEvent>(published);
@@ -163,6 +167,7 @@ public class RecordInterviewOutcomeHandlerTests
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Senior Software Engineer", null, null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        application.ScheduleInterview(Now);
         var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(2), 30, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);

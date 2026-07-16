@@ -125,16 +125,26 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
         return Task.CompletedTask;
     }
 
-    protected void OnRowSelected(RowSelectEventArgs<TItem> args)
+    // Ids of toolbar buttons whose enabled state tracks row selection. Re-assigning the
+    // Toolbar parameter (via GridToolbar) only sets the *initial* Disabled state when the
+    // grid's underlying JS toolbar is first created — Syncfusion Blazor Grid doesn't refresh
+    // an already-rendered toolbar just because a new Toolbar object was bound, so selection
+    // changes after first render need this explicit interop call to actually update the DOM.
+    private List<string> SelectionDependentToolbarIds =>
+        new List<string> { "hr-edit", "hr-view" }.Concat(_customActions.Select(a => a.Id)).ToList();
+
+    protected async Task OnRowSelected(RowSelectEventArgs<TItem> args)
     {
         _hasSelection = true;
-        StateHasChanged();
+        if (Grid is not null)
+            await Grid.EnableToolbarItemsAsync(SelectionDependentToolbarIds, true);
     }
 
-    protected void OnRowDeselected(RowDeselectEventArgs<TItem> args)
+    protected async Task OnRowDeselected(RowDeselectEventArgs<TItem> args)
     {
         _hasSelection = false;
-        StateHasChanged();
+        if (Grid is not null)
+            await Grid.EnableToolbarItemsAsync(SelectionDependentToolbarIds, false);
     }
 
     protected async Task OnToolbarClick(ClickEventArgs args)

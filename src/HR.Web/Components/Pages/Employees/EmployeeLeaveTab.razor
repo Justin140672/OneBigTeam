@@ -186,7 +186,7 @@ else
                     <span class="fw-semibold">Balance History</span>
                     @if (_historyOptions.Count > 0)
                     {
-                        <div style="min-width: 240px;">
+                        <div class="leave-type-picker">
                             <SfDropDownList TValue="Guid?" TItem="HistoryOption"
                                             DataSource="@_historyOptions"
                                             @bind-Value="_historyLeaveTypeId"

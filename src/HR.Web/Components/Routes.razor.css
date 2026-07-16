@@ -1,0 +1,17 @@
+.dev-error-boundary {
+    padding: 2rem;
+    font-family: monospace;
+    background: #fee;
+    border: 2px solid red;
+    margin: 1rem;
+}
+
+.dev-error-message,
+.dev-error-stacktrace {
+    white-space: pre-wrap;
+}
+
+.dev-error-stacktrace {
+    font-size: .8em;
+    color: #666;
+}

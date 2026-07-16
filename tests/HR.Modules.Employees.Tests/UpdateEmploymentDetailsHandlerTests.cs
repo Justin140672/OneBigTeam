@@ -236,6 +236,70 @@ public class UpdateEmploymentDetailsHandlerTests
         Assert.Equal("not_found", result.Error.Code);
     }
 
+    // ── Draft status transition ──────────────────────────────────────────────
+    // Draft isn't a selectable option on the Employment tab's status dropdown — it's only ever a
+    // brand-new employee's starting state before their first Activate. A Draft employee's edit
+    // that doesn't touch status at all still round-trips Status == Draft unchanged (see
+    // EmployeeEmploymentTab.razor's PopulateModel), which must be allowed; only an actual attempt
+    // to revert an already-progressed employee back to Draft should be rejected.
+
+    [Fact]
+    public async Task HandleAsync_Allows_Draft_Employee_Edit_That_Leaves_Status_Unchanged()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now); // starts Draft, never Activated
+        var manager = CreateEmployee(companyId, now);
+        context.Employees.AddRange(employee, manager);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
+        {
+            CompanyId = companyId,
+            Id = employee.Id,
+            Status = EmploymentStatus.Draft,
+            StartDate = StartDate,
+            ManagerId = manager.Id
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var saved = await context.Employees.SingleAsync(e => e.Id == employee.Id);
+        Assert.Equal(EmploymentStatus.Draft, saved.Status);
+        Assert.Equal(manager.Id, saved.ManagerId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Failure_When_Reverting_Active_Employee_To_Draft()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        employee.Activate(now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
+        {
+            CompanyId = companyId,
+            Id = employee.Id,
+            Status = EmploymentStatus.Draft,
+            StartDate = StartDate
+        }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        var saved = await context.Employees.SingleAsync();
+        Assert.Equal(EmploymentStatus.Active, saved.Status);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static Employee CreateEmployee(Guid companyId, DateTimeOffset now)

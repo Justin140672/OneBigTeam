@@ -8,13 +8,18 @@ namespace HR.Web.E2E.Tests.Tests;
 /// provides to every edit page (see EditPageBase.cs / UnsavedChangesDialog.razor). Exercised
 /// via the Candidate edit page as a representative host — the behavior under test lives in
 /// the shared base class, not in CandidateEdit itself.
+///
+/// Uses Marcus Diallo (Recruiter role) rather than Laura Bennett (HR Administrator) — candidate:view
+/// and recruitment:manage (candidate creation) are Recruiter-only (see
+/// IdentityModule.AddRolePolicies); an HR Administrator does not automatically get recruitment
+/// access.
 /// </summary>
 [Collection("E2E")]
 public sealed class CandidateEditCloseBehaviorTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example";
+    private const string MarcusEmail = "marcus.diallo@acme.example";
 
     [Fact]
     public async Task Close_ExistingRecordWithNoChanges_NavigatesDirectlyToList()
@@ -24,7 +29,7 @@ public sealed class CandidateEditCloseBehaviorTests(AppFixture fixture) : E2ETes
         var candidateEdit = new CandidateEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         // Create a candidate first so we have an existing, unmodified record to reopen.
         var unique   = Guid.NewGuid().ToString("N")[..8];
@@ -55,7 +60,7 @@ public sealed class CandidateEditCloseBehaviorTests(AppFixture fixture) : E2ETes
         var candidateEdit = new CandidateEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await candidateEdit.GoToNewAsync(AcmeId);
         await candidateEdit.FillFirstNameAsync("Unsaved Candidate");
@@ -78,7 +83,7 @@ public sealed class CandidateEditCloseBehaviorTests(AppFixture fixture) : E2ETes
         var candidateEdit = new CandidateEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await candidateEdit.GoToNewAsync(AcmeId);
         await candidateEdit.FillFirstNameAsync("E2E");
@@ -107,7 +112,7 @@ public sealed class CandidateEditCloseBehaviorTests(AppFixture fixture) : E2ETes
         var candidateEdit = new CandidateEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await candidateEdit.GoToNewAsync(AcmeId);
         await candidateEdit.FillFirstNameAsync("E2E");
@@ -134,7 +139,7 @@ public sealed class CandidateEditCloseBehaviorTests(AppFixture fixture) : E2ETes
         var candidateEdit = new CandidateEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await candidateEdit.GoToNewAsync(AcmeId);
         await candidateEdit.FillFirstNameAsync(firstName);

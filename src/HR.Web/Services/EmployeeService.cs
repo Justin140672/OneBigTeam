@@ -332,17 +332,31 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         if (response.IsSuccessStatusCode)
             return (true, null);
 
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return (false, body?.Error ?? "A conflict occurred.");
-        }
+        // The endpoint sends { error: "..." } for business-rule failures (not-found, conflict, a
+        // plain validation rejection like "Cannot set employment status to Draft."). But FluentValidation
+        // failures never reach the endpoint's own HandleAsync at all — this project sets
+        // Errors.StatusCode = 422 for those (see Program.cs) and FastEndpoints short-circuits with
+        // its own { statusCode, message, errors: { field: [...] } } shape instead. Falling back to a
+        // single generic message on anything that isn't the { error } shape silently swallowed real
+        // rejections like "Employee number is required." — check both known shapes before giving up.
+        var raw = await response.Content.ReadAsStringAsync();
 
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            return (false, "Employee not found.");
+        if (TryDeserialize<ErrorEnvelope>(raw)?.Error is { } businessMessage)
+            return (false, businessMessage);
 
-        return (false, "Failed to save employment details.");
+        if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
+            return (false, string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
+
+        return (false, $"Failed to save employment details ({(int)response.StatusCode} {response.StatusCode}).");
     }
+
+    private static T? TryDeserialize<T>(string json) where T : class
+    {
+        try { return System.Text.Json.JsonSerializer.Deserialize<T>(json, HrApiJsonOptions.Default); }
+        catch (System.Text.Json.JsonException) { return null; }
+    }
+
+    private sealed record ValidationErrorResponse(Dictionary<string, List<string>>? Errors);
 
     public async Task<(CreateEmployeeResponse? Employee, string? Error)> CreateEmployeeAsync(
         Guid companyId, CreateEmployeeRequest request)

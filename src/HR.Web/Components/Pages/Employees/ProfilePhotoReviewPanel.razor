@@ -21,8 +21,7 @@
             @if (_pending is not null)
             {
                 <div class="d-flex align-items-center gap-2 mb-3">
-                    <img src="@_pending.DownloadUrl" alt="Pending photo"
-                         style="width:64px;height:64px;border-radius:50%;object-fit:cover;flex-shrink:0;" />
+                    <img src="@_pending.DownloadUrl" alt="Pending photo" class="pending-photo-thumb" />
                     <div>
                         <div class="fw-semibold small">Pending Review</div>
                         <div class="small text-muted">Submitted @_pending.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div>

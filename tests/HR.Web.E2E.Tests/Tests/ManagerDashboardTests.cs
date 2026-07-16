@@ -75,6 +75,18 @@ public sealed class ManagerDashboardTests(AppFixture fixture) : E2ETestBase(fixt
         await empEdit.SelectManagerAsync("David Park");
         await empEdit.ClickSaveChangesAsync();
 
+        // ClickSaveChangesAsync redirects to the employee list on success (EmployeeEdit.razor's
+        // SaveCoreAsync always sets _redirectUrl to the list, even for an existing-employee
+        // update) — that alone doesn't prove the manager assignment actually persisted server-side,
+        // only that the save request didn't visibly error. Reload the employee fresh and re-read
+        // the Manager field from the database-backed value, not the client-side selection made
+        // moments ago, to catch a persistence failure here rather than as a confusing downstream
+        // symptom (e.g. the employee silently missing from David's dashboard widgets).
+        await empEdit.GoToAsync(AcmeId, employeeId);
+        await empEdit.OpenEmploymentTabAsync();
+        var savedManager = await empEdit.GetSelectedManagerTextAsync();
+        Assert.Equal("David Park", savedManager);
+
         return (employeeId, lastName);
     }
 

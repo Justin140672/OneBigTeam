@@ -82,6 +82,11 @@ else
             return;
         }
 
-        Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/{item.EmployeeId}/profile?tab=leave");
+        // Not the self-service "/profile" route — MyProfile.razor hard-redirects to "/" whenever
+        // the route's EmployeeId doesn't match the signed-in user's own (see its OnParametersSetAsync
+        // guard), which for an HR admin viewing someone else's request just bounces straight back to
+        // their dashboard. This is the admin-facing employee view (EmployeeEdit.razor), same route
+        // TeamOnboardingWidget already uses successfully for its own "?tab=" deep link.
+        Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/{item.EmployeeId}?tab=leave");
     }
 }

@@ -57,13 +57,10 @@ public class UpdateEmploymentDetailsValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmploymentDetailsRequest.EmploymentTypeId));
     }
 
-    [Fact]
-    public void Validate_Fails_When_Status_Is_Draft()
-    {
-        var result = _validator.Validate(ValidRequest() with { Status = EmploymentStatus.Draft });
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmploymentDetailsRequest.Status));
-    }
+    // Status == Draft is deliberately NOT rejected here — see UpdateEmploymentDetailsHandlerTests
+    // for the Draft-transition check, which needs the employee's *current* status (only available
+    // in the handler, not the request-shape-only validator) to tell "still Draft, unrelated edit"
+    // apart from "actively reverting back to Draft".
 
     [Fact]
     public void Validate_Fails_When_CompanyId_Is_Empty()

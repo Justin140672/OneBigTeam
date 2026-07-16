@@ -1,4 +1,5 @@
 @using System.ComponentModel.DataAnnotations
+@using Syncfusion.Blazor.Data
 @inject EmployeeService EmployeeService
 @inject DepartmentService DepartmentService
 @inject LocationService LocationService
@@ -137,7 +138,8 @@ else
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">Manager</label>
-                                <SfDropDownList TValue="Guid?"
+                                <SfDropDownList @ref="_managerDropdown"
+                                                TValue="Guid?"
                                                 TItem="ManagerOption"
                                                 DataSource="@_managerOptions"
                                                 @bind-Value="Model.ManagerId"
@@ -145,6 +147,7 @@ else
                                                 AllowFiltering="true"
                                                 ShowClearButton="true">
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
+                                    <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnManagerFilteringAsync" />
                                 </SfDropDownList>
                             </div>
                         </div>
@@ -245,6 +248,7 @@ else
     private List<DepartmentListItemModel> _departments = [];
     private List<LocationListItemModel> _locations = [];
     private List<PositionProfileListItemModel> _positionProfiles = [];
+    private SfDropDownList<Guid?, ManagerOption> _managerDropdown = default!;
     private List<ManagerOption> _managerOptions = [];
     private List<EmploymentTypeListItemModel> _employmentTypes = [];
 
@@ -253,8 +257,18 @@ else
     private static readonly string[] _allDays =
         ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+    // Draft must be a real option here even though nobody should ever *pick* it (a brand-new
+    // employee's Employment tab loads with Model.Status == "Draft" — see PopulateModel below —
+    // and if that value has no matching item in the dropdown's own DataSource, the widget clears
+    // its selection and, via @bind-Value, silently overwrites Model.Status back to the client with
+    // an empty string. That corrupts the field on first render, before the user has touched
+    // anything, and the empty value then fails server-side deserialization on save regardless of
+    // which field they actually meant to edit. UpdateEmploymentDetailsHandler still rejects any
+    // attempt to actively transition a non-Draft employee back to Draft, so including it here only
+    // fixes the display/round-trip of an already-Draft employee — it doesn't relax that rule.
     private static readonly Option[] _statusOptions =
     [
+        new("Draft",      "Draft"),
         new("Active",     "Active"),
         new("OnLeave",    "On Leave"),
         new("Suspended",  "Suspended"),
@@ -266,7 +280,7 @@ else
         var deptTask       = DepartmentService.ListDepartmentsAsync(CompanyId);
         var locationTask   = LocationService.ListLocationsAsync(CompanyId);
         var profileTask    = PositionProfileService.ListPositionProfilesAsync(CompanyId);
-        var empListTask    = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
+        var empListTask    = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
         var probationTask  = ProbationService.GetProbationRecordByEmployeeAsync(CompanyId, EmployeeId);
         var empTypesTask   = EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
 
@@ -276,17 +290,44 @@ else
         _locations        = (await locationTask)?.Items ?? [];
         _positionProfiles = (await profileTask)?.Items.ToList() ?? [];
         _employmentTypes  = (await empTypesTask)?.Items ?? [];
-        _managerOptions   = ((await empListTask)?.Items ?? [])
-            .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "Terminated")
-            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
-            .OrderBy(e => e.Name)
-            .ToList();
 
         _probationRecord = await probationTask;
 
         var employee = await EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
         if (employee is not null)
             PopulateModel(employee);
+
+        // A first page (browsable without typing anything) — same purpose as the initial
+        // pageSize:200 fetch in VacancyApplicationsTab.OpenAddDialog. The rest of the company
+        // is reached by typing, see OnManagerFilteringAsync, so this page doesn't need to be
+        // exhaustive. The currently-assigned manager is merged in explicitly in case they don't
+        // happen to fall within this first page, so their name always renders rather than blank.
+        _managerOptions = ((await empListTask)?.Items ?? [])
+            .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "Terminated")
+            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .ToList();
+
+        if (employee?.ManagerId is { } managerId && _managerOptions.All(m => m.Id != managerId))
+            _managerOptions.Add(new ManagerOption(managerId, employee.ManagerFullName ?? ""));
+
+        _managerOptions = _managerOptions.OrderBy(m => m.Name).ToList();
+    }
+
+    // The manager list can't be preloaded in one bounded page the way _departments/_locations/etc.
+    // are — a company can have far more employees than any reasonable page size, and whoever the
+    // target manager is might sort outside that page (alphabetically, by whatever order), making
+    // them impossible to find no matter what's typed into the filter box. Search server-side as
+    // the user types instead, same pattern as VacancyApplicationsTab's candidate picker.
+    private async Task OnManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        _managerOptions = (result?.Items ?? [])
+            .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "Terminated")
+            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(e => e.Name)
+            .ToList();
+        await _managerDropdown.FilterAsync(_managerOptions, new Query());
     }
 
     private void PopulateModel(GetEmployeeResponse e)

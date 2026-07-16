@@ -22,7 +22,8 @@ public class RequestPersonalDetailsChangeHandlerTests
             Guid companyId, Guid createdBy, string title, string? description,
             TaskPriority priority, TaskSource source, TaskActionType actionType,
             DateOnly? dueDate, Guid? assignedEmployeeId, Guid? assignedUserId,
-            Guid? sourceEntityId, CancellationToken cancellationToken)
+            Guid? sourceEntityId, CancellationToken cancellationToken,
+            bool notifyAssignee = true)
         {
             CallCount++;
             LastAssignedEmployeeId = assignedEmployeeId;

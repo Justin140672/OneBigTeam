@@ -111,9 +111,10 @@ internal sealed class PublishSharedCompanyDocumentHandler(
                     actionType:         TaskActionType.Acknowledge,
                     dueDate:            document.AcknowledgementDueDate,
                     assignedEmployeeId: employeeId,
-                    assignedUserId:     null,
+                    assignedUserId:     employeeId,
                     sourceEntityId:     document.Id,
-                    cancellationToken);
+                    cancellationToken,
+                    notifyAssignee:     false);
 
                 await notificationWriter.WriteAsync(
                     Guid.NewGuid(),

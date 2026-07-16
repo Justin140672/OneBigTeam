@@ -36,7 +36,8 @@ internal sealed class RequestAssetReturnHandler(AssetsDbContext db, ITaskCreator
             assignedEmployeeId: assignment.EmployeeId,
             assignedUserId:     null,
             sourceEntityId:     assignment.Id,
-            cancellationToken);
+            cancellationToken,
+            notifyAssignee:     false);
 
         await notificationWriter.WriteAsync(
             Guid.NewGuid(),

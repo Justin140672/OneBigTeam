@@ -80,7 +80,8 @@ internal sealed class ScheduleInterviewHandler(
             assignedEmployeeId: request.InterviewerEmployeeId,
             assignedUserId:     request.InterviewerEmployeeId,
             sourceEntityId:     interview.Id,
-            cancellationToken);
+            cancellationToken,
+            notifyAssignee:     false);
 
         await taskCreator.CreateAsync(
             request.CompanyId,
@@ -94,7 +95,8 @@ internal sealed class ScheduleInterviewHandler(
             assignedEmployeeId: request.InterviewerEmployeeId,
             assignedUserId:     request.InterviewerEmployeeId,
             sourceEntityId:     interview.Id,
-            cancellationToken);
+            cancellationToken,
+            notifyAssignee:     false);
 
         await notificationWriter.WriteAsync(
             Guid.NewGuid(),

@@ -1,0 +1,8 @@
+.logo-preview-box {
+    height: 120px;
+}
+
+.logo-preview-box img {
+    max-height: 100px;
+    max-width: 100%;
+}

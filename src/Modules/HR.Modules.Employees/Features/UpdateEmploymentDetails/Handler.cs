@@ -100,6 +100,15 @@ internal sealed class UpdateEmploymentDetailsHandler
             }
         }
 
+        // Draft isn't a selectable option on the Employment tab's status dropdown — it's only
+        // ever a brand-new employee's starting state — so the one transition worth rejecting here
+        // is someone actively reverting an already-progressed employee back to it. A Draft
+        // employee whose edit doesn't touch status at all (e.g. just assigning a manager) still
+        // round-trips Status == Draft unchanged, which must be allowed through.
+        if (request.Status == EmploymentStatus.Draft && employee.Status != EmploymentStatus.Draft)
+            return Result.Failure<UpdateEmploymentDetailsResponse>(
+                Error.Validation("Cannot set employment status to Draft."));
+
         var now = _clock.UtcNowOffset();
 
         if (employee.Status != request.Status)
