@@ -32,6 +32,7 @@ using HR.Modules.Documents.Features.DownloadEmployeeDocument;
 using HR.Modules.Documents.Features.GetEmployeeDocument;
 using HR.Modules.Documents.Features.GetEmployeeProfilePhoto;
 using HR.Modules.Documents.Features.GetExpiringDocuments;
+using HR.Modules.Documents.Features.ListSharedCompanyDocumentsDueForReview;
 using HR.Modules.Documents.Features.ProcessDocumentExpiryNotifications;
 using HR.Modules.Documents.Features.GetDocumentRequest;
 using HR.Modules.Documents.Features.ListDocumentRequests;
@@ -203,6 +204,9 @@ public static class DocumentsModule
 
         services.AddScoped<GetExpiringDocumentsHandler>();
         services.AddScoped<IValidator<GetExpiringDocumentsRequest>, GetExpiringDocumentsValidator>();
+
+        services.AddScoped<ListSharedCompanyDocumentsDueForReviewHandler>();
+        services.AddScoped<IValidator<ListSharedCompanyDocumentsDueForReviewRequest>, ListSharedCompanyDocumentsDueForReviewValidator>();
 
         services.AddScoped<ProcessDocumentExpiryNotificationsHandler>();
 

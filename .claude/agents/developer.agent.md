@@ -59,11 +59,13 @@ If any of the following rejection criteria are violated by the requested impleme
 2. Create or update the requested data model using the repository's existing conventions.
 3. Add the model to the existing DbContext with the minimum required change, and generate the EF Core migration for that change.
 4. Create the full FastEndpoints vertical slice needed for the requested operation (Endpoint/Request/Response/Validator/Handler), following the existing endpoint style in the repository and using positional record request and response DTOs.
-5. Check that each endpoint request contract is a positional record, each response contract is a positional record DTO rather than the entity model, and DTO construction uses constructors instead of property initializers.
-6. Verify that no unrelated code was added.
+5. Register every new Handler and Validator (and any other new service) in the module's `*Module.cs` DI registration. This repo wires up dependencies manually, not via assembly scanning — a new feature's handler and validator will fail to resolve at runtime, even though the build succeeds, unless they're added alongside the existing `services.AddScoped<...>()` lines. Check `*Module.cs` for every new type you added and confirm each one has a matching registration before considering the slice complete.
+6. Check that each endpoint request contract is a positional record, each response contract is a positional record DTO rather than the entity model, and DTO construction uses constructors instead of property initializers.
+7. Verify that no unrelated code was added.
 
 ## Output Format
 - State which model was created or updated.
 - State which DbContext file was changed and whether a migration was generated.
 - State which FastEndpoints files were created or updated.
+- State which DI registrations were added to `*Module.cs` for the new handler(s)/validator(s).
 - If work cannot proceed, report the exact missing prerequisite.

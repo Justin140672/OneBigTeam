@@ -1,0 +1,3 @@
+namespace HR.Modules.Documents.Features.ListSharedCompanyDocumentsDueForReview;
+
+internal sealed record ListSharedCompanyDocumentsDueForReviewRequest(Guid CompanyId);
