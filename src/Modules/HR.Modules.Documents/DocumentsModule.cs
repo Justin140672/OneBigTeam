@@ -220,6 +220,7 @@ public static class DocumentsModule
         services.AddScoped<IValidator<UploadRequestedDocumentRequest>, UploadRequestedDocumentValidator>();
 
         services.AddScoped<SharedCompanyDocumentAcknowledgementReminderJob>();
+        services.AddScoped<DetectDocumentsDueForReviewJob>();
     }
 
     public static WebApplication UseDocumentsRecurringJobs(this WebApplication app)
@@ -229,6 +230,10 @@ public static class DocumentsModule
             "shared-company-document-acknowledgement-reminders",
             job => job.ExecuteAsync(),
             Cron.Daily(9));
+        jobManager.AddOrUpdate<DetectDocumentsDueForReviewJob>(
+            "detect-documents-due-for-review",
+            job => job.ExecuteAsync(),
+            Cron.Daily(10));
         return app;
     }
 
