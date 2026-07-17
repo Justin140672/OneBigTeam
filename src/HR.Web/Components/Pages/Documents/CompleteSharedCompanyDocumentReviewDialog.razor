@@ -1,0 +1,157 @@
+@inject DocumentService DocumentService
+
+<SfDialog Visible="IsOpen" IsModal="true" Width="480px" ShowCloseIcon="false">
+    <DialogTemplates>
+        <Header>Complete Review</Header>
+        <Content>
+            <dl class="overview-dl">
+                <dt>Title</dt>
+                <dd>@Document?.Title</dd>
+                <dt>Category</dt>
+                <dd>@Document?.CategoryName</dd>
+                @if (Document?.ReviewDate.HasValue == true)
+                {
+                    <dt>Next Review Date</dt>
+                    <dd>@Document.ReviewDate!.Value.ToString("d MMMM yyyy")</dd>
+                }
+                @if (Document is not null && !string.IsNullOrWhiteSpace(Document.ReviewFrequency) && Document.ReviewFrequency != "None")
+                {
+                    <dt>Review Frequency</dt>
+                    <dd>
+                        @ReviewFrequencyDisplay.Label(Document.ReviewFrequency)
+                        @if (Document.ReviewFrequency == "Custom" && Document.CustomReviewFrequencyMonths.HasValue)
+                        {
+                            <text> (every @(Document.CustomReviewFrequencyMonths.Value) month@(Document.CustomReviewFrequencyMonths.Value == 1 ? "" : "s"))</text>
+                        }
+                    </dd>
+                }
+                @if (Document?.ReviewOwnerEmployeeId.HasValue == true)
+                {
+                    <dt>Review Owner</dt>
+                    <dd>@Document.ReviewOwnerName</dd>
+                }
+            </dl>
+            <div class="mb-2">
+                <label class="form-label" for="review-notes">Review Notes <span class="text-danger">*</span></label>
+                <textarea id="review-notes" class="form-control" rows="4" maxlength="2000" @bind="_reviewNotes"></textarea>
+                @if (!string.IsNullOrEmpty(_validationError))
+                {
+                    <div class="text-danger small mt-1">@_validationError</div>
+                }
+            </div>
+            <div class="mb-2">
+                <label class="form-label">Renewed File (optional)</label>
+                <InputFile class="form-control" OnChange="OnFileSelected"
+                           accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
+                <div class="form-text">PDF, Word, or image files up to 20 MB.</div>
+            </div>
+            @if (Document?.RequiresAcknowledgement == true && _selectedFile is not null)
+            {
+                <div class="mb-2">
+                    <SfCheckBox TChecked="bool"
+                                Label="Requires employees to acknowledge this version again"
+                                Checked="@_requiresReacknowledgement"
+                                CheckedChanged="@((bool v) => _requiresReacknowledgement = v)" />
+                </div>
+            }
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="alert alert-danger py-2 mb-0">@_error</div>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton CssClass="e-primary" Disabled="_saving" OnClick="ConfirmAsync">
+                @(_saving ? "Saving…" : "Complete Review")
+            </SfButton>
+            <SfButton Disabled="_saving" OnClick="CancelAsync">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public SharedCompanyDocumentDetailResponse? Document { get; set; }
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnSaved { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+
+    private bool _wasOpen;
+    private bool _saving;
+    private string _reviewNotes = string.Empty;
+    private string? _validationError;
+    private string? _error;
+    private IBrowserFile? _selectedFile;
+    private bool _requiresReacknowledgement;
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && !_wasOpen)
+        {
+            _reviewNotes = string.Empty;
+            _validationError = null;
+            _error = null;
+            _selectedFile = null;
+            _requiresReacknowledgement = false;
+        }
+
+        _wasOpen = IsOpen;
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
+
+    private async Task ConfirmAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_reviewNotes))
+        {
+            _validationError = "Review notes are required.";
+            return;
+        }
+
+        _validationError = null;
+        _saving = true;
+        _error = null;
+        StateHasChanged();
+
+        if (_selectedFile is not null)
+        {
+            var versionNote = $"Renewed via document review. {_reviewNotes}";
+            var uploadError = await DocumentService.UploadSharedCompanyDocumentVersionAsync(
+                CompanyId, Document!.Id, versionNote,
+                Document?.RequiresAcknowledgement == true && _requiresReacknowledgement,
+                _selectedFile);
+
+            if (uploadError is not null)
+            {
+                _saving = false;
+                _error = uploadError;
+                return;
+            }
+        }
+
+        var error = await DocumentService.CompleteSharedCompanyDocumentReviewAsync(CompanyId, Document!.Id, _reviewNotes);
+
+        _saving = false;
+
+        if (error is not null)
+        {
+            _error = error;
+            return;
+        }
+
+        _reviewNotes = string.Empty;
+        _selectedFile = null;
+        _requiresReacknowledgement = false;
+        _error = null;
+        await OnSaved.InvokeAsync();
+    }
+
+    private async Task CancelAsync()
+    {
+        _reviewNotes = string.Empty;
+        _validationError = null;
+        _error = null;
+        _selectedFile = null;
+        _requiresReacknowledgement = false;
+        await OnCancelled.InvokeAsync();
+    }
+}

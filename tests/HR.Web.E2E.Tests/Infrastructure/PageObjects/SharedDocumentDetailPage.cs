@@ -5,7 +5,9 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// <summary>
 /// Page object for the shared company document detail page
 /// (/companies/{companyId}/shared-documents/{documentId}), scoped to the Version History grid,
-/// the Publish flow, the Archive flow, the Acknowledgement card's "Edit" flow (used by
+/// the Publish flow, the Archive flow, the "Mark Expired" flow (see SharedDocumentExpireTests),
+/// the Complete Review flow (CompleteSharedCompanyDocumentReviewDialog.razor —
+/// see SharedDocumentCompleteReviewTests), the Acknowledgement card's "Edit" flow (used by
 /// CompanyDocumentsTabTests to set up documents with acknowledgement requirements before
 /// publishing), the Audience card's summary/edit-dialog affordances, the Document Metadata
 /// card's "Edit" flow (covering Review Frequency — see SharedDocumentReviewFrequencyTests — and
@@ -21,6 +23,17 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     private ILocator PublishHeaderButton => page.GetByRole(AriaRole.Button).Filter(new() { Has = page.Locator(".fa-paper-plane") });
     private ILocator ArchiveHeaderButton => page.GetByRole(AriaRole.Button).Filter(new() { Has = page.Locator(".fa-box-archive") });
 
+    // Same icon-filter disambiguation reasoning as ArchiveHeaderButton above — fa-calendar-xmark
+    // is unique to this header button (it isn't reused by the dialog's own footer button, which
+    // carries no icon).
+    private ILocator ExpireHeaderButton => page.GetByRole(AriaRole.Button).Filter(new() { Has = page.Locator(".fa-calendar-xmark") });
+
+    // The "Review Document" header button also carries the fa-clipboard-check icon that the
+    // Acknowledgement overview-card's header uses, but that header icon lives on a plain <span>
+    // (not a button), so filtering GetByRole(Button) by this icon still resolves to just the one
+    // header button — same reasoning as Publish/Archive above.
+    private ILocator ReviewHeaderButton => page.GetByRole(AriaRole.Button).Filter(new() { Has = page.Locator(".fa-clipboard-check") });
+
     // Unlike Publish/Archive, the page header's "Edit" button shares its icon (fa-pen) and text
     // with the Audience and Acknowledgement cards' own "Edit" buttons, so icon/text filtering
     // can't disambiguate it — it's the only one of the three that isn't inside an .overview-card,
@@ -31,6 +44,8 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 
     private ILocator PublishDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Publish Document" });
     private ILocator ArchiveDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Archive Document" });
+    private ILocator ExpireDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Mark Document as Expired" });
+    private ILocator ReviewDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Complete Review" });
 
     // Scoped to the "Acknowledgement" overview-card so its "Edit" button doesn't collide with the
     // page header's metadata "Edit" button or the "Audience" card's own "Edit" button.
@@ -71,7 +86,23 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 
     public Task<bool> IsArchiveButtonVisibleAsync() => ArchiveHeaderButton.IsVisibleAsync();
 
+    public Task<bool> IsExpireButtonVisibleAsync() => ExpireHeaderButton.IsVisibleAsync();
+
     public Task<bool> IsPublishButtonVisibleAsync() => PublishHeaderButton.IsVisibleAsync();
+
+    public Task<bool> IsReviewButtonVisibleAsync() => ReviewHeaderButton.IsVisibleAsync();
+
+    /// <summary>
+    /// Text of the "Next Review Date" row in the Document Metadata card (e.g. "16 August 2026"),
+    /// or null when the row isn't rendered at all — SharedDocumentDetail.razor only renders this
+    /// row once ReviewDate has a value.
+    /// </summary>
+    public async Task<string?> GetReviewDateTextAsync()
+    {
+        var row = page.Locator("dt:has-text('Next Review Date') + dd");
+        if (!await row.IsVisibleAsync()) return null;
+        return (await row.InnerTextAsync()).Trim();
+    }
 
     /// <summary>
     /// Text of the "Review Frequency" row in the Document Metadata card (e.g. "Quarterly" or
@@ -350,6 +381,188 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
     }
 
+    /// <summary>Opens the "Mark Document as Expired" confirmation dialog via the header "Mark Expired" button.</summary>
+    public async Task OpenExpireDialogAsync()
+    {
+        await ExpireHeaderButton.ClickAsync();
+        await ExpireDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+    }
+
+    public Task<bool> IsExpireDialogOpenAsync() => ExpireDialog.IsVisibleAsync();
+
+    /// <summary>The Expire dialog's body paragraph text (e.g. confirming the document title and consequences of expiring it).</summary>
+    public async Task<string> GetExpireDialogBodyTextAsync() =>
+        (await ExpireDialog.Locator("p").First.InnerTextAsync()).Trim();
+
+    /// <summary>Clicks the dialog's own "Mark Expired"/"Marking Expired…" footer button (does not wait for the dialog to close).</summary>
+    public Task ClickExpireConfirmAsync() =>
+        ExpireDialog.GetByRole(AriaRole.Button, new() { Name = "Mark Expired", Exact = true }).ClickAsync();
+
+    public Task ClickExpireCancelAsync() =>
+        ExpireDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
+
+    /// <summary>The inline error text shown inside the Expire dialog when the server rejects the request (e.g. already Expired/Archived), or null if none is shown.</summary>
+    public async Task<string?> GetExpireErrorAsync()
+    {
+        var error = ExpireDialog.Locator(".alert-danger");
+        if (!await error.IsVisibleAsync()) return null;
+        return (await error.InnerTextAsync()).Trim();
+    }
+
+    /// <summary>
+    /// Drives the header "Mark Expired" button and its confirmation dialog to completion, then
+    /// waits for the dialog to close and the page to reload its detail data.
+    /// </summary>
+    public async Task ExpireAsync()
+    {
+        await OpenExpireDialogAsync();
+        await ClickExpireConfirmAsync();
+        await WaitForExpireDialogToCloseAsync();
+    }
+
+    /// <summary>
+    /// Waits for a successful expire to close the dialog and the page to finish reloading its
+    /// detail data. Only resolves once the request succeeded — a server-side rejection leaves the
+    /// dialog open, so callers exercising that path should assert on GetExpireErrorAsync/
+    /// IsExpireDialogOpenAsync instead of calling this.
+    /// </summary>
+    public async Task WaitForExpireDialogToCloseAsync()
+    {
+        await ExpireDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
+    /// <summary>Opens the Complete Review dialog (CompleteSharedCompanyDocumentReviewDialog.razor) via the header "Review Document" button, without confirming or cancelling it.</summary>
+    public async Task OpenReviewDialogAsync()
+    {
+        await ReviewHeaderButton.ClickAsync();
+        await ReviewDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+    }
+
+    public Task<bool> IsReviewDialogOpenAsync() => ReviewDialog.IsVisibleAsync();
+
+    /// <summary>
+    /// Text of a labelled dt/dd metadata row inside the Complete Review dialog (e.g. "Title",
+    /// "Category", "Next Review Date", "Review Frequency", "Review Owner"), or null when the row
+    /// isn't rendered (Review Frequency and Review Owner are only rendered when set — same as the
+    /// page's own Document Metadata card). Deliberately scoped to the dialog itself rather than a
+    /// bare "dt:has-text(...) + dd" page-level locator, since SharedDocumentDetail.razor's own
+    /// Document Metadata card renders dt/dd rows with these exact same labels underneath the
+    /// dialog, which would otherwise resolve to two elements.
+    /// </summary>
+    public async Task<string?> GetReviewDialogMetadataRowAsync(string label)
+    {
+        var row = ReviewDialog.Locator($"dt:has-text('{label}') + dd");
+        if (!await row.IsVisibleAsync()) return null;
+        return (await row.InnerTextAsync()).Trim();
+    }
+
+    public Task FillReviewNotesAsync(string notes) => page.Locator("#review-notes").FillAsync(notes);
+
+    /// <summary>Clicks the dialog's own "Complete Review"/"Saving…" footer button (does not wait for the dialog to close, since blank/whitespace notes keeps it open).</summary>
+    public Task ClickReviewConfirmAsync() =>
+        ReviewDialog.GetByRole(AriaRole.Button, new() { Name = "Complete Review", Exact = true }).ClickAsync();
+
+    public Task ClickReviewCancelAsync() =>
+        ReviewDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
+
+    /// <summary>The inline validation message shown inside the Complete Review dialog when notes are blank/whitespace (e.g. "Review notes are required."), or null if none is shown.</summary>
+    public async Task<string?> GetReviewValidationErrorAsync()
+    {
+        var error = ReviewDialog.Locator(".text-danger.small.mt-1");
+        if (!await error.IsVisibleAsync()) return null;
+        return (await error.InnerTextAsync()).Trim();
+    }
+
+    /// <summary>
+    /// Fills in the review notes and confirms, then waits for the dialog to close and the page to
+    /// reload its detail data. Assumes the notes are non-blank (blank/whitespace notes keep the
+    /// dialog open — use OpenReviewDialogAsync/ClickReviewConfirmAsync/GetReviewValidationErrorAsync
+    /// directly to exercise that validation path).
+    /// </summary>
+    public async Task CompleteReviewAsync(string notes)
+    {
+        await OpenReviewDialogAsync();
+        await FillReviewNotesAsync(notes);
+        await ClickReviewConfirmAsync();
+        await WaitForReviewDialogToCloseAsync();
+    }
+
+    /// <summary>
+    /// Waits for a successful review completion to close the dialog and the page to finish
+    /// reloading its detail data. Only resolves once the notes were accepted — a validation
+    /// failure leaves the dialog open, so callers exercising that path should assert on
+    /// GetReviewValidationErrorAsync/IsReviewDialogOpenAsync instead of calling this.
+    /// </summary>
+    public async Task WaitForReviewDialogToCloseAsync()
+    {
+        await ReviewDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// Sets a file on the Complete Review dialog's optional "Renewed File" input
+    /// (CompleteSharedCompanyDocumentReviewDialog.razor). Attaching a file here (in addition to
+    /// the required review notes) drives the dialog to also call
+    /// DocumentService.UploadSharedCompanyDocumentVersionAsync before completing the review,
+    /// adding a new row to the Version History grid — see SharedDocumentReviewRenewalTests.
+    /// </summary>
+    public Task SetReviewRenewedFileAsync(string filePath) =>
+        ReviewDialog.Locator("input[type='file']").SetInputFilesAsync(filePath);
+
+    // Scoped to the Complete Review dialog so this doesn't collide with the same-labelled
+    // checkbox rendered by UploadSharedCompanyDocumentVersionDialog.razor's own "Upload New
+    // Version" dialog (both use the identical SfCheckBox label).
+    private ILocator ReviewReacknowledgementCheckbox => ReviewDialog.Locator(".e-checkbox-wrapper")
+        .Filter(new() { HasText = "Requires employees to acknowledge this version again" });
+
+    /// <summary>
+    /// Whether the "Requires employees to acknowledge this version again" checkbox is currently
+    /// rendered inside the Complete Review dialog. CompleteSharedCompanyDocumentReviewDialog.razor
+    /// only renders it once the document's RequiresAcknowledgement is true AND a "Renewed File"
+    /// has been selected via <see cref="SetReviewRenewedFileAsync"/> — see
+    /// SharedDocumentReviewRenewalTests.
+    /// </summary>
+    public Task<bool> IsReviewReacknowledgementCheckboxVisibleAsync() =>
+        ReviewReacknowledgementCheckbox.IsVisibleAsync();
+
+    /// <summary>
+    /// Checks the Complete Review dialog's "Requires employees to acknowledge this version
+    /// again" checkbox. Assumes it's currently rendered — i.e. a file has already been selected
+    /// via <see cref="SetReviewRenewedFileAsync"/> on a document with RequiresAcknowledgement true.
+    /// </summary>
+    public Task CheckReviewReacknowledgementAsync() => ReviewReacknowledgementCheckbox.Locator("label").ClickAsync();
+
+    /// <summary>
+    /// Fills in the review notes, attaches a "Renewed File", optionally checks the
+    /// reacknowledgement checkbox, and confirms — driving the same notes-then-upload-then-
+    /// complete-review flow CompleteSharedCompanyDocumentReviewDialog.razor's ConfirmAsync
+    /// performs once a file is selected — then waits for the dialog to close and the page to
+    /// reload its detail data (including the Version History grid). Assumes the notes are
+    /// non-blank and the file is a valid upload (see <see cref="CompleteReviewAsync"/> for the
+    /// notes-only, validation-focused equivalent).
+    /// </summary>
+    public async Task CompleteReviewWithRenewedFileAsync(string notes, string filePath, bool requiresReacknowledgement = false)
+    {
+        await OpenReviewDialogAsync();
+        await FillReviewNotesAsync(notes);
+        await SetReviewRenewedFileAsync(filePath);
+
+        if (requiresReacknowledgement)
+        {
+            await CheckReviewReacknowledgementAsync();
+        }
+
+        await ClickReviewConfirmAsync();
+        await WaitForReviewDialogToCloseAsync();
+    }
+
     /// <summary>Opens the Audience-edit dialog (EditSharedCompanyDocumentAudienceDialog.razor) via the "Audience" overview-card's "Edit" button.</summary>
     public async Task OpenEditAudienceDialogAsync()
     {
@@ -442,4 +655,73 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
     }
+
+    // Scoped to the "Review History" overview-card so its read-only grid (populated by
+    // CompleteSharedCompanyDocumentReviewDialog.razor — see SharedDocumentCompleteReviewTests)
+    // isn't confused with the "Version History" card's own grid immediately above it — both use
+    // the shared HrGrid component and so share ".e-grid"/".e-row"/".e-headercell" class names, but
+    // "Review History" doesn't appear as a substring of "Version History" (or any other card title
+    // on this page), so filtering by it alone is safe without needing icon-based disambiguation.
+    private ILocator ReviewHistoryCard => page.Locator(".overview-card").Filter(new() { HasText = "Review History" }).First;
+
+    public Task<bool> IsReviewHistoryCardVisibleAsync() => ReviewHistoryCard.IsVisibleAsync();
+
+    /// <summary>
+    /// Waits for the Review History grid to finish its own JS render tick (a data row or its
+    /// ".e-emptyrow" empty-state sibling present — same "'.e-grid' alone doesn't prove rows are
+    /// queryable" reasoning as e.g. CandidateListPage.RowsRenderedSelector), then returns the
+    /// number of actual data rows (0 for the empty-state case, since ".e-emptyrow" itself is
+    /// excluded from this count).
+    /// </summary>
+    public async Task<int> GetReviewHistoryRowCountAsync()
+    {
+        await ReviewHistoryCard.Locator(".e-row, .e-emptyrow").First
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        return await ReviewHistoryCard.Locator(".e-row").CountAsync();
+    }
+
+    /// <summary>
+    /// Waits for the Review History grid to show exactly <paramref name="expectedCount"/> rows,
+    /// then returns that count. Unlike <see cref="GetReviewHistoryRowCountAsync"/> (a one-shot
+    /// snapshot), this polls via Playwright's own <c>ToHaveCountAsync</c> assertion — necessary
+    /// because neither <see cref="CompleteReviewAsync"/>'s "dialog hidden" nor its "spinner gone"
+    /// wait guarantees the Blazor Server render carrying the new history row has actually been
+    /// flushed over SignalR and painted into the DOM by the time control returns to the caller
+    /// (same reasoning as <see cref="WaitForVersionRowCountAsync"/>).
+    /// </summary>
+    public async Task<int> WaitForReviewHistoryRowCountAsync(int expectedCount)
+    {
+        var rows = ReviewHistoryCard.Locator(".e-row");
+        await Assertions.Expect(rows).ToHaveCountAsync(expectedCount, new() { Timeout = 15_000 });
+        return await rows.CountAsync();
+    }
+
+    /// <summary>Header text of every column currently rendered on the Review History grid.</summary>
+    public async Task<IReadOnlyList<string>> GetReviewHistoryColumnHeadersAsync()
+    {
+        var headers = await ReviewHistoryCard.Locator(".e-headercell").AllInnerTextsAsync();
+        return headers.Select(h => h.Trim()).ToList();
+    }
+
+    /// <summary>
+    /// Returns the text of the given 0-based column index for the Review History grid row at the
+    /// given 0-based <paramref name="rowIndex"/> (0 = topmost row — the grid is sorted
+    /// newest-first server-side by ReviewDate, with no client-side sorting on top of that). Column
+    /// order matches SharedDocumentDetail.razor's Review History GridColumns: 0=Review Date,
+    /// 1=Reviewer, 2=Notes, 3=Previous Review Date.
+    /// </summary>
+    public async Task<string> GetReviewHistoryRowCellAsync(int rowIndex, int columnIndex)
+    {
+        var row = ReviewHistoryCard.Locator(".e-row").Nth(rowIndex);
+        return (await row.Locator(".e-rowcell").Nth(columnIndex).InnerTextAsync()).Trim();
+    }
+
+    /// <summary>
+    /// Count of interactive controls (buttons, links, or icon glyphs) rendered anywhere inside the
+    /// Review History grid's rows — expected to always be 0, since the grid is strictly read-only
+    /// (no edit/delete/action column), unlike the Version History grid immediately above it (which
+    /// has a per-row Download link) or other editable grids on this page.
+    /// </summary>
+    public Task<int> GetReviewHistoryRowActionControlCountAsync() =>
+        ReviewHistoryCard.Locator(".e-row button, .e-row a, .e-row i").CountAsync();
 }
