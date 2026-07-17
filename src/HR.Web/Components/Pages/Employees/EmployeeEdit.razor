@@ -14,6 +14,7 @@
 @using HR.Infrastructure.Abstractions
 @using HR.SharedKernel
 @using Microsoft.AspNetCore.WebUtilities
+@using Syncfusion.Blazor.Data
 
 <PageTitle>@PageTitle</PageTitle>
 
@@ -162,6 +163,20 @@
                                         <DropDownListFieldSettings Value="Id" Text="Name" />
                                     </SfDropDownList>
                                     <ValidationMessage For="@(() => Model.LocationId)" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Manager</label>
+                                    <SfDropDownList @ref="_managerDropdown"
+                                                    TValue="Guid?"
+                                                    TItem="ManagerOption"
+                                                    DataSource="@_managerOptions"
+                                                    @bind-Value="Model.ManagerId"
+                                                    Placeholder="None"
+                                                    AllowFiltering="true"
+                                                    ShowClearButton="true">
+                                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                                        <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnManagerFilteringAsync" />
+                                    </SfDropDownList>
                                 </div>
                             </div>
                         </div>
@@ -687,6 +702,8 @@
     private List<PositionProfileListItemModel> _positionProfiles = [];
     private List<EmploymentTypeListItemModel> _employmentTypes = [];
     private List<NationalityListItem> _nationalities = [];
+    private SfDropDownList<Guid?, ManagerOption> _managerDropdown = default!;
+    private List<ManagerOption> _managerOptions = [];
 
     private GetPositionProfileResponse? _selectedProfileDefaults;
     private string? _selectedProfileLeavePolicyName;
@@ -798,6 +815,13 @@
         else
         {
             Model.StartDate = DateOnly.FromDateTime(DateTime.Today);
+
+            var managerResult = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
+            _managerOptions = (managerResult?.Items ?? [])
+                .Where(e => e.Status != "Draft" && e.Status != "Terminated")
+                .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+                .OrderBy(e => e.Name)
+                .ToList();
         }
 
         // Parsed after _showProbationTab/_showOnboardingTab/_showOffboardingTab are known, since
@@ -828,6 +852,22 @@
 
     private void GoToStartOffboarding() =>
         Navigation.NavigateTo($"/companies/{CompanyId}/employees/{Id}?tab=offboarding", forceLoad: true);
+
+    // Same pattern as EmployeeEmploymentTab.OnManagerFilteringAsync — the manager list can't be
+    // preloaded in one bounded page, so search server-side as the user types.
+    private async Task OnManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        _managerOptions = (result?.Items ?? [])
+            .Where(e => e.Status != "Draft" && e.Status != "Terminated")
+            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(e => e.Name)
+            .ToList();
+        await _managerDropdown.FilterAsync(_managerOptions, new Query());
+    }
+
+    private sealed record ManagerOption(Guid Id, string Name);
 
     private async Task OnPositionProfileChanged(ChangeEventArgs<Guid?, PositionProfileListItemModel> args)
     {
@@ -898,7 +938,8 @@
                 string.IsNullOrWhiteSpace(Model.County)         ? null : Model.County.Trim(),
                 string.IsNullOrWhiteSpace(Model.PostCode)       ? null : Model.PostCode.Trim(),
                 string.IsNullOrWhiteSpace(Model.Country)        ? null : Model.Country.Trim(),
-                Model.HasSystemAccess);
+                Model.HasSystemAccess,
+                Model.ManagerId);
 
             var (created, error) = await EmployeeService.CreateEmployeeAsync(CompanyId, request);
 

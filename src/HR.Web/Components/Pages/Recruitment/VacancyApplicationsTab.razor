@@ -264,6 +264,20 @@
                         <DropDownListFieldSettings Value="Id" Text="Title" />
                     </SfDropDownList>
                 </div>
+                <div class="col-md-6">
+                    <label class="form-label">Manager</label>
+                    <SfDropDownList @ref="_hireManagerDropdown"
+                                    TValue="Guid?"
+                                    TItem="ManagerOption"
+                                    DataSource="@_hireManagerOptions"
+                                    @bind-Value="_managerId"
+                                    Placeholder="None"
+                                    AllowFiltering="true"
+                                    ShowClearButton="true">
+                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                        <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnHireManagerFilteringAsync" />
+                    </SfDropDownList>
+                </div>
             </div>
             @if (_dialogError is not null)
             {
@@ -320,6 +334,9 @@
     private Guid? _departmentId;
     private Guid? _locationId;
     private Guid? _positionProfileId;
+    private Guid? _managerId;
+    private SfDropDownList<Guid?, ManagerOption> _hireManagerDropdown = default!;
+    private List<ManagerOption> _hireManagerOptions = [];
 
     private static readonly string[] _genderOptions = ["Male", "Female", "Non-binary", "Prefer not to say", "Other"];
 
@@ -514,6 +531,7 @@
         _departmentId = null;
         _locationId = null;
         _positionProfileId = null;
+        _managerId = null;
 
         if (_nationalities.Count == 0)
         {
@@ -525,16 +543,38 @@
         var locationTask = LocationService.ListLocationsAsync(CompanyId);
         var profileTask = PositionProfileService.ListPositionProfilesAsync(CompanyId);
         var employmentTypeTask = EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
+        var managerTask = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
 
-        await Task.WhenAll(deptTask, locationTask, profileTask, employmentTypeTask);
+        await Task.WhenAll(deptTask, locationTask, profileTask, employmentTypeTask, managerTask);
 
         _departments = (await deptTask)?.Items ?? [];
         _locations = (await locationTask)?.Items ?? [];
         _positionProfiles = (await profileTask)?.Items.ToList() ?? [];
         _employmentTypes = (await employmentTypeTask)?.Items ?? [];
+        _hireManagerOptions = ((await managerTask)?.Items ?? [])
+            .Where(e => e.Status != "Draft" && e.Status != "Terminated")
+            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(e => e.Name)
+            .ToList();
 
         _showHireDialog = true;
     }
+
+    // Same pattern as OnCandidateFilteringAsync above / EmployeeEmploymentTab.OnManagerFilteringAsync
+    // — the manager list can't be preloaded in one bounded page, so search server-side as typed.
+    private async Task OnHireManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        _hireManagerOptions = (result?.Items ?? [])
+            .Where(e => e.Status != "Draft" && e.Status != "Terminated")
+            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(e => e.Name)
+            .ToList();
+        await _hireManagerDropdown.FilterAsync(_hireManagerOptions, new Query());
+    }
+
+    private sealed record ManagerOption(Guid Id, string Name);
 
     private async Task ConfirmHireAsync()
     {
@@ -553,7 +593,7 @@
             string.IsNullOrWhiteSpace(_genderOther) ? null : _genderOther.Trim(),
             _employeeNumber.Trim(), _employmentTypeId.Value,
             _departmentId.Value, _locationId.Value, _positionProfileId.Value,
-            null);
+            _managerId);
 
         var (result, error) = await ApplicationService.HireCandidateAsync(CompanyId, VacancyId, _activeApplication.Id, request);
 

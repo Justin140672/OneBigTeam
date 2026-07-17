@@ -155,6 +155,7 @@ public sealed class EmployeeProfileEditModel
     public Guid? LocationId { get; set; }
     [Required(ErrorMessage = "Position profile is required.")]
     public Guid? PositionProfileId { get; set; }
+    public Guid? ManagerId { get; set; }
     public bool HasSystemAccess { get; set; } = true;
     public bool OverrideWorkingPattern { get; set; } = false;
     public HashSet<string> WorkingWeek { get; set; } = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
@@ -238,7 +239,8 @@ public record CreateEmployeeRequest(
     string? County,
     string? PostCode,
     string? Country,
-    bool HasSystemAccess);
+    bool HasSystemAccess,
+    Guid? ManagerId = null);
 
 public record CreateEmployeeResponse(
     Guid Id,

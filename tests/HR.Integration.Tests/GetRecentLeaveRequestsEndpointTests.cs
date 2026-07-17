@@ -230,6 +230,119 @@ public class GetRecentLeaveRequestsEndpointTests : IClassFixture<ApiWebApplicati
         Assert.Equal(2, payload!.Items.Count);
     }
 
+    // ── TaskId for a genuinely-submitted request ──────────────────────────────────
+
+    [Fact]
+    public async Task Get_RecentLeaveRequests_HrAdministrator_Sees_TaskId_For_Pending_Request_With_Open_Task()
+    {
+        // Unlike SeedLeaveRequestAsync (writes LeaveRequest rows directly to the DbContext, which
+        // never fires LeaveRequestedIntegrationEvent and so never creates a real task), this goes
+        // through the actual submit-leave-request endpoint — the same path LeaveSubmittedCreatesTaskTests
+        // uses — so the leave-approval task genuinely exists via LeaveRequestedHandler, the same way
+        // it would for a real user. Regression coverage for: an HR administrator's dashboard widget
+        // failing to open the task dialog for a still-pending request.
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+
+        var managerId = await SeedEmployeeAsync(companyId, "Mona", "Manager");
+        var reportId = await SeedEmployeeAsync(companyId, "Remy", "Report");
+        await AssignManagerAsync(client, companyId, reportId, managerId);
+
+        var leaveTypeId = await SeedLeaveTypeAsync(companyId);
+        var policyId = await CreatePolicyAsync(client, companyId);
+        await AssignLeavePolicyAsync(client, companyId, reportId, policyId);
+
+        var submitResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{reportId}/leave-requests",
+            new
+            {
+                companyId,
+                employeeId = reportId,
+                leaveTypeId,
+                startDate = "2027-08-02",
+                startPart = "FullDay",
+                endDate = "2027-08-06",
+                endPart = "FullDay",
+                reason = "Regression test",
+            });
+        submitResponse.EnsureSuccessStatusCode();
+        var submitted = await submitResponse.Content.ReadFromJsonAsync<SubmittedLeaveRequestPayload>();
+        Assert.NotNull(submitted);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/leave-requests/recent");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<RecentPayload>();
+        Assert.NotNull(payload);
+        var item = Assert.Single(payload!.Items, i => i.LeaveRequestId == submitted!.Id);
+        Assert.Equal("Pending", item.Status);
+        Assert.NotNull(item.TaskId);
+    }
+
+    private async Task<Guid> CreatePolicyAsync(HttpClient client, Guid companyId)
+    {
+        var resp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = $"Test Policy {Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = true });
+        resp.EnsureSuccessStatusCode();
+        var payload = await resp.Content.ReadFromJsonAsync<PolicyPayload>();
+        return payload!.Id;
+    }
+
+    private async Task AssignLeavePolicyAsync(HttpClient client, Guid companyId, Guid employeeId, Guid policyId)
+    {
+        var resp = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leave-policy",
+            new { companyId, employeeId, leavePolicyId = policyId, effectiveFrom = "2026-01-01" });
+        resp.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task Get_RecentLeaveRequests_HrAdministrator_Sees_TaskId_For_Pending_Request_With_No_Manager()
+    {
+        // Same as the sibling test above, but the requesting employee has no manager assigned —
+        // checking whether TaskCreator still creates an (unassigned) open task in that case, since
+        // that's the one variable the reported "clicking doesn't show the task" bug could hinge on.
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+
+        var reportId = await SeedEmployeeAsync(companyId, "Orla", "Orphan");
+        // Deliberately no AssignManagerAsync call.
+
+        var leaveTypeId = await SeedLeaveTypeAsync(companyId);
+        var policyId = await CreatePolicyAsync(client, companyId);
+        await AssignLeavePolicyAsync(client, companyId, reportId, policyId);
+
+        var submitResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{reportId}/leave-requests",
+            new
+            {
+                companyId,
+                employeeId = reportId,
+                leaveTypeId,
+                startDate = "2027-09-02",
+                startPart = "FullDay",
+                endDate = "2027-09-06",
+                endPart = "FullDay",
+                reason = "Regression test - no manager",
+            });
+        submitResponse.EnsureSuccessStatusCode();
+        var submitted = await submitResponse.Content.ReadFromJsonAsync<SubmittedLeaveRequestPayload>();
+        Assert.NotNull(submitted);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/leave-requests/recent");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<RecentPayload>();
+        Assert.NotNull(payload);
+        var item = Assert.Single(payload!.Items, i => i.LeaveRequestId == submitted!.Id);
+        Assert.Equal("Pending", item.Status);
+        Assert.NotNull(item.TaskId);
+    }
+
+    private sealed record PolicyPayload(Guid Id);
+    private sealed record SubmittedLeaveRequestPayload(Guid Id);
+
     [Fact]
     public async Task Get_RecentLeaveRequests_HrAdministrator_Hides_Approved_Requests_Once_Started()
     {
