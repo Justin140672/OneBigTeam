@@ -10,22 +10,33 @@ internal sealed class OpenTaskBySourceEntityReader(TasksDbContext dbContext) : I
     public async Task<IReadOnlyDictionary<Guid, Guid>> GetOpenTaskIdsAsync(
         Guid companyId,
         IEnumerable<Guid> sourceEntityIds,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TaskActionType? actionType = null)
     {
         var ids = sourceEntityIds.Distinct().ToList();
 
         if (ids.Count == 0)
             return new Dictionary<Guid, Guid>();
 
-        // A source entity should only ever have one open (Open/InProgress) task at a time in
-        // practice, but grouping + taking the most recent keeps this safe even if that
-        // invariant is ever violated, rather than throwing on ToDictionaryAsync duplicates.
-        var openTasks = await dbContext.TaskItems
+        // A source entity should only ever have one open (Open/InProgress) task of a given
+        // action type at a time in practice, but grouping + taking the most recent keeps this
+        // safe even if that invariant is ever violated, rather than throwing on
+        // ToDictionaryAsync duplicates. Without the actionType filter, a source entity can
+        // legitimately have several concurrent open tasks of different action types (e.g. a
+        // Shared Company Document with many per-employee open Acknowledge tasks alongside a
+        // single open Review task) — callers that care about one specific kind must supply
+        // actionType or they will match the wrong task.
+        var query = dbContext.TaskItems
             .AsNoTracking()
             .Where(t => t.CompanyId == companyId
                      && t.SourceEntityId != null
                      && ids.Contains(t.SourceEntityId.Value)
-                     && (t.Status == TaskItemStatus.Open || t.Status == TaskItemStatus.InProgress))
+                     && (t.Status == TaskItemStatus.Open || t.Status == TaskItemStatus.InProgress));
+
+        if (actionType is not null)
+            query = query.Where(t => t.ActionType == actionType.Value);
+
+        var openTasks = await query
             .OrderByDescending(t => t.CreatedAt)
             .Select(t => new { t.Id, SourceEntityId = t.SourceEntityId!.Value })
             .ToListAsync(cancellationToken);

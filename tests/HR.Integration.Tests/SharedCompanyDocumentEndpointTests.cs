@@ -1591,6 +1591,132 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         Guid Id, Guid CompanyId, string Status, Guid ArchivedBy, DateTimeOffset ArchivedAt,
         string ArchiveReason, int AcknowledgementTasksCancelled);
 
+    // ── ExpireSharedCompanyDocument ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task Expire_Returns_Unauthorized_Without_Auth()
+    {
+        using var client = _factory.CreateClient();
+        var response = await client.PostAsync(
+            $"/api/companies/{Guid.NewGuid()}/shared-documents/{Guid.NewGuid()}/expire", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Expire_Returns_Forbidden_For_Manager()
+    {
+        var companyId = Guid.NewGuid();
+        var hrUserId  = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+
+        using var managerClient = ClientAs(companyId, managerId);
+        var response = await managerClient.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/expire", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Expire_Succeeds_For_HrAdministrator_On_Published_Document()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Aging Policy");
+        await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}/publish", EmptyJson());
+
+        var response = await client.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/expire", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ExpirePayload>();
+        Assert.Equal("Expired", payload!.Status);
+        Assert.Equal(userId, payload.ExpiredBy);
+    }
+
+    [Fact]
+    public async Task Expire_Returns_Conflict_When_Document_Already_Expired()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId);
+
+        await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}/expire", EmptyJson());
+        var response = await client.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/expire", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Expire_Returns_Conflict_When_Document_Already_Archived()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(client, companyId, categoryId);
+
+        await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/archive", new { Reason = "Superseded" });
+        var response = await client.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/expire", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Expire_Returns_NotFound_For_Unknown_Document()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        var response = await client.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/expire", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Expire_Returns_NotFound_When_Document_Belongs_To_Different_Company()
+    {
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        var hrInA    = Guid.NewGuid();
+        var hrInB    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
+
+        using var clientA = ClientAs(companyA, hrInA);
+        var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
+        var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
+
+        using var clientB = ClientAs(companyB, hrInB);
+        var response = await clientB.PostAsync(
+            $"/api/companies/{companyB}/shared-documents/{doc!.Id}/expire", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    private sealed record ExpirePayload(
+        Guid Id, Guid CompanyId, string Status, Guid ExpiredBy, DateTimeOffset ExpiredAt,
+        int ReviewTasksCancelled);
+
     // Seeds a Department directly via the Employees module's DbContext — there is no lighter-
     // weight way to get a real, existence-checkable department id into an integration test.
     private async Task<Guid> SeedDepartmentAsync(Guid companyId, string name)

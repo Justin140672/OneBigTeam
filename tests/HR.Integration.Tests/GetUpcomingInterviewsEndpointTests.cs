@@ -57,15 +57,19 @@ public class GetUpcomingInterviewsEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    // candidate:view is Recruiter-only by design (see IdentityModule.AddRolePolicies) — this
+    // endpoint returns CandidateName, real candidate PII, so an HR Administrator does not
+    // automatically get access without also holding the Recruiter role. HrAdminUser here holds
+    // only the HrAdministrator role, so Forbidden is the correct, intended result.
     [Fact]
-    public async Task Get_UpcomingInterviews_Returns_Ok_For_HrAdministrator()
+    public async Task Get_UpcomingInterviews_Returns_Forbidden_For_HrAdministrator_Without_Recruiter_Role()
     {
         var companyId = Guid.NewGuid();
         using var client = ClientAs(HrAdminUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/interviews/upcoming");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

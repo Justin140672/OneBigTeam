@@ -57,15 +57,19 @@ public class GetStaleVacanciesEndpointTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    // recruitment:manage is Recruiter-only by design (see IdentityModule.AddRolePolicies) —
+    // an HR Administrator does not automatically get recruitment access, the same non-overlap
+    // principle applied to company:manage/shared-document management. HrAdminUser here holds
+    // only the HrAdministrator role, so Forbidden is the correct, intended result.
     [Fact]
-    public async Task Get_StaleVacancies_Returns_Ok_For_HrAdministrator()
+    public async Task Get_StaleVacancies_Returns_Forbidden_For_HrAdministrator_Without_Recruiter_Role()
     {
         var companyId = Guid.NewGuid();
         using var client = ClientAs(HrAdminUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/stale");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

@@ -80,7 +80,7 @@ public class AssetLifecycleEndToEndTests : IClassFixture<ApiWebApplicationFactor
             $"/api/companies/{companyId}/notifications/my");
         Assert.True(notifications!.UnreadCount >= 1,
             "Expected at least one notification for the employee after asset assignment task");
-        Assert.Contains(notifications.Items, n => n.Type == "TaskAssigned" && !n.IsRead);
+        Assert.Contains(notifications.Items, n => n.Type == "AssetAssigned" && !n.IsRead);
 
         // ── Step 5: Employee completes the acknowledgement task ────────────────
         var ackCompleteResp = await employeeClient.PostAsync(

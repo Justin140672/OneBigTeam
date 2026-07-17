@@ -198,7 +198,12 @@ public sealed record SharedCompanyDocumentDetailResponse(
     DateTimeOffset? PublishedAt,
     string? ArchivedByName,
     DateTimeOffset? ArchivedAt,
-    string? ArchiveReason);
+    string? ArchiveReason,
+    DateOnly? LastReviewedAt,
+    Guid? LastReviewedByEmployeeId,
+    string? LastReviewedByName,
+    string? LastReviewNotes,
+    IReadOnlyList<SharedCompanyDocumentReviewHistoryModel> ReviewHistory);
 
 public sealed record AcknowledgementProgressModel(
     int AcknowledgedCount,
@@ -215,6 +220,13 @@ public sealed record SharedCompanyDocumentVersionModel(
     bool RequiresAcknowledgement,
     DateOnly? EffectiveDate,
     string PublicationStatus);
+
+public sealed record SharedCompanyDocumentReviewHistoryModel(
+    DateOnly ReviewDate,
+    Guid ReviewedByEmployeeId,
+    string ReviewedByName,
+    string? ReviewNotes,
+    DateOnly? PreviousReviewDate);
 
 // --- Shared Company Document acknowledgement progress (HR full view) ---
 
@@ -322,6 +334,27 @@ public sealed record ArchiveSharedCompanyDocumentRequest(
     Guid CompanyId,
     Guid DocumentId,
     string Reason);
+
+public sealed record ExpireSharedCompanyDocumentResponseModel(
+    Guid Id,
+    Guid CompanyId,
+    string Status,
+    Guid ExpiredBy,
+    DateTimeOffset ExpiredAt,
+    int ReviewTasksCancelled);
+
+public sealed record CompleteSharedCompanyDocumentReviewRequest(
+    Guid CompanyId,
+    Guid DocumentId,
+    string ReviewNotes);
+
+public sealed record CompleteSharedCompanyDocumentReviewResponseModel(
+    Guid Id,
+    Guid CompanyId,
+    DateOnly? ReviewDate,
+    DateOnly LastReviewedAt,
+    Guid LastReviewedByEmployeeId,
+    string? LastReviewNotes);
 
 public sealed record UpdateSharedCompanyDocumentAcknowledgementSettingsResponseModel(
     Guid Id,

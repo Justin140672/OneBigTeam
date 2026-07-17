@@ -26,6 +26,7 @@ internal sealed class ListSharedCompanyDocumentsDueForReviewHandler(
             .AsNoTracking()
             .Where(d => d.CompanyId == request.CompanyId
                 && d.Status != SharedCompanyDocumentStatus.Archived
+                && d.Status != SharedCompanyDocumentStatus.Expired
                 && d.ReviewDate != null
                 && d.ReviewDate <= dueBy)
             .OrderBy(d => d.ReviewDate)

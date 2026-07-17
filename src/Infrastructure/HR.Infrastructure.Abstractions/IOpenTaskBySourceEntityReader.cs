@@ -13,8 +13,19 @@ public interface IOpenTaskBySourceEntityReader
     /// Source entities with no open task (none created, or already completed/cancelled) are
     /// omitted from the result rather than mapped to null.
     /// </summary>
+    /// <param name="actionType">
+    /// Optional filter to only consider open tasks of a specific <see cref="TaskActionType"/>.
+    /// Defaults to null, which preserves the original behaviour of matching any open task
+    /// regardless of action type — required because a single source entity can have multiple,
+    /// concurrent open tasks of different action types (e.g. a Shared Company Document can have
+    /// many open Acknowledge tasks, one per eligible employee, alongside at most one open Review
+    /// task). Callers that only care about one specific kind of task for a source entity (e.g.
+    /// "does this document already have an open Review task?") must supply this to avoid an
+    /// unrelated open task of a different action type being mistaken for the one they're checking.
+    /// </param>
     Task<IReadOnlyDictionary<Guid, Guid>> GetOpenTaskIdsAsync(
         Guid companyId,
         IEnumerable<Guid> sourceEntityIds,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        TaskActionType? actionType = null);
 }

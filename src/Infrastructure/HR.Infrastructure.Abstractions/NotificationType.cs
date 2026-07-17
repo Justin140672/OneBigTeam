@@ -34,4 +34,5 @@ public enum NotificationType
     ProfilePhotoRejected         = 30,
     SharedCompanyDocumentAcknowledgementReminder = 31,
     SharedCompanyDocumentAcknowledgementOverdue  = 32,
+    SharedCompanyDocumentReviewDue                = 33,
 }

@@ -3,6 +3,7 @@ using System;
 using HR.Modules.Documents.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HR.Modules.Documents.Migrations
 {
     [DbContext(typeof(DocumentsDbContext))]
-    partial class DocumentsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260716182759_AddReviewCompletionToSharedCompanyDocument")]
+    partial class AddReviewCompletionToSharedCompanyDocument
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -507,14 +510,6 @@ namespace HR.Modules.Documents.Migrations
                         .HasColumnType("date")
                         .HasColumnName("effective_date");
 
-                    b.Property<DateTimeOffset?>("ExpiredAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expired_at");
-
-                    b.Property<Guid?>("ExpiredBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("expired_by");
-
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -681,50 +676,6 @@ namespace HR.Modules.Documents.Migrations
                     b.ToTable("shared_company_document_audience_rules", "documents");
                 });
 
-            modelBuilder.Entity("HR.Modules.Documents.Domain.SharedCompanyDocumentReviewHistory", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("company_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateOnly?>("PreviousReviewDate")
-                        .HasColumnType("date")
-                        .HasColumnName("previous_review_date");
-
-                    b.Property<DateOnly>("ReviewDate")
-                        .HasColumnType("date")
-                        .HasColumnName("review_date");
-
-                    b.Property<string>("ReviewNotes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("review_notes");
-
-                    b.Property<Guid>("ReviewedByEmployeeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("reviewed_by_employee_id");
-
-                    b.Property<Guid>("SharedCompanyDocumentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("shared_company_document_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("SharedCompanyDocumentId", "ReviewDate");
-
-                    b.ToTable("shared_company_document_review_histories", "documents");
-                });
-
             modelBuilder.Entity("HR.Modules.Documents.Domain.SharedCompanyDocumentVersion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -833,15 +784,6 @@ namespace HR.Modules.Documents.Migrations
                 });
 
             modelBuilder.Entity("HR.Modules.Documents.Domain.SharedCompanyDocumentAudienceRule", b =>
-                {
-                    b.HasOne("HR.Modules.Documents.Domain.SharedCompanyDocument", null)
-                        .WithMany()
-                        .HasForeignKey("SharedCompanyDocumentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("HR.Modules.Documents.Domain.SharedCompanyDocumentReviewHistory", b =>
                 {
                     b.HasOne("HR.Modules.Documents.Domain.SharedCompanyDocument", null)
                         .WithMany()

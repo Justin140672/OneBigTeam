@@ -260,6 +260,27 @@ public class ListSharedCompanyDocumentsDueForReviewHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Excludes_Expired_Document_Even_When_Overdue()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+
+        var doc = CreateDoc(companyId, "Expired Overdue Policy", category.Id, Today.AddDays(-10));
+        doc.Publish(Guid.NewGuid(), Now);
+        doc.MarkExpired(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new ListSharedCompanyDocumentsDueForReviewRequest(companyId),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.Items);
+    }
+
+    [Fact]
     public async Task HandleAsync_Includes_Draft_And_Published_Overdue_Documents()
     {
         await using var db = BuildContext();

@@ -39,7 +39,12 @@ internal sealed record GetSharedCompanyDocumentResponse(
     DateTimeOffset? PublishedAt,
     string? ArchivedByName,
     DateTimeOffset? ArchivedAt,
-    string? ArchiveReason);
+    string? ArchiveReason,
+    DateOnly? LastReviewedAt,
+    Guid? LastReviewedByEmployeeId,
+    string? LastReviewedByName,
+    string? LastReviewNotes,
+    IReadOnlyList<SharedCompanyDocumentReviewHistoryItem> ReviewHistory);
 
 internal sealed record AcknowledgementProgressInfo(
     int AcknowledgedCount,
@@ -56,3 +61,10 @@ internal sealed record SharedCompanyDocumentVersionItem(
     bool RequiresAcknowledgement,
     DateOnly? EffectiveDate,
     string PublicationStatus);
+
+internal sealed record SharedCompanyDocumentReviewHistoryItem(
+    DateOnly ReviewDate,
+    Guid ReviewedByEmployeeId,
+    string ReviewedByName,
+    string? ReviewNotes,
+    DateOnly? PreviousReviewDate);

@@ -361,6 +361,69 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
     }
 
     // Returns null on success, or an error message string on failure.
+    public async Task<string?> ExpireSharedCompanyDocumentAsync(
+        Guid companyId, Guid documentId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // FastEndpoints rejects a bodyless POST with 415 Unsupported Media Type once it has
+            // no Content-Type to bind against — an empty JSON object is the minimal body that
+            // satisfies model binding for this action, same as the integration tests' EmptyJson().
+            var response = await Http.PostAsync(
+                $"api/companies/{companyId}/shared-documents/{documentId}/expire",
+                new StringContent("{}", Encoding.UTF8, "application/json"),
+                cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return null;
+
+            try
+            {
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+                if (body.TryGetProperty("error", out var errorProp))
+                    return errorProp.GetString();
+            }
+            catch { }
+
+            return $"Expire failed ({(int)response.StatusCode}).";
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+    }
+
+    // Returns null on success, or an error message string on failure.
+    public async Task<string?> CompleteSharedCompanyDocumentReviewAsync(
+        Guid companyId, Guid documentId, string reviewNotes, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var request = new CompleteSharedCompanyDocumentReviewRequest(companyId, documentId, reviewNotes);
+
+            var response = await Http.PostAsJsonAsync(
+                $"api/companies/{companyId}/shared-documents/{documentId}/complete-review", request, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return null;
+
+            try
+            {
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+                if (body.TryGetProperty("error", out var errorProp))
+                    return errorProp.GetString();
+            }
+            catch { }
+
+            return $"Complete review failed ({(int)response.StatusCode}).";
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+    }
+
+    // Returns null on success, or an error message string on failure.
     public async Task<string?> UpdateSharedCompanyDocumentAcknowledgementSettingsAsync(
         Guid companyId,
         Guid documentId,

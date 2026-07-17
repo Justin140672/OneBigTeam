@@ -19,6 +19,7 @@ internal class DocumentsDbContext : DbContext
     public DbSet<SharedCompanyDocument> SharedCompanyDocuments => Set<SharedCompanyDocument>();
     public DbSet<CompanyDocumentCategory> CompanyDocumentCategories => Set<CompanyDocumentCategory>();
     public DbSet<SharedCompanyDocumentVersion> SharedCompanyDocumentVersions => Set<SharedCompanyDocumentVersion>();
+    public DbSet<SharedCompanyDocumentReviewHistory> SharedCompanyDocumentReviewHistories => Set<SharedCompanyDocumentReviewHistory>();
     public DbSet<SharedCompanyDocumentAcknowledgement> SharedCompanyDocumentAcknowledgements => Set<SharedCompanyDocumentAcknowledgement>();
     public DbSet<SharedCompanyDocumentAudienceRule> SharedCompanyDocumentAudienceRules => Set<SharedCompanyDocumentAudienceRule>();
 

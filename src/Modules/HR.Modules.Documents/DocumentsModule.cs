@@ -26,6 +26,8 @@ using HR.Modules.Documents.Features.UpdateSharedCompanyDocumentMetadata;
 using HR.Modules.Documents.Features.UpdateSharedCompanyDocumentAudience;
 using HR.Modules.Documents.Features.PublishSharedCompanyDocument;
 using HR.Modules.Documents.Features.ArchiveSharedCompanyDocument;
+using HR.Modules.Documents.Features.ExpireSharedCompanyDocument;
+using HR.Modules.Documents.Features.CompleteSharedCompanyDocumentReview;
 using HR.Modules.Documents.Features.UpdateSharedCompanyDocumentAcknowledgementSettings;
 using HR.Modules.Documents.Features.DeleteEmployeeDocument;
 using HR.Modules.Documents.Features.DownloadEmployeeDocument;
@@ -151,6 +153,12 @@ public static class DocumentsModule
 
         services.AddScoped<ArchiveSharedCompanyDocumentHandler>();
         services.AddScoped<IValidator<ArchiveSharedCompanyDocumentRequest>, ArchiveSharedCompanyDocumentValidator>();
+
+        services.AddScoped<ExpireSharedCompanyDocumentHandler>();
+        services.AddScoped<IValidator<ExpireSharedCompanyDocumentRequest>, ExpireSharedCompanyDocumentValidator>();
+
+        services.AddScoped<CompleteSharedCompanyDocumentReviewHandler>();
+        services.AddScoped<IValidator<CompleteSharedCompanyDocumentReviewRequest>, CompleteSharedCompanyDocumentReviewValidator>();
 
         services.AddScoped<UpdateSharedCompanyDocumentAcknowledgementSettingsHandler>();
         services.AddScoped<IValidator<UpdateSharedCompanyDocumentAcknowledgementSettingsRequest>, UpdateSharedCompanyDocumentAcknowledgementSettingsValidator>();

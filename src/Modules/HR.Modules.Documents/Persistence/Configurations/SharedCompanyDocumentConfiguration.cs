@@ -83,6 +83,16 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
         builder.Property(d => d.ReviewOwnerEmployeeId)
             .HasColumnName("review_owner_employee_id");
 
+        builder.Property(d => d.LastReviewedAt)
+            .HasColumnName("last_reviewed_at");
+
+        builder.Property(d => d.LastReviewedByEmployeeId)
+            .HasColumnName("last_reviewed_by_employee_id");
+
+        builder.Property(d => d.LastReviewNotes)
+            .HasColumnName("last_review_notes")
+            .HasMaxLength(2000);
+
         builder.Property(d => d.RequiresAcknowledgement)
             .HasColumnName("requires_acknowledgement")
             .IsRequired();
@@ -125,6 +135,12 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
         builder.Property(d => d.ArchiveReason)
             .HasColumnName("archive_reason")
             .HasMaxLength(500);
+
+        builder.Property(d => d.ExpiredBy)
+            .HasColumnName("expired_by");
+
+        builder.Property(d => d.ExpiredAt)
+            .HasColumnName("expired_at");
 
         builder.HasOne<CompanyDocumentCategory>()
             .WithMany()

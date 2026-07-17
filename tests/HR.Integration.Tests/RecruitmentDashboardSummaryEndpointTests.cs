@@ -23,6 +23,12 @@ public class RecruitmentDashboardSummaryEndpointTests : IClassFixture<ApiWebAppl
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUserId, SystemRoles.HrAdministrator);
+            // Also granted Recruiter: these tests exercise interviews-today-count/outstanding-task
+            // counting logic, not authorization (candidate:view/recruitment:manage are Recruiter-only
+            // by design — see IdentityModule.AddRolePolicies), and this user drives both the
+            // Recruitment-side setup calls (SeedApplicationAsync, scheduling interviews) and the
+            // Tasks-side outstanding-count reads, so it needs access to both.
+            await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUserId, SystemRoles.Recruiter);
             await TestRoleSeeder.AssignRoleAsync(factory, EmployeeUserId, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }

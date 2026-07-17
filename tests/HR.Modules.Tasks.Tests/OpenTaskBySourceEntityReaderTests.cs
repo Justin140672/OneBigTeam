@@ -14,11 +14,12 @@ public class OpenTaskBySourceEntityReaderTests
         Guid companyId,
         Guid? sourceEntityId,
         TaskItemStatus status = TaskItemStatus.Open,
-        string title = "Task")
+        string title = "Task",
+        TaskActionType actionType = TaskActionType.Complete)
     {
         var t = TaskItem.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
-            title, null, TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete,
+            title, null, TaskPriority.Medium, TaskSource.Workflow, actionType,
             null, null, null, Now, sourceEntityId);
 
         if (status == TaskItemStatus.InProgress) t.Start(Now);
@@ -132,6 +133,89 @@ public class OpenTaskBySourceEntityReaderTests
         var result = await reader.GetOpenTaskIdsAsync(companyId, [], CancellationToken.None);
 
         Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetOpenTaskIdsAsync_Without_ActionType_Filter_Matches_Any_ActionType()
+    {
+        // Default (null) behaviour is unchanged — an open task of ANY action type still matches
+        // when no actionType filter is supplied. This preserves the original contract relied on by
+        // the one existing caller, GetRecentLeaveRequestsHandler.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var sourceEntityId = Guid.NewGuid();
+        var task = MakeTask(companyId, sourceEntityId, TaskItemStatus.Open, actionType: TaskActionType.Approve);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var reader = new OpenTaskBySourceEntityReader(context);
+        var result = await reader.GetOpenTaskIdsAsync(companyId, [sourceEntityId], CancellationToken.None);
+
+        Assert.Equal(task.Id, result[sourceEntityId]);
+    }
+
+    [Fact]
+    public async Task GetOpenTaskIdsAsync_With_ActionType_Filter_Returns_Task_Id_When_ActionType_Matches()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var sourceEntityId = Guid.NewGuid();
+        var task = MakeTask(companyId, sourceEntityId, TaskItemStatus.Open, actionType: TaskActionType.Review);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var reader = new OpenTaskBySourceEntityReader(context);
+        var result = await reader.GetOpenTaskIdsAsync(
+            companyId, [sourceEntityId], CancellationToken.None, TaskActionType.Review);
+
+        Assert.Equal(task.Id, result[sourceEntityId]);
+    }
+
+    [Fact]
+    public async Task GetOpenTaskIdsAsync_With_ActionType_Filter_Omits_SourceEntityId_When_Only_A_Different_ActionType_Is_Open()
+    {
+        // Core new behaviour: the source entity id must be OMITTED entirely (not mapped to null,
+        // not matched to the wrong task) when its only open task is of a different action type.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var sourceEntityId = Guid.NewGuid();
+        context.TaskItems.Add(
+            MakeTask(companyId, sourceEntityId, TaskItemStatus.Open, actionType: TaskActionType.Acknowledge));
+        await context.SaveChangesAsync();
+
+        var reader = new OpenTaskBySourceEntityReader(context);
+        var result = await reader.GetOpenTaskIdsAsync(
+            companyId, [sourceEntityId], CancellationToken.None, TaskActionType.Review);
+
+        Assert.False(result.ContainsKey(sourceEntityId));
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetOpenTaskIdsAsync_With_ActionType_Filter_Distinguishes_Between_Two_Open_Tasks_Of_Different_ActionTypes_For_The_Same_SourceEntity()
+    {
+        // A single source entity (e.g. a Shared Company Document) can have multiple concurrent open
+        // tasks of different action types. Prove each actionType-scoped call returns only its own
+        // matching task id, never the other one.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var sourceEntityId = Guid.NewGuid();
+        var acknowledgeTask = MakeTask(
+            companyId, sourceEntityId, TaskItemStatus.Open, actionType: TaskActionType.Acknowledge);
+        var reviewTask = MakeTask(
+            companyId, sourceEntityId, TaskItemStatus.Open, actionType: TaskActionType.Review);
+        context.TaskItems.AddRange(acknowledgeTask, reviewTask);
+        await context.SaveChangesAsync();
+
+        var reader = new OpenTaskBySourceEntityReader(context);
+
+        var reviewResult = await reader.GetOpenTaskIdsAsync(
+            companyId, [sourceEntityId], CancellationToken.None, TaskActionType.Review);
+        Assert.Equal(reviewTask.Id, reviewResult[sourceEntityId]);
+
+        var acknowledgeResult = await reader.GetOpenTaskIdsAsync(
+            companyId, [sourceEntityId], CancellationToken.None, TaskActionType.Acknowledge);
+        Assert.Equal(acknowledgeTask.Id, acknowledgeResult[sourceEntityId]);
     }
 
     private static TasksDbContext BuildContext()

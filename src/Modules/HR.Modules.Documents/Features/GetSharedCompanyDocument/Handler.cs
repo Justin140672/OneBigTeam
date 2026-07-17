@@ -36,7 +36,18 @@ internal sealed class GetSharedCompanyDocumentHandler(
             .OrderByDescending(v => v.VersionNumber)
             .ToListAsync(cancellationToken);
 
+        // ThenByDescending(CreatedAt) breaks ties deterministically when two reviews are completed
+        // on the same calendar day (ReviewDate has only day granularity) — without it, "newest
+        // first" would be unspecified/non-deterministic for same-day reviews.
+        var reviewHistoryRows = await db.SharedCompanyDocumentReviewHistories
+            .AsNoTracking()
+            .Where(h => h.SharedCompanyDocumentId == document.Id)
+            .OrderByDescending(h => h.ReviewDate)
+            .ThenByDescending(h => h.CreatedAt)
+            .ToListAsync(cancellationToken);
+
         var uploaderIds = versions.Select(v => v.CreatedBy).Distinct().ToList();
+        var reviewerIds = reviewHistoryRows.Select(h => h.ReviewedByEmployeeId).Distinct().ToList();
         var idsToResolve = new List<Guid> { document.CreatedBy, document.UpdatedBy };
         if (document.PublishedBy is { } publishedBy)
             idsToResolve.Add(publishedBy);
@@ -44,7 +55,10 @@ internal sealed class GetSharedCompanyDocumentHandler(
             idsToResolve.Add(archivedBy);
         if (document.ReviewOwnerEmployeeId is { } reviewOwnerEmployeeId)
             idsToResolve.Add(reviewOwnerEmployeeId);
+        if (document.LastReviewedByEmployeeId is { } lastReviewedByEmployeeId)
+            idsToResolve.Add(lastReviewedByEmployeeId);
         idsToResolve.AddRange(uploaderIds);
+        idsToResolve.AddRange(reviewerIds);
 
         var namesLookup = await employeeNameReader.GetNamesAsync(
             request.CompanyId,
@@ -62,6 +76,15 @@ internal sealed class GetSharedCompanyDocumentHandler(
                 v.RequiresAcknowledgement,
                 v.EffectiveDate,
                 v.VersionNumber == document.VersionNumber ? document.Status.ToString() : "Superseded"))
+            .ToList();
+
+        var reviewHistory = reviewHistoryRows
+            .Select(h => new SharedCompanyDocumentReviewHistoryItem(
+                h.ReviewDate,
+                h.ReviewedByEmployeeId,
+                namesLookup.TryGetValue(h.ReviewedByEmployeeId, out var reviewerName) ? reviewerName : "Unknown",
+                h.ReviewNotes,
+                h.PreviousReviewDate))
             .ToList();
 
         var (audienceDepartmentIds, audienceLocationIds, audiencePositionProfileIds, audienceEmployeeIds) =
@@ -131,6 +154,13 @@ internal sealed class GetSharedCompanyDocumentHandler(
             document.PublishedAt,
             document.ArchivedBy is { } archBy ? (namesLookup.TryGetValue(archBy, out var archivedByName) ? archivedByName : "Unknown") : null,
             document.ArchivedAt,
-            document.ArchiveReason));
+            document.ArchiveReason,
+            document.LastReviewedAt,
+            document.LastReviewedByEmployeeId,
+            document.LastReviewedByEmployeeId is { } lastReviewerId
+                ? (namesLookup.TryGetValue(lastReviewerId, out var lastReviewedByName) ? lastReviewedByName : "Unknown")
+                : null,
+            document.LastReviewNotes,
+            reviewHistory));
     }
 }

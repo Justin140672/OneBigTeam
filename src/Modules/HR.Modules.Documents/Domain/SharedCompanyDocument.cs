@@ -33,6 +33,13 @@ internal sealed class SharedCompanyDocument
     // module), resolved to a display name only at the read side via IEmployeeNameReader.
     public Guid? ReviewOwnerEmployeeId { get; private set; }
 
+    // Records the most recently completed review — distinct from ReviewDate, which always holds
+    // the *next* scheduled review date (or null once cleared). LastReviewedByEmployeeId is the
+    // same "plain Guid, no navigation property" convention as ReviewOwnerEmployeeId above.
+    public DateOnly? LastReviewedAt { get; private set; }
+    public Guid? LastReviewedByEmployeeId { get; private set; }
+    public string? LastReviewNotes { get; private set; }
+
     // Audience is modelled as a separate set of SharedCompanyDocumentAudienceRule rows (see that
     // type), not fields here — this aggregate has no in-memory audience state of its own, the
     // same way version history lives entirely in SharedCompanyDocumentVersion rows.
@@ -61,6 +68,12 @@ internal sealed class SharedCompanyDocument
     public Guid? ArchivedBy { get; private set; }
     public DateTimeOffset? ArchivedAt { get; private set; }
     public string? ArchiveReason { get; private set; }
+
+    // Same rationale as PublishedBy/PublishedAt and ArchivedBy/ArchivedAt: a permanent record of
+    // who marked this document expired and when — must not be overwritten by later metadata/
+    // audience edits. Unlike Archive, expiry has no reason field.
+    public Guid? ExpiredBy { get; private set; }
+    public DateTimeOffset? ExpiredAt { get; private set; }
 
     public static SharedCompanyDocument Create(
         Guid id,
@@ -197,11 +210,43 @@ internal sealed class SharedCompanyDocument
         UpdatedAt     = now;
     }
 
+    /// <summary>
+    /// Marks the document Expired instead of being renewed — a terminal state distinct from
+    /// Archive: no reason is captured (the ticket does not ask for one, unlike Archive which
+    /// requires a reason). Expired documents are excluded from employee-facing reads via the
+    /// same strict equality-against-Published filter those handlers already use, so no changes
+    /// are needed there.
+    /// </summary>
+    public void MarkExpired(Guid expiredBy, DateTimeOffset now)
+    {
+        Status     = SharedCompanyDocumentStatus.Expired;
+        ExpiredBy  = expiredBy;
+        ExpiredAt  = now;
+        UpdatedBy  = expiredBy;
+        UpdatedAt  = now;
+    }
+
     /// <summary>Moves a Published document back to Draft (e.g. to correct a mistake before republishing).</summary>
     public void RevertToDraft(Guid updatedBy, DateTimeOffset now)
     {
         Status    = SharedCompanyDocumentStatus.Draft;
         UpdatedBy = updatedBy;
         UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// Records a completed review and moves ReviewDate forward to the next scheduled review date.
+    /// nextReviewDate is computed by the caller (based on ReviewFrequency/CustomReviewFrequencyMonths)
+    /// — this method has no knowledge of review cadence, the same way UpdateDetails receives
+    /// reviewDate/reviewFrequency as given values rather than computing anything itself.
+    /// </summary>
+    public void CompleteReview(Guid reviewedBy, string reviewNotes, DateOnly reviewDate, DateOnly? nextReviewDate, DateTimeOffset now)
+    {
+        LastReviewedAt           = reviewDate;
+        LastReviewedByEmployeeId = reviewedBy;
+        LastReviewNotes          = string.IsNullOrWhiteSpace(reviewNotes) ? null : reviewNotes.Trim();
+        ReviewDate               = nextReviewDate;
+        UpdatedBy                = reviewedBy;
+        UpdatedAt                = now;
     }
 }

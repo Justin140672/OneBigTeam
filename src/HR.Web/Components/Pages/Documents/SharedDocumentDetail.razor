@@ -42,10 +42,16 @@
                 <a class="btn btn-outline-primary" href="@DocumentService.GetSharedCompanyDocumentDownloadUrl(CompanyId, DocumentId)" target="_blank">
                     <i class="fa-solid fa-download me-1"></i> Download
                 </a>
-                @if (_detail.Status != "Archived")
+                <SfButton CssClass="e-outline" OnClick="@(() => _reviewOpen = true)">
+                    <i class="fa-solid fa-clipboard-check me-1"></i> Review Document
+                </SfButton>
+                @if (_detail.Status is "Draft" or "Published")
                 {
                     <SfButton CssClass="e-outline e-danger" OnClick="@(() => _archiveConfirmOpen = true)">
                         <i class="fa-solid fa-box-archive me-1"></i> Archive
+                    </SfButton>
+                    <SfButton CssClass="e-outline e-danger" OnClick="@(() => _expireConfirmOpen = true)">
+                        <i class="fa-solid fa-calendar-xmark me-1"></i> Mark Expired
                     </SfButton>
                 }
             </div>
@@ -230,6 +236,23 @@
             </div>
 
             <div class="col-12">
+                <div class="overview-card">
+                    <div class="overview-card-header">
+                        <i class="fa-solid fa-magnifying-glass-chart overview-card-icon"></i>
+                        <span class="overview-card-title">Review History</span>
+                    </div>
+                    <HrGrid TValue="SharedCompanyDocumentReviewHistoryModel" DataSource="@_detail.ReviewHistory" AllowPaging="false">
+                        <GridColumns>
+                            <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.ReviewDate)" HeaderText="Review Date" Width="130" Format="d" />
+                            <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.ReviewedByName)" HeaderText="Reviewer" Width="180" />
+                            <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.ReviewNotes)" HeaderText="Notes" Width="220" />
+                            <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.PreviousReviewDate)" HeaderText="Previous Review Date" Width="150" Format="d" />
+                        </GridColumns>
+                    </HrGrid>
+                </div>
+            </div>
+
+            <div class="col-12">
                 <p class="text-muted small mb-0">
                     Created by @_detail.CreatedByName on @_detail.CreatedAt.ToString("d MMM yyyy, HH:mm")
                     · Last updated by @_detail.UpdatedByName on @_detail.UpdatedAt.ToString("d MMM yyyy, HH:mm")
@@ -240,6 +263,10 @@
                     @if (_detail.ArchivedAt.HasValue)
                     {
                         <text> · Archived by @_detail.ArchivedByName on @_detail.ArchivedAt.Value.ToString("d MMM yyyy, HH:mm") — reason: @_detail.ArchiveReason</text>
+                    }
+                    @if (_detail.LastReviewedAt.HasValue)
+                    {
+                        <text> · Last reviewed by @_detail.LastReviewedByName on @_detail.LastReviewedAt.Value.ToString("d MMM yyyy")</text>
                     }
                 </p>
             </div>
@@ -271,6 +298,12 @@
                                            IsOpen="_uploadVersionOpen"
                                            OnSaved="OnVersionUploadedAsync"
                                            OnCancelled="@(() => _uploadVersionOpen = false)" />
+
+<CompleteSharedCompanyDocumentReviewDialog CompanyId="CompanyId"
+                                           Document="_detail"
+                                           IsOpen="_reviewOpen"
+                                           OnSaved="OnReviewCompletedAsync"
+                                           OnCancelled="@(() => _reviewOpen = false)" />
 
 <SfDialog Visible="_publishConfirmOpen" IsModal="true" Width="420px" ShowCloseIcon="false">
     <DialogTemplates>
@@ -315,6 +348,28 @@
     </DialogTemplates>
 </SfDialog>
 
+<SfDialog Visible="_expireConfirmOpen" IsModal="true" Width="420px" ShowCloseIcon="false">
+    <DialogTemplates>
+        <Header>Mark Document as Expired</Header>
+        <Content>
+            <p>
+                Marking "@_detail?.Title" as expired will remove it from the employee document list and
+                cancel any outstanding review tasks. This cannot be undone.
+            </p>
+            @if (!string.IsNullOrEmpty(_expireError))
+            {
+                <div class="alert alert-danger py-2 mb-0">@_expireError</div>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton CssClass="e-danger" Disabled="_expiring" OnClick="ConfirmExpireAsync">
+                @(_expiring ? "Marking Expired…" : "Mark Expired")
+            </SfButton>
+            <SfButton Disabled="_expiring" OnClick="CancelExpire">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
 @code {
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid DocumentId { get; set; }
@@ -325,6 +380,7 @@
     private bool _editAudienceOpen;
     private bool _editAcknowledgementOpen;
     private bool _uploadVersionOpen;
+    private bool _reviewOpen;
     private bool _publishConfirmOpen;
     private bool _publishing;
     private string? _publishError;
@@ -332,6 +388,9 @@
     private bool _archiving;
     private string _archiveReason = string.Empty;
     private string? _archiveError;
+    private bool _expireConfirmOpen;
+    private bool _expiring;
+    private string? _expireError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -366,6 +425,12 @@
     private async Task OnVersionUploadedAsync()
     {
         _uploadVersionOpen = false;
+        _detail = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, DocumentId);
+    }
+
+    private async Task OnReviewCompletedAsync()
+    {
+        _reviewOpen = false;
         _detail = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, DocumentId);
     }
 
@@ -424,11 +489,39 @@
         _detail = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, DocumentId);
     }
 
+    private void CancelExpire()
+    {
+        _expireConfirmOpen = false;
+        _expireError = null;
+    }
+
+    private async Task ConfirmExpireAsync()
+    {
+        _expiring = true;
+        _expireError = null;
+        StateHasChanged();
+
+        var error = await DocumentService.ExpireSharedCompanyDocumentAsync(CompanyId, DocumentId);
+
+        _expiring = false;
+
+        if (error is not null)
+        {
+            _expireError = error;
+            return;
+        }
+
+        _expireConfirmOpen = false;
+        _expireError = null;
+        _detail = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, DocumentId);
+    }
+
     private static string StatusBadgeClass(string status) => status switch
     {
         "Published"  => "bg-success",
         "Archived"   => "bg-secondary",
         "Superseded" => "bg-secondary",
+        "Expired"    => "bg-secondary",
         _            => "bg-warning text-dark",
     };
 
