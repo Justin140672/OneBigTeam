@@ -623,7 +623,10 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     /// <summary>Returns the text of the onboarding plan status badge on the progress panel.</summary>
     public async Task<string?> GetOnboardingStatusBadgeTextAsync()
     {
-        var badge = page.Locator(".card .badge").First;
+        // Scoped to the card containing the progress bar, not just any ".card .badge" — the
+        // Reporting Chain card (rendered above the tabs whenever the employee has a manager)
+        // also has a badge ("Current Employee"), and an unscoped .First would grab that instead.
+        var badge = page.Locator(".card:has(.progress) .badge").First;
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
 
