@@ -93,6 +93,29 @@ public sealed record ExpiringDocumentItem(
     DateOnly ExpiryDate,
     DocumentExpiryStatus ExpiryStatus);
 
+// ── DASHBOARD: DOCUMENT REVIEWS DUE ──────────────────────────────────────────────
+
+public sealed record GetSharedCompanyDocumentsDueForReviewResponse(IReadOnlyList<SharedCompanyDocumentDueForReviewItem> Items);
+
+public sealed record SharedCompanyDocumentDueForReviewItem(
+    Guid Id,
+    string Title,
+    string? Description,
+    Guid CategoryId,
+    string CategoryName,
+    string FileName,
+    int VersionNumber,
+    string Status,
+    DateOnly? EffectiveDate,
+    DateOnly? ReviewDate,
+    string ReviewFrequency,
+    Guid? ReviewOwnerEmployeeId,
+    string? ReviewOwnerName,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    string UpdatedByName,
+    bool IsOverdue);
+
 // --- Shared Company Documents ---
 
 public sealed record CompanyDocumentCategoryListResponse(IReadOnlyList<CompanyDocumentCategoryItem> Items);

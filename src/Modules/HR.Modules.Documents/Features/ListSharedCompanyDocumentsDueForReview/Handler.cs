@@ -17,12 +17,17 @@ internal sealed class ListSharedCompanyDocumentsDueForReviewHandler(
     {
         var today = DateOnly.FromDateTime(clock.UtcNow);
 
+        // Window covers overdue reviews (ReviewDate < today) as well as reviews due this week
+        // (ReviewDate between today and today + 7 days inclusive) — the two buckets surfaced by
+        // the HR dashboard's "Document Reviews" widget. IsOverdue below distinguishes the two.
+        var dueBy = today.AddDays(7);
+
         var documents = await db.SharedCompanyDocuments
             .AsNoTracking()
             .Where(d => d.CompanyId == request.CompanyId
                 && d.Status != SharedCompanyDocumentStatus.Archived
                 && d.ReviewDate != null
-                && d.ReviewDate <= today)
+                && d.ReviewDate <= dueBy)
             .OrderBy(d => d.ReviewDate)
             .ToListAsync(cancellationToken);
 
@@ -60,7 +65,8 @@ internal sealed class ListSharedCompanyDocumentsDueForReviewHandler(
                     : null,
                 d.CreatedAt,
                 d.UpdatedAt,
-                namesLookup.TryGetValue(d.UpdatedBy, out var updatedByName) ? updatedByName : "Unknown"))
+                namesLookup.TryGetValue(d.UpdatedBy, out var updatedByName) ? updatedByName : "Unknown",
+                d.ReviewDate < today))
             .ToList();
 
         return Result.Success(new ListSharedCompanyDocumentsDueForReviewResponse(items));

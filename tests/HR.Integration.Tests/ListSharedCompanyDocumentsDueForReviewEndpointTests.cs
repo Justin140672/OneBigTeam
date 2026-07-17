@@ -8,8 +8,8 @@ namespace HR.Integration.Tests;
 
 /// <summary>
 /// Verifies ListSharedCompanyDocumentsDueForReview end-to-end: only documents whose ReviewDate
-/// is today or in the past come back, Archived documents are always excluded regardless of
-/// ReviewDate, and results are scoped to the company in the route.
+/// is within the next 7 days (overdue, due today, or due this week) come back, Archived documents
+/// are always excluded regardless of ReviewDate, and results are scoped to the company in the route.
 /// </summary>
 public class ListSharedCompanyDocumentsDueForReviewEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
@@ -58,6 +58,52 @@ public class ListSharedCompanyDocumentsDueForReviewEndpointTests : IClassFixture
         Assert.Contains(payload.Items, i => i.Id == dueToday!.Id && i.Title == "Due Today Policy");
         Assert.DoesNotContain(payload.Items, i => i.Title == "Future Policy");
         Assert.DoesNotContain(payload.Items, i => i.Title == "Archived Overdue Policy");
+    }
+
+    [Fact]
+    public async Task Returns_IsOverdue_True_For_Overdue_Document_And_False_For_Due_This_Week_Document()
+    {
+        var companyId  = Guid.NewGuid();
+        var userId     = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+
+        var (overdue, _)      = await UploadAsync(client, companyId, categoryId, "Overdue Policy", Today.AddDays(-2));
+        var (dueThisWeek, _)  = await UploadAsync(client, companyId, categoryId, "Due This Week Policy", Today.AddDays(4));
+
+        var response = await client.GetAsync(DueForReviewUrl(companyId));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<DueForReviewPayload>();
+        Assert.Equal(2, payload!.Items.Count);
+
+        var overdueItem     = payload.Items.Single(i => i.Id == overdue!.Id);
+        var dueThisWeekItem = payload.Items.Single(i => i.Id == dueThisWeek!.Id);
+        Assert.True(overdueItem.IsOverdue);
+        Assert.False(dueThisWeekItem.IsOverdue);
+    }
+
+    [Fact]
+    public async Task Includes_Document_Due_Exactly_Seven_Days_Out_And_Excludes_Document_Due_Eight_Days_Out()
+    {
+        var companyId  = Guid.NewGuid();
+        var userId     = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+
+        var (withinWindow, _) = await UploadAsync(client, companyId, categoryId, "Exactly Seven Days Policy", Today.AddDays(7));
+        await UploadAsync(client, companyId, categoryId, "Eight Days Out Policy", Today.AddDays(8));
+
+        var response = await client.GetAsync(DueForReviewUrl(companyId));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<DueForReviewPayload>();
+        Assert.Single(payload!.Items);
+        Assert.Contains(payload.Items, i => i.Id == withinWindow!.Id && i.Title == "Exactly Seven Days Policy");
+        Assert.DoesNotContain(payload.Items, i => i.Title == "Eight Days Out Policy");
+        Assert.False(payload.Items.Single().IsOverdue);
     }
 
     [Fact]
@@ -142,5 +188,6 @@ public class ListSharedCompanyDocumentsDueForReviewEndpointTests : IClassFixture
     private sealed record DueForReviewPayload(IReadOnlyList<DueForReviewItem> Items);
     private sealed record DueForReviewItem(
         Guid Id, string Title, string CategoryName, string Status, DateOnly? ReviewDate,
-        string ReviewFrequency, Guid? ReviewOwnerEmployeeId, string? ReviewOwnerName, string UpdatedByName);
+        string ReviewFrequency, Guid? ReviewOwnerEmployeeId, string? ReviewOwnerName, string UpdatedByName,
+        bool IsOverdue);
 }

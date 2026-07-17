@@ -62,13 +62,13 @@ public class ListSharedCompanyDocumentsDueForReviewHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Excludes_Document_With_ReviewDate_In_The_Future()
+    public async Task HandleAsync_Excludes_Document_With_ReviewDate_Beyond_The_Next_Week()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);
 
-        var doc = CreateDoc(companyId, "Future Policy", category.Id, Today.AddDays(5));
+        var doc = CreateDoc(companyId, "Future Policy", category.Id, Today.AddDays(8));
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
@@ -78,6 +78,146 @@ public class ListSharedCompanyDocumentsDueForReviewHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value!.Items);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Includes_Document_Due_Within_The_Next_Week_And_Marks_It_Not_Overdue()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+
+        var doc = CreateDoc(companyId, "Due This Week Policy", category.Id, Today.AddDays(5));
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new ListSharedCompanyDocumentsDueForReviewRequest(companyId),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal("Due This Week Policy", item.Title);
+        Assert.False(item.IsOverdue);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Includes_Document_With_ReviewDate_Exactly_Seven_Days_Out_And_Marks_It_Not_Overdue()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+
+        var doc = CreateDoc(companyId, "Exactly Seven Days Policy", category.Id, Today.AddDays(7));
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new ListSharedCompanyDocumentsDueForReviewRequest(companyId),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal("Exactly Seven Days Policy", item.Title);
+        Assert.False(item.IsOverdue);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Includes_Document_With_ReviewDate_Six_Days_Out_And_Marks_It_Not_Overdue()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+
+        var doc = CreateDoc(companyId, "Six Days Out Policy", category.Id, Today.AddDays(6));
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new ListSharedCompanyDocumentsDueForReviewRequest(companyId),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal("Six Days Out Policy", item.Title);
+        Assert.False(item.IsOverdue);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Overdue_DueToday_DueThisWeek_And_Excludes_Beyond_Window_Together()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+
+        var overdue     = CreateDoc(companyId, "Overdue", category.Id, Today.AddDays(-3));
+        var dueToday     = CreateDoc(companyId, "Due Today", category.Id, Today);
+        var dueThisWeek = CreateDoc(companyId, "Due This Week", category.Id, Today.AddDays(7));
+        var beyondWindow = CreateDoc(companyId, "Beyond Window", category.Id, Today.AddDays(8));
+
+        db.SharedCompanyDocuments.AddRange(beyondWindow, dueThisWeek, dueToday, overdue);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new ListSharedCompanyDocumentsDueForReviewRequest(companyId),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(
+            ["Overdue", "Due Today", "Due This Week"],
+            result.Value!.Items.Select(i => i.Title));
+        Assert.DoesNotContain(result.Value.Items, i => i.Title == "Beyond Window");
+
+        Assert.True(result.Value.Items.Single(i => i.Title == "Overdue").IsOverdue);
+        Assert.False(result.Value.Items.Single(i => i.Title == "Due Today").IsOverdue);
+        Assert.False(result.Value.Items.Single(i => i.Title == "Due This Week").IsOverdue);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Includes_Document_Reverted_To_Draft_After_Publish()
+    {
+        // RevertToDraft moves a Published document back to Draft without touching Status filters
+        // beyond Archived/Expired — confirms a document that has cycled Draft -> Published -> Draft
+        // is still surfaced like any other non-terminal-status document.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+
+        var doc = CreateDoc(companyId, "Reverted Policy", category.Id, Today.AddDays(-1));
+        doc.Publish(Guid.NewGuid(), Now);
+        doc.RevertToDraft(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new ListSharedCompanyDocumentsDueForReviewRequest(companyId),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal("Draft", item.Status);
+        Assert.True(item.IsOverdue);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Marks_Past_ReviewDate_As_Overdue_And_Today_As_Not_Overdue()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+
+        var overdue  = CreateDoc(companyId, "Overdue Policy", category.Id, Today.AddDays(-5));
+        var dueToday = CreateDoc(companyId, "Due Today Policy", category.Id, Today);
+        db.SharedCompanyDocuments.AddRange(overdue, dueToday);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new ListSharedCompanyDocumentsDueForReviewRequest(companyId),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.Items.Single(i => i.Title == "Overdue Policy").IsOverdue);
+        Assert.False(result.Value.Items.Single(i => i.Title == "Due Today Policy").IsOverdue);
     }
 
     [Fact]

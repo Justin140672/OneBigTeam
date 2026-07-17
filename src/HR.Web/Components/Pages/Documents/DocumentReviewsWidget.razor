@@ -1,0 +1,113 @@
+@inject DocumentService DocumentService
+@inject NavigationManager Navigation
+@inject AppSession Session
+
+@if (Session.CanManageEmployees)
+{
+    @if (_loading)
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-magnifying-glass-chart widget-icon"></i>
+                <span class="widget-title">Document Reviews</span>
+            </div>
+            <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
+                <HrLoadingIndicator />
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="widget-card">
+            <div class="widget-header">
+                <i class="fa-solid fa-magnifying-glass-chart widget-icon"></i>
+                <span class="widget-title">Document Reviews</span>
+                @if (_items.Count > 0)
+                {
+                    <span class="widget-count-badge">@_items.Count</span>
+                }
+            </div>
+
+            @if (_overdue > 0 || _dueThisWeek > 0)
+            {
+                <div class="widget-stats">
+                    @if (_overdue > 0)
+                    {
+                        <div class="widget-stat widget-stat--danger">
+                            <i class="fa-solid fa-triangle-exclamation fa-xs"></i>
+                            <span class="widget-stat-value">@_overdue</span>
+                            <span class="widget-stat-label">overdue</span>
+                        </div>
+                    }
+                    @if (_dueThisWeek > 0)
+                    {
+                        <div class="widget-stat">
+                            <span class="widget-stat-value">@_dueThisWeek</span>
+                            <span class="widget-stat-label">due this week</span>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="widget-body">
+                @if (_items.Count == 0)
+                {
+                    <div class="widget-empty">
+                        <i class="fa-solid fa-circle-check fa-lg mb-2"></i>
+                        <p class="mb-0">No reviews due</p>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var item in _items.Take(5))
+                    {
+                        var doc = item;
+                        var (dueLabel, dueCss) = StatusBadge(doc.IsOverdue, doc.ReviewDate);
+                        var meta = string.IsNullOrWhiteSpace(doc.ReviewOwnerName)
+                            ? doc.CategoryName
+                            : $"{doc.CategoryName} — {doc.ReviewOwnerName}";
+                        var url = $"/companies/{Session.CompanyId}/shared-documents/{doc.Id}";
+                        <div @key="doc.Id" class="task-widget-item"
+                             @onclick="() => Navigation.NavigateTo(url)">
+                            <span class="priority-pip priority-pip--@(doc.IsOverdue ? "critical" : "medium")"></span>
+                            <div class="task-widget-content">
+                                <span class="task-widget-title">@doc.Title</span>
+                                <span class="task-widget-meta">@meta</span>
+                            </div>
+                            <span class="due-badge due-badge--@dueCss">@dueLabel</span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private IReadOnlyList<SharedCompanyDocumentDueForReviewItem> _items = [];
+    private int _overdue;
+    private int _dueThisWeek;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.CanManageEmployees)
+        {
+            _loading = false;
+            return;
+        }
+
+        var response = await DocumentService.GetSharedCompanyDocumentsDueForReviewAsync(Session.CompanyId);
+        _items = response?.Items ?? [];
+
+        _overdue = _items.Count(d => d.IsOverdue);
+        _dueThisWeek = _items.Count(d => !d.IsOverdue);
+        _loading = false;
+    }
+
+    private static (string Label, string Css) StatusBadge(bool isOverdue, DateOnly? reviewDate) => isOverdue switch
+    {
+        true => ("Overdue", "overdue"),
+        false => (reviewDate?.ToString("d MMM") ?? "—", "soon"),
+    };
+}

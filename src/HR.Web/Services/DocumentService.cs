@@ -22,6 +22,17 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         catch { return null; }
     }
 
+    public async Task<GetSharedCompanyDocumentsDueForReviewResponse?> GetSharedCompanyDocumentsDueForReviewAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetSharedCompanyDocumentsDueForReviewResponse>(
+                $"api/companies/{companyId}/shared-documents/due-for-review", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch { return null; }
+    }
+
     public async Task<EmployeeDocumentListResponse?> ListEmployeeDocumentsAsync(
         Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
     {

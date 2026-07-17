@@ -138,4 +138,44 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
         await UpcomingProbationWidget.Locator(".task-widget-item").First.ClickAsync();
         await page.WaitForURLAsync(new Regex(@"/employees/[0-9a-f-]{36}\?tab=probation"), new() { Timeout = 15_000 });
     }
+
+    // ── Document Reviews Widget ────────────────────────────────────────────────
+    // DocumentReviewsWidget.razor — gated on Session.CanManageEmployees (redundant with the
+    // route guard, same as the sickness trio above), header title "Document Reviews".
+
+    private ILocator DocumentReviewsWidget =>
+        page.Locator(".widget-card").Filter(new() { HasText = "Document Reviews" }).First;
+
+    /// <summary>Returns the document titles shown in the Document Reviews widget items.</summary>
+    public async Task<IReadOnlyList<string>> GetDocumentReviewTitlesAsync()
+    {
+        await DocumentReviewsWidget.Locator(".task-widget-item, .widget-empty").First
+            .WaitForAsync(new() { Timeout = 15_000 });
+
+        var titles = await DocumentReviewsWidget.Locator(".task-widget-title").AllAsync();
+        var names  = new List<string>();
+        foreach (var t in titles)
+            names.Add((await t.TextContentAsync())?.Trim() ?? "");
+        return names;
+    }
+
+    /// <summary>
+    /// Clicks the Document Reviews widget row whose title contains <paramref name="titleFragment"/>
+    /// (DocumentReviewsWidget.razor navigates straight to the SharedDocumentDetail route on click,
+    /// unlike LeaveRequestsWidget's dual outcome) and waits for navigation to
+    /// "/companies/{companyId}/shared-documents/{documentId}".
+    /// </summary>
+    public async Task ClickDocumentReviewItemAsync(string titleFragment)
+    {
+        await DocumentReviewsWidget.Locator(".task-widget-item, .widget-empty").First
+            .WaitForAsync(new() { Timeout = 15_000 });
+
+        await DocumentReviewsWidget.Locator(".task-widget-item")
+            .Filter(new() { HasText = titleFragment })
+            .First
+            .ClickAsync();
+        await page.WaitForURLAsync(
+            new Regex(@"/companies/[0-9a-f-]{36}/shared-documents/[0-9a-f-]{36}"),
+            new() { Timeout = 15_000 });
+    }
 }

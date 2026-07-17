@@ -18,4 +18,5 @@ internal sealed record SharedCompanyDocumentDueForReviewItem(
     string? ReviewOwnerName,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    string UpdatedByName);
+    string UpdatedByName,
+    bool IsOverdue);
