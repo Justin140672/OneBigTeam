@@ -1,11 +1,12 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Features.ListSharedCompanyDocuments;
 
-internal sealed class ListSharedCompanyDocumentsHandler(DocumentsDbContext db, IEmployeeNameReader employeeNameReader)
+internal sealed class ListSharedCompanyDocumentsHandler(DocumentsDbContext db, IEmployeeNameReader employeeNameReader, IClock clock)
 {
     public async Task<Result<ListSharedCompanyDocumentsResponse>> HandleAsync(
         ListSharedCompanyDocumentsRequest request,
@@ -31,6 +32,38 @@ internal sealed class ListSharedCompanyDocumentsHandler(DocumentsDbContext db, I
         {
             var search = request.Search.Trim().ToLowerInvariant();
             query = query.Where(d => d.Title.ToLower().Contains(search));
+        }
+
+        if (request.ReviewStatusFilter is not null)
+        {
+            // Mirrors the Overdue/due-within-7-days bucketing in
+            // ListSharedCompanyDocumentsDueForReviewHandler (dashboard widget) — Expired is its
+            // own bucket keyed off Status rather than ReviewDate, since an expired document may
+            // still carry a stale ReviewDate.
+            var today = DateOnly.FromDateTime(clock.UtcNow);
+            var dueBy = today.AddDays(7);
+
+            query = request.ReviewStatusFilter switch
+            {
+                SharedCompanyDocumentReviewStatusFilter.DueSoon => query.Where(d =>
+                    d.Status != SharedCompanyDocumentStatus.Archived
+                    && d.Status != SharedCompanyDocumentStatus.Expired
+                    && d.ReviewDate != null
+                    && d.ReviewDate >= today
+                    && d.ReviewDate <= dueBy),
+                SharedCompanyDocumentReviewStatusFilter.Overdue => query.Where(d =>
+                    d.Status != SharedCompanyDocumentStatus.Archived
+                    && d.Status != SharedCompanyDocumentStatus.Expired
+                    && d.ReviewDate != null
+                    && d.ReviewDate < today),
+                SharedCompanyDocumentReviewStatusFilter.NoReview => query.Where(d =>
+                    d.Status != SharedCompanyDocumentStatus.Archived
+                    && d.Status != SharedCompanyDocumentStatus.Expired
+                    && d.ReviewDate == null),
+                SharedCompanyDocumentReviewStatusFilter.Expired => query.Where(d =>
+                    d.Status == SharedCompanyDocumentStatus.Expired),
+                _ => query,
+            };
         }
 
         var documents = await query

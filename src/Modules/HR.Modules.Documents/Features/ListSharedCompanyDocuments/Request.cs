@@ -10,4 +10,5 @@ internal sealed record ListSharedCompanyDocumentsRequest
     public DateOnly? ReviewDateFrom { get; init; }
     public DateOnly? ReviewDateTo { get; init; }
     public string? Search { get; init; }
+    public SharedCompanyDocumentReviewStatusFilter? ReviewStatusFilter { get; init; }
 }

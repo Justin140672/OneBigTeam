@@ -266,6 +266,122 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
     }
 
     [Fact]
+    public async Task List_Returns_Unauthorized_Without_Auth()
+    {
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync($"/api/companies/{Guid.NewGuid()}/shared-documents");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task List_ReviewStatusFilter_Invalid_Value_Returns_UnprocessableEntity()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        // Mirrors how other invalid-request cases in this endpoint surface as 422 —
+        // c.Errors.StatusCode is configured globally to 422 in Program.cs, including for
+        // FastEndpoints query-binding failures such as an unrecognized enum member name.
+        var response = await client.GetAsync(
+            $"/api/companies/{companyId}/shared-documents?reviewStatusFilter=NotARealFilter");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task List_ReviewStatusFilter_DueSoon_Returns_Only_Matching_Documents()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        await UploadAsync(client, companyId, categoryId, title: "Due Soon Policy", reviewDate: today.AddDays(3));
+        await UploadAsync(client, companyId, categoryId, title: "Overdue Policy", reviewDate: today.AddDays(-3));
+        await UploadAsync(client, companyId, categoryId, title: "Beyond Window Policy", reviewDate: today.AddDays(30));
+        await UploadAsync(client, companyId, categoryId, title: "No Review Date Policy");
+
+        var list = await client.GetFromJsonAsync<ListPayload>(
+            $"/api/companies/{companyId}/shared-documents?reviewStatusFilter=DueSoon");
+
+        Assert.Single(list!.Items);
+        Assert.Equal("Due Soon Policy", list.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task List_ReviewStatusFilter_Overdue_Returns_Only_Matching_Documents()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        await UploadAsync(client, companyId, categoryId, title: "Overdue Policy", reviewDate: today.AddDays(-3));
+        await UploadAsync(client, companyId, categoryId, title: "Due Soon Policy", reviewDate: today.AddDays(3));
+        await UploadAsync(client, companyId, categoryId, title: "No Review Date Policy");
+
+        var list = await client.GetFromJsonAsync<ListPayload>(
+            $"/api/companies/{companyId}/shared-documents?reviewStatusFilter=Overdue");
+
+        Assert.Single(list!.Items);
+        Assert.Equal("Overdue Policy", list.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task List_ReviewStatusFilter_NoReview_Returns_Only_Matching_Documents()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        await UploadAsync(client, companyId, categoryId, title: "No Review Date Policy");
+        await UploadAsync(client, companyId, categoryId, title: "Overdue Policy", reviewDate: today.AddDays(-3));
+        await UploadAsync(client, companyId, categoryId, title: "Due Soon Policy", reviewDate: today.AddDays(3));
+
+        var list = await client.GetFromJsonAsync<ListPayload>(
+            $"/api/companies/{companyId}/shared-documents?reviewStatusFilter=NoReview");
+
+        Assert.Single(list!.Items);
+        Assert.Equal("No Review Date Policy", list.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task List_ReviewStatusFilter_Expired_Returns_Only_Matching_Documents()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var (expiredDoc, _) = await UploadAsync(client, companyId, categoryId, title: "Expired Policy");
+        await client.PostAsync($"/api/companies/{companyId}/shared-documents/{expiredDoc!.Id}/publish", EmptyJson());
+        await client.PostAsync($"/api/companies/{companyId}/shared-documents/{expiredDoc.Id}/expire", EmptyJson());
+
+        // Still-active Overdue document must not be picked up by the Expired bucket even though
+        // it also has a ReviewDate in the past — Expired is keyed purely off Status.
+        await UploadAsync(client, companyId, categoryId, title: "Overdue Policy", reviewDate: today.AddDays(-3));
+
+        var list = await client.GetFromJsonAsync<ListPayload>(
+            $"/api/companies/{companyId}/shared-documents?reviewStatusFilter=Expired");
+
+        Assert.Single(list!.Items);
+        Assert.Equal("Expired Policy", list.Items[0].Title);
+        Assert.Equal("Expired", list.Items[0].Status);
+    }
+
+    [Fact]
     public async Task List_Includes_UpdatedBy_Name()
     {
         var companyId = Guid.NewGuid();

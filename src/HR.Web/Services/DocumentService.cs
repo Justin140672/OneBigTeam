@@ -100,6 +100,7 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         DateOnly? reviewDateFrom = null,
         DateOnly? reviewDateTo = null,
         string? search = null,
+        string? reviewStatusFilter = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -115,6 +116,8 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
                 query.Add($"reviewDateTo={reviewDateTo.Value:yyyy-MM-dd}");
             if (!string.IsNullOrWhiteSpace(search))
                 query.Add($"search={Uri.EscapeDataString(search)}");
+            if (!string.IsNullOrWhiteSpace(reviewStatusFilter))
+                query.Add($"reviewStatusFilter={Uri.EscapeDataString(reviewStatusFilter)}");
 
             var url = $"api/companies/{companyId}/shared-documents";
             if (query.Count > 0)
