@@ -15,7 +15,7 @@ public class GetRecentLeaveRequestsHandlerTests
     {
         await using var context = BuildContext();
         var handler = new GetRecentLeaveRequestsHandler(
-            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader(), new FakeClock(Now.UtcDateTime));
 
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(Guid.NewGuid(), null),
@@ -41,7 +41,7 @@ public class GetRecentLeaveRequestsHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new GetRecentLeaveRequestsHandler(
-            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader(), new FakeClock(Now.UtcDateTime));
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
             Guid.NewGuid(),
@@ -68,7 +68,7 @@ public class GetRecentLeaveRequestsHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new GetRecentLeaveRequestsHandler(
-            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader(), new FakeClock(Now.UtcDateTime));
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
             Guid.NewGuid(),
@@ -96,7 +96,7 @@ public class GetRecentLeaveRequestsHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new GetRecentLeaveRequestsHandler(
-            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader(), new FakeClock(Now.UtcDateTime));
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, 3),
             Guid.NewGuid(),
@@ -119,7 +119,7 @@ public class GetRecentLeaveRequestsHandlerTests
 
         var names = new Dictionary<Guid, string> { [employeeId] = "Jane Doe" };
         var handler = new GetRecentLeaveRequestsHandler(
-            context, new FakeEmployeeNameReader(names), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
+            context, new FakeEmployeeNameReader(names), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader(), new FakeClock(Now.UtcDateTime));
 
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
@@ -144,7 +144,7 @@ public class GetRecentLeaveRequestsHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new GetRecentLeaveRequestsHandler(
-            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader(), new FakeClock(Now.UtcDateTime));
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
             Guid.NewGuid(),
@@ -170,7 +170,7 @@ public class GetRecentLeaveRequestsHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new GetRecentLeaveRequestsHandler(
-            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader(), new FakeClock(Now.UtcDateTime));
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
             Guid.NewGuid(),
@@ -198,7 +198,7 @@ public class GetRecentLeaveRequestsHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new GetRecentLeaveRequestsHandler(
-            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(directReportId), new FakeOpenTaskBySourceEntityReader());
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(directReportId), new FakeOpenTaskBySourceEntityReader(), new FakeClock(Now.UtcDateTime));
 
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
@@ -223,7 +223,7 @@ public class GetRecentLeaveRequestsHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new GetRecentLeaveRequestsHandler(
-            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader(), new FakeClock(Now.UtcDateTime));
 
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
@@ -250,7 +250,7 @@ public class GetRecentLeaveRequestsHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new GetRecentLeaveRequestsHandler(
-            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(directReportId), new FakeOpenTaskBySourceEntityReader());
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(directReportId), new FakeOpenTaskBySourceEntityReader(), new FakeClock(Now.UtcDateTime));
 
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
@@ -273,14 +273,19 @@ public class GetRecentLeaveRequestsHandlerTests
         var leaveType = SeedLeaveType(context, companyId);
 
         var pending = CreateRequest(companyId, unrelatedEmployeeId, leaveType.Id, Now);
-        var approved = CreateRequest(companyId, unrelatedEmployeeId, leaveType.Id, Now.AddDays(-1));
+        // Approved but not yet started (StartDate is after "Now") — still expected to show; see
+        // HandleAsync_HrAdministrator_Hides_Approved_Requests_Once_Started for the other side.
+        var approved = CreateRequest(
+            companyId, unrelatedEmployeeId, leaveType.Id, Now.AddDays(-1),
+            startDate: DateOnly.FromDateTime(Now.UtcDateTime).AddDays(5),
+            endDate: DateOnly.FromDateTime(Now.UtcDateTime).AddDays(7));
         approved.Approve(Guid.NewGuid(), Now);
         context.LeaveRequests.AddRange(pending, approved);
         await context.SaveChangesAsync();
 
         // Viewer has no direct reports at all — HR admins must still see everything.
         var handler = new GetRecentLeaveRequestsHandler(
-            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader(), new FakeClock(Now.UtcDateTime));
 
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
@@ -289,6 +294,66 @@ public class GetRecentLeaveRequestsHandlerTests
             CancellationToken.None);
 
         Assert.Equal(2, result.Items.Count);
+    }
+
+    [Fact]
+    public async Task HandleAsync_HrAdministrator_Hides_Approved_Requests_Once_Started()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var leaveType = SeedLeaveType(context, companyId);
+        var today = DateOnly.FromDateTime(Now.UtcDateTime);
+
+        var startedYesterday = CreateRequest(
+            companyId, employeeId, leaveType.Id, Now, startDate: today.AddDays(-1), endDate: today.AddDays(1));
+        startedYesterday.Approve(Guid.NewGuid(), Now);
+        var startsToday = CreateRequest(
+            companyId, employeeId, leaveType.Id, Now, startDate: today, endDate: today.AddDays(2));
+        startsToday.Approve(Guid.NewGuid(), Now);
+        context.LeaveRequests.AddRange(startedYesterday, startsToday);
+        await context.SaveChangesAsync();
+
+        var handler = new GetRecentLeaveRequestsHandler(
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader(), new FakeClock(Now.UtcDateTime));
+
+        var result = await handler.HandleAsync(
+            new GetRecentLeaveRequestsRequest(companyId, null),
+            Guid.NewGuid(),
+            isHrAdministrator: true,
+            CancellationToken.None);
+
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task HandleAsync_HrAdministrator_Still_Sees_NonApproved_Requests_That_Have_Started()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var leaveType = SeedLeaveType(context, companyId);
+        var today = DateOnly.FromDateTime(Now.UtcDateTime);
+
+        // Only Status == Approved is affected by the "hide once started" rule — a pending
+        // request covering a date range that has already begun (e.g. submitted late) must
+        // still surface for an admin to action.
+        var pending = CreateRequest(
+            companyId, employeeId, leaveType.Id, Now, startDate: today.AddDays(-1), endDate: today.AddDays(1));
+        context.LeaveRequests.Add(pending);
+        await context.SaveChangesAsync();
+
+        var handler = new GetRecentLeaveRequestsHandler(
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader(), new FakeClock(Now.UtcDateTime));
+
+        var result = await handler.HandleAsync(
+            new GetRecentLeaveRequestsRequest(companyId, null),
+            Guid.NewGuid(),
+            isHrAdministrator: true,
+            CancellationToken.None);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(pending.Id, item.LeaveRequestId);
     }
 
     // ── TaskId ─────────────────────────────────────────────────────────────────
@@ -305,7 +370,7 @@ public class GetRecentLeaveRequestsHandlerTests
         await context.SaveChangesAsync();
 
         var handler = new GetRecentLeaveRequestsHandler(
-            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader());
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader(), new FakeClock(Now.UtcDateTime));
 
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
@@ -331,7 +396,7 @@ public class GetRecentLeaveRequestsHandlerTests
         var taskId = Guid.NewGuid();
         var openTaskReader = new FakeOpenTaskBySourceEntityReader(new Dictionary<Guid, Guid> { [request.Id] = taskId });
         var handler = new GetRecentLeaveRequestsHandler(
-            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), openTaskReader);
+            context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), openTaskReader, new FakeClock(Now.UtcDateTime));
 
         var result = await handler.HandleAsync(
             new GetRecentLeaveRequestsRequest(companyId, null),
@@ -352,10 +417,13 @@ public class GetRecentLeaveRequestsHandlerTests
         return leaveType;
     }
 
-    private static LeaveRequest CreateRequest(Guid companyId, Guid employeeId, Guid leaveTypeId, DateTimeOffset createdAt) =>
+    private static LeaveRequest CreateRequest(
+        Guid companyId, Guid employeeId, Guid leaveTypeId, DateTimeOffset createdAt,
+        DateOnly? startDate = null, DateOnly? endDate = null) =>
         LeaveRequest.Create(
             Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
-            new DateOnly(2026, 7, 1), LeaveDayPart.FullDay, new DateOnly(2026, 7, 3), LeaveDayPart.FullDay,
+            startDate ?? new DateOnly(2026, 7, 1), LeaveDayPart.FullDay,
+            endDate ?? new DateOnly(2026, 7, 3), LeaveDayPart.FullDay,
             3m, "Trip", createdAt);
 
     private static LeaveDbContext BuildContext()

@@ -213,7 +213,13 @@ public class GetRecentLeaveRequestsEndpointTests : IClassFixture<ApiWebApplicati
         var leaveTypeId = await SeedLeaveTypeAsync(companyId);
 
         await SeedLeaveRequestAsync(companyId, employeeAId, leaveTypeId, Now);
-        var approvedId = await SeedLeaveRequestAsync(companyId, employeeBId, leaveTypeId, Now.AddDays(-1));
+        // Approved but not yet started, so it's still expected to show — see
+        // Get_RecentLeaveRequests_HrAdministrator_Hides_Approved_Requests_Once_Started for the
+        // other side of this rule.
+        var today = DateOnly.FromDateTime(Now.UtcDateTime);
+        var approvedId = await SeedLeaveRequestAsync(
+            companyId, employeeBId, leaveTypeId, Now.AddDays(-1),
+            startDate: today.AddDays(5), endDate: today.AddDays(7));
         await ApproveLeaveRequestAsync(approvedId);
 
         var response = await hrAdminClient.GetAsync($"/api/companies/{companyId}/leave-requests/recent");
@@ -222,6 +228,31 @@ public class GetRecentLeaveRequestsEndpointTests : IClassFixture<ApiWebApplicati
         var payload = await response.Content.ReadFromJsonAsync<RecentPayload>();
         Assert.NotNull(payload);
         Assert.Equal(2, payload!.Items.Count);
+    }
+
+    [Fact]
+    public async Task Get_RecentLeaveRequests_HrAdministrator_Hides_Approved_Requests_Once_Started()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = AuthenticatedClient(companyId);
+
+        var employeeId = await SeedEmployeeAsync(companyId, "Ivy", "Started");
+        var leaveTypeId = await SeedLeaveTypeAsync(companyId);
+        var today = DateOnly.FromDateTime(Now.UtcDateTime);
+
+        var startedYesterdayId = await SeedLeaveRequestAsync(
+            companyId, employeeId, leaveTypeId, Now, startDate: today.AddDays(-1), endDate: today.AddDays(1));
+        await ApproveLeaveRequestAsync(startedYesterdayId);
+        var startsTodayId = await SeedLeaveRequestAsync(
+            companyId, employeeId, leaveTypeId, Now, startDate: today, endDate: today.AddDays(2));
+        await ApproveLeaveRequestAsync(startsTodayId);
+
+        var response = await hrAdminClient.GetAsync($"/api/companies/{companyId}/leave-requests/recent");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<RecentPayload>();
+        Assert.NotNull(payload);
+        Assert.Empty(payload!.Items);
     }
 
     private async Task<Guid> SeedEmployeeAsync(Guid companyId, string firstName, string lastName)
@@ -247,13 +278,16 @@ public class GetRecentLeaveRequestsEndpointTests : IClassFixture<ApiWebApplicati
         return leaveType.Id;
     }
 
-    private async Task<Guid> SeedLeaveRequestAsync(Guid companyId, Guid employeeId, Guid leaveTypeId, DateTimeOffset createdAt)
+    private async Task<Guid> SeedLeaveRequestAsync(
+        Guid companyId, Guid employeeId, Guid leaveTypeId, DateTimeOffset createdAt,
+        DateOnly? startDate = null, DateOnly? endDate = null)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
         var request = LeaveRequest.Create(
             Guid.NewGuid(), companyId, employeeId, leaveTypeId, Guid.NewGuid(),
-            new DateOnly(2026, 7, 1), LeaveDayPart.FullDay, new DateOnly(2026, 7, 3), LeaveDayPart.FullDay,
+            startDate ?? new DateOnly(2026, 7, 1), LeaveDayPart.FullDay,
+            endDate ?? new DateOnly(2026, 7, 3), LeaveDayPart.FullDay,
             3m, "Trip", createdAt);
         db.LeaveRequests.Add(request);
         await db.SaveChangesAsync();

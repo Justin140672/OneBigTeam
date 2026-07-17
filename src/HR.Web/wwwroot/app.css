@@ -370,6 +370,13 @@ html[data-theme="dark"] .card-header {
     color: var(--hr-gray-900);
 }
 
+.widget-subtitle {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--hr-gray-400);
+    margin-top: 1px;
+}
+
 .widget-count-badge {
     font-size: 0.7rem;
     font-weight: 700;
@@ -751,6 +758,10 @@ html[data-theme="dark"] .widget-header {
 
 html[data-theme="dark"] .widget-title {
     color: var(--hr-gray-50);
+}
+
+html[data-theme="dark"] .widget-subtitle {
+    color: var(--hr-gray-500);
 }
 
 html[data-theme="dark"] .widget-stats {

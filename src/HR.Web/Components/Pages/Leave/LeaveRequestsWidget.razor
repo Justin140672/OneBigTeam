@@ -7,7 +7,13 @@
     <div class="widget-card">
         <div class="widget-header">
             <i class="fa-solid fa-plane-departure widget-icon"></i>
-            <span class="widget-title">Leave Requests</span>
+            <div>
+                <span class="widget-title">Leave Requests</span>
+                @if (Session.IsHrAdministrator)
+                {
+                    <span class="widget-subtitle">Approved requests hide once leave starts</span>
+                }
+            </div>
         </div>
         <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
             <HrLoadingIndicator Label="Loading leave requests…" />
@@ -19,7 +25,13 @@ else
     <div class="widget-card">
         <div class="widget-header">
             <i class="fa-solid fa-plane-departure widget-icon"></i>
-            <span class="widget-title">Leave Requests</span>
+            <div>
+                <span class="widget-title">Leave Requests</span>
+                @if (Session.IsHrAdministrator)
+                {
+                    <span class="widget-subtitle">Approved requests hide once leave starts</span>
+                }
+            </div>
             @if (_items.Count > 0)
             {
                 <span class="widget-count-badge ms-auto">@_items.Count</span>
