@@ -207,6 +207,30 @@ internal sealed record SharedCompanyDocumentExpiredAuditEvent(
     object? IAuditEvent.Metadata        => new { ReviewTasksCancelled };
 }
 
+internal sealed record SharedCompanyDocumentReviewCompletedAuditEvent(
+    Guid CompanyId,
+    Guid SharedCompanyDocumentId,
+    string Title,
+    DateOnly? PreviousReviewDate,
+    DateOnly ReviewDate,
+    string? ReviewNotes,
+    DateOnly? NextReviewDate,
+    Guid ReviewedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "shared_company_document.review_completed";
+    string  IAuditEvent.EntityType      => "SharedCompanyDocument";
+    Guid    IAuditEvent.EntityId        => SharedCompanyDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => null;
+    Guid?   IAuditEvent.ActorUserId     => ReviewedBy;
+    Guid?   IAuditEvent.ActorEmployeeId => ReviewedBy;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Document '{Title}' review completed";
+    object? IAuditEvent.Before          => new { ReviewDate = PreviousReviewDate };
+    object? IAuditEvent.After           => new { ReviewDate, ReviewNotes, NextReviewDate };
+    object? IAuditEvent.Metadata        => null;
+}
+
 internal sealed record SharedCompanyDocumentAcknowledgementSettingsUpdatedAuditEvent(
     Guid CompanyId,
     Guid SharedCompanyDocumentId,

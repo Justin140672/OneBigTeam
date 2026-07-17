@@ -7,6 +7,7 @@ namespace HR.Modules.Documents.Features.CompleteSharedCompanyDocumentReview;
 
 internal sealed class CompleteSharedCompanyDocumentReviewHandler(
     DocumentsDbContext db,
+    IAuditEventPublisher auditPublisher,
     IClock clock)
 {
     public async Task<Result<CompleteSharedCompanyDocumentReviewResponse>> HandleAsync(
@@ -42,6 +43,17 @@ internal sealed class CompleteSharedCompanyDocumentReviewHandler(
         db.SharedCompanyDocumentReviewHistories.Add(historyEntry);
 
         await db.SaveChangesAsync(cancellationToken);
+
+        await auditPublisher.PublishAsync(new SharedCompanyDocumentReviewCompletedAuditEvent(
+            document.CompanyId,
+            document.Id,
+            document.Title,
+            previousReviewDate,
+            reviewDate,
+            document.LastReviewNotes,
+            nextReviewDate,
+            reviewedBy,
+            clock.UtcNowOffset()), cancellationToken);
 
         return Result.Success(new CompleteSharedCompanyDocumentReviewResponse(
             document.Id,

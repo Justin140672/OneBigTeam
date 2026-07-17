@@ -1,3 +1,4 @@
+using System.Text.Json;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.CompleteSharedCompanyDocumentReview;
 using HR.Modules.Documents.Features.ListSharedCompanyDocumentsDueForReview;
@@ -278,8 +279,101 @@ public class CompleteSharedCompanyDocumentReviewHandlerTests
         Assert.Null(entry.PreviousReviewDate);
     }
 
-    private static CompleteSharedCompanyDocumentReviewHandler Handler(DocumentsDbContext db) =>
-        new(db, new FakeClock(FixedUtcNow));
+    [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var category   = await SeedCategory(db, companyId);
+        var reviewedBy = Guid.NewGuid();
+        var doc = CreateDoc(companyId, category.Id, Guid.NewGuid(), SharedCompanyDocumentReviewFrequency.Yearly, null, Today.AddDays(-1));
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var audit = new FakeAuditPublisher();
+        var result = await Handler(db, audit).HandleAsync(
+            new CompleteSharedCompanyDocumentReviewRequest
+            {
+                CompanyId = companyId,
+                DocumentId = doc.Id,
+                ReviewNotes = "Reviewed against latest legislation.",
+            },
+            reviewedBy, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var evt = Assert.Single(audit.Published);
+        Assert.Equal("shared_company_document.review_completed", evt.EventType);
+        Assert.Equal("SharedCompanyDocument",                    evt.EntityType);
+        Assert.Equal(doc.Id,                                     evt.EntityId);
+        Assert.Equal(reviewedBy,                                 evt.ActorUserId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Audit_Event_Before_After_Reflects_ReviewDate_And_Notes_Change()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var category   = await SeedCategory(db, companyId);
+        var reviewedBy = Guid.NewGuid();
+        var previousReviewDate = Today.AddDays(-1);
+        var doc = CreateDoc(companyId, category.Id, Guid.NewGuid(), SharedCompanyDocumentReviewFrequency.Yearly, null, previousReviewDate);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var audit = new FakeAuditPublisher();
+        var result = await Handler(db, audit).HandleAsync(
+            new CompleteSharedCompanyDocumentReviewRequest
+            {
+                CompanyId = companyId,
+                DocumentId = doc.Id,
+                ReviewNotes = "Reviewed against latest legislation.",
+            },
+            reviewedBy, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var expectedNextReviewDate = Today.AddMonths(12);
+        Assert.Equal(expectedNextReviewDate, result.Value!.ReviewDate);
+
+        var evt = Assert.Single(audit.Published);
+
+        // Before carries the review date this review fulfilled; After carries the new review
+        // date/notes/next review date — serialize both and confirm each value only shows up
+        // where expected, mirroring UpdateSharedCompanyDocumentMetadataHandlerTests' Before/After
+        // JSON assertion style.
+        var beforeJson = JsonSerializer.Serialize(evt.Before);
+        var afterJson  = JsonSerializer.Serialize(evt.After);
+
+        Assert.Contains(previousReviewDate.ToString("yyyy-MM-dd"), beforeJson);
+        Assert.DoesNotContain(expectedNextReviewDate.ToString("yyyy-MM-dd"), beforeJson);
+
+        Assert.Contains(Today.ToString("yyyy-MM-dd"), afterJson);
+        Assert.Contains(expectedNextReviewDate.ToString("yyyy-MM-dd"), afterJson);
+        Assert.Contains("Reviewed against latest legislation.", afterJson);
+        Assert.DoesNotContain(previousReviewDate.ToString("yyyy-MM-dd"), afterJson);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_Audit_Event_On_Failure()
+    {
+        await using var db = BuildContext();
+
+        var audit = new FakeAuditPublisher();
+        await Handler(db, audit).HandleAsync(
+            new CompleteSharedCompanyDocumentReviewRequest
+            {
+                CompanyId = Guid.NewGuid(),
+                DocumentId = Guid.NewGuid(),
+                ReviewNotes = "Reviewed.",
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.Empty(audit.Published);
+    }
+
+    private static CompleteSharedCompanyDocumentReviewHandler Handler(
+        DocumentsDbContext db, FakeAuditPublisher? auditPublisher = null) =>
+        new(db, auditPublisher ?? new FakeAuditPublisher(), new FakeClock(FixedUtcNow));
 
     private static ListSharedCompanyDocumentsDueForReviewHandler DueForReviewHandler(DocumentsDbContext db) =>
         new(db, new FakeClock(FixedUtcNow), new FakeEmployeeNameReader());

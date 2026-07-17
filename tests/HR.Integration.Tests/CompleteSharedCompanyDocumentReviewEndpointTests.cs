@@ -1,8 +1,11 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using HR.Infrastructure.Persistence;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
@@ -71,6 +74,45 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests : IClassFixture<Ap
         Assert.Equal(userId, reviewHistoryEntry.ReviewedByEmployeeId);
         Assert.Equal("Reviewed against the latest legislation.", reviewHistoryEntry.ReviewNotes);
         Assert.Equal(new DateOnly(2020, 1, 1), reviewHistoryEntry.PreviousReviewDate);
+    }
+
+    [Fact]
+    public async Task CompleteReview_Persists_Audit_Record()
+    {
+        // shared_company_document.review_completed's EmployeeId is always null (see
+        // SharedCompanyDocumentReviewCompletedAuditEvent), so — just like
+        // AuditHistoryIntegrationTests.UpdateCompanySettings_Persists_Audit_Record — it can never
+        // appear via the employee-scoped GetEmployeeAuditHistory endpoint. Read AuditDbContext
+        // directly via the test host's DI container instead, proving the audit event raised by the
+        // handler actually lands in the audit table end-to-end.
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(
+            client, companyId, categoryId, title: "Remote Working Policy",
+            reviewFrequency: "Yearly", reviewDate: new DateOnly(2020, 1, 1));
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/complete-review",
+            new { ReviewNotes = "Reviewed against the latest legislation." });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecord = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "shared_company_document.review_completed")
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(auditRecord);
+        Assert.Equal("SharedCompanyDocument", auditRecord!.EntityType);
+        Assert.Equal(doc.Id, auditRecord.EntityId);
+        Assert.Equal(userId, auditRecord.ActorUserId);
+        Assert.Contains("Reviewed against the latest legislation.", auditRecord.AfterJson);
     }
 
     [Fact]
