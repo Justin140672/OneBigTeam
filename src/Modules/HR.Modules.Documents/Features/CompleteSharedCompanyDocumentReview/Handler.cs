@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.SharedKernel;
@@ -7,6 +8,7 @@ namespace HR.Modules.Documents.Features.CompleteSharedCompanyDocumentReview;
 
 internal sealed class CompleteSharedCompanyDocumentReviewHandler(
     DocumentsDbContext db,
+    ITaskCompleter taskCompleter,
     IAuditEventPublisher auditPublisher,
     IClock clock)
 {
@@ -43,6 +45,19 @@ internal sealed class CompleteSharedCompanyDocumentReviewHandler(
         db.SharedCompanyDocumentReviewHistories.Add(historyEntry);
 
         await db.SaveChangesAsync(cancellationToken);
+
+        // Closes the open Review task created by DetectDocumentsDueForReviewJob (sourceEntityId =
+        // document.Id, TaskActionType.Review) so the next review cycle's ReviewDate isn't
+        // permanently suppressed by a dangling open task — mirrors UploadRequestedDocumentHandler's
+        // placement, after SaveChangesAsync so a task-completion failure can't roll back the review
+        // itself. No-op if no matching open task exists.
+        await taskCompleter.CompleteBySourceEntityAsync(
+            document.CompanyId,
+            document.Id,
+            TaskSource.Document,
+            TaskActionType.Review,
+            reviewedBy,
+            cancellationToken);
 
         await auditPublisher.PublishAsync(new SharedCompanyDocumentReviewCompletedAuditEvent(
             document.CompanyId,

@@ -1,9 +1,13 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using HR.Infrastructure.Abstractions;
 using HR.Infrastructure.Persistence;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
+using HR.Modules.Tasks.Domain;
+using HR.Modules.Tasks.Persistence;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -74,6 +78,45 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests : IClassFixture<Ap
         Assert.Equal(userId, reviewHistoryEntry.ReviewedByEmployeeId);
         Assert.Equal("Reviewed against the latest legislation.", reviewHistoryEntry.ReviewNotes);
         Assert.Equal(new DateOnly(2020, 1, 1), reviewHistoryEntry.PreviousReviewDate);
+    }
+
+    [Fact]
+    public async Task CompleteReview_Closes_Open_Review_Task_Created_By_DetectDocumentsDueForReviewJob()
+    {
+        // Proves the fix for "Prevent Duplicate Review Tasks": completing a review must close
+        // the open Review task DetectDocumentsDueForReviewJob created for this document
+        // (sourceEntityId = document.Id, TaskSource.Document, TaskActionType.Review) — otherwise
+        // the job's openReviewTaskIds check keeps skipping the document forever once its next
+        // ReviewDate comes due.
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(
+            client, companyId, categoryId, title: "Remote Working Policy",
+            reviewFrequency: "Yearly", reviewDate: new DateOnly(2020, 1, 1));
+
+        var taskId = await TaskSeeder.SeedAsync(
+            _factory, companyId,
+            title: $"Review due: {doc!.Title}",
+            source: TaskSource.Document,
+            actionType: TaskActionType.Review,
+            sourceEntityId: doc.Id,
+            status: TaskItemStatus.Open);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/complete-review",
+            new { ReviewNotes = "Reviewed against the latest legislation." });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var tasksDb = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
+        var task = await tasksDb.TaskItems.AsNoTracking().SingleAsync(t => t.Id == taskId);
+
+        Assert.Equal(TaskItemStatus.Completed, task.Status);
+        Assert.Equal(userId, task.CompletedBy);
     }
 
     [Fact]

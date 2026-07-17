@@ -1,9 +1,11 @@
 using System.Text.Json;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.CompleteSharedCompanyDocumentReview;
 using HR.Modules.Documents.Features.ListSharedCompanyDocumentsDueForReview;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Tests;
@@ -371,9 +373,58 @@ public class CompleteSharedCompanyDocumentReviewHandlerTests
         Assert.Empty(audit.Published);
     }
 
+    [Fact]
+    public async Task HandleAsync_Completes_Open_Review_Task_By_Source_Entity()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var category   = await SeedCategory(db, companyId);
+        var reviewedBy = Guid.NewGuid();
+        var doc = CreateDoc(companyId, category.Id, Guid.NewGuid(), SharedCompanyDocumentReviewFrequency.Yearly, null, Today.AddDays(-1));
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var taskCompleter = new FakeTaskCompleter();
+        var result = await Handler(db, taskCompleter: taskCompleter).HandleAsync(
+            new CompleteSharedCompanyDocumentReviewRequest
+            {
+                CompanyId = companyId,
+                DocumentId = doc.Id,
+                ReviewNotes = "Reviewed against latest legislation.",
+            },
+            reviewedBy, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var call = Assert.Single(taskCompleter.Calls);
+        Assert.Equal(doc.CompanyId, call.CompanyId);
+        Assert.Equal(doc.Id,        call.SourceEntityId);
+        Assert.Equal(TaskSource.Document, call.Source);
+        Assert.Equal(TaskActionType.Review, call.ActionType);
+        Assert.Equal(reviewedBy, call.CompletedBy);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Complete_Task_On_Failure()
+    {
+        await using var db = BuildContext();
+
+        var taskCompleter = new FakeTaskCompleter();
+        await Handler(db, taskCompleter: taskCompleter).HandleAsync(
+            new CompleteSharedCompanyDocumentReviewRequest
+            {
+                CompanyId = Guid.NewGuid(),
+                DocumentId = Guid.NewGuid(),
+                ReviewNotes = "Reviewed.",
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.Empty(taskCompleter.Calls);
+    }
+
     private static CompleteSharedCompanyDocumentReviewHandler Handler(
-        DocumentsDbContext db, FakeAuditPublisher? auditPublisher = null) =>
-        new(db, auditPublisher ?? new FakeAuditPublisher(), new FakeClock(FixedUtcNow));
+        DocumentsDbContext db, FakeAuditPublisher? auditPublisher = null, FakeTaskCompleter? taskCompleter = null) =>
+        new(db, taskCompleter ?? new FakeTaskCompleter(), auditPublisher ?? new FakeAuditPublisher(), new FakeClock(FixedUtcNow));
 
     private static ListSharedCompanyDocumentsDueForReviewHandler DueForReviewHandler(DocumentsDbContext db) =>
         new(db, new FakeClock(FixedUtcNow), new FakeEmployeeNameReader());
