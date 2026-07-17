@@ -17,28 +17,16 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     public async Task GoToAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees");
-        // Prerender delivers .e-grid immediately. After circuit connects, SearchPageBase sets
-        // IsLoading=true (briefly shows .spinner-border, removes .e-grid), then re-fetches
-        // and restores .e-grid. We watch for that spinner→grid cycle to confirm the circuit
-        // is connected and toolbar OnToolbarClick handlers are wired up.
-        await page.EvaluateAsync(@"() => {
-            window._listReady = false;
-            let spinnerSeen = document.querySelector('.spinner-border') !== null;
-            const obs = new MutationObserver(() => {
-                if (!spinnerSeen && document.querySelector('.spinner-border')) {
-                    spinnerSeen = true;
-                }
-                if (spinnerSeen && !document.querySelector('.spinner-border') &&
-                    document.querySelector('.e-grid')) {
-                    window._listReady = true;
-                    obs.disconnect();
-                }
-            });
-            obs.observe(document.body, { subtree: true, childList: true });
-        }");
-        await page.WaitForFunctionAsync(
-            "window._listReady === true",
-            null, new PageWaitForFunctionOptions { Timeout = 20_000 });
+        // Previously this tried to confirm the circuit had connected by watching for a
+        // spinner→grid transition via a MutationObserver installed with page.EvaluateAsync
+        // *after* navigation. That's a race: if Blazor's prerender→interactive spinner cycle
+        // finishes before the observer script gets installed (routine on a fast/local run),
+        // the transition is never observed, window._listReady never flips true, and the wait
+        // times out — which made most tests starting with GoToAsync fail. RowsRenderedSelector
+        // alone is sufficient and race-free: Syncfusion can only populate real ".e-row"/
+        // ".e-rowcell" data via its JS interop once the interactive circuit is connected and
+        // the component's data fetch has completed, so waiting for it already proves both.
+        // Same pattern as VacancyListPage/PublicHolidayListPage etc.
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 20_000 });
     }
 
