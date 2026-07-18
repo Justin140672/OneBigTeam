@@ -26,7 +26,7 @@ public class GetStaleVacanciesHandlerTests
         db.Applications.Add(application);
         await db.SaveChangesAsync();
 
-        var handler = new GetStaleVacanciesHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new GetStaleVacanciesHandler(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader());
         var result = await handler.HandleAsync(new GetStaleVacanciesRequest { CompanyId = companyId }, CancellationToken.None);
 
         Assert.Empty(result.Items);
@@ -47,7 +47,7 @@ public class GetStaleVacanciesHandlerTests
         db.Applications.Add(application);
         await db.SaveChangesAsync();
 
-        var handler = new GetStaleVacanciesHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new GetStaleVacanciesHandler(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader());
         var result = await handler.HandleAsync(new GetStaleVacanciesRequest { CompanyId = companyId }, CancellationToken.None);
 
         var item = Assert.Single(result.Items);
@@ -66,7 +66,7 @@ public class GetStaleVacanciesHandlerTests
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
 
-        var handler = new GetStaleVacanciesHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new GetStaleVacanciesHandler(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader());
         var result = await handler.HandleAsync(new GetStaleVacanciesRequest { CompanyId = companyId }, CancellationToken.None);
 
         var item = Assert.Single(result.Items);
@@ -81,7 +81,7 @@ public class GetStaleVacanciesHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         // Never opened — stays in Draft status.
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Software Engineer", null, null, Guid.NewGuid(), Now.AddDays(-60));
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Software Engineer", null, Guid.NewGuid(), Now.AddDays(-60));
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Noah", "Patel", "noah.patel@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now.AddDays(-40));
 
@@ -90,7 +90,7 @@ public class GetStaleVacanciesHandlerTests
         db.Applications.Add(application);
         await db.SaveChangesAsync();
 
-        var handler = new GetStaleVacanciesHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new GetStaleVacanciesHandler(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader());
         var result = await handler.HandleAsync(new GetStaleVacanciesRequest { CompanyId = companyId }, CancellationToken.None);
 
         Assert.Empty(result.Items);
@@ -111,7 +111,7 @@ public class GetStaleVacanciesHandlerTests
         db.Applications.Add(application);
         await db.SaveChangesAsync();
 
-        var handler = new GetStaleVacanciesHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new GetStaleVacanciesHandler(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader());
         var result = await handler.HandleAsync(
             new GetStaleVacanciesRequest { CompanyId = companyId, StaleAfterDays = null },
             CancellationToken.None);
@@ -134,7 +134,7 @@ public class GetStaleVacanciesHandlerTests
         db.Applications.Add(application);
         await db.SaveChangesAsync();
 
-        var handler = new GetStaleVacanciesHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new GetStaleVacanciesHandler(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader());
         var result = await handler.HandleAsync(
             new GetStaleVacanciesRequest { CompanyId = companyId, StaleAfterDays = 30 },
             CancellationToken.None);
@@ -144,7 +144,7 @@ public class GetStaleVacanciesHandlerTests
 
     private static Vacancy OpenVacancy(Guid companyId, DateTimeOffset openedAt)
     {
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Senior Software Engineer", null, null, Guid.NewGuid(), openedAt);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), openedAt);
         vacancy.Open(openedAt, DateOnly.FromDateTime(openedAt.Date));
         return vacancy;
     }

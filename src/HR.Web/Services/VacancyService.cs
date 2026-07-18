@@ -8,13 +8,15 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
-    public async Task<ListVacanciesResponse?> ListVacanciesAsync(Guid companyId, string? status = null, Guid? departmentId = null)
+    public async Task<ListVacanciesResponse?> ListVacanciesAsync(
+        Guid companyId, string? status = null, Guid? positionProfileId = null, Guid? departmentId = null)
     {
         try
         {
             var url = $"api/companies/{companyId}/vacancies";
             var query = new List<string>();
             if (!string.IsNullOrWhiteSpace(status)) query.Add($"status={status}");
+            if (positionProfileId is not null) query.Add($"positionProfileId={positionProfileId}");
             if (departmentId is not null) query.Add($"departmentId={departmentId}");
             if (query.Count > 0) url += "?" + string.Join("&", query);
 
@@ -108,10 +110,9 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
         var response = await GetVacancyAsync(companyId, id);
         return response is null ? null : new VacancyEditModel
         {
-            Title = response.Title,
-            Description = response.Description,
-            Location = response.Location,
-            DepartmentId = response.DepartmentId,
+            AdvertTitle = response.AdvertTitle,
+            AdvertDescription = response.AdvertDescription,
+            PositionProfileId = response.PositionProfileId,
             HiringManagerId = response.HiringManagerId,
         };
     }
@@ -119,9 +120,9 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
     async Task<(VacancyEditModel? Result, string? Error)> IEditService<VacancyEditModel, Guid>.CreateAsync(Guid companyId, VacancyEditModel model)
     {
         var request = new CreateVacancyRequest(
-            companyId, model.DepartmentId, model.Title.Trim(),
-            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
-            string.IsNullOrWhiteSpace(model.Location) ? null : model.Location.Trim(),
+            companyId, model.PositionProfileId!.Value,
+            string.IsNullOrWhiteSpace(model.AdvertTitle) ? null : model.AdvertTitle.Trim(),
+            string.IsNullOrWhiteSpace(model.AdvertDescription) ? null : model.AdvertDescription.Trim(),
             model.HiringManagerId!.Value);
 
         var (created, error) = await CreateVacancyAsync(companyId, request);
@@ -131,10 +132,13 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
     async Task<(VacancyEditModel? Result, string? Error)> IEditService<VacancyEditModel, Guid>.UpdateAsync(Guid companyId, Guid id, VacancyEditModel model)
     {
         var request = new UpdateVacancyRequest(
-            companyId, id, model.DepartmentId, model.Title.Trim(),
-            string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
-            string.IsNullOrWhiteSpace(model.Location) ? null : model.Location.Trim(),
-            model.HiringManagerId!.Value);
+            companyId, id,
+            model.PositionProfileId,
+            string.IsNullOrWhiteSpace(model.AdvertTitle) ? null : model.AdvertTitle.Trim(),
+            string.IsNullOrWhiteSpace(model.AdvertDescription) ? null : model.AdvertDescription.Trim(),
+            model.HiringManagerId!.Value,
+            model.IsAuthorisedCorrection,
+            string.IsNullOrWhiteSpace(model.CorrectionReason) ? null : model.CorrectionReason.Trim());
 
         var (updated, error) = await UpdateVacancyAsync(companyId, id, request);
         return (updated is null ? null : model, error);

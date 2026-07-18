@@ -271,6 +271,16 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AdvertDescription")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("advert_description");
+
+                    b.Property<string>("AdvertTitle")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("advert_title");
+
                     b.Property<DateOnly?>("ClosedAt")
                         .HasColumnType("date")
                         .HasColumnName("closed_at");
@@ -283,39 +293,23 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<Guid?>("DepartmentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("department_id");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("description");
-
                     b.Property<Guid>("HiringManagerId")
                         .HasColumnType("uuid")
                         .HasColumnName("hiring_manager_id");
 
-                    b.Property<string>("Location")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("location");
-
                     b.Property<DateOnly?>("OpenedAt")
                         .HasColumnType("date")
                         .HasColumnName("opened_at");
+
+                    b.Property<Guid>("PositionProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("position_profile_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("title");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -325,7 +319,7 @@ namespace HR.Modules.Recruitment.Migrations
 
                     b.HasIndex("CompanyId");
 
-                    b.HasIndex("DepartmentId");
+                    b.HasIndex("PositionProfileId");
 
                     b.HasIndex("CompanyId", "Status");
 

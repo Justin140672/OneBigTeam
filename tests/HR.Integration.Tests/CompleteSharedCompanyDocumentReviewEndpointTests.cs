@@ -81,6 +81,51 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests : IClassFixture<Ap
     }
 
     [Fact]
+    public async Task CompleteReview_AfterUploadingRenewedVersion_StillPersists_LastReviewedFields()
+    {
+        // Regression check for a reported E2E failure (CompleteReview_WithRenewedFile_...): the
+        // Complete Review dialog, when a renewed file is attached, chains two real HTTP calls —
+        // upload-version first, then complete-review — mirroring that exact sequence here via the
+        // real API/DB (not fakes) to determine whether the "Last reviewed by" fields genuinely
+        // fail to persist server-side, or whether the E2E failure is purely a UI-side timing issue.
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(
+            client, companyId, categoryId, title: "Renewal Regression Policy",
+            reviewFrequency: "Yearly", reviewDate: new DateOnly(2020, 1, 1));
+
+        using var versionForm = new MultipartFormDataContent();
+        versionForm.Add(new StringContent("Renewed via document review. Reviewed and reissued."), "VersionNote");
+        versionForm.Add(new StringContent("false"), "RequiresReacknowledgement");
+        var versionFileContent = new ByteArrayContent(PdfBytes());
+        versionFileContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        versionForm.Add(versionFileContent, "File", "renewed.pdf");
+
+        var uploadVersionResponse = await client.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/versions", versionForm);
+        Assert.Equal(HttpStatusCode.Created, uploadVersionResponse.StatusCode);
+
+        var completeReviewResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/complete-review",
+            new { ReviewNotes = "Reviewed and reissued." });
+        Assert.Equal(HttpStatusCode.OK, completeReviewResponse.StatusCode);
+        var completePayload = await completeReviewResponse.Content.ReadFromJsonAsync<CompleteReviewPayload>();
+        Assert.Equal(userId, completePayload!.LastReviewedByEmployeeId);
+
+        var detailResponse = await client.GetAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}");
+        Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
+        var detail = await detailResponse.Content.ReadFromJsonAsync<GetDetailPayload>();
+
+        Assert.NotNull(detail!.LastReviewedAt);
+        Assert.Equal(userId, detail.LastReviewedByEmployeeId);
+        Assert.Equal(2, detail.VersionHistory.Count);
+    }
+
+    [Fact]
     public async Task CompleteReview_Closes_Open_Review_Task_Created_By_DetectDocumentsDueForReviewJob()
     {
         // Proves the fix for "Prevent Duplicate Review Tasks": completing a review must close

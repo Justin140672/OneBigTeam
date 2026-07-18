@@ -1,6 +1,8 @@
 using FluentValidation;
 using Hangfire;
 using HR.Modules.Recruitment.Domain;
+using HR.Modules.Recruitment.Features.ApplyPositionProfileMatches;
+using HR.Modules.Recruitment.Features.AssignVacancyPositionProfile;
 using HR.Modules.Recruitment.Features.CloseVacancy;
 using HR.Modules.Recruitment.Features.CreateApplication;
 using HR.Modules.Recruitment.Features.CreateCandidate;
@@ -13,6 +15,7 @@ using HR.Modules.Recruitment.Features.GetCandidate;
 using HR.Modules.Recruitment.Features.GetInterviewsTodayCount;
 using HR.Modules.Recruitment.Features.GetPipelineSummary;
 using HR.Modules.Recruitment.Features.GetStaleVacancies;
+using HR.Modules.Recruitment.Features.GetVacanciesNeedingPositionProfileReview;
 using HR.Modules.Recruitment.Features.GetUpcomingInterviews;
 using HR.Modules.Recruitment.Features.GetVacancy;
 using HR.Modules.Recruitment.Features.HireCandidate;
@@ -137,6 +140,16 @@ public static class RecruitmentModule
         services.AddScoped<GetUpcomingInterviewsHandler>();
         services.AddScoped<GetStaleVacanciesHandler>();
 
+        services.AddScoped<VacancyPositionProfileMatcher>();
+
+        services.AddScoped<GetVacanciesNeedingPositionProfileReviewHandler>();
+
+        services.AddScoped<ApplyPositionProfileMatchesHandler>();
+        services.AddScoped<IValidator<ApplyPositionProfileMatchesRequest>, ApplyPositionProfileMatchesValidator>();
+
+        services.AddScoped<AssignVacancyPositionProfileHandler>();
+        services.AddScoped<IValidator<AssignVacancyPositionProfileRequest>, AssignVacancyPositionProfileValidator>();
+
         services.AddScoped<UploadCandidateDocumentHandler>();
         services.AddScoped<IValidator<UploadCandidateDocumentRequest>, UploadCandidateDocumentValidator>();
 
@@ -181,8 +194,6 @@ public static class RecruitmentModule
 
         // ── Acme Corporation ─────────────────────────────────────────────────
         var acmeId          = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        var acmeEngDeptId   = Guid.Parse("10000000-0000-0000-0000-000000000001");
-        var acmeHrDeptId    = Guid.Parse("10000000-0000-0000-0000-000000000002");
         var acmeJamesId     = Guid.Parse("30000000-0000-0000-0000-000000000002"); // James Okafor
         var acmeLauraId     = Guid.Parse("30000000-0000-0000-0000-000000000005"); // Laura Bennett
 
@@ -190,14 +201,29 @@ public static class RecruitmentModule
         var acmeHrBpVacancyId      = Guid.Parse("e0000000-0000-0000-0000-000000000002");
         var acmeDesignerVacancyId  = Guid.Parse("e0000000-0000-0000-0000-000000000003");
 
+        // Position profile IDs are the same literal GUIDs seeded by EmployeesModule.SeedEmployeesAsync
+        // for Acme (see posSenDevId/posHrAdvisorId/posDevId there) — the two modules cannot share a C#
+        // constant since Recruitment has no reference to Employees, so the literals are duplicated by
+        // convention, the same way department/employee IDs already are elsewhere in this method.
+        var acmeSenSoftwareEngineerPositionProfileId = Guid.Parse("20000000-0000-0000-0000-000000000002"); // "Senior Software Engineer" (Engineering) — exact title+department match
+        var acmeHrAdvisorPositionProfileId            = Guid.Parse("20000000-0000-0000-0000-000000000005"); // "HR Advisor" (People & HR) — closest existing role; no "HR Business Partner" profile exists, so this is a manual assignment rather than an automatic exact-title match
+        var acmeSoftwareEngineerPositionProfileId     = Guid.Parse("20000000-0000-0000-0000-000000000003"); // "Software Engineer" (Engineering) — closest existing role; no "Product Designer" profile exists, so this is a manual assignment rather than an automatic exact-title match
+
         if (!await db.Vacancies.AnyAsync(v => v.CompanyId == acmeId))
         {
-            var seniorEngVacancy = Vacancy.Create(acmeSeniorEngVacancyId, acmeId, acmeEngDeptId, "Senior Software Engineer", "Own delivery of core platform services.", "Remote", acmeJamesId, now);
+            // The department arguments that used to be passed here have been removed entirely (see
+            // Vacancy.DepartmentId's removal) — department is now only ever known via the linked
+            // Position Profile. seniorEngVacancy's AdvertTitle is deliberately left null (it's an
+            // exact title match to its Position Profile, so this exercises the "no override — fall
+            // back to Position Profile title" path); hrBpVacancy/designerVacancy keep a distinct
+            // AdvertTitle since their linked Position Profile's title genuinely differs (see the
+            // comments on acmeHrAdvisorPositionProfileId/acmeSoftwareEngineerPositionProfileId above).
+            var seniorEngVacancy = Vacancy.Create(acmeSeniorEngVacancyId, acmeId, acmeSenSoftwareEngineerPositionProfileId, null, "Own delivery of core platform services.", acmeJamesId, now);
             seniorEngVacancy.Open(now, DateOnly.FromDateTime(now.UtcDateTime.AddDays(-14)));
 
-            var hrBpVacancy = Vacancy.Create(acmeHrBpVacancyId, acmeId, acmeHrDeptId, "HR Business Partner", "Partner with department leads on people strategy.", "London", acmeLauraId, now);
+            var hrBpVacancy = Vacancy.Create(acmeHrBpVacancyId, acmeId, acmeHrAdvisorPositionProfileId, "HR Business Partner", "Partner with department leads on people strategy.", acmeLauraId, now);
 
-            var designerVacancy = Vacancy.Create(acmeDesignerVacancyId, acmeId, acmeEngDeptId, "Product Designer", "Own end-to-end design for the employee portal.", "Remote", acmeJamesId, now);
+            var designerVacancy = Vacancy.Create(acmeDesignerVacancyId, acmeId, acmeSoftwareEngineerPositionProfileId, "Product Designer", "Own end-to-end design for the employee portal.", acmeJamesId, now);
             designerVacancy.Open(now, DateOnly.FromDateTime(now.UtcDateTime.AddDays(-60)));
             designerVacancy.Close(now, DateOnly.FromDateTime(now.UtcDateTime.AddDays(-5)));
 
@@ -249,14 +275,18 @@ public static class RecruitmentModule
 
         // ── Beta Corp ─────────────────────────────────────────────────────────
         var betaCorpId    = Guid.Parse("00000000-0000-0000-0000-000000000002");
-        var betaEngDeptId = Guid.Parse("10000000-0000-0000-0000-000000000011");
         var betaAliceId   = Guid.Parse("30000000-0000-0000-0000-000000000011"); // Alice Morgan
 
         var betaBackendVacancyId = Guid.Parse("e0000000-0000-0000-0000-000000000011");
 
+        // Same literal-GUID convention as the Acme block above: matches betaPosDevId ("Software
+        // Developer") in EmployeesModule.SeedEmployeesAsync. No "Backend Engineer" profile exists for
+        // Beta, so this is a manual assignment rather than an automatic exact-title match.
+        var betaSoftwareDeveloperPositionProfileId = Guid.Parse("20000000-0000-0000-0000-000000000012");
+
         if (!await db.Vacancies.AnyAsync(v => v.CompanyId == betaCorpId))
         {
-            var backendVacancy = Vacancy.Create(betaBackendVacancyId, betaCorpId, betaEngDeptId, "Backend Engineer", "Build and scale our payments platform.", "Remote", betaAliceId, now);
+            var backendVacancy = Vacancy.Create(betaBackendVacancyId, betaCorpId, betaSoftwareDeveloperPositionProfileId, "Backend Engineer", "Build and scale our payments platform.", betaAliceId, now);
             backendVacancy.Open(now, DateOnly.FromDateTime(now.UtcDateTime.AddDays(-7)));
 
             db.Vacancies.Add(backendVacancy);

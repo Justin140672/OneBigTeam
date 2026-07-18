@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
@@ -143,6 +144,16 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             .Filter(new() { HasText = frequencyLabel })
             .First
             .ClickAsync();
+
+        // Popup-hidden alone can be a purely client-side JS close animation and isn't proof that
+        // Blazor's ValueChanged round-trip to the server actually committed the selection yet —
+        // wait for the combobox's own input value too (same pattern as the Review Owner selector
+        // below / EmployeeEditPage.SelectManagerAsync). Without this, an immediate Save can race
+        // the round-trip.
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
+            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        await Assertions.Expect(reviewFrequencyGroup.Locator(".e-input-group input").First)
+            .ToHaveValueAsync(new Regex(Regex.Escape(frequencyLabel)), new() { Timeout = 10_000 });
 
         if (frequencyLabel != "None")
         {
@@ -576,11 +587,25 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         (await page.Locator("dt:has-text('Audience') + dd").InnerTextAsync()).Trim();
 
     /// <summary>The "Created by / Last updated by / Published by / Archived by" summary line at the bottom of the page.</summary>
+    public ILocator FooterSummary => page.Locator("p.text-muted.small.mb-0");
+
     public async Task<string> GetFooterSummaryTextAsync() =>
-        (await page.Locator("p.text-muted.small.mb-0").InnerTextAsync()).Trim();
+        (await FooterSummary.InnerTextAsync()).Trim();
+
+    /// <summary>
+    /// The Version History card's own container — same ".overview-card" scoping pattern as
+    /// <see cref="ReviewHistoryCard"/>. The page now has TWO grids that both render ".e-row"/
+    /// ".e-grid .e-headercell" markup (Version History and, since the "Display Review Information"
+    /// story, Review History) — an unscoped page-wide ".e-grid .e-row"/".e-row" locator silently
+    /// counts both grids' rows combined, which is exactly the kind of bug that made
+    /// WaitForVersionRowCountAsync(2) actually observe 3 (2 versions + 1 review history row) once
+    /// a test's flow both uploads a version *and* completes a review. Every version-row locator
+    /// below is scoped to this card specifically to avoid that collision.
+    /// </summary>
+    private ILocator VersionHistoryCard => page.Locator(".overview-card").Filter(new() { HasText = "Version History" }).First;
 
     public async Task<int> GetVersionRowCountAsync() =>
-        await page.Locator(".e-grid .e-row").CountAsync();
+        await VersionHistoryCard.Locator(".e-row").CountAsync();
 
     /// <summary>
     /// Waits for the Version History grid to show exactly <paramref name="expectedCount"/> rows,
@@ -594,7 +619,7 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<int> WaitForVersionRowCountAsync(int expectedCount)
     {
-        var rows = page.Locator(".e-grid .e-row");
+        var rows = VersionHistoryCard.Locator(".e-row");
         await Assertions.Expect(rows).ToHaveCountAsync(expectedCount, new() { Timeout = 15_000 });
         return await rows.CountAsync();
     }
@@ -602,7 +627,7 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// <summary>Header text of every column currently rendered on the Version History grid.</summary>
     public async Task<IReadOnlyList<string>> GetVersionColumnHeadersAsync()
     {
-        var headers = await page.Locator(".e-grid .e-headercell").AllInnerTextsAsync();
+        var headers = await VersionHistoryCard.Locator(".e-grid .e-headercell").AllInnerTextsAsync();
         return headers.Select(h => h.Trim()).ToList();
     }
 
@@ -616,7 +641,7 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<string> GetVersionRowCellAsync(string rowTextFragment, int columnIndex)
     {
-        var row = page.Locator(".e-row").Filter(new() { HasText = rowTextFragment }).First;
+        var row = VersionHistoryCard.Locator(".e-row").Filter(new() { HasText = rowTextFragment }).First;
         return (await row.Locator(".e-rowcell").Nth(columnIndex).InnerTextAsync()).Trim();
     }
 
@@ -629,7 +654,7 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<string?> GetVersionDownloadHrefAsync(string rowTextFragment)
     {
-        var row = page.Locator(".e-row").Filter(new() { HasText = rowTextFragment }).First;
+        var row = VersionHistoryCard.Locator(".e-row").Filter(new() { HasText = rowTextFragment }).First;
         return await row.Locator("a[title='Download this version']").GetAttributeAsync("href");
     }
 

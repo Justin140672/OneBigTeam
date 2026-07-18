@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.CloseVacancy;
 using HR.Modules.Recruitment.Persistence;
@@ -17,7 +18,7 @@ public class CloseVacancyHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Senior Software Engineer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         vacancy.Open(Now, DateOnly.FromDateTime(Now.UtcDateTime));
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
@@ -38,6 +39,7 @@ public class CloseVacancyHandlerTests
         Assert.Equal("Vacancy", ((IAuditEvent)auditEvent).EntityType);
         Assert.Equal(vacancy.Id, ((IAuditEvent)auditEvent).EntityId);
         Assert.Equal(VacancyStatus.Open, auditEvent.PreviousStatus);
+        Assert.Equal("Senior Software Engineer", auditEvent.EffectiveTitle);
     }
 
     [Fact]
@@ -45,7 +47,7 @@ public class CloseVacancyHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Backend Engineer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
         vacancy.Open(Now, DateOnly.FromDateTime(Now.UtcDateTime));
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
@@ -80,7 +82,7 @@ public class CloseVacancyHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Product Designer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
         vacancy.Open(Now, DateOnly.FromDateTime(Now.UtcDateTime));
         vacancy.Close(Now, DateOnly.FromDateTime(Now.UtcDateTime));
         db.Vacancies.Add(vacancy);
@@ -101,7 +103,7 @@ public class CloseVacancyHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "HR Business Partner", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "HR Business Partner", null, Guid.NewGuid(), Now);
         vacancy.Cancel(Now);
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
@@ -116,8 +118,59 @@ public class CloseVacancyHandlerTests
         Assert.Empty(auditPublisher.Published);
     }
 
-    private static CloseVacancyHandler handler(RecruitmentDbContext db, FakeAuditPublisher? auditPublisher = null) =>
-        new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher());
+    [Fact]
+    public async Task HandleAsync_EffectiveTitle_Resolves_To_PositionProfile_Title_When_AdvertTitle_Is_Null()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var positionProfileId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, null, null, Guid.NewGuid(), Now);
+        vacancy.Open(Now, DateOnly.FromDateTime(Now.UtcDateTime));
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var summaries = new Dictionary<Guid, PositionProfileSummary>
+        {
+            [positionProfileId] = new(positionProfileId, "Position Profile Title", null, null, true, null, null),
+        };
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, auditPublisher, new FakePositionProfileReader(summaries: summaries)).HandleAsync(
+            new CloseVacancyRequest { CompanyId = companyId, VacancyId = vacancy.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var auditEvent = Assert.IsType<VacancyClosedAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.Equal("Position Profile Title", auditEvent.EffectiveTitle);
+    }
+
+    [Fact]
+    public async Task HandleAsync_EffectiveTitle_Falls_Back_To_Untitled_When_No_PositionProfile_And_AdvertTitle_Null()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), null, null, Guid.NewGuid(), Now);
+        vacancy.Open(Now, DateOnly.FromDateTime(Now.UtcDateTime));
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        // No summaries dictionary supplied — simulates the linked profile no longer being resolvable.
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, auditPublisher).HandleAsync(
+            new CloseVacancyRequest { CompanyId = companyId, VacancyId = vacancy.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var auditEvent = Assert.IsType<VacancyClosedAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.Equal("(untitled)", auditEvent.EffectiveTitle);
+    }
+
+    private static CloseVacancyHandler handler(
+        RecruitmentDbContext db,
+        FakeAuditPublisher? auditPublisher = null,
+        IPositionProfileReader? positionProfileReader = null) =>
+        new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher(), positionProfileReader ?? new FakePositionProfileReader());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

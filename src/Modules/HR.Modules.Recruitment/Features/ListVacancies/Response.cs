@@ -6,11 +6,20 @@ internal sealed record ListVacanciesResponse(IReadOnlyList<VacancyListItem> Item
 
 internal sealed record VacancyListItem(
     Guid Id,
-    Guid? DepartmentId,
-    string Title,
-    string? Location,
+    Guid PositionProfileId,
+    string? AdvertTitle,
     VacancyStatus Status,
     Guid HiringManagerId,
     DateOnly? OpenedAt,
     DateOnly? ClosedAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    // Canonical title/department from the linked Position Profile — see GetVacancyResponse's remarks
+    // for the same additive/null-when-unresolved behaviour. Description is intentionally omitted here
+    // (kept on GetVacancyResponse only) to keep the list payload light.
+    string? PositionProfileTitle,
+    Guid? PositionProfileDepartmentId,
+    // Resolved at the read layer — see GetVacancyResponse's EffectiveTitle remarks.
+    string EffectiveTitle,
+    // Location comes exclusively from the linked Position Profile — see GetVacancyResponse's
+    // EffectiveLocation remarks.
+    string? EffectiveLocation);

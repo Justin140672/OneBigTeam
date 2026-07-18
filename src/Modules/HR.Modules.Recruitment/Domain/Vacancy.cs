@@ -6,10 +6,30 @@ internal sealed class Vacancy
 
     public Guid Id { get; private set; }
     public Guid CompanyId { get; private set; }
-    public Guid? DepartmentId { get; private set; }
-    public string Title { get; private set; } = string.Empty;
-    public string? Description { get; private set; }
-    public string? Location { get; private set; }
+
+    // Tightened to a non-nullable Guid per explicit product direction: "the only way to create a
+    // vacancy is from a position profile, so it should be mandatory everywhere". Every vacancy row is
+    // now guaranteed to have one — see the AddNotNullConstraintToVacancyPositionProfileId migration,
+    // which was only safe to apply because RecruitmentModule.SeedRecruitmentAsync's seed data was
+    // already fully backfilled beforehand (verified: zero null rows). The GetVacanciesNeedingPositionProfileReview
+    // / ApplyPositionProfileMatches / AssignVacancyPositionProfile admin review-and-backfill features
+    // (see Services/VacancyPositionProfileMatcher) are retained as legacy/dead-in-practice code for a
+    // possible future one-time historical backfill before a real deployment adopts this constraint —
+    // see the comments on those handlers for the reasoning — but under normal operation they will
+    // always report zero vacancies needing review, since a null PositionProfileId can no longer exist.
+    public Guid PositionProfileId { get; private set; }
+
+    // Optional recruitment-specific override of the linked Position Profile's canonical title —
+    // the Position Profile always has a title, so a vacancy no longer needs one of its own. When
+    // null, callers resolve the effective title from the linked Position Profile at the read layer
+    // (see GetVacancyHandler/ListVacanciesHandler etc.) rather than here in the domain, since that
+    // requires a cross-module read via IPositionProfileReader which the domain layer must not perform.
+    public string? AdvertTitle { get; private set; }
+
+    // Optional recruitment-specific override of the linked Position Profile's canonical description —
+    // same rationale as AdvertTitle above.
+    public string? AdvertDescription { get; private set; }
+
     public VacancyStatus Status { get; private set; }
     public Guid HiringManagerId { get; private set; }
     public DateOnly? OpenedAt { get; private set; }
@@ -20,39 +40,61 @@ internal sealed class Vacancy
     public static Vacancy Create(
         Guid id,
         Guid companyId,
-        Guid? departmentId,
-        string title,
-        string? description,
-        string? location,
+        Guid positionProfileId,
+        string? advertTitle,
+        string? advertDescription,
         Guid hiringManagerId,
         DateTimeOffset now) => new()
     {
-        Id              = id,
-        CompanyId       = companyId,
-        DepartmentId    = departmentId,
-        Title           = title.Trim(),
-        Description     = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
-        Location        = string.IsNullOrWhiteSpace(location) ? null : location.Trim(),
-        Status          = VacancyStatus.Draft,
-        HiringManagerId = hiringManagerId,
-        CreatedAt       = now,
-        UpdatedAt       = now,
+        Id                = id,
+        CompanyId         = companyId,
+        PositionProfileId = positionProfileId,
+        AdvertTitle       = string.IsNullOrWhiteSpace(advertTitle) ? null : advertTitle.Trim(),
+        AdvertDescription = string.IsNullOrWhiteSpace(advertDescription) ? null : advertDescription.Trim(),
+        Status            = VacancyStatus.Draft,
+        HiringManagerId   = hiringManagerId,
+        CreatedAt         = now,
+        UpdatedAt         = now,
     };
 
     public void UpdateDetails(
-        Guid? departmentId,
-        string title,
-        string? description,
-        string? location,
+        string? advertTitle,
+        string? advertDescription,
         Guid hiringManagerId,
         DateTimeOffset now)
     {
-        DepartmentId    = departmentId;
-        Title           = title.Trim();
-        Description     = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
-        Location        = string.IsNullOrWhiteSpace(location) ? null : location.Trim();
-        HiringManagerId = hiringManagerId;
-        UpdatedAt       = now;
+        AdvertTitle       = string.IsNullOrWhiteSpace(advertTitle) ? null : advertTitle.Trim();
+        AdvertDescription = string.IsNullOrWhiteSpace(advertDescription) ? null : advertDescription.Trim();
+        HiringManagerId   = hiringManagerId;
+        UpdatedAt         = now;
+    }
+
+    /// <summary>
+    /// Assigns (or re-assigns) the position profile linked to this vacancy. Used by the manual HR
+    /// review action (AssignVacancyPositionProfile) and by the auto-match backfill process
+    /// (ApplyPositionProfileMatches / VacancyPositionProfileMatcher) — distinct from Create() because
+    /// this can also apply to vacancies that already had a value (HR overriding a prior assignment).
+    /// </summary>
+    public void AssignPositionProfile(Guid positionProfileId, DateTimeOffset now)
+    {
+        PositionProfileId = positionProfileId;
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// Changes the position profile linked to this vacancy after creation, via the standard
+    /// UpdateVacancy flow. Distinct from <see cref="AssignPositionProfile"/> (used by the manual
+    /// review action and auto-match backfill, which apply unconditionally regardless of vacancy
+    /// state) — this method backs the guarded change-control path where UpdateVacancyHandler has
+    /// already verified the vacancy is eligible (see UpdateVacancyHandler.CanChangePositionProfile).
+    /// Kept intentionally simple with no audit/correction-workflow ceremony of its own; the
+    /// "Prevent Invalid Position Profile Changes" story is expected to extend this path with an
+    /// authorised correction workflow and audit trail on top of this same baseline check.
+    /// </summary>
+    public void ChangePositionProfile(Guid positionProfileId, DateTimeOffset now)
+    {
+        PositionProfileId = positionProfileId;
+        UpdatedAt = now;
     }
 
     public void Open(DateTimeOffset now, DateOnly openedAt)

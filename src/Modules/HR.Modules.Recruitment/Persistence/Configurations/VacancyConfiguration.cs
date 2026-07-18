@@ -20,21 +20,26 @@ internal sealed class VacancyConfiguration : IEntityTypeConfiguration<Vacancy>
             .HasColumnName("company_id")
             .IsRequired();
 
-        builder.Property(v => v.DepartmentId)
-            .HasColumnName("department_id");
-
-        builder.Property(v => v.Title)
-            .HasColumnName("title")
-            .HasMaxLength(200)
+        // No FK constraint: PositionProfile is owned by HR.Modules.Employees and this module has no
+        // reference to its DbContext/schema. Existence + same-company validation happens in the
+        // CreateVacancy/AssignVacancyPositionProfile handlers via IPositionProfileReader. NOT NULL at
+        // the DB level — see the nullability note on Vacancy.PositionProfileId for the full reasoning
+        // (mandatory per explicit product direction; the review/backfill admin tooling is retained as
+        // legacy/dead-in-practice code, not as a reason to keep this column nullable).
+        builder.Property(v => v.PositionProfileId)
+            .HasColumnName("position_profile_id")
             .IsRequired();
 
-        builder.Property(v => v.Description)
-            .HasColumnName("description")
-            .HasMaxLength(4000);
-
-        builder.Property(v => v.Location)
-            .HasColumnName("location")
+        // Optional recruitment-specific override of the Position Profile's canonical title — renamed
+        // (via column rename, preserving existing data) from the previously-required "title" column.
+        // See Vacancy.AdvertTitle's remarks.
+        builder.Property(v => v.AdvertTitle)
+            .HasColumnName("advert_title")
             .HasMaxLength(200);
+
+        builder.Property(v => v.AdvertDescription)
+            .HasColumnName("advert_description")
+            .HasMaxLength(4000);
 
         builder.Property(v => v.Status)
             .HasColumnName("status")
@@ -61,7 +66,7 @@ internal sealed class VacancyConfiguration : IEntityTypeConfiguration<Vacancy>
             .IsRequired();
 
         builder.HasIndex(v => v.CompanyId);
-        builder.HasIndex(v => v.DepartmentId);
+        builder.HasIndex(v => v.PositionProfileId);
         builder.HasIndex(v => new { v.CompanyId, v.Status });
     }
 }

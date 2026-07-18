@@ -16,7 +16,7 @@ public class GetUpcomingInterviewsHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Senior Software Engineer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
 
@@ -34,7 +34,7 @@ public class GetUpcomingInterviewsHandlerTests
         db.Interviews.AddRange(futurePending, pastPending, futureCancelled);
         await db.SaveChangesAsync();
 
-        var handler = new GetUpcomingInterviewsHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new GetUpcomingInterviewsHandler(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader());
         var result = await handler.HandleAsync(new GetUpcomingInterviewsRequest { CompanyId = companyId }, CancellationToken.None);
 
         var item = Assert.Single(result.Items);
@@ -46,7 +46,7 @@ public class GetUpcomingInterviewsHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Software Engineer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Software Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
 
@@ -60,7 +60,7 @@ public class GetUpcomingInterviewsHandlerTests
         db.Interviews.AddRange(later, soonest, middle);
         await db.SaveChangesAsync();
 
-        var handler = new GetUpcomingInterviewsHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new GetUpcomingInterviewsHandler(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader());
         var result = await handler.HandleAsync(new GetUpcomingInterviewsRequest { CompanyId = companyId }, CancellationToken.None);
 
         Assert.Equal(
@@ -73,7 +73,7 @@ public class GetUpcomingInterviewsHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Product Designer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", "olivia.grant@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
         var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(1), 45, "Zoom", Now);
@@ -84,7 +84,7 @@ public class GetUpcomingInterviewsHandlerTests
         db.Interviews.Add(interview);
         await db.SaveChangesAsync();
 
-        var handler = new GetUpcomingInterviewsHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new GetUpcomingInterviewsHandler(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader());
         var result = await handler.HandleAsync(new GetUpcomingInterviewsRequest { CompanyId = companyId }, CancellationToken.None);
 
         var item = Assert.Single(result.Items);
@@ -102,7 +102,7 @@ public class GetUpcomingInterviewsHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, null, "Product Designer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Noah", "Patel", "noah.patel@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), otherCompanyId, vacancy.Id, candidate.Id, null, Now);
         var interview = Interview.Create(Guid.NewGuid(), otherCompanyId, application.Id, Guid.NewGuid(), Now.AddDays(1), 30, null, Now);
@@ -113,7 +113,7 @@ public class GetUpcomingInterviewsHandlerTests
         db.Interviews.Add(interview);
         await db.SaveChangesAsync();
 
-        var handler = new GetUpcomingInterviewsHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new GetUpcomingInterviewsHandler(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader());
         var result = await handler.HandleAsync(new GetUpcomingInterviewsRequest { CompanyId = companyId }, CancellationToken.None);
 
         Assert.Empty(result.Items);
@@ -124,7 +124,7 @@ public class GetUpcomingInterviewsHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Software Engineer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Software Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Ava", "Bell", "ava.bell@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
 
@@ -135,7 +135,7 @@ public class GetUpcomingInterviewsHandlerTests
             db.Interviews.Add(Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(i), 30, null, Now));
         await db.SaveChangesAsync();
 
-        var handler = new GetUpcomingInterviewsHandler(db, new FakeClock(FixedUtcNow));
+        var handler = new GetUpcomingInterviewsHandler(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader());
         var result = await handler.HandleAsync(new GetUpcomingInterviewsRequest { CompanyId = companyId }, CancellationToken.None);
 
         Assert.Equal(15, result.Items.Count);

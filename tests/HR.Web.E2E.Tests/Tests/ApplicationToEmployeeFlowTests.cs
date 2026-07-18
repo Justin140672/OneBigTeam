@@ -61,10 +61,13 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
             $"Expected the new candidate '{candidateLast}' to appear in the candidate list");
 
         // ── Step 2: Create the vacancy ─────────────────────────────────────────────
+        // Position Profile is mandatory for creation (the API rejects a vacancy with no
+        // PositionProfileId belonging to the same company) — "Senior Software Engineer" is
+        // seeded for Acme (see EmployeesModule.SeedEmployeesAsync).
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        await vacancyDetail.FillLocationAsync("Remote");
+        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 
@@ -115,14 +118,16 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         await vacancyDetail.SelectHireNationalityAsync("British");
         await vacancyDetail.SelectHireGenderAsync("Male");
 
-        // Employee Number, Employment Type, Department, Location and Position Profile are now
-        // required — hiring a candidate creates a real Employee record, which can no longer
-        // exist without them. Reuse the same seeded Acme reference data as CreateEmployeeTests.
+        // Employee Number and Employment Type are still filled in manually — Department,
+        // Location and Position Profile are no longer manual fields as of the "Vacancy - Position
+        // Profile relationship" epic: they're derived server-side by HireCandidateHandler from the
+        // Vacancy's own linked Position Profile ("Senior Software Engineer", selected when the
+        // vacancy was created above) and shown read-only in the dialog for confirmation.
+        Assert.Equal("Senior Software Engineer", await vacancyDetail.GetHireDerivedPositionProfileTextAsync());
+        Assert.Equal("Remote", await vacancyDetail.GetHireDerivedLocationTextAsync());
+
         await vacancyDetail.FillHireEmployeeNumberAsync($"E2E-{unique}");
         await vacancyDetail.SelectHireDropdownAsync("Employment Type", "Permanent");
-        await vacancyDetail.SelectHireDropdownAsync("Department", "Engineering");
-        await vacancyDetail.SelectHireDropdownAsync("Location", "London Office");
-        await vacancyDetail.SelectHireDropdownAsync("Position Profile", "Senior Software Engineer");
 
         await vacancyDetail.SubmitHireAsync();
 
@@ -152,15 +157,29 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         await vacancyDetail.ClickHireForAsync(candidateLast);
         await vacancyDetail.WaitForHireDialogAsync();
 
-        // Fill in the fields that were already required before Department/Location/Position
-        // Profile/Employment Type/Employee Number became mandatory...
+        // The manual Department/Location/Position Profile dropdowns are gone entirely — those
+        // values are now shown read-only, derived from the Vacancy's linked Position Profile.
+        Assert.False(await vacancyDetail.HasHireDropdownLabelAsync("Department"),
+            "Expected the manual Department dropdown to no longer exist in the Hire dialog");
+        Assert.False(await vacancyDetail.HasHireDropdownLabelAsync("Location"),
+            "Expected the manual Location dropdown to no longer exist in the Hire dialog");
+        Assert.False(await vacancyDetail.HasHireDropdownLabelAsync("Position Profile"),
+            "Expected the manual Position Profile dropdown to no longer exist in the Hire dialog");
+        Assert.Equal("Senior Software Engineer", await vacancyDetail.GetHireDerivedPositionProfileTextAsync());
+        Assert.Equal("Remote", await vacancyDetail.GetHireDerivedLocationTextAsync());
+
+        // Fill in the fields that were already required before Employment Type/Employee Number
+        // became mandatory...
         await vacancyDetail.FillHireStartDateAsync("01/10/2026");
         await vacancyDetail.FillHireDateOfBirthAsync("15/06/1990");
         await vacancyDetail.SelectHireNationalityAsync("British");
         await vacancyDetail.SelectHireGenderAsync("Male");
 
-        // ...but deliberately leave the newly-required fields (Employee Number, Employment Type,
-        // Department, Location, Position Profile) blank and attempt to submit anyway.
+        // ...but deliberately leave the newly-required manual fields (Employee Number, Employment
+        // Type) blank and attempt to submit anyway. Department/Location/Position Profile are no
+        // longer manual inputs at all as of the "Vacancy - Position Profile relationship" epic —
+        // they're derived server-side from the Vacancy's linked Position Profile, so they can't be
+        // "left blank" here the way they used to be.
         await vacancyDetail.ClickHireSubmitButtonAsync();
 
         await _page.WaitForSelectorAsync(".hire-candidate-dialog .alert-danger", new() { Timeout = 10_000 });
@@ -203,10 +222,11 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         await candidateEdit.FillEmailAsync(candidateEmail);
         await candidateEdit.SaveNewCandidateAsync();
 
+        // Position Profile is mandatory for creation — "Senior Software Engineer" is seeded for Acme.
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        await vacancyDetail.FillLocationAsync("Remote");
+        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 

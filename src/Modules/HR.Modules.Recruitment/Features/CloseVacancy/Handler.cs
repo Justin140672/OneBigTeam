@@ -1,11 +1,16 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.CloseVacancy;
 
-internal sealed class CloseVacancyHandler(RecruitmentDbContext db, IClock clock, IAuditEventPublisher auditPublisher)
+internal sealed class CloseVacancyHandler(
+    RecruitmentDbContext db,
+    IClock clock,
+    IAuditEventPublisher auditPublisher,
+    IPositionProfileReader positionProfileReader)
 {
     public async Task<Result<CloseVacancyResponse>> HandleAsync(
         CloseVacancyRequest request,
@@ -31,17 +36,22 @@ internal sealed class CloseVacancyHandler(RecruitmentDbContext db, IClock clock,
         vacancy.Close(now, closedAt);
         await db.SaveChangesAsync(cancellationToken);
 
+        // Cross-module read purely for a readable audit Summary line — see VacancyClosedAuditEvent's
+        // remarks and the identical pattern in UpdateVacancyHandler.
+        var effectiveTitle = vacancy.AdvertTitle
+            ?? (await positionProfileReader.GetSummaryAsync(request.CompanyId, vacancy.PositionProfileId, cancellationToken))?.Title
+            ?? "(untitled)";
+
         await auditPublisher.PublishAsync(
-            new VacancyClosedAuditEvent(vacancy.CompanyId, vacancy.Id, vacancy.Title, previousStatus, closedAt, now),
+            new VacancyClosedAuditEvent(vacancy.CompanyId, vacancy.Id, effectiveTitle, previousStatus, closedAt, now),
             cancellationToken);
 
         return Result.Success(new CloseVacancyResponse(
             vacancy.Id,
             vacancy.CompanyId,
-            vacancy.DepartmentId,
-            vacancy.Title,
-            vacancy.Description,
-            vacancy.Location,
+            vacancy.PositionProfileId,
+            vacancy.AdvertTitle,
+            vacancy.AdvertDescription,
             vacancy.Status,
             vacancy.HiringManagerId,
             vacancy.OpenedAt,

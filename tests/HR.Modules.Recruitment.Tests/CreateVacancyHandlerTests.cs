@@ -17,69 +17,161 @@ public class CreateVacancyHandlerTests
         var companyId = Guid.NewGuid();
         var hiringManagerId = Guid.NewGuid();
 
+        var positionProfileId = Guid.NewGuid();
+
         var result = await handler(db).HandleAsync(
             new CreateVacancyRequest
             {
-                CompanyId       = companyId,
-                Title           = "Senior Software Engineer",
-                HiringManagerId = hiringManagerId,
+                CompanyId         = companyId,
+                PositionProfileId = positionProfileId,
+                AdvertTitle       = "Senior Software Engineer",
+                HiringManagerId   = hiringManagerId,
             },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(companyId, result.Value!.CompanyId);
-        Assert.Equal("Senior Software Engineer", result.Value.Title);
+        Assert.Equal(positionProfileId, result.Value.PositionProfileId);
+        Assert.Equal("Senior Software Engineer", result.Value.AdvertTitle);
         Assert.Equal(VacancyStatus.Draft, result.Value.Status);
         Assert.Equal(hiringManagerId, result.Value.HiringManagerId);
 
         var saved = await db.Vacancies.SingleAsync();
         Assert.Equal(result.Value.Id, saved.Id);
+        // Round-trip through the (InMemory) RecruitmentDbContext, not just the handler's response DTO.
+        Assert.Equal(positionProfileId, saved.PositionProfileId);
     }
 
     [Fact]
-    public async Task HandleAsync_Trims_Title_Description_And_Location()
+    public async Task HandleAsync_Returns_NotFound_When_PositionProfile_Does_Not_Exist()
+    {
+        await using var db = BuildContext();
+
+        var result = await handler(db, new FakePositionProfileReader(exists: false)).HandleAsync(
+            new CreateVacancyRequest
+            {
+                CompanyId         = Guid.NewGuid(),
+                PositionProfileId = Guid.NewGuid(),
+                AdvertTitle       = "Senior Software Engineer",
+                HiringManagerId   = Guid.NewGuid(),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+        Assert.Empty(db.Vacancies);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_PositionProfile_Belongs_To_Different_Company()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var positionProfileId = Guid.NewGuid();
+
+        var reader = new FakePositionProfileReader(
+            matchingCompanyId: Guid.NewGuid(), // a different company than the request below
+            matchingPositionProfileId: positionProfileId);
+
+        var result = await handler(db, reader).HandleAsync(
+            new CreateVacancyRequest
+            {
+                CompanyId         = companyId,
+                PositionProfileId = positionProfileId,
+                AdvertTitle       = "Senior Software Engineer",
+                HiringManagerId   = Guid.NewGuid(),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+        Assert.Empty(db.Vacancies);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Trims_AdvertTitle_And_AdvertDescription()
     {
         await using var db = BuildContext();
 
         var result = await handler(db).HandleAsync(
             new CreateVacancyRequest
             {
-                CompanyId       = Guid.NewGuid(),
-                Title           = "  Backend Engineer  ",
-                Description     = "  Own the payments platform  ",
-                Location        = "  Remote  ",
-                HiringManagerId = Guid.NewGuid(),
+                CompanyId         = Guid.NewGuid(),
+                PositionProfileId = Guid.NewGuid(),
+                AdvertTitle       = "  Backend Engineer  ",
+                AdvertDescription = "  Own the payments platform  ",
+                HiringManagerId   = Guid.NewGuid(),
             },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Backend Engineer", result.Value!.Title);
-        Assert.Equal("Own the payments platform", result.Value.Description);
-        Assert.Equal("Remote", result.Value.Location);
+        Assert.Equal("Backend Engineer", result.Value!.AdvertTitle);
+        Assert.Equal("Own the payments platform", result.Value.AdvertDescription);
     }
 
     [Fact]
-    public async Task HandleAsync_Assigns_Optional_DepartmentId()
+    public async Task HandleAsync_Creates_Vacancy_Without_AdvertTitle_Succeeds_With_Null_AdvertTitle()
     {
         await using var db = BuildContext();
-        var departmentId = Guid.NewGuid();
 
         var result = await handler(db).HandleAsync(
             new CreateVacancyRequest
             {
-                CompanyId       = Guid.NewGuid(),
-                DepartmentId    = departmentId,
-                Title           = "Product Designer",
-                HiringManagerId = Guid.NewGuid(),
+                CompanyId         = Guid.NewGuid(),
+                PositionProfileId = Guid.NewGuid(),
+                AdvertTitle       = null,
+                HiringManagerId   = Guid.NewGuid(),
             },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(departmentId, result.Value!.DepartmentId);
+        Assert.Null(result.Value!.AdvertTitle);
+
+        var saved = await db.Vacancies.SingleAsync();
+        Assert.Null(saved.AdvertTitle);
     }
 
-    private static CreateVacancyHandler handler(RecruitmentDbContext db) =>
-        new(db, new FakeClock(FixedUtcNow));
+    [Fact]
+    public void CreateVacancyRequest_Has_No_Location_Field()
+    {
+        // Location was removed entirely from the domain — assert (via reflection, so this test would
+        // fail loudly if the field were ever reintroduced) that CreateVacancyRequest has no Location
+        // member of any kind, rather than relying solely on compile-time enforcement.
+        var members = typeof(CreateVacancyRequest).GetMembers()
+            .Select(m => m.Name);
+
+        Assert.DoesNotContain(members, name => name.Contains("Location", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task HandleAsync_PositionProfileId_Persists_And_Reads_Back_As_A_Valid_NonNullable_Guid()
+    {
+        // Proves the NOT NULL PositionProfileId migration/config doesn't break the normal Create flow:
+        // a vacancy created via the handler round-trips through the DbContext with a valid,
+        // non-nullable PositionProfileId, with no exception thrown reading it back.
+        await using var db = BuildContext();
+        var positionProfileId = Guid.NewGuid();
+
+        var result = await handler(db).HandleAsync(
+            new CreateVacancyRequest
+            {
+                CompanyId         = Guid.NewGuid(),
+                PositionProfileId = positionProfileId,
+                AdvertTitle       = "Backend Engineer",
+                HiringManagerId   = Guid.NewGuid(),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var saved = await db.Vacancies.SingleAsync(v => v.Id == result.Value!.Id);
+        Guid nonNullablePositionProfileId = saved.PositionProfileId;
+        Assert.Equal(positionProfileId, nonNullablePositionProfileId);
+        Assert.NotEqual(Guid.Empty, nonNullablePositionProfileId);
+    }
+
+    private static CreateVacancyHandler handler(RecruitmentDbContext db, HR.Infrastructure.Abstractions.IPositionProfileReader? positionProfileReader = null) =>
+        new(db, new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

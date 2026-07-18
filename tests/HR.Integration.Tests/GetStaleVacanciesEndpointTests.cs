@@ -97,7 +97,7 @@ public class GetStaleVacanciesEndpointTests : IClassFixture<ApiWebApplicationFac
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
             var openedAt = Now.AddDays(-30);
-            var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Senior Software Engineer", null, null, Guid.NewGuid(), openedAt);
+            var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), openedAt);
             vacancy.Open(openedAt, DateOnly.FromDateTime(openedAt.Date));
             vacancyId = vacancy.Id;
 
@@ -124,7 +124,7 @@ public class GetStaleVacanciesEndpointTests : IClassFixture<ApiWebApplicationFac
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
             var openedAt = Now.AddDays(-30);
-            var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Product Designer", null, null, Guid.NewGuid(), openedAt);
+            var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), openedAt);
             vacancy.Open(openedAt, DateOnly.FromDateTime(openedAt.Date));
             var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, Now);
             // Recent activity (2 days ago) — well within the default 14-day window.
@@ -154,7 +154,7 @@ public class GetStaleVacanciesEndpointTests : IClassFixture<ApiWebApplicationFac
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
             // Never opened — stays in Draft status.
-            var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Data Analyst", null, null, Guid.NewGuid(), Now.AddDays(-60));
+            var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Data Analyst", null, Guid.NewGuid(), Now.AddDays(-60));
             db.Vacancies.Add(vacancy);
             await db.SaveChangesAsync();
         }
@@ -178,7 +178,7 @@ public class GetStaleVacanciesEndpointTests : IClassFixture<ApiWebApplicationFac
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
             var openedAt = Now.AddDays(-30);
-            var otherVacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, null, "Product Designer", null, null, Guid.NewGuid(), openedAt);
+            var otherVacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), openedAt);
             otherVacancy.Open(openedAt, DateOnly.FromDateTime(openedAt.Date));
             db.Vacancies.Add(otherVacancy);
             await db.SaveChangesAsync();

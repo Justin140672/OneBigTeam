@@ -52,6 +52,21 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
         await page.GetByPlaceholder("Max").FillAsync(max.ToString());
     }
 
+    /// <summary>Selects a value from the Department dropdown on the position profile create/edit form.</summary>
+    public async Task SelectDepartmentAsync(string nameFragment)
+    {
+        var field = page.Locator(".mb-3", new PageLocatorOptions { HasText = "Department" }).First;
+        await field.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
+        await filterInput.FillAsync(nameFragment);
+        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
+            .Filter(new() { HasText = nameFragment })
+            .First
+            .ClickAsync();
+    }
+
     public async Task SetUseCompanyWorkingPatternAsync(bool useCompanyDefault)
     {
         var checkbox = page.GetByLabel("Use company working pattern");

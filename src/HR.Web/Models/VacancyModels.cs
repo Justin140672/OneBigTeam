@@ -8,14 +8,19 @@ public record ListVacanciesResponse(List<VacancyListItemModel> Items);
 
 public record VacancyListItemModel(
     Guid Id,
-    Guid? DepartmentId,
-    string Title,
-    string? Location,
+    Guid PositionProfileId,
+    string? AdvertTitle,
     string Status,
     Guid HiringManagerId,
     DateOnly? OpenedAt,
     DateOnly? ClosedAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? PositionProfileTitle,
+    Guid? PositionProfileDepartmentId,
+    string EffectiveTitle,
+    // Resolved exclusively from the linked Position Profile — a vacancy no longer has a location of
+    // its own to override.
+    string? EffectiveLocation);
 
 // ── DASHBOARD: STALE VACANCIES ──────────────────────────────────────────────────
 
@@ -33,34 +38,39 @@ public record StaleVacancyItem(
 public record GetVacancyResponse(
     Guid Id,
     Guid CompanyId,
-    Guid? DepartmentId,
-    string Title,
-    string? Description,
-    string? Location,
+    Guid PositionProfileId,
+    string? AdvertTitle,
+    string? AdvertDescription,
     string Status,
     Guid HiringManagerId,
     DateOnly? OpenedAt,
     DateOnly? ClosedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? PositionProfileTitle,
+    Guid? PositionProfileDepartmentId,
+    string? PositionProfileDescription,
+    bool? PositionProfileIsActive,
+    string EffectiveTitle,
+    string? EffectiveLocation,
+    int ApplicationCount,
+    bool CanChangePositionProfile);
 
 // ── CREATE ────────────────────────────────────────────────────────────────────
 
 public record CreateVacancyRequest(
     Guid CompanyId,
-    Guid? DepartmentId,
-    string Title,
-    string? Description,
-    string? Location,
+    Guid PositionProfileId,
+    string? AdvertTitle,
+    string? AdvertDescription,
     Guid HiringManagerId);
 
 public record CreateVacancyResponse(
     Guid Id,
     Guid CompanyId,
-    Guid? DepartmentId,
-    string Title,
-    string? Description,
-    string? Location,
+    Guid PositionProfileId,
+    string? AdvertTitle,
+    string? AdvertDescription,
     string Status,
     Guid HiringManagerId,
     DateOnly? OpenedAt,
@@ -73,19 +83,19 @@ public record CreateVacancyResponse(
 public record UpdateVacancyRequest(
     Guid CompanyId,
     Guid VacancyId,
-    Guid? DepartmentId,
-    string Title,
-    string? Description,
-    string? Location,
-    Guid HiringManagerId);
+    Guid? PositionProfileId,
+    string? AdvertTitle,
+    string? AdvertDescription,
+    Guid HiringManagerId,
+    bool IsAuthorisedCorrection = false,
+    string? CorrectionReason = null);
 
 public record UpdateVacancyResponse(
     Guid Id,
     Guid CompanyId,
-    Guid? DepartmentId,
-    string Title,
-    string? Description,
-    string? Location,
+    Guid PositionProfileId,
+    string? AdvertTitle,
+    string? AdvertDescription,
     string Status,
     Guid HiringManagerId,
     DateOnly? OpenedAt,
@@ -100,10 +110,9 @@ public record CloseVacancyRequest(Guid CompanyId, Guid VacancyId, DateOnly? Clos
 public record CloseVacancyResponse(
     Guid Id,
     Guid CompanyId,
-    Guid? DepartmentId,
-    string Title,
-    string? Description,
-    string? Location,
+    Guid PositionProfileId,
+    string? AdvertTitle,
+    string? AdvertDescription,
     string Status,
     Guid HiringManagerId,
     DateOnly? OpenedAt,
@@ -115,13 +124,18 @@ public record CloseVacancyResponse(
 
 public sealed class VacancyEditModel
 {
-    [Required(ErrorMessage = "Title is required.")]
-    public string Title { get; set; } = string.Empty;
-    public string? Description { get; set; }
-    public string? Location { get; set; }
-    public Guid? DepartmentId { get; set; }
+    public string? AdvertTitle { get; set; }
+    public string? AdvertDescription { get; set; }
+    [Required(ErrorMessage = "Position profile is required.")]
+    public Guid? PositionProfileId { get; set; }
     [Required(ErrorMessage = "Hiring manager is required.")]
     public Guid? HiringManagerId { get; set; }
+
+    // Authorised correction escape hatch — only meaningful when PositionProfileId is being changed on
+    // a vacancy that's no longer eligible for the normal Draft+no-applications path. See
+    // VacancyDetail.razor.
+    public bool IsAuthorisedCorrection { get; set; }
+    public string? CorrectionReason { get; set; }
 }
 
 // ── DASHBOARD: HIRING PIPELINE SUMMARY ──────────────────────────────────────────

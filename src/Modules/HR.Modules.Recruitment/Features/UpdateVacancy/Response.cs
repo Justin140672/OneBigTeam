@@ -5,10 +5,9 @@ namespace HR.Modules.Recruitment.Features.UpdateVacancy;
 internal sealed record UpdateVacancyResponse(
     Guid Id,
     Guid CompanyId,
-    Guid? DepartmentId,
-    string Title,
-    string? Description,
-    string? Location,
+    Guid PositionProfileId,
+    string? AdvertTitle,
+    string? AdvertDescription,
     VacancyStatus Status,
     Guid HiringManagerId,
     DateOnly? OpenedAt,

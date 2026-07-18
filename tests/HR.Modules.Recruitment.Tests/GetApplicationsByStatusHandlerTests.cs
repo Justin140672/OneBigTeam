@@ -1,6 +1,7 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.GetApplicationsByStatus;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Tests;
@@ -14,7 +15,7 @@ public class GetApplicationsByStatusHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Senior Software Engineer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         var applied = GetPipelineSummaryHandlerTests.CreateApplicationWithStatus(companyId, vacancy.Id, candidate.Id, ApplicationStatus.Applied);
         var screening = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
@@ -25,7 +26,7 @@ public class GetApplicationsByStatusHandlerTests
         db.Applications.AddRange(applied, screening);
         await db.SaveChangesAsync();
 
-        var handler = new GetApplicationsByStatusHandler(db);
+        var handler = new GetApplicationsByStatusHandler(db, new FakePositionProfileReader());
         var result = await handler.HandleAsync(
             new GetApplicationsByStatusRequest(companyId, ApplicationStatus.Applied),
             CancellationToken.None);
@@ -44,7 +45,7 @@ public class GetApplicationsByStatusHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Backend Engineer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
         var candidateA = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         var candidateB = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
 
@@ -56,7 +57,7 @@ public class GetApplicationsByStatusHandlerTests
         db.Applications.AddRange(earlier, later);
         await db.SaveChangesAsync();
 
-        var handler = new GetApplicationsByStatusHandler(db);
+        var handler = new GetApplicationsByStatusHandler(db, new FakePositionProfileReader());
         var result = await handler.HandleAsync(
             new GetApplicationsByStatusRequest(companyId, ApplicationStatus.Applied),
             CancellationToken.None);
@@ -71,7 +72,7 @@ public class GetApplicationsByStatusHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Backend Engineer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         var screening = GetPipelineSummaryHandlerTests.CreateApplicationWithStatus(companyId, vacancy.Id, candidate.Id, ApplicationStatus.Screening);
 
@@ -80,7 +81,7 @@ public class GetApplicationsByStatusHandlerTests
         db.Applications.Add(screening);
         await db.SaveChangesAsync();
 
-        var handler = new GetApplicationsByStatusHandler(db);
+        var handler = new GetApplicationsByStatusHandler(db, new FakePositionProfileReader());
         var result = await handler.HandleAsync(
             new GetApplicationsByStatusRequest(companyId, ApplicationStatus.Applied),
             CancellationToken.None);
@@ -95,11 +96,11 @@ public class GetApplicationsByStatusHandlerTests
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
 
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Backend Engineer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
 
-        var otherVacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, null, "Product Designer", null, null, Guid.NewGuid(), Now);
+        var otherVacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
         var otherCandidate = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
         var otherApplication = Application.Create(Guid.NewGuid(), otherCompanyId, otherVacancy.Id, otherCandidate.Id, null, Now);
 
@@ -108,7 +109,7 @@ public class GetApplicationsByStatusHandlerTests
         db.Applications.AddRange(application, otherApplication);
         await db.SaveChangesAsync();
 
-        var handler = new GetApplicationsByStatusHandler(db);
+        var handler = new GetApplicationsByStatusHandler(db, new FakePositionProfileReader());
         var result = await handler.HandleAsync(
             new GetApplicationsByStatusRequest(companyId, ApplicationStatus.Applied),
             CancellationToken.None);
@@ -121,7 +122,7 @@ public class GetApplicationsByStatusHandlerTests
     public async Task HandleAsync_Returns_Empty_When_No_Applications_Match_Status()
     {
         await using var db = BuildContext();
-        var handler = new GetApplicationsByStatusHandler(db);
+        var handler = new GetApplicationsByStatusHandler(db, new FakePositionProfileReader());
 
         var result = await handler.HandleAsync(
             new GetApplicationsByStatusRequest(Guid.NewGuid(), ApplicationStatus.Hired),

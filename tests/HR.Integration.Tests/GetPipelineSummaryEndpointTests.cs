@@ -93,7 +93,7 @@ public class GetPipelineSummaryEndpointTests : IClassFixture<ApiWebApplicationFa
         await SeedAsync(scope =>
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
-            var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Software Engineer", null, null, Guid.NewGuid(), Now);
+            var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Software Engineer", null, Guid.NewGuid(), Now);
             db.Vacancies.Add(vacancy);
 
             for (var i = 0; i < 4; i++)
@@ -136,7 +136,7 @@ public class GetPipelineSummaryEndpointTests : IClassFixture<ApiWebApplicationFa
         await SeedAsync(scope =>
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
-            var otherVacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, null, "Product Designer", null, null, Guid.NewGuid(), Now);
+            var otherVacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
             var otherCandidate = Candidate.Create(Guid.NewGuid(), otherCompanyId, "First", "Last", $"c.{Guid.NewGuid():N}@example.com", null, null, Now);
             db.Vacancies.Add(otherVacancy);
             db.Candidates.Add(otherCandidate);

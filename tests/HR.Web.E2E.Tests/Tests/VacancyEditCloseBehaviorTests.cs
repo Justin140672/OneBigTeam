@@ -30,12 +30,14 @@ public sealed class VacancyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
-        // Create a vacancy first so we have an existing, unmodified record to reopen.
+        // Create a vacancy first so we have an existing, unmodified record to reopen. Position
+        // Profile is mandatory for creation (the API rejects a vacancy with no PositionProfileId
+        // belonging to the same company) — "Senior Software Engineer" is seeded for Acme.
         var vacancyTitle = $"E2E Close {Guid.NewGuid().ToString("N")[..8]}";
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        await vacancyDetail.FillLocationAsync("Remote");
+        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 
@@ -111,7 +113,8 @@ public sealed class VacancyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
 
         await vacancyDetail.GoToNewAsync(AcmeId);
         await vacancyDetail.FillTitleAsync(vacancyTitle);
-        await vacancyDetail.FillLocationAsync("Remote");
+        // Position Profile is mandatory for creation — "Senior Software Engineer" is seeded for Acme.
+        await vacancyDetail.SelectPositionProfileAsync("Senior Software Engineer");
         await vacancyDetail.SelectHiringManagerAsync("James");
 
         await vacancyDetail.ClickCloseAsync();

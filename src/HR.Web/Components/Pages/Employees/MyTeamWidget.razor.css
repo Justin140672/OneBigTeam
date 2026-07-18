@@ -1,24 +1,90 @@
-/* Show phone/email as visible text next to their icons, stacked to stay compact
-   in the team-member row. Overrides the icon-only layout from app.css's shared
-   .team-widget-contact rule (higher specificity via the scoped attribute). */
-.team-widget-contact {
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
+/* Responsive grid of per-member cards, replacing the single-column stacked-row layout
+   task-widget-item/task-widget-content are shared with (HrInboxWidget, LeaveRequestsWidget, …) —
+   these classes are scoped to this widget only, so they don't affect anything else. */
+.team-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+    padding: 14px 16px;
 }
 
-.team-widget-contact-link {
+.team-card {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 5px;
-    max-width: 170px;
-    overflow: hidden;
-    text-decoration: none;
+    text-align: center;
+    gap: 4px;
+    padding: 14px 8px;
+    border: 1px solid var(--hr-gray-100);
+    border-radius: var(--hr-radius-md);
+    transition: box-shadow 0.15s, transform 0.15s;
 }
 
-.team-widget-contact-text {
-    font-size: 0.72rem;
+.team-card:hover {
+    box-shadow: var(--hr-shadow-sm);
+    transform: translateY(-1px);
+}
+
+.team-card-name {
+    margin-top: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--hr-gray-900);
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.team-card-title {
+    font-size: 0.72rem;
+    color: var(--hr-gray-400);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.team-card-contact {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.team-card-contact-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--hr-gray-50);
+    color: var(--hr-gray-500);
+    font-size: 0.7rem;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+}
+
+.team-card-contact-link:hover {
+    background: var(--hr-color-primary-subtle);
+    color: var(--hr-color-primary);
+}
+
+html[data-theme="dark"] .team-card {
+    border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .team-card-name {
+    color: var(--hr-gray-50);
+}
+
+html[data-theme="dark"] .team-card-title {
+    color: var(--hr-gray-500);
+}
+
+html[data-theme="dark"] .team-card-contact-link {
+    background: var(--hr-gray-800);
+    color: var(--hr-gray-400);
 }

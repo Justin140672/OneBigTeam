@@ -2,9 +2,7 @@
 @inject ApplicationService ApplicationService
 @inject CandidateService CandidateService
 @inject EmployeeService EmployeeService
-@inject DepartmentService DepartmentService
-@inject LocationService LocationService
-@inject PositionProfileService PositionProfileService
+@inject VacancyService VacancyService
 @inject EmploymentTypeService EmploymentTypeService
 @inject IJSRuntime JS
 
@@ -232,37 +230,14 @@
                     </SfDropDownList>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">Department <span class="text-danger">*</span></label>
-                    <SfDropDownList TValue="Guid?"
-                                    TItem="DepartmentListItemModel"
-                                    DataSource="@_departments"
-                                    @bind-Value="_departmentId"
-                                    Placeholder="Select department"
-                                    AllowFiltering="true">
-                        <DropDownListFieldSettings Value="Id" Text="Name" />
-                    </SfDropDownList>
+                    <label class="form-label">Position Profile</label>
+                    <div class="p-2 rounded border bg-light" data-testid="hire-derived-position-profile">@_derivedPositionProfileName</div>
+                    <div class="form-text">Derived from the vacancy — the employee is assigned to this profile (and its department/location) automatically.</div>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">Location <span class="text-danger">*</span></label>
-                    <SfDropDownList TValue="Guid?"
-                                    TItem="LocationListItemModel"
-                                    DataSource="@_locations"
-                                    @bind-Value="_locationId"
-                                    Placeholder="Select location"
-                                    AllowFiltering="true">
-                        <DropDownListFieldSettings Value="Id" Text="Name" />
-                    </SfDropDownList>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Position Profile <span class="text-danger">*</span></label>
-                    <SfDropDownList TValue="Guid?"
-                                    TItem="PositionProfileListItemModel"
-                                    DataSource="@_positionProfiles"
-                                    @bind-Value="_positionProfileId"
-                                    Placeholder="Select position profile"
-                                    AllowFiltering="true">
-                        <DropDownListFieldSettings Value="Id" Text="Title" />
-                    </SfDropDownList>
+                    <label class="form-label">Location</label>
+                    <div class="p-2 rounded border bg-light" data-testid="hire-derived-location">@_derivedLocationName</div>
+                    <div class="form-text">Derived from the vacancy's position profile.</div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Manager</label>
@@ -320,9 +295,6 @@
 
     private bool _showHireDialog;
     private List<NationalityListItem> _nationalities = [];
-    private List<DepartmentListItemModel> _departments = [];
-    private List<LocationListItemModel> _locations = [];
-    private List<PositionProfileListItemModel> _positionProfiles = [];
     private List<EmploymentTypeListItemModel> _employmentTypes = [];
     private DateOnly? _startDate;
     private DateOnly? _dateOfBirth;
@@ -331,10 +303,13 @@
     private string? _genderOther;
     private string _employeeNumber = string.Empty;
     private Guid? _employmentTypeId;
-    private Guid? _departmentId;
-    private Guid? _locationId;
-    private Guid? _positionProfileId;
     private Guid? _managerId;
+    // Derived read-only display fields — populated from the Vacancy's linked Position Profile
+    // (GetVacancyResponse) when the Hire dialog opens. The employee is always assigned to this
+    // Position Profile (and its Department/Location) automatically by HireCandidateHandler; these are
+    // shown to HR only for confirmation, they are not submitted as independent request fields.
+    private string _derivedLocationName = string.Empty;
+    private string _derivedPositionProfileName = string.Empty;
     private SfDropDownList<Guid?, ManagerOption> _hireManagerDropdown = default!;
     private List<ManagerOption> _hireManagerOptions = [];
 
@@ -528,10 +503,9 @@
         _genderOther = null;
         _employeeNumber = string.Empty;
         _employmentTypeId = null;
-        _departmentId = null;
-        _locationId = null;
-        _positionProfileId = null;
         _managerId = null;
+        _derivedLocationName = string.Empty;
+        _derivedPositionProfileName = string.Empty;
 
         if (_nationalities.Count == 0)
         {
@@ -539,17 +513,19 @@
             _nationalities = result?.Items.ToList() ?? [];
         }
 
-        var deptTask = DepartmentService.ListDepartmentsAsync(CompanyId);
-        var locationTask = LocationService.ListLocationsAsync(CompanyId);
-        var profileTask = PositionProfileService.ListPositionProfilesAsync(CompanyId);
+        var vacancyTask = VacancyService.GetVacancyAsync(CompanyId, VacancyId);
         var employmentTypeTask = EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
         var managerTask = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
 
-        await Task.WhenAll(deptTask, locationTask, profileTask, employmentTypeTask, managerTask);
+        await Task.WhenAll(vacancyTask, employmentTypeTask, managerTask);
 
-        _departments = (await deptTask)?.Items ?? [];
-        _locations = (await locationTask)?.Items ?? [];
-        _positionProfiles = (await profileTask)?.Items.ToList() ?? [];
+        // Position Profile/Department/Location are no longer entered manually — they are derived
+        // server-side by HireCandidateHandler from the Vacancy's own linked Position Profile. These
+        // two fields are shown read-only here purely so HR can confirm what will be assigned.
+        var vacancy = await vacancyTask;
+        _derivedPositionProfileName = vacancy?.PositionProfileTitle ?? vacancy?.EffectiveTitle ?? "(unknown)";
+        _derivedLocationName = vacancy?.EffectiveLocation ?? "(none set)";
+
         _employmentTypes = (await employmentTypeTask)?.Items ?? [];
         _hireManagerOptions = ((await managerTask)?.Items ?? [])
             .Where(e => e.Status != "Draft" && e.Status != "Terminated")
@@ -580,8 +556,7 @@
     {
         if (_activeApplication is null || _startDate is null || _dateOfBirth is null ||
             string.IsNullOrWhiteSpace(_nationality) || string.IsNullOrWhiteSpace(_gender) ||
-            string.IsNullOrWhiteSpace(_employeeNumber) || _employmentTypeId is null ||
-            _departmentId is null || _locationId is null || _positionProfileId is null)
+            string.IsNullOrWhiteSpace(_employeeNumber) || _employmentTypeId is null)
         {
             _dialogError = "Please complete all required fields.";
             return;
@@ -592,7 +567,6 @@
             _startDate.Value, _dateOfBirth.Value, _nationality, _gender,
             string.IsNullOrWhiteSpace(_genderOther) ? null : _genderOther.Trim(),
             _employeeNumber.Trim(), _employmentTypeId.Value,
-            _departmentId.Value, _locationId.Value, _positionProfileId.Value,
             _managerId);
 
         var (result, error) = await ApplicationService.HireCandidateAsync(CompanyId, VacancyId, _activeApplication.Id, request);

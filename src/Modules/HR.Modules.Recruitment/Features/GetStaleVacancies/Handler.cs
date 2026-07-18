@@ -1,11 +1,13 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
+using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.GetStaleVacancies;
 
-internal sealed class GetStaleVacanciesHandler(RecruitmentDbContext db, IClock clock)
+internal sealed class GetStaleVacanciesHandler(
+    RecruitmentDbContext db, IClock clock, IPositionProfileReader positionProfileReader)
 {
     private const int DefaultStaleAfterDays = 14;
 
@@ -36,6 +38,18 @@ internal sealed class GetStaleVacanciesHandler(RecruitmentDbContext db, IClock c
             .Select(g => new { VacancyId = g.Key, LastActivityAt = g.Max(a => a.UpdatedAt) })
             .ToDictionaryAsync(x => x.VacancyId, x => x.LastActivityAt, cancellationToken);
 
+        // Batch cross-module read for effective (AdvertTitle ?? PositionProfile.Title) display titles —
+        // same pattern as ListVacanciesHandler.
+        var positionProfileIds = vacancies
+            .Select(v => v.PositionProfileId)
+            .Distinct()
+            .ToList();
+
+        var positionProfilesById = (positionProfileIds.Count > 0
+                ? await positionProfileReader.GetSummariesAsync(request.CompanyId, positionProfileIds, cancellationToken)
+                : [])
+            .ToDictionary(p => p.Id);
+
         var items = vacancies
             .Select(v =>
             {
@@ -49,12 +63,17 @@ internal sealed class GetStaleVacanciesHandler(RecruitmentDbContext db, IClock c
             })
             .Where(x => x.ReferenceDate < cutoff)
             .OrderByDescending(x => x.DaysSinceActivity)
-            .Select(x => new StaleVacancyItem(
-                x.Vacancy.Id,
-                x.Vacancy.Title,
-                x.Vacancy.OpenedAt,
-                x.LastActivityAt,
-                x.DaysSinceActivity))
+            .Select(x =>
+            {
+                var positionProfile = positionProfilesById.GetValueOrDefault(x.Vacancy.PositionProfileId);
+
+                return new StaleVacancyItem(
+                    x.Vacancy.Id,
+                    x.Vacancy.AdvertTitle ?? positionProfile?.Title ?? "(untitled)",
+                    x.Vacancy.OpenedAt,
+                    x.LastActivityAt,
+                    x.DaysSinceActivity);
+            })
             .ToList();
 
         return new GetStaleVacanciesResponse(items);

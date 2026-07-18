@@ -54,9 +54,15 @@ public class RecruitmentAuthorizationTests : IClassFixture<ApiWebApplicationFact
 
     private async Task<(Guid VacancyId, Guid CandidateId, Guid ApplicationId)> SeedApplicationAsync(HttpClient client, Guid companyId)
     {
+        // PositionProfileId is required on Vacancy creation (recruitment:manage) but seeding one
+        // requires employee:manage, a permission Recruiter does not hold, so it is seeded directly
+        // via EF (EmployeeReferenceDataSeeder) rather than through the HTTP-authenticated client.
+        var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
+
         var vacancyResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
         {
             companyId,
+            positionProfileId = referenceData.PositionProfileId,
             title = "Senior Software Engineer",
             hiringManagerId = Guid.NewGuid()
         });

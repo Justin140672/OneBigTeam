@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 
@@ -16,11 +17,32 @@ internal sealed class Endpoint(CreateVacancyHandler handler)
         CreateVacancyRequest request,
         CancellationToken cancellationToken)
     {
+        // Defence in depth alongside TenantRouteAuthorizationMiddleware (which already blocks any
+        // request whose route {companyId} doesn't match the caller's own company_id claim): mirrors
+        // the same explicit per-endpoint check used throughout the Documents/DataImport modules
+        // (e.g. CompleteSharedCompanyDocumentReview/Endpoint.cs) so this "manage"-policy write never
+        // trusts a client-supplied company identifier even if the route-level check is ever bypassed
+        // or refactored.
+        var companyClaim = User.FindFirstValue("company_id");
+        if (!Guid.TryParse(companyClaim, out var callerCompanyId) || callerCompanyId != request.CompanyId)
+        {
+            await Send.ResultAsync(TypedResults.Forbid());
+            return;
+        }
+
         var result = await handler.HandleAsync(request, cancellationToken);
 
         if (result.IsFailure)
         {
-            await Send.ResultAsync(TypedResults.BadRequest(new { error = result.Error.Message }));
+            var businessError = new { error = result.Error.Message };
+
+            if (result.Error.Code == "not_found")
+            {
+                await Send.ResultAsync(TypedResults.NotFound(businessError));
+                return;
+            }
+
+            await Send.ResultAsync(TypedResults.BadRequest(businessError));
             return;
         }
 

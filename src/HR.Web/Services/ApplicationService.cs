@@ -60,7 +60,7 @@ public sealed class ApplicationService(IHttpClientFactory httpClientFactory)
         return (null, await ReadErrorAsync(response, "Failed to withdraw application."));
     }
 
-    public async Task<(ApplicationActionResponse? Result, string? Error)> OfferCandidateAsync(Guid companyId, Guid vacancyId, Guid applicationId)
+    public async Task<(OfferCandidateResponse? Result, string? Error)> OfferCandidateAsync(Guid companyId, Guid vacancyId, Guid applicationId)
     {
         // A truly bodyless POST (no Content-Type header at all) gets rejected by FastEndpoints
         // with 415 Unsupported Media Type, even though OfferCandidateRequest's properties are
@@ -69,7 +69,7 @@ public sealed class ApplicationService(IHttpClientFactory httpClientFactory)
         var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/offer", new { });
 
         if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<ApplicationActionResponse>(), null);
+            return (await response.Content.ReadFromJsonAsync<OfferCandidateResponse>(HrApiJsonOptions.Default), null);
 
         return (null, await ReadErrorAsync(response, "Failed to make offer."));
     }

@@ -3,18 +3,21 @@ using HR.SharedKernel;
 namespace HR.Modules.Recruitment;
 
 internal sealed record VacancyAuditSnapshot(
-    Guid? DepartmentId,
-    string Title,
-    string? Description,
-    string? Location,
+    string? AdvertTitle,
+    string? AdvertDescription,
     Guid HiringManagerId,
     Domain.VacancyStatus Status);
 
+// EffectiveTitle is resolved by the handler (vacancy.AdvertTitle ?? linked Position Profile's title)
+// purely for a readable audit Summary line — it is not part of the Before/After snapshot itself,
+// which records the vacancy's own raw field values only. Resolving it requires a cross-module read
+// via IPositionProfileReader, which the handler performs, not this record.
 internal sealed record VacancyUpdatedAuditEvent(
     Guid CompanyId,
     Guid VacancyId,
     VacancyAuditSnapshot Before,
     VacancyAuditSnapshot After,
+    string EffectiveTitle,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
     string IAuditEvent.EventType => "vacancy.updated";
@@ -23,7 +26,7 @@ internal sealed record VacancyUpdatedAuditEvent(
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => null;
     Guid? IAuditEvent.CorrelationId => null;
-    string? IAuditEvent.Summary => $"Vacancy '{After.Title}' updated";
+    string? IAuditEvent.Summary => $"Vacancy '{EffectiveTitle}' updated";
     object? IAuditEvent.Before => Before;
     object? IAuditEvent.After => After;
     object? IAuditEvent.Metadata => null;
@@ -32,7 +35,7 @@ internal sealed record VacancyUpdatedAuditEvent(
 internal sealed record VacancyClosedAuditEvent(
     Guid CompanyId,
     Guid VacancyId,
-    string Title,
+    string EffectiveTitle,
     Domain.VacancyStatus PreviousStatus,
     DateOnly ClosedAt,
     DateTimeOffset OccurredAt) : IAuditEvent
@@ -43,10 +46,37 @@ internal sealed record VacancyClosedAuditEvent(
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => null;
     Guid? IAuditEvent.CorrelationId => null;
-    string? IAuditEvent.Summary => $"Vacancy '{Title}' closed";
+    string? IAuditEvent.Summary => $"Vacancy '{EffectiveTitle}' closed";
     object? IAuditEvent.Before => new { Status = PreviousStatus };
     object? IAuditEvent.After => new { Status = Domain.VacancyStatus.Closed, ClosedAt };
     object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record VacancyPositionProfileAssignedAuditEvent(
+    Guid CompanyId,
+    Guid VacancyId,
+    Guid? PreviousPositionProfileId,
+    Guid PositionProfileId,
+    string AssignmentMethod, // "auto_match" | "manual" | "update" | "authorised_correction"
+    DateTimeOffset OccurredAt,
+    // Populated only for the "authorised_correction" path (see UpdateVacancyHandler): who performed
+    // the override and why. Null for the other assignment methods, which either have no authenticated
+    // actor in scope (auto_match/manual) or don't require a reason (update).
+    Guid? PerformedBy = null,
+    string? CorrectionReason = null) : IAuditEvent
+{
+    string IAuditEvent.EventType => "vacancy.position_profile_assigned";
+    string IAuditEvent.EntityType => "Vacancy";
+    Guid IAuditEvent.EntityId => VacancyId;
+    Guid? IAuditEvent.ActorUserId => PerformedBy;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => AssignmentMethod == "authorised_correction"
+        ? $"Vacancy position profile changed via authorised correction: {CorrectionReason}"
+        : $"Vacancy assigned position profile ({AssignmentMethod})";
+    object? IAuditEvent.Before => new { PositionProfileId = PreviousPositionProfileId };
+    object? IAuditEvent.After => new { PositionProfileId };
+    object? IAuditEvent.Metadata => new { AssignmentMethod, CorrectionReason };
 }
 
 internal sealed record CandidateAuditSnapshot(

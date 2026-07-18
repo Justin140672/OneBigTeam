@@ -35,14 +35,5 @@ internal sealed class HireCandidateValidator : AbstractValidator<HireCandidateRe
 
         RuleFor(r => r.EmploymentTypeId)
             .NotEmpty().WithMessage("Employment type is required.");
-
-        RuleFor(r => r.DepartmentId)
-            .NotEmpty().WithMessage("Department is required.");
-
-        RuleFor(r => r.LocationId)
-            .NotEmpty().WithMessage("Location is required.");
-
-        RuleFor(r => r.PositionProfileId)
-            .NotEmpty().WithMessage("Position profile is required.");
     }
 }

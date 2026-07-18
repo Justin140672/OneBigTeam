@@ -174,9 +174,13 @@ public sealed class SharedDocumentCompleteReviewTests(AppFixture fixture) : E2ET
             // Note: this assertion is date-based and would be flaky if the test happened to
             // straddle midnight between upload and this check (server clock advancing to the next
             // day mid-test), though in practice the flow completes in well under a second.
+            // "Dialog closed" (asserted above) is an unreliable proxy for "the page's post-close
+            // reload has landed in the DOM" — the two can arrive in separate render batches. Assert
+            // directly on the footer's own content with Playwright's auto-retrying Expect instead
+            // of a one-shot read, so the assertion itself waits out that gap.
             var expectedReviewedOn = DateTime.Today.ToString("d MMM yyyy");
-            var footerSummary = await detail.GetFooterSummaryTextAsync();
-            Assert.Contains($"Last reviewed by Laura Bennett on {expectedReviewedOn}", footerSummary);
+            await Assertions.Expect(detail.FooterSummary)
+                .ToContainTextAsync($"Last reviewed by Laura Bennett on {expectedReviewedOn}", new() { Timeout = 15_000 });
 
             // SharedDocumentDetail.razor renders ReviewDate as "d MMMM yyyy" (full month name) —
             // distinct from the footer's "d MMM yyyy" (abbreviated) used for LastReviewedAt above.

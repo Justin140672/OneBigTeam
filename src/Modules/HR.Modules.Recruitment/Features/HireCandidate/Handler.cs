@@ -9,6 +9,7 @@ namespace HR.Modules.Recruitment.Features.HireCandidate;
 internal sealed class HireCandidateHandler(
     RecruitmentDbContext db,
     IEmployeeProvisioningService employeeProvisioningService,
+    IPositionProfileReader positionProfileReader,
     IClock clock,
     IIntegrationEventPublisher eventPublisher,
     IAuditEventPublisher auditPublisher)
@@ -17,6 +18,16 @@ internal sealed class HireCandidateHandler(
         HireCandidateRequest request,
         CancellationToken cancellationToken)
     {
+        var vacancy = await db.Vacancies
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                v => v.Id == request.VacancyId && v.CompanyId == request.CompanyId,
+                cancellationToken);
+
+        if (vacancy is null)
+            return Result.Failure<HireCandidateResponse>(
+                Error.NotFound($"Vacancy '{request.VacancyId}' was not found."));
+
         var application = await db.Applications
             .SingleOrDefaultAsync(
                 a => a.Id == request.ApplicationId &&
@@ -43,6 +54,27 @@ internal sealed class HireCandidateHandler(
             return Result.Failure<HireCandidateResponse>(
                 Error.Conflict("This candidate is already linked to an employee."));
 
+        // The hired employee is assigned to the Vacancy's own Position Profile — never to an
+        // independently-entered value — so Department and Location are both derived here via the
+        // narrow IPositionProfileReader contract, the same cross-module read pattern
+        // CreateVacancyHandler already uses for Department. Vacancy.PositionProfileId is mandatory
+        // (non-nullable), so this always resolves to a real Position Profile; if it can no longer be
+        // found (e.g. hard-deleted out from under an existing Vacancy), hiring cannot proceed.
+        var positionProfileSummary = await positionProfileReader.GetSummaryAsync(
+            request.CompanyId, vacancy.PositionProfileId, cancellationToken);
+
+        if (positionProfileSummary is null)
+            return Result.Failure<HireCandidateResponse>(
+                Error.NotFound($"Position profile '{vacancy.PositionProfileId}' was not found."));
+
+        if (positionProfileSummary.DepartmentId is null)
+            return Result.Failure<HireCandidateResponse>(
+                Error.Validation("The vacancy's position profile has no department set; cannot hire without a department."));
+
+        if (positionProfileSummary.LocationId is null)
+            return Result.Failure<HireCandidateResponse>(
+                Error.Validation("The vacancy's position profile has no location set; cannot hire without a location."));
+
         var provisioningResult = await employeeProvisioningService.CreateFromCandidateAsync(
             new EmployeeProvisioningRequest(
                 request.CompanyId,
@@ -55,9 +87,9 @@ internal sealed class HireCandidateHandler(
                 request.Gender,
                 request.EmployeeNumber,
                 request.EmploymentTypeId,
-                request.DepartmentId,
-                request.LocationId,
-                request.PositionProfileId,
+                positionProfileSummary.DepartmentId.Value,
+                positionProfileSummary.LocationId.Value,
+                vacancy.PositionProfileId,
                 request.GenderOther,
                 PersonalEmail: null,
                 candidate.Phone,

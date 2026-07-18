@@ -5,6 +5,9 @@
 @inject VacancyService VacancyService
 @inject DepartmentService DepartmentService
 @inject EmployeeService EmployeeService
+@inject PositionProfileService PositionProfileService
+@inject LocationService LocationService
+@inject AppSession Session
 
 @inherits EditPageBase<VacancyEditModel, Guid>
 
@@ -50,7 +53,7 @@
     else
     {
         <div class="d-flex align-items-center gap-3 mb-1">
-            <h1 class="mb-0 fs-4">@Model.Title</h1>
+            <h1 class="mb-0 fs-4">@(_vacancy?.EffectiveTitle ?? PageTitle)</h1>
             @if (_vacancy is not null)
             {
                 <StatusBadge Variant="@StatusVariant(_vacancy.Status)">@_vacancy.Status</StatusBadge>
@@ -140,14 +143,25 @@
     private GetVacancyResponse? _vacancy;
     private List<DepartmentListItemModel> _departments = [];
     private List<EmployeeListItemModel> _employees = [];
+    private List<LocationListItemModel> _locations = [];
+    private List<PositionProfileListItemModel> _positionProfiles = [];
+    private GetPositionProfileResponse? _selectedProfileDefaults;
     private bool _closing;
     private string? _closeError;
 
     private string PageTitle => IsNew ? "Add Vacancy"
-        : Model.Title.Trim().Length > 0 ? Model.Title
+        : _vacancy is not null ? _vacancy.EffectiveTitle
         : IsViewMode ? "View Vacancy" : "Edit Vacancy";
 
     private bool CanClose => _vacancy is not null && _vacancy.Status is not ("Closed" or "Cancelled") && !IsViewMode;
+
+    // Locked (CanChangePositionProfile == false) unless the user is requesting an authorised
+    // correction — gated behind the same Recruiter role that already owns UpdateVacancy
+    // ("recruitment:manage" on the API side), so re-enabling the dropdown here can never grant more
+    // access than the endpoint itself would allow.
+    private bool CanRequestCorrection => Session.IsRecruiter && _vacancy is not null && !_vacancy.CanChangePositionProfile;
+    private bool CanEditPositionProfile => IsNew || (_vacancy?.CanChangePositionProfile ?? false)
+        || (Model.IsAuthorisedCorrection && CanRequestCorrection);
 
     protected override IEditService<VacancyEditModel, Guid> Service => VacancyService;
     protected override Guid GetCompanyId() => CompanyId;
@@ -161,8 +175,36 @@
         var empResult = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
         _employees = empResult?.Items.ToList() ?? [];
 
+        var locationResult = await LocationService.ListLocationsAsync(CompanyId);
+        _locations = locationResult?.Items ?? [];
+
+        var profileResult = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
+        _positionProfiles = profileResult?.Items.ToList() ?? [];
+
         if (!IsNew)
+        {
             _vacancy = await VacancyService.GetVacancyAsync(CompanyId, Id!.Value);
+
+            // _positionProfiles is active-only (ListPositionProfilesAsync defaults to
+            // includeInactive: false), so if this vacancy's already-assigned profile has since
+            // gone inactive it won't be in that list. The Position Profile dropdown is disabled
+            // in edit mode, so without merging it in explicitly it would render blank instead of
+            // the correct title — same pattern as EmployeeEmploymentTab's manager merge.
+            if (_vacancy?.PositionProfileId is { } profileId && _positionProfiles.All(p => p.Id != profileId))
+            {
+                var profile = await PositionProfileService.GetPositionProfileAsync(CompanyId, profileId);
+                if (profile is not null)
+                {
+                    var departmentName = profile.DepartmentId is { } deptId
+                        ? _departments.FirstOrDefault(d => d.Id == deptId)?.Name
+                        : null;
+
+                    _positionProfiles.Add(new PositionProfileListItemModel(
+                        profile.Id, departmentName, profile.Title, profile.Description,
+                        profile.IsActive, profile.SalaryMin, profile.SalaryMax, profile.SalaryType));
+                }
+            }
+        }
     }
 
     protected override string? ListUrl => $"/companies/{CompanyId}/vacancies";
@@ -197,35 +239,185 @@
         _ => StatusBadgeVariant.Info,
     };
 
+    // Position Profile is selected first and drives the rest of the form. Department and location are
+    // both derived entirely from the linked Position Profile (shown read-only below) — there's no
+    // vacancy-level department or location to populate here anymore. AdvertTitle is a deliberate,
+    // genuinely-optional override, so it's intentionally left untouched here — it should stay empty
+    // unless the user explicitly types something.
+    private async Task OnPositionProfileChanged(ChangeEventArgs<Guid?, PositionProfileListItemModel> args)
+    {
+        Model.PositionProfileId = args.Value;
+        _selectedProfileDefaults = null;
+
+        if (args.Value is Guid profileId)
+        {
+            _selectedProfileDefaults = await PositionProfileService.GetPositionProfileAsync(CompanyId, profileId);
+        }
+    }
+
+    private void OnAuthorisedCorrectionToggled(Microsoft.AspNetCore.Components.ChangeEventArgs args)
+    {
+        Model.IsAuthorisedCorrection = args.Value is bool value && value;
+        if (!Model.IsAuthorisedCorrection)
+        {
+            Model.CorrectionReason = null;
+            // Revert to the vacancy's actual current Position Profile — the dropdown was only
+            // unlocked to allow a correction, so unchecking the box should not leave a pending
+            // change that would still be sent because it was selected while unlocked.
+            Model.PositionProfileId = _vacancy?.PositionProfileId ?? Model.PositionProfileId;
+        }
+    }
+
+    private string? SelectedProfileDepartmentName =>
+        _selectedProfileDefaults?.DepartmentId is { } deptId
+            ? _departments.FirstOrDefault(d => d.Id == deptId)?.Name
+            : null;
+
+    private string? SelectedProfileLocationName =>
+        _selectedProfileDefaults?.LocationId is { } locationId
+            ? _locations.FirstOrDefault(l => l.Id == locationId)?.Name
+            : null;
+
+    private string? LinkedProfileDepartmentName =>
+        _vacancy?.PositionProfileDepartmentId is { } deptId
+            ? _departments.FirstOrDefault(d => d.Id == deptId)?.Name
+            : null;
+
+    private static string ProfileSalaryRangeSummary(GetPositionProfileResponse profile) => (profile.SalaryMin, profile.SalaryMax) switch
+    {
+        (not null, not null) => $"{profile.SalaryMin:N0} - {profile.SalaryMax:N0}",
+        (not null, null) => $"From {profile.SalaryMin:N0}",
+        (null, not null) => $"Up to {profile.SalaryMax:N0}",
+        _ => string.Empty
+    };
+
     private RenderFragment RenderDetailsCard() => @<div class="row">
         <div class="col-lg-8">
             <div class="card mb-4">
                 <div class="card-header">
-                    <h5 class="mb-0">Vacancy Details</h5>
+                    <h5 class="mb-0">Position Profile</h5>
                 </div>
                 <div class="card-body @(IsViewMode ? "view-mode" : "")">
                     <div class="row g-3">
                         <div class="col-md-8">
-                            <label class="form-label">Title <span class="text-danger">*</span></label>
-                            <HrTextBox @bind-Value="Model.Title" Placeholder="e.g. Senior Software Engineer" />
-                            <ValidationMessage For="@(() => Model.Title)" />
+                            <label class="form-label">Position Profile <span class="text-danger">*</span></label>
+                            <SfDropDownList TValue="Guid?"
+                                            TItem="PositionProfileListItemModel"
+                                            DataSource="@_positionProfiles"
+                                            @bind-Value="Model.PositionProfileId"
+                                            Placeholder="Select position profile"
+                                            AllowFiltering="true"
+                                            Enabled="@CanEditPositionProfile">
+                                <DropDownListFieldSettings Value="Id" Text="Title" />
+                                <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?" ValueChange="OnPositionProfileChanged" />
+                            </SfDropDownList>
+                            <ValidationMessage For="@(() => Model.PositionProfileId)" />
+                            @if (IsNew)
+                            {
+                                <div class="form-text">Select the position profile first — it sets defaults for the fields below.</div>
+                            }
+                            else if (_vacancy is not null && !_vacancy.CanChangePositionProfile)
+                            {
+                                <div class="form-text">Position Profile cannot be changed after the vacancy has applications or has moved past Draft status@(CanRequestCorrection ? ", unless you request an authorised correction below." : ".")</div>
+                            }
+                        </div>
+                    </div>
+
+                    @if (CanRequestCorrection && !IsViewMode)
+                    {
+                        <div class="row g-3 mt-1" data-testid="position-profile-correction-section">
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="isAuthorisedCorrection"
+                                           checked="@Model.IsAuthorisedCorrection"
+                                           @onchange="OnAuthorisedCorrectionToggled" />
+                                    <label class="form-check-label" for="isAuthorisedCorrection">
+                                        This is an authorised correction
+                                    </label>
+                                </div>
+                            </div>
+                            @if (Model.IsAuthorisedCorrection)
+                            {
+                                <div class="col-md-8">
+                                    <label class="form-label">Correction Reason <span class="text-danger">*</span></label>
+                                    <HrTextBox @bind-Value="Model.CorrectionReason" Placeholder="Explain why this correction is required" />
+                                    <ValidationMessage For="@(() => Model.CorrectionReason)" />
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @if (_selectedProfileDefaults is not null)
+            {
+                <div class="card mb-4" data-testid="position-profile-defaults-summary">
+                    <div class="card-header">
+                        <h5 class="mb-0">From Position Profile</h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0 small">
+                            <dt class="col-5 text-muted fw-normal">Department</dt>
+                            <dd class="col-7">@(SelectedProfileDepartmentName ?? "None")</dd>
+                            <dt class="col-5 text-muted fw-normal">Location</dt>
+                            <dd class="col-7">@(SelectedProfileLocationName ?? "None")</dd>
+                            @if (_selectedProfileDefaults.SalaryMin is not null || _selectedProfileDefaults.SalaryMax is not null)
+                            {
+                                <dt class="col-5 text-muted fw-normal">Salary Range</dt>
+                                <dd class="col-7">@ProfileSalaryRangeSummary(_selectedProfileDefaults)</dd>
+                            }
+                        </dl>
+                    </div>
+                </div>
+            }
+
+            @if (_vacancy is not null)
+            {
+                <div class="card mb-4" data-testid="linked-position-profile-card">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <h5 class="mb-0">Linked Position Profile</h5>
+                        <a href="/companies/@CompanyId/position-profiles/@_vacancy.PositionProfileId/view">View Position Profile</a>
+                    </div>
+                    <div class="card-body">
+                        @if (_vacancy.PositionProfileTitle is null)
+                        {
+                            <p class="text-muted mb-0">No position profile linked.</p>
+                        }
+                        else
+                        {
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <span class="fw-semibold">@_vacancy.PositionProfileTitle</span>
+                                @if (_vacancy.PositionProfileIsActive == false)
+                                {
+                                    <ActiveStatusBadge IsActive="false" />
+                                }
+                            </div>
+                            <dl class="row mb-0 small">
+                                <dt class="col-5 text-muted fw-normal">Department</dt>
+                                <dd class="col-7">@(LinkedProfileDepartmentName ?? "None")</dd>
+                                <dt class="col-5 text-muted fw-normal">Location</dt>
+                                <dd class="col-7">@(_vacancy.EffectiveLocation ?? "None")</dd>
+                                <dt class="col-5 text-muted fw-normal">Description</dt>
+                                <dd class="col-7">@(string.IsNullOrWhiteSpace(_vacancy.PositionProfileDescription) ? "—" : _vacancy.PositionProfileDescription)</dd>
+                            </dl>
+                        }
+                    </div>
+                </div>
+            }
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Recruitment Advert Details</h5>
+                </div>
+                <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                    <div class="form-text mb-3">The role itself (title, department, location, job description) is defined by the Position Profile above. These fields are only for recruitment-specific advert wording — e.g. a tailored posting title/description.</div>
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Advert Title (optional)</label>
+                            <HrTextBox @bind-Value="Model.AdvertTitle" Placeholder="e.g. Senior Software Engineer" />
+                            <ValidationMessage For="@(() => Model.AdvertTitle)" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Location</label>
-                            <HrTextBox @bind-Value="Model.Location" Placeholder="e.g. Remote" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Department</label>
-                            <SfDropDownList TValue="Guid?"
-                                            TItem="DepartmentListItemModel"
-                                            DataSource="@_departments"
-                                            @bind-Value="Model.DepartmentId"
-                                            Placeholder="None"
-                                            AllowFiltering="true">
-                                <DropDownListFieldSettings Value="Id" Text="Name" />
-                            </SfDropDownList>
-                        </div>
-                        <div class="col-md-6">
                             <label class="form-label">Hiring Manager <span class="text-danger">*</span></label>
                             <SfDropDownList TValue="Guid?"
                                             TItem="EmployeeListItemModel"
@@ -246,8 +438,8 @@
                             <ValidationMessage For="@(() => Model.HiringManagerId)" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Description</label>
-                            <SfTextBox @bind-Value="Model.Description" Multiline="true" Rows="4" Readonly="@IsViewMode" />
+                            <label class="form-label">Advert Description (optional)</label>
+                            <SfTextBox @bind-Value="Model.AdvertDescription" Multiline="true" Rows="4" Readonly="@IsViewMode" />
                         </div>
                     </div>
                 </div>

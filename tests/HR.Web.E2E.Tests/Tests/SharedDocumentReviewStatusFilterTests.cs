@@ -45,7 +45,12 @@ public sealed class SharedDocumentReviewStatusFilterTests(AppFixture fixture) : 
 
             await GoToListPageAsync();
 
-            await Assertions.Expect(ReviewStatusCombobox).ToContainTextAsync("All review statuses");
+            // Syncfusion renders the placeholder via the underlying <input>'s native "placeholder"
+            // attribute (browser-rendered ghost text), not as actual DOM text content — a
+            // ToContainTextAsync check against the wrapping combobox span always sees "" here
+            // regardless of what the placeholder says. Assert on the attribute directly instead.
+            await Assertions.Expect(ReviewStatusCombobox.Locator("input"))
+                .ToHaveAttributeAsync("placeholder", "All review statuses");
             Assert.True(await IsTitleVisibleInGridAsync(title));
         }
         finally
@@ -315,10 +320,19 @@ public sealed class SharedDocumentReviewStatusFilterTests(AppFixture fixture) : 
 
         await dialog.GetByPlaceholder("Document title").FillAsync(title);
 
+        // Type into the filter input before clicking (same pattern as SelectFilterAsync/
+        // SelectReviewStatusAsync elsewhere in this suite) rather than clicking the option
+        // immediately after opening the popup. This dropdown has AllowFiltering="true" and
+        // clicking an option right after open — before typing settles the list — can catch
+        // Syncfusion mid-render, detaching the target <li> out from under the click ("element was
+        // detached from the DOM, retrying").
         var categoryGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
         await categoryGroup.Locator("span[role='combobox']").First.ClickAsync();
         await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await _page.Locator(".e-popup.e-ddl .e-list-item")
+        var categoryFilterInput = _page.Locator(".e-popup.e-ddl:visible input.e-input").First;
+        await categoryFilterInput.FillAsync("Policy");
+        await _page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
+        await _page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
             .Filter(new() { HasText = "Policy" })
             .First
             .ClickAsync();

@@ -65,12 +65,19 @@ public sealed class SharedDocumentReviewRenewalTests(AppFixture fixture) : E2ETe
             Assert.False(await detail.IsReviewDialogOpenAsync(),
                 "Expected the Complete Review dialog to close after a successful submission with a renewed file");
 
-            // Same footer assertion style as
-            // SharedDocumentCompleteReviewTests.CompleteReview_WithValidNotes_UpdatesFooterAndAdvancesNextReviewDate
-            // — proves complete-review still ran (not just the version upload).
+            // A real backend integration test (CompleteReview_AfterUploadingRenewedVersion_
+            // StillPersists_LastReviewedFields) proves the server genuinely persists
+            // LastReviewedAt/LastReviewedByEmployeeId correctly after this exact chained
+            // upload-version + complete-review sequence — so a footer that doesn't show "Last
+            // reviewed by" here is a client-side rendering/timing gap, not a backend bug.
+            // "Dialog closed" is an unreliable proxy for "the page's post-close reload
+            // (SharedDocumentDetail.razor's OnReviewCompletedAsync re-fetching _detail) has landed
+            // in the DOM" — the two can arrive in separate render batches. Assert directly on the
+            // footer's own content with Playwright's auto-retrying Expect instead of a one-shot
+            // read, so the assertion itself waits out that gap rather than a proxy signal.
             var expectedReviewedOn = DateTime.Today.ToString("d MMM yyyy");
-            var footerSummary = await detail.GetFooterSummaryTextAsync();
-            Assert.Contains($"Last reviewed by Laura Bennett on {expectedReviewedOn}", footerSummary);
+            await Assertions.Expect(detail.FooterSummary)
+                .ToContainTextAsync($"Last reviewed by Laura Bennett on {expectedReviewedOn}", new() { Timeout = 15_000 });
 
             // The renewed file must have gone through the version-retention mechanism (a second,
             // additive row) rather than silently replacing the first version in place.

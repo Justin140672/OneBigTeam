@@ -47,30 +47,28 @@
                 }
                 else
                 {
-                    @foreach (var member in _items.Take(8))
-                    {
-                        var m = member;
-                        <div @key="m.EmployeeId" class="task-widget-item task-widget-item--static">
-                            <ProfilePhotoAvatar PhotoUrl="@m.ProfilePhotoUrl" Initials="@Initials(m.FullName)" SizePx="36" />
-                            <div class="task-widget-content">
-                                <span class="task-widget-title">@m.FullName</span>
-                                <span class="task-widget-meta">@(m.JobTitle ?? "—")</span>
-                            </div>
-                            <div class="team-widget-contact">
-                                @if (!string.IsNullOrEmpty(m.PhoneNumber))
-                                {
-                                    <a href="tel:@m.PhoneNumber" title="@m.PhoneNumber" class="team-widget-contact-link" @onclick:stopPropagation="true">
-                                        <i class="fa-solid fa-phone"></i>
-                                        <span class="team-widget-contact-text">@m.PhoneNumber</span>
+                    <div class="team-card-grid">
+                        @foreach (var member in _items.Take(8))
+                        {
+                            var m = member;
+                            <div @key="m.EmployeeId" class="team-card">
+                                <ProfilePhotoAvatar PhotoUrl="@m.ProfilePhotoUrl" Initials="@Initials(m.FullName)" SizePx="48" />
+                                <span class="team-card-name" title="@m.FullName">@m.FullName</span>
+                                <span class="team-card-title" title="@(m.JobTitle ?? "—")">@(m.JobTitle ?? "—")</span>
+                                <div class="team-card-contact">
+                                    @if (!string.IsNullOrEmpty(m.PhoneNumber))
+                                    {
+                                        <a href="tel:@m.PhoneNumber" title="@m.PhoneNumber" class="team-card-contact-link">
+                                            <i class="fa-solid fa-phone"></i>
+                                        </a>
+                                    }
+                                    <a href="mailto:@m.WorkEmail" title="@m.WorkEmail" class="team-card-contact-link">
+                                        <i class="fa-solid fa-envelope"></i>
                                     </a>
-                                }
-                                <a href="mailto:@m.WorkEmail" title="@m.WorkEmail" class="team-widget-contact-link" @onclick:stopPropagation="true">
-                                    <i class="fa-solid fa-envelope"></i>
-                                    <span class="team-widget-contact-text">@m.WorkEmail</span>
-                                </a>
+                                </div>
                             </div>
-                        </div>
-                    }
+                        }
+                    </div>
                 }
             </div>
         </div>

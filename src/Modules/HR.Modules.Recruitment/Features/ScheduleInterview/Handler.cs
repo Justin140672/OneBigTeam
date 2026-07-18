@@ -10,7 +10,8 @@ internal sealed class ScheduleInterviewHandler(
     RecruitmentDbContext db,
     ITaskCreator taskCreator,
     INotificationWriter notificationWriter,
-    IClock clock)
+    IClock clock,
+    IPositionProfileReader positionProfileReader)
 {
     public async Task<Result<ScheduleInterviewResponse>> HandleAsync(
         ScheduleInterviewRequest request,
@@ -61,10 +62,18 @@ internal sealed class ScheduleInterviewHandler(
             .Select(c => c.FirstName + " " + c.LastName)
             .SingleOrDefaultAsync(cancellationToken) ?? "the candidate";
 
-        var vacancyTitle = await db.Vacancies
+        // Pure-display title for task/notification text — not the advert-vs-profile distinction, so
+        // resolved as AdvertTitle ?? PositionProfile.Title, same as the dashboard read features.
+        var vacancyFields = await db.Vacancies
             .Where(v => v.Id == application.VacancyId)
-            .Select(v => v.Title)
-            .SingleOrDefaultAsync(cancellationToken) ?? "this vacancy";
+            .Select(v => new { v.AdvertTitle, v.PositionProfileId })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        var vacancyPositionProfile = vacancyFields is not null
+            ? await positionProfileReader.GetSummaryAsync(request.CompanyId, vacancyFields.PositionProfileId, cancellationToken)
+            : null;
+
+        var vacancyTitle = vacancyFields?.AdvertTitle ?? vacancyPositionProfile?.Title ?? "this vacancy";
 
         var interviewDate = DateOnly.FromDateTime(request.ScheduledAt.UtcDateTime);
 

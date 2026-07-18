@@ -22,27 +22,29 @@
             <label class="form-label">Status</label>
             <SfDropDownList TValue="string" TItem="string"
                             DataSource="@_statusOptions"
-                            @bind-Value="_statusFilter"
-                            ValueChange="@(async () => await LoadDocumentsAsync())"
-                            Placeholder="All statuses" />
+                            Value="@_statusFilter"
+                            Placeholder="All statuses">
+                <DropDownListEvents TValue="string" TItem="string" ValueChange="OnStatusFilterChanged" />
+            </SfDropDownList>
         </div>
         <div class="col-md-2">
             <label class="form-label">Review Status</label>
             <SfDropDownList TValue="string" TItem="string"
                             DataSource="@_reviewStatusOptions"
-                            @bind-Value="_reviewStatusFilterDisplay"
-                            ValueChange="@(async () => await OnReviewStatusFilterChangedAsync())"
-                            Placeholder="All review statuses" />
+                            Value="@_reviewStatusFilterDisplay"
+                            Placeholder="All review statuses">
+                <DropDownListEvents TValue="string" TItem="string" ValueChange="OnReviewStatusFilterChanged" />
+            </SfDropDownList>
         </div>
         <div class="col-md-2">
             <label class="form-label">Category</label>
             <SfDropDownList TValue="Guid?" TItem="CompanyDocumentCategoryItem"
                             DataSource="@_categories"
-                            @bind-Value="_categoryFilter"
-                            ValueChange="@(async () => await LoadDocumentsAsync())"
+                            Value="@_categoryFilter"
                             Placeholder="All categories"
                             AllowFiltering="true">
                 <DropDownListFieldSettings Value="Id" Text="Name" />
+                <DropDownListEvents TValue="Guid?" TItem="CompanyDocumentCategoryItem" ValueChange="OnCategoryFilterChanged" />
             </SfDropDownList>
         </div>
         <div class="col-md-2">
@@ -155,11 +157,30 @@
         await LoadDocumentsAsync();
     }
 
-    private async Task OnReviewStatusFilterChangedAsync()
+    // Explicit typed ValueChange handlers rather than @bind-Value + a separate inline ValueChange
+    // lambda — the two can fire in an order where the reload runs before the bound field has
+    // actually been updated, reloading with the *previous* filter value (see EmployeeEdit.razor's
+    // OnPositionProfileChanged / VacancyList.razor's OnPositionProfileFilterChanged for the same
+    // established pattern: set the field from args.Value first, then reload, so there's no
+    // ambiguity about ordering).
+    private async Task OnStatusFilterChanged(ChangeEventArgs<string, string> args)
     {
+        _statusFilter = args.Value;
+        await LoadDocumentsAsync();
+    }
+
+    private async Task OnReviewStatusFilterChanged(ChangeEventArgs<string, string> args)
+    {
+        _reviewStatusFilterDisplay = args.Value;
         _reviewStatusFilter = _reviewStatusFilterDisplay is not null && ReviewStatusFilterMap.TryGetValue(_reviewStatusFilterDisplay, out var mapped)
             ? mapped
             : null;
+        await LoadDocumentsAsync();
+    }
+
+    private async Task OnCategoryFilterChanged(ChangeEventArgs<Guid?, CompanyDocumentCategoryItem> args)
+    {
+        _categoryFilter = args.Value;
         await LoadDocumentsAsync();
     }
 

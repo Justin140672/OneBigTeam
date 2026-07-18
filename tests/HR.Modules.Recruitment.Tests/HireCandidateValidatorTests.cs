@@ -17,9 +17,6 @@ public class HireCandidateValidatorTests
         Gender            = "Female",
         EmployeeNumber    = "EMP-0001",
         EmploymentTypeId  = Guid.NewGuid(),
-        DepartmentId      = Guid.NewGuid(),
-        LocationId        = Guid.NewGuid(),
-        PositionProfileId = Guid.NewGuid(),
     };
 
     [Fact]

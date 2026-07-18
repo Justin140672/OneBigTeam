@@ -96,7 +96,7 @@ public class GetPipelineSummaryHandlerTests
     private static (Vacancy Vacancy, List<Candidate> Candidates) SeedVacancyAndCandidates(
         RecruitmentDbContext db, Guid companyId, int candidateCount)
     {
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Software Engineer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Software Engineer", null, Guid.NewGuid(), Now);
         db.Vacancies.Add(vacancy);
 
         var candidates = new List<Candidate>();

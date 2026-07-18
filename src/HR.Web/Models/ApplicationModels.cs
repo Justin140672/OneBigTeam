@@ -65,6 +65,33 @@ public record ApplicationActionResponse(
 
 public record RejectCandidateRequest(Guid CompanyId, Guid VacancyId, Guid ApplicationId, string? RejectionReason);
 
+// Dedicated response for the Offer action (rather than the generic ApplicationActionResponse) so the
+// linked Position Profile's read-only employment defaults are available to the UI while HR decides to
+// make an offer. See OfferCandidateResponse (HR.Modules.Recruitment) for the authoritative shape.
+public record OfferCandidateResponse(
+    Guid Id,
+    Guid VacancyId,
+    Guid CandidateId,
+    string Status,
+    string? InterviewOutcome,
+    string? Notes,
+    DateTimeOffset AppliedAt,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt,
+    Guid PositionProfileId,
+    string? PositionProfileTitle,
+    decimal? SalaryMin,
+    decimal? SalaryMax,
+    string? SalaryType,
+    string? WorkingDaysOverride,
+    decimal? HoursPerDayOverride,
+    int? ProbationMonthsOverride,
+    Guid? DefaultLeavePolicyId,
+    string? LocationName);
+
+// Department, Location and Position Profile are no longer independently-entered fields — the hired
+// employee is always assigned to the Vacancy's own linked Position Profile (and the Department/Location
+// derived from it), resolved server-side by HireCandidateHandler. See that handler's remarks.
 public record HireCandidateRequest(
     Guid CompanyId,
     Guid VacancyId,
@@ -76,9 +103,6 @@ public record HireCandidateRequest(
     string? GenderOther,
     string EmployeeNumber,
     Guid EmploymentTypeId,
-    Guid DepartmentId,
-    Guid LocationId,
-    Guid PositionProfileId,
     Guid? ManagerId);
 
 public record HireCandidateResponse(

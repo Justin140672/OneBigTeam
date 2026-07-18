@@ -12,19 +12,25 @@ internal sealed class UpdateVacancyValidator : AbstractValidator<UpdateVacancyRe
         RuleFor(r => r.VacancyId)
             .NotEmpty();
 
-        RuleFor(r => r.Title)
-            .NotEmpty()
-            .MaximumLength(200);
+        RuleFor(r => r.PositionProfileId)
+            .NotEqual(Guid.Empty)
+            .When(r => r.PositionProfileId.HasValue);
 
-        RuleFor(r => r.Description)
-            .MaximumLength(4000)
-            .When(r => !string.IsNullOrWhiteSpace(r.Description));
-
-        RuleFor(r => r.Location)
+        RuleFor(r => r.AdvertTitle)
             .MaximumLength(200)
-            .When(r => !string.IsNullOrWhiteSpace(r.Location));
+            .When(r => !string.IsNullOrWhiteSpace(r.AdvertTitle));
+
+        RuleFor(r => r.AdvertDescription)
+            .MaximumLength(4000)
+            .When(r => !string.IsNullOrWhiteSpace(r.AdvertDescription));
 
         RuleFor(r => r.HiringManagerId)
             .NotEmpty();
+
+        RuleFor(r => r.CorrectionReason)
+            .NotEmpty()
+            .WithMessage("A reason is required when requesting an authorised correction.")
+            .MaximumLength(1000)
+            .When(r => r.IsAuthorisedCorrection);
     }
 }

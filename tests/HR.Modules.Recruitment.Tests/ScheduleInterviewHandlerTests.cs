@@ -17,7 +17,7 @@ public class ScheduleInterviewHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Senior Software Engineer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
         db.Vacancies.Add(vacancy);
@@ -56,7 +56,7 @@ public class ScheduleInterviewHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Backend Engineer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
         application.MoveToScreening(Now);
@@ -110,7 +110,7 @@ public class ScheduleInterviewHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Product Designer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", "olivia.grant@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
         application.MoveToScreening(Now);
@@ -145,7 +145,7 @@ public class ScheduleInterviewHandlerTests
         await using var db = BuildContext();
         var taskCreator = new FakeTaskCreator();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Senior Software Engineer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
         db.Vacancies.Add(vacancy);
@@ -215,7 +215,7 @@ public class ScheduleInterviewHandlerTests
         await using var db = BuildContext();
         var notificationWriter = new FakeNotificationWriter();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, null, "Senior Software Engineer", null, null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
         db.Vacancies.Add(vacancy);
@@ -269,11 +269,84 @@ public class ScheduleInterviewHandlerTests
         Assert.Empty(notificationWriter.Written);
     }
 
+    [Fact]
+    public async Task HandleAsync_Uses_PositionProfile_Title_In_Task_And_Notification_Text_When_AdvertTitle_Is_Null()
+    {
+        await using var db = BuildContext();
+        var taskCreator = new FakeTaskCreator();
+        var notificationWriter = new FakeNotificationWriter();
+        var companyId = Guid.NewGuid();
+        var positionProfileId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, null, null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var summaries = new Dictionary<Guid, PositionProfileSummary>
+        {
+            [positionProfileId] = new(positionProfileId, "Position Profile Title", null, null, true, null, null),
+        };
+
+        var result = await handler(db, taskCreator, notificationWriter, new FakePositionProfileReader(summaries: summaries)).HandleAsync(
+            new ScheduleInterviewRequest
+            {
+                CompanyId             = companyId,
+                VacancyId             = vacancy.Id,
+                ApplicationId         = application.Id,
+                InterviewerEmployeeId = Guid.NewGuid(),
+                ScheduledAt           = Now.AddDays(3),
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var prepTask = taskCreator.Created.Single(t => t.ActionType == TaskActionType.Review);
+        Assert.Contains("Position Profile Title", prepTask.Description);
+        var notification = Assert.Single(notificationWriter.Written);
+        Assert.Contains("Position Profile Title", notification.Body);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Falls_Back_To_This_Vacancy_In_Task_Text_When_No_AdvertTitle_Or_PositionProfile()
+    {
+        await using var db = BuildContext();
+        var taskCreator = new FakeTaskCreator();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), null, null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        // No summaries dictionary supplied — simulates the linked profile no longer being resolvable.
+        var result = await handler(db, taskCreator).HandleAsync(
+            new ScheduleInterviewRequest
+            {
+                CompanyId             = companyId,
+                VacancyId             = vacancy.Id,
+                ApplicationId         = application.Id,
+                InterviewerEmployeeId = Guid.NewGuid(),
+                ScheduledAt           = Now.AddDays(3),
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var prepTask = taskCreator.Created.Single(t => t.ActionType == TaskActionType.Review);
+        Assert.Contains("this vacancy", prepTask.Description);
+    }
+
     private static ScheduleInterviewHandler handler(
         RecruitmentDbContext db,
         FakeTaskCreator? taskCreator = null,
-        FakeNotificationWriter? notificationWriter = null) =>
-        new(db, taskCreator ?? new FakeTaskCreator(), notificationWriter ?? new FakeNotificationWriter(), new FakeClock(FixedUtcNow));
+        FakeNotificationWriter? notificationWriter = null,
+        IPositionProfileReader? positionProfileReader = null) =>
+        new(db, taskCreator ?? new FakeTaskCreator(), notificationWriter ?? new FakeNotificationWriter(), new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()
