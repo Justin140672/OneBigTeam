@@ -638,6 +638,15 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             .ClickAsync();
     }
 
+    /// <summary>Reads the current value of a Hire Candidate dialog dropdown's visible text, identified by nearby label text.</summary>
+    public async Task<string?> GetSelectedHireDropdownTextAsync(string labelText)
+    {
+        var group = page.Locator(".hire-candidate-dialog .col-md-6")
+            .Filter(new() { HasText = labelText })
+            .First;
+        return await group.Locator(".e-input-group input").First.InputValueAsync();
+    }
+
     /// <summary>
     /// Reads the read-only "Position Profile" value shown in the (currently open) Hire Candidate
     /// dialog (data-testid="hire-derived-position-profile") — derived server-side from the

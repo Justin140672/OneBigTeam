@@ -62,4 +62,36 @@ public sealed class OnboardingTemplateManagementTests(AppFixture fixture) : E2ET
         Assert.Equal(updatedName, await templateEdit.GetNameAsync());
         Assert.Equal(updatedTaskTitle, await templateEdit.GetTaskTitleAsync());
     }
+
+    [Fact]
+    public async Task DeactivateOnboardingTemplate_HiddenFromActiveList_VisibleWhenShowingInactive()
+    {
+        var templateName = $"E2E Onboarding Deact {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login        = new LoginPage(_page, _fixture.WebBaseUrl);
+        var templateList = new OnboardingTemplateListPage(_page, _fixture.WebBaseUrl);
+        var templateEdit = new OnboardingTemplateEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Create first
+        await templateEdit.GoToNewAsync(AcmeId);
+        await templateEdit.FillNameAsync(templateName);
+        await templateEdit.SaveAsync();
+
+        // Now deactivate
+        await templateList.GoToAsync(AcmeId);
+        Assert.True(await templateList.IsActiveAsync(templateName), "Expected newly created template to be Active");
+        await templateList.DeactivateAsync(templateName);
+
+        Assert.False(await templateList.HasItemAsync(templateName),
+            "Expected deactivated template to be hidden from the default active-only list");
+
+        // Show inactive and verify
+        await templateList.ShowInactiveAsync();
+
+        Assert.True(await templateList.HasItemAsync(templateName),
+            "Expected deactivated template to appear when 'Show inactive' is enabled");
+    }
 }

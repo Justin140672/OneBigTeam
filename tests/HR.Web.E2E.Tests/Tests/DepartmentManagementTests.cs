@@ -89,6 +89,39 @@ public sealed class DepartmentManagementTests(AppFixture fixture) : E2ETestBase(
     }
 
     [Fact]
+    public async Task DeactivateDepartment_HidesFromActiveList_ShowsWhenInactiveToggled()
+    {
+        var deptName = $"E2E Deact {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var deptList = new DepartmentListPage(_page, _fixture.WebBaseUrl);
+        var deptEdit = new DepartmentEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Create first.
+        await deptList.GoToAsync(AcmeId);
+        await deptList.ClickNewDepartmentAsync();
+        await deptEdit.FillNameAsync(deptName);
+        await deptEdit.SaveAsync();
+
+        // Deactivate.
+        await deptList.GoToAsync(AcmeId);
+        Assert.True(await deptList.IsActiveAsync(deptName), "Expected newly created department to be Active");
+        await deptList.DeactivateDepartmentAsync(deptName);
+
+        Assert.False(await deptList.HasDepartmentAsync(deptName),
+            $"Expected '{deptName}' to no longer appear in the default active-only view after deactivation");
+
+        // Show inactive and verify it reappears.
+        await deptList.ShowInactiveAsync();
+
+        Assert.True(await deptList.HasDepartmentAsync(deptName),
+            "Expected deactivated department to appear when 'Show Inactive' is enabled");
+    }
+
+    [Fact]
     public async Task EditDepartment_PersistsAcrossReload()
     {
         var originalName = $"E2E Dept Edit {Guid.NewGuid().ToString("N")[..8]}";

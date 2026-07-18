@@ -98,8 +98,7 @@
                                             DataSource="@_reviewOwnerOptions"
                                             @bind-Value="Model.ReviewOwnerEmployeeId"
                                             Placeholder="None"
-                                            AllowFiltering="true"
-                                            ShowClearButton="true">
+                                            AllowFiltering="true">
                                 <DropDownListFieldSettings Value="Id" Text="Name" />
                                 <DropDownListEvents TValue="Guid?" TItem="ReviewOwnerOption" Filtering="OnReviewOwnerFilteringAsync" />
                             </SfDropDownList>
@@ -155,6 +154,8 @@
             .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .ToList();
 
+        Model.ReviewOwnerEmployeeId = Guid.Empty;
+
         if (Document is not null)
         {
             Model.Title = Document.Title;
@@ -164,7 +165,7 @@
             Model.ReviewDate = Document.ReviewDate;
             Model.ReviewFrequency = Document.ReviewFrequency;
             Model.CustomReviewFrequencyMonths = Document.CustomReviewFrequencyMonths;
-            Model.ReviewOwnerEmployeeId = Document.ReviewOwnerEmployeeId;
+            Model.ReviewOwnerEmployeeId = Document.ReviewOwnerEmployeeId ?? Guid.Empty;
 
             // The current review owner might not fall within the first page above — merge them in
             // explicitly so their name always renders rather than blank, same as the manager
@@ -173,7 +174,9 @@
                 _reviewOwnerOptions.Add(new ReviewOwnerOption(reviewOwnerId, Document.ReviewOwnerName ?? ""));
         }
 
-        _reviewOwnerOptions = _reviewOwnerOptions.OrderBy(o => o.Name).ToList();
+        _reviewOwnerOptions = _reviewOwnerOptions.OrderBy(o => o.Name)
+            .Prepend(new ReviewOwnerOption(Guid.Empty, "Not assigned"))
+            .ToList();
 
         _dataLoaded = true;
     }
@@ -188,6 +191,7 @@
         _reviewOwnerOptions = (result?.Items ?? [])
             .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .OrderBy(e => e.Name)
+            .Prepend(new ReviewOwnerOption(Guid.Empty, "Not assigned"))
             .ToList();
         await _reviewOwnerDropdown.FilterAsync(_reviewOwnerOptions, new Query());
     }
@@ -211,7 +215,7 @@
             Model.Title, Model.Description, Model.CategoryId!.Value,
             Model.EffectiveDate, Model.ReviewDate,
             Model.ReviewFrequency, Model.CustomReviewFrequencyMonths,
-            Model.ReviewOwnerEmployeeId);
+            Model.ReviewOwnerEmployeeId == Guid.Empty ? null : Model.ReviewOwnerEmployeeId);
     }
 
     protected override void ResetForm()

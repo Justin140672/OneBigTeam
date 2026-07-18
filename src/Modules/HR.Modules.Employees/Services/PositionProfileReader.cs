@@ -46,7 +46,7 @@ internal sealed class PositionProfileReader(EmployeesDbContext dbContext)
         return dbContext.PositionProfiles
             .AsNoTracking()
             .Where(p => p.Id == positionProfileId && p.CompanyId == companyId && p.IsActive)
-            .Select(p => p.DepartmentId)
+            .Select(p => (Guid?)p.DepartmentId)
             .FirstOrDefaultAsync(cancellationToken);
     }
 

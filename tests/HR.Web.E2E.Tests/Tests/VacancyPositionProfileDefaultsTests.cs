@@ -46,6 +46,9 @@ public sealed class VacancyPositionProfileDefaultsTests(AppFixture fixture) : E2
 
         await ppEdit.FillTitleAsync(profileTitle);
         await ppEdit.SelectDepartmentAsync("Engineering");
+        // Location and Default Leave Policy are now mandatory on Position Profile.
+        await ppEdit.SelectLocationAsync("London Office");
+        await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
         await ppEdit.FillSalaryRangeAsync(50000, 70000);
         await ppEdit.SaveAsync();
 

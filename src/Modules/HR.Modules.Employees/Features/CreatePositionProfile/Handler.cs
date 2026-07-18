@@ -23,36 +23,30 @@ internal sealed class CreatePositionProfileHandler
         CreatePositionProfileRequest request,
         CancellationToken cancellationToken)
     {
-        if (request.DepartmentId is not null)
-        {
-            var departmentExists = await _dbContext.Departments
-                .AnyAsync(
-                    d => d.Id == request.DepartmentId &&
-                         d.CompanyId == request.CompanyId &&
-                         d.IsActive,
-                    cancellationToken);
+        var departmentExists = await _dbContext.Departments
+            .AnyAsync(
+                d => d.Id == request.DepartmentId &&
+                     d.CompanyId == request.CompanyId &&
+                     d.IsActive,
+                cancellationToken);
 
-            if (!departmentExists)
-            {
-                return Result.Failure<CreatePositionProfileResponse>(
-                    Error.NotFound($"Department '{request.DepartmentId}' was not found."));
-            }
+        if (!departmentExists)
+        {
+            return Result.Failure<CreatePositionProfileResponse>(
+                Error.NotFound($"Department '{request.DepartmentId}' was not found."));
         }
 
-        if (request.LocationId is not null)
-        {
-            var locationExists = await _dbContext.Locations
-                .AnyAsync(
-                    l => l.Id == request.LocationId &&
-                         l.CompanyId == request.CompanyId &&
-                         l.IsActive,
-                    cancellationToken);
+        var locationExists = await _dbContext.Locations
+            .AnyAsync(
+                l => l.Id == request.LocationId &&
+                     l.CompanyId == request.CompanyId &&
+                     l.IsActive,
+                cancellationToken);
 
-            if (!locationExists)
-            {
-                return Result.Failure<CreatePositionProfileResponse>(
-                    Error.NotFound($"Location '{request.LocationId}' was not found."));
-            }
+        if (!locationExists)
+        {
+            return Result.Failure<CreatePositionProfileResponse>(
+                Error.NotFound($"Location '{request.LocationId}' was not found."));
         }
 
         var titleExists = await _dbContext.PositionProfiles
@@ -68,16 +62,13 @@ internal sealed class CreatePositionProfileHandler
                 Error.Conflict($"An active position profile titled '{request.Title.Trim()}' already exists in this company."));
         }
 
-        if (request.DefaultLeavePolicyId is not null)
-        {
-            var leavePolicyExists = await _leavePolicyReader.ExistsAsync(
-                request.CompanyId, request.DefaultLeavePolicyId.Value, cancellationToken);
+        var leavePolicyExists = await _leavePolicyReader.ExistsAsync(
+            request.CompanyId, request.DefaultLeavePolicyId, cancellationToken);
 
-            if (!leavePolicyExists)
-            {
-                return Result.Failure<CreatePositionProfileResponse>(
-                    Error.NotFound($"Leave policy '{request.DefaultLeavePolicyId}' was not found."));
-            }
+        if (!leavePolicyExists)
+        {
+            return Result.Failure<CreatePositionProfileResponse>(
+                Error.NotFound($"Leave policy '{request.DefaultLeavePolicyId}' was not found."));
         }
 
         if (request.OnboardingTemplateId is not null)

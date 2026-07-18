@@ -11,8 +11,8 @@ internal sealed class PositionProfile
 
     public Guid Id { get; private set; }
     public Guid CompanyId { get; private set; }
-    public Guid? DepartmentId { get; private set; }
-    public Guid? LocationId { get; private set; }
+    public Guid DepartmentId { get; private set; }
+    public Guid LocationId { get; private set; }
     public string Title { get; private set; } = string.Empty;
     public string? Description { get; private set; }
     public int? ProbationMonthsOverride { get; private set; }
@@ -21,7 +21,7 @@ internal sealed class PositionProfile
     public decimal? SalaryMin { get; private set; }
     public decimal? SalaryMax { get; private set; }
     public SalaryType? SalaryType { get; private set; }
-    public Guid? DefaultLeavePolicyId { get; private set; }
+    public Guid DefaultLeavePolicyId { get; private set; }
     public Guid? OnboardingTemplateId { get; private set; }
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -33,8 +33,8 @@ internal sealed class PositionProfile
     public static PositionProfile Create(
         Guid id,
         Guid companyId,
-        Guid? departmentId,
-        Guid? locationId,
+        Guid departmentId,
+        Guid locationId,
         string title,
         string? description,
         int? probationMonthsOverride,
@@ -43,7 +43,7 @@ internal sealed class PositionProfile
         decimal? salaryMin,
         decimal? salaryMax,
         SalaryType? salaryType,
-        Guid? defaultLeavePolicyId,
+        Guid defaultLeavePolicyId,
         DateTimeOffset now,
         Guid? onboardingTemplateId = null)
     {
@@ -70,8 +70,8 @@ internal sealed class PositionProfile
     }
 
     public void Update(
-        Guid? departmentId,
-        Guid? locationId,
+        Guid departmentId,
+        Guid locationId,
         string title,
         string? description,
         int? probationMonthsOverride,
@@ -80,7 +80,7 @@ internal sealed class PositionProfile
         decimal? salaryMin,
         decimal? salaryMax,
         SalaryType? salaryType,
-        Guid? defaultLeavePolicyId,
+        Guid defaultLeavePolicyId,
         DateTimeOffset now,
         Guid? onboardingTemplateId = null)
     {

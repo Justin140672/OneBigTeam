@@ -68,10 +68,10 @@ public class GetVacancyEndpointTests : IClassFixture<ApiWebApplicationFactory>
             departmentId = Guid.NewGuid();
             var department = Department.Create(departmentId, companyId, "Engineering", null, Now);
             var positionProfile = PositionProfile.Create(
-                Guid.NewGuid(), companyId, departmentId, locationId: null, "Backend Engineer",
+                Guid.NewGuid(), companyId, departmentId, locationId: Guid.NewGuid(), "Backend Engineer",
                 description: "Owns the payments platform", probationMonthsOverride: null,
                 workingDaysOverride: null, hoursPerDayOverride: null, salaryMin: null, salaryMax: null,
-                salaryType: null, defaultLeavePolicyId: null, Now);
+                salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), Now);
             employeesDb.Departments.Add(department);
             employeesDb.PositionProfiles.Add(positionProfile);
             await employeesDb.SaveChangesAsync();
@@ -109,10 +109,10 @@ public class GetVacancyEndpointTests : IClassFixture<ApiWebApplicationFactory>
         {
             var employeesDb = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
             var positionProfile = PositionProfile.Create(
-                Guid.NewGuid(), companyId, null, locationId: null, "Legacy Support Engineer",
+                Guid.NewGuid(), companyId, Guid.NewGuid(), locationId: Guid.NewGuid(), "Legacy Support Engineer",
                 description: "Legacy on-call support", probationMonthsOverride: null,
                 workingDaysOverride: null, hoursPerDayOverride: null, salaryMin: null, salaryMax: null,
-                salaryType: null, defaultLeavePolicyId: null, Now);
+                salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), Now);
             positionProfile.Deactivate(Now);
             employeesDb.PositionProfiles.Add(positionProfile);
             await employeesDb.SaveChangesAsync();

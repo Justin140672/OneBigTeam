@@ -28,4 +28,32 @@ public sealed class DocumentTypeListPage(IPage page, string baseUrl)
             .Filter(new() { HasText = nameFragment })
             .First
             .IsVisibleAsync();
+
+    public async Task DeactivateAsync(string nameFragment)
+    {
+        var row = page.Locator(".e-row")
+            .Filter(new() { HasText = nameFragment })
+            .First;
+        await row.ClickAsync();
+        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Deactivate" });
+        await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await btn.ClickAsync();
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
+    public async Task<bool> IsActiveAsync(string nameFragment)
+    {
+        var row = page.Locator(".e-row")
+            .Filter(new() { HasText = nameFragment })
+            .First;
+        return await row.Locator(".status-badge.status-badge--success").IsVisibleAsync();
+    }
+
+    public async Task ShowInactiveAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Show Inactive" }).ClickAsync();
+        await page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow, .alert-danger", new() { Timeout = 15_000 });
+    }
 }

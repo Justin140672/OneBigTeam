@@ -10,6 +10,15 @@ internal sealed class CreatePositionProfileValidator : AbstractValidator<CreateP
         RuleFor(r => r.CompanyId)
             .NotEmpty();
 
+        RuleFor(r => r.DepartmentId)
+            .NotEmpty();
+
+        RuleFor(r => r.LocationId)
+            .NotEmpty();
+
+        RuleFor(r => r.DefaultLeavePolicyId)
+            .NotEmpty();
+
         RuleFor(r => r.Title)
             .NotEmpty()
             .MaximumLength(200);

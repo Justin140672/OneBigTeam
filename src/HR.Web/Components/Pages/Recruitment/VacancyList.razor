@@ -19,8 +19,7 @@
                             DataSource="@_positionProfiles"
                             Value="@_positionProfileFilter"
                             Placeholder="All position profiles"
-                            AllowFiltering="true"
-                            ShowClearButton="true">
+                            AllowFiltering="true">
                 <DropDownListFieldSettings Value="Id" Text="Title" />
                 <DropDownListEvents TValue="Guid?" TItem="PositionProfileListItemModel" ValueChange="OnPositionProfileFilterChanged" />
             </SfDropDownList>
@@ -31,8 +30,7 @@
                             DataSource="@_departments"
                             Value="@_departmentFilter"
                             Placeholder="All departments"
-                            AllowFiltering="true"
-                            ShowClearButton="true">
+                            AllowFiltering="true">
                 <DropDownListFieldSettings Value="Id" Text="Name" />
                 <DropDownListEvents TValue="Guid?" TItem="DepartmentListItemModel" ValueChange="OnDepartmentFilterChanged" />
             </SfDropDownList>

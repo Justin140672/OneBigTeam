@@ -6,8 +6,8 @@ namespace HR.Modules.Employees.Features.UpdatePositionProfile;
 internal sealed record UpdatePositionProfileResponse(
     Guid Id,
     Guid CompanyId,
-    Guid? DepartmentId,
-    Guid? LocationId,
+    Guid DepartmentId,
+    Guid LocationId,
     string Title,
     string? Description,
     int? ProbationMonthsOverride,
@@ -16,7 +16,7 @@ internal sealed record UpdatePositionProfileResponse(
     decimal? SalaryMin,
     decimal? SalaryMax,
     SalaryType? SalaryType,
-    Guid? DefaultLeavePolicyId,
+    Guid DefaultLeavePolicyId,
     Guid? OnboardingTemplateId,
     bool IsActive,
     DateTimeOffset UpdatedAt);

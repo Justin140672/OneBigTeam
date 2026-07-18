@@ -340,6 +340,12 @@ public static class EmployeesModule
             db.LocationTypes.Add(LocationType.Create(locTypeOfficeId, acmeId, "Office", null, now));
             db.Locations.Add(Location.Create(locLondonId, acmeId, locTypeOfficeId, "London Office", null, now));
 
+            // Shared with HR.Modules.Leave's seed data (LeaveModule.SeedLeaveAsync) — Employees cannot
+            // reference Leave's DbContext/entities directly (no cross-module DB references), so both
+            // modules seed the same hardcoded LeavePolicy id constant, matching the existing pattern
+            // used for shared CompanyId constants across module seed methods.
+            var acmeLeavePolicyId = Guid.Parse("C0000000-0000-0000-0000-000000000001");
+
             var posCtoId        = Guid.Parse("20000000-0000-0000-0000-000000000001");
             var posSenDevId     = Guid.Parse("20000000-0000-0000-0000-000000000002");
             var posDevId        = Guid.Parse("20000000-0000-0000-0000-000000000003");
@@ -350,14 +356,14 @@ public static class EmployeesModule
             var posAeId         = Guid.Parse("20000000-0000-0000-0000-000000000008");
 
             db.PositionProfiles.AddRange(
-                PositionProfile.Create(posCtoId,        acmeId, deptEngId,     null, "Chief Technology Officer", null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posSenDevId,     acmeId, deptEngId,     locLondonId, "Senior Software Engineer", null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posDevId,        acmeId, deptEngId,     null, "Software Engineer",        null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posHrMgrId,      acmeId, deptHrId,      null, "HR Manager",               null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posHrAdvisorId,  acmeId, deptHrId,      null, "HR Advisor",               null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posFinanceMgrId, acmeId, deptFinanceId, null, "Finance Manager",          null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posSalesMgrId,   acmeId, deptSalesId,   null, "Sales Manager",            null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(posAeId,         acmeId, deptSalesId,   null, "Account Executive",        null, null, null, null, null, null, null, null, now));
+                PositionProfile.Create(posCtoId,        acmeId, deptEngId,     locLondonId, "Chief Technology Officer", null, null, null, null, null, null, null, acmeLeavePolicyId, now),
+                PositionProfile.Create(posSenDevId,     acmeId, deptEngId,     locLondonId, "Senior Software Engineer", null, null, null, null, null, null, null, acmeLeavePolicyId, now),
+                PositionProfile.Create(posDevId,        acmeId, deptEngId,     locLondonId, "Software Engineer",        null, null, null, null, null, null, null, acmeLeavePolicyId, now),
+                PositionProfile.Create(posHrMgrId,      acmeId, deptHrId,      locLondonId, "HR Manager",               null, null, null, null, null, null, null, acmeLeavePolicyId, now),
+                PositionProfile.Create(posHrAdvisorId,  acmeId, deptHrId,      locLondonId, "HR Advisor",               null, null, null, null, null, null, null, acmeLeavePolicyId, now),
+                PositionProfile.Create(posFinanceMgrId, acmeId, deptFinanceId, locLondonId, "Finance Manager",          null, null, null, null, null, null, null, acmeLeavePolicyId, now),
+                PositionProfile.Create(posSalesMgrId,   acmeId, deptSalesId,   locLondonId, "Sales Manager",            null, null, null, null, null, null, null, acmeLeavePolicyId, now),
+                PositionProfile.Create(posAeId,         acmeId, deptSalesId,   locLondonId, "Account Executive",        null, null, null, null, null, null, null, acmeLeavePolicyId, now));
 
             var empCtoId      = Guid.Parse("30000000-0000-0000-0000-000000000001");
             var empSenDev1Id  = Guid.Parse("30000000-0000-0000-0000-000000000002");
@@ -442,9 +448,12 @@ public static class EmployeesModule
             db.LocationTypes.Add(LocationType.Create(betaLocTypeOfficeId, betaCorpId, "Office", null, now));
             db.Locations.Add(Location.Create(betaLocLeedsId, betaCorpId, betaLocTypeOfficeId, "Leeds Office", null, now));
 
+            // Shared with HR.Modules.Leave's seed data — see the acmeLeavePolicyId comment above.
+            var betaLeavePolicyId = Guid.Parse("C0000000-0000-0000-0000-000000000002");
+
             db.PositionProfiles.AddRange(
-                PositionProfile.Create(betaPosEngMgrId, betaCorpId, betaDeptEngId, null, "Engineering Manager", null, null, null, null, null, null, null, null, now),
-                PositionProfile.Create(betaPosDevId,    betaCorpId, betaDeptEngId, null, "Software Developer",  null, null, null, null, null, null, null, null, now));
+                PositionProfile.Create(betaPosEngMgrId, betaCorpId, betaDeptEngId, betaLocLeedsId, "Engineering Manager", null, null, null, null, null, null, null, betaLeavePolicyId, now),
+                PositionProfile.Create(betaPosDevId,    betaCorpId, betaDeptEngId, betaLocLeedsId, "Software Developer",  null, null, null, null, null, null, null, betaLeavePolicyId, now));
 
             Employee MakeBeta(Guid id, string first, string last, string email, DateOnly start,
                               Guid posId, Guid? managerId, DateOnly dob, string nationality, string gender,

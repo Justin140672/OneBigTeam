@@ -67,6 +67,23 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
             .ClickAsync();
     }
 
+    /// <summary>Selects a value from the Location dropdown on the position profile create/edit form.
+    /// Location is now mandatory (see DepartmentId/LocationId/DefaultLeavePolicyId required-fields
+    /// change), so every create/edit flow that saves successfully must call this.</summary>
+    public async Task SelectLocationAsync(string nameFragment)
+    {
+        var field = page.Locator(".mb-3", new PageLocatorOptions { HasText = "Location" }).First;
+        await field.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
+        await filterInput.FillAsync(nameFragment);
+        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
+            .Filter(new() { HasText = nameFragment })
+            .First
+            .ClickAsync();
+    }
+
     public async Task SetUseCompanyWorkingPatternAsync(bool useCompanyDefault)
     {
         var checkbox = page.GetByLabel("Use company working pattern");
@@ -86,6 +103,43 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
             .Filter(new() { HasText = leavePolicyName })
             .First
             .ClickAsync(new() { Timeout = 10_000 });
+    }
+
+    /// <summary>Selects a value from the Onboarding Template dropdown on the position profile create/edit form.</summary>
+    public async Task SelectOnboardingTemplateAsync(string nameFragment)
+    {
+        var field = page.Locator(".mb-3", new PageLocatorOptions { HasText = "Onboarding Template" });
+        await field.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = nameFragment })
+            .First
+            .ClickAsync(new() { Timeout = 10_000 });
+    }
+
+    /// <summary>
+    /// Clears the Onboarding Template selection by opening its dropdown and selecting the
+    /// prepended "None" sentinel item (Id = Guid.Empty) — replaces the old ShowClearButton ("x"
+    /// icon) approach, which was removed in favor of this explicit no-selection list item (see
+    /// PositionProfileEdit.razor's OnboardingTemplateListItemModel list, which prepends a
+    /// Guid.Empty/"None" entry).
+    /// </summary>
+    public async Task ClearOnboardingTemplateAsync()
+    {
+        var field = page.Locator(".mb-3", new PageLocatorOptions { HasText = "Onboarding Template" });
+        await field.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = "None" })
+            .First
+            .ClickAsync(new() { Timeout = 10_000 });
+    }
+
+    /// <summary>Reads the current value of the Onboarding Template dropdown's visible text.</summary>
+    public async Task<string?> GetSelectedOnboardingTemplateTextAsync()
+    {
+        var field = page.Locator(".mb-3", new PageLocatorOptions { HasText = "Onboarding Template" });
+        return await field.Locator(".e-input-group input").First.InputValueAsync();
     }
 
     private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");

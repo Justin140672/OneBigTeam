@@ -83,4 +83,38 @@ public sealed class LocationManagementTests(AppFixture fixture) : E2ETestBase(fi
 
         Assert.Equal(updatedName, await locationEdit.GetNameAsync());
     }
+
+    [Fact]
+    public async Task DeactivateLocation_HiddenFromActiveList_VisibleWhenShowingInactive()
+    {
+        var locationName = $"E2E Location Deact {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var locationList = new LocationListPage(_page, _fixture.WebBaseUrl);
+        var locationEdit = new LocationEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Create first
+        await locationList.GoToAsync(AcmeId);
+        await locationList.ClickNewLocationAsync();
+        await locationEdit.FillNameAsync(locationName);
+        await locationEdit.SelectLocationTypeAsync(SeededLocationTypeName);
+        await locationEdit.SaveAsync();
+
+        // Now deactivate
+        await locationList.GoToAsync(AcmeId);
+        Assert.True(await locationList.IsActiveAsync(locationName), "Expected newly created location to be Active");
+        await locationList.DeactivateAsync(locationName);
+
+        Assert.False(await locationList.HasLocationAsync(locationName),
+            "Expected deactivated location to be hidden from the default active-only list");
+
+        // Show inactive and verify
+        await locationList.ShowInactiveAsync();
+
+        Assert.True(await locationList.HasLocationAsync(locationName),
+            "Expected deactivated location to appear when 'Show inactive' is enabled");
+    }
 }

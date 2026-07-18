@@ -19,7 +19,7 @@ public class AddOnboardingTemplateHandlerTests
         var actorId = Guid.NewGuid();
         var auditPublisher = new FakeAuditPublisher();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.PositionProfiles.Add(profile);
 
         var template = OnboardingTemplate.Create(Guid.NewGuid(), companyId, "Standard Onboarding", null, Now);
@@ -71,7 +71,7 @@ public class AddOnboardingTemplateHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Profile_Belongs_To_Different_Company()
     {
         await using var context = BuildContext();
-        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -92,7 +92,7 @@ public class AddOnboardingTemplateHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -113,7 +113,7 @@ public class AddOnboardingTemplateHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.PositionProfiles.Add(profile);
 
         var template = OnboardingTemplate.Create(Guid.NewGuid(), companyId, "Standard Onboarding", null, Now);
@@ -138,7 +138,7 @@ public class AddOnboardingTemplateHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.PositionProfiles.Add(profile);
 
         var template = OnboardingTemplate.Create(Guid.NewGuid(), Guid.NewGuid(), "Standard Onboarding", null, Now);
@@ -162,7 +162,7 @@ public class AddOnboardingTemplateHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.PositionProfiles.Add(profile);
 
         var template = OnboardingTemplate.Create(Guid.NewGuid(), companyId, "Standard Onboarding", null, Now);
@@ -190,7 +190,7 @@ public class AddOnboardingTemplateHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.PositionProfiles.Add(profile);
 
         var template = OnboardingTemplate.Create(Guid.NewGuid(), companyId, "Standard Onboarding", null, Now);
@@ -218,8 +218,8 @@ public class AddOnboardingTemplateHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profileA = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
-        var profileB = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Manager", null, null, null, null, null, null, null, null, Now);
+        var profileA = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+        var profileB = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Manager", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.PositionProfiles.AddRange(profileA, profileB);
 
         var template = OnboardingTemplate.Create(Guid.NewGuid(), companyId, "Standard Onboarding", null, Now);

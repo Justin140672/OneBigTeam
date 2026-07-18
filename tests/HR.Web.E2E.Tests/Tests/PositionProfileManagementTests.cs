@@ -52,6 +52,10 @@ public sealed class PositionProfileManagementTests(AppFixture fixture) : E2ETest
 
         await ppEdit.FillTitleAsync(profileTitle);
         await ppEdit.FillDescriptionAsync("Created by E2E test");
+        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
+        await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.SelectLocationAsync("London Office");
+        await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
         await ppEdit.SaveAsync();
 
         Assert.True(await ppList.HasPositionProfileAsync(profileTitle),
@@ -76,6 +80,9 @@ public sealed class PositionProfileManagementTests(AppFixture fixture) : E2ETest
         await ppEdit.FillTitleAsync(profileTitle);
         await ppEdit.FillProbationMonthsOverrideAsync(3);
         await ppEdit.FillSalaryRangeAsync(40000, 60000);
+        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
+        await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.SelectLocationAsync("London Office");
         await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
         await ppEdit.SetUseCompanyWorkingPatternAsync(false);
         await ppEdit.SaveAsync();
@@ -116,6 +123,49 @@ public sealed class PositionProfileManagementTests(AppFixture fixture) : E2ETest
         Assert.Contains("/position-profiles/new", _page.Url);
         Assert.True(await ppEdit.HasErrorAsync(),
             "Expected a validation error when saving a position profile with no title");
+    }
+
+    [Fact]
+    public async Task PositionProfile_SetAndClearOnboardingTemplate_PersistsAcrossReload()
+    {
+        var profileTitle = $"E2E Onboarding Link {Guid.NewGuid().ToString("N")[..8]}";
+        var templateName = $"E2E Template {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login         = new LoginPage(_page, _fixture.WebBaseUrl);
+        var ppList        = new PositionProfileListPage(_page, _fixture.WebBaseUrl);
+        var ppEdit        = new PositionProfileEditPage(_page, _fixture.WebBaseUrl);
+        var templateEdit  = new OnboardingTemplateEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Create an onboarding template to link to the profile.
+        await templateEdit.GoToNewAsync(AcmeId);
+        await templateEdit.FillNameAsync(templateName);
+        await templateEdit.SaveAsync();
+
+        // Create a position profile and select the new onboarding template.
+        await ppList.GoToAsync(AcmeId);
+        await ppList.ClickNewPositionProfileAsync();
+
+        await ppEdit.FillTitleAsync(profileTitle);
+        await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.SelectLocationAsync("London Office");
+        await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
+        await ppEdit.SelectOnboardingTemplateAsync(templateName);
+        await ppEdit.SaveAsync();
+
+        // Reopen and confirm the onboarding template selection persisted.
+        await ppList.OpenPositionProfileAsync(profileTitle);
+        Assert.Equal(templateName, await ppEdit.GetSelectedOnboardingTemplateTextAsync());
+
+        // Clear the onboarding template via the "None" sentinel item and save.
+        await ppEdit.ClearOnboardingTemplateAsync();
+        await ppEdit.SaveAsync();
+
+        // Reopen and confirm the cleared selection persisted.
+        await ppList.OpenPositionProfileAsync(profileTitle);
+        Assert.Equal("None", await ppEdit.GetSelectedOnboardingTemplateTextAsync());
     }
 
     [Fact]

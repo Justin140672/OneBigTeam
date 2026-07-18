@@ -24,9 +24,10 @@ public class PositionProfileServiceTests
         var profileId = Guid.NewGuid();
         var leavePolicyId = Guid.NewGuid();
         var locationId = Guid.NewGuid();
+        var departmentId = Guid.NewGuid();
 
         var response = new GetPositionProfileResponse(
-            profileId, companyId, null, locationId, "Senior Developer", null,
+            profileId, companyId, departmentId, locationId, "Senior Developer", null,
             ProbationMonthsOverride: 3,
             WorkingDaysOverride: WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday,
             HoursPerDayOverride: 6m,
@@ -73,17 +74,19 @@ public class PositionProfileServiceTests
     {
         var companyId = Guid.NewGuid();
         var leavePolicyId = Guid.NewGuid();
+        var departmentId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
         HttpRequestMessage? captured = null;
 
         var response = new CreatePositionProfileResponse(
-            Guid.NewGuid(), companyId, null, "Senior Developer", null, true, DateTimeOffset.UtcNow);
+            Guid.NewGuid(), companyId, departmentId, "Senior Developer", null, true, DateTimeOffset.UtcNow);
 
         var handler = new CapturingJsonResponseHandler(HttpStatusCode.OK, response, req => captured = req);
         var factory = BuildFactory(handler);
         var service = new PositionProfileService(factory);
 
         var request = new CreatePositionProfileRequest(
-            companyId, null, "Senior Developer", null,
+            companyId, departmentId, locationId, "Senior Developer", null,
             ProbationMonthsOverride: 3,
             WorkingDaysOverride: WorkingDays.Monday | WorkingDays.Tuesday,
             HoursPerDayOverride: 6m,
@@ -113,7 +116,7 @@ public class PositionProfileServiceTests
         var service = new PositionProfileService(factory);
 
         var (created, error) = await service.CreatePositionProfileAsync(
-            Guid.NewGuid(), new CreatePositionProfileRequest(Guid.NewGuid(), null, "Duplicate", null, null, null, null, null, null, null, null, null));
+            Guid.NewGuid(), new CreatePositionProfileRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Duplicate", null, null, null, null, null, null, null, Guid.NewGuid(), null));
 
         Assert.Null(created);
         Assert.Equal("A position profile with that title already exists.", error);
@@ -125,6 +128,8 @@ public class PositionProfileServiceTests
         var companyId = Guid.NewGuid();
         var profileId = Guid.NewGuid();
         var leavePolicyId = Guid.NewGuid();
+        var departmentId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
         HttpRequestMessage? captured = null;
 
         var handler = new CapturingJsonResponseHandler(HttpStatusCode.OK, new { }, req => captured = req);
@@ -132,7 +137,7 @@ public class PositionProfileServiceTests
         var service = new PositionProfileService(factory);
 
         var request = new UpdatePositionProfileRequest(
-            companyId, profileId, null, "Senior Developer", null,
+            companyId, profileId, departmentId, locationId, "Senior Developer", null,
             ProbationMonthsOverride: 4,
             WorkingDaysOverride: WorkingDays.Thursday,
             HoursPerDayOverride: 8m,

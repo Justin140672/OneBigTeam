@@ -97,8 +97,7 @@
                                             DataSource="@_reviewOwnerOptions"
                                             @bind-Value="Model.ReviewOwnerEmployeeId"
                                             Placeholder="None"
-                                            AllowFiltering="true"
-                                            ShowClearButton="true">
+                                            AllowFiltering="true">
                                 <DropDownListFieldSettings Value="Id" Text="Name" />
                                 <DropDownListEvents TValue="Guid?" TItem="ReviewOwnerOption" Filtering="OnReviewOwnerFilteringAsync" />
                             </SfDropDownList>
@@ -285,7 +284,10 @@
         _reviewOwnerOptions = (reviewOwnersTask.Result?.Items ?? [])
             .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .OrderBy(e => e.Name)
+            .Prepend(new ReviewOwnerOption(Guid.Empty, "Not assigned"))
             .ToList();
+
+        Model.ReviewOwnerEmployeeId = Guid.Empty;
 
         _dataLoaded = true;
     }
@@ -299,6 +301,7 @@
         _reviewOwnerOptions = (result?.Items ?? [])
             .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .OrderBy(e => e.Name)
+            .Prepend(new ReviewOwnerOption(Guid.Empty, "Not assigned"))
             .ToList();
         await _reviewOwnerDropdown.FilterAsync(_reviewOwnerOptions, new Query());
     }
@@ -329,7 +332,7 @@
             Model.AcknowledgementDueDate, Model.AcknowledgementStatement,
             _selectedFile!,
             Model.ReviewFrequency, Model.CustomReviewFrequencyMonths,
-            Model.ReviewOwnerEmployeeId);
+            Model.ReviewOwnerEmployeeId == Guid.Empty ? null : Model.ReviewOwnerEmployeeId);
 
     protected override void ResetForm()
     {

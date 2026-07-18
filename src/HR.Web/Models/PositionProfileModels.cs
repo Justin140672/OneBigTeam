@@ -23,8 +23,8 @@ public record PositionProfileListItemModel(
 public record GetPositionProfileResponse(
     Guid Id,
     Guid CompanyId,
-    Guid? DepartmentId,
-    Guid? LocationId,
+    Guid DepartmentId,
+    Guid LocationId,
     string Title,
     string? Description,
     int? ProbationMonthsOverride,
@@ -33,7 +33,7 @@ public record GetPositionProfileResponse(
     decimal? SalaryMin,
     decimal? SalaryMax,
     string? SalaryType,
-    Guid? DefaultLeavePolicyId,
+    Guid DefaultLeavePolicyId,
     Guid? OnboardingTemplateId,
     bool IsActive,
     DateTimeOffset CreatedAt,
@@ -61,7 +61,10 @@ public sealed class PositionProfileEditModel
     [Required(ErrorMessage = "Title is required.")]
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
+    [Required(ErrorMessage = "Department is required.")]
     public Guid? DepartmentId { get; set; }
+    [Required(ErrorMessage = "Location is required.")]
+    public Guid? LocationId { get; set; }
     [Range(1, 24, ErrorMessage = "Probation months override must be between 1 and 24.")]
     public int? ProbationMonthsOverride { get; set; }
     public bool UseCompanyWorkingPattern { get; set; } = true;
@@ -71,6 +74,7 @@ public sealed class PositionProfileEditModel
     public decimal? SalaryMin { get; set; }
     public decimal? SalaryMax { get; set; }
     public string? SalaryType { get; set; } = "Annual";
+    [Required(ErrorMessage = "Default leave policy is required.")]
     public Guid? DefaultLeavePolicyId { get; set; }
     public Guid? OnboardingTemplateId { get; set; }
 }
@@ -79,7 +83,8 @@ public sealed class PositionProfileEditModel
 
 public record CreatePositionProfileRequest(
     Guid CompanyId,
-    Guid? DepartmentId,
+    Guid DepartmentId,
+    Guid LocationId,
     string Title,
     string? Description,
     int? ProbationMonthsOverride,
@@ -88,13 +93,13 @@ public record CreatePositionProfileRequest(
     decimal? SalaryMin,
     decimal? SalaryMax,
     string? SalaryType,
-    Guid? DefaultLeavePolicyId,
+    Guid DefaultLeavePolicyId,
     Guid? OnboardingTemplateId);
 
 public record CreatePositionProfileResponse(
     Guid Id,
     Guid CompanyId,
-    Guid? DepartmentId,
+    Guid DepartmentId,
     string Title,
     string? Description,
     bool IsActive,
@@ -169,7 +174,8 @@ public record AddOnboardingTemplateToProfileResponse(Guid Id);
 public record UpdatePositionProfileRequest(
     Guid CompanyId,
     Guid Id,
-    Guid? DepartmentId,
+    Guid DepartmentId,
+    Guid LocationId,
     string Title,
     string? Description,
     int? ProbationMonthsOverride,
@@ -178,13 +184,13 @@ public record UpdatePositionProfileRequest(
     decimal? SalaryMin,
     decimal? SalaryMax,
     string? SalaryType,
-    Guid? DefaultLeavePolicyId,
+    Guid DefaultLeavePolicyId,
     Guid? OnboardingTemplateId);
 
 public record UpdatePositionProfileResponse(
     Guid Id,
     Guid CompanyId,
-    Guid? DepartmentId,
+    Guid DepartmentId,
     string Title,
     string? Description,
     bool IsActive,

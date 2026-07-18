@@ -147,10 +147,10 @@ public class UpdateVacancyEndpointTests : IClassFixture<ApiWebApplicationFactory
         using var scope = _factory.Services.CreateScope();
         var employeesDb = scope.ServiceProvider.GetRequiredService<HR.Modules.Employees.Persistence.EmployeesDbContext>();
         var positionProfile = HR.Modules.Employees.Domain.PositionProfile.Create(
-            Guid.NewGuid(), companyId, departmentId: null, locationId: null, "Support Engineer",
+            Guid.NewGuid(), companyId, departmentId: Guid.NewGuid(), locationId: Guid.NewGuid(), "Support Engineer",
             description: null, probationMonthsOverride: null, workingDaysOverride: null,
             hoursPerDayOverride: null, salaryMin: null, salaryMax: null, salaryType: null,
-            defaultLeavePolicyId: null, Now);
+            defaultLeavePolicyId: Guid.NewGuid(), Now);
         employeesDb.PositionProfiles.Add(positionProfile);
         await employeesDb.SaveChangesAsync();
         return positionProfile.Id;

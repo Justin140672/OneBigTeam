@@ -37,8 +37,8 @@ public class WorkingPatternProviderTests
         var companyId = Guid.NewGuid();
 
         var profile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, null, null, "Engineer", null, null,
-            WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday, 6m, null, null, null, null, Now);
+            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null,
+            WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday, 6m, null, null, null, Guid.NewGuid(), Now);
         context.PositionProfiles.Add(profile);
 
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2026, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
@@ -62,8 +62,8 @@ public class WorkingPatternProviderTests
 
         var profileDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday;
         var profile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, null, null, "Engineer", null, null,
-            profileDays, 6m, null, null, null, null, Now);
+            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null,
+            profileDays, 6m, null, null, null, Guid.NewGuid(), Now);
         context.PositionProfiles.Add(profile);
 
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2026, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
@@ -86,7 +86,7 @@ public class WorkingPatternProviderTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.PositionProfiles.Add(profile);
 
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2026, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);

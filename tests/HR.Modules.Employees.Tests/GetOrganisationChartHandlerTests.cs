@@ -232,7 +232,7 @@ public class GetOrganisationChartHandlerTests
         var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "London Office", null, now);
         var positionProfile = PositionProfile.Create(
             Guid.NewGuid(), companyId, department.Id, location.Id, "Senior Software Engineer", null,
-            null, null, null, null, null, null, null, now);
+            null, null, null, null, null, null, Guid.NewGuid(), now);
 
         var manager = Employee.Create(Guid.NewGuid(), companyId, "Mia", "Manager", "mia@example.com", StartDate,
             hasSystemAccess: true, Dob, "British", "Female", "EMP-0000", Guid.NewGuid(), department.Id, location.Id, positionProfile.Id, now);

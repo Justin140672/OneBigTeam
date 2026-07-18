@@ -39,7 +39,7 @@ internal static class EmployeeReferenceDataSeeder
         var positionProfile = PositionProfile.Create(
             Guid.NewGuid(), companyId, department.Id, location.Id, $"Role-{Guid.NewGuid():N}", null,
             probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
-            salaryMin: null, salaryMax: null, salaryType: null, defaultLeavePolicyId: null, now);
+            salaryMin: null, salaryMax: null, salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), now);
         var employmentType = EmploymentType.Create(Guid.NewGuid(), companyId, $"EmpType-{Guid.NewGuid():N}", null, now);
 
         db.Departments.Add(department);

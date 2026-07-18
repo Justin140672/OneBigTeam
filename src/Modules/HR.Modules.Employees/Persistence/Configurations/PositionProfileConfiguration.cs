@@ -21,10 +21,12 @@ internal sealed class PositionProfileConfiguration : IEntityTypeConfiguration<Po
             .IsRequired();
 
         builder.Property(p => p.DepartmentId)
-            .HasColumnName("department_id");
+            .HasColumnName("department_id")
+            .IsRequired();
 
         builder.Property(p => p.LocationId)
-            .HasColumnName("location_id");
+            .HasColumnName("location_id")
+            .IsRequired();
 
         builder.Property(p => p.Title)
             .HasColumnName("title")
@@ -59,7 +61,8 @@ internal sealed class PositionProfileConfiguration : IEntityTypeConfiguration<Po
             .HasMaxLength(20);
 
         builder.Property(p => p.DefaultLeavePolicyId)
-            .HasColumnName("default_leave_policy_id");
+            .HasColumnName("default_leave_policy_id")
+            .IsRequired();
 
         builder.Property(p => p.OnboardingTemplateId)
             .HasColumnName("onboarding_template_id");

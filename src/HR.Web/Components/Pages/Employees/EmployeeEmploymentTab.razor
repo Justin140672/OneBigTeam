@@ -57,8 +57,7 @@ else
                                                 TItem="EmploymentTypeListItemModel"
                                                 DataSource="@_employmentTypes"
                                                 @bind-Value="Model.EmploymentTypeId"
-                                                Placeholder="Select type"
-                                                ShowClearButton="true">
+                                                Placeholder="Select type">
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
                                 </SfDropDownList>
                                 <ValidationMessage For="@(() => Model.EmploymentTypeId)" />
@@ -106,8 +105,7 @@ else
                                                 DataSource="@_positionProfiles"
                                                 @bind-Value="Model.PositionProfileId"
                                                 Placeholder="None"
-                                                AllowFiltering="true"
-                                                ShowClearButton="true">
+                                                AllowFiltering="true">
                                     <DropDownListFieldSettings Value="Id" Text="Title" />
                                     <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?" ValueChange="OnPositionProfileChanged" />
                                 </SfDropDownList>
@@ -119,11 +117,10 @@ else
                                                 DataSource="@_departments"
                                                 @bind-Value="Model.DepartmentId"
                                                 Placeholder="None"
-                                                AllowFiltering="true"
-                                                ShowClearButton="true">
+                                                AllowFiltering="true">
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
                                 </SfDropDownList>
-                            </div>                            
+                            </div>
                             <div class="col-md-4">
                                 <label class="form-label">Location</label>
                                 <SfDropDownList TValue="Guid?"
@@ -144,8 +141,7 @@ else
                                                 DataSource="@_managerOptions"
                                                 @bind-Value="Model.ManagerId"
                                                 Placeholder="None"
-                                                AllowFiltering="true"
-                                                ShowClearButton="true">
+                                                AllowFiltering="true">
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
                                     <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnManagerFilteringAsync" />
                                 </SfDropDownList>
@@ -310,7 +306,9 @@ else
         if (employee?.ManagerId is { } managerId && _managerOptions.All(m => m.Id != managerId))
             _managerOptions.Add(new ManagerOption(managerId, employee.ManagerFullName ?? ""));
 
-        _managerOptions = _managerOptions.OrderBy(m => m.Name).ToList();
+        _managerOptions = _managerOptions.OrderBy(m => m.Name)
+            .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
+            .ToList();
     }
 
     // The manager list can't be preloaded in one bounded page the way _departments/_locations/etc.
@@ -326,6 +324,7 @@ else
             .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "Terminated")
             .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .OrderBy(e => e.Name)
+            .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
             .ToList();
         await _managerDropdown.FilterAsync(_managerOptions, new Query());
     }
@@ -340,7 +339,7 @@ else
         Model.DepartmentId          = e.DepartmentId;
         Model.LocationId            = e.LocationId;
         Model.PositionProfileId     = e.PositionProfileId;
-        Model.ManagerId             = e.ManagerId;
+        Model.ManagerId             = e.ManagerId ?? Guid.Empty;
         Model.StartDate             = e.StartDate;
         Model.ContinuousServiceDate = e.ContinuousServiceDate;
         Model.ProbationEndDate      = e.ProbationEndDate;
@@ -388,7 +387,7 @@ else
             Model.DepartmentId,
             Model.LocationId,
             Model.PositionProfileId,
-            Model.ManagerId,
+            Model.ManagerId == Guid.Empty ? null : Model.ManagerId,
             Model.StartDate,
             Model.ContinuousServiceDate,
             Model.ProbationEndDate,

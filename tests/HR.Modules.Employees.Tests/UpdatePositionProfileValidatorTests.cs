@@ -10,8 +10,38 @@ public class UpdatePositionProfileValidatorTests
     {
         CompanyId = Guid.NewGuid(),
         Id = Guid.NewGuid(),
+        DepartmentId = Guid.NewGuid(),
+        LocationId = Guid.NewGuid(),
+        DefaultLeavePolicyId = Guid.NewGuid(),
         Title = "Senior Developer"
     };
+
+    [Fact]
+    public void Validate_Fails_When_DepartmentId_Is_Empty()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { DepartmentId = Guid.Empty });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdatePositionProfileRequest.DepartmentId));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_LocationId_Is_Empty()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { LocationId = Guid.Empty });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdatePositionProfileRequest.LocationId));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_DefaultLeavePolicyId_Is_Empty()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with { DefaultLeavePolicyId = Guid.Empty });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdatePositionProfileRequest.DefaultLeavePolicyId));
+    }
 
     [Fact]
     public void Validate_Fails_When_CompanyId_Is_Empty()

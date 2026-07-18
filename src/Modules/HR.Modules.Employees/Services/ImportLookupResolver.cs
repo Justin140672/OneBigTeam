@@ -127,30 +127,12 @@ internal sealed class ImportLookupResolver(EmployeesDbContext dbContext, IClock 
         if (existing is not null)
             return new PositionProfileImportLookupResult(existing.Value, WasCreated: false, Skipped: false);
 
-        if (departmentId is null || locationId is null)
-            return new PositionProfileImportLookupResult(Id: null, WasCreated: false, Skipped: true);
-
-        var now = clock.UtcNowOffset();
-        var profile = PositionProfile.Create(
-            Guid.NewGuid(),
-            companyId,
-            departmentId,
-            locationId,
-            trimmed,
-            description: null,
-            probationMonthsOverride: null,
-            workingDaysOverride: null,
-            hoursPerDayOverride: null,
-            salaryMin: null,
-            salaryMax: null,
-            salaryType: null,
-            defaultLeavePolicyId: null,
-            now);
-
-        dbContext.PositionProfiles.Add(profile);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        return new PositionProfileImportLookupResult(profile.Id, WasCreated: true, Skipped: false);
+        // Department, Location and DefaultLeavePolicyId are now mandatory on PositionProfile. The
+        // import flow has no source for a default leave policy, so a brand-new position profile can
+        // never be safely auto-created here — always skip, same as the existing missing
+        // department/location guard. Callers must create the position profile (with a leave policy)
+        // through CreatePositionProfile before importing employees who reference it by title.
+        return new PositionProfileImportLookupResult(Id: null, WasCreated: false, Skipped: true);
     }
 
     private async Task<Guid> GetOrCreateDefaultLocationTypeIdAsync(Guid companyId, CancellationToken cancellationToken)

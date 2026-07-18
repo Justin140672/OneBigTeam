@@ -15,7 +15,7 @@ public class PositionProfileRequiredDocumentsTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.PositionProfiles.Add(profile);
 
         var active = PositionProfileRequiredDocument.Create(
@@ -48,7 +48,7 @@ public class PositionProfileRequiredDocumentsTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Manager", null, null, null, null, null, null, null, null, Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Manager", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -67,8 +67,8 @@ public class PositionProfileRequiredDocumentsTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var profileA = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, Now);
-        var profileB = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Designer", null, null, null, null, null, null, null, null, Now);
+        var profileA = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+        var profileB = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Designer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.PositionProfiles.AddRange(profileA, profileB);
 
         var docForB = PositionProfileRequiredDocument.Create(

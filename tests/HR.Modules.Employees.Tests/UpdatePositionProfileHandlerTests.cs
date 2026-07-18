@@ -11,14 +11,29 @@ public class UpdatePositionProfileHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 8, 10, 0, 0, DateTimeKind.Utc);
 
+    private static async Task<(Department Department, Location Location)> SeedDepartmentAndLocationAsync(
+        EmployeesDbContext context, Guid companyId)
+    {
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
+        var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
+        var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "London", null, now);
+        context.Departments.Add(department);
+        context.LocationTypes.Add(locationType);
+        context.Locations.Add(location);
+        await context.SaveChangesAsync();
+        return (department, location);
+    }
+
     [Fact]
     public async Task HandleAsync_Updates_PositionProfile()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Old Title", null, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Old Title", null, null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -29,6 +44,9 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "New Title",
                 Description = "Updated description"
             },
@@ -53,6 +71,9 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = Guid.NewGuid(),
                 Id = Guid.NewGuid(),
+                DepartmentId = Guid.NewGuid(),
+                LocationId = Guid.NewGuid(),
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Some Title"
             },
             CancellationToken.None);
@@ -66,8 +87,10 @@ public class UpdatePositionProfileHandlerTests
     {
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var profileCompanyId = Guid.NewGuid();
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, profileCompanyId);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, null, "Engineer", null, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), profileCompanyId, department.Id, location.Id, "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -78,6 +101,9 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = Guid.NewGuid(),
                 Id = profile.Id,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "New Title"
             },
             CancellationToken.None);
@@ -92,9 +118,10 @@ public class UpdatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
-        var profile1 = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, now);
-        var profile2 = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Manager", null, null, null, null, null, null, null, null, now);
+        var profile1 = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
+        var profile2 = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Manager", null, null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.AddRange(profile1, profile2);
         await context.SaveChangesAsync();
 
@@ -106,6 +133,9 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile1.Id,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Manager"
             },
             CancellationToken.None);
@@ -120,8 +150,9 @@ public class UpdatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -132,6 +163,9 @@ public class UpdatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 Id = profile.Id,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Engineer"
             },
             CancellationToken.None);
@@ -145,8 +179,9 @@ public class UpdatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -158,7 +193,39 @@ public class UpdatePositionProfileHandlerTests
                 CompanyId = companyId,
                 Id = profile.Id,
                 Title = "Engineer",
-                DepartmentId = Guid.NewGuid()
+                DepartmentId = Guid.NewGuid(),
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid()
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_Location_Does_Not_Exist()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
+
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
+        context.PositionProfiles.Add(profile);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+
+        var result = await handler.HandleAsync(
+            new UpdatePositionProfileRequest
+            {
+                CompanyId = companyId,
+                Id = profile.Id,
+                Title = "Engineer",
+                DepartmentId = department.Id,
+                LocationId = Guid.NewGuid(),
+                DefaultLeavePolicyId = Guid.NewGuid()
             },
             CancellationToken.None);
 
@@ -172,11 +239,12 @@ public class UpdatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (originalDepartment, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
-        var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
+        var department = Department.Create(Guid.NewGuid(), companyId, "New Department", null, now);
         context.Departments.Add(department);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, originalDepartment.Id, location.Id, "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -188,7 +256,9 @@ public class UpdatePositionProfileHandlerTests
                 CompanyId = companyId,
                 Id = profile.Id,
                 Title = "Engineer",
-                DepartmentId = department.Id
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid()
             },
             CancellationToken.None);
 
@@ -202,8 +272,9 @@ public class UpdatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -215,6 +286,8 @@ public class UpdatePositionProfileHandlerTests
                 CompanyId = companyId,
                 Id = profile.Id,
                 Title = "Engineer",
+                DepartmentId = department.Id,
+                LocationId = location.Id,
                 DefaultLeavePolicyId = Guid.NewGuid()
             },
             CancellationToken.None);
@@ -230,8 +303,9 @@ public class UpdatePositionProfileHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
         var leavePolicyId = Guid.NewGuid();
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -243,6 +317,8 @@ public class UpdatePositionProfileHandlerTests
                 CompanyId = companyId,
                 Id = profile.Id,
                 Title = "Engineer",
+                DepartmentId = department.Id,
+                LocationId = location.Id,
                 WorkingDaysOverride = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday,
                 HoursPerDayOverride = 6m,
                 SalaryMin = 45000,
@@ -265,8 +341,9 @@ public class UpdatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -278,6 +355,9 @@ public class UpdatePositionProfileHandlerTests
                 CompanyId = companyId,
                 Id = profile.Id,
                 Title = "Engineer",
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 SalaryMin = 45000,
                 SalaryMax = 55000,
                 SalaryType = SalaryType.Hourly
@@ -297,8 +377,9 @@ public class UpdatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, SalaryType.Annual, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Engineer", null, null, null, null, null, null, SalaryType.Annual, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -310,6 +391,9 @@ public class UpdatePositionProfileHandlerTests
                 CompanyId = companyId,
                 Id = profile.Id,
                 Title = "Engineer",
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 SalaryType = null
             },
             CancellationToken.None);
@@ -324,11 +408,12 @@ public class UpdatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
         var template = OnboardingTemplate.Create(Guid.NewGuid(), companyId, "Standard Onboarding", null, now);
         context.OnboardingTemplates.Add(template);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -340,6 +425,9 @@ public class UpdatePositionProfileHandlerTests
                 CompanyId = companyId,
                 Id = profile.Id,
                 Title = "Engineer",
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 OnboardingTemplateId = template.Id,
             },
             CancellationToken.None);
@@ -354,8 +442,9 @@ public class UpdatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Engineer", null, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -367,6 +456,9 @@ public class UpdatePositionProfileHandlerTests
                 CompanyId = companyId,
                 Id = profile.Id,
                 Title = "Engineer",
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 OnboardingTemplateId = Guid.NewGuid(),
             },
             CancellationToken.None);

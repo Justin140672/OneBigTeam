@@ -160,8 +160,8 @@ public class ImportLookupResolverTests
         var companyId = Guid.NewGuid();
 
         var existingProfile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, null, null, "Software Developer",
-            null, null, null, null, null, null, null, null, Now);
+            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Software Developer",
+            null, null, null, null, null, null, null, Guid.NewGuid(), Now);
         db.PositionProfiles.Add(existingProfile);
         await db.SaveChangesAsync();
 
@@ -181,9 +181,15 @@ public class ImportLookupResolverTests
     [InlineData(true, false)]
     [InlineData(false, true)]
     [InlineData(false, false)]
-    public async Task GetOrCreatePositionProfileAsync_Returns_Skipped_When_Not_Existing_And_Department_Or_Location_Missing(
+    [InlineData(true, true)]
+    public async Task GetOrCreatePositionProfileAsync_Always_Returns_Skipped_When_Profile_Does_Not_Already_Exist(
         bool hasDepartment, bool hasLocation)
     {
+        // PositionProfile now requires a mandatory DefaultLeavePolicyId (in addition to Department and
+        // Location), and the employee-import flow has no source for a leave policy. Auto-creating a new
+        // PositionProfile during import can therefore never be done safely, regardless of whether a
+        // Department/Location was resolved — the resolver always skips instead of creating. Callers must
+        // create the position profile (with a leave policy) via CreatePositionProfile up front.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow));
@@ -199,29 +205,6 @@ public class ImportLookupResolverTests
         Assert.False(result.WasCreated);
 
         Assert.Empty(await db.PositionProfiles.ToListAsync());
-    }
-
-    [Fact]
-    public async Task GetOrCreatePositionProfileAsync_Creates_New_Profile_When_Department_And_Location_Present()
-    {
-        await using var db = BuildContext();
-        var companyId = Guid.NewGuid();
-        var departmentId = Guid.NewGuid();
-        var locationId = Guid.NewGuid();
-        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow));
-
-        var result = await resolver.GetOrCreatePositionProfileAsync(
-            companyId, "Software Developer", departmentId, locationId, CancellationToken.None);
-
-        Assert.True(result.WasCreated);
-        Assert.False(result.Skipped);
-        Assert.NotNull(result.Id);
-
-        var saved = await db.PositionProfiles.SingleAsync();
-        Assert.Equal(result.Id, saved.Id);
-        Assert.Equal("Software Developer", saved.Title);
-        Assert.Equal(departmentId, saved.DepartmentId);
-        Assert.Equal(locationId, saved.LocationId);
     }
 
     [Fact]
@@ -280,15 +263,18 @@ public class ImportLookupResolverTests
     }
 
     [Fact]
-    public async Task GetOrCreatePositionProfileAsync_Does_Not_Leak_Across_Companies()
+    public async Task GetOrCreatePositionProfileAsync_Does_Not_Match_Existing_Profile_From_Different_Company()
     {
+        // Since GetOrCreatePositionProfileAsync always skips instead of creating (see the
+        // Always_Returns_Skipped test above), this test now verifies company isolation on the
+        // lookup side only: a title match in another company must not be returned as "existing".
         await using var db = BuildContext();
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
         var existingInCompanyA = PositionProfile.Create(
-            Guid.NewGuid(), companyA, null, null, "Software Developer",
-            null, null, null, null, null, null, null, null, Now);
+            Guid.NewGuid(), companyA, Guid.NewGuid(), Guid.NewGuid(), "Software Developer",
+            null, null, null, null, null, null, null, Guid.NewGuid(), Now);
         db.PositionProfiles.Add(existingInCompanyA);
         await db.SaveChangesAsync();
 
@@ -297,9 +283,11 @@ public class ImportLookupResolverTests
         var result = await resolver.GetOrCreatePositionProfileAsync(
             companyB, "Software Developer", Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
-        Assert.True(result.WasCreated);
+        Assert.True(result.Skipped);
+        Assert.False(result.WasCreated);
+        Assert.Null(result.Id);
         Assert.NotEqual(existingInCompanyA.Id, result.Id);
 
-        Assert.Equal(2, await db.PositionProfiles.CountAsync());
+        Assert.Single(await db.PositionProfiles.ToListAsync());
     }
 }

@@ -172,8 +172,7 @@
                                                     DataSource="@_managerOptions"
                                                     @bind-Value="Model.ManagerId"
                                                     Placeholder="None"
-                                                    AllowFiltering="true"
-                                                    ShowClearButton="true">
+                                                    AllowFiltering="true">
                                         <DropDownListFieldSettings Value="Id" Text="Name" />
                                         <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnManagerFilteringAsync" />
                                     </SfDropDownList>
@@ -821,7 +820,10 @@
                 .Where(e => e.Status != "Draft" && e.Status != "Terminated")
                 .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
                 .OrderBy(e => e.Name)
+                .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
                 .ToList();
+
+            Model.ManagerId = Guid.Empty;
         }
 
         // Parsed after _showProbationTab/_showOnboardingTab/_showOffboardingTab are known, since
@@ -863,6 +865,7 @@
             .Where(e => e.Status != "Draft" && e.Status != "Terminated")
             .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .OrderBy(e => e.Name)
+            .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
             .ToList();
         await _managerDropdown.FilterAsync(_managerOptions, new Query());
     }
@@ -939,7 +942,7 @@
                 string.IsNullOrWhiteSpace(Model.PostCode)       ? null : Model.PostCode.Trim(),
                 string.IsNullOrWhiteSpace(Model.Country)        ? null : Model.Country.Trim(),
                 Model.HasSystemAccess,
-                Model.ManagerId);
+                Model.ManagerId == Guid.Empty ? null : Model.ManagerId);
 
             var (created, error) = await EmployeeService.CreateEmployeeAsync(CompanyId, request);
 

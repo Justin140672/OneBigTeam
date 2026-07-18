@@ -33,36 +33,30 @@ internal sealed class UpdatePositionProfileHandler
                 Error.NotFound($"Position profile with id '{request.Id}' was not found."));
         }
 
-        if (request.DepartmentId is not null)
-        {
-            var departmentExists = await _dbContext.Departments
-                .AnyAsync(
-                    d => d.Id == request.DepartmentId &&
-                         d.CompanyId == request.CompanyId &&
-                         d.IsActive,
-                    cancellationToken);
+        var departmentExists = await _dbContext.Departments
+            .AnyAsync(
+                d => d.Id == request.DepartmentId &&
+                     d.CompanyId == request.CompanyId &&
+                     d.IsActive,
+                cancellationToken);
 
-            if (!departmentExists)
-            {
-                return Result.Failure<UpdatePositionProfileResponse>(
-                    Error.NotFound($"Department '{request.DepartmentId}' was not found."));
-            }
+        if (!departmentExists)
+        {
+            return Result.Failure<UpdatePositionProfileResponse>(
+                Error.NotFound($"Department '{request.DepartmentId}' was not found."));
         }
 
-        if (request.LocationId is not null)
-        {
-            var locationExists = await _dbContext.Locations
-                .AnyAsync(
-                    l => l.Id == request.LocationId &&
-                         l.CompanyId == request.CompanyId &&
-                         l.IsActive,
-                    cancellationToken);
+        var locationExists = await _dbContext.Locations
+            .AnyAsync(
+                l => l.Id == request.LocationId &&
+                     l.CompanyId == request.CompanyId &&
+                     l.IsActive,
+                cancellationToken);
 
-            if (!locationExists)
-            {
-                return Result.Failure<UpdatePositionProfileResponse>(
-                    Error.NotFound($"Location '{request.LocationId}' was not found."));
-            }
+        if (!locationExists)
+        {
+            return Result.Failure<UpdatePositionProfileResponse>(
+                Error.NotFound($"Location '{request.LocationId}' was not found."));
         }
 
         var newTitle = request.Title.Trim();
@@ -84,16 +78,13 @@ internal sealed class UpdatePositionProfileHandler
             }
         }
 
-        if (request.DefaultLeavePolicyId is not null)
-        {
-            var leavePolicyExists = await _leavePolicyReader.ExistsAsync(
-                request.CompanyId, request.DefaultLeavePolicyId.Value, cancellationToken);
+        var leavePolicyExists = await _leavePolicyReader.ExistsAsync(
+            request.CompanyId, request.DefaultLeavePolicyId, cancellationToken);
 
-            if (!leavePolicyExists)
-            {
-                return Result.Failure<UpdatePositionProfileResponse>(
-                    Error.NotFound($"Leave policy '{request.DefaultLeavePolicyId}' was not found."));
-            }
+        if (!leavePolicyExists)
+        {
+            return Result.Failure<UpdatePositionProfileResponse>(
+                Error.NotFound($"Leave policy '{request.DefaultLeavePolicyId}' was not found."));
         }
 
         if (request.OnboardingTemplateId is not null)

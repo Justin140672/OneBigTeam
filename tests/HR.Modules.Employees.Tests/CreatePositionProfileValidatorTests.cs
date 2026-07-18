@@ -76,11 +76,67 @@ public class CreatePositionProfileValidatorTests
         {
             CompanyId = Guid.NewGuid(),
             DepartmentId = Guid.NewGuid(),
+            LocationId = Guid.NewGuid(),
+            DefaultLeavePolicyId = Guid.NewGuid(),
             Title = "Software Developer",
             Description = "Builds software"
         });
 
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_DepartmentId_Is_Empty()
+    {
+        var validator = new CreatePositionProfileValidator();
+
+        var result = validator.Validate(new CreatePositionProfileRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            DepartmentId = Guid.Empty,
+            LocationId = Guid.NewGuid(),
+            DefaultLeavePolicyId = Guid.NewGuid(),
+            Title = "Software Developer"
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreatePositionProfileRequest.DepartmentId));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_LocationId_Is_Empty()
+    {
+        var validator = new CreatePositionProfileValidator();
+
+        var result = validator.Validate(new CreatePositionProfileRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            DepartmentId = Guid.NewGuid(),
+            LocationId = Guid.Empty,
+            DefaultLeavePolicyId = Guid.NewGuid(),
+            Title = "Software Developer"
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreatePositionProfileRequest.LocationId));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_DefaultLeavePolicyId_Is_Empty()
+    {
+        var validator = new CreatePositionProfileValidator();
+
+        var result = validator.Validate(new CreatePositionProfileRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            DepartmentId = Guid.NewGuid(),
+            LocationId = Guid.NewGuid(),
+            DefaultLeavePolicyId = Guid.Empty,
+            Title = "Software Developer"
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreatePositionProfileRequest.DefaultLeavePolicyId));
     }
 
     [Fact]
@@ -143,6 +199,8 @@ public class CreatePositionProfileValidatorTests
         var result = validator.Validate(new CreatePositionProfileRequest
         {
             CompanyId = Guid.NewGuid(),
+            DepartmentId = Guid.NewGuid(),
+            LocationId = Guid.NewGuid(),
             Title = "Software Developer",
             ProbationMonthsOverride = 3,
             WorkingDaysOverride = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday | WorkingDays.Thursday,
@@ -164,6 +222,9 @@ public class CreatePositionProfileValidatorTests
         var result = validator.Validate(new CreatePositionProfileRequest
         {
             CompanyId = Guid.NewGuid(),
+            DepartmentId = Guid.NewGuid(),
+            LocationId = Guid.NewGuid(),
+            DefaultLeavePolicyId = Guid.NewGuid(),
             Title = "Software Developer",
             SalaryType = null
         });

@@ -97,7 +97,7 @@ public class CreateEmployeeHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
-        var positionProfile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, null, "Developer", null, null, null, null, null, null, null, null, now);
+        var positionProfile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(), "Developer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
         var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane.manager@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Departments.Add(department);
         context.PositionProfiles.Add(positionProfile);
@@ -372,7 +372,7 @@ public class CreateEmployeeHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), null, null, "Developer", null, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Developer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -694,7 +694,7 @@ public class CreateEmployeeHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Senior Dev", null, 3, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Senior Dev", null, 3, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -770,7 +770,7 @@ public class CreateEmployeeHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
         var leavePolicyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Senior Dev", null, null, null, null, null, null, null, leavePolicyId, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Senior Dev", null, null, null, null, null, null, null, leavePolicyId, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -804,15 +804,18 @@ public class CreateEmployeeHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Published_Event_Has_Null_DefaultLeavePolicyId_When_No_PositionProfile()
+    public async Task HandleAsync_Published_Event_Has_PositionProfiles_DefaultLeavePolicyId()
     {
+        // DefaultLeavePolicyId is now mandatory on PositionProfile (a PositionProfile can no longer
+        // exist without one), so every employee linked to a position profile now always publishes a
+        // non-null DefaultLeavePolicyId on the created event. This supersedes the old
+        // "...Has_Null_DefaultLeavePolicyId_When_No_PositionProfile" scenario, which is no longer a
+        // reachable state.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
-        // The seeded position profile has no DefaultLeavePolicyId configured, so the published
-        // event's DefaultLeavePolicyId is still null (a literal absence of PositionProfile is no
-        // longer a valid Employee state now that PositionProfile is mandatory).
         var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+        var expectedLeavePolicyId = (await context.PositionProfiles.SingleAsync(p => p.Id == positionProfileId)).DefaultLeavePolicyId;
         var publisher = new CapturingIntegrationEventPublisher();
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeProbationDateResolver(), new FakeCompanyContactValidationReader());
 
@@ -837,7 +840,7 @@ public class CreateEmployeeHandlerTests
 
         Assert.True(result.IsSuccess);
         var evt = Assert.IsType<EmployeeCreatedIntegrationEvent>(Assert.Single(publisher.Published));
-        Assert.Null(evt.DefaultLeavePolicyId);
+        Assert.Equal(expectedLeavePolicyId, evt.DefaultLeavePolicyId);
     }
 
     private static FakeCompanyContactValidationReader UkContactRules() => new(
@@ -1010,7 +1013,7 @@ public class CreateEmployeeHandlerTests
         var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, now);
         var positionProfile = PositionProfile.Create(
             Guid.NewGuid(), companyId, department.Id, location.Id, "Developer",
-            null, null, null, null, null, null, null, null, now);
+            null, null, null, null, null, null, null, Guid.NewGuid(), now);
         var employmentType = EmploymentType.Create(Guid.NewGuid(), companyId, "Permanent", null, now);
 
         context.Departments.Add(department);

@@ -247,8 +247,7 @@
                                     DataSource="@_hireManagerOptions"
                                     @bind-Value="_managerId"
                                     Placeholder="None"
-                                    AllowFiltering="true"
-                                    ShowClearButton="true">
+                                    AllowFiltering="true">
                         <DropDownListFieldSettings Value="Id" Text="Name" />
                         <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnHireManagerFilteringAsync" />
                     </SfDropDownList>
@@ -503,7 +502,7 @@
         _genderOther = null;
         _employeeNumber = string.Empty;
         _employmentTypeId = null;
-        _managerId = null;
+        _managerId = Guid.Empty;
         _derivedLocationName = string.Empty;
         _derivedPositionProfileName = string.Empty;
 
@@ -531,6 +530,7 @@
             .Where(e => e.Status != "Draft" && e.Status != "Terminated")
             .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .OrderBy(e => e.Name)
+            .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
             .ToList();
 
         _showHireDialog = true;
@@ -546,6 +546,7 @@
             .Where(e => e.Status != "Draft" && e.Status != "Terminated")
             .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .OrderBy(e => e.Name)
+            .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
             .ToList();
         await _hireManagerDropdown.FilterAsync(_hireManagerOptions, new Query());
     }
@@ -567,7 +568,7 @@
             _startDate.Value, _dateOfBirth.Value, _nationality, _gender,
             string.IsNullOrWhiteSpace(_genderOther) ? null : _genderOther.Trim(),
             _employeeNumber.Trim(), _employmentTypeId.Value,
-            _managerId);
+            _managerId == Guid.Empty ? null : _managerId);
 
         var (result, error) = await ApplicationService.HireCandidateAsync(CompanyId, VacancyId, _activeApplication.Id, request);
 

@@ -313,9 +313,11 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 
     /// <summary>
     /// Drives the page header's "Edit" button and EditSharedCompanyDocumentMetadataDialog.razor
-    /// to clear the Review Owner via its dropdown's clear ("x") button (ShowClearButton="true"),
-    /// then waits for the page to reload its detail data. Assumes a Review Owner is currently set
-    /// — the clear button only renders once the dropdown has a value.
+    /// to clear the Review Owner by opening its dropdown and selecting the prepended "Not
+    /// assigned" sentinel item (Id = Guid.Empty), then waits for the page to reload its detail
+    /// data. Replaces the old ShowClearButton ("x" icon) approach, which was removed in favor of
+    /// this explicit no-selection list item (see EditSharedCompanyDocumentMetadataDialog.razor's
+    /// ReviewOwnerOption list, which prepends a Guid.Empty/"Not assigned" entry).
     /// </summary>
     public async Task ClearReviewOwnerAsync()
     {
@@ -323,9 +325,17 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
         var reviewOwnerGroup = EditMetadataDialog.Locator(".col-md-6").Filter(new() { HasText = "Review Owner" });
-        await reviewOwnerGroup.Locator(".e-clear-icon").ClickAsync();
+        await reviewOwnerGroup.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = "Not assigned" })
+            .First
+            .ClickAsync();
+
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
+            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
         await Assertions.Expect(reviewOwnerGroup.Locator(".e-input-group input").First)
-            .ToHaveValueAsync("", new() { Timeout = 10_000 });
+            .ToHaveValueAsync("Not assigned", new() { Timeout = 10_000 });
 
         // Same "visually cleared but not yet round-tripped" concern as SetReviewOwnerAsync above —
         // give the pending ValueChanged interop call a moment to land before Save reads the model.
@@ -334,9 +344,14 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await EditMetadataDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
 
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        // Dialog-hidden isn't proof the page's own detail reload has landed in the DOM yet — the
+        // Review Owner row can still show the pre-clear name for a beat after the dialog closes.
+        // SharedDocumentDetail.razor only renders the "Review Owner" dt/dd pair at all when
+        // ReviewOwnerEmployeeId has a value, so assert the row is gone (auto-retrying) rather than
+        // a spinner-clear proxy — same pattern used for EditTitleDescriptionCategoryAsync's h1
+        // assertion above.
+        await Assertions.Expect(page.Locator("dt:has-text('Review Owner')"))
+            .Not.ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
     /// <summary>

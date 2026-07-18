@@ -11,17 +11,35 @@ public class CreatePositionProfileHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 8, 10, 0, 0, DateTimeKind.Utc);
 
+    private static async Task<(Department Department, Location Location)> SeedDepartmentAndLocationAsync(
+        EmployeesDbContext context, Guid companyId)
+    {
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
+        var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
+        var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "London", null, now);
+        context.Departments.Add(department);
+        context.LocationTypes.Add(locationType);
+        context.Locations.Add(location);
+        await context.SaveChangesAsync();
+        return (department, location);
+    }
+
     [Fact]
     public async Task HandleAsync_Creates_PositionProfile()
     {
         await using var context = BuildContext();
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
         var companyId = Guid.NewGuid();
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
             {
                 CompanyId = companyId,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Software Developer"
             },
             CancellationToken.None);
@@ -30,7 +48,8 @@ public class CreatePositionProfileHandlerTests
         Assert.NotNull(result.Value);
         Assert.Equal(companyId, result.Value!.CompanyId);
         Assert.Equal("Software Developer", result.Value.Title);
-        Assert.Null(result.Value.DepartmentId);
+        Assert.Equal(department.Id, result.Value.DepartmentId);
+        Assert.Equal(location.Id, result.Value.LocationId);
         Assert.True(result.Value.IsActive);
 
         var saved = await context.PositionProfiles.SingleAsync();
@@ -42,11 +61,7 @@ public class CreatePositionProfileHandlerTests
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
-        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
-
-        var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
-        context.Departments.Add(department);
-        await context.SaveChangesAsync();
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
@@ -55,6 +70,8 @@ public class CreatePositionProfileHandlerTests
             {
                 CompanyId = companyId,
                 DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Engineering Manager"
             },
             CancellationToken.None);
@@ -69,15 +86,23 @@ public class CreatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
         context.PositionProfiles.Add(
-            PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Software Developer", null, null, null, null, null, null, null, null, now));
+            PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Software Developer", null, null, null, null, null, null, null, Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
-            new CreatePositionProfileRequest { CompanyId = companyId, Title = "Software Developer" },
+            new CreatePositionProfileRequest
+            {
+                CompanyId = companyId,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
+                Title = "Software Developer"
+            },
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -88,13 +113,17 @@ public class CreatePositionProfileHandlerTests
     public async Task HandleAsync_Returns_Not_Found_When_Department_Does_Not_Exist()
     {
         await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (_, location) = await SeedDepartmentAndLocationAsync(context, companyId);
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
             {
-                CompanyId = Guid.NewGuid(),
+                CompanyId = companyId,
                 DepartmentId = Guid.NewGuid(),
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Software Developer"
             },
             CancellationToken.None);
@@ -108,6 +137,8 @@ public class CreatePositionProfileHandlerTests
     {
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var companyId = Guid.NewGuid();
+        var (_, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
         var otherCompanyId = Guid.NewGuid();
         var department = Department.Create(Guid.NewGuid(), otherCompanyId, "Engineering", null, now);
@@ -119,8 +150,33 @@ public class CreatePositionProfileHandlerTests
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
             {
-                CompanyId = Guid.NewGuid(),
+                CompanyId = companyId,
                 DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
+                Title = "Software Developer"
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Not_Found_When_Location_Does_Not_Exist()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (department, _) = await SeedDepartmentAndLocationAsync(context, companyId);
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+
+        var result = await handler.HandleAsync(
+            new CreatePositionProfileRequest
+            {
+                CompanyId = companyId,
+                DepartmentId = department.Id,
+                LocationId = Guid.NewGuid(),
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Software Developer"
             },
             CancellationToken.None);
@@ -137,15 +193,24 @@ public class CreatePositionProfileHandlerTests
 
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
+        var (departmentA, locationA) = await SeedDepartmentAndLocationAsync(context, companyA);
+        var (departmentB, locationB) = await SeedDepartmentAndLocationAsync(context, companyB);
 
         context.PositionProfiles.Add(
-            PositionProfile.Create(Guid.NewGuid(), companyA, null, null, "Software Developer", null, null, null, null, null, null, null, null, now));
+            PositionProfile.Create(Guid.NewGuid(), companyA, departmentA.Id, locationA.Id, "Software Developer", null, null, null, null, null, null, null, Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
-            new CreatePositionProfileRequest { CompanyId = companyB, Title = "Software Developer" },
+            new CreatePositionProfileRequest
+            {
+                CompanyId = companyB,
+                DepartmentId = departmentB.Id,
+                LocationId = locationB.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
+                Title = "Software Developer"
+            },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -155,13 +220,17 @@ public class CreatePositionProfileHandlerTests
     public async Task HandleAsync_Creates_PositionProfile_With_Valid_DefaultLeavePolicyId()
     {
         await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(exists: true));
         var leavePolicyId = Guid.NewGuid();
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
             {
-                CompanyId = Guid.NewGuid(),
+                CompanyId = companyId,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
                 Title = "Software Developer",
                 DefaultLeavePolicyId = leavePolicyId
             },
@@ -175,12 +244,16 @@ public class CreatePositionProfileHandlerTests
     public async Task HandleAsync_Returns_Not_Found_When_DefaultLeavePolicyId_Does_Not_Exist()
     {
         await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(exists: false));
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
             {
-                CompanyId = Guid.NewGuid(),
+                CompanyId = companyId,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
                 Title = "Software Developer",
                 DefaultLeavePolicyId = Guid.NewGuid()
             },
@@ -194,12 +267,17 @@ public class CreatePositionProfileHandlerTests
     public async Task HandleAsync_Creates_PositionProfile_With_WorkingPattern_And_SalaryRange()
     {
         await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
             {
-                CompanyId = Guid.NewGuid(),
+                CompanyId = companyId,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Software Developer",
                 WorkingDaysOverride = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday | WorkingDays.Thursday,
                 HoursPerDayOverride = 8m,
@@ -219,12 +297,17 @@ public class CreatePositionProfileHandlerTests
     public async Task HandleAsync_Creates_PositionProfile_With_SalaryType()
     {
         await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
             {
-                CompanyId = Guid.NewGuid(),
+                CompanyId = companyId,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Software Developer",
                 SalaryMin = 40000,
                 SalaryMax = 60000,
@@ -243,12 +326,17 @@ public class CreatePositionProfileHandlerTests
     public async Task HandleAsync_Creates_PositionProfile_With_Null_SalaryType()
     {
         await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
             {
-                CompanyId = Guid.NewGuid(),
+                CompanyId = companyId,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Software Developer"
             },
             CancellationToken.None);
@@ -263,6 +351,7 @@ public class CreatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
         var template = OnboardingTemplate.Create(Guid.NewGuid(), companyId, "Standard Onboarding", null, now);
         context.OnboardingTemplates.Add(template);
@@ -274,6 +363,9 @@ public class CreatePositionProfileHandlerTests
             new CreatePositionProfileRequest
             {
                 CompanyId = companyId,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Software Developer",
                 OnboardingTemplateId = template.Id,
             },
@@ -287,12 +379,17 @@ public class CreatePositionProfileHandlerTests
     public async Task HandleAsync_Returns_Not_Found_When_OnboardingTemplateId_Does_Not_Exist()
     {
         await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
             {
-                CompanyId = Guid.NewGuid(),
+                CompanyId = companyId,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Software Developer",
                 OnboardingTemplateId = Guid.NewGuid(),
             },

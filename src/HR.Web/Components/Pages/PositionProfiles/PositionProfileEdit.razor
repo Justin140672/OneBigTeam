@@ -4,6 +4,7 @@
 @rendermode InteractiveServer
 @inject PositionProfileService PositionProfileService
 @inject DepartmentService DepartmentService
+@inject LocationService LocationService
 @inject LeavePolicyService LeavePolicyService
 @inject OnboardingTemplateService OnboardingTemplateService
 @inherits EditPageBase<PositionProfileEditModel>
@@ -53,15 +54,28 @@
                                     <HrTextBox @bind-Value="Model.Description" Placeholder="Optional description" />
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">Department</label>
+                                    <label class="form-label">Department <span class="text-danger">*</span></label>
                                     <SfDropDownList TValue="Guid?"
                                                     TItem="DepartmentListItemModel"
                                                     DataSource="@_departments"
                                                     @bind-Value="Model.DepartmentId"
-                                                    Placeholder="None"
+                                                    Placeholder="Select department"
                                                     AllowFiltering="true">
                                         <DropDownListFieldSettings Value="Id" Text="Name" />
                                     </SfDropDownList>
+                                    <ValidationMessage For="@(() => Model.DepartmentId)" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Location <span class="text-danger">*</span></label>
+                                    <SfDropDownList TValue="Guid?"
+                                                    TItem="LocationListItemModel"
+                                                    DataSource="@_locations"
+                                                    @bind-Value="Model.LocationId"
+                                                    Placeholder="Select location"
+                                                    AllowFiltering="true">
+                                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                                    </SfDropDownList>
+                                    <ValidationMessage For="@(() => Model.LocationId)" />
                                 </div>
                             </div>
                         </div>
@@ -107,15 +121,28 @@
                                                         <HrTextBox @bind-Value="Model.Description" Placeholder="Optional description" />
                                                     </div>
                                                     <div class="mb-3">
-                                                        <label class="form-label">Department</label>
+                                                        <label class="form-label">Department <span class="text-danger">*</span></label>
                                                         <SfDropDownList TValue="Guid?"
                                                                         TItem="DepartmentListItemModel"
                                                                         DataSource="@_departments"
                                                                         @bind-Value="Model.DepartmentId"
-                                                                        Placeholder="None"
+                                                                        Placeholder="Select department"
                                                                         AllowFiltering="true">
                                                             <DropDownListFieldSettings Value="Id" Text="Name" />
                                                         </SfDropDownList>
+                                                        <ValidationMessage For="@(() => Model.DepartmentId)" />
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Location <span class="text-danger">*</span></label>
+                                                        <SfDropDownList TValue="Guid?"
+                                                                        TItem="LocationListItemModel"
+                                                                        DataSource="@_locations"
+                                                                        @bind-Value="Model.LocationId"
+                                                                        Placeholder="Select location"
+                                                                        AllowFiltering="true">
+                                                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                                                        </SfDropDownList>
+                                                        <ValidationMessage For="@(() => Model.LocationId)" />
                                                     </div>
                                                 </div>
                                             </div>
@@ -197,6 +224,7 @@
         : IsViewMode ? "View Position Profile" : "Edit Position Profile";
 
     private List<DepartmentListItemModel> _departments = [];
+    private List<LocationListItemModel> _locations = [];
     private List<LeavePolicyListItemModel> _leavePolicies = [];
     private List<OnboardingTemplateListItemModel> _onboardingTemplates = [];
 
@@ -206,14 +234,20 @@
     protected override async Task LoadAsync()
     {
         var deptTask = DepartmentService.ListDepartmentsAsync(CompanyId);
+        var locationTask = LocationService.ListLocationsAsync(CompanyId);
         var leavePolicyTask = LeavePolicyService.ListLeavePoliciesAsync(CompanyId, activeOnly: true);
         var onboardingTemplateTask = OnboardingTemplateService.ListOnboardingTemplatesAsync(CompanyId);
 
-        await Task.WhenAll(deptTask, leavePolicyTask, onboardingTemplateTask);
+        await Task.WhenAll(deptTask, locationTask, leavePolicyTask, onboardingTemplateTask);
 
         _departments = (await deptTask)?.Items ?? [];
+        _locations = (await locationTask)?.Items ?? [];
         _leavePolicies = (await leavePolicyTask)?.Items ?? [];
-        _onboardingTemplates = (await onboardingTemplateTask)?.Items.ToList() ?? [];
+        _onboardingTemplates = ((await onboardingTemplateTask)?.Items ?? [])
+            .Prepend(new OnboardingTemplateListItemModel(Guid.Empty, "None", null, true, 0))
+            .ToList();
+
+        Model.OnboardingTemplateId ??= Guid.Empty;
 
         if (!IsNew)
         {
@@ -223,12 +257,13 @@
                 Model.Title = profile.Title;
                 Model.Description = profile.Description;
                 Model.DepartmentId = profile.DepartmentId;
+                Model.LocationId = profile.LocationId;
                 Model.ProbationMonthsOverride = profile.ProbationMonthsOverride;
                 Model.SalaryMin = profile.SalaryMin;
                 Model.SalaryMax = profile.SalaryMax;
                 Model.SalaryType = profile.SalaryType ?? "Annual";
                 Model.DefaultLeavePolicyId = profile.DefaultLeavePolicyId;
-                Model.OnboardingTemplateId = profile.OnboardingTemplateId;
+                Model.OnboardingTemplateId = profile.OnboardingTemplateId ?? Guid.Empty;
 
                 if (profile.WorkingDaysOverride.HasValue && profile.HoursPerDayOverride.HasValue)
                 {
@@ -262,7 +297,8 @@
         {
             var request = new CreatePositionProfileRequest(
                 CompanyId,
-                Model.DepartmentId,
+                Model.DepartmentId!.Value,
+                Model.LocationId!.Value,
                 Model.Title.Trim(),
                 string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
                 Model.ProbationMonthsOverride,
@@ -271,8 +307,8 @@
                 Model.SalaryMin,
                 Model.SalaryMax,
                 Model.SalaryType,
-                Model.DefaultLeavePolicyId,
-                Model.OnboardingTemplateId);
+                Model.DefaultLeavePolicyId!.Value,
+                Model.OnboardingTemplateId == Guid.Empty ? null : Model.OnboardingTemplateId);
 
             var (created, error) = await PositionProfileService.CreatePositionProfileAsync(CompanyId, request);
             return created is not null ? null : error ?? "Failed to create position profile.";
@@ -282,7 +318,8 @@
             var request = new UpdatePositionProfileRequest(
                 CompanyId,
                 Id!.Value,
-                Model.DepartmentId,
+                Model.DepartmentId!.Value,
+                Model.LocationId!.Value,
                 Model.Title.Trim(),
                 string.IsNullOrWhiteSpace(Model.Description) ? null : Model.Description.Trim(),
                 Model.ProbationMonthsOverride,
@@ -291,8 +328,8 @@
                 Model.SalaryMin,
                 Model.SalaryMax,
                 Model.SalaryType,
-                Model.DefaultLeavePolicyId,
-                Model.OnboardingTemplateId);
+                Model.DefaultLeavePolicyId!.Value,
+                Model.OnboardingTemplateId == Guid.Empty ? null : Model.OnboardingTemplateId);
 
             var (success, error) = await PositionProfileService.UpdatePositionProfileAsync(CompanyId, Id!.Value, request);
             return success ? null : error;
@@ -336,16 +373,16 @@
                 <ValidationMessage For="@(() => Model.SalaryMax)" />
             </div>
             <div class="mb-3">
-                <label class="form-label">Default Leave Policy</label>
+                <label class="form-label">Default Leave Policy <span class="text-danger">*</span></label>
                 <SfDropDownList TValue="Guid?"
                                 TItem="LeavePolicyListItemModel"
                                 DataSource="@_leavePolicies"
                                 @bind-Value="Model.DefaultLeavePolicyId"
-                                Placeholder="None"
-                                AllowFiltering="true"
-                                ShowClearButton="true">
+                                Placeholder="Select leave policy"
+                                AllowFiltering="true">
                     <DropDownListFieldSettings Value="Id" Text="Name" />
                 </SfDropDownList>
+                <ValidationMessage For="@(() => Model.DefaultLeavePolicyId)" />
             </div>
             <div class="mb-3">
                 <label class="form-label">Onboarding Template</label>
@@ -354,8 +391,7 @@
                                 DataSource="@_onboardingTemplates"
                                 @bind-Value="Model.OnboardingTemplateId"
                                 Placeholder="None"
-                                AllowFiltering="true"
-                                ShowClearButton="true">
+                                AllowFiltering="true">
                     <DropDownListFieldSettings Value="Id" Text="Name" />
                 </SfDropDownList>
             </div>

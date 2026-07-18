@@ -113,7 +113,7 @@ public class EmployeeImportWriterTests
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
         var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
         var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "HQ", null, now);
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Developer", null, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Developer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
         context.Departments.Add(department);
         context.LocationTypes.Add(locationType);
         context.Locations.Add(location);
@@ -139,7 +139,7 @@ public class EmployeeImportWriterTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Senior Dev", null, 3, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Senior Dev", null, 3, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 

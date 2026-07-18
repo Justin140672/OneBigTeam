@@ -50,4 +50,36 @@ public sealed class AssignManagerTests(AppFixture fixture) : E2ETestBase(fixture
         var content = await _page.ContentAsync();
         Assert.Contains("Laura Bennett", content, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task ClearManager_ViaNoManagerOption_PersistsAsUnset()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        // ── Step 1: Login as Laura ─────────────────────────────────────────────
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // ── Step 2: Navigate to Marcus's admin employee profile and set a manager ──
+        await empEdit.GoToAsync(AcmeId, MarcusId);
+        await empEdit.OpenEmploymentTabAsync();
+        await empEdit.SelectManagerAsync("Laura Bennett");
+        await empEdit.ClickSaveChangesAsync();
+        Assert.False(await empEdit.HasErrorAsync(), "Expected no error after assigning a manager");
+
+        // ── Step 3: Reload, then clear the manager via the "No Manager" sentinel item ──
+        await empEdit.GoToAsync(AcmeId, MarcusId);
+        await empEdit.OpenEmploymentTabAsync();
+        Assert.Equal("Laura Bennett", await empEdit.GetSelectedManagerTextAsync());
+
+        await empEdit.ClearManagerAsync();
+        await empEdit.ClickSaveChangesAsync();
+        Assert.False(await empEdit.HasErrorAsync(), "Expected no error after clearing the manager");
+
+        // ── Step 4: Reload and verify the cleared state persisted ─────────────
+        await empEdit.GoToAsync(AcmeId, MarcusId);
+        await empEdit.OpenEmploymentTabAsync();
+        Assert.Equal("No Manager", await empEdit.GetSelectedManagerTextAsync());
+    }
 }

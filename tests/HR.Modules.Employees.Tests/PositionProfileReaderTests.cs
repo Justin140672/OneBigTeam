@@ -22,10 +22,10 @@ public class PositionProfileReaderTests
         bool isActive = true)
     {
         var profile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, departmentId, locationId: null, title,
+            Guid.NewGuid(), companyId, departmentId ?? Guid.NewGuid(), locationId: Guid.NewGuid(), title,
             description: null, probationMonthsOverride: null, workingDaysOverride: null,
             hoursPerDayOverride: null, salaryMin: null, salaryMax: null, salaryType: null,
-            defaultLeavePolicyId: null, Now);
+            defaultLeavePolicyId: Guid.NewGuid(), Now);
 
         if (!isActive)
             profile.Deactivate(Now);

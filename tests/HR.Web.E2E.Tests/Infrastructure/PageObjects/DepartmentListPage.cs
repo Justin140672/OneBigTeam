@@ -66,8 +66,12 @@ public sealed class DepartmentListPage(IPage page, string baseUrl)
             .Filter(new() { HasText = nameFragment })
             .First;
         await row.ClickAsync();
-        // The toolbar deactivate button uses a fa-circle-xmark icon.
-        await page.Locator(".e-toolbar-item[title='Deactivate']").ClickAsync();
+        // Blazor re-renders the toolbar after row selection; wait for the button to be enabled
+        // (same pattern as EmploymentTypeListPage.DeactivateAsync — a title-attribute selector
+        // doesn't reliably resolve here since the toolbar button isn't guaranteed to expose one).
+        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Deactivate" });
+        await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await btn.ClickAsync();
         // Wait for the grid to refresh.
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
@@ -81,7 +85,13 @@ public sealed class DepartmentListPage(IPage page, string baseUrl)
         var row = page.Locator(".e-row")
             .Filter(new() { HasText = nameFragment })
             .First;
-        var badge = row.Locator(".badge.bg-success");
+        var badge = row.Locator(".status-badge.status-badge--success");
         return await badge.IsVisibleAsync();
+    }
+
+    public async Task ShowInactiveAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Show Inactive" }).ClickAsync();
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 }

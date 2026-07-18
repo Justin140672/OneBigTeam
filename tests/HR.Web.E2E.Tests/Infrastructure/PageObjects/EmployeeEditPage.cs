@@ -131,6 +131,33 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     }
 
     /// <summary>
+    /// Clears the manager selection on the Employment tab by opening the Manager dropdown and
+    /// selecting its prepended "No Manager" sentinel item (Id = Guid.Empty) — replaces the old
+    /// ShowClearButton ("x" icon) approach, which was removed in favor of this explicit
+    /// no-selection list item (see EmployeeEmploymentTab.razor's ManagerOption list, which
+    /// prepends a Guid.Empty/"No Manager" entry rather than setting ShowClearButton="true").
+    /// </summary>
+    public async Task ClearManagerAsync()
+    {
+        var managerGroup = page.Locator(".col-md-4, .col-12")
+            .Filter(new() { HasText = "Manager" })
+            .First;
+        await managerGroup.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = "No Manager" })
+            .First
+            .ClickAsync();
+
+        // Same "popup-hidden isn't proof of the server round-trip" concern as SelectManagerAsync
+        // above — wait for the combobox's own input value too before returning.
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
+            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        await Assertions.Expect(managerGroup.Locator(".e-input-group input").First)
+            .ToHaveValueAsync("No Manager", new() { Timeout = 10_000 });
+    }
+
+    /// <summary>
     /// Clicks the single page-level Save button (persistent across all tabs, below the SfTab).
     /// Saves both the Details and Employment tabs together and navigates to the employee list on success.
     /// </summary>

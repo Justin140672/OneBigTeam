@@ -205,7 +205,7 @@ public class ListEmployeesHandlerTests
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
         var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
         var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, now);
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, null, null, "Software Developer", null, null, null, null, null, null, null, null, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Software Developer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
         var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Departments.Add(department);
         context.LocationTypes.Add(locationType);

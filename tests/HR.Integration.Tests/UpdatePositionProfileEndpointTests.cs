@@ -25,6 +25,82 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         return client;
     }
 
+    private static async Task<Guid> CreateDepartmentAsync(HttpClient client, Guid companyId, string name = "Engineering")
+    {
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
+        {
+            companyId,
+            name = $"{name} {Guid.NewGuid():N}"
+        });
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<IdPayload>();
+        Assert.NotNull(payload);
+        return payload!.Id;
+    }
+
+    private static async Task<Guid> CreateLocationAsync(HttpClient client, Guid companyId, string name = "Head Office")
+    {
+        var locationTypeResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/location-types", new
+        {
+            companyId,
+            name = $"Office Type {Guid.NewGuid():N}"
+        });
+        locationTypeResponse.EnsureSuccessStatusCode();
+        var locationType = await locationTypeResponse.Content.ReadFromJsonAsync<IdPayload>();
+        Assert.NotNull(locationType);
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/locations", new
+        {
+            companyId,
+            name = $"{name} {Guid.NewGuid():N}",
+            locationTypeId = locationType!.Id
+        });
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<IdPayload>();
+        Assert.NotNull(payload);
+        return payload!.Id;
+    }
+
+    private static async Task<Guid> CreateLeavePolicyAsync(HttpClient client, Guid companyId, string name = "Standard Leave")
+    {
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/leave-policies", new
+        {
+            companyId,
+            name = $"{name} {Guid.NewGuid():N}",
+            carryOverDays = 5,
+            allowNegativeBalance = false
+        });
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<IdPayload>();
+        Assert.NotNull(payload);
+        return payload!.Id;
+    }
+
+    private async Task<(Guid DepartmentId, Guid LocationId, Guid LeavePolicyId)> SeedReferenceDataAsync(HttpClient client, Guid companyId)
+    {
+        var departmentId = await CreateDepartmentAsync(client, companyId);
+        var locationId = await CreateLocationAsync(client, companyId);
+        var leavePolicyId = await CreateLeavePolicyAsync(client, companyId);
+        return (departmentId, locationId, leavePolicyId);
+    }
+
+    private async Task<PositionProfilePayload> CreatePositionProfileAsync(
+        HttpClient client, Guid companyId, Guid departmentId, Guid locationId, Guid leavePolicyId, string title)
+    {
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
+        {
+            companyId,
+            departmentId,
+            locationId,
+            defaultLeavePolicyId = leavePolicyId,
+            title
+        });
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<PositionProfilePayload>();
+        Assert.NotNull(payload);
+        return payload!;
+    }
+
     [Fact]
     public async Task Put_PositionProfile_Returns_Unauthorized_For_Anonymous_Request()
     {
@@ -43,21 +119,18 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
     {
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
+        var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
 
-        var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
-        {
-            companyId,
-            title = "Original Title"
-        });
-        createResponse.EnsureSuccessStatusCode();
-        var created = await createResponse.Content.ReadFromJsonAsync<PositionProfilePayload>();
-        Assert.NotNull(created);
+        var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
 
         var updateResponse = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/position-profiles/{created!.Id}", new
+            $"/api/companies/{companyId}/position-profiles/{created.Id}", new
             {
                 companyId,
                 id = created.Id,
+                departmentId,
+                locationId,
+                defaultLeavePolicyId = leavePolicyId,
                 title = "Updated Title",
                 description = "Now with description"
             });
@@ -68,6 +141,9 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.NotNull(payload);
         Assert.Equal("Updated Title", payload!.Title);
         Assert.Equal("Now with description", payload.Description);
+        Assert.Equal(departmentId, payload.DepartmentId);
+        Assert.Equal(locationId, payload.LocationId);
+        Assert.Equal(leavePolicyId, payload.DefaultLeavePolicyId);
     }
 
     [Fact]
@@ -75,12 +151,16 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
     {
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
+        var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles/{Guid.NewGuid()}", new
             {
                 companyId,
                 id = Guid.NewGuid(),
+                departmentId,
+                locationId,
+                defaultLeavePolicyId = leavePolicyId,
                 title = "Whatever"
             });
 
@@ -92,28 +172,19 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
     {
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
+        var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
 
-        var create1 = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
-        {
-            companyId,
-            title = "Profile A"
-        });
-        create1.EnsureSuccessStatusCode();
-
-        var create2 = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
-        {
-            companyId,
-            title = "Profile B"
-        });
-        create2.EnsureSuccessStatusCode();
-        var profileB = await create2.Content.ReadFromJsonAsync<PositionProfilePayload>();
-        Assert.NotNull(profileB);
+        await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Profile A");
+        var profileB = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Profile B");
 
         var updateResponse = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/position-profiles/{profileB!.Id}", new
+            $"/api/companies/{companyId}/position-profiles/{profileB.Id}", new
             {
                 companyId,
                 id = profileB.Id,
+                departmentId,
+                locationId,
+                defaultLeavePolicyId = leavePolicyId,
                 title = "Profile A"
             });
 
@@ -126,43 +197,112 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
         using var client = AuthenticatedClient(companyA);
+        var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyA);
 
-        var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyA}/position-profiles", new
-        {
-            companyId = companyA,
-            title = "Designer"
-        });
-        createResponse.EnsureSuccessStatusCode();
-        var created = await createResponse.Content.ReadFromJsonAsync<PositionProfilePayload>();
-        Assert.NotNull(created);
+        var created = await CreatePositionProfileAsync(client, companyA, departmentId, locationId, leavePolicyId, "Designer");
 
         // Authenticated as companyA but route targets companyB — middleware blocks it.
         var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyB}/position-profiles/{created!.Id}", new
+            $"/api/companies/{companyB}/position-profiles/{created.Id}", new
             {
                 companyId = companyB,
                 id = created.Id,
+                departmentId,
+                locationId,
+                defaultLeavePolicyId = leavePolicyId,
                 title = "Designer"
             });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Put_PositionProfile_Returns_BadRequest_When_DepartmentId_Is_Empty()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
+        var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles/{created.Id}", new
+            {
+                companyId,
+                id = created.Id,
+                departmentId = Guid.Empty,
+                locationId,
+                defaultLeavePolicyId = leavePolicyId,
+                title = "Original Title"
+            });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_PositionProfile_Returns_BadRequest_When_LocationId_Is_Empty()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
+        var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles/{created.Id}", new
+            {
+                companyId,
+                id = created.Id,
+                departmentId,
+                locationId = Guid.Empty,
+                defaultLeavePolicyId = leavePolicyId,
+                title = "Original Title"
+            });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_PositionProfile_Returns_BadRequest_When_DefaultLeavePolicyId_Is_Empty()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
+        var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles/{created.Id}", new
+            {
+                companyId,
+                id = created.Id,
+                departmentId,
+                locationId,
+                defaultLeavePolicyId = Guid.Empty,
+                title = "Original Title"
+            });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    private sealed record IdPayload(Guid Id);
+
     private sealed record PositionProfilePayload(
         Guid Id,
         Guid CompanyId,
-        Guid? DepartmentId,
+        Guid DepartmentId,
+        Guid LocationId,
         string Title,
         string? Description,
+        Guid DefaultLeavePolicyId,
         bool IsActive,
         DateTimeOffset CreatedAt);
 
     private sealed record UpdatedPositionProfilePayload(
         Guid Id,
         Guid CompanyId,
-        Guid? DepartmentId,
+        Guid DepartmentId,
+        Guid LocationId,
         string Title,
         string? Description,
+        Guid DefaultLeavePolicyId,
         bool IsActive,
         DateTimeOffset UpdatedAt);
 }
