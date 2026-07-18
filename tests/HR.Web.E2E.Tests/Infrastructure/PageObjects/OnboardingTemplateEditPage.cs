@@ -14,8 +14,20 @@ public sealed class OnboardingTemplateEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
     }
 
+    public async Task GoToAsync(Guid companyId, Guid templateId)
+    {
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/onboarding-templates/{templateId}");
+        await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
+    }
+
     public Task FillNameAsync(string name) =>
         page.GetByPlaceholder("e.g. Standard Engineering Onboarding").FillAsync(name);
+
+    public Task<string> GetNameAsync() =>
+        page.GetByPlaceholder("e.g. Standard Engineering Onboarding").InputValueAsync();
+
+    public Task<string> GetTaskTitleAsync() =>
+        page.GetByPlaceholder("Task title").First.InputValueAsync();
 
     // Scoped to .First: the template-level description field is always the first element in the
     // DOM with this placeholder — checklist task rows (added via ClickAddTaskAsync) reuse the same

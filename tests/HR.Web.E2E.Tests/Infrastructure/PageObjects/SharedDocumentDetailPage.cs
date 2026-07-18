@@ -85,6 +85,67 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     public async Task<string> GetStatusAsync() =>
         (await page.Locator("dt:has-text('Status') + dd .badge").InnerTextAsync()).Trim();
 
+    /// <summary>Page header's document title (the &lt;h1&gt; — SharedDocumentDetail.razor renders @_detail.Title there).</summary>
+    public async Task<string> GetTitleAsync() =>
+        (await page.Locator("h1").First.InnerTextAsync()).Trim();
+
+    /// <summary>Text of the "Category" row in the Document Metadata card.</summary>
+    public async Task<string> GetCategoryAsync() =>
+        (await page.Locator("dt:has-text('Category') + dd").InnerTextAsync()).Trim();
+
+    /// <summary>
+    /// Text of the "Description" row in the Document Metadata card, or null when the row isn't
+    /// rendered at all — SharedDocumentDetail.razor only renders this row once Description is
+    /// non-blank.
+    /// </summary>
+    public async Task<string?> GetDescriptionAsync()
+    {
+        var row = page.Locator("dt:has-text('Description') + dd");
+        if (!await row.IsVisibleAsync()) return null;
+        return (await row.InnerTextAsync()).Trim();
+    }
+
+    /// <summary>
+    /// Drives the page header's "Edit" button and EditSharedCompanyDocumentMetadataDialog.razor to
+    /// change Title, Description, and Category together, then waits for the page to reload its
+    /// detail data. <paramref name="categoryLabel"/> is matched against the Category dropdown's
+    /// list items (e.g. "Handbook") — same click-open/wait-for-popup/click-item pattern as
+    /// SetReviewFrequencyAsync above.
+    /// </summary>
+    public async Task EditTitleDescriptionCategoryAsync(string title, string description, string categoryLabel)
+    {
+        await EditMetadataHeaderButton.ClickAsync();
+        await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
+        await EditMetadataDialog.GetByPlaceholder("Document title").FillAsync(title);
+        await EditMetadataDialog.GetByPlaceholder("Optional description").FillAsync(description);
+
+        var categoryGroup = EditMetadataDialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
+        await categoryGroup.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = categoryLabel })
+            .First
+            .ClickAsync();
+
+        // Popup-hidden alone isn't proof the Blazor round-trip committed Model.CategoryId yet —
+        // wait for the combobox's own input value too (same pattern as SetReviewFrequencyAsync).
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
+            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        await Assertions.Expect(categoryGroup.Locator(".e-input-group input").First)
+            .ToHaveValueAsync(new Regex(Regex.Escape(categoryLabel)), new() { Timeout = 10_000 });
+
+        await EditMetadataDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+
+        // Dialog-hidden isn't proof the page's own detail reload has landed in the DOM yet — the
+        // h1 can still show the pre-edit title for a beat after the dialog closes. Assert directly
+        // on the h1's content (auto-retrying) rather than a spinner-clear proxy, same pattern used
+        // for CompleteReview's footer summary elsewhere in this file.
+        await Assertions.Expect(page.Locator("h1").First)
+            .ToHaveTextAsync(title, new() { Timeout = 15_000 });
+    }
+
     public Task<bool> IsArchiveButtonVisibleAsync() => ArchiveHeaderButton.IsVisibleAsync();
 
     public Task<bool> IsExpireButtonVisibleAsync() => ExpireHeaderButton.IsVisibleAsync();

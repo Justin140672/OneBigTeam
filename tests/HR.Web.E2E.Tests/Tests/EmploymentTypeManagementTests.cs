@@ -72,6 +72,47 @@ public sealed class EmploymentTypeManagementTests(AppFixture fixture) : E2ETestB
     }
 
     [Fact]
+    public async Task EditEmploymentType_PersistsAcrossReload()
+    {
+        var originalName = $"E2E Type Edit {Guid.NewGuid().ToString("N")[..8]}";
+        var updatedName  = $"{originalName} Updated";
+
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var typeList = new EmploymentTypeListPage(_page, _fixture.WebBaseUrl);
+        var typeEdit = new EmploymentTypeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await typeList.GoToAsync(AcmeId);
+        await typeList.ClickNewAsync();
+        await typeEdit.FillNameAsync(originalName);
+        await typeEdit.FillDescriptionAsync("Created by E2E test");
+        await typeEdit.SaveAsync();
+
+        await typeList.GoToAsync(AcmeId);
+        var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = originalName }).First.GetAttributeAsync("href");
+        Assert.NotNull(href);
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}{href}");
+        await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
+
+        await typeEdit.FillNameAsync(updatedName);
+        await typeEdit.SaveAsync();
+
+        await typeList.GoToAsync(AcmeId);
+        var updatedHref = await _page.Locator(".e-rowcell a").Filter(new() { HasText = updatedName }).First.GetAttributeAsync("href");
+        Assert.NotNull(updatedHref);
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}{updatedHref}");
+        await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
+
+        // Reload the page directly to confirm the change persisted server-side, not just in local state.
+        await _page.ReloadAsync();
+        await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
+
+        Assert.Equal(updatedName, await typeEdit.GetNameAsync());
+    }
+
+    [Fact]
     public async Task PlainEmployee_IsRedirectedAway_FromEmploymentTypesPage()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);

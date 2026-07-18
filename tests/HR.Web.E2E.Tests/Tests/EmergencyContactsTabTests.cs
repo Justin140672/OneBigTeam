@@ -106,4 +106,62 @@ public sealed class EmergencyContactsTabTests(AppFixture fixture) : E2ETestBase(
         Assert.False(await emergency.HasContactAsync("Invalid Phone Test"),
             "The contact should not have been saved with an invalid phone number");
     }
+
+    [Fact]
+    public async Task EmergencyContactsTab_EditContact_PersistsChanges()
+    {
+        var unique          = Guid.NewGuid().ToString("N")[..8];
+        var originalName    = $"E2E Original {unique}";
+        var updatedName     = $"E2E Updated {unique}";
+        var updatedPhone    = "07700 900098";
+        var updatedRelation = "Parent";
+
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile   = new MyProfilePage(_page, _fixture.WebBaseUrl);
+        var emergency = new EmergencyContactsTab(_page);
+
+        // ── Step 1: Login as Tom ──────────────────────────────────────────────
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        // ── Step 2: Navigate to Emergency Contacts tab ────────────────────────
+        await profile.GoToAsync(AcmeId, TomId);
+        await profile.OpenEmergencyContactsTabAsync();
+        await emergency.WaitForLoadAsync();
+
+        // ── Step 3: Add a contact to edit ──────────────────────────────────────
+        await emergency.ClickAddContactAsync();
+        await emergency.FillContactNameAsync(originalName);
+        await emergency.FillContactRelationshipAsync("Friend");
+        await emergency.FillContactPhoneAsync("07700 900097");
+        await emergency.SaveContactAsync();
+
+        Assert.True(await emergency.HasContactAsync(originalName),
+            $"Expected the contact '{originalName}' to appear in the emergency contacts list before editing it");
+
+        // ── Step 4: Edit the contact's name, phone, and relationship ──────────
+        await emergency.ClickEditContactAsync(originalName);
+        await emergency.FillContactNameAsync(updatedName);
+        await emergency.FillContactRelationshipAsync(updatedRelation);
+        await emergency.FillContactPhoneAsync(updatedPhone);
+
+        // The edit form's own save button shares the "Save" text with SaveContactAsync's
+        // "Add Contact"-labelled button, so drive it directly here rather than reusing that helper.
+        await _page.Locator("button.e-primary, button[type='submit']")
+            .Filter(new() { HasText = "Save" })
+            .Last
+            .ClickAsync();
+        await _page.WaitForSelectorAsync(".ec-success-banner", new() { Timeout = 15_000 });
+
+        // ── Step 5: The updated contact appears in the list; the old name is gone ──
+        Assert.True(await emergency.HasContactAsync(updatedName),
+            $"Expected the updated contact '{updatedName}' to appear in the emergency contacts list");
+        Assert.False(await emergency.HasContactAsync(originalName),
+            $"Expected the original contact name '{originalName}' to no longer appear after editing");
+
+        // ── Step 6: The updated phone and relationship are also reflected on the card ──
+        var content = await _page.ContentAsync();
+        Assert.Contains(updatedPhone, content);
+        Assert.Contains(updatedRelation, content);
+    }
 }

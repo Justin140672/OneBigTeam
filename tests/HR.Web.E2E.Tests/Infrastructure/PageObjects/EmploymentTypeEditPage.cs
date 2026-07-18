@@ -10,6 +10,12 @@ public sealed class EmploymentTypeEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
     }
 
+    public async Task GoToAsync(Guid companyId, Guid employmentTypeId)
+    {
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/employment-types/{employmentTypeId}");
+        await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
+    }
+
     public async Task FillNameAsync(string name) =>
         await page.GetByPlaceholder("e.g. Permanent, Contractor").FillAsync(name);
 

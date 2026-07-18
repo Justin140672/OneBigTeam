@@ -156,6 +156,81 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
     }
 
     [Fact]
+    public async Task EmploymentTab_ChangingPositionProfile_PersistsDepartmentAndLocationAfterSave()
+    {
+        // Uses a freshly-created employee (rather than mutating a shared seeded one like Emma
+        // Jones, who other tests — e.g. EmployeeCurrentProfilePhotoTests, ManagerDashboardTests —
+        // rely on remaining untouched) so that actually clicking Save here (unlike the sibling
+        // EmploymentTab_ChangingPositionProfile_UpdatesDepartmentAndLocation test above, which only
+        // verifies the client-side pre-population and never saves) can't leak side effects into
+        // other tests.
+        var unique    = Guid.NewGuid().ToString("N")[..8];
+        var lastName  = $"PosProfile{unique}";
+        var workEmail = $"e2e.posprofile{unique}@acme.example";
+
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // ── Step 1: Create an employee starting on "Account Executive" (Sales, no location) ──
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "Account Executive");
+
+        // Account Executive has no Location attached, but CreateEmployee.Validator requires one
+        // (RuleFor(r => r.LocationId).NotEmpty()) — without picking one manually here, Save
+        // silently fails client-side validation and SaveNewEmployeeAsync's WaitForURLAsync times
+        // out, since it doesn't check for the error banner the way ClickSaveChangesAsync does.
+        await empEdit.SelectDropdownAsync("Location", "London Office");
+
+        await empEdit.SaveNewEmployeeAsync();
+
+        Assert.True(await empList.HasEmployeeAsync(lastName),
+            $"Expected the new employee '{lastName}' to appear in the employee list after creation");
+
+        // Navigate into the new employee's edit page and read its id back out of the URL
+        // (…/employees/{id}) rather than adding a separate id-lookup helper.
+        await empList.ClickEmployeeAsync(lastName);
+        var employeeId = Guid.Parse(_page.Url.TrimEnd('/').Split('/').Last());
+
+        // ── Step 2: Open the Employment tab and change Position Profile ────────
+        await empEdit.OpenEmploymentTabAsync();
+
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+
+        var departmentTextBeforeSave = await empEdit.GetSelectedDepartmentTextAsync();
+        Assert.Equal("Engineering", departmentTextBeforeSave);
+
+        var locationTextBeforeSave = await empEdit.GetSelectedLocationTextAsync();
+        Assert.Equal("London Office", locationTextBeforeSave);
+
+        // ── Step 3: Save and reload — the new Department/Location must persist ─
+        await empEdit.ClickSaveChangesAsync();
+
+        await empEdit.GoToAsync(AcmeId, employeeId);
+        await empEdit.OpenEmploymentTabAsync();
+
+        var departmentTextAfterReload = await empEdit.GetSelectedDepartmentTextAsync();
+        Assert.Equal("Engineering", departmentTextAfterReload);
+
+        var locationTextAfterReload = await empEdit.GetSelectedLocationTextAsync();
+        Assert.Equal("London Office", locationTextAfterReload);
+    }
+
+    [Fact]
     public async Task EmployeeTasksTab_ClickingTask_OpensTaskDialog_WithoutNavigatingAway()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);

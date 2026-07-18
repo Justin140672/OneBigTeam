@@ -10,6 +10,12 @@ public sealed class LeaveTypeEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
     }
 
+    public async Task GoToAsync(Guid companyId, Guid leaveTypeId)
+    {
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/leave-types/{leaveTypeId}");
+        await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
+    }
+
     public async Task FillNameAsync(string name) =>
         await page.GetByPlaceholder("e.g. Annual Leave").FillAsync(name);
 
