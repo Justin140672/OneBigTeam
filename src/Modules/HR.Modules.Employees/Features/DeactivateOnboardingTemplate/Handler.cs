@@ -20,6 +20,20 @@ internal sealed class DeactivateOnboardingTemplateHandler(EmployeesDbContext dbC
         if (template is null)
             return Result.Failure(Error.NotFound($"Onboarding template '{request.Id}' was not found."));
 
+        var activeAssignmentCount = await dbContext.PositionProfileOnboardingTemplates
+            .CountAsync(
+                t => t.OnboardingTemplateId == request.Id
+                  && t.CompanyId == request.CompanyId
+                  && t.IsActive,
+                cancellationToken);
+
+        if (activeAssignmentCount > 0)
+        {
+            return Result.Failure(Error.Conflict(
+                $"Cannot deactivate '{template.Name}' — it is currently assigned to " +
+                $"{activeAssignmentCount} active position profile{(activeAssignmentCount == 1 ? "" : "s")}."));
+        }
+
         template.Deactivate(clock.UtcNowOffset());
         await dbContext.SaveChangesAsync(cancellationToken);
 

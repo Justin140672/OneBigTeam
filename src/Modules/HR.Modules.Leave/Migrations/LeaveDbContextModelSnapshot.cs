@@ -214,6 +214,12 @@ namespace HR.Modules.Leave.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("is_active");
 
+                    b.Property<bool>("IsDefault")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_default");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -226,7 +232,10 @@ namespace HR.Modules.Leave.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CompanyId");
+                    b.HasIndex("CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_leave_policies_company_id_is_default")
+                        .HasFilter("is_default");
 
                     b.ToTable("leave_policies", "leave");
                 });

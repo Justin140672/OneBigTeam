@@ -47,6 +47,62 @@ public class DeactivateOnboardingTemplateHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_Template_Has_Active_PositionProfile_Assignment()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var template = OnboardingTemplate.Create(Guid.NewGuid(), companyId, "Standard Onboarding", null, now);
+        context.OnboardingTemplates.Add(template);
+
+        var assignment = PositionProfileOnboardingTemplate.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), template.Id, Guid.NewGuid(), now);
+        context.PositionProfileOnboardingTemplates.Add(assignment);
+        await context.SaveChangesAsync();
+
+        var handler = new DeactivateOnboardingTemplateHandler(context, new FakeClock(FixedUtcNow));
+        var result = await handler.HandleAsync(
+            new DeactivateOnboardingTemplateRequest { CompanyId = companyId, Id = template.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+        Assert.Contains("Standard Onboarding", result.Error.Message);
+        Assert.Contains("1 active position profile", result.Error.Message);
+
+        var saved = await context.OnboardingTemplates.SingleAsync();
+        Assert.True(saved.IsActive);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Deactivates_Template_When_Only_Inactive_PositionProfile_Assignment()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var template = OnboardingTemplate.Create(Guid.NewGuid(), companyId, "Standard Onboarding", null, now);
+        context.OnboardingTemplates.Add(template);
+
+        var assignment = PositionProfileOnboardingTemplate.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), template.Id, Guid.NewGuid(), now);
+        assignment.Deactivate();
+        context.PositionProfileOnboardingTemplates.Add(assignment);
+        await context.SaveChangesAsync();
+
+        var handler = new DeactivateOnboardingTemplateHandler(context, new FakeClock(FixedUtcNow));
+        var result = await handler.HandleAsync(
+            new DeactivateOnboardingTemplateRequest { CompanyId = companyId, Id = template.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var saved = await context.OnboardingTemplates.SingleAsync();
+        Assert.False(saved.IsActive);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Already_Inactive()
     {
         await using var context = BuildContext();

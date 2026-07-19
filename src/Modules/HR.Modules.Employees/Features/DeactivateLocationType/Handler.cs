@@ -19,6 +19,18 @@ internal sealed class DeactivateLocationTypeHandler(EmployeesDbContext db, ICloc
         if (!entity.IsActive)
             return Result.Failure(Error.Conflict("Location type is already inactive."));
 
+        var activeLocationCount = await db.Locations
+            .CountAsync(
+                l => l.LocationTypeId == request.Id && l.CompanyId == request.CompanyId && l.IsActive,
+                cancellationToken);
+
+        if (activeLocationCount > 0)
+        {
+            return Result.Failure(Error.Conflict(
+                $"Cannot deactivate '{entity.Name}' — it is currently used by " +
+                $"{activeLocationCount} active location{(activeLocationCount == 1 ? "" : "s")}."));
+        }
+
         entity.Deactivate(new DateTimeOffset(clock.UtcNow, TimeSpan.Zero));
         await db.SaveChangesAsync(cancellationToken);
 

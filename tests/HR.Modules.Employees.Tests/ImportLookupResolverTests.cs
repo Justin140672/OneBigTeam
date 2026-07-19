@@ -25,7 +25,7 @@ public class ImportLookupResolverTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow));
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await resolver.GetOrCreateDepartmentAsync(companyId, "Sales", CancellationToken.None);
 
@@ -43,7 +43,7 @@ public class ImportLookupResolverTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow));
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var first = await resolver.GetOrCreateDepartmentAsync(companyId, "Sales", CancellationToken.None);
         var second = await resolver.GetOrCreateDepartmentAsync(companyId, "  SALES  ", CancellationToken.None);
@@ -60,7 +60,7 @@ public class ImportLookupResolverTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow));
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await resolver.GetOrCreateEmploymentTypeAsync(companyId, "Contractor", CancellationToken.None);
 
@@ -76,7 +76,7 @@ public class ImportLookupResolverTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow));
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var first = await resolver.GetOrCreateEmploymentTypeAsync(companyId, "Contractor", CancellationToken.None);
         var second = await resolver.GetOrCreateEmploymentTypeAsync(companyId, " contractor ", CancellationToken.None);
@@ -93,7 +93,7 @@ public class ImportLookupResolverTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow));
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await resolver.GetOrCreateLocationAsync(companyId, "London", CancellationToken.None);
 
@@ -115,7 +115,7 @@ public class ImportLookupResolverTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow));
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var first = await resolver.GetOrCreateLocationAsync(companyId, "London", CancellationToken.None);
         var second = await resolver.GetOrCreateLocationAsync(companyId, "Manchester", CancellationToken.None);
@@ -141,7 +141,7 @@ public class ImportLookupResolverTests
         db.LocationTypes.Add(existingGeneral);
         await db.SaveChangesAsync();
 
-        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow));
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await resolver.GetOrCreateLocationAsync(companyId, "London", CancellationToken.None);
 
@@ -165,7 +165,7 @@ public class ImportLookupResolverTests
         db.PositionProfiles.Add(existingProfile);
         await db.SaveChangesAsync();
 
-        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow));
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await resolver.GetOrCreatePositionProfileAsync(
             companyId, "  SOFTWARE DEVELOPER  ", departmentId: Guid.NewGuid(), locationId: Guid.NewGuid(), CancellationToken.None);
@@ -177,22 +177,48 @@ public class ImportLookupResolverTests
         Assert.Single(await db.PositionProfiles.ToListAsync());
     }
 
-    [Theory]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    [InlineData(false, false)]
-    [InlineData(true, true)]
-    public async Task GetOrCreatePositionProfileAsync_Always_Returns_Skipped_When_Profile_Does_Not_Already_Exist(
-        bool hasDepartment, bool hasLocation)
+    [Fact]
+    public async Task GetOrCreatePositionProfileAsync_Creates_Profile_When_Department_Location_And_DefaultLeavePolicy_All_Resolved()
     {
-        // PositionProfile now requires a mandatory DefaultLeavePolicyId (in addition to Department and
-        // Location), and the employee-import flow has no source for a leave policy. Auto-creating a new
-        // PositionProfile during import can therefore never be done safely, regardless of whether a
-        // Department/Location was resolved — the resolver always skips instead of creating. Callers must
-        // create the position profile (with a leave policy) via CreatePositionProfile up front.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow));
+        var defaultLeavePolicyId = Guid.NewGuid();
+        var resolver = new ImportLookupResolver(
+            db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(defaultLeavePolicyId: defaultLeavePolicyId));
+
+        var departmentId = Guid.NewGuid();
+        var locationId = Guid.NewGuid();
+
+        var result = await resolver.GetOrCreatePositionProfileAsync(
+            companyId, "Software Developer", departmentId, locationId, CancellationToken.None);
+
+        Assert.True(result.WasCreated);
+        Assert.False(result.Skipped);
+        Assert.NotNull(result.Id);
+
+        var saved = await db.PositionProfiles.SingleAsync();
+        Assert.Equal(result.Id, saved.Id);
+        Assert.Equal("Software Developer", saved.Title);
+        Assert.Equal(departmentId, saved.DepartmentId);
+        Assert.Equal(locationId, saved.LocationId);
+    }
+
+    [Theory]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, false)]
+    public async Task GetOrCreatePositionProfileAsync_Skips_When_Department_Location_Or_DefaultLeavePolicy_Missing(
+        bool hasDepartment, bool hasLocation, bool hasDefaultLeavePolicy)
+    {
+        // PositionProfile requires a mandatory DefaultLeavePolicyId in addition to Department and Location.
+        // The resolver can only auto-create a PositionProfile during import when all three are resolvable;
+        // otherwise it skips and callers must create the position profile up front via CreatePositionProfile.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var defaultLeavePolicyId = hasDefaultLeavePolicy ? Guid.NewGuid() : (Guid?)null;
+        var resolver = new ImportLookupResolver(
+            db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(defaultLeavePolicyId: defaultLeavePolicyId));
 
         var departmentId = hasDepartment ? Guid.NewGuid() : (Guid?)null;
         var locationId = hasLocation ? Guid.NewGuid() : (Guid?)null;
@@ -213,7 +239,7 @@ public class ImportLookupResolverTests
         await using var db = BuildContext();
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
-        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow));
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var forCompanyA = await resolver.GetOrCreateDepartmentAsync(companyA, "Sales", CancellationToken.None);
         var forCompanyB = await resolver.GetOrCreateDepartmentAsync(companyB, "Sales", CancellationToken.None);
@@ -231,7 +257,7 @@ public class ImportLookupResolverTests
         await using var db = BuildContext();
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
-        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow));
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var forCompanyA = await resolver.GetOrCreateEmploymentTypeAsync(companyA, "Contractor", CancellationToken.None);
         var forCompanyB = await resolver.GetOrCreateEmploymentTypeAsync(companyB, "Contractor", CancellationToken.None);
@@ -249,7 +275,7 @@ public class ImportLookupResolverTests
         await using var db = BuildContext();
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
-        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow));
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var forCompanyA = await resolver.GetOrCreateLocationAsync(companyA, "London", CancellationToken.None);
         var forCompanyB = await resolver.GetOrCreateLocationAsync(companyB, "London", CancellationToken.None);
@@ -278,7 +304,7 @@ public class ImportLookupResolverTests
         db.PositionProfiles.Add(existingInCompanyA);
         await db.SaveChangesAsync();
 
-        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow));
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await resolver.GetOrCreatePositionProfileAsync(
             companyB, "Software Developer", Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);

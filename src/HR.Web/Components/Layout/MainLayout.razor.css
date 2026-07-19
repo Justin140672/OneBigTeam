@@ -371,6 +371,27 @@
     .content-area {
         padding: 16px;
     }
+
+    /* Below the SfSidebar's MediaQuery breakpoint (see MainLayout.razor) the sidebar switches
+       from pushing .main-content to overlaying it, so the top bar's own contents are what need to
+       shrink to fit a phone-width viewport — trim padding and drop the name/job-title text next
+       to the avatar, keeping just the avatar itself as a tap target through to My Profile. */
+    .top-bar {
+        padding: 0 12px;
+        gap: 8px;
+    }
+
+    .top-bar-actions {
+        gap: 4px;
+    }
+
+    .top-bar-user-info {
+        display: none;
+    }
+
+    .dev-persona-switcher {
+        display: none;
+    }
 }
 
 #blazor-error-ui {

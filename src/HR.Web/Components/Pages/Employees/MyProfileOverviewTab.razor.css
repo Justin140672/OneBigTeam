@@ -26,6 +26,12 @@
     .overview-sidebar {
         width: 100%;
         position: static;
+        /* .overview-sidebar (holding the quick-action buttons) comes after .overview-main in
+           markup order, which is fine for the desktop side-by-side rail but means it lands below
+           every card once the layout stacks vertically — pushing the actions the user is most
+           likely to want (Leave, Sickness, Documents, Tasks) below the fold on a phone. Move it
+           to the front of the stack instead. */
+        order: -1;
     }
 }
 
@@ -306,6 +312,16 @@
     .action-btn {
         width: auto;
         border: 1px solid #e5e7eb;
+    }
+}
+
+@media (max-width: 480px) {
+    /* auto-fill's minmax(420px, 1fr) / minmax(280px, 1fr) are both wider than a phone viewport,
+       which forces the grid to overflow horizontally instead of stacking — collapse to a single
+       column below the width either could ever fit at. */
+    .overview-grid,
+    .overview-skeleton {
+        grid-template-columns: 1fr;
     }
 }
 

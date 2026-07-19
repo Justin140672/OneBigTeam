@@ -6,6 +6,7 @@ using HR.Modules.Leave.Features.CancelLeaveRequest;
 using HR.Modules.Leave.Features.RejectLeaveRequest;
 using HR.Modules.Leave.Features.CreateLeavePolicy;
 using HR.Modules.Leave.Features.UpdateLeavePolicy;
+using HR.Modules.Leave.Features.SetDefaultLeavePolicy;
 using HR.Modules.Leave.Features.GetEmployeeLeaveBalance;
 using HR.Modules.Leave.Features.GetLeavePolicy;
 using HR.Modules.Leave.Features.ListLeavePolicies;
@@ -52,6 +53,8 @@ public static class LeaveModule
         services.AddScoped<IValidator<CreateLeavePolicyRequest>, CreateLeavePolicyValidator>();
         services.AddScoped<UpdateLeavePolicyHandler>();
         services.AddScoped<IValidator<UpdateLeavePolicyRequest>, UpdateLeavePolicyValidator>();
+        services.AddScoped<SetDefaultLeavePolicyHandler>();
+        services.AddScoped<IValidator<SetDefaultLeavePolicyRequest>, SetDefaultLeavePolicyValidator>();
         services.AddScoped<GetLeavePolicyHandler>();
         services.AddScoped<ListLeavePoliciesHandler>();
         services.AddScoped<AssignLeavePolicyToEmployeeHandler>();
@@ -133,6 +136,7 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
                 "Default leave policy for all employees",
                 carryOverDays: 5,
                 allowNegativeBalance: false,
+                isDefault: true,
                 now);
 
             db.LeavePolicies.Add(policy);
@@ -203,7 +207,7 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
             var betaPolicy = LeavePolicy.Create(
                 betaPolicyId, betaCorpId,
                 "Standard", "Default leave policy",
-                carryOverDays: 5, allowNegativeBalance: false, now);
+                carryOverDays: 5, allowNegativeBalance: false, isDefault: true, now);
 
             db.LeavePolicies.Add(betaPolicy);
             await db.SaveChangesAsync();

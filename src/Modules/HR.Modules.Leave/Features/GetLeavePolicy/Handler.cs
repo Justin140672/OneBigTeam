@@ -37,6 +37,7 @@ internal sealed class GetLeavePolicyHandler
             policy.CarryOverDays,
             policy.AllowNegativeBalance,
             policy.IsActive,
+            policy.IsDefault,
             policy.CreatedAt));
     }
 }

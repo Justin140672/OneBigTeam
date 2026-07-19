@@ -16,7 +16,7 @@ public class GetLeavePolicyHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", "Default leave policy", 5, false, now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", "Default leave policy", 5, false, false, now);
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 
@@ -57,7 +57,7 @@ public class GetLeavePolicyHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var policy = LeavePolicy.Create(Guid.NewGuid(), Guid.NewGuid(), "Standard Policy", null, 0, false, now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), Guid.NewGuid(), "Standard Policy", null, 0, false, false, now);
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 

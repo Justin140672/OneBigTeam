@@ -43,6 +43,11 @@ internal sealed class LeavePolicyConfiguration : IEntityTypeConfiguration<LeaveP
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(p => p.IsDefault)
+            .HasColumnName("is_default")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(p => p.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
@@ -52,5 +57,11 @@ internal sealed class LeavePolicyConfiguration : IEntityTypeConfiguration<LeaveP
             .IsRequired();
 
         builder.HasIndex(p => p.CompanyId);
+
+        // Enforces "at most one default leave policy per company" at the database level.
+        builder.HasIndex(p => p.CompanyId)
+            .IsUnique()
+            .HasFilter("is_default")
+            .HasDatabaseName("ix_leave_policies_company_id_is_default");
     }
 }

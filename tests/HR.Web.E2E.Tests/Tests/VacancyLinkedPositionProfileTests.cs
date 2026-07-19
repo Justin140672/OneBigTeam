@@ -114,24 +114,68 @@ public sealed class VacancyLinkedPositionProfileTests(AppFixture fixture) : E2ET
     /// ActiveStatusBadge usage gated on "_vacancy.PositionProfileIsActive == false" in
     /// VacancyDetail.razor's RenderDetailsCard).
     ///
-    /// This cannot currently be exercised end-to-end from this test project: as already documented
-    /// on VacancyPositionProfileDefaultsTests.CreateVacancy_PositionProfileDropdown_OnlyShowsActiveProfiles,
-    /// there is no product feature (UI action or API endpoint) to deactivate a Position Profile —
-    /// PositionProfile.Deactivate(DateTimeOffset) exists on the domain entity
-    /// (HR.Modules.Employees.Domain.PositionProfile) but nothing calls it, and
-    /// PositionProfileList.razor never registers a "Deactivate" toolbar action the way
-    /// DepartmentList/EmploymentTypeList/LocationList do. Every Position Profile reachable from the
-    /// UI (seeded or created by this test suite) therefore always has IsActive == true.
-    ///
-    /// Skipped (rather than faked with a weaker assertion) so this gap stays visible. Un-skip and
-    /// fill in the body once a "Deactivate Position Profile" feature ships: seed/create a position
-    /// profile, link a vacancy to it, deactivate the profile, then reload the vacancy's detail page
-    /// and assert IsLinkedPositionProfileInactiveBadgeVisibleAsync() is true while
-    /// Title/Department/Description are unchanged.
+    /// Position Profile deactivation is now available via a "Deactivate" toolbar action on
+    /// PositionProfileList.razor, backed by DELETE
+    /// /api/companies/{companyId}/position-profiles/{id} (see
+    /// PositionProfileListPage.DeactivateAsync). This test seeds/creates a position profile, links
+    /// a vacancy to it, deactivates the profile, then reloads the vacancy's detail page and asserts
+    /// IsLinkedPositionProfileInactiveBadgeVisibleAsync() is true while Title/Department/Description
+    /// are unchanged.
     /// </summary>
-    [Fact(Skip = "Blocked: no product feature exists yet to deactivate a Position Profile (no UI action, no API endpoint) — see doc comment on this test.")]
+    [Fact]
     public async Task ViewingVacancy_WithDeactivatedLinkedProfile_ShowsInactiveIndicator()
     {
-        await Task.CompletedTask;
+        var profileTitle = $"E2E Deactivated Linked Profile {Guid.NewGuid().ToString("N")[..8]}";
+        var profileDescription = $"E2E profile description {Guid.NewGuid():N}";
+        var vacancyTitle = $"E2E Vacancy {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login         = new LoginPage(_page, _fixture.WebBaseUrl);
+        var ppList        = new PositionProfileListPage(_page, _fixture.WebBaseUrl);
+        var ppEdit        = new PositionProfileEditPage(_page, _fixture.WebBaseUrl);
+        var vacancyList   = new VacancyListPage(_page, _fixture.WebBaseUrl);
+        var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await ppList.GoToAsync(AcmeId);
+        await ppList.ClickNewPositionProfileAsync();
+        await ppEdit.FillTitleAsync(profileTitle);
+        await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.FillDescriptionAsync(profileDescription);
+        await ppEdit.SaveAsync();
+
+        Assert.True(await ppList.HasPositionProfileAsync(profileTitle),
+            $"Expected the new position profile '{profileTitle}' to appear in the list");
+
+        // Link a vacancy to the still-active profile before deactivating it.
+        await login.SwitchAccountAsync(MarcusEmail);
+
+        await vacancyList.GoToAsync(AcmeId);
+        await vacancyList.ClickNewVacancyAsync();
+        await vacancyDetail.FillTitleAsync(vacancyTitle);
+        await vacancyDetail.SelectPositionProfileAsync(profileTitle);
+        await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SaveNewVacancyAsync();
+
+        // Deactivate the linked profile.
+        await login.SwitchAccountAsync(LauraEmail);
+        await ppList.GoToAsync(AcmeId);
+        await ppList.DeactivateAsync(profileTitle);
+
+        // Reload the vacancy's detail page and confirm the linked profile card shows the
+        // "Inactive" indicator while its Title/Department/Description remain unchanged.
+        await login.SwitchAccountAsync(MarcusEmail);
+        await vacancyList.GoToAsync(AcmeId);
+        await vacancyList.ClickVacancyAsync(vacancyTitle);
+
+        Assert.True(await vacancyDetail.IsLinkedPositionProfileCardVisibleAsync(),
+            "Expected the 'Linked Position Profile' card to render for an existing vacancy");
+        Assert.Equal(profileTitle, await vacancyDetail.GetLinkedPositionProfileTitleAsync());
+        Assert.Contains("Engineering", await vacancyDetail.GetLinkedPositionProfileDepartmentAsync() ?? string.Empty);
+        Assert.Equal(profileDescription, await vacancyDetail.GetLinkedPositionProfileDescriptionAsync());
+
+        Assert.True(await vacancyDetail.IsLinkedPositionProfileInactiveBadgeVisibleAsync(),
+            "Expected an 'Inactive' indicator for a deactivated linked position profile");
     }
 }

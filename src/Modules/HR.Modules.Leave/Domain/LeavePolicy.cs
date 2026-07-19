@@ -11,6 +11,7 @@ internal sealed class LeavePolicy
     public int CarryOverDays { get; private set; }
     public bool AllowNegativeBalance { get; private set; }
     public bool IsActive { get; private set; }
+    public bool IsDefault { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -21,6 +22,7 @@ internal sealed class LeavePolicy
         string? description,
         int carryOverDays,
         bool allowNegativeBalance,
+        bool isDefault,
         DateTimeOffset now)
     {
         return new LeavePolicy
@@ -32,6 +34,7 @@ internal sealed class LeavePolicy
             CarryOverDays = carryOverDays,
             AllowNegativeBalance = allowNegativeBalance,
             IsActive = true,
+            IsDefault = isDefault,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -51,6 +54,9 @@ internal sealed class LeavePolicy
         UpdatedAt = now;
     }
 
+    // NOTE: When a Deactivate feature is eventually added for this entity, it must block
+    // deactivating the company's default leave policy — no caller exists yet, so that guard
+    // is intentionally not implemented here.
     public void Deactivate(DateTimeOffset now)
     {
         IsActive = false;
@@ -60,6 +66,18 @@ internal sealed class LeavePolicy
     public void Activate(DateTimeOffset now)
     {
         IsActive = true;
+        UpdatedAt = now;
+    }
+
+    public void MarkAsDefault(DateTimeOffset now)
+    {
+        IsDefault = true;
+        UpdatedAt = now;
+    }
+
+    public void UnmarkAsDefault(DateTimeOffset now)
+    {
+        IsDefault = false;
         UpdatedAt = now;
     }
 }

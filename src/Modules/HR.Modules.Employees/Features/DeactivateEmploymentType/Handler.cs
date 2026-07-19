@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +19,20 @@ internal sealed class DeactivateEmploymentTypeHandler(EmployeesDbContext db, ICl
 
         if (!entity.IsActive)
             return Result.Failure(Error.Conflict("Employment type is already inactive."));
+
+        var currentEmployeeCount = await db.Employees
+            .CountAsync(
+                e => e.EmploymentTypeId == request.Id
+                  && e.CompanyId == request.CompanyId
+                  && e.Status != EmploymentStatus.Terminated,
+                cancellationToken);
+
+        if (currentEmployeeCount > 0)
+        {
+            return Result.Failure(Error.Conflict(
+                $"Cannot deactivate '{entity.Name}' — it is currently assigned to " +
+                $"{currentEmployeeCount} active employee{(currentEmployeeCount == 1 ? "" : "s")}."));
+        }
 
         entity.Deactivate(new DateTimeOffset(clock.UtcNow, TimeSpan.Zero));
         await db.SaveChangesAsync(cancellationToken);

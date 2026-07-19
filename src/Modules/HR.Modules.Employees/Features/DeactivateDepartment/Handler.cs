@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +27,20 @@ internal sealed class DeactivateDepartmentHandler
 
         if (department is null)
             return Result.Failure(Error.NotFound($"Department '{request.Id}' was not found."));
+
+        var currentEmployeeCount = await _dbContext.Employees
+            .CountAsync(
+                e => e.DepartmentId == request.Id
+                  && e.CompanyId == request.CompanyId
+                  && e.Status != EmploymentStatus.Terminated,
+                cancellationToken);
+
+        if (currentEmployeeCount > 0)
+        {
+            return Result.Failure(Error.Conflict(
+                $"Cannot deactivate '{department.Name}' — it is currently assigned to " +
+                $"{currentEmployeeCount} active employee{(currentEmployeeCount == 1 ? "" : "s")}."));
+        }
 
         department.Deactivate(_clock.UtcNowOffset());
         await _dbContext.SaveChangesAsync(cancellationToken);

@@ -215,13 +215,84 @@ public class LeavePolicyCrudEndpointTests : IClassFixture<ApiWebApplicationFacto
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
+    // ── IsDefault behavior ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CreatePolicy_First_Policy_For_New_Company_Is_Forced_Default()
+    {
+        var newCompanyId = Guid.NewGuid();
+        using var client = HrAdminClient(newCompanyId);
+        var policyName   = $"First Policy {Guid.NewGuid():N}";
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{newCompanyId}/leave-policies",
+            new { companyId = newCompanyId, name = policyName, carryOverDays = 0, allowNegativeBalance = false, isDefault = false });
+
+        response.EnsureSuccessStatusCode();
+        var created = await response.Content.ReadFromJsonAsync<PolicyPayload>();
+        Assert.True(created!.IsDefault);
+    }
+
+    [Fact]
+    public async Task CreatePolicy_With_IsDefault_True_Unmarks_Existing_Default()
+    {
+        var newCompanyId = Guid.NewGuid();
+        using var client = HrAdminClient(newCompanyId);
+
+        var firstResp = await client.PostAsJsonAsync(
+            $"/api/companies/{newCompanyId}/leave-policies",
+            new { companyId = newCompanyId, name = $"First {Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false, isDefault = false });
+        firstResp.EnsureSuccessStatusCode();
+        var first = await firstResp.Content.ReadFromJsonAsync<PolicyPayload>();
+
+        var secondResp = await client.PostAsJsonAsync(
+            $"/api/companies/{newCompanyId}/leave-policies",
+            new { companyId = newCompanyId, name = $"Second {Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false, isDefault = true });
+        secondResp.EnsureSuccessStatusCode();
+        var second = await secondResp.Content.ReadFromJsonAsync<PolicyPayload>();
+
+        Assert.True(second!.IsDefault);
+
+        var reloadedFirst = await (await client.GetAsync(
+            $"/api/companies/{newCompanyId}/leave-policies/{first!.Id}")).Content.ReadFromJsonAsync<PolicyPayload>();
+        Assert.False(reloadedFirst!.IsDefault);
+    }
+
+    [Fact]
+    public async Task UpdatePolicy_Returns_BadRequest_When_Removing_Default_From_Only_Default_Policy()
+    {
+        var newCompanyId = Guid.NewGuid();
+        using var client = HrAdminClient(newCompanyId);
+
+        var createResp = await client.PostAsJsonAsync(
+            $"/api/companies/{newCompanyId}/leave-policies",
+            new { companyId = newCompanyId, name = $"Only Policy {Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false, isDefault = false });
+        createResp.EnsureSuccessStatusCode();
+        var created = await createResp.Content.ReadFromJsonAsync<PolicyPayload>();
+        Assert.True(created!.IsDefault);
+
+        var updateResp = await client.PutAsJsonAsync(
+            $"/api/companies/{newCompanyId}/leave-policies/{created.Id}",
+            new
+            {
+                companyId     = newCompanyId,
+                policyId      = created.Id,
+                name          = created.Name,
+                carryOverDays = 0,
+                allowNegativeBalance = false,
+                isDefault     = false
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, updateResp.StatusCode);
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
-    private HttpClient HrAdminClient()
+    private HttpClient HrAdminClient(Guid? companyId = null)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, HrAdminUser.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, (companyId ?? SeededCompanyId).ToString());
         return client;
     }
 
@@ -233,7 +304,7 @@ public class LeavePolicyCrudEndpointTests : IClassFixture<ApiWebApplicationFacto
         return client;
     }
 
-    private sealed record PolicyPayload(Guid Id, string Name, int CarryOverDays, bool AllowNegativeBalance);
+    private sealed record PolicyPayload(Guid Id, string Name, int CarryOverDays, bool AllowNegativeBalance, bool IsDefault);
     private sealed record ListPoliciesPayload(IReadOnlyList<PolicyItem> Items);
     private sealed record PolicyItem(Guid Id, string Name);
 }

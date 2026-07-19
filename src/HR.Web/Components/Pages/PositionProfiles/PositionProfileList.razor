@@ -20,6 +20,14 @@
     }
     else
     {
+        @if (ActionError is not null)
+        {
+            <div class="alert alert-danger alert-dismissible">
+                @ActionError
+                <button type="button" class="btn-close" @onclick="ClearActionError"></button>
+            </div>
+        }
+
         <HrGrid @ref="Grid"
                 TValue="PositionProfileListItemModel"
                 DataSource="@Items"
@@ -69,6 +77,20 @@
         return Task.CompletedTask;
     }
 
+    protected override void ConfigureToolbar()
+    {
+        AddToolbarAction(
+            id:      "hr-deactivate",
+            text:    "Deactivate",
+            icon:    "fa-solid fa-circle-xmark",
+            onClick: async item =>
+            {
+                if (!item.IsActive) return;
+                await Deactivate(item);
+            },
+            tooltip: "Deactivate selected position profile");
+    }
+
     protected override async Task<IReadOnlyList<PositionProfileListItemModel>?> FetchItemsAsync(string? search)
     {
         var result = await PositionProfileService.ListPositionProfilesAsync(CompanyId, ShowInactive);
@@ -99,5 +121,15 @@
             return $"£{item.SalaryMin.Value:N0}+{suffix}";
 
         return $"Up to £{item.SalaryMax!.Value:N0}{suffix}";
+    }
+
+    private async Task Deactivate(PositionProfileListItemModel profile)
+    {
+        ClearActionError();
+        var error = await PositionProfileService.DeactivatePositionProfileAsync(CompanyId, profile.Id);
+        if (error is not null)
+            SetActionError(error);
+        else
+            await LoadAsync();
     }
 }

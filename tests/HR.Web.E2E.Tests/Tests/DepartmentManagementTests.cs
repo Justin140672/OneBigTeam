@@ -163,6 +163,40 @@ public sealed class DepartmentManagementTests(AppFixture fixture) : E2ETestBase(
     }
 
     [Fact]
+    public async Task DeactivateDepartment_WithActiveEmployeesAssigned_IsBlockedWithError()
+    {
+        // The seeded Acme "Engineering" department has several active employees assigned to it
+        // (Sarah Chen, James Okafor, Priya Sharma, Tom Williams — see
+        // EmployeesModule.SeedEmployeesAsync), so attempting to deactivate it should be blocked by
+        // the "Cannot deactivate ... it is currently assigned to N active employee(s)" guard on
+        // DeactivateDepartmentHandler rather than actually deactivating the department.
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var deptList = new DepartmentListPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await deptList.GoToAsync(AcmeId);
+        Assert.True(await deptList.IsActiveAsync("Engineering"),
+            "Expected the seeded 'Engineering' department to be Active before attempting deactivation");
+
+        await deptList.DeactivateDepartmentAsync("Engineering");
+
+        // The blocked deactivation surfaces via DepartmentList.razor's ActionError banner
+        // (rendered as <div class="alert alert-danger alert-dismissible">).
+        var errorBanner = _page.Locator(".alert.alert-danger.alert-dismissible");
+        await errorBanner.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        var errorText = await errorBanner.TextContentAsync() ?? string.Empty;
+        Assert.Contains("Cannot deactivate", errorText);
+        Assert.Contains("Engineering", errorText);
+        Assert.Contains("active employee", errorText);
+
+        // The department should still show as active afterward.
+        Assert.True(await deptList.IsActiveAsync("Engineering"),
+            "Expected the 'Engineering' department to remain Active after a blocked deactivation attempt");
+    }
+
+    [Fact]
     public async Task PlainEmployee_IsRedirectedAway_FromDepartmentsPage()
     {
         const string tomEmail = "tom.williams@acme.example";

@@ -56,7 +56,7 @@ public class LeavePolicyServiceTests
     {
         var companyId = Guid.NewGuid();
         var policyId = Guid.NewGuid();
-        var response = new GetLeavePolicyResponse(policyId, companyId, "Standard", "Default policy", 5, false, true, DateTimeOffset.UtcNow);
+        var response = new GetLeavePolicyResponse(policyId, companyId, "Standard", "Default policy", 5, false, true, false, DateTimeOffset.UtcNow);
 
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
         var service = new LeavePolicyService(factory);

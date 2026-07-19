@@ -16,8 +16,8 @@ public class ListLeavePoliciesHandlerTests
         var companyId = Guid.NewGuid();
 
         context.LeavePolicies.AddRange(
-            LeavePolicy.Create(Guid.NewGuid(), companyId, "Policy B", null, 0, false, Now),
-            LeavePolicy.Create(Guid.NewGuid(), companyId, "Policy A", null, 5, true, Now));
+            LeavePolicy.Create(Guid.NewGuid(), companyId, "Policy B", null, 0, false, false, Now),
+            LeavePolicy.Create(Guid.NewGuid(), companyId, "Policy A", null, 5, true, false, Now));
         await context.SaveChangesAsync();
 
         var handler = new ListLeavePoliciesHandler(context);
@@ -38,8 +38,8 @@ public class ListLeavePoliciesHandlerTests
         var companyB = Guid.NewGuid();
 
         context.LeavePolicies.AddRange(
-            LeavePolicy.Create(Guid.NewGuid(), companyA, "Policy A", null, 0, false, Now),
-            LeavePolicy.Create(Guid.NewGuid(), companyB, "Policy B", null, 0, false, Now));
+            LeavePolicy.Create(Guid.NewGuid(), companyA, "Policy A", null, 0, false, false, Now),
+            LeavePolicy.Create(Guid.NewGuid(), companyB, "Policy B", null, 0, false, false, Now));
         await context.SaveChangesAsync();
 
         var handler = new ListLeavePoliciesHandler(context);
@@ -57,8 +57,8 @@ public class ListLeavePoliciesHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var active = LeavePolicy.Create(Guid.NewGuid(), companyId, "Active", null, 0, false, Now);
-        var inactive = LeavePolicy.Create(Guid.NewGuid(), companyId, "Inactive", null, 0, false, Now);
+        var active = LeavePolicy.Create(Guid.NewGuid(), companyId, "Active", null, 0, false, false, Now);
+        var inactive = LeavePolicy.Create(Guid.NewGuid(), companyId, "Inactive", null, 0, false, false, Now);
         inactive.Deactivate(Now);
 
         context.LeavePolicies.AddRange(active, inactive);
@@ -79,8 +79,8 @@ public class ListLeavePoliciesHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var active = LeavePolicy.Create(Guid.NewGuid(), companyId, "Active", null, 0, false, Now);
-        var inactive = LeavePolicy.Create(Guid.NewGuid(), companyId, "Inactive", null, 0, false, Now);
+        var active = LeavePolicy.Create(Guid.NewGuid(), companyId, "Active", null, 0, false, false, Now);
+        var inactive = LeavePolicy.Create(Guid.NewGuid(), companyId, "Inactive", null, 0, false, false, Now);
         inactive.Deactivate(Now);
 
         context.LeavePolicies.AddRange(active, inactive);

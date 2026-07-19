@@ -185,3 +185,13 @@
     flex-shrink: 0;
     line-height: 1;
 }
+
+@media (max-width: 576px) {
+    .ec-field-row {
+        grid-template-columns: 1fr;
+    }
+
+    .ec-contact-card {
+        flex-direction: column;
+    }
+}

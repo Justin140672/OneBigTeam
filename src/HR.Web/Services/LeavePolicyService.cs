@@ -43,6 +43,7 @@ public class LeavePolicyService(IHttpClientFactory httpClientFactory) : IEditSer
             Description = response.Description,
             CarryOverDays = response.CarryOverDays,
             AllowNegativeBalance = response.AllowNegativeBalance,
+            IsDefault = response.IsDefault,
         };
     }
 
@@ -51,7 +52,7 @@ public class LeavePolicyService(IHttpClientFactory httpClientFactory) : IEditSer
     {
         var request = new CreateLeavePolicyRequest(
             companyId, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
-            model.CarryOverDays, model.AllowNegativeBalance);
+            model.CarryOverDays, model.AllowNegativeBalance, model.IsDefault);
 
         var (created, error) = await CreateAsync(companyId, request);
         return (created is null ? null : model, error);
@@ -62,7 +63,7 @@ public class LeavePolicyService(IHttpClientFactory httpClientFactory) : IEditSer
     {
         var request = new UpdateLeavePolicyRequest(
             companyId, id, model.Name.Trim(), string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim(),
-            model.CarryOverDays, model.AllowNegativeBalance);
+            model.CarryOverDays, model.AllowNegativeBalance, model.IsDefault);
 
         var (updated, error) = await UpdateAsync(companyId, id, request);
         return (updated is null ? null : model, error);
@@ -109,6 +110,21 @@ public class LeavePolicyService(IHttpClientFactory httpClientFactory) : IEditSer
             return (null, "Leave policy not found.");
 
         return (null, "Failed to update leave policy.");
+    }
+
+    public async Task<string?> SetDefaultLeavePolicyAsync(Guid companyId, Guid id)
+    {
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/leave-policies/{id}/set-default", new { });
+
+        if (response.IsSuccessStatusCode)
+            return null;
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return "Leave policy not found.";
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+        return body?.Error ?? "Failed to set default leave policy.";
     }
 
     private sealed record ErrorEnvelope(string? Error);

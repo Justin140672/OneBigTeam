@@ -8,4 +8,5 @@ internal sealed record GetLeavePolicyResponse(
     int CarryOverDays,
     bool AllowNegativeBalance,
     bool IsActive,
+    bool IsDefault,
     DateTimeOffset CreatedAt);

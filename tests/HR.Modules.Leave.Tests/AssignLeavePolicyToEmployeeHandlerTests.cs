@@ -19,7 +19,7 @@ public class AssignLeavePolicyToEmployeeHandlerTests
         var employeeId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, now);
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 
@@ -55,8 +55,8 @@ public class AssignLeavePolicyToEmployeeHandlerTests
         var employeeId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var oldPolicy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Old Policy", null, 0, false, now);
-        var newPolicy = LeavePolicy.Create(Guid.NewGuid(), companyId, "New Policy", null, 10, false, now);
+        var oldPolicy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Old Policy", null, 0, false, false, now);
+        var newPolicy = LeavePolicy.Create(Guid.NewGuid(), companyId, "New Policy", null, 10, false, false, now);
         context.LeavePolicies.AddRange(oldPolicy, newPolicy);
 
         var existingAssignment = EmployeeLeavePolicyAssignment.Create(
@@ -112,7 +112,7 @@ public class AssignLeavePolicyToEmployeeHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var policy = LeavePolicy.Create(Guid.NewGuid(), Guid.NewGuid(), "Standard", null, 5, false, now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), Guid.NewGuid(), "Standard", null, 5, false, false, now);
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 

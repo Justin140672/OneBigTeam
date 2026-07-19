@@ -25,4 +25,18 @@ internal sealed class PositionProfileDocumentsReader(EmployeesDbContext dbContex
                 d.RequiresExpiryDate))
             .ToListAsync(cancellationToken);
     }
+
+    public Task<int> CountActiveReferencesToDocumentTypeAsync(
+        Guid companyId,
+        Guid documentTypeId,
+        CancellationToken cancellationToken)
+    {
+        return dbContext.PositionProfileRequiredDocuments
+            .AsNoTracking()
+            .CountAsync(
+                d => d.CompanyId == companyId
+                  && d.DocumentTypeId == documentTypeId
+                  && d.IsActive,
+                cancellationToken);
+    }
 }

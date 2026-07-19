@@ -43,6 +43,77 @@ public class CreateLeavePolicyHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Forces_First_Policy_For_Company_To_Be_Default_Even_When_Not_Requested()
+    {
+        await using var context = BuildContext();
+        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+        var companyId = Guid.NewGuid();
+
+        var result = await handler.HandleAsync(
+            new CreateLeavePolicyRequest
+            {
+                CompanyId = companyId,
+                Name = "Standard Policy",
+                IsDefault = false
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.IsDefault);
+
+        var saved = await context.LeavePolicies.SingleAsync();
+        Assert.True(saved.IsDefault);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creating_Second_Policy_As_Default_Unmarks_Previous_Default()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var first = LeavePolicy.Create(Guid.NewGuid(), companyId, "First Policy", null, 0, false, true, now);
+        context.LeavePolicies.Add(first);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(
+            new CreateLeavePolicyRequest { CompanyId = companyId, Name = "Second Policy", IsDefault = true },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.IsDefault);
+
+        var reloadedFirst = await context.LeavePolicies.SingleAsync(p => p.Id == first.Id);
+        Assert.False(reloadedFirst.IsDefault);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creating_Second_Policy_Without_Default_Leaves_Existing_Default_Unchanged()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var first = LeavePolicy.Create(Guid.NewGuid(), companyId, "First Policy", null, 0, false, true, now);
+        context.LeavePolicies.Add(first);
+        await context.SaveChangesAsync();
+
+        var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(
+            new CreateLeavePolicyRequest { CompanyId = companyId, Name = "Second Policy", IsDefault = false },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.IsDefault);
+
+        var reloadedFirst = await context.LeavePolicies.SingleAsync(p => p.Id == first.Id);
+        Assert.True(reloadedFirst.IsDefault);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_Conflict_When_Name_Already_Exists_In_Same_Company()
     {
         await using var context = BuildContext();
@@ -50,7 +121,7 @@ public class CreateLeavePolicyHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         context.LeavePolicies.Add(
-            LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 0, false, now));
+            LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 0, false, false, now));
         await context.SaveChangesAsync();
 
         var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));
@@ -72,7 +143,7 @@ public class CreateLeavePolicyHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         context.LeavePolicies.Add(
-            LeavePolicy.Create(Guid.NewGuid(), companyA, "Standard Policy", null, 0, false, now));
+            LeavePolicy.Create(Guid.NewGuid(), companyA, "Standard Policy", null, 0, false, false, now));
         await context.SaveChangesAsync();
 
         var handler = new CreateLeavePolicyHandler(context, new FakeClock(FixedUtcNow));

@@ -67,6 +67,64 @@ public class DeactivateDepartmentHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_Department_Has_Active_Employee()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var dept = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, FixedOffset);
+        context.Departments.Add(dept);
+
+        var employee = Employee.Create(
+            Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", DateOnly.FromDateTime(FixedUtcNow),
+            hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001",
+            Guid.NewGuid(), dept.Id, Guid.NewGuid(), Guid.NewGuid(), FixedOffset);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new DeactivateDepartmentHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(
+            new DeactivateDepartmentRequest { CompanyId = companyId, Id = dept.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+        Assert.Contains("Engineering", result.Error.Message);
+        Assert.Contains("1 active employee", result.Error.Message);
+
+        var saved = await context.Departments.SingleAsync();
+        Assert.True(saved.IsActive);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Deactivates_Department_When_Only_Terminated_Employees_Assigned()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var dept = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, FixedOffset);
+        context.Departments.Add(dept);
+
+        var employee = Employee.Create(
+            Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", DateOnly.FromDateTime(FixedUtcNow),
+            hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001",
+            Guid.NewGuid(), dept.Id, Guid.NewGuid(), Guid.NewGuid(), FixedOffset);
+        employee.Terminate(FixedOffset);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new DeactivateDepartmentHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(
+            new DeactivateDepartmentRequest { CompanyId = companyId, Id = dept.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var saved = await context.Departments.SingleAsync();
+        Assert.False(saved.IsActive);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_NotFound_For_Wrong_Company()
     {
         await using var context = BuildContext();

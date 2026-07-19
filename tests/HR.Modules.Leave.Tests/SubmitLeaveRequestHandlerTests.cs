@@ -41,7 +41,7 @@ public class SubmitLeaveRequestHandlerTests
 
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", (int)entitlementDays,
             AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
-        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 5, allowNegativeBalance: false, now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 5, allowNegativeBalance: false, false, now);
         var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
             DateOnly.FromDateTime(FixedUtcNow), now);
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
@@ -165,7 +165,7 @@ public class SubmitLeaveRequestHandlerTests
 
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 0,
             AccrualMethod.None, LeaveTypeBehaviour.Standard, now);
-        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Flexible Policy", null, 0, allowNegativeBalance: true, now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Flexible Policy", null, 0, allowNegativeBalance: true, false, now);
         var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
             DateOnly.FromDateTime(FixedUtcNow), now);
 
@@ -469,7 +469,7 @@ public class SubmitLeaveRequestHandlerTests
 
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 0,
             AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
-        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 0, allowNegativeBalance: false, now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 0, allowNegativeBalance: false, false, now);
         var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
             DateOnly.FromDateTime(FixedUtcNow), now);
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,

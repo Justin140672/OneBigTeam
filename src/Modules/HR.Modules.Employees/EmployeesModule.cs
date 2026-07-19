@@ -20,6 +20,7 @@ using HR.Modules.Employees.Features.CreateDepartment;
 using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Modules.Employees.Features.CreatePositionProfile;
 using HR.Modules.Employees.Features.DeactivateDepartment;
+using HR.Modules.Employees.Features.DeactivatePositionProfile;
 using HR.Modules.Employees.Features.GetDepartment;
 using HR.Modules.Employees.Features.GetEmployee;
 using HR.Modules.Employees.Features.GetHeadcountSummary;
@@ -98,6 +99,7 @@ public static class EmployeesModule
         services.AddScoped<IValidator<UpdateDepartmentRequest>, UpdateDepartmentValidator>();
 
         services.AddScoped<DeactivateDepartmentHandler>();
+        services.AddScoped<DeactivatePositionProfileHandler>();
 
         services.AddScoped<CreatePositionProfileHandler>();
         services.AddScoped<IValidator<CreatePositionProfileRequest>, CreatePositionProfileValidator>();
@@ -254,6 +256,7 @@ public static class EmployeesModule
         services.AddScoped<IPositionProfileDocumentsReader, PositionProfileDocumentsReader>();
         services.AddScoped<IPositionProfileAssetsReader, PositionProfileAssetsReader>();
         services.AddScoped<IPositionProfileReader, PositionProfileReader>();
+        services.AddScoped<ICurrentEmployeeReader, CurrentEmployeeReader>();
         services.AddScoped<IOnboardingTemplateReader, OnboardingTemplateReader>();
         services.AddScoped<IEmployeeProvisioningService, EmployeeProvisioningService>();
         services.AddScoped<IEmployeeImportLookupReader, EmployeeImportLookupReader>();

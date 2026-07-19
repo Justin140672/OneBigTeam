@@ -8,4 +8,5 @@ internal sealed record UpdateLeavePolicyRequest
     public string? Description { get; init; }
     public int CarryOverDays { get; init; }
     public bool AllowNegativeBalance { get; init; }
+    public bool IsDefault { get; init; }
 }

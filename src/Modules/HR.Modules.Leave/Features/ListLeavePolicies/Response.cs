@@ -10,4 +10,5 @@ internal sealed record LeavePolicyItem(
     int CarryOverDays,
     bool AllowNegativeBalance,
     bool IsActive,
+    bool IsDefault,
     DateTimeOffset CreatedAt);

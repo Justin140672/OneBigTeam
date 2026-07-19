@@ -225,5 +225,19 @@ public class PositionProfileService(IHttpClientFactory httpClientFactory)
         return (false, "Failed to save position profile.");
     }
 
+    public async Task<string?> DeactivatePositionProfileAsync(Guid companyId, Guid id)
+    {
+        var response = await Http.DeleteAsync($"api/companies/{companyId}/position-profiles/{id}");
+
+        if (response.IsSuccessStatusCode)
+            return null;
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return "Position profile not found.";
+
+        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+        return body?.Error ?? "Failed to deactivate position profile.";
+    }
+
     private sealed record ErrorEnvelope(string? Error);
 }

@@ -10,4 +10,10 @@ internal sealed class FakePositionProfileDocumentsReader(
         Guid positionProfileId,
         CancellationToken cancellationToken)
         => Task.FromResult(items);
+
+    public Task<int> CountActiveReferencesToDocumentTypeAsync(
+        Guid companyId,
+        Guid documentTypeId,
+        CancellationToken cancellationToken)
+        => Task.FromResult(items.Count(i => i.DocumentTypeId == documentTypeId));
 }

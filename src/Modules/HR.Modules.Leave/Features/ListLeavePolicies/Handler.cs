@@ -26,6 +26,7 @@ internal sealed class ListLeavePoliciesHandler(LeaveDbContext dbContext)
                 p.CarryOverDays,
                 p.AllowNegativeBalance,
                 p.IsActive,
+                p.IsDefault,
                 p.CreatedAt))
             .ToListAsync(cancellationToken);
 

@@ -10,4 +10,10 @@ internal sealed class LeavePolicyReader(LeaveDbContext dbContext) : ILeavePolicy
         => dbContext.LeavePolicies.AnyAsync(
             lp => lp.Id == leavePolicyId && lp.CompanyId == companyId && lp.IsActive,
             cancellationToken);
+
+    public Task<Guid?> GetDefaultLeavePolicyIdAsync(Guid companyId, CancellationToken cancellationToken)
+        => dbContext.LeavePolicies
+            .Where(lp => lp.CompanyId == companyId && lp.IsDefault && lp.IsActive)
+            .Select(lp => (Guid?)lp.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 }

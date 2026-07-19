@@ -28,4 +28,36 @@ public sealed class LeavePolicyListPage(IPage page, string baseUrl)
             .Filter(new() { HasText = nameFragment })
             .First
             .IsVisibleAsync();
+
+    /// <summary>
+    /// Checks whether the row containing <paramref name="nameFragment"/> shows the "Default"
+    /// star badge.
+    /// </summary>
+    public async Task<bool> IsDefaultAsync(string nameFragment)
+    {
+        var row = page.Locator(".e-row")
+            .Filter(new() { HasText = nameFragment })
+            .First;
+        return await row.Locator(".badge:has-text('Default')").IsVisibleAsync();
+    }
+
+    /// <summary>
+    /// Sets the policy whose row contains <paramref name="nameFragment"/> as the company's
+    /// default leave policy via the "Set as Default" toolbar action.
+    /// </summary>
+    public async Task SetAsDefaultAsync(string nameFragment)
+    {
+        var row = page.Locator(".e-row")
+            .Filter(new() { HasText = nameFragment })
+            .First;
+        await row.ClickAsync();
+
+        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Set as Default" });
+        await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await btn.ClickAsync();
+
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
 }

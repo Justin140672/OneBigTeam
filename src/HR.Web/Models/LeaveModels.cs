@@ -119,6 +119,7 @@ public sealed record LeavePolicyListItemModel(
     int CarryOverDays,
     bool AllowNegativeBalance,
     bool IsActive,
+    bool IsDefault,
     DateTimeOffset CreatedAt);
 
 public sealed record GetLeavePolicyResponse(
@@ -129,6 +130,7 @@ public sealed record GetLeavePolicyResponse(
     int CarryOverDays,
     bool AllowNegativeBalance,
     bool IsActive,
+    bool IsDefault,
     DateTimeOffset CreatedAt);
 
 public record CreateLeavePolicyRequest(
@@ -136,7 +138,8 @@ public record CreateLeavePolicyRequest(
     string Name,
     string? Description,
     int CarryOverDays,
-    bool AllowNegativeBalance);
+    bool AllowNegativeBalance,
+    bool IsDefault);
 
 public record CreateLeavePolicyResponse(
     Guid Id,
@@ -146,6 +149,7 @@ public record CreateLeavePolicyResponse(
     int CarryOverDays,
     bool AllowNegativeBalance,
     bool IsActive,
+    bool IsDefault,
     DateTimeOffset CreatedAt);
 
 public record UpdateLeavePolicyRequest(
@@ -154,7 +158,8 @@ public record UpdateLeavePolicyRequest(
     string Name,
     string? Description,
     int CarryOverDays,
-    bool AllowNegativeBalance);
+    bool AllowNegativeBalance,
+    bool IsDefault);
 
 public record UpdateLeavePolicyResponse(
     Guid Id,
@@ -164,6 +169,7 @@ public record UpdateLeavePolicyResponse(
     int CarryOverDays,
     bool AllowNegativeBalance,
     bool IsActive,
+    bool IsDefault,
     DateTimeOffset UpdatedAt);
 
 public sealed class LeavePolicyEditModel
@@ -174,6 +180,7 @@ public sealed class LeavePolicyEditModel
     [Range(0, int.MaxValue, ErrorMessage = "Carry over days cannot be negative.")]
     public int CarryOverDays { get; set; }
     public bool AllowNegativeBalance { get; set; }
+    public bool IsDefault { get; set; }
 }
 
 // ── Leave request list ─────────────────────────────────────────────────────

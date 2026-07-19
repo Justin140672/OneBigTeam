@@ -43,4 +43,43 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
         await page.Locator(".e-rowcell a").Filter(new() { HasText = title }).First.ClickAsync();
         await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
     }
+
+    /// <summary>
+    /// Deactivates the position profile whose row contains <paramref name="title"/>
+    /// by clicking the deactivate toolbar action.
+    /// </summary>
+    public async Task DeactivateAsync(string title)
+    {
+        // Select the row first, then click the deactivate toolbar button.
+        var row = page.Locator(".e-row")
+            .Filter(new() { HasText = title })
+            .First;
+        await row.ClickAsync();
+        // Blazor re-renders the toolbar after row selection; wait for the button to be enabled
+        // (same pattern as DepartmentListPage.DeactivateDepartmentAsync).
+        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Deactivate" });
+        await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await btn.ClickAsync();
+        // Wait for the grid to refresh.
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
+    public async Task<bool> IsActiveAsync(string title)
+    {
+        var row = page.Locator(".e-row")
+            .Filter(new() { HasText = title })
+            .First;
+        var badge = row.Locator(".status-badge.status-badge--success");
+        return await badge.IsVisibleAsync();
+    }
+
+    public async Task ShowInactiveAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Show Inactive" }).ClickAsync();
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
 }

@@ -169,6 +169,42 @@ public sealed class PositionProfileManagementTests(AppFixture fixture) : E2ETest
     }
 
     [Fact]
+    public async Task DeactivatePositionProfile_HidesFromActiveList_ShowsWhenInactiveToggled()
+    {
+        var profileTitle = $"E2E Deact {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login  = new LoginPage(_page, _fixture.WebBaseUrl);
+        var ppList = new PositionProfileListPage(_page, _fixture.WebBaseUrl);
+        var ppEdit = new PositionProfileEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Create first.
+        await ppList.GoToAsync(AcmeId);
+        await ppList.ClickNewPositionProfileAsync();
+        await ppEdit.FillTitleAsync(profileTitle);
+        await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.SaveAsync();
+
+        // Deactivate.
+        await ppList.GoToAsync(AcmeId);
+        Assert.True(await ppList.IsActiveAsync(profileTitle), "Expected newly created position profile to be Active");
+        await ppList.DeactivateAsync(profileTitle);
+
+        Assert.False(await ppList.HasPositionProfileAsync(profileTitle),
+            $"Expected '{profileTitle}' to no longer appear in the default active-only view after deactivation");
+
+        // Show inactive and verify it reappears.
+        await ppList.ShowInactiveAsync();
+
+        Assert.True(await ppList.HasPositionProfileAsync(profileTitle),
+            "Expected deactivated position profile to appear when 'Show Inactive' is enabled");
+        Assert.False(await ppList.IsActiveAsync(profileTitle),
+            "Expected deactivated position profile to show an inactive indicator");
+    }
+
+    [Fact]
     public async Task PlainEmployee_IsRedirectedAway_FromPositionProfilesPage()
     {
         const string tomEmail = "tom.williams@acme.example";

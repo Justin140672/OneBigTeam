@@ -33,6 +33,17 @@ public sealed class LeavePolicyEditPage(IPage page, string baseUrl)
     public async Task<string> GetNameAsync() =>
         await page.GetByPlaceholder("e.g. Standard Policy").InputValueAsync();
 
+    private ILocator IsDefaultCheckbox => page.Locator("#isDefault");
+
+    public async Task SetIsDefaultAsync(bool value)
+    {
+        var isChecked = await IsDefaultCheckbox.IsCheckedAsync();
+        if (isChecked != value)
+            await IsDefaultCheckbox.ClickAsync();
+    }
+
+    public Task<bool> IsDefaultCheckedAsync() => IsDefaultCheckbox.IsCheckedAsync();
+
     private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
 
     public Task ClickCloseAsync() =>

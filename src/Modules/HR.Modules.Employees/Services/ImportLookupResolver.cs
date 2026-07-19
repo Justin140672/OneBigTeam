@@ -12,7 +12,10 @@ namespace HR.Modules.Employees.Services;
 /// Scoped per request; small in-memory caches avoid redundant lookups for names repeated across
 /// many rows of the same import file.
 /// </summary>
-internal sealed class ImportLookupResolver(EmployeesDbContext dbContext, IClock clock) : IImportLookupResolver
+internal sealed class ImportLookupResolver(
+    EmployeesDbContext dbContext,
+    IClock clock,
+    ILeavePolicyReader leavePolicyReader) : IImportLookupResolver
 {
     private const string DefaultLocationTypeName = "General";
 
@@ -127,12 +130,36 @@ internal sealed class ImportLookupResolver(EmployeesDbContext dbContext, IClock 
         if (existing is not null)
             return new PositionProfileImportLookupResult(existing.Value, WasCreated: false, Skipped: false);
 
-        // Department, Location and DefaultLeavePolicyId are now mandatory on PositionProfile. The
-        // import flow has no source for a default leave policy, so a brand-new position profile can
-        // never be safely auto-created here — always skip, same as the existing missing
-        // department/location guard. Callers must create the position profile (with a leave policy)
-        // through CreatePositionProfile before importing employees who reference it by title.
-        return new PositionProfileImportLookupResult(Id: null, WasCreated: false, Skipped: true);
+        // Department, Location and DefaultLeavePolicyId are mandatory on PositionProfile. A brand-new
+        // position profile can only be safely auto-created here when the department, location, AND the
+        // company's default leave policy (via ILeavePolicyReader) are all resolvable. If any of the
+        // three is missing, skip — same as the existing missing department/location guard.
+        var defaultLeavePolicyId = await leavePolicyReader.GetDefaultLeavePolicyIdAsync(companyId, cancellationToken);
+
+        if (departmentId is null || locationId is null || defaultLeavePolicyId is null)
+            return new PositionProfileImportLookupResult(Id: null, WasCreated: false, Skipped: true);
+
+        var now = clock.UtcNowOffset();
+        var profile = PositionProfile.Create(
+            Guid.NewGuid(),
+            companyId,
+            departmentId.Value,
+            locationId.Value,
+            trimmed,
+            description: null,
+            probationMonthsOverride: null,
+            workingDaysOverride: null,
+            hoursPerDayOverride: null,
+            salaryMin: null,
+            salaryMax: null,
+            salaryType: null,
+            defaultLeavePolicyId.Value,
+            now);
+
+        dbContext.PositionProfiles.Add(profile);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new PositionProfileImportLookupResult(profile.Id, WasCreated: true, Skipped: false);
     }
 
     private async Task<Guid> GetOrCreateDefaultLocationTypeIdAsync(Guid companyId, CancellationToken cancellationToken)

@@ -212,7 +212,7 @@ public class AwardToilEndpointTests : IClassFixture<ApiWebApplicationFactory>
         var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
 
         var policyId = Guid.NewGuid();
-        db.LeavePolicies.Add(LeavePolicy.Create(policyId, companyId, "TOIL Policy", null, 0, false, DateTimeOffset.UtcNow));
+        db.LeavePolicies.Add(LeavePolicy.Create(policyId, companyId, "TOIL Policy", null, 0, false, false, DateTimeOffset.UtcNow));
         db.EmployeeLeavePolicyAssignments.Add(EmployeeLeavePolicyAssignment.Create(
             Guid.NewGuid(), companyId, employeeId, policyId, new DateOnly(2026, 1, 1), DateTimeOffset.UtcNow));
         await db.SaveChangesAsync();

@@ -1,3 +1,4 @@
+using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +27,20 @@ internal sealed class DeactivateLocationHandler
 
         if (location is null)
             return Result.Failure(Error.NotFound($"Location '{request.Id}' was not found."));
+
+        var currentEmployeeCount = await _dbContext.Employees
+            .CountAsync(
+                e => e.LocationId == request.Id
+                  && e.CompanyId == request.CompanyId
+                  && e.Status != EmploymentStatus.Terminated,
+                cancellationToken);
+
+        if (currentEmployeeCount > 0)
+        {
+            return Result.Failure(Error.Conflict(
+                $"Cannot deactivate '{location.Name}' — it is currently assigned to " +
+                $"{currentEmployeeCount} active employee{(currentEmployeeCount == 1 ? "" : "s")}."));
+        }
 
         location.Deactivate(_clock.UtcNowOffset());
         await _dbContext.SaveChangesAsync(cancellationToken);

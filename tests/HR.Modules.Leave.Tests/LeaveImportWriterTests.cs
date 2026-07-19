@@ -101,7 +101,7 @@ public class LeaveImportWriterTests
         var adjustedBy = Guid.NewGuid();
 
         var leaveType = CreateBalanceTrackedLeaveType(companyId);
-        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, Now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, Now);
         // Baseline entitlement of 25 days, no adjustment yet.
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, PolicyYear, 25m, Now);
 
@@ -140,7 +140,7 @@ public class LeaveImportWriterTests
         var employeeId = Guid.NewGuid();
 
         var leaveType = CreateBalanceTrackedLeaveType(companyId);
-        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, Now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, Now);
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, PolicyYear, 25m, Now);
 
         context.LeaveTypes.Add(leaveType);
@@ -170,7 +170,7 @@ public class LeaveImportWriterTests
         // LeaveType.Create upper-cases the stored code; the writer's lookup is an exact (not
         // case-insensitive) match, so a lowercase request code will not resolve it.
         var leaveType = CreateBalanceTrackedLeaveType(companyId, code: "annual");
-        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, Now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, Now);
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, PolicyYear, 25m, Now);
 
         context.LeaveTypes.Add(leaveType);

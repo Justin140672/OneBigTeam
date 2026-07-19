@@ -15,7 +15,7 @@ public class LeavePolicyReaderTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, Now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, Now);
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 
@@ -37,7 +37,7 @@ public class LeavePolicyReaderTests
     public async Task ExistsAsync_Returns_False_When_Policy_Belongs_To_Different_Company()
     {
         await using var context = BuildContext();
-        var policy = LeavePolicy.Create(Guid.NewGuid(), Guid.NewGuid(), "Standard", null, 5, false, Now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), Guid.NewGuid(), "Standard", null, 5, false, false, Now);
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();
 
@@ -52,7 +52,7 @@ public class LeavePolicyReaderTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, Now);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, Now);
         policy.Deactivate(Now);
         context.LeavePolicies.Add(policy);
         await context.SaveChangesAsync();

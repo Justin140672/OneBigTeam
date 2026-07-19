@@ -103,26 +103,53 @@ public sealed class VacancyPositionProfileDefaultsTests(AppFixture fixture) : E2
     /// PositionProfileService.ListPositionProfilesAsync's default includeInactive: false, used by
     /// VacancyDetail.razor's OnLoadedAsync).
     ///
-    /// This cannot currently be exercised end-to-end from this test project: there is no product
-    /// feature (UI action or API endpoint) to deactivate a Position Profile.
-    /// PositionProfile.Deactivate(DateTimeOffset) exists on the domain entity
-    /// (HR.Modules.Employees.Domain.PositionProfile) but nothing calls it — compare
-    /// DeactivateDepartment/DeactivateEmploymentType/DeactivateLocation, which all have a
-    /// Features/Deactivate*/Endpoint.cs + Handler.cs pair, and their *List.razor pages register a
-    /// "Deactivate" toolbar action via ConfigureToolbar(). PositionProfileList.razor never overrides
-    /// ConfigureToolbar(), so there's no "Deactivate" action in that grid either. Every Position
-    /// Profile reachable from the UI (seeded or created by this test suite) therefore always has
-    /// IsActive == true, so a genuinely inactive profile can't be produced without adding backend/UI
-    /// production code, which is out of scope for this test-only change.
-    ///
-    /// Skipped (rather than faked with a weaker assertion) so this gap stays visible. Un-skip and
-    /// fill in the body once a "Deactivate Position Profile" feature ships: seed/create one active
-    /// and one inactive profile for the same company, open this dropdown on the vacancy create
-    /// form, and assert only the active profile's title is among GetPositionProfileDropdownOptionsAsync().
+    /// Position Profile deactivation is now available via a "Deactivate" toolbar action on
+    /// PositionProfileList.razor, backed by DELETE
+    /// /api/companies/{companyId}/position-profiles/{id} (see
+    /// PositionProfileListPage.DeactivateAsync). This test seeds one active and one inactive
+    /// profile for the same company, opens the dropdown on the vacancy create form, and asserts
+    /// only the active profile's title is among GetPositionProfileDropdownOptionsAsync().
     /// </summary>
-    [Fact(Skip = "Blocked: no product feature exists yet to deactivate a Position Profile (no UI action, no API endpoint) — see doc comment on this test.")]
+    [Fact]
     public async Task CreateVacancy_PositionProfileDropdown_OnlyShowsActiveProfiles()
     {
-        await Task.CompletedTask;
+        var activeProfileTitle   = $"E2E Active Profile {Guid.NewGuid().ToString("N")[..8]}";
+        var inactiveProfileTitle = $"E2E Inactive Profile {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login         = new LoginPage(_page, _fixture.WebBaseUrl);
+        var ppList        = new PositionProfileListPage(_page, _fixture.WebBaseUrl);
+        var ppEdit        = new PositionProfileEditPage(_page, _fixture.WebBaseUrl);
+        var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await ppList.GoToAsync(AcmeId);
+        await ppList.ClickNewPositionProfileAsync();
+        await ppEdit.FillTitleAsync(activeProfileTitle);
+        await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.SaveAsync();
+        Assert.True(await ppList.HasPositionProfileAsync(activeProfileTitle),
+            $"Expected the new position profile '{activeProfileTitle}' to appear in the list");
+
+        await ppList.GoToAsync(AcmeId);
+        await ppList.ClickNewPositionProfileAsync();
+        await ppEdit.FillTitleAsync(inactiveProfileTitle);
+        await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.SaveAsync();
+        Assert.True(await ppList.HasPositionProfileAsync(inactiveProfileTitle),
+            $"Expected the new position profile '{inactiveProfileTitle}' to appear in the list");
+
+        await ppList.GoToAsync(AcmeId);
+        await ppList.DeactivateAsync(inactiveProfileTitle);
+
+        // Switch to Marcus (Recruiter) to open the vacancy create form's Position Profile dropdown.
+        await login.SwitchAccountAsync(MarcusEmail);
+
+        await vacancyDetail.GoToNewAsync(AcmeId);
+        var options = await vacancyDetail.GetPositionProfileDropdownOptionsAsync();
+
+        Assert.Contains(activeProfileTitle, options);
+        Assert.DoesNotContain(inactiveProfileTitle, options);
     }
 }

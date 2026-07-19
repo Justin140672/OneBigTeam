@@ -49,7 +49,7 @@ public class LeaveYearHandlerTests
 
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
             AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, JanuaryNow);
-        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Policy", null, 0, allowNegativeBalance: false, JanuaryNow);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Policy", null, 0, allowNegativeBalance: false, false, JanuaryNow);
         var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
             new DateOnly(2026, 4, 1), JanuaryNow);
         // Balance in policy year 2026 — the correct year for Jan 2027 with April start
@@ -88,7 +88,7 @@ public class LeaveYearHandlerTests
 
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
             AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, JanuaryNow);
-        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Policy", null, 0, allowNegativeBalance: false, JanuaryNow);
+        var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Policy", null, 0, allowNegativeBalance: false, false, JanuaryNow);
         var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
             new DateOnly(2026, 4, 1), JanuaryNow);
         // Balance incorrectly stored in calendar year 2027 — handler should look in 2026 and not find it

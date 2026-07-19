@@ -10,4 +10,10 @@ internal sealed class FakePositionProfileAssetsReader(
         Guid positionProfileId,
         CancellationToken cancellationToken)
         => Task.FromResult(items);
+
+    public Task<int> CountActiveReferencesToAssetCategoryAsync(
+        Guid companyId,
+        Guid assetCategoryId,
+        CancellationToken cancellationToken)
+        => Task.FromResult(items.Count(i => i.AssetCategoryId == assetCategoryId));
 }

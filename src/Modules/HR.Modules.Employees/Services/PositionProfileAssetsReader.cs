@@ -24,4 +24,18 @@ internal sealed class PositionProfileAssetsReader(EmployeesDbContext dbContext)
                 a.Quantity))
             .ToListAsync(cancellationToken);
     }
+
+    public Task<int> CountActiveReferencesToAssetCategoryAsync(
+        Guid companyId,
+        Guid assetCategoryId,
+        CancellationToken cancellationToken)
+    {
+        return dbContext.PositionProfileRequiredAssets
+            .AsNoTracking()
+            .CountAsync(
+                a => a.CompanyId == companyId
+                  && a.AssetCategoryId == assetCategoryId
+                  && a.IsActive,
+                cancellationToken);
+    }
 }

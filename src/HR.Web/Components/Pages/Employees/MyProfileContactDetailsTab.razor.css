@@ -136,3 +136,9 @@
 }
 
 .cd-success-dismiss:hover { opacity: 1; }
+
+@media (max-width: 576px) {
+    .cd-field-row {
+        grid-template-columns: 1fr;
+    }
+}
