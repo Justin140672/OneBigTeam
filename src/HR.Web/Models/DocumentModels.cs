@@ -249,7 +249,9 @@ public sealed record SharedCompanyDocumentAcknowledgementProgressItem(
     string? LocationName,
     string Status,
     DateOnly? DueDate,
-    DateTimeOffset? AcknowledgedAt);
+    DateTimeOffset? AcknowledgedAt,
+    int? VersionNumber,
+    string? AcknowledgementStatement);
 
 // --- Shared Company Document detail (employee simplified view) ---
 

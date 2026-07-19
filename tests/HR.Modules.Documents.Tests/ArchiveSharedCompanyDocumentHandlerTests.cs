@@ -166,7 +166,7 @@ public class ArchiveSharedCompanyDocumentHandlerTests
         db.SharedCompanyDocumentVersions.Add(version);
 
         var acknowledgement = SharedCompanyDocumentAcknowledgement.Create(
-            Guid.NewGuid(), companyId, doc.Id, employeeId, doc.VersionNumber, "Statement", null, Now);
+            Guid.NewGuid(), companyId, doc.Id, employeeId, doc.VersionNumber, "Statement", null, true, Now);
         db.SharedCompanyDocumentAcknowledgements.Add(acknowledgement);
 
         await db.SaveChangesAsync();

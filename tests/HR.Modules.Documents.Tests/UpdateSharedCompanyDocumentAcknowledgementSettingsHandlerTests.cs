@@ -155,6 +155,163 @@ public class UpdateSharedCompanyDocumentAcknowledgementSettingsHandlerTests
         Assert.Empty(audit.Published);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_Changing_Statement_Text_On_Published_Document()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
+            acknowledgementStatement: "Original statement", createdBy: Guid.NewGuid(), now: Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new UpdateSharedCompanyDocumentAcknowledgementSettingsRequest
+            {
+                CompanyId                = companyId,
+                DocumentId               = doc.Id,
+                RequiresAcknowledgement  = true,
+                AcknowledgementDueDate   = new DateOnly(2027, 1, 1),
+                AcknowledgementStatement = "A different statement",
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+        Assert.Equal(
+            "The acknowledgement statement cannot be changed once a document has been published. Upload a new version to change the wording.",
+            result.Error.Message);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Succeeds_Toggling_RequiresAcknowledgement_On_Published_Document_When_Resulting_Statement_Unchanged()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
+            acknowledgementStatement: "Original statement", createdBy: Guid.NewGuid(), now: Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        // Only the RequiresAcknowledgement flag changes; the statement text supplied is the same as
+        // what's already stored, so normalizedStatement equals document.AcknowledgementStatement and
+        // the post-publish guard does not trip.
+        var result = await Handler(db).HandleAsync(
+            new UpdateSharedCompanyDocumentAcknowledgementSettingsRequest
+            {
+                CompanyId                = companyId,
+                DocumentId               = doc.Id,
+                RequiresAcknowledgement  = true,
+                AcknowledgementDueDate   = new DateOnly(2027, 1, 1),
+                AcknowledgementStatement = "Original statement",
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Original statement", result.Value!.AcknowledgementStatement);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Succeeds_Changing_DueDate_Alone_On_Published_Document_When_Statement_Text_Unchanged()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
+            acknowledgementStatement: "Original statement", createdBy: Guid.NewGuid(), now: Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new UpdateSharedCompanyDocumentAcknowledgementSettingsRequest
+            {
+                CompanyId                = companyId,
+                DocumentId               = doc.Id,
+                RequiresAcknowledgement  = true,
+                AcknowledgementDueDate   = new DateOnly(2027, 6, 1),
+                AcknowledgementStatement = "Original statement",
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new DateOnly(2027, 6, 1), result.Value!.AcknowledgementDueDate);
+        Assert.Equal("Original statement", result.Value.AcknowledgementStatement);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Freely_Editing_Statement_On_Draft_Document()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
+            acknowledgementStatement: "Original statement", createdBy: Guid.NewGuid(), now: Now);
+        // Never published — stays Draft.
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new UpdateSharedCompanyDocumentAcknowledgementSettingsRequest
+            {
+                CompanyId                = companyId,
+                DocumentId               = doc.Id,
+                RequiresAcknowledgement  = true,
+                AcknowledgementDueDate   = new DateOnly(2027, 1, 1),
+                AcknowledgementStatement = "A brand new statement",
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("A brand new statement", result.Value!.AcknowledgementStatement);
+    }
+
+    // Edge case: on a Published document, turning RequiresAcknowledgement off must always succeed
+    // regardless of what the stored statement is — the post-publish lock only applies to an actual
+    // edit to the wording while acknowledgement remains required (request.RequiresAcknowledgement
+    // is true). Turning the flag off always normalizes the statement to null internally, but that
+    // is not itself treated as a "statement change" by the guard, since the guard only evaluates
+    // when request.RequiresAcknowledgement is true.
+    [Fact]
+    public async Task HandleAsync_Succeeds_When_Turning_RequiresAcknowledgement_Off_On_Published_Document_With_NonNull_Statement()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
+            acknowledgementStatement: "Original statement", createdBy: Guid.NewGuid(), now: Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new UpdateSharedCompanyDocumentAcknowledgementSettingsRequest
+            {
+                CompanyId               = companyId,
+                DocumentId              = doc.Id,
+                RequiresAcknowledgement = false,
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.RequiresAcknowledgement);
+        Assert.Null(result.Value.AcknowledgementStatement);
+    }
+
     private static UpdateSharedCompanyDocumentAcknowledgementSettingsHandler Handler(
         DocumentsDbContext db, FakeAuditPublisher? auditPublisher = null) =>
         new(db, auditPublisher ?? new FakeAuditPublisher(), new FakeClock(FixedUtcNow));

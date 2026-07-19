@@ -150,6 +150,22 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         catch { return null; }
     }
 
+    public async Task<IReadOnlyList<DocumentAuditHistoryItemModel>> GetSharedCompanyDocumentAuditHistoryAsync(
+        Guid companyId, Guid documentId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<GetSharedCompanyDocumentAuditHistoryResponse>(
+                $"api/companies/{companyId}/shared-documents/{documentId}/audit-history",
+                HrApiJsonOptions.Default, cancellationToken);
+            return response?.Items ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
     public async Task<SharedCompanyDocumentAcknowledgementProgressResponse?> GetSharedCompanyDocumentAcknowledgementProgressAsync(
         Guid companyId,
         Guid documentId,
@@ -194,13 +210,13 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
 
     // Returns null on success, or an error message string on failure.
     public async Task<string?> AcknowledgeSharedCompanyDocumentAsync(
-        Guid companyId, Guid documentId, Guid? taskId = null, CancellationToken cancellationToken = default)
+        Guid companyId, Guid documentId, Guid? taskId, bool confirmed, CancellationToken cancellationToken = default)
     {
         try
         {
             var response = await Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/shared-documents/{documentId}/acknowledge",
-                new { TaskId = taskId }, cancellationToken);
+                new { TaskId = taskId, Confirmed = confirmed }, cancellationToken);
 
             if (response.IsSuccessStatusCode)
                 return null;
@@ -469,6 +485,7 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         string versionNote,
         bool requiresReacknowledgement,
         IBrowserFile file,
+        string? acknowledgementStatement = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -476,6 +493,8 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
             using var content = new MultipartFormDataContent();
             content.Add(new StringContent(versionNote), "VersionNote");
             content.Add(new StringContent(requiresReacknowledgement.ToString()), "RequiresReacknowledgement");
+            if (!string.IsNullOrWhiteSpace(acknowledgementStatement))
+                content.Add(new StringContent(acknowledgementStatement), "AcknowledgementStatement");
 
             await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
             var fileContent = new StreamContent(stream);

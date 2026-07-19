@@ -14,6 +14,7 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
     IVirusScanService virusScanner,
     SharedCompanyDocumentAudienceMatcher audienceMatcher,
     ITaskCreator taskCreator,
+    ITaskCanceller taskCanceller,
     INotificationWriter notificationWriter,
     IAuditEventPublisher auditPublisher,
     IClock clock)
@@ -80,7 +81,36 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
         var now = clock.UtcNowOffset();
         document.ReplaceFile(storageKey, safeFileName, file.Length, file.ContentType, uploadedBy, now);
 
+        // Only route left to change the acknowledgement wording once a document is Published (see
+        // UpdateSharedCompanyDocumentAcknowledgementSettingsHandler's post-publish lock) — applied
+        // only when this version also requires re-acknowledgement, matching how re-triggering
+        // acknowledgement tasks already only happens in that case.
+        if (document.RequiresAcknowledgement && request.RequiresReacknowledgement &&
+            !string.IsNullOrWhiteSpace(request.AcknowledgementStatement))
+        {
+            document.SetAcknowledgementSettings(
+                document.RequiresAcknowledgement,
+                document.AcknowledgementDueDate,
+                request.AcknowledgementStatement,
+                uploadedBy,
+                now);
+        }
+
         var versionNote = request.VersionNote.Trim();
+
+        // Copy-forward: the version about to become "previous" is document.VersionNumber - 1,
+        // since document.ReplaceFile() above already incremented VersionNumber for the new
+        // version being created here. HR may explicitly override the wording for the new version
+        // (request.AcknowledgementStatement); otherwise the previous version's own statement is
+        // carried forward unchanged so every version always holds its own independent copy.
+        var previousVersionStatement = await db.SharedCompanyDocumentVersions
+            .Where(v => v.SharedCompanyDocumentId == document.Id && v.VersionNumber == document.VersionNumber - 1)
+            .Select(v => v.AcknowledgementStatement)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var resolvedAcknowledgementStatement = !string.IsNullOrWhiteSpace(request.AcknowledgementStatement)
+            ? request.AcknowledgementStatement
+            : previousVersionStatement;
 
         var version = SharedCompanyDocumentVersion.Create(
             Guid.NewGuid(),
@@ -95,7 +125,8 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
             now,
             versionNote: versionNote,
             requiresAcknowledgement: document.RequiresAcknowledgement && request.RequiresReacknowledgement,
-            effectiveDate: document.EffectiveDate);
+            effectiveDate: document.EffectiveDate,
+            acknowledgementStatement: resolvedAcknowledgementStatement);
 
         db.SharedCompanyDocumentVersions.Add(version);
 
@@ -106,7 +137,15 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
                 var eligibleEmployeeIds = await audienceMatcher.GetEligibleEmployeeIdsAsync(
                     request.CompanyId, document.Id, cancellationToken);
 
-                // Known v1 limitation: an employee who still has an open Acknowledge task from the previous version will end up with two open tasks for this document — ITaskCanceller has no bulk-cancel-by-source-entity capability (it only cancels the first match), so stale per-version tasks aren't cleaned up here. Completing either task still correctly records acknowledgement of the current version, since AcknowledgeSharedCompanyDocumentHandler reads VersionNumber fresh at acknowledge-time.
+                // Cancel any still-open Acknowledge task from a previous version before creating
+                // this version's tasks below — otherwise an employee who hadn't yet acknowledged
+                // the prior version ends up with two open tasks for the same document. Completing
+                // either task would still have correctly recorded acknowledgement of the current
+                // version (AcknowledgeSharedCompanyDocumentHandler reads VersionNumber fresh at
+                // acknowledge-time), but leaving the stale one open is confusing task-list clutter.
+                await taskCanceller.CancelAllBySourceEntityAsync(
+                    request.CompanyId, document.Id, TaskSource.Document, TaskActionType.Acknowledge, cancellationToken);
+
                 foreach (var employeeId in eligibleEmployeeIds)
                 {
                     await taskCreator.CreateAsync(
@@ -153,6 +192,7 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
                         document.VersionNumber,
                         acknowledgementStatement: priorAcknowledgement.AcknowledgementStatement,
                         taskId: null,
+                        isConfirmed: priorAcknowledgement.IsConfirmed,
                         now: priorAcknowledgement.AcknowledgedAt));
                 }
             }

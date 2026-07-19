@@ -178,9 +178,8 @@ public sealed class ManagerDashboardTests(AppFixture fixture) : E2ETestBase(fixt
     {
         // Tom Williams is seeded with phone "07700 900004" and work email
         // "tom.williams@acme.example" (see EmployeesModule.SeedEmployeesAsync's MakeAcme call for
-        // empDev1Id). MyTeamWidget.razor used to render these as icon-only mailto:/tel: links with
-        // the value hidden in a "title" tooltip — they're now visible ".team-widget-contact-text"
-        // spans next to each icon.
+        // empDev1Id). MyTeamWidget.razor renders these as visible ".team-card-contact-text" spans
+        // next to each icon, not just hidden in the link's "title" tooltip attribute.
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
         var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
 

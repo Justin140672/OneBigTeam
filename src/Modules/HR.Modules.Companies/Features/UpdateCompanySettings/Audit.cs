@@ -15,7 +15,8 @@ internal sealed record CompanySettingsAuditSnapshot(
     bool ExcludePublicHolidaysFromSickness,
     bool DisplaySalaryOnEmployeeProfile,
     int? FitNoteRequiredAfterDays,
-    int? ReturnToWorkRequiredAfterDays);
+    int? ReturnToWorkRequiredAfterDays,
+    string DefaultAcknowledgementStatement);
 
 internal sealed record CompanySettingsUpdatedAuditEvent(
     Guid CompanyId,

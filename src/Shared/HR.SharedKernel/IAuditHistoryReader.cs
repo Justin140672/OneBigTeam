@@ -13,6 +13,14 @@ public interface IAuditHistoryReader
     /// </summary>
     Task<IReadOnlyList<AuditHistoryEntry>> GetRecentCompanyAuditHistoryAsync(
         Guid companyId, IReadOnlyCollection<string> entityTypes, int take, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Full audit history for one specific entity (e.g. a single SharedCompanyDocument), newest
+    /// first. Unlike the per-employee overload above, this is not scoped to an employee — it
+    /// answers "what happened to this record", regardless of who it happened to.
+    /// </summary>
+    Task<IReadOnlyList<AuditHistoryEntry>> GetEntityAuditHistoryAsync(
+        Guid companyId, string entityType, Guid entityId, CancellationToken cancellationToken);
 }
 
 public sealed record AuditHistoryEntry(
@@ -24,4 +32,5 @@ public sealed record AuditHistoryEntry(
     string? Summary,
     string? BeforeJson,
     string? AfterJson,
-    Guid? EmployeeId = null);
+    Guid? EmployeeId = null,
+    Guid EntityId = default);

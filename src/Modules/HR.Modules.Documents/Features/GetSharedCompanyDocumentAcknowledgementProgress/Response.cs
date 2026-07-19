@@ -19,4 +19,6 @@ internal sealed record SharedCompanyDocumentAcknowledgementProgressItem(
     string? LocationName,
     string Status,
     DateOnly? DueDate,
-    DateTimeOffset? AcknowledgedAt);
+    DateTimeOffset? AcknowledgedAt,
+    int? VersionNumber,
+    string? AcknowledgementStatement);

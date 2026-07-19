@@ -48,4 +48,6 @@ public sealed class CompanySettingsEditModel
     public bool DisplaySalaryOnEmployeeProfile { get; set; }
     public int? FitNoteRequiredAfterDays { get; set; }
     public int? ReturnToWorkRequiredAfterDays { get; set; }
+    [MaxLength(2000)]
+    public string? DefaultAcknowledgementStatement { get; set; }
 }

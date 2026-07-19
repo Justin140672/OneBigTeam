@@ -21,6 +21,19 @@ internal sealed class FakeTaskCompleter : ITaskCompleter
         return Task.CompletedTask;
     }
 
+    public Task CompleteBySourceEntityForEmployeeAsync(
+        Guid companyId,
+        Guid sourceEntityId,
+        TaskSource source,
+        TaskActionType actionType,
+        Guid assignedEmployeeId,
+        Guid completedBy,
+        CancellationToken cancellationToken)
+    {
+        _calls.Add(new CompletedCall(companyId, sourceEntityId, source, actionType, completedBy));
+        return Task.CompletedTask;
+    }
+
     internal sealed record CompletedCall(
         Guid CompanyId,
         Guid SourceEntityId,

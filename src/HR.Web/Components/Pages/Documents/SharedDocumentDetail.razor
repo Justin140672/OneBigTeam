@@ -45,6 +45,9 @@
                 <SfButton CssClass="e-outline" OnClick="@(() => _reviewOpen = true)">
                     <i class="fa-solid fa-clipboard-check me-1"></i> Review Document
                 </SfButton>
+                <SfButton CssClass="e-outline" OnClick="@(() => _auditHistoryOpen = true)">
+                    <i class="fa-solid fa-clock-rotate-left me-1"></i> Audit History
+                </SfButton>
                 @if (_detail.Status is "Draft" or "Published")
                 {
                     <SfButton CssClass="e-outline e-danger" OnClick="@(() => _archiveConfirmOpen = true)">
@@ -305,6 +308,11 @@
                                            OnSaved="OnReviewCompletedAsync"
                                            OnCancelled="@(() => _reviewOpen = false)" />
 
+<SharedCompanyDocumentAuditHistoryDialog CompanyId="CompanyId"
+                                          DocumentId="DocumentId"
+                                          IsOpen="_auditHistoryOpen"
+                                          OnClosed="@(() => _auditHistoryOpen = false)" />
+
 <SfDialog Visible="_publishConfirmOpen" IsModal="true" Width="420px" ShowCloseIcon="false">
     <DialogTemplates>
         <Header>Publish Document</Header>
@@ -381,6 +389,7 @@
     private bool _editAcknowledgementOpen;
     private bool _uploadVersionOpen;
     private bool _reviewOpen;
+    private bool _auditHistoryOpen;
     private bool _publishConfirmOpen;
     private bool _publishing;
     private string? _publishError;

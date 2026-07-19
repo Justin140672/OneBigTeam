@@ -31,6 +31,13 @@ internal sealed class SharedCompanyDocumentVersion
     // user-editable field of the version itself.
     public DateOnly? EffectiveDate { get; private set; }
 
+    // Independent, point-in-time copy of the acknowledgement statement wording in effect when
+    // this version was created — nullable because a version that never required acknowledgement
+    // has none. Never mutated after creation; a later edit to
+    // SharedCompanyDocument.AcknowledgementStatement (the mutable "current" value) must not
+    // change what earlier versions recorded here.
+    public string? AcknowledgementStatement { get; private set; }
+
     public static SharedCompanyDocumentVersion Create(
         Guid id,
         Guid companyId,
@@ -44,7 +51,8 @@ internal sealed class SharedCompanyDocumentVersion
         DateTimeOffset now,
         string? versionNote,
         bool requiresAcknowledgement,
-        DateOnly? effectiveDate) => new()
+        DateOnly? effectiveDate,
+        string? acknowledgementStatement = null) => new()
     {
         Id                      = id,
         CompanyId               = companyId,
@@ -59,5 +67,6 @@ internal sealed class SharedCompanyDocumentVersion
         VersionNote             = string.IsNullOrWhiteSpace(versionNote) ? null : versionNote.Trim(),
         RequiresAcknowledgement = requiresAcknowledgement,
         EffectiveDate           = effectiveDate,
+        AcknowledgementStatement = string.IsNullOrWhiteSpace(acknowledgementStatement) ? null : acknowledgementStatement.Trim(),
     };
 }

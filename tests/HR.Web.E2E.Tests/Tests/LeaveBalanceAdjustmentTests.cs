@@ -80,62 +80,17 @@ public sealed class LeaveBalanceAdjustmentTests(AppFixture fixture) : E2ETestBas
         Assert.EndsWith("h", toilText, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public async Task AdminLeaveTab_EmployeeWithNoLeavePolicyAssignment_ShowsNaAndNoAdjustButtons()
-    {
-        // Position Profile is now mandatory, so this employee must have one — but "Senior
-        // Software Engineer" (like every seeded profile) has no DefaultLeavePolicyId, so
-        // HR.Modules.Leave's EmployeeCreatedHandler still never creates a policy assignment or
-        // any LeaveBalance rows for them (see EmployeeCreatedHandler.HandleAsync: it returns
-        // early when integrationEvent.DefaultLeavePolicyId is null and no assignment already
-        // exists). That deterministically reproduces the "n/a" / HasBalance == false row for
-        // every leave type, unlike relying on a specific seeded leave type name.
-        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
-        var empList  = new EmployeeListPage(_page, _fixture.WebBaseUrl);
-        var empEdit  = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
-        var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
-
-        var unique    = Guid.NewGuid().ToString("N")[..8];
-        var lastName  = $"NoLeave{unique}";
-        var workEmail = $"e2e.noleave{unique}@acme.example";
-
-        await empList.GoToAsync(AcmeId);
-        await empList.ClickNewEmployeeAsync();
-
-        await empEdit.FillFirstNameAsync("E2E");
-        await empEdit.FillLastNameAsync(lastName);
-        await empEdit.FillWorkEmailAsync(workEmail);
-        await empEdit.SelectDropdownAsync("Gender", "Male");
-        await empEdit.SelectDropdownAsync("Nationality", "British");
-        await empEdit.FillDateOfBirthAsync("15/06/1990");
-        await empEdit.FillStartDateAsync("01/03/2026");
-
-        // Employee Number, Employment Type, Department, Location and Position Profile are all
-        // mandatory now — selecting "Senior Software Engineer" (seeded with Engineering / London
-        // Office attached, and crucially no DefaultLeavePolicyId) satisfies all of them while
-        // preserving this test's "no leave policy assigned" premise.
-        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
-        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
-
-        await empEdit.SaveNewEmployeeAsync();
-
-        await empList.ClickEmployeeAsync(lastName);
-        await _page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
-
-        await empAdmin.OpenLeaveTabAsync();
-
-        Assert.Equal("n/a", await empAdmin.GetBalanceRowTextAsync("Annual Leave"));
-        Assert.False(await empAdmin.HasAdjustButtonAsync("Annual Leave"),
-            "A leave type row with no balance must never show an Adjust button");
-
-        Assert.Equal("n/a", await empAdmin.GetToilBalanceTextAsync());
-        Assert.False(await empAdmin.HasToilAdjustButtonAsync(),
-            "The TOIL card must never show an Adjust button when the employee has no TOIL balance");
-    }
+    // NOTE: AdminLeaveTab_EmployeeWithNoLeavePolicyAssignment_ShowsNaAndNoAdjustButtons used to
+    // live here, covering the "n/a" / no-Adjust-button empty state for an employee with no
+    // EmployeeLeavePolicyAssignment. Its setup relied on a Position Profile with no
+    // DefaultLeavePolicyId (every seeded profile used to have none) to keep
+    // EmployeeCreatedHandler from creating an assignment/balances. PositionProfile.
+    // DefaultLeavePolicyId is now a mandatory, non-nullable field (see the
+    // MakePositionProfileDepartmentLocationLeavePolicyRequired migration and
+    // CreatePositionProfileValidator's NotEmpty rule), and Employee.PositionProfileId is likewise
+    // mandatory — so every newly created employee now always resolves a real leave policy at
+    // creation. The "no leave policy assignment" state this test constructed can no longer occur
+    // through any UI path, so it was removed rather than adapted.
 
     // ── 2. Adjust button visibility for HR Administrator ─────────────────────
 

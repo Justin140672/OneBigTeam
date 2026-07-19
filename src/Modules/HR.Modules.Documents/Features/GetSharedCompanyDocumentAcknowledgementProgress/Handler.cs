@@ -35,10 +35,10 @@ internal sealed class GetSharedCompanyDocumentAcknowledgementProgressHandler(
 
         var eligibleIds = await audienceMatcher.GetEligibleEmployeeIdsAsync(request.CompanyId, document.Id, cancellationToken);
 
-        var acknowledgedAtByEmployeeId = await db.SharedCompanyDocumentAcknowledgements
+        var acknowledgementsByEmployeeId = await db.SharedCompanyDocumentAcknowledgements
             .AsNoTracking()
             .Where(a => a.SharedCompanyDocumentId == document.Id && a.VersionNumber == document.VersionNumber)
-            .ToDictionaryAsync(a => a.EmployeeId, a => a.AcknowledgedAt, cancellationToken);
+            .ToDictionaryAsync(a => a.EmployeeId, a => a, cancellationToken);
 
         var names = await employeeNameReader.GetNamesAsync(request.CompanyId, eligibleIds, cancellationToken);
         var details = await audienceReader.GetEmployeeAudienceDetailsAsync(request.CompanyId, eligibleIds, cancellationToken);
@@ -48,7 +48,8 @@ internal sealed class GetSharedCompanyDocumentAcknowledgementProgressHandler(
 
         var allItems = eligibleIds.Select(employeeId =>
         {
-            var acknowledgedAt = acknowledgedAtByEmployeeId.TryGetValue(employeeId, out var at) ? (DateTimeOffset?)at : null;
+            acknowledgementsByEmployeeId.TryGetValue(employeeId, out var acknowledgement);
+            var acknowledgedAt = acknowledgement?.AcknowledgedAt;
             var isOverdue = acknowledgedAt is null && document.AcknowledgementDueDate is not null && document.AcknowledgementDueDate < today;
             var status = acknowledgedAt is not null ? StatusAcknowledged : isOverdue ? StatusOverdue : StatusOutstanding;
 
@@ -63,7 +64,9 @@ internal sealed class GetSharedCompanyDocumentAcknowledgementProgressHandler(
                 detail?.LocationName,
                 status,
                 document.AcknowledgementDueDate,
-                acknowledgedAt);
+                acknowledgedAt,
+                acknowledgement is not null ? acknowledgement.VersionNumber : null,
+                acknowledgement?.AcknowledgementStatement);
         }).ToList();
 
         var totalAssigned = allItems.Count;

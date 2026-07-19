@@ -19,6 +19,7 @@ using HR.Modules.Documents.Features.ListPublishedSharedCompanyDocuments;
 using HR.Modules.Documents.Features.GetSharedCompanyDocument;
 using HR.Modules.Documents.Features.GetSharedCompanyDocumentAcknowledgementProgress;
 using HR.Modules.Documents.Features.GetPublishedSharedCompanyDocument;
+using HR.Modules.Documents.Features.GetSharedCompanyDocumentAuditHistory;
 using HR.Modules.Documents.Features.DownloadSharedCompanyDocument;
 using HR.Modules.Documents.Features.DownloadSharedCompanyDocumentVersion;
 using HR.Modules.Documents.Features.AcknowledgeSharedCompanyDocument;
@@ -139,9 +140,11 @@ public static class DocumentsModule
         services.AddScoped<GetSharedCompanyDocumentHandler>();
         services.AddScoped<GetSharedCompanyDocumentAcknowledgementProgressHandler>();
         services.AddScoped<GetPublishedSharedCompanyDocumentHandler>();
+        services.AddScoped<GetSharedCompanyDocumentAuditHistoryHandler>();
         services.AddScoped<DownloadSharedCompanyDocumentHandler>();
         services.AddScoped<DownloadSharedCompanyDocumentVersionHandler>();
         services.AddScoped<AcknowledgeSharedCompanyDocumentHandler>();
+        services.AddScoped<IValidator<AcknowledgeSharedCompanyDocumentRequest>, AcknowledgeSharedCompanyDocumentValidator>();
 
         services.AddScoped<UpdateSharedCompanyDocumentMetadataHandler>();
         services.AddScoped<IValidator<UpdateSharedCompanyDocumentMetadataRequest>, UpdateSharedCompanyDocumentMetadataValidator>();

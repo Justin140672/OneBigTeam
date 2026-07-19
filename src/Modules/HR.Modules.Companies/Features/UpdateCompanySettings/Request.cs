@@ -18,4 +18,5 @@ internal sealed record UpdateCompanySettingsRequest
 	public bool DisplaySalaryOnEmployeeProfile { get; init; } = false;
 	public int? FitNoteRequiredAfterDays { get; init; }
 	public int? ReturnToWorkRequiredAfterDays { get; init; }
+	public string DefaultAcknowledgementStatement { get; init; } = string.Empty;
 }

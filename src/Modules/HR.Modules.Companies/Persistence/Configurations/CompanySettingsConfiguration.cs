@@ -92,6 +92,12 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .IsRequired()
             .HasDefaultValue(UkContactRegexDefaults.Mobile);
 
+        builder.Property(settings => settings.DefaultAcknowledgementStatement)
+            .HasColumnName("default_acknowledgement_statement")
+            .HasMaxLength(2000)
+            .IsRequired()
+            .HasDefaultValue(CompanySettings.DefaultAcknowledgementStatementText);
+
         builder.Property(settings => settings.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

@@ -2,8 +2,6 @@
 @rendermode InteractiveServer
 @inherits SearchPageBase<VacancyListItemModel>
 @inject VacancyService VacancyService
-@inject PositionProfileService PositionProfileService
-@inject DepartmentService DepartmentService
 @inject AppSession Session
 
 <PageTitle>Vacancies</PageTitle>
@@ -11,31 +9,6 @@
 <div class="container-fluid py-4">
     <h1 class="mb-1">Vacancies</h1>
     <p class="text-muted mb-3">Track open roles and their hiring progress.</p>
-
-    <div class="row g-3 mb-3">
-        <div class="col-md-3">
-            <label class="form-label">Position Profile</label>
-            <SfDropDownList TValue="Guid?" TItem="PositionProfileListItemModel"
-                            DataSource="@_positionProfiles"
-                            Value="@_positionProfileFilter"
-                            Placeholder="All position profiles"
-                            AllowFiltering="true">
-                <DropDownListFieldSettings Value="Id" Text="Title" />
-                <DropDownListEvents TValue="Guid?" TItem="PositionProfileListItemModel" ValueChange="OnPositionProfileFilterChanged" />
-            </SfDropDownList>
-        </div>
-        <div class="col-md-3">
-            <label class="form-label">Department</label>
-            <SfDropDownList TValue="Guid?" TItem="DepartmentListItemModel"
-                            DataSource="@_departments"
-                            Value="@_departmentFilter"
-                            Placeholder="All departments"
-                            AllowFiltering="true">
-                <DropDownListFieldSettings Value="Id" Text="Name" />
-                <DropDownListEvents TValue="Guid?" TItem="DepartmentListItemModel" ValueChange="OnDepartmentFilterChanged" />
-            </SfDropDownList>
-        </div>
-    </div>
 
     @if (IsLoading)
     {
@@ -94,48 +67,19 @@
 </div>
 
 @code {
-    private List<PositionProfileListItemModel> _positionProfiles = [];
-    private List<DepartmentListItemModel> _departments = [];
-    private Guid? _positionProfileFilter;
-    private Guid? _departmentFilter;
-
-    protected override async Task OnBeforeLoadAsync()
+    protected override Task OnBeforeLoadAsync()
     {
         if (!Session.IsRecruiter)
         {
             Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
-            return;
         }
 
-        var positionProfilesTask = PositionProfileService.ListPositionProfilesAsync(CompanyId);
-        var departmentsTask = DepartmentService.ListDepartmentsAsync(CompanyId);
-        await Task.WhenAll(positionProfilesTask, departmentsTask);
-
-        _positionProfiles = (await positionProfilesTask)?.Items.ToList() ?? [];
-        _departments = (await departmentsTask)?.Items ?? [];
-    }
-
-    // Explicit typed ValueChange handlers rather than @bind-Value + a separate inline ValueChange
-    // lambda — the two can fire in an order where the reload runs before the bound field has
-    // actually been updated, reloading with the *previous* filter value (see EmployeeEdit.razor's
-    // OnPositionProfileChanged for the same established pattern: set the field from args.Value
-    // first, then reload, so there's no ambiguity about ordering).
-    private async Task OnPositionProfileFilterChanged(ChangeEventArgs<Guid?, PositionProfileListItemModel> args)
-    {
-        _positionProfileFilter = args.Value;
-        await LoadAsync();
-    }
-
-    private async Task OnDepartmentFilterChanged(ChangeEventArgs<Guid?, DepartmentListItemModel> args)
-    {
-        _departmentFilter = args.Value;
-        await LoadAsync();
+        return Task.CompletedTask;
     }
 
     protected override async Task<IReadOnlyList<VacancyListItemModel>?> FetchItemsAsync(string? search)
     {
-        var result = await VacancyService.ListVacanciesAsync(
-            CompanyId, positionProfileId: _positionProfileFilter, departmentId: _departmentFilter);
+        var result = await VacancyService.ListVacanciesAsync(CompanyId);
         return result?.Items;
     }
 

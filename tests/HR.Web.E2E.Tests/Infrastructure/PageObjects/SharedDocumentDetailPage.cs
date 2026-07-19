@@ -401,6 +401,124 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
     }
 
+    // The header's "Audit History" button carries the fa-clock-rotate-left icon, which is also
+    // used by the "Review History" card's own header — but that header icon lives on a plain
+    // <span> (not a button), same disambiguation reasoning as ReviewHeaderButton above, so
+    // filtering GetByRole(Button) by this icon still resolves to just the one header button.
+    private ILocator AuditHistoryHeaderButton => page.GetByRole(AriaRole.Button).Filter(new() { Has = page.Locator(".fa-clock-rotate-left") });
+    private ILocator AuditHistoryDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Audit History" });
+    private ILocator AuditDetailDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Audit Event Detail" });
+
+    /// <summary>Opens the Audit History dialog (SharedCompanyDocumentAuditHistoryDialog.razor) via the header "Audit History" button.</summary>
+    public async Task OpenAuditHistoryDialogAsync()
+    {
+        await AuditHistoryHeaderButton.ClickAsync();
+        await AuditHistoryDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+    }
+
+    public Task<bool> IsAuditHistoryDialogOpenAsync() => AuditHistoryDialog.IsVisibleAsync();
+
+    /// <summary>
+    /// Number of rows currently rendered in the Audit History dialog's grid
+    /// (data-testid="document-audit-history-grid"), scoped to the dialog so it can't collide with
+    /// any other ".e-row" markup elsewhere on the page.
+    /// </summary>
+    public Task<int> GetAuditHistoryRowCountAsync() =>
+        AuditHistoryDialog.Locator("[data-testid='document-audit-history-grid'] .e-row").CountAsync();
+
+    /// <summary>
+    /// Clicks the "View" (fa-eye) button on the Audit History grid row whose text contains
+    /// <paramref name="rowTextFragment"/> (e.g. an Action value like "Published" or "Acknowledgement Settings Updated"),
+    /// opening the Audit Event Detail dialog.
+    /// </summary>
+    public async Task ClickViewAuditHistoryRowAsync(string rowTextFragment)
+    {
+        var row = AuditHistoryDialog.Locator("[data-testid='document-audit-history-grid'] .e-row")
+            .Filter(new() { HasText = rowTextFragment })
+            .First;
+        await row.GetByRole(AriaRole.Button, new() { Name = "View" }).ClickAsync();
+        await AuditDetailDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+    }
+
+    public Task<bool> IsAuditDetailDialogOpenAsync() => AuditDetailDialog.IsVisibleAsync();
+
+    /// <summary>All text content of the Audit Event Detail dialog (Date/User/Action rows plus the Before/After changes table).</summary>
+    public async Task<string> GetAuditDetailDialogTextAsync() =>
+        (await AuditDetailDialog.InnerTextAsync()).Trim();
+
+    public async Task CloseAuditDetailDialogAsync()
+    {
+        await AuditDetailDialog.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+        await AuditDetailDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    public async Task CloseAuditHistoryDialogAsync()
+    {
+        await AuditHistoryDialog.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+        await AuditHistoryDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    // ── Edit Acknowledgement Settings dialog (statement field, Reset to Default, publish-lock) ──
+
+    /// <summary>
+    /// Opens the "Acknowledgement" card's Edit dialog without changing/saving anything — unlike
+    /// <see cref="RequireAcknowledgementAsync"/>, which drives the whole toggle-and-save flow, this
+    /// is for tests that need to inspect or interact with the dialog's fields directly (e.g. the
+    /// statement field's locked/editable state, or the "Reset to Default" button).
+    /// </summary>
+    public async Task OpenEditAcknowledgementDialogAsync()
+    {
+        await AcknowledgementCard.GetByRole(AriaRole.Button, new() { Name = "Edit" }).ClickAsync();
+        await EditAcknowledgementDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+    }
+
+    public Task<bool> IsEditAcknowledgementDialogOpenAsync() => EditAcknowledgementDialog.IsVisibleAsync();
+
+    // The Acknowledgement Statement field is the only HrTextBox (Multiline, so a <textarea>)
+    // rendered inside this dialog.
+    private ILocator AcknowledgementStatementTextArea => EditAcknowledgementDialog.Locator("textarea");
+
+    public Task<string> GetAcknowledgementStatementValueAsync() =>
+        AcknowledgementStatementTextArea.InputValueAsync();
+
+    public Task FillAcknowledgementStatementAsync(string value) =>
+        AcknowledgementStatementTextArea.FillAsync(value);
+
+    /// <summary>
+    /// True once the document's Status is no longer "Draft" — EditSharedCompanyDocumentAcknowledgementDialog.razor
+    /// sets HrTextBox's Readonly to this, rendering a "readonly" attribute on the underlying textarea.
+    /// </summary>
+    public async Task<bool> IsAcknowledgementStatementReadOnlyAsync() =>
+        await AcknowledgementStatementTextArea.GetAttributeAsync("readonly") is not null;
+
+    private ILocator ResetAcknowledgementStatementButton =>
+        EditAcknowledgementDialog.GetByRole(AriaRole.Button, new() { Name = "Reset to Default" });
+
+    public Task<bool> IsResetAcknowledgementStatementButtonDisabledAsync() =>
+        ResetAcknowledgementStatementButton.IsDisabledAsync();
+
+    public Task ClickResetAcknowledgementStatementToDefaultAsync() =>
+        ResetAcknowledgementStatementButton.ClickAsync();
+
+    /// <summary>
+    /// Whether the "Locked after publishing — upload a new version to change the wording." note is
+    /// shown, which EditSharedCompanyDocumentAcknowledgementDialog.razor only renders once the
+    /// statement field is locked (Status != "Draft").
+    /// </summary>
+    public Task<bool> IsAcknowledgementLockedNoteVisibleAsync() =>
+        EditAcknowledgementDialog.GetByText("Locked after publishing").IsVisibleAsync();
+
+    /// <summary>Saves the Edit Acknowledgement Settings dialog, then waits for it to close and the page to reload its detail data.</summary>
+    public async Task SaveEditAcknowledgementDialogAsync()
+    {
+        await EditAcknowledgementDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await EditAcknowledgementDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+    }
+
     /// <summary>Opens the Publish confirmation dialog via the header "Publish" button, without confirming or cancelling it.</summary>
     public async Task OpenPublishDialogAsync()
     {

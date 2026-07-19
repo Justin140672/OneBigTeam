@@ -38,6 +38,7 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
                 defaults.PostcodeRegex,
                 defaults.TelephoneRegex,
                 defaults.MobileRegex,
+                defaults.DefaultAcknowledgementStatement,
                 defaults.UpdatedAt));
         }
 
@@ -52,6 +53,7 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
             settings.PostcodeRegex,
             settings.TelephoneRegex,
             settings.MobileRegex,
+            settings.DefaultAcknowledgementStatement,
             settings.UpdatedAt));
     }
 }

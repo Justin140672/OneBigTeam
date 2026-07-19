@@ -37,6 +37,13 @@ internal sealed class SharedCompanyDocumentAcknowledgement
     // constraint) — this is provenance metadata, not a referential integrity guarantee.
     public Guid? TaskId { get; private set; }
 
+    // Server-side confirmation that the employee actually ticked the "I confirm I have read and
+    // understood this document" checkbox before submitting — enforced by the request validator,
+    // not trusted from the client alone. Existing rows created before this flag existed are
+    // backfilled to true (see EF configuration default) because they were all real confirmations
+    // under the old UI-only gate.
+    public bool IsConfirmed { get; private set; }
+
     public static SharedCompanyDocumentAcknowledgement Create(
         Guid id,
         Guid companyId,
@@ -45,6 +52,7 @@ internal sealed class SharedCompanyDocumentAcknowledgement
         int versionNumber,
         string acknowledgementStatement,
         Guid? taskId,
+        bool isConfirmed,
         DateTimeOffset now) => new()
     {
         Id                       = id,
@@ -54,6 +62,7 @@ internal sealed class SharedCompanyDocumentAcknowledgement
         VersionNumber            = versionNumber,
         AcknowledgementStatement = acknowledgementStatement.Trim(),
         TaskId                   = taskId,
+        IsConfirmed              = isConfirmed,
         AcknowledgedAt           = now,
     };
 }

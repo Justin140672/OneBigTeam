@@ -232,6 +232,121 @@ public class UpdateCompanySettingsHandlerTests
 		Assert.True(auditEvent.CurrentSettings.ExcludePublicHolidaysFromLeave);
 	}
 
+	[Fact]
+	public async Task HandleAsync_Persists_DefaultAcknowledgementStatement_And_Returns_It_In_Response()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 7, 19, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var handler = new UpdateCompanySettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 7, 19, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher());
+
+		var result = await handler.HandleAsync(
+			new UpdateCompanySettingsRequest
+			{
+				Id = company.Id,
+				TimeZone = "UTC",
+				Locale = "en-GB",
+				WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+				              WorkingDays.Thursday | WorkingDays.Friday,
+				HoursPerDay = 7.5m,
+				LeaveYearStartMonth = 1,
+				DefaultHolidayAllowance = 25,
+				ProbationMonths = 6,
+				DefaultAcknowledgementStatement = "Please confirm you have read this policy.",
+			},
+			CancellationToken.None);
+
+		Assert.True(result.IsSuccess);
+		Assert.Equal("Please confirm you have read this policy.", result.Value!.DefaultAcknowledgementStatement);
+
+		var savedSettings = await context.CompanySettings.SingleAsync();
+		Assert.Equal("Please confirm you have read this policy.", savedSettings.DefaultAcknowledgementStatement);
+	}
+
+	[Fact]
+	public async Task HandleAsync_Falls_Back_To_Hardcoded_Default_When_DefaultAcknowledgementStatement_Is_Blank()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 7, 19, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var handler = new UpdateCompanySettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 7, 19, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher());
+
+		var result = await handler.HandleAsync(
+			new UpdateCompanySettingsRequest
+			{
+				Id = company.Id,
+				TimeZone = "UTC",
+				Locale = "en-GB",
+				WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+				              WorkingDays.Thursday | WorkingDays.Friday,
+				HoursPerDay = 7.5m,
+				LeaveYearStartMonth = 1,
+				DefaultHolidayAllowance = 25,
+				ProbationMonths = 6,
+				DefaultAcknowledgementStatement = "   ",
+			},
+			CancellationToken.None);
+
+		Assert.True(result.IsSuccess);
+		Assert.Equal(CompanySettings.DefaultAcknowledgementStatementText, result.Value!.DefaultAcknowledgementStatement);
+	}
+
+	[Fact]
+	public async Task HandleAsync_Includes_DefaultAcknowledgementStatement_In_AuditEvent_BeforeAndAfter_Snapshots()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 7, 19, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		var initialSettings = CompanySettings.CreateDefault(company.Id, now);
+		company.SetSettings(initialSettings, now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var auditPublisher = new CapturingAuditEventPublisher();
+		var updateTime = new DateTime(2026, 7, 19, 11, 0, 0, DateTimeKind.Utc);
+		var handler = new UpdateCompanySettingsHandler(context, new FakeClock(updateTime), auditPublisher);
+
+		await handler.HandleAsync(
+			new UpdateCompanySettingsRequest
+			{
+				Id = company.Id,
+				TimeZone = "UTC",
+				Locale = "en-GB",
+				WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+				              WorkingDays.Thursday | WorkingDays.Friday,
+				HoursPerDay = 7.5m,
+				LeaveYearStartMonth = 1,
+				DefaultHolidayAllowance = 25,
+				ProbationMonths = 6,
+				DefaultAcknowledgementStatement = "New acknowledgement statement.",
+			},
+			CancellationToken.None);
+
+		var auditEvt = Assert.Single(auditPublisher.Published);
+		var auditEvent = Assert.IsType<CompanySettingsUpdatedAuditEvent>(auditEvt);
+
+		Assert.NotNull(auditEvent.PreviousSettings);
+		Assert.Equal(CompanySettings.DefaultAcknowledgementStatementText, auditEvent.PreviousSettings!.DefaultAcknowledgementStatement);
+		Assert.Equal("New acknowledgement statement.", auditEvent.CurrentSettings.DefaultAcknowledgementStatement);
+	}
+
 	private static CompaniesDbContext BuildContext()
 	{
 		var options = new DbContextOptionsBuilder<CompaniesDbContext>()

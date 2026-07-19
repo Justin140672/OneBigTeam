@@ -80,12 +80,23 @@ internal static class EmployeeReferenceDataSeeder
         locationResponse.EnsureSuccessStatusCode();
         var locationId = (await locationResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 
+        var leavePolicyResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/leave-policies", new
+        {
+            companyId,
+            name = $"LeavePolicy-{Guid.NewGuid():N}",
+            carryOverDays = 0,
+            allowNegativeBalance = false
+        });
+        leavePolicyResponse.EnsureSuccessStatusCode();
+        var defaultLeavePolicyId = (await leavePolicyResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
         var positionProfileResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
             companyId,
             departmentId,
             locationId,
-            title = $"Role-{Guid.NewGuid():N}"
+            title = $"Role-{Guid.NewGuid():N}",
+            defaultLeavePolicyId
         });
         positionProfileResponse.EnsureSuccessStatusCode();
         var positionProfileId = (await positionProfileResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;

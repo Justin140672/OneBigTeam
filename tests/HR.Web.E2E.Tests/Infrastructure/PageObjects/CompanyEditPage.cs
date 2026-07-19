@@ -305,6 +305,22 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
         return int.TryParse(value, out var parsed) ? parsed : null;
     }
 
+    /// <summary>
+    /// The "Default Acknowledgement Statement" HrTextBox (Multiline) in the Settings tab's
+    /// "Document Acknowledgement" section. Located by its fixed placeholder text — the only
+    /// rendering of that placeholder on this page — since HrTextBox uses FloatLabelType.Never by
+    /// default (a real HTML placeholder attribute), unlike the numeric fields elsewhere on this
+    /// tab that use FloatLabelType.Auto floating labels (see NumericBoxByLabel's doc comment).
+    /// </summary>
+    private ILocator DefaultAcknowledgementStatementTextArea =>
+        page.GetByPlaceholder("I confirm that I have read and understood this document.");
+
+    public Task SetDefaultAcknowledgementStatementAsync(string value) =>
+        DefaultAcknowledgementStatementTextArea.FillAsync(value);
+
+    public Task<string> GetDefaultAcknowledgementStatementAsync() =>
+        DefaultAcknowledgementStatementTextArea.InputValueAsync();
+
     // ── Save ───────────────────────────────────────────────────────────────────
 
     public async Task SaveAsync()

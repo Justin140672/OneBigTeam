@@ -177,9 +177,15 @@ public class AwardToilEndpointTests : IClassFixture<ApiWebApplicationFactory>
         locResp.EnsureSuccessStatusCode();
         var locationId = (await locResp.Content.ReadFromJsonAsync<CompanyPayload>())!.Id;
 
+        var leavePolicyResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = $"LeavePolicy-{Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false });
+        leavePolicyResp.EnsureSuccessStatusCode();
+        var defaultLeavePolicyId = (await leavePolicyResp.Content.ReadFromJsonAsync<CompanyPayload>())!.Id;
+
         var ppResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles",
-            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}" });
+            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}", defaultLeavePolicyId });
         ppResp.EnsureSuccessStatusCode();
         var positionProfileId = (await ppResp.Content.ReadFromJsonAsync<CompanyPayload>())!.Id;
 

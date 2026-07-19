@@ -17,4 +17,5 @@ internal sealed record UpdateCompanySettingsResponse(
 	bool DisplaySalaryOnEmployeeProfile,
 	int? FitNoteRequiredAfterDays,
 	int? ReturnToWorkRequiredAfterDays,
+	string DefaultAcknowledgementStatement,
 	DateTimeOffset UpdatedAt);

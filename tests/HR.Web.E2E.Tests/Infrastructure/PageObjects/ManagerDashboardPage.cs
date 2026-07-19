@@ -95,9 +95,9 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
 
     public async Task<IReadOnlyList<string>> GetMyTeamMemberNamesAsync()
     {
-        await MyTeamWidget.Locator(".task-widget-item, .widget-empty").First.WaitForAsync(new() { Timeout = 15_000 });
+        await MyTeamWidget.Locator(".team-card, .widget-empty").First.WaitForAsync(new() { Timeout = 15_000 });
 
-        var titles = await MyTeamWidget.Locator(".task-widget-title").AllAsync();
+        var titles = await MyTeamWidget.Locator(".team-card-name").AllAsync();
         var names  = new List<string>();
         foreach (var t in titles)
             names.Add((await t.TextContentAsync())?.Trim() ?? "");
@@ -106,14 +106,14 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
 
     /// <summary>
     /// Returns the visible phone/email contact text (MyTeamWidget.razor's
-    /// ".team-widget-contact-text" spans) for the team-member row whose name contains
+    /// ".team-card-contact-text" spans) for the team-member card whose name contains
     /// <paramref name="nameFragment"/> — proves the phone number/email are rendered as visible
     /// text next to their icons, not just present in a hidden "title" tooltip attribute.
     /// </summary>
     public async Task<IReadOnlyList<string>> GetTeamMemberContactTextAsync(string nameFragment)
     {
-        var row = MyTeamWidget.Locator(".task-widget-item").Filter(new() { HasText = nameFragment }).First;
-        var spans = await row.Locator(".team-widget-contact-text").AllAsync();
+        var card = MyTeamWidget.Locator(".team-card").Filter(new() { HasText = nameFragment }).First;
+        var spans = await card.Locator(".team-card-contact-text").AllAsync();
 
         var values = new List<string>();
         foreach (var s in spans)

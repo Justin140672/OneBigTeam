@@ -154,6 +154,10 @@ public sealed class VacancyManagementTests(AppFixture fixture) : E2ETestBase(fix
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(profileTitle);
+        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
+        await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.SelectLocationAsync("London Office");
+        await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
         await ppEdit.SaveAsync();
 
         Assert.True(await ppList.HasPositionProfileAsync(profileTitle),

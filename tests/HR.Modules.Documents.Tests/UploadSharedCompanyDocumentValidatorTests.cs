@@ -18,7 +18,9 @@ public class UploadSharedCompanyDocumentValidatorTests
     private static UploadSharedCompanyDocumentRequest BuildRequest(
         SharedCompanyDocumentReviewFrequency reviewFrequency = SharedCompanyDocumentReviewFrequency.None,
         int? customReviewFrequencyMonths = null,
-        DateOnly? reviewDate = null) =>
+        DateOnly? reviewDate = null,
+        bool requiresAcknowledgement = false,
+        string? acknowledgementStatement = null) =>
         new()
         {
             CompanyId                   = Guid.NewGuid(),
@@ -27,6 +29,8 @@ public class UploadSharedCompanyDocumentValidatorTests
             ReviewFrequency             = reviewFrequency,
             CustomReviewFrequencyMonths = customReviewFrequencyMonths,
             ReviewDate                  = reviewDate,
+            RequiresAcknowledgement     = requiresAcknowledgement,
+            AcknowledgementStatement    = acknowledgementStatement,
             File                        = FakeFile(),
         };
 
@@ -146,5 +150,66 @@ public class UploadSharedCompanyDocumentValidatorTests
             reviewDate: null));
 
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_RequiresAcknowledgement_With_Null_AcknowledgementStatement_Fails()
+    {
+        var result = Validator.Validate(BuildRequest(
+            requiresAcknowledgement: true,
+            acknowledgementStatement: null));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e =>
+            e.PropertyName == nameof(UploadSharedCompanyDocumentRequest.AcknowledgementStatement) &&
+            e.ErrorMessage == "An acknowledgement statement is required when acknowledgement is required.");
+    }
+
+    [Fact]
+    public void Validate_RequiresAcknowledgement_With_Empty_AcknowledgementStatement_Fails()
+    {
+        var result = Validator.Validate(BuildRequest(
+            requiresAcknowledgement: true,
+            acknowledgementStatement: string.Empty));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e =>
+            e.PropertyName == nameof(UploadSharedCompanyDocumentRequest.AcknowledgementStatement) &&
+            e.ErrorMessage == "An acknowledgement statement is required when acknowledgement is required.");
+    }
+
+    [Fact]
+    public void Validate_RequiresAcknowledgement_With_WhitespaceOnly_AcknowledgementStatement_Fails()
+    {
+        var result = Validator.Validate(BuildRequest(
+            requiresAcknowledgement: true,
+            acknowledgementStatement: "   "));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e =>
+            e.PropertyName == nameof(UploadSharedCompanyDocumentRequest.AcknowledgementStatement) &&
+            e.ErrorMessage == "An acknowledgement statement is required when acknowledgement is required.");
+    }
+
+    [Fact]
+    public void Validate_RequiresAcknowledgement_With_NonBlank_AcknowledgementStatement_Passes()
+    {
+        var result = Validator.Validate(BuildRequest(
+            requiresAcknowledgement: true,
+            acknowledgementStatement: "I confirm I have read this policy."));
+
+        Assert.DoesNotContain(result.Errors, e =>
+            e.PropertyName == nameof(UploadSharedCompanyDocumentRequest.AcknowledgementStatement));
+    }
+
+    [Fact]
+    public void Validate_AcknowledgementNotRequired_With_Null_AcknowledgementStatement_Passes()
+    {
+        var result = Validator.Validate(BuildRequest(
+            requiresAcknowledgement: false,
+            acknowledgementStatement: null));
+
+        Assert.DoesNotContain(result.Errors, e =>
+            e.PropertyName == nameof(UploadSharedCompanyDocumentRequest.AcknowledgementStatement));
     }
 }

@@ -70,4 +70,39 @@ public class UpdateCompanySettingsValidatorTests
 		Assert.False(result.IsValid);
 		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateCompanySettingsRequest.DefaultHolidayAllowance));
 	}
+
+	[Fact]
+	public void Validate_Passes_When_DefaultAcknowledgementStatement_Is_Blank()
+	{
+		// The domain-level fallback to the hardcoded default happens in CompanySettings.Update,
+		// not here — a blank string must pass the validator.
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { DefaultAcknowledgementStatement = string.Empty });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Passes_When_DefaultAcknowledgementStatement_Is_Whitespace()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { DefaultAcknowledgementStatement = "   " });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Passes_When_DefaultAcknowledgementStatement_At_MaximumLength()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { DefaultAcknowledgementStatement = new string('a', 2000) });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Fails_When_DefaultAcknowledgementStatement_Exceeds_MaximumLength()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { DefaultAcknowledgementStatement = new string('a', 2001) });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateCompanySettingsRequest.DefaultAcknowledgementStatement));
+	}
 }

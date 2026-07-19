@@ -127,7 +127,10 @@ public sealed class VacancyPositionProfileDefaultsTests(AppFixture fixture) : E2
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(activeProfileTitle);
+        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
         await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.SelectLocationAsync("London Office");
+        await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
         await ppEdit.SaveAsync();
         Assert.True(await ppList.HasPositionProfileAsync(activeProfileTitle),
             $"Expected the new position profile '{activeProfileTitle}' to appear in the list");
@@ -136,6 +139,8 @@ public sealed class VacancyPositionProfileDefaultsTests(AppFixture fixture) : E2
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(inactiveProfileTitle);
         await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.SelectLocationAsync("London Office");
+        await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
         await ppEdit.SaveAsync();
         Assert.True(await ppList.HasPositionProfileAsync(inactiveProfileTitle),
             $"Expected the new position profile '{inactiveProfileTitle}' to appear in the list");

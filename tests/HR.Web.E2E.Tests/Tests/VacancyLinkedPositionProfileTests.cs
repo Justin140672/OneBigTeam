@@ -47,7 +47,10 @@ public sealed class VacancyLinkedPositionProfileTests(AppFixture fixture) : E2ET
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(profileTitle);
+        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
         await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.SelectLocationAsync("London Office");
+        await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
         await ppEdit.FillDescriptionAsync(profileDescription);
         await ppEdit.SaveAsync();
 
@@ -141,7 +144,10 @@ public sealed class VacancyLinkedPositionProfileTests(AppFixture fixture) : E2ET
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(profileTitle);
+        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
         await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.SelectLocationAsync("London Office");
+        await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
         await ppEdit.FillDescriptionAsync(profileDescription);
         await ppEdit.SaveAsync();
 

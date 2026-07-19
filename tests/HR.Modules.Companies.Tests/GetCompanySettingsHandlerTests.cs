@@ -17,7 +17,7 @@ public class GetCompanySettingsHandlerTests
         var settings = CompanySettings.CreateDefault(company.Id, now);
         settings.Update(
             "Europe/London", "en-GB", WorkingDays.Monday | WorkingDays.Tuesday, 6m, 4, 30, 8,
-            false, true, true, 7, 3, now);
+            false, true, true, 7, 3, "Custom acknowledgement statement.", now);
         company.SetSettings(settings, now);
         context.Companies.Add(company);
         await context.SaveChangesAsync();
@@ -33,6 +33,7 @@ public class GetCompanySettingsHandlerTests
         Assert.True(result.Value.ExcludePublicHolidaysFromSickness);
         Assert.True(result.Value.DisplaySalaryOnEmployeeProfile);
         Assert.Equal(7, result.Value.FitNoteRequiredAfterDays);
+        Assert.Equal("Custom acknowledgement statement.", result.Value.DefaultAcknowledgementStatement);
     }
 
     [Fact]
@@ -56,6 +57,7 @@ public class GetCompanySettingsHandlerTests
         Assert.Equal(25, result.Value.DefaultHolidayAllowance);
         Assert.False(result.Value.DisplaySalaryOnEmployeeProfile);
         Assert.False(string.IsNullOrEmpty(result.Value.PostcodeRegex));
+        Assert.Equal(CompanySettings.DefaultAcknowledgementStatementText, result.Value.DefaultAcknowledgementStatement);
     }
 
     [Fact]

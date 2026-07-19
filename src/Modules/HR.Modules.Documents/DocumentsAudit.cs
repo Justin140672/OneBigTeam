@@ -281,6 +281,8 @@ internal sealed record SharedCompanyDocumentAcknowledgedAuditEvent(
     string Title,
     int VersionNumber,
     Guid AcknowledgedBy,
+    bool IsConfirmed,
+    string AcknowledgementStatement,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
     string  IAuditEvent.EventType       => "shared_company_document.acknowledged";
@@ -292,7 +294,7 @@ internal sealed record SharedCompanyDocumentAcknowledgedAuditEvent(
     Guid?   IAuditEvent.CorrelationId   => null;
     string? IAuditEvent.Summary         => $"Document '{Title}' acknowledged (v{VersionNumber})";
     object? IAuditEvent.Before          => null;
-    object? IAuditEvent.After           => new { VersionNumber };
+    object? IAuditEvent.After           => new { VersionNumber, IsConfirmed, AcknowledgementStatement };
     object? IAuditEvent.Metadata        => null;
 }
 

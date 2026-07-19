@@ -676,8 +676,8 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
 
         using var employeeClient = ClientAs(companyId, employeeId);
-        var response = await employeeClient.PostAsync(
-            $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", EmptyJson());
+        var response = await employeeClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", new { Confirmed = true });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -712,11 +712,165 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         await PublishDirectlyAsync(companyA, doc!.Id, requiresAcknowledgement: true);
 
         using var clientB = ClientAs(companyB, employeeInB);
-        var response = await clientB.PostAsync(
-            $"/api/companies/{companyB}/shared-documents/{doc.Id}/acknowledge", EmptyJson());
+        var response = await clientB.PostAsJsonAsync(
+            $"/api/companies/{companyB}/shared-documents/{doc.Id}/acknowledge", new { Confirmed = true });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Acknowledge_With_Confirmed_False_Returns_UnprocessableEntity_With_Validator_Message()
+    {
+        var companyId  = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+        await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
+
+        using var employeeClient = ClientAs(companyId, employeeId);
+        var response = await employeeClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", new { Confirmed = false });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains(
+            "You must confirm that you have read and understood this document before it can be acknowledged.", body);
+    }
+
+    [Fact]
+    public async Task Acknowledge_Omitting_Confirmed_Defaults_To_False_And_Returns_UnprocessableEntity()
+    {
+        var companyId  = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+        await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
+
+        using var employeeClient = ClientAs(companyId, employeeId);
+        var response = await employeeClient.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", EmptyJson());
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Acknowledge_With_Confirmed_True_Succeeds_And_Persists_IsConfirmed()
+    {
+        var companyId  = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+        await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
+
+        using var employeeClient = ClientAs(companyId, employeeId);
+        var response = await employeeClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", new { Confirmed = true });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
+        var saved = await db.SharedCompanyDocumentAcknowledgements
+            .SingleAsync(a => a.SharedCompanyDocumentId == doc.Id && a.EmployeeId == employeeId);
+
+        Assert.True(saved.IsConfirmed);
+    }
+
+    // ── GetSharedCompanyDocumentAuditHistory ────────────────────────────────────
+
+    [Fact]
+    public async Task AuditHistory_Returns_Unauthorized_Without_Auth()
+    {
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync(
+            $"/api/companies/{Guid.NewGuid()}/shared-documents/{Guid.NewGuid()}/audit-history");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AuditHistory_Returns_Forbidden_For_Manager()
+    {
+        var companyId = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var managerId  = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+
+        using var managerClient = ClientAs(companyId, managerId);
+        var response = await managerClient.GetAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/audit-history");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AuditHistory_Returns_History_Items_After_An_Acknowledgement_Was_Made()
+    {
+        var companyId  = Guid.NewGuid();
+        var hrUserId   = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
+
+        using var hrClient = ClientAs(companyId, hrUserId);
+        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
+        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
+        await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
+
+        using var employeeClient = ClientAs(companyId, employeeId);
+        var ackResponse = await employeeClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", new { Confirmed = true });
+        Assert.Equal(HttpStatusCode.OK, ackResponse.StatusCode);
+
+        var response = await hrClient.GetAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc.Id}/audit-history");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<AuditHistoryPayload>();
+        Assert.Contains(payload!.Items, i => i.Action.Contains("acknowledged", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task AuditHistory_Returns_Empty_Items_For_A_Document_With_No_Audit_Entries()
+    {
+        // The handler always returns 200 with an empty history list rather than 404 when no
+        // audit entries exist for the given document id — it does not verify the document
+        // itself exists, only that no matching audit rows were found.
+        var companyId = Guid.NewGuid();
+        var hrUserId  = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
+        using var hrClient = ClientAs(companyId, hrUserId);
+
+        var response = await hrClient.GetAsync(
+            $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/audit-history");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<AuditHistoryPayload>();
+        Assert.Empty(payload!.Items);
+    }
+
+    private sealed record AuditHistoryPayload(IReadOnlyList<AuditHistoryItemPayload> Items);
+    private sealed record AuditHistoryItemPayload(DateTimeOffset OccurredAt, string Action, string User);
 
     // ── DownloadSharedCompanyDocument ───────────────────────────────────────────
 
@@ -1129,7 +1283,7 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
 
         await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/acknowledgement-settings",
-            new { RequiresAcknowledgement = true });
+            new { RequiresAcknowledgement = true, AcknowledgementStatement = "I confirm I have read this." });
 
         var response = await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/publish", EmptyJson());
 
@@ -1297,7 +1451,7 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         await CreateActiveEmployeeAsync(companyId, employeeId);
 
         using var employeeClient = ClientAs(companyId, employeeId);
-        await employeeClient.PostAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", EmptyJson());
+        await employeeClient.PostAsJsonAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", new { Confirmed = true });
 
         var response = await hrClient.GetAsync(
             $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledgement-progress");
@@ -1308,6 +1462,17 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.True(payload.TotalAssigned >= payload.AcknowledgedCount);
         Assert.Equal(payload.TotalAssigned, payload.AcknowledgedCount + payload.OutstandingCount + payload.OverdueCount);
         Assert.Contains(payload.Items, i => i.EmployeeId == employeeId && i.Status == "Acknowledged");
+
+        var acknowledgedItem = payload.Items.Single(i => i.EmployeeId == employeeId);
+        Assert.Equal(1, acknowledgedItem.VersionNumber);
+        Assert.False(string.IsNullOrWhiteSpace(acknowledgedItem.AcknowledgementStatement));
+
+        var outstandingItem = payload.Items.SingleOrDefault(i => i.Status != "Acknowledged");
+        if (outstandingItem is not null)
+        {
+            Assert.Null(outstandingItem.VersionNumber);
+            Assert.Null(outstandingItem.AcknowledgementStatement);
+        }
     }
 
     [Fact]
@@ -1389,7 +1554,8 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
 
     private sealed record AcknowledgementProgressItemPayload(
         Guid EmployeeId, string EmployeeName, Guid? DepartmentId, string? DepartmentName,
-        Guid? LocationId, string? LocationName, string Status, DateOnly? DueDate, DateTimeOffset? AcknowledgedAt);
+        Guid? LocationId, string? LocationName, string Status, DateOnly? DueDate, DateTimeOffset? AcknowledgedAt,
+        int? VersionNumber, string? AcknowledgementStatement);
 
     private sealed record PublishPayload(Guid Id, string Status, Guid PublishedBy, DateTimeOffset PublishedAt);
 
@@ -1468,14 +1634,73 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task UploadVersion_Copies_Forward_Previous_Versions_AcknowledgementStatement_When_No_Override_Given()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(
+            client, companyId, categoryId, title: "Remote Working Policy",
+            requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
+            acknowledgementStatement: "I confirm I have read the original policy.");
+
+        var response = await client.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/versions",
+            BuildVersionUpload(requiresReacknowledgement: true));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
+        var v1 = await db.SharedCompanyDocumentVersions.SingleAsync(v => v.SharedCompanyDocumentId == doc.Id && v.VersionNumber == 1);
+        var v2 = await db.SharedCompanyDocumentVersions.SingleAsync(v => v.SharedCompanyDocumentId == doc.Id && v.VersionNumber == 2);
+
+        Assert.Equal("I confirm I have read the original policy.", v1.AcknowledgementStatement);
+        Assert.Equal("I confirm I have read the original policy.", v2.AcknowledgementStatement);
+    }
+
+    [Fact]
+    public async Task UploadVersion_Uses_Override_AcknowledgementStatement_Without_Mutating_Previous_Versions_Row()
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientAs(companyId, userId);
+        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
+        var (doc, _) = await UploadAsync(
+            client, companyId, categoryId, title: "Remote Working Policy",
+            requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
+            acknowledgementStatement: "I confirm I have read the original policy.");
+
+        var response = await client.PostAsync(
+            $"/api/companies/{companyId}/shared-documents/{doc!.Id}/versions",
+            BuildVersionUpload(requiresReacknowledgement: true, acknowledgementStatement: "HR-edited wording for the new version."));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
+        var v1 = await db.SharedCompanyDocumentVersions.SingleAsync(v => v.SharedCompanyDocumentId == doc.Id && v.VersionNumber == 1);
+        var v2 = await db.SharedCompanyDocumentVersions.SingleAsync(v => v.SharedCompanyDocumentId == doc.Id && v.VersionNumber == 2);
+
+        Assert.Equal("HR-edited wording for the new version.", v2.AcknowledgementStatement);
+        Assert.Equal("I confirm I have read the original policy.", v1.AcknowledgementStatement);
+    }
+
     private sealed record VersionUploadPayload(Guid Id, Guid CompanyId, int VersionNumber, string FileName, string VersionNote);
 
     private static MultipartFormDataContent BuildVersionUpload(
-        string versionNote = "Updated section 3", bool requiresReacknowledgement = false)
+        string versionNote = "Updated section 3", bool requiresReacknowledgement = false,
+        string? acknowledgementStatement = null)
     {
         var form = new MultipartFormDataContent();
         form.Add(new StringContent(versionNote), "VersionNote");
         form.Add(new StringContent(requiresReacknowledgement.ToString()), "RequiresReacknowledgement");
+        if (acknowledgementStatement is not null)
+            form.Add(new StringContent(acknowledgementStatement), "AcknowledgementStatement");
 
         var fileContent = new ByteArrayContent(PdfBytes());
         fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
@@ -1903,11 +2128,14 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
     private async Task<(DocumentPayload? Payload, HttpResponseMessage Response)> UploadAsync(
         HttpClient client, Guid companyId, Guid categoryId, string title = "Test Document",
         string? reviewFrequency = null, int? customReviewFrequencyMonths = null, DateOnly? reviewDate = null,
-        Guid? reviewOwnerEmployeeId = null)
+        Guid? reviewOwnerEmployeeId = null, bool requiresAcknowledgement = false, DateOnly? acknowledgementDueDate = null,
+        string? acknowledgementStatement = null)
     {
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/shared-documents",
-            BuildUpload(title, categoryId, reviewFrequency, customReviewFrequencyMonths, reviewDate, reviewOwnerEmployeeId));
+            BuildUpload(
+                title, categoryId, reviewFrequency, customReviewFrequencyMonths, reviewDate, reviewOwnerEmployeeId,
+                requiresAcknowledgement, acknowledgementDueDate, acknowledgementStatement));
         DocumentPayload? payload = null;
         if (response.IsSuccessStatusCode)
             payload = await response.Content.ReadFromJsonAsync<DocumentPayload>();
@@ -1917,7 +2145,8 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
     private static MultipartFormDataContent BuildUpload(
         string title = "Test Document", Guid? categoryId = null,
         string? reviewFrequency = null, int? customReviewFrequencyMonths = null, DateOnly? reviewDate = null,
-        Guid? reviewOwnerEmployeeId = null)
+        Guid? reviewOwnerEmployeeId = null, bool requiresAcknowledgement = false, DateOnly? acknowledgementDueDate = null,
+        string? acknowledgementStatement = null)
     {
         var form = new MultipartFormDataContent();
         form.Add(new StringContent(title), "Title");
@@ -1930,6 +2159,12 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
             form.Add(new StringContent(reviewDate.Value.ToString("yyyy-MM-dd")), "ReviewDate");
         if (reviewOwnerEmployeeId is not null)
             form.Add(new StringContent(reviewOwnerEmployeeId.Value.ToString()), "ReviewOwnerEmployeeId");
+        if (requiresAcknowledgement)
+            form.Add(new StringContent("true"), "RequiresAcknowledgement");
+        if (acknowledgementDueDate is not null)
+            form.Add(new StringContent(acknowledgementDueDate.Value.ToString("yyyy-MM-dd")), "AcknowledgementDueDate");
+        if (acknowledgementStatement is not null)
+            form.Add(new StringContent(acknowledgementStatement), "AcknowledgementStatement");
 
         var fileContent = new ByteArrayContent(PdfBytes());
         fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");

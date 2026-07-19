@@ -66,6 +66,7 @@ public record GetCompanySettingsResponse(
     string PostcodeRegex,
     string TelephoneRegex,
     string MobileRegex,
+    string DefaultAcknowledgementStatement,
     DateTime UpdatedAt);
 
 public record UpdateCompanySettingsRequest(
@@ -81,7 +82,8 @@ public record UpdateCompanySettingsRequest(
     bool ExcludePublicHolidaysFromSickness,
     bool DisplaySalaryOnEmployeeProfile,
     int? FitNoteRequiredAfterDays,
-    int? ReturnToWorkRequiredAfterDays);
+    int? ReturnToWorkRequiredAfterDays,
+    string? DefaultAcknowledgementStatement);
 
 public record UpdateCompanySettingsResponse(
     Guid CompanyId,
@@ -97,6 +99,7 @@ public record UpdateCompanySettingsResponse(
     bool DisplaySalaryOnEmployeeProfile,
     int? FitNoteRequiredAfterDays,
     int? ReturnToWorkRequiredAfterDays,
+    string DefaultAcknowledgementStatement,
     DateTime UpdatedAt);
 
 // ── LOGO UPLOAD ───────────────────────────────────────────────────────────────

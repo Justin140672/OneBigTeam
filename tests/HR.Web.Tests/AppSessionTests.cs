@@ -33,7 +33,8 @@ public class AppSessionTests
             new GetCompanyBrandingResponse("logo.png", "small-logo.png", null));
         var settings = new GetCompanySettingsResponse(
             companyId, "Europe/London", "en-GB", 31, 7.5m, 1, 25m, 6, true, false, true, null, null,
-            "^postcode$", "^telephone$", "^mobile$", DateTime.UtcNow);
+            "^postcode$", "^telephone$", "^mobile$",
+            "I confirm that I have read and understood this document.", DateTime.UtcNow);
         var employee = new MyEmployeeResponse(employeeId, "Alice", "Smith", "Engineer", null, null, "avatar.png");
 
         return new RoutingHandler(new()

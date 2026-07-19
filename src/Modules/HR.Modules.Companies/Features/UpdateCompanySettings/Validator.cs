@@ -36,5 +36,8 @@ internal sealed class UpdateCompanySettingsValidator : AbstractValidator<UpdateC
 
 		RuleFor(request => request.ProbationMonths)
 			.InclusiveBetween(0, 24);
+
+		RuleFor(request => request.DefaultAcknowledgementStatement)
+			.MaximumLength(2000);
 	}
 }

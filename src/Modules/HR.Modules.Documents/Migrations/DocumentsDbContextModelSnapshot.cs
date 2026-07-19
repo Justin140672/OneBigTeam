@@ -625,6 +625,12 @@ namespace HR.Modules.Documents.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("employee_id");
 
+                    b.Property<bool>("IsConfirmed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_confirmed");
+
                     b.Property<Guid>("SharedCompanyDocumentId")
                         .HasColumnType("uuid")
                         .HasColumnName("shared_company_document_id");
@@ -730,6 +736,11 @@ namespace HR.Modules.Documents.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("AcknowledgementStatement")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("acknowledgement_statement");
 
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")

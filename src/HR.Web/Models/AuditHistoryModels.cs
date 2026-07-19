@@ -10,3 +10,11 @@ public sealed record AuditHistoryItemModel(
     IReadOnlyList<AuditFieldChangeModel> Changes);
 
 public sealed record GetEmployeeAuditHistoryResponse(IReadOnlyList<AuditHistoryItemModel> Items);
+
+public sealed record DocumentAuditHistoryItemModel(
+    DateTimeOffset OccurredAt,
+    string Action,
+    string User,
+    IReadOnlyList<AuditFieldChangeModel> Changes);
+
+public sealed record GetSharedCompanyDocumentAuditHistoryResponse(IReadOnlyList<DocumentAuditHistoryItemModel> Items);

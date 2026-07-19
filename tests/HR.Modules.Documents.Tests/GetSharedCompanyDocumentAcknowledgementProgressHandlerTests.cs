@@ -71,7 +71,7 @@ public class GetSharedCompanyDocumentAcknowledgementProgressHandlerTests
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAcknowledgements.Add(
             SharedCompanyDocumentAcknowledgement.Create(
-                Guid.NewGuid(), companyId, doc.Id, acknowledgedEmployee, 1, "Statement", null, Now));
+                Guid.NewGuid(), companyId, doc.Id, acknowledgedEmployee, 1, "Statement", null, true, Now));
         await db.SaveChangesAsync();
 
         var audienceReader = new FakeEmployeeAudienceReader
@@ -106,6 +106,48 @@ public class GetSharedCompanyDocumentAcknowledgementProgressHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Populates_VersionNumber_And_AcknowledgementStatement_For_Acknowledged_Employees()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+
+        var acknowledgedEmployee = Guid.NewGuid();
+        var outstandingEmployee  = Guid.NewGuid();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
+            acknowledgementStatement: null, createdBy: Guid.NewGuid(), now: Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        db.SharedCompanyDocumentAcknowledgements.Add(
+            SharedCompanyDocumentAcknowledgement.Create(
+                Guid.NewGuid(), companyId, doc.Id, acknowledgedEmployee, 1,
+                "I confirm I have read this document.", null, true, Now));
+        await db.SaveChangesAsync();
+
+        var audienceReader = new FakeEmployeeAudienceReader
+        {
+            EligibleEmployeeIds = [acknowledgedEmployee, outstandingEmployee],
+        };
+
+        var result = await Handler(db, audienceReader).HandleAsync(
+            new GetSharedCompanyDocumentAcknowledgementProgressRequest { CompanyId = companyId, DocumentId = doc.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var acknowledgedItem = result.Value!.Items.Single(i => i.EmployeeId == acknowledgedEmployee);
+        Assert.Equal(1, acknowledgedItem.VersionNumber);
+        Assert.Equal("I confirm I have read this document.", acknowledgedItem.AcknowledgementStatement);
+
+        var outstandingItem = result.Value.Items.Single(i => i.EmployeeId == outstandingEmployee);
+        Assert.Null(outstandingItem.VersionNumber);
+        Assert.Null(outstandingItem.AcknowledgementStatement);
+    }
+
+    [Fact]
     public async Task HandleAsync_Computes_Overdue_When_Due_Date_Has_Passed_And_Employee_Has_Not_Acknowledged()
     {
         await using var db = BuildContext();
@@ -123,7 +165,7 @@ public class GetSharedCompanyDocumentAcknowledgementProgressHandlerTests
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAcknowledgements.Add(
             SharedCompanyDocumentAcknowledgement.Create(
-                Guid.NewGuid(), companyId, doc.Id, acknowledgedEmployee, 1, "Statement", null, Now));
+                Guid.NewGuid(), companyId, doc.Id, acknowledgedEmployee, 1, "Statement", null, true, Now));
         await db.SaveChangesAsync();
 
         var audienceReader = new FakeEmployeeAudienceReader
@@ -233,7 +275,7 @@ public class GetSharedCompanyDocumentAcknowledgementProgressHandlerTests
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAcknowledgements.Add(
             SharedCompanyDocumentAcknowledgement.Create(
-                Guid.NewGuid(), companyId, doc.Id, acknowledgedEmployee, 1, "Statement", null, Now));
+                Guid.NewGuid(), companyId, doc.Id, acknowledgedEmployee, 1, "Statement", null, true, Now));
         await db.SaveChangesAsync();
 
         var audienceReader = new FakeEmployeeAudienceReader

@@ -131,7 +131,7 @@ public class GetPublishedSharedCompanyDocumentHandlerTests
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAcknowledgements.Add(
-            SharedCompanyDocumentAcknowledgement.Create(Guid.NewGuid(), companyId, doc.Id, caller, 1, "Statement", null, Now));
+            SharedCompanyDocumentAcknowledgement.Create(Guid.NewGuid(), companyId, doc.Id, caller, 1, "Statement", null, true, Now));
         await db.SaveChangesAsync();
 
         var result = await Handler(db).HandleAsync(
@@ -205,7 +205,7 @@ public class GetPublishedSharedCompanyDocumentHandlerTests
         doc.Publish(Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAcknowledgements.Add(
-            SharedCompanyDocumentAcknowledgement.Create(Guid.NewGuid(), companyId, doc.Id, someoneElse, 1, "Statement", null, Now));
+            SharedCompanyDocumentAcknowledgement.Create(Guid.NewGuid(), companyId, doc.Id, someoneElse, 1, "Statement", null, true, Now));
         await db.SaveChangesAsync();
 
         var result = await Handler(db).HandleAsync(
@@ -217,7 +217,8 @@ public class GetPublishedSharedCompanyDocumentHandlerTests
 
     private static GetPublishedSharedCompanyDocumentHandler Handler(
         DocumentsDbContext db, FakeEmployeeAudienceReader? audienceReader = null) =>
-        new(db, new SharedCompanyDocumentAudienceMatcher(db, audienceReader ?? new FakeEmployeeAudienceReader()));
+        new(db, new SharedCompanyDocumentAudienceMatcher(db, audienceReader ?? new FakeEmployeeAudienceReader()),
+            new FakeCompanyAcknowledgementSettingsReader());
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

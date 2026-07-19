@@ -1,8 +1,11 @@
+using System.Text.Json;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.AcknowledgeSharedCompanyDocument;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
 using HR.Modules.Documents.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Tests;
@@ -362,10 +365,182 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
         Assert.Equal("Original statement.", saved.AcknowledgementStatement);
     }
 
+    [Fact]
+    public async Task HandleAsync_CompletesTheCallingEmployeesOwnAcknowledgeTask()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+        var taskCompleter = new FakeTaskCompleter();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db, taskCompleter: taskCompleter).HandleAsync(
+            new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id }, caller,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var call = Assert.Single(taskCompleter.ForEmployeeCalls);
+        Assert.Equal(companyId,                  call.CompanyId);
+        Assert.Equal(doc.Id,                      call.SourceEntityId);
+        Assert.Equal(TaskSource.Document,         call.Source);
+        Assert.Equal(TaskActionType.Acknowledge,  call.ActionType);
+        Assert.Equal(caller,                      call.AssignedEmployeeId);
+        Assert.Equal(caller,                      call.CompletedBy);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WhenAlreadyAcknowledgedIdempotently_DoesNotCallTaskCompleterAgain()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+        var taskCompleter = new FakeTaskCompleter();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var request = new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id };
+        await Handler(db, taskCompleter: taskCompleter).HandleAsync(request, caller, CancellationToken.None);
+        await Handler(db, taskCompleter: taskCompleter).HandleAsync(request, caller, CancellationToken.None);
+
+        Assert.Equal(1, taskCompleter.ForEmployeeCallCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Persists_IsConfirmed_True_When_Request_Confirmed_Is_True()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id, Confirmed = true }, caller,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var saved = await db.SharedCompanyDocumentAcknowledgements.SingleAsync();
+        Assert.True(saved.IsConfirmed);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Persists_IsConfirmed_False_When_Request_Confirmed_Is_False()
+    {
+        // The handler itself doesn't reject an unconfirmed request — that's the validator's job —
+        // so this succeeds and simply stores the flag as false.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).HandleAsync(
+            new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id, Confirmed = false }, caller,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var saved = await db.SharedCompanyDocumentAcknowledgements.SingleAsync();
+        Assert.False(saved.IsConfirmed);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_With_IsConfirmed_And_AcknowledgementStatement()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+        var auditPublisher = new FakeAuditPublisher();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, acknowledgementDueDate: null,
+            acknowledgementStatement: "I confirm I have read the updated expenses policy.",
+            createdBy: Guid.NewGuid(), now: Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        await Handler(db, auditPublisher: auditPublisher).HandleAsync(
+            new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id, Confirmed = true }, caller,
+            CancellationToken.None);
+
+        var published = Assert.Single(auditPublisher.Published.OfType<SharedCompanyDocumentAcknowledgedAuditEvent>());
+        Assert.True(published.IsConfirmed);
+        Assert.Equal("I confirm I have read the updated expenses policy.", published.AcknowledgementStatement);
+
+        // The After payload — not just the record's own properties — is what actually gets
+        // rendered by GetSharedCompanyDocumentAuditHistoryHandler's BuildChanges, so assert its
+        // shape directly: VersionNumber, IsConfirmed and AcknowledgementStatement all now live in
+        // After (not Metadata, which is null for this event).
+        IAuditEvent auditEvent = published;
+        var afterJson = JsonSerializer.SerializeToElement(auditEvent.After);
+        Assert.Equal(1, afterJson.GetProperty("VersionNumber").GetInt32());
+        Assert.True(afterJson.GetProperty("IsConfirmed").GetBoolean());
+        Assert.Equal("I confirm I have read the updated expenses policy.", afterJson.GetProperty("AcknowledgementStatement").GetString());
+        Assert.Null(auditEvent.Metadata);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_Audit_Event_With_IsConfirmed_False_When_Not_Confirmed()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+        var auditPublisher = new FakeAuditPublisher();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        await Handler(db, auditPublisher: auditPublisher).HandleAsync(
+            new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id, Confirmed = false }, caller,
+            CancellationToken.None);
+
+        var published = Assert.Single(auditPublisher.Published.OfType<SharedCompanyDocumentAcknowledgedAuditEvent>());
+        Assert.False(published.IsConfirmed);
+    }
+
     private static AcknowledgeSharedCompanyDocumentHandler Handler(
-        DocumentsDbContext db, FakeEmployeeAudienceReader? audienceReader = null, FakeAuditPublisher? auditPublisher = null) =>
+        DocumentsDbContext db,
+        FakeEmployeeAudienceReader? audienceReader = null,
+        FakeTaskCompleter? taskCompleter = null,
+        FakeAuditPublisher? auditPublisher = null) =>
         new(db, new SharedCompanyDocumentAudienceMatcher(db, audienceReader ?? new FakeEmployeeAudienceReader()),
-            auditPublisher ?? new FakeAuditPublisher(), new FakeClock(FixedUtcNow));
+            taskCompleter ?? new FakeTaskCompleter(),
+            auditPublisher ?? new FakeAuditPublisher(),
+            new FakeCompanyAcknowledgementSettingsReader(),
+            new FakeClock(FixedUtcNow));
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

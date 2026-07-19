@@ -126,13 +126,64 @@
                             }
                         </Template>
                     </GridColumn>
+                    <GridColumn Field="@nameof(SharedCompanyDocumentAcknowledgementProgressItem.VersionNumber)" HeaderText="Version" Width="90">
+                        <Template>
+                            @{
+                                var row = (context as SharedCompanyDocumentAcknowledgementProgressItem)!;
+                                @(row.VersionNumber is { } v ? $"v{v}" : "—")
+                            }
+                        </Template>
+                    </GridColumn>
                     <GridColumn Field="@nameof(SharedCompanyDocumentAcknowledgementProgressItem.DueDate)" HeaderText="Due Date" Width="120" Format="d" />
                     <GridColumn Field="@nameof(SharedCompanyDocumentAcknowledgementProgressItem.AcknowledgedAt)" HeaderText="Acknowledged Date" Width="160" Format="g" />
+                    <GridColumn HeaderText="" Width="90" AllowSorting="false" AllowFiltering="false" TextAlign="TextAlign.Right">
+                        <Template>
+                            @{
+                                var row = (context as SharedCompanyDocumentAcknowledgementProgressItem)!;
+                            }
+                            @if (row.AcknowledgedAt is not null)
+                            {
+                                <SfButton CssClass="e-outline e-small" title="View statement" OnClick="() => HandleViewStatement(row)">
+                                    <i class="fa-solid fa-eye"></i>
+                                </SfButton>
+                            }
+                        </Template>
+                    </GridColumn>
                 </GridColumns>
             </HrGrid>
         }
     }
 </div>
+
+<SfDialog Visible="_statementDialogOpen" IsModal="true" Width="600px" ShowCloseIcon="true">
+    <DialogEvents Closed="@(() => _statementDialogOpen = false)" />
+    <DialogTemplates>
+        <Header>Acknowledgement Statement</Header>
+        <Content>
+            @if (_selectedItem is not null)
+            {
+                <dl class="row mb-3">
+                    <dt class="col-sm-3 text-muted fw-normal">Employee</dt>
+                    <dd class="col-sm-9">@_selectedItem.EmployeeName</dd>
+
+                    <dt class="col-sm-3 text-muted fw-normal">Document Version</dt>
+                    <dd class="col-sm-9">@(_selectedItem.VersionNumber is { } v ? $"v{v}" : "—")</dd>
+
+                    <dt class="col-sm-3 text-muted fw-normal">Acknowledged Date</dt>
+                    <dd class="col-sm-9">@(_selectedItem.AcknowledgedAt?.ToString("d MMM yyyy HH:mm") ?? "—")</dd>
+                </dl>
+
+                <label class="form-label text-muted small">Statement (read-only)</label>
+                <div class="border rounded p-2 bg-light" style="white-space: pre-wrap;" data-testid="acknowledgement-statement-text">
+                    @(string.IsNullOrWhiteSpace(_selectedItem.AcknowledgementStatement) ? "No statement was recorded." : _selectedItem.AcknowledgementStatement)
+                </div>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton OnClick="@(() => _statementDialogOpen = false)">Close</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
 
 @code {
     [Parameter] public Guid CompanyId { get; set; }
@@ -148,6 +199,9 @@
     private Guid? _locationFilter;
     private bool? _isAcknowledgedFilter;
     private bool? _isOverdueFilter;
+
+    private bool _statementDialogOpen;
+    private SharedCompanyDocumentAcknowledgementProgressItem? _selectedItem;
 
     private readonly List<FilterOption> _acknowledgedOptions =
         [new("Acknowledged", true), new("Not Acknowledged", false)];
@@ -194,6 +248,12 @@
         {
             _loading = false;
         }
+    }
+
+    private void HandleViewStatement(SharedCompanyDocumentAcknowledgementProgressItem item)
+    {
+        _selectedItem = item;
+        _statementDialogOpen = true;
     }
 
     private static string StatusBadgeClass(string status) => status switch

@@ -53,7 +53,8 @@ internal sealed class UpdateCompanySettingsHandler
 				company.Settings.ExcludePublicHolidaysFromSickness,
 				company.Settings.DisplaySalaryOnEmployeeProfile,
 				company.Settings.FitNoteRequiredAfterDays,
-				company.Settings.ReturnToWorkRequiredAfterDays);
+				company.Settings.ReturnToWorkRequiredAfterDays,
+				company.Settings.DefaultAcknowledgementStatement);
 
 		var settings = company.Settings ?? CompanySettings.CreateDefault(company.Id, now);
 		settings.Update(
@@ -69,6 +70,7 @@ internal sealed class UpdateCompanySettingsHandler
 			request.DisplaySalaryOnEmployeeProfile,
 			request.FitNoteRequiredAfterDays,
 			request.ReturnToWorkRequiredAfterDays,
+			request.DefaultAcknowledgementStatement.Trim(),
 			now);
 
 		company.SetSettings(settings, now);
@@ -117,7 +119,8 @@ internal sealed class UpdateCompanySettingsHandler
 					settings.ExcludePublicHolidaysFromSickness,
 					settings.DisplaySalaryOnEmployeeProfile,
 					settings.FitNoteRequiredAfterDays,
-					settings.ReturnToWorkRequiredAfterDays)),
+					settings.ReturnToWorkRequiredAfterDays,
+					settings.DefaultAcknowledgementStatement)),
 			cancellationToken);
 
 		return Result.Success(new UpdateCompanySettingsResponse(
@@ -134,6 +137,7 @@ internal sealed class UpdateCompanySettingsHandler
 			settings.DisplaySalaryOnEmployeeProfile,
 			settings.FitNoteRequiredAfterDays,
 			settings.ReturnToWorkRequiredAfterDays,
+			settings.DefaultAcknowledgementStatement,
 			settings.UpdatedAt));
 	}
 }

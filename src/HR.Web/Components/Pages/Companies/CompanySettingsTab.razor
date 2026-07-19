@@ -98,6 +98,23 @@ else
                                           ShowSpinButton="false"
                                           Min="0" />
                     </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Document Acknowledgement</label>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Default Acknowledgement Statement</label>
+                        <HrTextBox @bind-Value="Model.DefaultAcknowledgementStatement"
+                                   Placeholder="I confirm that I have read and understood this document."
+                                   Multiline="true"
+                                   Maxlength="2000" />
+                        <div class="form-text">
+                            Shown to employees by default when a shared document requires acknowledgement and no
+                            document-specific statement is set. Plain text only — line breaks are preserved but no
+                            formatting/markup.
+                        </div>
+                        <div class="text-muted small text-end">@(Model.DefaultAcknowledgementStatement?.Length ?? 0) / 2000</div>
+                        <ValidationMessage For="@(() => Model.DefaultAcknowledgementStatement)" />
+                    </div>
                 </div>
             </div>
         </div>
@@ -133,6 +150,7 @@ else
             Model.DisplaySalaryOnEmployeeProfile = settings.DisplaySalaryOnEmployeeProfile;
             Model.FitNoteRequiredAfterDays = settings.FitNoteRequiredAfterDays;
             Model.ReturnToWorkRequiredAfterDays = settings.ReturnToWorkRequiredAfterDays;
+            Model.DefaultAcknowledgementStatement = settings.DefaultAcknowledgementStatement;
         }
     }
 
@@ -149,7 +167,8 @@ else
             Model.ProbationMonths, Model.ExcludePublicHolidaysFromLeave,
             Model.ExcludePublicHolidaysFromSickness, Model.DisplaySalaryOnEmployeeProfile,
             Model.FitNoteRequiredAfterDays,
-            Model.ReturnToWorkRequiredAfterDays);
+            Model.ReturnToWorkRequiredAfterDays,
+            Model.DefaultAcknowledgementStatement);
 
         var result = await CompanyService.UpdateCompanySettingsAsync(CompanyId, request);
         return result is not null ? null : "Failed to save company settings.";

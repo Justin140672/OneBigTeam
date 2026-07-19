@@ -217,7 +217,7 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
 
         db.SharedCompanyDocumentAcknowledgements.Add(
             SharedCompanyDocumentAcknowledgement.Create(
-                Guid.NewGuid(), companyId, doc.Id, employeeId, doc.VersionNumber, "Statement", null, Now));
+                Guid.NewGuid(), companyId, doc.Id, employeeId, doc.VersionNumber, "Statement", null, true, Now));
         await db.SaveChangesAsync();
 
         var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [] };
@@ -244,7 +244,7 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
 
         db.SharedCompanyDocumentAcknowledgements.Add(
             SharedCompanyDocumentAcknowledgement.Create(
-                Guid.NewGuid(), companyId, doc.Id, employeeId, doc.VersionNumber, "Statement", null, Now));
+                Guid.NewGuid(), companyId, doc.Id, employeeId, doc.VersionNumber, "Statement", null, true, Now));
         await db.SaveChangesAsync();
 
         var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [employeeId] };

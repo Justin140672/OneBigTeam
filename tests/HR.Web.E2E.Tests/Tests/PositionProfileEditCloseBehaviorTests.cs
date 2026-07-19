@@ -102,6 +102,10 @@ public sealed class PositionProfileEditCloseBehaviorTests(AppFixture fixture) : 
 
         await ppEdit.GoToNewAsync(AcmeId);
         await ppEdit.FillTitleAsync(title);
+        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
+        await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.SelectLocationAsync("London Office");
+        await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
 
         await ppEdit.ClickCloseAsync();
         Assert.True(await ppEdit.IsUnsavedChangesDialogVisibleAsync());

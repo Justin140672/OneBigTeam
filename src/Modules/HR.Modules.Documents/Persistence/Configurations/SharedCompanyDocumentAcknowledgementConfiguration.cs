@@ -44,6 +44,13 @@ internal sealed class SharedCompanyDocumentAcknowledgementConfiguration : IEntit
         builder.Property(a => a.TaskId)
             .HasColumnName("task_id");
 
+        // Backfilled to true for rows created before this flag existed — they were all real
+        // confirmations made under the old UI-only checkbox gate.
+        builder.Property(a => a.IsConfirmed)
+            .HasColumnName("is_confirmed")
+            .IsRequired()
+            .HasDefaultValue(true);
+
         builder.HasOne<SharedCompanyDocument>()
             .WithMany()
             .HasForeignKey(a => a.SharedCompanyDocumentId)

@@ -91,7 +91,10 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(AppFixture fixture) 
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(profileTitle);
+        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
         await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.SelectLocationAsync("London Office");
+        await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
         await ppEdit.SaveAsync();
 
         await login.SwitchAccountAsync(MarcusEmail);
@@ -135,13 +138,18 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(AppFixture fixture) 
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(initialProfileTitle);
+        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
         await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.SelectLocationAsync("London Office");
+        await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
         await ppEdit.SaveAsync();
 
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(newProfileTitle);
         await ppEdit.SelectDepartmentAsync("Sales");
+        await ppEdit.SelectLocationAsync("London Office");
+        await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
         await ppEdit.SaveAsync();
 
         await login.SwitchAccountAsync(MarcusEmail);

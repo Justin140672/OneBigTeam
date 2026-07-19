@@ -28,6 +28,7 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
         FakeVirusScanService? scanner = null,
         FakeEmployeeAudienceReader? audienceReader = null,
         FakeTaskCreator? taskCreator = null,
+        FakeTaskCanceller? taskCanceller = null,
         FakeNotificationWriter? notificationWriter = null,
         FileUploadOptions? options = null,
         FakeAuditPublisher? auditPublisher = null) =>
@@ -37,6 +38,7 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
             scanner ?? new FakeVirusScanService(),
             new SharedCompanyDocumentAudienceMatcher(db, audienceReader ?? new FakeEmployeeAudienceReader()),
             taskCreator ?? new FakeTaskCreator(),
+            taskCanceller ?? new FakeTaskCanceller(),
             notificationWriter ?? new FakeNotificationWriter(),
             auditPublisher ?? new FakeAuditPublisher(),
             new FakeClock(FixedUtcNow));
@@ -104,13 +106,15 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
         Guid documentId,
         IFormFile? file = null,
         string versionNote = "Updated section 3",
-        bool requiresReacknowledgement = false) =>
+        bool requiresReacknowledgement = false,
+        string? acknowledgementStatement = null) =>
         new()
         {
             CompanyId                 = companyId,
             DocumentId                = documentId,
             VersionNote               = versionNote,
             RequiresReacknowledgement = requiresReacknowledgement,
+            AcknowledgementStatement  = acknowledgementStatement,
             File                      = file ?? FakePdfFile(),
         };
 
@@ -279,7 +283,7 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
         var originalAcknowledgedAt = Now.AddDays(-3);
 
         db.SharedCompanyDocumentAcknowledgements.Add(SharedCompanyDocumentAcknowledgement.Create(
-            Guid.NewGuid(), companyId, doc.Id, employeeId, 1, "Original statement", null, originalAcknowledgedAt));
+            Guid.NewGuid(), companyId, doc.Id, employeeId, 1, "Original statement", null, true, originalAcknowledgedAt));
         await db.SaveChangesAsync();
 
         var taskCreator        = new FakeTaskCreator();
@@ -396,7 +400,7 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
         var originalAcknowledgedAt = Now.AddDays(-5);
 
         db.SharedCompanyDocumentAcknowledgements.Add(SharedCompanyDocumentAcknowledgement.Create(
-            Guid.NewGuid(), companyId, doc.Id, employeeId, 1, "Original statement", null, originalAcknowledgedAt));
+            Guid.NewGuid(), companyId, doc.Id, employeeId, 1, "Original statement", null, true, originalAcknowledgedAt));
         await db.SaveChangesAsync();
 
         // Reacknowledgement required this time — exercises the task-creation branch, which also
@@ -494,6 +498,203 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
             var afterJson = JsonSerializer.Serialize(evt.After);
             Assert.DoesNotContain(storageKey, afterJson, StringComparison.Ordinal);
         });
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithRequiresReacknowledgement_CancelsPriorVersionsOpenAcknowledgeTasks()
+    {
+        // Regression test: an employee who hadn't yet acknowledged the previous version used to
+        // end up with two open Acknowledge tasks for the same document once a new version
+        // requiring re-acknowledgement was uploaded — ITaskCanceller.CancelAllBySourceEntityAsync
+        // now cancels every still-open task for this document before the new ones are created.
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var category   = await SeedCategory(db, companyId);
+        var doc         = await SeedDocument(db, companyId, category.Id, requiresAcknowledgement: true, published: true);
+        var uploadedBy  = Guid.NewGuid();
+        var taskCanceller = new FakeTaskCanceller { CancelAllReturnCount = 1 };
+        var handler       = BuildHandler(db, taskCanceller: taskCanceller);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, doc.Id, requiresReacknowledgement: true),
+            uploadedBy,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var cancelCall = Assert.Single(taskCanceller.CancelAllCalls);
+        Assert.Equal(companyId, cancelCall.CompanyId);
+        Assert.Equal(doc.Id,    cancelCall.SourceEntityId);
+        Assert.Equal(TaskSource.Document,       cancelCall.Source);
+        Assert.Equal(TaskActionType.Acknowledge, cancelCall.ActionType);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Copies_Forward_Previous_Version_AcknowledgementStatement_When_No_Override_Given()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = await SeedDocument(db, companyId, category.Id, requiresAcknowledgement: true, published: true);
+
+        var v1 = await db.SharedCompanyDocumentVersions.SingleAsync(v => v.SharedCompanyDocumentId == doc.Id && v.VersionNumber == 1);
+        // Domain type has no public setter for AcknowledgementStatement outside Create, so seed it
+        // via a fresh row replacing the existing one with the value the handler should copy forward.
+        db.SharedCompanyDocumentVersions.Remove(v1);
+        db.SharedCompanyDocumentVersions.Add(SharedCompanyDocumentVersion.Create(
+            Guid.NewGuid(), companyId, doc.Id, 1, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
+            Guid.NewGuid(), Now, versionNote: null, requiresAcknowledgement: true, effectiveDate: null,
+            acknowledgementStatement: "Original wording from version 1."));
+        await db.SaveChangesAsync();
+
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, doc.Id, requiresReacknowledgement: true, acknowledgementStatement: null),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var newVersion = await db.SharedCompanyDocumentVersions
+            .SingleAsync(v => v.SharedCompanyDocumentId == doc.Id && v.VersionNumber == 2);
+        Assert.Equal("Original wording from version 1.", newVersion.AcknowledgementStatement);
+
+        var previousVersion = await db.SharedCompanyDocumentVersions
+            .SingleAsync(v => v.SharedCompanyDocumentId == doc.Id && v.VersionNumber == 1);
+        Assert.Equal("Original wording from version 1.", previousVersion.AcknowledgementStatement);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Uses_Request_AcknowledgementStatement_Override_Instead_Of_Previous_Version_When_Provided()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = await SeedDocument(db, companyId, category.Id, requiresAcknowledgement: true, published: true);
+
+        var v1 = await db.SharedCompanyDocumentVersions.SingleAsync(v => v.SharedCompanyDocumentId == doc.Id && v.VersionNumber == 1);
+        db.SharedCompanyDocumentVersions.Remove(v1);
+        db.SharedCompanyDocumentVersions.Add(SharedCompanyDocumentVersion.Create(
+            Guid.NewGuid(), companyId, doc.Id, 1, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
+            Guid.NewGuid(), Now, versionNote: null, requiresAcknowledgement: true, effectiveDate: null,
+            acknowledgementStatement: "Original wording from version 1."));
+        await db.SaveChangesAsync();
+
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(
+                companyId, doc.Id,
+                requiresReacknowledgement: true,
+                acknowledgementStatement: "HR-edited wording for version 2."),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var newVersion = await db.SharedCompanyDocumentVersions
+            .SingleAsync(v => v.SharedCompanyDocumentId == doc.Id && v.VersionNumber == 2);
+        Assert.Equal("HR-edited wording for version 2.", newVersion.AcknowledgementStatement);
+
+        // The previous version's own row must remain untouched — it still shows what was in effect
+        // when it was created, independent of this override.
+        var previousVersion = await db.SharedCompanyDocumentVersions
+            .SingleAsync(v => v.SharedCompanyDocumentId == doc.Id && v.VersionNumber == 1);
+        Assert.Equal("Original wording from version 1.", previousVersion.AcknowledgementStatement);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Updates_AcknowledgementStatement_When_Reacknowledgement_Required_And_Statement_Provided()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = await SeedDocument(db, companyId, category.Id, requiresAcknowledgement: true, published: true);
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(
+                companyId, doc.Id,
+                requiresReacknowledgement: true,
+                acknowledgementStatement: "I confirm I have read the updated policy."),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var stored = await db.SharedCompanyDocuments.AsNoTracking().SingleAsync(d => d.Id == doc.Id);
+        Assert.Equal("I confirm I have read the updated policy.", stored.AcknowledgementStatement);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Ignores_AcknowledgementStatement_When_Reacknowledgement_Not_Required()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = await SeedDocument(db, companyId, category.Id, requiresAcknowledgement: true, published: true);
+        var originalStatement = doc.AcknowledgementStatement;
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(
+                companyId, doc.Id,
+                requiresReacknowledgement: false,
+                acknowledgementStatement: "This should be ignored."),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var stored = await db.SharedCompanyDocuments.AsNoTracking().SingleAsync(d => d.Id == doc.Id);
+        Assert.Equal(originalStatement, stored.AcknowledgementStatement);
+        Assert.NotEqual("This should be ignored.", stored.AcknowledgementStatement);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Keeps_Existing_Statement_When_Reacknowledgement_Required_But_Statement_Omitted()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = await SeedDocument(db, companyId, category.Id, requiresAcknowledgement: true, published: true);
+        var originalStatement = doc.AcknowledgementStatement;
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, doc.Id, requiresReacknowledgement: true, acknowledgementStatement: null),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var stored = await db.SharedCompanyDocuments.AsNoTracking().SingleAsync(d => d.Id == doc.Id);
+        Assert.Equal(originalStatement, stored.AcknowledgementStatement);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Set_AcknowledgementStatement_When_Document_Does_Not_Require_Acknowledgement()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var doc = await SeedDocument(db, companyId, category.Id, requiresAcknowledgement: false, published: true);
+        var handler = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(
+                companyId, doc.Id,
+                requiresReacknowledgement: true,
+                acknowledgementStatement: "Should never be applied."),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var stored = await db.SharedCompanyDocuments.AsNoTracking().SingleAsync(d => d.Id == doc.Id);
+        Assert.False(stored.RequiresAcknowledgement);
+        Assert.Null(stored.AcknowledgementStatement);
     }
 
     // Subclass used only in the orphan-cleanup test to simulate a DB save failure.
@@ -608,5 +809,53 @@ public class UploadSharedCompanyDocumentVersionValidatorTests
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UploadSharedCompanyDocumentVersionRequest.File));
+    }
+}
+
+public class SharedCompanyDocumentVersionDomainTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 7, 13, 10, 0, 0, TimeSpan.Zero);
+
+    private static SharedCompanyDocumentVersion CreateVersion(string? acknowledgementStatement) =>
+        SharedCompanyDocumentVersion.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 1,
+            "key/v1.pdf", "v1.pdf", 100, "application/pdf",
+            Guid.NewGuid(), Now,
+            versionNote: null,
+            requiresAcknowledgement: true,
+            effectiveDate: null,
+            acknowledgementStatement: acknowledgementStatement);
+
+    [Fact]
+    public void Create_Stores_The_AcknowledgementStatement_Trimmed()
+    {
+        var version = CreateVersion("  Please confirm you have read this.  ");
+
+        Assert.Equal("Please confirm you have read this.", version.AcknowledgementStatement);
+    }
+
+    [Fact]
+    public void Create_Defaults_AcknowledgementStatement_To_Null_When_Not_Provided()
+    {
+        var version = SharedCompanyDocumentVersion.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 1,
+            "key/v1.pdf", "v1.pdf", 100, "application/pdf",
+            Guid.NewGuid(), Now,
+            versionNote: null,
+            requiresAcknowledgement: false,
+            effectiveDate: null);
+
+        Assert.Null(version.AcknowledgementStatement);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Create_Normalizes_Null_Or_Whitespace_AcknowledgementStatement_To_Null(string? acknowledgementStatement)
+    {
+        var version = CreateVersion(acknowledgementStatement);
+
+        Assert.Null(version.AcknowledgementStatement);
     }
 }

@@ -13,5 +13,10 @@ internal sealed class UpdateSharedCompanyDocumentAcknowledgementSettingsValidato
         RuleFor(r => r.AcknowledgementStatement)
             .MaximumLength(1000)
             .When(r => !string.IsNullOrWhiteSpace(r.AcknowledgementStatement));
+
+        RuleFor(r => r.AcknowledgementStatement)
+            .NotEmpty()
+            .WithMessage("An acknowledgement statement is required when acknowledgement is required.")
+            .When(r => r.RequiresAcknowledgement);
     }
 }

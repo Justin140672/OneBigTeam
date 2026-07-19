@@ -1,4 +1,5 @@
 @inject DocumentService DocumentService
+@inject CompanyService CompanyService
 @inherits EditDialogBase<EditSharedCompanyDocumentAcknowledgementDialog.EditSharedCompanyDocumentAcknowledgementFormModel>
 
 <SfDialog @bind-Visible="Visible" IsModal="true" Width="520px" ShowCloseIcon="true">
@@ -32,16 +33,31 @@
                                           ShowClearButton="true" />
                             <div class="form-text">Required before this document can be published.</div>
                         </div>
-                        <div class="col-12">
-                            <label class="form-label">Acknowledgement Statement</label>
+                        <div class="col-12 @(_isLocked ? "view-mode" : "")">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <label class="form-label mb-0">Acknowledgement Statement</label>
+                                <SfButton CssClass="e-small e-outline" Disabled="_isLocked" OnClick="ResetToDefault">
+                                    Reset to Default
+                                </SfButton>
+                            </div>
                             <HrTextBox @bind-Value="Model.AcknowledgementStatement"
                                        Placeholder="@AcknowledgementStatementPlaceholder"
-                                       Multiline="true" />
+                                       Multiline="true"
+                                       Readonly="_isLocked" />
                             <div class="form-text">
                                 Optional — shown to employees before they acknowledge. If left blank, they'll see:
                                 "@AcknowledgementStatementPlaceholder"
                             </div>
                         </div>
+                        @if (_isLocked)
+                        {
+                            <div class="col-12">
+                                <div class="text-muted small">
+                                    <i class="fa-solid fa-lock me-1"></i>
+                                    Locked after publishing — upload a new version to change the wording.
+                                </div>
+                            </div>
+                        }
                     }
                 </div>
             </EditForm>
@@ -57,8 +73,11 @@
     [Parameter] public SharedCompanyDocumentDetailResponse? Document { get; set; }
 
     private const string AcknowledgementStatementPlaceholder = "I confirm that I have read and understood this document.";
+    private string? _companyDefaultAcknowledgementStatement;
 
-    protected override Task OnOpenedAsync()
+    private bool _isLocked => Document is not null && Document.Status != "Draft";
+
+    protected override async Task OnOpenedAsync()
     {
         GlobalError = null;
 
@@ -69,13 +88,25 @@
             Model.AcknowledgementStatement = Document.AcknowledgementStatement;
         }
 
-        return Task.CompletedTask;
+        _companyDefaultAcknowledgementStatement =
+            (await CompanyService.GetCompanySettingsAsync(CompanyId))?.DefaultAcknowledgementStatement;
+    }
+
+    private void ResetToDefault()
+    {
+        if (_isLocked) return;
+        Model.AcknowledgementStatement = _companyDefaultAcknowledgementStatement;
     }
 
     protected override async Task<string?> SaveCoreAsync()
     {
         if (Document is null)
             return "No document selected.";
+
+        if (_isLocked)
+            return await DocumentService.UpdateSharedCompanyDocumentAcknowledgementSettingsAsync(
+                CompanyId, Document.Id,
+                Model.RequiresAcknowledgement, Model.AcknowledgementDueDate, Document.AcknowledgementStatement);
 
         return await DocumentService.UpdateSharedCompanyDocumentAcknowledgementSettingsAsync(
             CompanyId, Document.Id,

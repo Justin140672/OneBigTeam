@@ -184,7 +184,7 @@
                         <SfCheckBox TChecked="bool"
                                     Label="Requires employee acknowledgement"
                                     Checked="@Model.RequiresAcknowledgement"
-                                    CheckedChanged="@((bool v) => Model.RequiresAcknowledgement = v)" />
+                                    CheckedChanged="OnRequiresAcknowledgementChangedAsync" />
                     </div>
                     @if (Model.RequiresAcknowledgement)
                     {
@@ -197,14 +197,21 @@
                                           ShowClearButton="true" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Acknowledgement Statement</label>
+                            <label class="form-label">Acknowledgement Statement <span class="text-danger">*</span></label>
                             <HrTextBox @bind-Value="Model.AcknowledgementStatement"
                                        Placeholder="@AcknowledgementStatementPlaceholder"
                                        Multiline="true" />
                             <div class="form-text">
-                                Optional — shown to employees before they acknowledge. If left blank, they'll see:
-                                "@AcknowledgementStatementPlaceholder"
+                                Shown to employees before they acknowledge.
                             </div>
+                            @if (string.IsNullOrWhiteSpace(Model.AcknowledgementStatement) && _statementTouched)
+                            {
+                                <div class="text-danger small">An acknowledgement statement is required.</div>
+                            }
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label mb-1">Preview — this is what employees will see:</label>
+                            <div class="alert alert-info mb-0">@Model.AcknowledgementStatement</div>
                         </div>
                     }
                 </div>
@@ -221,6 +228,7 @@
     [Inject] public LocationService LocationService { get; set; } = null!;
     [Inject] public PositionProfileService PositionProfileService { get; set; } = null!;
     [Inject] public EmployeeService EmployeeService { get; set; } = null!;
+    [Inject] public CompanyService CompanyService { get; set; } = null!;
 
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
 
@@ -307,8 +315,24 @@
     }
 
     private const string AcknowledgementStatementPlaceholder = "I confirm that I have read and understood this document.";
+    private string? _companyDefaultAcknowledgementStatement;
+    private bool _statementTouched;
 
     private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
+
+    private async Task OnRequiresAcknowledgementChangedAsync(bool value)
+    {
+        Model.RequiresAcknowledgement = value;
+
+        if (value && string.IsNullOrWhiteSpace(Model.AcknowledgementStatement))
+        {
+            _companyDefaultAcknowledgementStatement ??=
+                (await CompanyService.GetCompanySettingsAsync(CompanyId))?.DefaultAcknowledgementStatement;
+
+            if (!string.IsNullOrWhiteSpace(_companyDefaultAcknowledgementStatement))
+                Model.AcknowledgementStatement = _companyDefaultAcknowledgementStatement;
+        }
+    }
 
     // A due date isn't required here — acknowledgement settings only need to be complete by the
     // time the document is published (enforced server-side by PublishSharedCompanyDocument), so
@@ -318,6 +342,11 @@
         if (_selectedFile is null) return "Please select a file.";
         if (Model.ReviewFrequency != "None" && Model.ReviewDate is null)
             return "A next review date is required when a review frequency is set.";
+        if (Model.RequiresAcknowledgement && string.IsNullOrWhiteSpace(Model.AcknowledgementStatement))
+        {
+            _statementTouched = true;
+            return "An acknowledgement statement is required when acknowledgement is enabled.";
+        }
         return null;
     }
 
@@ -352,6 +381,8 @@
         Model.CustomReviewFrequencyMonths = null;
         Model.ReviewOwnerEmployeeId = null;
         _selectedFile = null;
+        _statementTouched = false;
+        _companyDefaultAcknowledgementStatement = null;
     }
 
     public sealed record EmployeeOption(Guid Id, string Name);

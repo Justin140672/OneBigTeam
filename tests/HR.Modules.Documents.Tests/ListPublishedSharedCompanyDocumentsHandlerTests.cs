@@ -252,7 +252,7 @@ public class ListPublishedSharedCompanyDocumentsHandlerTests
         var ackAt = Now.AddHours(1);
         db.SharedCompanyDocumentAcknowledgements.Add(SharedCompanyDocumentAcknowledgement.Create(
             Guid.NewGuid(), companyId, doc.Id, caller, doc.VersionNumber, "I confirm that I have read this.",
-            null, ackAt));
+            null, true, ackAt));
         await db.SaveChangesAsync();
 
         var result = await Handler(db).HandleAsync(
@@ -304,7 +304,7 @@ public class ListPublishedSharedCompanyDocumentsHandlerTests
         var staleVersion = doc.VersionNumber;
         db.SharedCompanyDocumentAcknowledgements.Add(SharedCompanyDocumentAcknowledgement.Create(
             Guid.NewGuid(), companyId, doc.Id, caller, staleVersion, "I confirm that I have read this.",
-            null, Now));
+            null, true, Now));
         doc.ReplaceFile("key/p-v2.pdf", "p-v2.pdf", 200, "application/pdf", publisher, Now);
         await db.SaveChangesAsync();
 

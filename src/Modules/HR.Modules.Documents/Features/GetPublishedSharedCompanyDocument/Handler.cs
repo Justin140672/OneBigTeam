@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
@@ -8,7 +9,8 @@ namespace HR.Modules.Documents.Features.GetPublishedSharedCompanyDocument;
 
 internal sealed class GetPublishedSharedCompanyDocumentHandler(
     DocumentsDbContext db,
-    SharedCompanyDocumentAudienceMatcher audienceMatcher)
+    SharedCompanyDocumentAudienceMatcher audienceMatcher,
+    ICompanyAcknowledgementSettingsReader companyAcknowledgementSettingsReader)
 {
     public async Task<Result<GetPublishedSharedCompanyDocumentResponse>> HandleAsync(
         GetPublishedSharedCompanyDocumentRequest request,
@@ -56,6 +58,14 @@ internal sealed class GetPublishedSharedCompanyDocumentHandler(
                 .FirstOrDefaultAsync(cancellationToken);
         }
 
+        string? acknowledgementStatement = null;
+        if (document.RequiresAcknowledgement)
+        {
+            acknowledgementStatement = string.IsNullOrWhiteSpace(document.AcknowledgementStatement)
+                ? await companyAcknowledgementSettingsReader.GetDefaultAcknowledgementStatementAsync(request.CompanyId, cancellationToken)
+                : document.AcknowledgementStatement;
+        }
+
         return Result.Success(new GetPublishedSharedCompanyDocumentResponse(
             document.Id,
             document.Title,
@@ -64,7 +74,7 @@ internal sealed class GetPublishedSharedCompanyDocumentHandler(
             document.EffectiveDate,
             document.RequiresAcknowledgement,
             document.AcknowledgementDueDate,
-            document.RequiresAcknowledgement ? AcknowledgementStatementDefaults.Resolve(document.AcknowledgementStatement) : null,
+            acknowledgementStatement,
             myAcknowledgedAt));
     }
 }

@@ -1,0 +1,127 @@
+@using HR.Web.Models
+@using Syncfusion.Blazor.Grids
+@inject DocumentService DocumentService
+
+<SfDialog Visible="IsOpen" IsModal="true" Width="700px" ShowCloseIcon="true">
+    <DialogEvents Closed="HandleClosed" />
+    <DialogTemplates>
+        <Header>Audit History</Header>
+        <Content>
+            @if (_loading)
+            {
+                <HrLoadingIndicator Label="Loading audit history…" />
+            }
+            else if (_items.Count == 0)
+            {
+                <HrEmptyState Message="No audit history recorded for this document." Icon="fa-solid fa-clock-rotate-left" />
+            }
+            else
+            {
+                <HrGrid TValue="DocumentAuditHistoryItemModel" DataSource="@_items" AllowPaging="true" AllowSorting="true" data-testid="document-audit-history-grid">
+                    <GridColumns>
+                        <GridColumn Field="@nameof(DocumentAuditHistoryItemModel.OccurredAt)" HeaderText="Date" Width="180">
+                            <Template>
+                                @{ var item = (context as DocumentAuditHistoryItemModel)!; }
+                                @item.OccurredAt.ToString("d MMM yyyy HH:mm")
+                            </Template>
+                        </GridColumn>
+                        <GridColumn Field="@nameof(DocumentAuditHistoryItemModel.User)" HeaderText="User" Width="150" />
+                        <GridColumn Field="@nameof(DocumentAuditHistoryItemModel.Action)" HeaderText="Action" />
+                        <GridColumn HeaderText="" Width="100" AllowSorting="false" AllowFiltering="false" TextAlign="TextAlign.Right">
+                            <Template>
+                                @{ var item = (context as DocumentAuditHistoryItemModel)!; }
+                                <SfButton CssClass="e-outline e-small" title="View" OnClick="() => HandleView(item)">
+                                    <i class="fa-solid fa-eye"></i>
+                                </SfButton>
+                            </Template>
+                        </GridColumn>
+                    </GridColumns>
+                </HrGrid>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton OnClick="HandleClosed">Close</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+<SfDialog Visible="_detailOpen" IsModal="true" Width="600px" ShowCloseIcon="true">
+    <DialogEvents Closed="@(() => _detailOpen = false)" />
+    <DialogTemplates>
+        <Header>Audit Event Detail</Header>
+        <Content>
+            @if (_selectedItem is not null)
+            {
+                <dl class="row mb-3">
+                    <dt class="col-sm-3 text-muted fw-normal">Date</dt>
+                    <dd class="col-sm-9">@_selectedItem.OccurredAt.ToString("d MMM yyyy HH:mm")</dd>
+
+                    <dt class="col-sm-3 text-muted fw-normal">User</dt>
+                    <dd class="col-sm-9">@_selectedItem.User</dd>
+
+                    <dt class="col-sm-3 text-muted fw-normal">Action</dt>
+                    <dd class="col-sm-9">@_selectedItem.Action</dd>
+                </dl>
+
+                @if (_selectedItem.Changes.Count == 0)
+                {
+                    <p class="text-muted mb-0">No further details were recorded for this event.</p>
+                }
+                else
+                {
+                    <table class="table table-sm" data-testid="document-audit-detail-changes-table">
+                        <thead>
+                            <tr><th>Field</th><th>Before</th><th>After</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var change in _selectedItem.Changes)
+                            {
+                                <tr>
+                                    <td>@change.Field</td>
+                                    <td class="text-muted text-decoration-line-through">@change.Before</td>
+                                    <td class="fw-semibold text-success">@change.After</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton OnClick="@(() => _detailOpen = false)">Close</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid DocumentId { get; set; }
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+
+    private bool _loading = true;
+    private IReadOnlyList<DocumentAuditHistoryItemModel> _items = [];
+    private DocumentAuditHistoryItemModel? _selectedItem;
+    private bool _detailOpen;
+    private bool _wasOpen;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && !_wasOpen)
+        {
+            _loading = true;
+            _items = await DocumentService.GetSharedCompanyDocumentAuditHistoryAsync(CompanyId, DocumentId);
+            _loading = false;
+        }
+
+        _wasOpen = IsOpen;
+    }
+
+    private void HandleView(DocumentAuditHistoryItemModel item)
+    {
+        _selectedItem = item;
+        _detailOpen = true;
+    }
+
+    private async Task HandleClosed() => await OnClosed.InvokeAsync();
+}

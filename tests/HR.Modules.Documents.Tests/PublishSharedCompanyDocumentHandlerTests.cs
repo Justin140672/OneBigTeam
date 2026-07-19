@@ -316,7 +316,7 @@ public class PublishSharedCompanyDocumentHandlerTests
             createdBy: Guid.NewGuid(), now: Now);
         db.SharedCompanyDocuments.Add(doc);
         db.SharedCompanyDocumentAcknowledgements.Add(SharedCompanyDocumentAcknowledgement.Create(
-            Guid.NewGuid(), companyId, doc.Id, alreadyAcknowledged, doc.VersionNumber, "Statement", null, Now));
+            Guid.NewGuid(), companyId, doc.Id, alreadyAcknowledged, doc.VersionNumber, "Statement", null, true, Now));
         await db.SaveChangesAsync();
 
         var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [alreadyAcknowledged, stillPending] };

@@ -118,6 +118,7 @@ public static class CompaniesModule
         services.AddScoped<ICompanyLeaveSettingsReader, CompanyLeaveSettingsReader>();
         services.AddScoped<ICompanyProbationSettingsReader, CompanyProbationSettingsReader>();
         services.AddScoped<ICompanySicknessSettingsReader, CompanySicknessSettingsReader>();
+        services.AddScoped<ICompanyAcknowledgementSettingsReader, CompanyAcknowledgementSettingsReader>();
         services.AddScoped<ICompanyContactValidationReader, CompanyContactValidationReader>();
         services.AddScoped<IPublicHolidayReader, PublicHolidayReader>();
         services.AddScoped<CreatePublicHolidayHandler>();

@@ -30,6 +30,33 @@ internal sealed class TaskCompleter(
                      && t.Status != TaskItemStatus.Cancelled)
             .FirstOrDefaultAsync(cancellationToken);
 
+        await CompleteAsync(task, completedBy, cancellationToken);
+    }
+
+    public async Task CompleteBySourceEntityForEmployeeAsync(
+        Guid companyId,
+        Guid sourceEntityId,
+        TaskSource source,
+        TaskActionType actionType,
+        Guid assignedEmployeeId,
+        Guid completedBy,
+        CancellationToken cancellationToken)
+    {
+        var task = await dbContext.TaskItems
+            .Where(t => t.CompanyId == companyId
+                     && t.SourceEntityId == sourceEntityId
+                     && t.Source == source
+                     && t.ActionType == actionType
+                     && t.AssignedEmployeeId == assignedEmployeeId
+                     && t.Status != TaskItemStatus.Completed
+                     && t.Status != TaskItemStatus.Cancelled)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        await CompleteAsync(task, completedBy, cancellationToken);
+    }
+
+    private async Task CompleteAsync(TaskItem? task, Guid completedBy, CancellationToken cancellationToken)
+    {
         if (task is null)
             return;
 

@@ -17,4 +17,5 @@ internal sealed record GetCompanySettingsResponse(
     string PostcodeRegex,
     string TelephoneRegex,
     string MobileRegex,
+    string DefaultAcknowledgementStatement,
     DateTimeOffset UpdatedAt);

@@ -161,6 +161,14 @@ namespace HR.Modules.Companies.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("DefaultAcknowledgementStatement")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasDefaultValue("I confirm that I have read and understood this document.")
+                        .HasColumnName("default_acknowledgement_statement");
+
                     b.Property<decimal>("DefaultHolidayAllowance")
                         .HasPrecision(5, 2)
                         .HasColumnType("numeric(5,2)")

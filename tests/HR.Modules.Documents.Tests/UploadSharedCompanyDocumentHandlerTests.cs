@@ -529,6 +529,50 @@ public class UploadSharedCompanyDocumentHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Copies_AcknowledgementStatement_Onto_The_First_Version_Row()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var uploadedBy = Guid.NewGuid();
+        var category   = await SeedCategory(db, companyId);
+        var handler    = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(
+                companyId, category.Id,
+                requiresAcknowledgement: true,
+                acknowledgementStatement: "Please confirm you have read the new expenses policy."),
+            uploadedBy,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var version = await db.SharedCompanyDocumentVersions.SingleAsync();
+        Assert.Equal(1, version.VersionNumber);
+        Assert.Equal("Please confirm you have read the new expenses policy.", version.AcknowledgementStatement);
+    }
+
+    [Fact]
+    public async Task HandleAsync_First_Version_Has_Null_AcknowledgementStatement_When_Document_Has_None()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var uploadedBy = Guid.NewGuid();
+        var category   = await SeedCategory(db, companyId);
+        var handler    = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, category.Id, requiresAcknowledgement: false),
+            uploadedBy,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var version = await db.SharedCompanyDocumentVersions.SingleAsync();
+        Assert.Null(version.AcknowledgementStatement);
+    }
+
+    [Fact]
     public async Task HandleAsync_Accepts_RequiresAcknowledgement_And_DepartmentAudience()
     {
         await using var db = BuildContext();

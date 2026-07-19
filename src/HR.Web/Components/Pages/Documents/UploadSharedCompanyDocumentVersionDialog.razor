@@ -39,6 +39,19 @@
                                         Checked="@Model.RequiresReacknowledgement"
                                         CheckedChanged="@((bool v) => Model.RequiresReacknowledgement = v)" />
                         </div>
+                        @if (Model.RequiresReacknowledgement)
+                        {
+                            <div class="col-12">
+                                <label class="form-label">Acknowledgement Statement</label>
+                                <HrTextBox @bind-Value="Model.AcknowledgementStatement"
+                                           Placeholder="I confirm that I have read and understood this document."
+                                           Multiline="true" />
+                                <div class="form-text">
+                                    Optional — updates the statement employees see when re-acknowledging this document.
+                                    Leave blank to keep the existing statement.
+                                </div>
+                            </div>
+                        }
                     }
                 </div>
             </EditForm>
@@ -73,12 +86,14 @@
             CompanyId, DocumentId,
             Model.VersionNote,
             Document?.RequiresAcknowledgement == true && Model.RequiresReacknowledgement,
-            _selectedFile!);
+            _selectedFile!,
+            Document?.RequiresAcknowledgement == true && Model.RequiresReacknowledgement ? Model.AcknowledgementStatement : null);
 
     protected override void ResetForm()
     {
         Model.VersionNote = string.Empty;
         Model.RequiresReacknowledgement = true;
+        Model.AcknowledgementStatement = null;
         _selectedFile = null;
     }
 
@@ -87,5 +102,6 @@
         [Required(ErrorMessage = "A version note is required.")]
         public string VersionNote { get; set; } = string.Empty;
         public bool RequiresReacknowledgement { get; set; } = true;
+        public string? AcknowledgementStatement { get; set; }
     }
 }

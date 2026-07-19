@@ -130,7 +130,7 @@
         _error = null;
         StateHasChanged();
 
-        var error = await DocumentService.AcknowledgeSharedCompanyDocumentAsync(CompanyId, _detail.Id, _taskId);
+        var error = await DocumentService.AcknowledgeSharedCompanyDocumentAsync(CompanyId, _detail.Id, _taskId, _confirmed);
         if (error is not null)
         {
             _error = error;
