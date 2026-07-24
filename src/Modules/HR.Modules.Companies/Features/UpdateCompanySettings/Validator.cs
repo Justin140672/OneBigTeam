@@ -39,5 +39,8 @@ internal sealed class UpdateCompanySettingsValidator : AbstractValidator<UpdateC
 
 		RuleFor(request => request.DefaultAcknowledgementStatement)
 			.MaximumLength(2000);
+
+		RuleFor(request => request.AcknowledgementReminderIntervalDays)
+			.GreaterThanOrEqualTo(1);
 	}
 }

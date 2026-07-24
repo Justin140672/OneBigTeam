@@ -30,6 +30,8 @@ using HR.Modules.Documents.Features.ArchiveSharedCompanyDocument;
 using HR.Modules.Documents.Features.ExpireSharedCompanyDocument;
 using HR.Modules.Documents.Features.CompleteSharedCompanyDocumentReview;
 using HR.Modules.Documents.Features.UpdateSharedCompanyDocumentAcknowledgementSettings;
+using HR.Modules.Documents.Features.GetEmployeeAcknowledgementHistory;
+using HR.Modules.Documents.Features.ReissueSharedCompanyDocumentAcknowledgement;
 using HR.Modules.Documents.Features.DeleteEmployeeDocument;
 using HR.Modules.Documents.Features.DownloadEmployeeDocument;
 using HR.Modules.Documents.Features.GetEmployeeDocument;
@@ -165,6 +167,12 @@ public static class DocumentsModule
 
         services.AddScoped<UpdateSharedCompanyDocumentAcknowledgementSettingsHandler>();
         services.AddScoped<IValidator<UpdateSharedCompanyDocumentAcknowledgementSettingsRequest>, UpdateSharedCompanyDocumentAcknowledgementSettingsValidator>();
+
+        services.AddScoped<GetEmployeeAcknowledgementHistoryHandler>();
+        services.AddScoped<IValidator<GetEmployeeAcknowledgementHistoryRequest>, GetEmployeeAcknowledgementHistoryValidator>();
+
+        services.AddScoped<ReissueSharedCompanyDocumentAcknowledgementHandler>();
+        services.AddScoped<IValidator<ReissueSharedCompanyDocumentAcknowledgementRequest>, ReissueSharedCompanyDocumentAcknowledgementValidator>();
 
         services.AddScoped<SharedCompanyDocumentAudienceRuleBuilder>();
         services.AddScoped<SharedCompanyDocumentAudienceMatcher>();

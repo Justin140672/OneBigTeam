@@ -34,7 +34,7 @@ public class AppSessionTests
         var settings = new GetCompanySettingsResponse(
             companyId, "Europe/London", "en-GB", 31, 7.5m, 1, 25m, 6, true, false, true, null, null,
             "^postcode$", "^telephone$", "^mobile$",
-            "I confirm that I have read and understood this document.", DateTime.UtcNow);
+            "I confirm that I have read and understood this document.", 3, DateTime.UtcNow);
         var employee = new MyEmployeeResponse(employeeId, "Alice", "Smith", "Engineer", null, null, "avatar.png");
 
         return new RoutingHandler(new()

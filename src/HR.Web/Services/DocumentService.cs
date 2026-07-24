@@ -166,6 +166,22 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<IReadOnlyList<EmployeeAcknowledgementHistoryItemModel>> GetEmployeeAcknowledgementHistoryAsync(
+        Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<GetEmployeeAcknowledgementHistoryResponse>(
+                $"api/companies/{companyId}/employees/{employeeId}/acknowledgement-history",
+                HrApiJsonOptions.Default, cancellationToken);
+            return response?.Items ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
     public async Task<SharedCompanyDocumentAcknowledgementProgressResponse?> GetSharedCompanyDocumentAcknowledgementProgressAsync(
         Guid companyId,
         Guid documentId,
@@ -342,6 +358,36 @@ public sealed class DocumentService(IHttpClientFactory httpClientFactory)
             catch { }
 
             return $"Publish failed ({(int)response.StatusCode}).";
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+    }
+
+    // Returns null on success, or an error message string on failure.
+    public async Task<string?> ReissueSharedCompanyDocumentAcknowledgementAsync(
+        Guid companyId, Guid documentId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await Http.PostAsync(
+                $"api/companies/{companyId}/shared-documents/{documentId}/reissue-acknowledgement",
+                new StringContent("{}", Encoding.UTF8, "application/json"),
+                cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+                return null;
+
+            try
+            {
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
+                if (body.TryGetProperty("error", out var errorProp))
+                    return errorProp.GetString();
+            }
+            catch { }
+
+            return $"Reissue failed ({(int)response.StatusCode}).";
         }
         catch (Exception ex)
         {

@@ -615,6 +615,15 @@
                 </TabItem>
 
                 <TabItem>
+                    <ChildContent><TabHeader Text="Acknowledgement History" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <EmployeeAcknowledgementHistoryTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
+                <TabItem>
                     <ChildContent><TabHeader Text="Audit" /></ChildContent>
                     <ContentTemplate>
                         <div class="mt-4">

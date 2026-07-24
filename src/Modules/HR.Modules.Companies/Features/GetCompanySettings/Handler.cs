@@ -39,6 +39,7 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
                 defaults.TelephoneRegex,
                 defaults.MobileRegex,
                 defaults.DefaultAcknowledgementStatement,
+                defaults.AcknowledgementReminderIntervalDays,
                 defaults.UpdatedAt));
         }
 
@@ -54,6 +55,7 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
             settings.TelephoneRegex,
             settings.MobileRegex,
             settings.DefaultAcknowledgementStatement,
+            settings.AcknowledgementReminderIntervalDays,
             settings.UpdatedAt));
     }
 }

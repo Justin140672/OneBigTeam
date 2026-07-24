@@ -5,7 +5,8 @@ public sealed record EmployeeAudienceProfile(Guid? DepartmentId, Guid? LocationI
 
 /// <summary>An employee's department/location, resolved to both id and display name in one batch.</summary>
 public sealed record EmployeeAudienceDetail(
-    Guid EmployeeId, Guid? DepartmentId, string? DepartmentName, Guid? LocationId, string? LocationName);
+    Guid EmployeeId, Guid? DepartmentId, string? DepartmentName, Guid? LocationId, string? LocationName,
+    Guid? ManagerId, string? ManagerName);
 
 /// <summary>
 /// Cross-module read access to an employee's department/location/position, and to counting/

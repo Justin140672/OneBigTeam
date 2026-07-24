@@ -9,7 +9,8 @@ namespace HR.Modules.Documents.Features.ListPublishedSharedCompanyDocuments;
 
 internal sealed class ListPublishedSharedCompanyDocumentsHandler(
     DocumentsDbContext db,
-    IEmployeeAudienceReader audienceReader)
+    IEmployeeAudienceReader audienceReader,
+    IClock clock)
 {
     public async Task<Result<ListPublishedSharedCompanyDocumentsResponse>> HandleAsync(
         ListPublishedSharedCompanyDocumentsRequest request,
@@ -57,17 +58,27 @@ internal sealed class ListPublishedSharedCompanyDocumentsHandler(
                         && a.VersionNumber == currentVersion)
             .ToDictionary(a => a.SharedCompanyDocumentId, a => (DateTimeOffset?)a.AcknowledgedAt);
 
+        var today = DateOnly.FromDateTime(clock.UtcNow);
+
         var items = documents
-            .Select(d => new PublishedSharedCompanyDocumentItem(
-                d.Id,
-                d.Title,
-                d.Description,
-                categoryNames.TryGetValue(d.CategoryId, out var name) ? name : "Unknown",
-                d.EffectiveDate,
-                d.RequiresAcknowledgement,
-                d.AcknowledgementDueDate,
-                myAcknowledgedAtByDocument.TryGetValue(d.Id, out var ackAt) ? ackAt : null,
-                d.PublishedAt))
+            .Select(d =>
+            {
+                var ackAt = myAcknowledgedAtByDocument.TryGetValue(d.Id, out var a) ? a : null;
+                var status = SharedCompanyDocumentAcknowledgementStatusCalculator.Calculate(
+                    d.RequiresAcknowledgement, ackAt, d.AcknowledgementDueDate, today);
+
+                return new PublishedSharedCompanyDocumentItem(
+                    d.Id,
+                    d.Title,
+                    d.Description,
+                    categoryNames.TryGetValue(d.CategoryId, out var name) ? name : "Unknown",
+                    d.EffectiveDate,
+                    d.RequiresAcknowledgement,
+                    d.AcknowledgementDueDate,
+                    ackAt,
+                    d.PublishedAt,
+                    status);
+            })
             .ToList();
 
         return Result.Success(new ListPublishedSharedCompanyDocumentsResponse(items));

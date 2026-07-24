@@ -35,4 +35,5 @@ public enum NotificationType
     SharedCompanyDocumentAcknowledgementReminder = 31,
     SharedCompanyDocumentAcknowledgementOverdue  = 32,
     SharedCompanyDocumentReviewDue                = 33,
+    SharedCompanyDocumentManagerEscalation        = 34,
 }

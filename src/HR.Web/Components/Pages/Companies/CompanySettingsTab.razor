@@ -115,6 +115,14 @@ else
                         <div class="text-muted small text-end">@(Model.DefaultAcknowledgementStatement?.Length ?? 0) / 2000</div>
                         <ValidationMessage For="@(() => Model.DefaultAcknowledgementStatement)" />
                     </div>
+                    <div class="col-md-4">
+                        <SfNumericTextBox TValue="int" @bind-Value="Model.AcknowledgementReminderIntervalDays"
+                                          Placeholder="Acknowledgement Reminder Interval (days)"
+                                          FloatLabelType="FloatLabelType.Auto"
+                                          ShowSpinButton="false"
+                                          Min="1" />
+                        <ValidationMessage For="@(() => Model.AcknowledgementReminderIntervalDays)" />
+                    </div>
                 </div>
             </div>
         </div>
@@ -151,6 +159,7 @@ else
             Model.FitNoteRequiredAfterDays = settings.FitNoteRequiredAfterDays;
             Model.ReturnToWorkRequiredAfterDays = settings.ReturnToWorkRequiredAfterDays;
             Model.DefaultAcknowledgementStatement = settings.DefaultAcknowledgementStatement;
+            Model.AcknowledgementReminderIntervalDays = settings.AcknowledgementReminderIntervalDays;
         }
     }
 
@@ -168,7 +177,8 @@ else
             Model.ExcludePublicHolidaysFromSickness, Model.DisplaySalaryOnEmployeeProfile,
             Model.FitNoteRequiredAfterDays,
             Model.ReturnToWorkRequiredAfterDays,
-            Model.DefaultAcknowledgementStatement);
+            Model.DefaultAcknowledgementStatement,
+            Model.AcknowledgementReminderIntervalDays);
 
         var result = await CompanyService.UpdateCompanySettingsAsync(CompanyId, request);
         return result is not null ? null : "Failed to save company settings.";

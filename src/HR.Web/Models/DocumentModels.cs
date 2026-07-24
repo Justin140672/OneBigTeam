@@ -158,7 +158,8 @@ public sealed record PublishedSharedCompanyDocumentItem(
     bool RequiresAcknowledgement,
     DateOnly? AcknowledgementDueDate,
     DateTimeOffset? MyAcknowledgedAt,
-    DateTimeOffset? PublishedAt);
+    DateTimeOffset? PublishedAt,
+    string AcknowledgementStatus);
 
 // --- Shared Company Document detail (HR full view) ---
 
@@ -247,6 +248,8 @@ public sealed record SharedCompanyDocumentAcknowledgementProgressItem(
     string? DepartmentName,
     Guid? LocationId,
     string? LocationName,
+    Guid? ManagerId,
+    string? ManagerName,
     string Status,
     DateOnly? DueDate,
     DateTimeOffset? AcknowledgedAt,

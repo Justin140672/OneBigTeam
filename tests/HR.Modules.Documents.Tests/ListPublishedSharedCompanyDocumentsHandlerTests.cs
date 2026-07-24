@@ -344,9 +344,59 @@ public class ListPublishedSharedCompanyDocumentsHandlerTests
         Assert.Equal(["Z Policy", "A Policy"], result.Value!.Items.Select(i => i.Title));
     }
 
+    [Fact]
+    public async Task HandleAsync_Sets_AcknowledgementStatus_To_All_Four_Canonical_Values()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+        var today      = DateOnly.FromDateTime(Now.UtcDateTime);
+
+        var notRequired = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Not Required Doc", null, category.Id, "key/nr.pdf", "nr.pdf", 100,
+            "application/pdf", null, null, SharedCompanyDocumentReviewFrequency.None, null, null,
+            false, null, null, Guid.NewGuid(), Now);
+        notRequired.Publish(Guid.NewGuid(), Now);
+
+        var pending = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Pending Doc", null, category.Id, "key/pd.pdf", "pd.pdf", 100,
+            "application/pdf", null, null, SharedCompanyDocumentReviewFrequency.None, null, null,
+            true, today.AddDays(30), "Please confirm.", Guid.NewGuid(), Now);
+        pending.Publish(Guid.NewGuid(), Now);
+
+        var overdue = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Overdue Doc", null, category.Id, "key/od.pdf", "od.pdf", 100,
+            "application/pdf", null, null, SharedCompanyDocumentReviewFrequency.None, null, null,
+            true, today.AddDays(-1), "Please confirm.", Guid.NewGuid(), Now);
+        overdue.Publish(Guid.NewGuid(), Now);
+
+        var completed = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Completed Doc", null, category.Id, "key/cd.pdf", "cd.pdf", 100,
+            "application/pdf", null, null, SharedCompanyDocumentReviewFrequency.None, null, null,
+            true, today.AddDays(30), "Please confirm.", Guid.NewGuid(), Now);
+        completed.Publish(Guid.NewGuid(), Now);
+
+        db.SharedCompanyDocuments.AddRange(notRequired, pending, overdue, completed);
+        db.SharedCompanyDocumentAcknowledgements.Add(SharedCompanyDocumentAcknowledgement.Create(
+            Guid.NewGuid(), companyId, completed.Id, caller, completed.VersionNumber,
+            "Please confirm.", null, isConfirmed: true, Now));
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db, clock: new FakeClock(Now.UtcDateTime)).HandleAsync(
+            new ListPublishedSharedCompanyDocumentsRequest { CompanyId = companyId }, caller,
+            CancellationToken.None);
+
+        var byTitle = result.Value!.Items.ToDictionary(i => i.Title, i => i.AcknowledgementStatus);
+        Assert.Equal("Not Required", byTitle["Not Required Doc"]);
+        Assert.Equal("Pending", byTitle["Pending Doc"]);
+        Assert.Equal("Overdue", byTitle["Overdue Doc"]);
+        Assert.Equal("Completed", byTitle["Completed Doc"]);
+    }
+
     private static ListPublishedSharedCompanyDocumentsHandler Handler(
-        DocumentsDbContext db, FakeEmployeeAudienceReader? audienceReader = null) =>
-        new(db, audienceReader ?? new FakeEmployeeAudienceReader());
+        DocumentsDbContext db, FakeEmployeeAudienceReader? audienceReader = null, FakeClock? clock = null) =>
+        new(db, audienceReader ?? new FakeEmployeeAudienceReader(), clock ?? new FakeClock(DateTime.UtcNow));
 
     private static SharedCompanyDocument CreateDoc(
         Guid companyId, string title, Guid categoryId, string storageKey, string fileName, Guid createdBy) =>

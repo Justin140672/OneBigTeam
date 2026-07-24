@@ -28,4 +28,17 @@ public interface IOpenTaskBySourceEntityReader
         IEnumerable<Guid> sourceEntityIds,
         CancellationToken cancellationToken,
         TaskActionType? actionType = null);
+
+    /// <summary>
+    /// Resolves the open (Open/InProgress) task id for a single assignee against a given source
+    /// entity id and action type — needed when a single source entity (e.g. a Shared Company
+    /// Document) fans out to many per-employee tasks that all share the same SourceEntityId, so
+    /// <see cref="GetOpenTaskIdsAsync"/> alone cannot disambiguate between employees.
+    /// </summary>
+    Task<Guid?> GetOpenTaskIdForAssigneeAsync(
+        Guid companyId,
+        Guid sourceEntityId,
+        Guid assignedEmployeeId,
+        TaskActionType actionType,
+        CancellationToken cancellationToken);
 }

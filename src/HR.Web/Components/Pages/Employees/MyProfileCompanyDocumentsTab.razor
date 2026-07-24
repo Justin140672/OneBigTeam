@@ -126,26 +126,24 @@ else
         _loading = false;
     }
 
+    // Backed by SharedCompanyDocumentAcknowledgementStatusCalculator's canonical status, computed
+    // server-side and carried on d.AcknowledgementStatus — "Outstanding" here covers both of the
+    // calculator's two not-yet-done states (Pending and Overdue).
     private static bool IsOutstanding(PublishedSharedCompanyDocumentItem d) =>
-        d.RequiresAcknowledgement && d.MyAcknowledgedAt is null;
+        d.AcknowledgementStatus is "Pending" or "Overdue";
 
     private static bool IsCompleted(PublishedSharedCompanyDocumentItem d) =>
-        d.RequiresAcknowledgement && d.MyAcknowledgedAt is not null;
+        d.AcknowledgementStatus == "Completed";
 
     private static bool IsNew(PublishedSharedCompanyDocumentItem d) =>
         d.PublishedAt.HasValue && DateTimeOffset.UtcNow - d.PublishedAt.Value <= TimeSpan.FromDays(14);
 
-    private static string AcknowledgementBadgeClass(PublishedSharedCompanyDocumentItem d)
+    private static string AcknowledgementBadgeClass(PublishedSharedCompanyDocumentItem d) => d.AcknowledgementStatus switch
     {
-        if (!IsOutstanding(d))
-        {
-            return "bg-success";
-        }
-
-        var isOverdue = d.AcknowledgementDueDate.HasValue &&
-            d.AcknowledgementDueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow);
-        return isOverdue ? "bg-danger" : "bg-warning text-dark";
-    }
+        "Completed" => "bg-success",
+        "Overdue" => "bg-danger",
+        _ => "bg-warning text-dark",
+    };
 
     private static string AcknowledgementBadgeText(PublishedSharedCompanyDocumentItem d)
     {

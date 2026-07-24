@@ -67,6 +67,7 @@ public record GetCompanySettingsResponse(
     string TelephoneRegex,
     string MobileRegex,
     string DefaultAcknowledgementStatement,
+    int AcknowledgementReminderIntervalDays,
     DateTime UpdatedAt);
 
 public record UpdateCompanySettingsRequest(
@@ -83,7 +84,8 @@ public record UpdateCompanySettingsRequest(
     bool DisplaySalaryOnEmployeeProfile,
     int? FitNoteRequiredAfterDays,
     int? ReturnToWorkRequiredAfterDays,
-    string? DefaultAcknowledgementStatement);
+    string? DefaultAcknowledgementStatement,
+    int AcknowledgementReminderIntervalDays);
 
 public record UpdateCompanySettingsResponse(
     Guid CompanyId,
@@ -100,6 +102,7 @@ public record UpdateCompanySettingsResponse(
     int? FitNoteRequiredAfterDays,
     int? ReturnToWorkRequiredAfterDays,
     string DefaultAcknowledgementStatement,
+    int AcknowledgementReminderIntervalDays,
     DateTime UpdatedAt);
 
 // ── LOGO UPLOAD ───────────────────────────────────────────────────────────────

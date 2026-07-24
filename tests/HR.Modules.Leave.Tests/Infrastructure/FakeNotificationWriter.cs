@@ -29,6 +29,24 @@ internal sealed class FakeNotificationWriter : INotificationWriter
         Guid employeeId, Guid sourceEntityId, NotificationType type,
         CancellationToken cancellationToken = default)
         => Task.FromResult(false);
+
+    public Task<DateTimeOffset?> GetLastSentAtAsync(
+        Guid employeeId, Guid sourceEntityId, NotificationType type,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(Written
+            .Where(n => n.EmployeeId == employeeId && n.SourceEntityId == sourceEntityId && n.Type == type)
+            .OrderByDescending(n => n.CreatedAt)
+            .Select(n => (DateTimeOffset?)n.CreatedAt)
+            .FirstOrDefault());
+
+    public Task<int> RemoveBySourceEntityAsync(
+        Guid companyId, Guid sourceEntityId, NotificationType type,
+        CancellationToken cancellationToken = default)
+    {
+        var removed = Written.RemoveAll(n =>
+            n.CompanyId == companyId && n.SourceEntityId == sourceEntityId && n.Type == type);
+        return Task.FromResult(removed);
+    }
 }
 
 internal sealed class NoOpNotificationWriter : INotificationWriter
@@ -46,4 +64,14 @@ internal sealed class NoOpNotificationWriter : INotificationWriter
         Guid employeeId, Guid sourceEntityId, NotificationType type,
         CancellationToken cancellationToken = default)
         => Task.FromResult(false);
+
+    public Task<DateTimeOffset?> GetLastSentAtAsync(
+        Guid employeeId, Guid sourceEntityId, NotificationType type,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult<DateTimeOffset?>(null);
+
+    public Task<int> RemoveBySourceEntityAsync(
+        Guid companyId, Guid sourceEntityId, NotificationType type,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(0);
 }

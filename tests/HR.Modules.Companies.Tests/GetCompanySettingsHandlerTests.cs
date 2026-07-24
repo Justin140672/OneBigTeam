@@ -17,7 +17,7 @@ public class GetCompanySettingsHandlerTests
         var settings = CompanySettings.CreateDefault(company.Id, now);
         settings.Update(
             "Europe/London", "en-GB", WorkingDays.Monday | WorkingDays.Tuesday, 6m, 4, 30, 8,
-            false, true, true, 7, 3, "Custom acknowledgement statement.", now);
+            false, true, true, 7, 3, "Custom acknowledgement statement.", 5, now);
         company.SetSettings(settings, now);
         context.Companies.Add(company);
         await context.SaveChangesAsync();

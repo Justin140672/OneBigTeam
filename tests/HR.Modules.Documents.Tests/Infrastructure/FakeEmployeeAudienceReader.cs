@@ -13,6 +13,8 @@ internal sealed class FakeEmployeeAudienceReader : IEmployeeAudienceReader
     public Dictionary<Guid, string> LocationNames { get; } = new();
     public Dictionary<Guid, string> PositionProfileNames { get; } = new();
     public List<Guid> EligibleEmployeeIds { get; set; } = [];
+    public Dictionary<Guid, Guid> ManagerIds { get; } = new();
+    public Dictionary<Guid, string> ManagerNames { get; } = new();
 
     public Task<EmployeeAudienceProfile?> GetEmployeeAudienceAsync(
         Guid companyId, Guid employeeId, CancellationToken cancellationToken) =>
@@ -25,7 +27,9 @@ internal sealed class FakeEmployeeAudienceReader : IEmployeeAudienceReader
             EmployeeAudiences.TryGetValue(id, out var profile);
             var departmentName = profile?.DepartmentId is { } deptId && DepartmentNames.TryGetValue(deptId, out var dn) ? dn : null;
             var locationName = profile?.LocationId is { } locId && LocationNames.TryGetValue(locId, out var ln) ? ln : null;
-            return new EmployeeAudienceDetail(id, profile?.DepartmentId, departmentName, profile?.LocationId, locationName);
+            var managerId = ManagerIds.TryGetValue(id, out var mgrId) ? mgrId : (Guid?)null;
+            var managerName = managerId is { } mid && ManagerNames.TryGetValue(mid, out var mn) ? mn : null;
+            return new EmployeeAudienceDetail(id, profile?.DepartmentId, departmentName, profile?.LocationId, locationName, managerId, managerName);
         }).ToList());
 
     public Task<bool> DepartmentExistsAsync(Guid companyId, Guid departmentId, CancellationToken cancellationToken) =>

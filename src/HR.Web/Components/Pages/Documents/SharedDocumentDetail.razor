@@ -150,6 +150,12 @@
                                 <a class="btn e-small e-outline btn-outline-secondary btn-sm me-1" href="/companies/@CompanyId/shared-documents/@DocumentId/acknowledgement-progress">
                                     <i class="fa-solid fa-chart-simple me-1"></i> View Progress
                                 </a>
+                                @if (_detail.Status == "Published")
+                                {
+                                    <SfButton CssClass="e-small e-outline me-1" OnClick="@(() => _reissueConfirmOpen = true)">
+                                        <i class="fa-solid fa-paper-plane me-1"></i> Reissue
+                                    </SfButton>
+                                }
                             }
                             <SfButton CssClass="e-small e-outline" OnClick="@(() => _editAcknowledgementOpen = true)">
                                 <i class="fa-solid fa-pen me-1"></i> Edit
@@ -356,6 +362,29 @@
     </DialogTemplates>
 </SfDialog>
 
+<SfDialog Visible="_reissueConfirmOpen" IsModal="true" Width="420px" ShowCloseIcon="false">
+    <DialogTemplates>
+        <Header>Reissue Acknowledgement Request</Header>
+        <Content>
+            <p>
+                This sends a fresh reminder notification to every employee who hasn't yet acknowledged
+                "@_detail?.Title", and creates an acknowledgement task for anyone who doesn't already have
+                one. Employees who have already acknowledged are not affected.
+            </p>
+            @if (!string.IsNullOrEmpty(_reissueError))
+            {
+                <div class="alert alert-danger py-2 mb-0">@_reissueError</div>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton CssClass="e-primary" Disabled="_reissuing" OnClick="ConfirmReissueAsync">
+                @(_reissuing ? "Sending…" : "Reissue")
+            </SfButton>
+            <SfButton Disabled="_reissuing" OnClick="@(() => _reissueConfirmOpen = false)">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
 <SfDialog Visible="_expireConfirmOpen" IsModal="true" Width="420px" ShowCloseIcon="false">
     <DialogTemplates>
         <Header>Mark Document as Expired</Header>
@@ -390,6 +419,9 @@
     private bool _uploadVersionOpen;
     private bool _reviewOpen;
     private bool _auditHistoryOpen;
+    private bool _reissueConfirmOpen;
+    private bool _reissuing;
+    private string? _reissueError;
     private bool _publishConfirmOpen;
     private bool _publishing;
     private string? _publishError;
@@ -495,6 +527,26 @@
         _archiveConfirmOpen = false;
         _archiveReason = string.Empty;
         _archiveError = null;
+        _detail = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, DocumentId);
+    }
+
+    private async Task ConfirmReissueAsync()
+    {
+        _reissuing = true;
+        _reissueError = null;
+        StateHasChanged();
+
+        var error = await DocumentService.ReissueSharedCompanyDocumentAcknowledgementAsync(CompanyId, DocumentId);
+
+        _reissuing = false;
+
+        if (error is not null)
+        {
+            _reissueError = error;
+            return;
+        }
+
+        _reissueConfirmOpen = false;
         _detail = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, DocumentId);
     }
 

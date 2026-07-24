@@ -34,4 +34,36 @@ internal sealed class NotificationWriter(NotificationsDbContext dbContext) : INo
                 n => n.EmployeeId == employeeId && n.SourceEntityId == sourceEntityId && n.Type == type,
                 cancellationToken);
     }
+
+    public async Task<DateTimeOffset?> GetLastSentAtAsync(
+        Guid employeeId,
+        Guid sourceEntityId,
+        NotificationType type,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Notifications
+            .AsNoTracking()
+            .Where(n => n.EmployeeId == employeeId && n.SourceEntityId == sourceEntityId && n.Type == type)
+            .OrderByDescending(n => n.CreatedAt)
+            .Select(n => (DateTimeOffset?)n.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<int> RemoveBySourceEntityAsync(
+        Guid companyId,
+        Guid sourceEntityId,
+        NotificationType type,
+        CancellationToken cancellationToken = default)
+    {
+        var matching = await dbContext.Notifications
+            .Where(n => n.CompanyId == companyId && n.SourceEntityId == sourceEntityId && n.Type == type)
+            .ToListAsync(cancellationToken);
+
+        if (matching.Count == 0)
+            return 0;
+
+        dbContext.Notifications.RemoveRange(matching);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return matching.Count;
+    }
 }

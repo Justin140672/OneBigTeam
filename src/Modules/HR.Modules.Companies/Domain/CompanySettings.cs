@@ -31,6 +31,7 @@ internal sealed class CompanySettings
     public const string DefaultAcknowledgementStatementText = "I confirm that I have read and understood this document.";
 
     public string DefaultAcknowledgementStatement { get; private set; } = DefaultAcknowledgementStatementText;
+    public int AcknowledgementReminderIntervalDays { get; private set; } = 3;
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -56,6 +57,7 @@ internal sealed class CompanySettings
             TelephoneRegex = UkContactRegexDefaults.Telephone,
             MobileRegex = UkContactRegexDefaults.Mobile,
             DefaultAcknowledgementStatement = DefaultAcknowledgementStatementText,
+            AcknowledgementReminderIntervalDays = 3,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -75,6 +77,7 @@ internal sealed class CompanySettings
         int? fitNoteRequiredAfterDays,
         int? returnToWorkRequiredAfterDays,
         string defaultAcknowledgementStatement,
+        int acknowledgementReminderIntervalDays,
         DateTimeOffset now)
     {
         TimeZone = timeZone;
@@ -92,6 +95,7 @@ internal sealed class CompanySettings
         DefaultAcknowledgementStatement = string.IsNullOrWhiteSpace(defaultAcknowledgementStatement)
             ? DefaultAcknowledgementStatementText
             : defaultAcknowledgementStatement;
+        AcknowledgementReminderIntervalDays = acknowledgementReminderIntervalDays;
         UpdatedAt = now;
     }
 }

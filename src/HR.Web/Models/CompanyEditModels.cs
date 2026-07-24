@@ -50,4 +50,6 @@ public sealed class CompanySettingsEditModel
     public int? ReturnToWorkRequiredAfterDays { get; set; }
     [MaxLength(2000)]
     public string? DefaultAcknowledgementStatement { get; set; }
+    [Range(1, int.MaxValue, ErrorMessage = "Reminder interval must be at least 1 day.")]
+    public int AcknowledgementReminderIntervalDays { get; set; } = 3;
 }

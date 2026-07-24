@@ -1,0 +1,3 @@
+namespace HR.Modules.Documents.Features.ReissueSharedCompanyDocumentAcknowledgement;
+
+internal sealed record ReissueSharedCompanyDocumentAcknowledgementResponse(int EmployeesNotifiedCount);

@@ -17,6 +17,8 @@ internal sealed record SharedCompanyDocumentAcknowledgementProgressItem(
     string? DepartmentName,
     Guid? LocationId,
     string? LocationName,
+    Guid? ManagerId,
+    string? ManagerName,
     string Status,
     DateOnly? DueDate,
     DateTimeOffset? AcknowledgedAt,

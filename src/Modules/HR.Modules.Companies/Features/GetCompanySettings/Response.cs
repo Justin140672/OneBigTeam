@@ -18,4 +18,5 @@ internal sealed record GetCompanySettingsResponse(
     string TelephoneRegex,
     string MobileRegex,
     string DefaultAcknowledgementStatement,
+    int AcknowledgementReminderIntervalDays,
     DateTimeOffset UpdatedAt);

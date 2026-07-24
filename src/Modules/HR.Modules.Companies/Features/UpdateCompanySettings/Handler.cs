@@ -54,7 +54,8 @@ internal sealed class UpdateCompanySettingsHandler
 				company.Settings.DisplaySalaryOnEmployeeProfile,
 				company.Settings.FitNoteRequiredAfterDays,
 				company.Settings.ReturnToWorkRequiredAfterDays,
-				company.Settings.DefaultAcknowledgementStatement);
+				company.Settings.DefaultAcknowledgementStatement,
+				company.Settings.AcknowledgementReminderIntervalDays);
 
 		var settings = company.Settings ?? CompanySettings.CreateDefault(company.Id, now);
 		settings.Update(
@@ -71,6 +72,7 @@ internal sealed class UpdateCompanySettingsHandler
 			request.FitNoteRequiredAfterDays,
 			request.ReturnToWorkRequiredAfterDays,
 			request.DefaultAcknowledgementStatement.Trim(),
+			request.AcknowledgementReminderIntervalDays,
 			now);
 
 		company.SetSettings(settings, now);
@@ -120,7 +122,8 @@ internal sealed class UpdateCompanySettingsHandler
 					settings.DisplaySalaryOnEmployeeProfile,
 					settings.FitNoteRequiredAfterDays,
 					settings.ReturnToWorkRequiredAfterDays,
-					settings.DefaultAcknowledgementStatement)),
+					settings.DefaultAcknowledgementStatement,
+					settings.AcknowledgementReminderIntervalDays)),
 			cancellationToken);
 
 		return Result.Success(new UpdateCompanySettingsResponse(
@@ -138,6 +141,7 @@ internal sealed class UpdateCompanySettingsHandler
 			settings.FitNoteRequiredAfterDays,
 			settings.ReturnToWorkRequiredAfterDays,
 			settings.DefaultAcknowledgementStatement,
+			settings.AcknowledgementReminderIntervalDays,
 			settings.UpdatedAt));
 	}
 }

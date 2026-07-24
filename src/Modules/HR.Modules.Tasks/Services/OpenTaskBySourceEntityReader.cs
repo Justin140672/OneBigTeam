@@ -45,4 +45,23 @@ internal sealed class OpenTaskBySourceEntityReader(TasksDbContext dbContext) : I
             .GroupBy(t => t.SourceEntityId)
             .ToDictionary(g => g.Key, g => g.First().Id);
     }
+
+    public async Task<Guid?> GetOpenTaskIdForAssigneeAsync(
+        Guid companyId,
+        Guid sourceEntityId,
+        Guid assignedEmployeeId,
+        TaskActionType actionType,
+        CancellationToken cancellationToken)
+    {
+        return await dbContext.TaskItems
+            .AsNoTracking()
+            .Where(t => t.CompanyId == companyId
+                     && t.SourceEntityId == sourceEntityId
+                     && t.AssignedEmployeeId == assignedEmployeeId
+                     && t.ActionType == actionType
+                     && (t.Status == TaskItemStatus.Open || t.Status == TaskItemStatus.InProgress))
+            .OrderByDescending(t => t.CreatedAt)
+            .Select(t => (Guid?)t.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
 }

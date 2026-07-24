@@ -19,4 +19,15 @@ internal sealed class CompanyAcknowledgementSettingsReader(CompaniesDbContext db
             ? CompanySettings.DefaultAcknowledgementStatementText
             : statement;
     }
+
+    public async Task<int> GetReminderIntervalDaysAsync(Guid companyId, CancellationToken cancellationToken)
+    {
+        var interval = await dbContext.CompanySettings
+            .AsNoTracking()
+            .Where(s => s.CompanyId == companyId)
+            .Select(s => (int?)s.AcknowledgementReminderIntervalDays)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return interval ?? 3;
+    }
 }

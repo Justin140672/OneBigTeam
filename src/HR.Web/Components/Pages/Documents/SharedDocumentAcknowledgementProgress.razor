@@ -112,11 +112,24 @@
         }
         else
         {
-            <HrGrid TValue="SharedCompanyDocumentAcknowledgementProgressItem" DataSource="@_progress.Items" AllowPaging="true" AllowSorting="true">
+            <div class="d-flex justify-content-end gap-2 mb-2">
+                <SfButton CssClass="e-small e-outline" OnClick="@(() => _grid!.ExportToExcelAsync())">
+                    <i class="fa-solid fa-file-excel me-1"></i> Export to Excel
+                </SfButton>
+                <SfButton CssClass="e-small e-outline" OnClick="@(() => _grid!.ExportToCsvAsync())">
+                    <i class="fa-solid fa-file-csv me-1"></i> Export to CSV
+                </SfButton>
+                <SfButton CssClass="e-small e-outline" OnClick="@(() => _grid!.ExportToPdfAsync())">
+                    <i class="fa-solid fa-file-pdf me-1"></i> Export to PDF
+                </SfButton>
+            </div>
+
+            <HrGrid @ref="_grid" TValue="SharedCompanyDocumentAcknowledgementProgressItem" DataSource="@_progress.Items" AllowPaging="true" AllowSorting="true">
                 <GridPageSettings PageSize="20" />
                 <GridColumns>
                     <GridColumn Field="@nameof(SharedCompanyDocumentAcknowledgementProgressItem.EmployeeName)" HeaderText="Employee" Width="180" />
                     <GridColumn Field="@nameof(SharedCompanyDocumentAcknowledgementProgressItem.DepartmentName)" HeaderText="Department" Width="150" />
+                    <GridColumn Field="@nameof(SharedCompanyDocumentAcknowledgementProgressItem.ManagerName)" HeaderText="Manager" Width="150" />
                     <GridColumn Field="@nameof(SharedCompanyDocumentAcknowledgementProgressItem.LocationName)" HeaderText="Location" Width="150" />
                     <GridColumn Field="@nameof(SharedCompanyDocumentAcknowledgementProgressItem.Status)" HeaderText="Status" Width="120">
                         <Template>
@@ -194,6 +207,7 @@
     private List<LocationListItemModel> _locations = [];
     private bool _loading = true;
     private string? _error;
+    private HrGrid<SharedCompanyDocumentAcknowledgementProgressItem>? _grid;
 
     private Guid? _departmentFilter;
     private Guid? _locationFilter;

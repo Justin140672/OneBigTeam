@@ -27,7 +27,7 @@ internal sealed class EmployeeAudienceReader(EmployeesDbContext dbContext) : IEm
         var employees = await dbContext.Employees
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId && employeeIds.Contains(e.Id))
-            .Select(e => new { e.Id, e.DepartmentId, e.LocationId })
+            .Select(e => new { e.Id, e.DepartmentId, e.LocationId, e.ManagerId })
             .ToListAsync(cancellationToken);
 
         var departmentNames = await dbContext.Departments.AsNoTracking()
@@ -38,12 +38,21 @@ internal sealed class EmployeeAudienceReader(EmployeesDbContext dbContext) : IEm
             .Where(l => l.CompanyId == companyId)
             .ToDictionaryAsync(l => l.Id, l => l.Name, cancellationToken);
 
+        var managerIds = employees.Where(e => e.ManagerId.HasValue).Select(e => e.ManagerId!.Value).Distinct().ToList();
+
+        var managerNames = await dbContext.Employees.AsNoTracking()
+            .Where(e => e.CompanyId == companyId && managerIds.Contains(e.Id))
+            .Select(e => new { e.Id, e.FirstName, e.LastName })
+            .ToDictionaryAsync(e => e.Id, e => $"{e.FirstName} {e.LastName}".Trim(), cancellationToken);
+
         return employees.Select(e => new EmployeeAudienceDetail(
             e.Id,
             e.DepartmentId,
             departmentNames.TryGetValue(e.DepartmentId, out var departmentName) ? departmentName : null,
             e.LocationId,
-            locationNames.TryGetValue(e.LocationId, out var locationName) ? locationName : null)).ToList();
+            locationNames.TryGetValue(e.LocationId, out var locationName) ? locationName : null,
+            e.ManagerId,
+            e.ManagerId is { } managerId && managerNames.TryGetValue(managerId, out var managerName) ? managerName : null)).ToList();
     }
 
     public Task<bool> DepartmentExistsAsync(Guid companyId, Guid departmentId, CancellationToken cancellationToken) =>

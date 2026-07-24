@@ -18,4 +18,5 @@ internal sealed record UpdateCompanySettingsResponse(
 	int? FitNoteRequiredAfterDays,
 	int? ReturnToWorkRequiredAfterDays,
 	string DefaultAcknowledgementStatement,
+	int AcknowledgementReminderIntervalDays,
 	DateTimeOffset UpdatedAt);

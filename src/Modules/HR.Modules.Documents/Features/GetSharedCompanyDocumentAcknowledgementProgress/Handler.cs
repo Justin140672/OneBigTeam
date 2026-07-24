@@ -62,6 +62,8 @@ internal sealed class GetSharedCompanyDocumentAcknowledgementProgressHandler(
                 detail?.DepartmentName,
                 detail?.LocationId,
                 detail?.LocationName,
+                detail?.ManagerId,
+                detail?.ManagerName,
                 status,
                 document.AcknowledgementDueDate,
                 acknowledgedAt,

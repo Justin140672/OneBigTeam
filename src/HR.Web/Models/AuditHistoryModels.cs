@@ -18,3 +18,10 @@ public sealed record DocumentAuditHistoryItemModel(
     IReadOnlyList<AuditFieldChangeModel> Changes);
 
 public sealed record GetSharedCompanyDocumentAuditHistoryResponse(IReadOnlyList<DocumentAuditHistoryItemModel> Items);
+
+public sealed record EmployeeAcknowledgementHistoryItemModel(
+    string DocumentTitle,
+    int VersionNumber,
+    DateTimeOffset AcknowledgedAt);
+
+public sealed record GetEmployeeAcknowledgementHistoryResponse(IReadOnlyList<EmployeeAcknowledgementHistoryItemModel> Items);

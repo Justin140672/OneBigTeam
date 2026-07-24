@@ -19,4 +19,5 @@ internal sealed record UpdateCompanySettingsRequest
 	public int? FitNoteRequiredAfterDays { get; init; }
 	public int? ReturnToWorkRequiredAfterDays { get; init; }
 	public string DefaultAcknowledgementStatement { get; init; } = string.Empty;
+	public int AcknowledgementReminderIntervalDays { get; init; } = 3;
 }

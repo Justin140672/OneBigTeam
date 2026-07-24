@@ -1,6 +1,8 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.UpdateSharedCompanyDocumentAcknowledgementSettings;
 using HR.Modules.Documents.Persistence;
+using HR.Modules.Documents.Services;
 using HR.Modules.Documents.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -313,8 +315,19 @@ public class UpdateSharedCompanyDocumentAcknowledgementSettingsHandlerTests
     }
 
     private static UpdateSharedCompanyDocumentAcknowledgementSettingsHandler Handler(
-        DocumentsDbContext db, FakeAuditPublisher? auditPublisher = null) =>
-        new(db, auditPublisher ?? new FakeAuditPublisher(), new FakeClock(FixedUtcNow));
+        DocumentsDbContext db,
+        FakeAuditPublisher? auditPublisher = null,
+        FakeEmployeeAudienceReader? audienceReader = null,
+        FakeTaskCanceller? taskCanceller = null,
+        FakeOpenTaskBySourceEntityReader? openTaskReader = null,
+        FakeNotificationWriter? notificationWriter = null) =>
+        new(db,
+            new SharedCompanyDocumentAudienceMatcher(db, audienceReader ?? new FakeEmployeeAudienceReader()),
+            taskCanceller ?? new FakeTaskCanceller(),
+            openTaskReader ?? new FakeOpenTaskBySourceEntityReader(),
+            notificationWriter ?? new FakeNotificationWriter(),
+            auditPublisher ?? new FakeAuditPublisher(),
+            new FakeClock(FixedUtcNow));
 
     private static SharedCompanyDocument CreateDoc(Guid companyId, Guid categoryId, Guid createdBy) =>
         SharedCompanyDocument.Create(

@@ -24,11 +24,21 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
         FakeEmployeeAudienceReader audienceReader,
         FakeNotificationWriter writer,
         FakeTaskCreator? taskCreator = null,
-        FakeClock? clock = null) =>
+        FakeClock? clock = null,
+        FakeOpenTaskBySourceEntityReader? openTaskReader = null,
+        FakeCompanyAcknowledgementSettingsReader? acknowledgementSettingsReader = null,
+        FakeManagerReader? managerReader = null,
+        FakeEmployeeNameReader? employeeNameReader = null,
+        FakeAuditPublisher? auditPublisher = null) =>
         new(db,
             new SharedCompanyDocumentAudienceMatcher(db, audienceReader),
             writer,
             taskCreator ?? new FakeTaskCreator(),
+            openTaskReader ?? new FakeOpenTaskBySourceEntityReader(),
+            acknowledgementSettingsReader ?? new FakeCompanyAcknowledgementSettingsReader(),
+            managerReader ?? new FakeManagerReader(),
+            employeeNameReader ?? new FakeEmployeeNameReader(),
+            auditPublisher ?? new FakeAuditPublisher(),
             clock ?? new FakeClock(FixedUtcNow));
 
     private static async Task<CompanyDocumentCategory> SeedCategoryAsync(DocumentsDbContext db, Guid companyId)
@@ -74,14 +84,16 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
 
         var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [employeeId] };
         var writer = new FakeNotificationWriter();
+        var taskCreator = new FakeTaskCreator();
 
-        await BuildJob(db, audienceReader, writer).ExecuteAsync();
+        await BuildJob(db, audienceReader, writer, taskCreator).ExecuteAsync();
 
+        var task = Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == employeeId);
         var reminder = Assert.Single(writer.Written,
             n => n.Type == NotificationType.SharedCompanyDocumentAcknowledgementReminder);
         Assert.Equal(companyId, reminder.CompanyId);
         Assert.Equal(employeeId, reminder.EmployeeId);
-        Assert.Equal(doc.Id, reminder.SourceEntityId);
+        Assert.Equal(task.Id, reminder.SourceEntityId);
         Assert.Equal(NotificationPriority.Normal, reminder.Priority);
     }
 
@@ -96,14 +108,16 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
 
         var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [employeeId] };
         var writer = new FakeNotificationWriter();
+        var taskCreator = new FakeTaskCreator();
 
-        await BuildJob(db, audienceReader, writer).ExecuteAsync();
+        await BuildJob(db, audienceReader, writer, taskCreator).ExecuteAsync();
 
+        var task = Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == employeeId);
         var overdue = Assert.Single(writer.Written,
             n => n.Type == NotificationType.SharedCompanyDocumentAcknowledgementOverdue);
         Assert.Equal(companyId, overdue.CompanyId);
         Assert.Equal(employeeId, overdue.EmployeeId);
-        Assert.Equal(doc.Id, overdue.SourceEntityId);
+        Assert.Equal(task.Id, overdue.SourceEntityId);
         Assert.Equal(NotificationPriority.High, overdue.Priority);
     }
 
@@ -129,10 +143,10 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
 
         await BuildJob(db, audienceReader, writer, taskCreator).ExecuteAsync();
 
-        Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == employeeId);
+        var createdTask = Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == employeeId);
         var reminder = Assert.Single(writer.Written,
             n => n.Type == NotificationType.SharedCompanyDocumentAcknowledgementReminder);
-        Assert.Equal(doc.Id, reminder.SourceEntityId);
+        Assert.Equal(createdTask.Id, reminder.SourceEntityId);
         Assert.Equal(NotificationPriority.Normal, reminder.Priority);
     }
 
@@ -146,14 +160,22 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var category   = await SeedCategoryAsync(db, companyId);
-        await SeedDocumentAsync(db, companyId, category.Id, Today.AddDays(10));
+        var doc         = await SeedDocumentAsync(db, companyId, category.Id, Today.AddDays(10));
 
         var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [employeeId] };
         var writer = new FakeNotificationWriter();
         var taskCreator = new FakeTaskCreator();
-        var job = BuildJob(db, audienceReader, writer, taskCreator);
+        var openTaskReader = new FakeOpenTaskBySourceEntityReader();
+        var job = BuildJob(db, audienceReader, writer, taskCreator, openTaskReader: openTaskReader);
 
         await job.ExecuteAsync();
+
+        // The real IOpenTaskBySourceEntityReader implementation queries the live Tasks database,
+        // so a task created on the first run is naturally visible to the second run's lookup —
+        // the fake needs this wired manually to reproduce that continuity.
+        var firstRunTask = Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == employeeId);
+        openTaskReader.AddOpenTaskForAssignee(doc.Id, employeeId, TaskActionType.Acknowledge, firstRunTask.Id);
+
         await job.ExecuteAsync();
 
         Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == employeeId);
@@ -176,12 +198,18 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
         var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [existingEmployee] };
         var writer = new FakeNotificationWriter();
         var taskCreator = new FakeTaskCreator();
-        var job = BuildJob(db, audienceReader, writer, taskCreator);
+        var openTaskReader = new FakeOpenTaskBySourceEntityReader();
+        var job = BuildJob(db, audienceReader, writer, taskCreator, openTaskReader: openTaskReader);
 
         await job.ExecuteAsync();
 
         Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == existingEmployee);
         Assert.DoesNotContain(taskCreator.Created, t => t.AssignedEmployeeId == movedEmployee);
+
+        // Wire the first run's task into the fake reader so the second run sees existingEmployee
+        // as already engaged — mirrors the real DB-backed reader's natural continuity.
+        var existingEmployeeTask = taskCreator.Created.Single(t => t.AssignedEmployeeId == existingEmployee);
+        openTaskReader.AddOpenTaskForAssignee(doc.Id, existingEmployee, TaskActionType.Acknowledge, existingEmployeeTask.Id);
 
         // The employee's department change lands — they now match the audience.
         audienceReader.EligibleEmployeeIds = [existingEmployee, movedEmployee];
@@ -193,6 +221,9 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
         Assert.Equal(doc.Id, newHireTask.SourceEntityId);
         // The existing employee is untouched by the second run — still exactly one task for them.
         Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == existingEmployee);
+
+        // Wire the second run's new task for movedEmployee before the third run.
+        openTaskReader.AddOpenTaskForAssignee(doc.Id, movedEmployee, TaskActionType.Acknowledge, newHireTask.Id);
 
         await job.ExecuteAsync();
 
@@ -296,15 +327,20 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var category   = await SeedCategoryAsync(db, companyId);
-        await SeedDocumentAsync(db, companyId, category.Id, Today.AddDays(2));
+        var doc         = await SeedDocumentAsync(db, companyId, category.Id, Today.AddDays(2));
 
         var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [employeeId] };
         var writer = new FakeNotificationWriter();
         var taskCreator = new FakeTaskCreator();
-        var job = BuildJob(db, audienceReader, writer, taskCreator);
+        var openTaskReader = new FakeOpenTaskBySourceEntityReader();
+        var job = BuildJob(db, audienceReader, writer, taskCreator, openTaskReader: openTaskReader);
 
-        // Run twice — second run sees the existing reminder via ExistsAsync and skips.
+        // Run twice — second run sees the existing reminder (still within the configured interval)
+        // and skips it. Wire the first run's task into the fake reader so the second run correctly
+        // sees the employee as already engaged, same as the real DB-backed reader would.
         await job.ExecuteAsync();
+        var firstRunTask = taskCreator.Created.Single(t => t.AssignedEmployeeId == employeeId);
+        openTaskReader.AddOpenTaskForAssignee(doc.Id, employeeId, TaskActionType.Acknowledge, firstRunTask.Id);
         await job.ExecuteAsync();
 
         Assert.Single(writer.Written, n => n.Type == NotificationType.SharedCompanyDocumentAcknowledgementReminder);
@@ -370,22 +406,28 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var category   = await SeedCategoryAsync(db, companyId);
-        await SeedDocumentAsync(db, companyId, category.Id, Today.AddDays(2));
+        var doc         = await SeedDocumentAsync(db, companyId, category.Id, Today.AddDays(2));
 
         var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [employeeId] };
         var writer = new FakeNotificationWriter();
         var taskCreator = new FakeTaskCreator();
+        var openTaskReader = new FakeOpenTaskBySourceEntityReader();
 
         // First run: due date is within the due-soon window relative to FixedUtcNow — establishes
         // both the reminder notification and the task.
-        await BuildJob(db, audienceReader, writer, taskCreator).ExecuteAsync();
+        await BuildJob(db, audienceReader, writer, taskCreator, openTaskReader: openTaskReader).ExecuteAsync();
 
         Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == employeeId);
         Assert.Single(writer.Written, n => n.Type == NotificationType.SharedCompanyDocumentAcknowledgementReminder);
 
+        // Wire the first run's task into the fake reader (same as the real DB-backed reader would
+        // naturally see it) so the second run correctly treats the employee as already engaged.
+        var firstRunTask = taskCreator.Created.Single(t => t.AssignedEmployeeId == employeeId);
+        openTaskReader.AddOpenTaskForAssignee(doc.Id, employeeId, TaskActionType.Acknowledge, firstRunTask.Id);
+
         // Second run: a later clock makes the SAME fixed due date now overdue.
         var laterClock = new FakeClock(FixedUtcNow.AddDays(10));
-        await BuildJob(db, audienceReader, writer, taskCreator, laterClock).ExecuteAsync();
+        await BuildJob(db, audienceReader, writer, taskCreator, laterClock, openTaskReader).ExecuteAsync();
 
         Assert.Single(writer.Written, n => n.Type == NotificationType.SharedCompanyDocumentAcknowledgementOverdue);
         Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == employeeId);

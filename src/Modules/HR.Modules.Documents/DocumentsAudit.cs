@@ -298,6 +298,74 @@ internal sealed record SharedCompanyDocumentAcknowledgedAuditEvent(
     object? IAuditEvent.Metadata        => null;
 }
 
+internal sealed record SharedCompanyDocumentReminderSentAuditEvent(
+    Guid CompanyId,
+    Guid SharedCompanyDocumentId,
+    string Title,
+    Guid EmployeeId,
+    string NotificationType,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "shared_company_document.reminder_sent";
+    string  IAuditEvent.EntityType      => "SharedCompanyDocument";
+    Guid    IAuditEvent.EntityId        => SharedCompanyDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => EmployeeId;
+    Guid?   IAuditEvent.ActorUserId     => null;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Reminder ({NotificationType}) sent for document '{Title}'";
+    object? IAuditEvent.Before          => null;
+    // Deliberately in After, not Metadata — GetSharedCompanyDocumentAuditHistoryHandler's
+    // BuildChanges only ever parses Before/After JSON, never Metadata, so anything placed there
+    // alone is stored but never actually surfaced in the audit history dialog (see the identical
+    // fix applied to SharedCompanyDocumentAcknowledgedAuditEvent earlier this session).
+    object? IAuditEvent.After           => new { EmployeeId, NotificationType };
+    object? IAuditEvent.Metadata        => null;
+}
+
+internal sealed record SharedCompanyDocumentManagerEscalationSentAuditEvent(
+    Guid CompanyId,
+    Guid SharedCompanyDocumentId,
+    string Title,
+    Guid ManagerId,
+    int OverdueReportCount,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "shared_company_document.manager_escalation_sent";
+    string  IAuditEvent.EntityType      => "SharedCompanyDocument";
+    Guid    IAuditEvent.EntityId        => SharedCompanyDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => ManagerId;
+    Guid?   IAuditEvent.ActorUserId     => null;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Manager escalation sent for document '{Title}' ({OverdueReportCount} overdue report(s))";
+    object? IAuditEvent.Before          => null;
+    object? IAuditEvent.After           => new { ManagerId, OverdueReportCount };
+    object? IAuditEvent.Metadata        => null;
+}
+
+internal sealed record SharedCompanyDocumentAcknowledgementWithdrawnAuditEvent(
+    Guid CompanyId,
+    Guid SharedCompanyDocumentId,
+    string Title,
+    int TasksCancelledCount,
+    int NotificationsRemovedCount,
+    Guid WithdrawnBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "shared_company_document.acknowledgement_withdrawn";
+    string  IAuditEvent.EntityType      => "SharedCompanyDocument";
+    Guid    IAuditEvent.EntityId        => SharedCompanyDocumentId;
+    Guid?   IAuditEvent.EmployeeId      => null;
+    Guid?   IAuditEvent.ActorUserId     => WithdrawnBy;
+    Guid?   IAuditEvent.ActorEmployeeId => WithdrawnBy;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary         => $"Acknowledgement request withdrawn for document '{Title}'";
+    object? IAuditEvent.Before          => null;
+    object? IAuditEvent.After           => new { TasksCancelledCount, NotificationsRemovedCount };
+    object? IAuditEvent.Metadata        => null;
+}
+
 internal sealed record SharedCompanyDocumentCreatedAuditEvent(
     Guid CompanyId,
     Guid SharedCompanyDocumentId,

@@ -39,6 +39,31 @@ internal sealed class FakeNotificationWriter : INotificationWriter
         return Task.FromResult(exists);
     }
 
+    public Task<DateTimeOffset?> GetLastSentAtAsync(
+        Guid employeeId,
+        Guid sourceEntityId,
+        NotificationType type,
+        CancellationToken cancellationToken = default)
+    {
+        var lastSentAt = _written
+            .Where(n => n.EmployeeId == employeeId && n.SourceEntityId == sourceEntityId && n.Type == type)
+            .OrderByDescending(n => n.CreatedAt)
+            .Select(n => (DateTimeOffset?)n.CreatedAt)
+            .FirstOrDefault();
+        return Task.FromResult(lastSentAt);
+    }
+
+    public Task<int> RemoveBySourceEntityAsync(
+        Guid companyId,
+        Guid sourceEntityId,
+        NotificationType type,
+        CancellationToken cancellationToken = default)
+    {
+        var removed = _written.RemoveAll(n =>
+            n.CompanyId == companyId && n.SourceEntityId == sourceEntityId && n.Type == type);
+        return Task.FromResult(removed);
+    }
+
     internal sealed record WrittenNotification(
         Guid Id,
         Guid CompanyId,

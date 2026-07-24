@@ -1,0 +1,46 @@
+@inject DocumentService DocumentService
+
+@if (_loading)
+{
+    <HrLoadingIndicator Label="Loading acknowledgement history…" />
+}
+else if (_items.Count == 0)
+{
+    <p class="text-muted">No document acknowledgements yet.</p>
+}
+else
+{
+    <HrGrid TValue="EmployeeAcknowledgementHistoryItemModel"
+            DataSource="@_items"
+            AllowFiltering="false"
+            AllowPaging="false"
+            AllowSorting="true">
+        <GridColumns>
+            <GridColumn Field="@nameof(EmployeeAcknowledgementHistoryItemModel.DocumentTitle)" HeaderText="Document" />
+            <GridColumn HeaderText="Version" Width="100">
+                <Template>
+                    @{
+                        var item = (EmployeeAcknowledgementHistoryItemModel)context;
+                    }
+                    v@item.VersionNumber
+                </Template>
+            </GridColumn>
+            <GridColumn Field="@nameof(EmployeeAcknowledgementHistoryItemModel.AcknowledgedAt)" HeaderText="Date Acknowledged" Width="180" Format="g" />
+        </GridColumns>
+    </HrGrid>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private List<EmployeeAcknowledgementHistoryItemModel> _items = [];
+    private bool _loading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = _items.Count == 0;
+        _items = (await DocumentService.GetEmployeeAcknowledgementHistoryAsync(CompanyId, EmployeeId)).ToList();
+        _loading = false;
+    }
+}

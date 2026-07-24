@@ -98,6 +98,11 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .IsRequired()
             .HasDefaultValue(CompanySettings.DefaultAcknowledgementStatementText);
 
+        builder.Property(settings => settings.AcknowledgementReminderIntervalDays)
+            .HasColumnName("acknowledgement_reminder_interval_days")
+            .IsRequired()
+            .HasDefaultValue(3);
+
         builder.Property(settings => settings.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

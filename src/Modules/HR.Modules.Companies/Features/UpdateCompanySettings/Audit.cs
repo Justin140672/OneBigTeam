@@ -16,7 +16,8 @@ internal sealed record CompanySettingsAuditSnapshot(
     bool DisplaySalaryOnEmployeeProfile,
     int? FitNoteRequiredAfterDays,
     int? ReturnToWorkRequiredAfterDays,
-    string DefaultAcknowledgementStatement);
+    string DefaultAcknowledgementStatement,
+    int AcknowledgementReminderIntervalDays);
 
 internal sealed record CompanySettingsUpdatedAuditEvent(
     Guid CompanyId,
