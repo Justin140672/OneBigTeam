@@ -9,10 +9,12 @@ internal sealed record CompensationRecordCreatedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
     Guid CompensationRecordId,
+    Guid ActorEmployeeId,
     DateOnly EffectiveFrom,
     string SalaryType,
     decimal Salary,
     string Currency,
+    string Reason,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
     string IAuditEvent.EventType => "employee.compensation.created";
@@ -20,18 +22,73 @@ internal sealed record CompensationRecordCreatedAuditEvent(
     Guid IAuditEvent.EntityId => CompensationRecordId;
     Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
-    Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => "Compensation record created";
     object? IAuditEvent.Before => null;
-    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Salary, Currency };
+    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Salary, Currency, Reason };
     object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record CompensationRecordImportedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid CompensationRecordId,
+    Guid ActorEmployeeId,
+    DateOnly EffectiveFrom,
+    string SalaryType,
+    decimal Salary,
+    string Currency,
+    string Reason,
+    Guid ImportBatchId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "employee.compensation.imported";
+    string IAuditEvent.EntityType => "Compensation";
+    Guid IAuditEvent.EntityId => CompensationRecordId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
+    Guid? IAuditEvent.CorrelationId => ImportBatchId;
+    string? IAuditEvent.Summary => "Compensation record created via import";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Salary, Currency, Reason };
+    object? IAuditEvent.Metadata => new { Source = "Import", ImportBatchId };
+}
+
+internal sealed record CompensationRecordBulkAppliedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid CompensationRecordId,
+    Guid ActorEmployeeId,
+    DateOnly EffectiveFrom,
+    string SalaryType,
+    decimal Salary,
+    decimal PreviousSalary,
+    string Currency,
+    string Reason,
+    string AdjustmentMode,
+    Guid BulkOperationId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "employee.compensation.bulk-applied";
+    string IAuditEvent.EntityType => "Compensation";
+    Guid IAuditEvent.EntityId => CompensationRecordId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
+    Guid? IAuditEvent.CorrelationId => BulkOperationId;
+    string? IAuditEvent.Summary => "Compensation record created via bulk adjustment";
+    object? IAuditEvent.Before => new { Salary = PreviousSalary };
+    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Salary, Currency, Reason };
+    object? IAuditEvent.Metadata => new { AdjustmentMode, BulkOperationId };
 }
 
 internal sealed record CompensationRecordClosedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
     Guid CompensationRecordId,
+    Guid ActorEmployeeId,
     DateOnly EffectiveFrom,
     DateOnly EffectiveTo,
     DateTimeOffset OccurredAt) : IAuditEvent
@@ -41,7 +98,7 @@ internal sealed record CompensationRecordClosedAuditEvent(
     Guid IAuditEvent.EntityId => CompensationRecordId;
     Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
-    Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => "Compensation record closed";
     object? IAuditEvent.Before => null;
@@ -53,10 +110,12 @@ internal sealed record CompensationRecordUpdatedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
     Guid CompensationRecordId,
+    Guid ActorEmployeeId,
     DateOnly EffectiveFrom,
     string SalaryType,
     decimal Salary,
     string Currency,
+    string Reason,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
     string IAuditEvent.EventType => "employee.compensation.updated";
@@ -64,11 +123,11 @@ internal sealed record CompensationRecordUpdatedAuditEvent(
     Guid IAuditEvent.EntityId => CompensationRecordId;
     Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
-    Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => "Compensation record updated";
     object? IAuditEvent.Before => null;
-    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Salary, Currency };
+    object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Salary, Currency, Reason };
     object? IAuditEvent.Metadata => null;
 }
 
@@ -76,6 +135,7 @@ internal sealed record CompensationRecordDeletedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
     Guid CompensationRecordId,
+    Guid ActorEmployeeId,
     DateOnly EffectiveFrom,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
@@ -84,7 +144,7 @@ internal sealed record CompensationRecordDeletedAuditEvent(
     Guid IAuditEvent.EntityId => CompensationRecordId;
     Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
-    Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => "Compensation record deleted";
     object? IAuditEvent.Before => new { EffectiveFrom };
@@ -96,6 +156,7 @@ internal sealed record CompensationRecordReopenedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
     Guid CompensationRecordId,
+    Guid ActorEmployeeId,
     DateOnly EffectiveFrom,
     DateOnly PreviousEffectiveTo,
     DateTimeOffset OccurredAt) : IAuditEvent
@@ -105,7 +166,7 @@ internal sealed record CompensationRecordReopenedAuditEvent(
     Guid IAuditEvent.EntityId => CompensationRecordId;
     Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
-    Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => "Compensation record reopened after deletion of its successor";
     object? IAuditEvent.Before => new { EffectiveTo = PreviousEffectiveTo };

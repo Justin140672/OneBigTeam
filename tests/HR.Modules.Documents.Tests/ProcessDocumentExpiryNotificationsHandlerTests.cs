@@ -21,9 +21,12 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
     private static ProcessDocumentExpiryNotificationsHandler BuildHandler(
         DocumentsDbContext db,
         FakeAuditPublisher? audit        = null,
-        FakeTaskCreator?    taskCreator  = null) =>
+        FakeTaskCreator?    taskCreator  = null,
+        DateTime?           fixedUtcNow  = null,
+        FakeCompanyTimeZoneReader? companyTimeZoneReader = null) =>
         new(db,
-            new FakeClock(FixedUtcNow),
+            new FakeClock(fixedUtcNow ?? FixedUtcNow),
+            companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
             audit       ?? new FakeAuditPublisher(),
             taskCreator ?? new FakeTaskCreator());
 
@@ -376,5 +379,30 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
             CancellationToken.None);
 
         Assert.Equal(empDoc.Id, tasks.Created[0].SourceEntityId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Uses_Company_Local_Day_Not_UTC_Day_To_Classify_Expired_Vs_ExpiringSoon()
+    {
+        // At 2026-06-17T23:30:00Z the UTC day is still Jun 17. In a fixed UTC+12 zone (no DST) the
+        // local day is already Jun 18, so a document expiring Jun 17 must be classified Expired
+        // (not ExpiringSoon) once the company's timezone is applied.
+        var fixedUtcNow = new DateTime(2026, 6, 17, 23, 30, 0, DateTimeKind.Utc);
+
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var audit = new FakeAuditPublisher();
+        await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: new DateOnly(2026, 6, 17));
+        var handler = BuildHandler(
+            db, audit,
+            fixedUtcNow: fixedUtcNow,
+            companyTimeZoneReader: new FakeCompanyTimeZoneReader("Etc/GMT-12"));
+
+        var result = await handler.HandleAsync(
+            new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExpiringSoonCount);
+        Assert.Equal(1, result.ExpiredCount);
     }
 }

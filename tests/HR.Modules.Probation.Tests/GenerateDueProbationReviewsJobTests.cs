@@ -287,6 +287,26 @@ public class GenerateDueProbationReviewsJobTests
         Assert.Empty(taskCreator.Created);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_Uses_Company_Local_Day_Not_UTC_Day_When_Determining_Review_Is_Due()
+    {
+        // ManagerCheckIn is due 2026-01-31. At 2026-01-30T23:30:00Z it's still Jan 30 in UTC, but
+        // already Jan 31 11:30 in "Etc/GMT-12" (a fixed UTC+12 zone, no DST) — the review must be
+        // created based on the company's local day, not the UTC day.
+        await using var context = BuildContext();
+        await SeedActiveRecord(context);
+
+        var utcNow = new DateTime(2026, 1, 30, 23, 30, 0, DateTimeKind.Utc);
+        await BuildJob(
+            context,
+            today: utcNow,
+            companyTimeZoneReader: new FakeCompanyTimeZoneReader("Etc/GMT-12")).ExecuteAsync();
+
+        var reviews = await context.ProbationReviews.ToListAsync();
+        Assert.Single(reviews);
+        Assert.Equal(ProbationReviewType.ManagerCheckIn, reviews[0].ReviewType);
+    }
+
     private async Task<ProbationRecord> SeedActiveRecord(
         ProbationDbContext context,
         Guid? employeeId = null,
@@ -306,9 +326,11 @@ public class GenerateDueProbationReviewsJobTests
         ProbationDbContext context,
         DateTime today,
         FakeTaskCreator? taskCreator = null,
-        FakeEmployeeNameReader? employeeNameReader = null) =>
+        FakeEmployeeNameReader? employeeNameReader = null,
+        FakeCompanyTimeZoneReader? companyTimeZoneReader = null) =>
         new(context,
             new FakeClock(today),
+            companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
             taskCreator ?? new FakeTaskCreator(),
             employeeNameReader ?? new FakeEmployeeNameReader(),
             NullLogger<GenerateDueProbationReviewsJob>.Instance);

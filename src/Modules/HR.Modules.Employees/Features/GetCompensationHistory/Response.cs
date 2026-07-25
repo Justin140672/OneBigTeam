@@ -10,6 +10,8 @@ internal sealed record CompensationHistoryItem(
     decimal? HoursPerWeek,
     decimal? FTE,
     string? Notes,
+    string Reason,
+    Guid CreatedBy,
     DateTimeOffset CreatedAt);
 
 internal sealed record GetCompensationHistoryResponse(IReadOnlyList<CompensationHistoryItem> Items);

@@ -13,6 +13,9 @@ using HR.Modules.Employees.Features.GetRecentEmployeeChanges;
 using HR.Modules.Employees.Features.CreateCompensationRecord;
 using HR.Modules.Employees.Features.UpdateFutureCompensationRecord;
 using HR.Modules.Employees.Features.DeleteFutureCompensationRecord;
+using HR.Modules.Employees.Features.BulkApplyCompensationAdjustments;
+using HR.Modules.Employees.Features.GetCompensationImportTemplate;
+using HR.Modules.Employees.Features.ImportCompensationChanges;
 using HR.Modules.Employees.Features.ListNationalities;
 using HR.Modules.Employees.Features.RemoveMyEmergencyContact;
 using HR.Modules.Employees.Features.UpdateMyContactDetails;
@@ -206,11 +209,17 @@ public static class EmployeesModule
         services.AddScoped<GetCompensationHistoryHandler>();
         services.AddScoped<GetEmployeeAuditHistoryHandler>();
         services.AddScoped<GetRecentEmployeeChangesHandler>();
+        services.AddScoped<CompensationRecordWriter>();
         services.AddScoped<CreateCompensationRecordHandler>();
         services.AddScoped<IValidator<CreateCompensationRecordRequest>, CreateCompensationRecordValidator>();
         services.AddScoped<UpdateFutureCompensationRecordHandler>();
         services.AddScoped<IValidator<UpdateFutureCompensationRecordRequest>, UpdateFutureCompensationRecordValidator>();
         services.AddScoped<DeleteFutureCompensationRecordHandler>();
+        services.AddScoped<BulkApplyCompensationAdjustmentsHandler>();
+        services.AddScoped<IValidator<BulkApplyCompensationAdjustmentsRequest>, BulkApplyCompensationAdjustmentsValidator>();
+        services.AddScoped<GetCompensationImportTemplateHandler>();
+        services.AddScoped<ImportCompensationChangesHandler>();
+        services.AddScoped<IValidator<ImportCompensationChangesRequest>, ImportCompensationChangesValidator>();
 
         services.AddScoped<ListEmploymentTypesHandler>();
         services.AddScoped<IValidator<ListEmploymentTypesRequest>, ListEmploymentTypesValidator>();
@@ -448,13 +457,13 @@ public static class EmployeesModule
             var ctoStartingSalary = Compensation.Create(
                 Guid.Parse("50000000-0000-0000-0000-000000000002"), acmeId, empCtoId,
                 new DateOnly(2020, 1, 6), SalaryType.Annual, 120000m, "GBP", 37.5m, 1m,
-                "Starting salary", now);
+                "Starting salary", CompensationChangeReason.NewHire, empHrMgrId, now);
             ctoStartingSalary.Close(new DateOnly(2022, 12, 31), now);
 
             var ctoCurrentSalary = Compensation.Create(
                 Guid.Parse("50000000-0000-0000-0000-000000000001"), acmeId, empCtoId,
                 new DateOnly(2023, 1, 1), SalaryType.Annual, 145000m, "GBP", 37.5m, 1m,
-                "Promoted to CTO", now);
+                "Promoted to CTO", CompensationChangeReason.Promotion, empHrMgrId, now);
 
             db.Compensations.AddRange(ctoStartingSalary, ctoCurrentSalary);
 

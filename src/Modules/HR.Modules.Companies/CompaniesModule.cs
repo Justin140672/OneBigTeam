@@ -122,6 +122,7 @@ public static class CompaniesModule
         services.AddScoped<ICompanySicknessSettingsReader, CompanySicknessSettingsReader>();
         services.AddScoped<ICompanyAcknowledgementSettingsReader, CompanyAcknowledgementSettingsReader>();
         services.AddScoped<ICompanyContactValidationReader, CompanyContactValidationReader>();
+        services.AddScoped<ICompanyTimeZoneReader, CompanyTimeZoneReader>();
         services.AddScoped<IPublicHolidayReader, PublicHolidayReader>();
         services.AddScoped<CreatePublicHolidayHandler>();
         services.AddScoped<IValidator<CreatePublicHolidayRequest>, CreatePublicHolidayValidator>();

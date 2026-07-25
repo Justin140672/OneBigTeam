@@ -12,7 +12,8 @@ public class UpdateFutureCompensationRecordValidatorTests
         Id = Guid.NewGuid(),
         SalaryType = SalaryType.Annual,
         Salary = 45000m,
-        Currency = "GBP"
+        Currency = "GBP",
+        Reason = CompensationChangeReason.Correction
     };
 
     [Fact]
@@ -69,6 +70,15 @@ public class UpdateFutureCompensationRecordValidatorTests
         var result = v.Validate(ValidRequest() with { FTE = fte });
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateFutureCompensationRecordRequest.FTE));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Reason_Is_Not_A_Defined_Value()
+    {
+        var v = new UpdateFutureCompensationRecordValidator();
+        var result = v.Validate(ValidRequest() with { Reason = (CompensationChangeReason)999 });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateFutureCompensationRecordRequest.Reason));
     }
 
     [Fact]

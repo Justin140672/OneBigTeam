@@ -10,6 +10,7 @@ namespace HR.Modules.Employees.Features.AmendLeavingProcess;
 internal sealed class AmendLeavingProcessHandler(
     EmployeesDbContext dbContext,
     IClock clock,
+    ICompanyTimeZoneReader companyTimeZoneReader,
     IAuditEventPublisher auditEventPublisher,
     IOffboardingStatusReader offboardingStatusReader,
     IEmployeeDepartureFinalizer departureFinalizer)
@@ -34,7 +35,8 @@ internal sealed class AmendLeavingProcessHandler(
         // before today requires explicit confirmation since it immediately finalises the employee
         // through the same idempotent finalisation path ProcessLeavingEmployeesJob uses once a
         // leaving date becomes due.
-        var today = DateOnly.FromDateTime(clock.UtcNow);
+        var timeZoneId = await companyTimeZoneReader.GetTimeZoneAsync(request.CompanyId, cancellationToken);
+        var today = clock.TodayIn(timeZoneId);
         var isBackdated = request.LeavingDate < today;
 
         if (isBackdated && !request.ConfirmBackdatedLeavingDate)

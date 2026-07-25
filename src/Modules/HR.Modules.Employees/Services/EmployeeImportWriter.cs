@@ -116,6 +116,8 @@ internal sealed class EmployeeImportWriter(
             compensation.HoursPerWeek,
             compensation.Fte,
             notes: "Imported",
+            CompensationChangeReason.NewHire,
+            employeeId,
             now);
 
         dbContext.Compensations.Add(record);

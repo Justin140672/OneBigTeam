@@ -10,13 +10,13 @@ namespace HR.Modules.Probation.Jobs;
 internal sealed class GenerateDueProbationReviewsJob(
     ProbationDbContext dbContext,
     IClock clock,
+    ICompanyTimeZoneReader timeZoneReader,
     ITaskCreator taskCreator,
     IEmployeeNameReader employeeNameReader,
     ILogger<GenerateDueProbationReviewsJob> logger)
 {
     public async Task ExecuteAsync()
     {
-        var today = DateOnly.FromDateTime(clock.UtcNow);
         var now = clock.UtcNowOffset();
 
         var activeRecords = await dbContext.ProbationRecords
@@ -25,6 +25,16 @@ internal sealed class GenerateDueProbationReviewsJob(
 
         if (activeRecords.Count == 0)
             return;
+
+        // Records may belong to different companies each with their own configured time zone, so
+        // "today" (used as the review due-date boundary) must be resolved per company rather than
+        // once globally.
+        var todayByCompany = new Dictionary<Guid, DateOnly>();
+        foreach (var companyId in activeRecords.Select(r => r.CompanyId).Distinct())
+        {
+            var timeZoneId = await timeZoneReader.GetTimeZoneAsync(companyId, CancellationToken.None);
+            todayByCompany[companyId] = clock.TodayIn(timeZoneId);
+        }
 
         var recordIds = activeRecords.Select(r => r.Id).ToList();
 
@@ -41,6 +51,8 @@ internal sealed class GenerateDueProbationReviewsJob(
 
         foreach (var record in activeRecords)
         {
+            var today = todayByCompany[record.CompanyId];
+
             var existing = existingByRecord.TryGetValue(record.Id, out var types)
                 ? types
                 : new HashSet<ProbationReviewType>();

@@ -1,4 +1,6 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,12 +9,14 @@ namespace HR.Modules.Employees.Features.DeleteFutureCompensationRecord;
 internal sealed class DeleteFutureCompensationRecordHandler(
     EmployeesDbContext dbContext,
     IClock clock,
+    ICompanyTimeZoneReader timeZoneReader,
     IAuditEventPublisher auditEventPublisher)
 {
     public async Task<Result> HandleAsync(
         Guid companyId,
         Guid employeeId,
         Guid id,
+        Guid actorEmployeeId,
         CancellationToken cancellationToken)
     {
         var record = await dbContext.Compensations
@@ -23,7 +27,7 @@ internal sealed class DeleteFutureCompensationRecordHandler(
         if (record is null)
             return Result.Failure(Error.NotFound($"Compensation record '{id}' was not found."));
 
-        var today = DateOnly.FromDateTime(clock.UtcNow);
+        var today = await CompanyToday.ResolveAsync(companyId, clock, timeZoneReader, cancellationToken);
 
         if (record.EffectiveFrom <= today)
             return Result.Failure(Error.Conflict("Only future-dated compensation records can be deleted."));
@@ -57,13 +61,14 @@ internal sealed class DeleteFutureCompensationRecordHandler(
         {
             await auditEventPublisher.PublishAsync(
                 new CompensationRecordReopenedAuditEvent(
-                    companyId, employeeId, predecessor.Id, predecessor.EffectiveFrom,
+                    companyId, employeeId, predecessor.Id, actorEmployeeId, predecessor.EffectiveFrom,
                     reopenedPredecessorEffectiveTo.Value, now),
                 cancellationToken);
         }
 
         await auditEventPublisher.PublishAsync(
-            new CompensationRecordDeletedAuditEvent(companyId, employeeId, record.Id, record.EffectiveFrom, now),
+            new CompensationRecordDeletedAuditEvent(
+                companyId, employeeId, record.Id, actorEmployeeId, record.EffectiveFrom, now),
             cancellationToken);
 
         return Result.Success();

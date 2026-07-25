@@ -9,15 +9,20 @@ namespace HR.Modules.Employees.Tests;
 public class DeleteFutureCompensationRecordHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 8, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly Guid ActorEmployeeId = Guid.NewGuid();
+
+    private static DeleteFutureCompensationRecordHandler BuildHandler(
+        EmployeesDbContext context, FakeAuditPublisher publisher) =>
+        new(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), publisher);
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Record_Does_Not_Exist()
     {
         await using var context = BuildContext();
         var publisher = new FakeAuditPublisher();
-        var handler = new DeleteFutureCompensationRecordHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = BuildHandler(context, publisher);
 
-        var result = await handler.HandleAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+        var result = await handler.HandleAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), ActorEmployeeId, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -33,14 +38,14 @@ public class DeleteFutureCompensationRecordHandlerTests
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2020, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Employees.Add(employee);
 
-        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2026, 6, 8), SalaryType.Annual, 40000m, "GBP", null, null, null, now);
+        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2026, 6, 8), SalaryType.Annual, 40000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), now);
         context.Compensations.Add(record);
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new DeleteFutureCompensationRecordHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = BuildHandler(context, publisher);
 
-        var result = await handler.HandleAsync(companyId, employee.Id, record.Id, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employee.Id, record.Id, ActorEmployeeId, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("conflict", result.Error.Code);
@@ -58,16 +63,16 @@ public class DeleteFutureCompensationRecordHandlerTests
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2020, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Employees.Add(employee);
 
-        var earlierFuture = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, now);
+        var earlierFuture = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), now);
         earlierFuture.Close(new DateOnly(2027, 12, 31), now);
-        var laterFuture = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2028, 1, 1), SalaryType.Annual, 50000m, "GBP", null, null, null, now);
+        var laterFuture = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2028, 1, 1), SalaryType.Annual, 50000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), now);
         context.Compensations.AddRange(earlierFuture, laterFuture);
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new DeleteFutureCompensationRecordHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = BuildHandler(context, publisher);
 
-        var result = await handler.HandleAsync(companyId, employee.Id, earlierFuture.Id, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employee.Id, earlierFuture.Id, ActorEmployeeId, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("conflict", result.Error.Code);
@@ -85,20 +90,21 @@ public class DeleteFutureCompensationRecordHandlerTests
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2020, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Employees.Add(employee);
 
-        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, now);
+        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), now);
         context.Compensations.Add(record);
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new DeleteFutureCompensationRecordHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = BuildHandler(context, publisher);
 
-        var result = await handler.HandleAsync(companyId, employee.Id, record.Id, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employee.Id, record.Id, ActorEmployeeId, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(await context.Compensations.ToListAsync());
 
         var deletedEvent = Assert.IsType<CompensationRecordDeletedAuditEvent>(Assert.Single(publisher.Published));
         Assert.Equal(record.Id, deletedEvent.CompensationRecordId);
+        Assert.Equal(ActorEmployeeId, deletedEvent.ActorEmployeeId);
     }
 
     [Fact]
@@ -110,14 +116,14 @@ public class DeleteFutureCompensationRecordHandlerTests
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2020, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Employees.Add(employee);
 
-        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, now);
+        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), now);
         context.Compensations.Add(record);
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new DeleteFutureCompensationRecordHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = BuildHandler(context, publisher);
 
-        await handler.HandleAsync(companyId, employee.Id, record.Id, CancellationToken.None);
+        await handler.HandleAsync(companyId, employee.Id, record.Id, ActorEmployeeId, CancellationToken.None);
 
         Assert.DoesNotContain(publisher.Published, e => e is CompensationRecordReopenedAuditEvent);
     }
@@ -133,16 +139,16 @@ public class DeleteFutureCompensationRecordHandlerTests
 
         // Simulates: predecessor was open, then a future record was created effective 2027-01-01,
         // which closed the predecessor on 2026-12-31.
-        var predecessor = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2025, 1, 1), SalaryType.Annual, 40000m, "GBP", null, null, null, now);
+        var predecessor = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2025, 1, 1), SalaryType.Annual, 40000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), now);
         predecessor.Close(new DateOnly(2026, 12, 31), now);
-        var futureRecord = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, now);
+        var futureRecord = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), now);
         context.Compensations.AddRange(predecessor, futureRecord);
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new DeleteFutureCompensationRecordHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = BuildHandler(context, publisher);
 
-        var result = await handler.HandleAsync(companyId, employee.Id, futureRecord.Id, CancellationToken.None);
+        var result = await handler.HandleAsync(companyId, employee.Id, futureRecord.Id, ActorEmployeeId, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
 
@@ -154,6 +160,7 @@ public class DeleteFutureCompensationRecordHandlerTests
             Assert.Single(publisher.Published, e => e is CompensationRecordReopenedAuditEvent));
         Assert.Equal(predecessor.Id, reopenedEvent.CompensationRecordId);
         Assert.Equal(new DateOnly(2026, 12, 31), reopenedEvent.PreviousEffectiveTo);
+        Assert.Equal(ActorEmployeeId, reopenedEvent.ActorEmployeeId);
 
         Assert.Contains(publisher.Published, e => e is CompensationRecordDeletedAuditEvent);
     }
@@ -168,14 +175,14 @@ public class DeleteFutureCompensationRecordHandlerTests
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2020, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Employees.Add(employee);
 
-        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, now);
+        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), now);
         context.Compensations.Add(record);
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new DeleteFutureCompensationRecordHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = BuildHandler(context, publisher);
 
-        var result = await handler.HandleAsync(otherCompanyId, employee.Id, record.Id, CancellationToken.None);
+        var result = await handler.HandleAsync(otherCompanyId, employee.Id, record.Id, ActorEmployeeId, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);

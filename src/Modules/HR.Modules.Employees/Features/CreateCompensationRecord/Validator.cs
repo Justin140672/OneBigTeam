@@ -19,6 +19,9 @@ internal sealed class CreateCompensationRecordValidator : AbstractValidator<Crea
         RuleFor(r => r.SalaryType)
             .IsInEnum();
 
+        RuleFor(r => r.Reason)
+            .IsInEnum();
+
         RuleFor(r => r.Salary)
             .GreaterThan(0);
 

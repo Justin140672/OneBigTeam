@@ -35,6 +35,7 @@ namespace HR.Modules.Documents.Jobs;
 internal sealed class DetectDocumentsDueForReviewJob(
     DocumentsDbContext db,
     IClock clock,
+    ICompanyTimeZoneReader timeZoneReader,
     ITaskCreator taskCreator,
     IOpenTaskBySourceEntityReader openTaskReader,
     IEmployeeNameReader employeeNameReader,
@@ -43,21 +44,30 @@ internal sealed class DetectDocumentsDueForReviewJob(
 {
     public async Task ExecuteAsync()
     {
-        var today = DateOnly.FromDateTime(clock.UtcNow);
-
-        var dueDocuments = await db.SharedCompanyDocuments
+        // ReviewDate due-ness depends on each company's own configured time zone, so the "due"
+        // filter cannot be applied globally in the initial query — candidates are fetched broadly
+        // (status + ReviewDate set) and then filtered per company below using that company's
+        // "today".
+        var allDocumentsWithReviewDate = await db.SharedCompanyDocuments
             .AsNoTracking()
             .Where(d => d.Status != SharedCompanyDocumentStatus.Archived
                 && d.Status != SharedCompanyDocumentStatus.Expired
-                && d.ReviewDate != null
-                && d.ReviewDate <= today)
+                && d.ReviewDate != null)
             .ToListAsync();
+
+        var candidates = new List<SharedCompanyDocument>();
+        foreach (var companyGroup in allDocumentsWithReviewDate.GroupBy(d => d.CompanyId))
+        {
+            var timeZoneId = await timeZoneReader.GetTimeZoneAsync(companyGroup.Key, CancellationToken.None);
+            var today = clock.TodayIn(timeZoneId);
+            candidates.AddRange(companyGroup.Where(d => d.ReviewDate <= today));
+        }
 
         logger.LogInformation(
             "DetectDocumentsDueForReviewJob found {DueCount} shared company document(s) due for review",
-            dueDocuments.Count);
+            candidates.Count);
 
-        var candidates = dueDocuments.Where(d => d.ReviewOwnerEmployeeId is not null).ToList();
+        candidates = candidates.Where(d => d.ReviewOwnerEmployeeId is not null).ToList();
         var createdCount = 0;
 
         foreach (var companyGroup in candidates.GroupBy(d => d.CompanyId))

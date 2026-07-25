@@ -45,6 +45,15 @@
                         <ValidationMessage For="@(() => Model.Currency)" />
                     </div>
                     <div class="col-6">
+                        <label class="form-label">Reason <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="string" TItem="CompensationChangeReasonChoice"
+                                        DataSource="@ReasonOptions"
+                                        @bind-Value="Model.Reason">
+                            <DropDownListFieldSettings Value="Value" Text="Label" />
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => Model.Reason)" />
+                    </div>
+                    <div class="col-6">
                         <label class="form-label">Hours Per Week</label>
                         <SfNumericTextBox TValue="decimal?" @bind-Value="Model.HoursPerWeek" Min="0" Max="168" ShowSpinButton="false"
                                           FloatLabelType="FloatLabelType.Auto" Placeholder="e.g. 37.5" />
@@ -79,6 +88,17 @@
         new("Daily", "Daily")
     ];
 
+    public static readonly CompensationChangeReasonChoice[] ReasonOptions =
+    [
+        new("NewHire", "New Hire"),
+        new("AnnualReview", "Annual Review"),
+        new("Promotion", "Promotion"),
+        new("MarketAdjustment", "Market Adjustment"),
+        new("RoleChange", "Role Change"),
+        new("Correction", "Correction"),
+        new("Other", "Other")
+    ];
+
     protected override async Task<string?> SaveCoreAsync()
     {
         var request = new CreateCompensationRecordRequest(
@@ -90,7 +110,8 @@
             Model.Currency.Trim().ToUpperInvariant(),
             Model.HoursPerWeek,
             Model.FTE,
-            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim());
+            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim(),
+            Model.Reason);
 
         var (created, error) = await CompensationService.CreateCompensationRecordAsync(CompanyId, EmployeeId, request);
 
@@ -112,9 +133,11 @@
         Model.HoursPerWeek = null;
         Model.FTE = null;
         Model.Notes = null;
+        Model.Reason = "NewHire";
     }
 
     public sealed record SalaryTypeChoice(string Value, string Label);
+    public sealed record CompensationChangeReasonChoice(string Value, string Label);
 
     public sealed class AddCompensationFormModel
     {
@@ -130,5 +153,7 @@
         public decimal? HoursPerWeek { get; set; }
         public decimal? FTE { get; set; }
         public string? Notes { get; set; }
+        [Required(ErrorMessage = "Please select a reason.")]
+        public string Reason { get; set; } = "NewHire";
     }
 }

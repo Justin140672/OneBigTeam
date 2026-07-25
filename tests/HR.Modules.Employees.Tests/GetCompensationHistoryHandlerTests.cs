@@ -46,11 +46,11 @@ public class GetCompensationHistoryHandlerTests
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2024, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
         context.Employees.Add(employee);
 
-        var oldest = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2024, 1, 1), SalaryType.Annual, 35000m, "GBP", 37.5m, 1m, "Starting salary", Now);
+        var oldest = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2024, 1, 1), SalaryType.Annual, 35000m, "GBP", 37.5m, 1m, "Starting salary", CompensationChangeReason.NewHire, Guid.NewGuid(), Now);
         oldest.Close(new DateOnly(2024, 12, 31), Now);
-        var middle = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2025, 1, 1), SalaryType.Annual, 40000m, "GBP", 37.5m, 1m, null, Now);
+        var middle = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2025, 1, 1), SalaryType.Annual, 40000m, "GBP", 37.5m, 1m, null, CompensationChangeReason.AnnualReview, Guid.NewGuid(), Now);
         middle.Close(new DateOnly(2025, 12, 31), Now);
-        var newest = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2026, 1, 1), SalaryType.Annual, 45000m, "GBP", 37.5m, 1m, null, Now);
+        var newest = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2026, 1, 1), SalaryType.Annual, 45000m, "GBP", 37.5m, 1m, null, CompensationChangeReason.AnnualReview, Guid.NewGuid(), Now);
         context.Compensations.AddRange(middle, oldest, newest);
         await context.SaveChangesAsync();
 
@@ -76,8 +76,8 @@ public class GetCompensationHistoryHandlerTests
         var otherEmployee = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", new DateOnly(2024, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
         context.Employees.AddRange(employee, otherEmployee);
 
-        var mine = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2026, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, Now);
-        var theirs = Compensation.Create(Guid.NewGuid(), companyId, otherEmployee.Id, new DateOnly(2026, 1, 1), SalaryType.Annual, 60000m, "GBP", null, null, null, Now);
+        var mine = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2026, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), Now);
+        var theirs = Compensation.Create(Guid.NewGuid(), companyId, otherEmployee.Id, new DateOnly(2026, 1, 1), SalaryType.Annual, 60000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), Now);
         context.Compensations.AddRange(mine, theirs);
         await context.SaveChangesAsync();
 
@@ -99,7 +99,7 @@ public class GetCompensationHistoryHandlerTests
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2024, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
         context.Employees.Add(employee);
 
-        var compensation = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2026, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, Now);
+        var compensation = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2026, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), Now);
         context.Compensations.Add(compensation);
         await context.SaveChangesAsync();
 

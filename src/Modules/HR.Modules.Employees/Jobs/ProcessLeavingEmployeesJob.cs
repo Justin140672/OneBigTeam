@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
@@ -16,12 +17,12 @@ namespace HR.Modules.Employees.Jobs;
 internal sealed class ProcessLeavingEmployeesJob(
     EmployeesDbContext dbContext,
     IClock clock,
+    ICompanyTimeZoneReader companyTimeZoneReader,
     IEmployeeDepartureFinalizer departureFinalizer,
     ILogger<ProcessLeavingEmployeesJob> logger)
 {
     public async Task ExecuteAsync()
     {
-        var today = DateOnly.FromDateTime(clock.UtcNow);
         var now = clock.UtcNowOffset();
 
         var leavingEmployees = await dbContext.Employees
@@ -45,6 +46,11 @@ internal sealed class ProcessLeavingEmployeesJob(
             .GroupBy(p => p.EmployeeId)
             .ToDictionary(g => g.Key, g => g.OrderBy(p => p.StartedAt).First());
 
+        // Employees may belong to different companies each with their own configured time zone,
+        // so "today" (used as the leaving-date due boundary) must be resolved per company rather
+        // than once globally.
+        var todayByCompany = new Dictionary<Guid, DateOnly>();
+
         foreach (var employee in leavingEmployees)
         {
             if (!processByEmployee.TryGetValue(employee.Id, out var process))
@@ -55,6 +61,13 @@ internal sealed class ProcessLeavingEmployeesJob(
                     employee.Id,
                     employee.CompanyId);
                 continue;
+            }
+
+            if (!todayByCompany.TryGetValue(employee.CompanyId, out var today))
+            {
+                var timeZoneId = await companyTimeZoneReader.GetTimeZoneAsync(employee.CompanyId, CancellationToken.None);
+                today = clock.TodayIn(timeZoneId);
+                todayByCompany[employee.CompanyId] = today;
             }
 
             if (process.LeavingDate <= today)

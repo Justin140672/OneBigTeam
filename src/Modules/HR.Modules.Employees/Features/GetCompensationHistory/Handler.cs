@@ -32,6 +32,8 @@ internal sealed class GetCompensationHistoryHandler(EmployeesDbContext dbContext
                 c.HoursPerWeek,
                 c.FTE,
                 c.Notes,
+                c.Reason.ToString(),
+                c.CreatedBy,
                 c.CreatedAt))
             .ToListAsync(cancellationToken);
 

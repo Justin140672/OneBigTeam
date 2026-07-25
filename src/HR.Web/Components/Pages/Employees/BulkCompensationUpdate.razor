@@ -1,0 +1,531 @@
+@page "/companies/{CompanyId:guid}/employees/compensation/bulk-update"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using HR.Web.Models
+@using HR.Web.Services
+@inject CompensationService CompensationService
+@inject EmployeeService EmployeeService
+@inject AppSession Session
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Bulk Compensation Update</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+        <h1 class="mb-1">Bulk Compensation Update</h1>
+        <div class="d-flex gap-2">
+            <SfButton Disabled="@_downloadingTemplate" OnClick="DownloadTemplateAsync">
+                @if (_downloadingTemplate)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Download Import Template
+            </SfButton>
+        </div>
+    </div>
+    <p class="text-muted mb-4">Apply a percentage increase, fixed amount increase, or a directly-set salary to many employees at once, or import changes from a spreadsheet.</p>
+
+    @if (_globalError is not null)
+    {
+        <div class="alert alert-danger alert-dismissible mb-3">
+            @_globalError
+            <button type="button" class="btn-close" @onclick="@(() => _globalError = null)"></button>
+        </div>
+    }
+
+    @if (_successMessage is not null)
+    {
+        <div class="alert alert-success alert-dismissible mb-3">
+            @_successMessage
+            <button type="button" class="btn-close" @onclick="@(() => _successMessage = null)"></button>
+        </div>
+    }
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Import from Excel</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">Upload a spreadsheet (use the template above) to update many employees' compensation in one step.</p>
+            <InputFile class="form-control mb-2" OnChange="OnImportFileSelected" accept=".xlsx" disabled="@_importing" />
+            <SfButton IsPrimary="true" Disabled="@(_importFile is null || _importing)" OnClick="ImportAsync">
+                @if (_importing)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Import from Excel
+            </SfButton>
+
+            @if (_importResult is not null)
+            {
+                <div class="alert alert-success mt-3 mb-0">
+                    Imported compensation changes for @_importResult.Items.Count employee(s).
+                </div>
+            }
+
+            @if (_importRowErrors is { Count: > 0 })
+            {
+                <div class="alert alert-danger mt-3 mb-0">
+                    <p class="mb-2">Nothing was imported. Fix the following row(s) and re-upload:</p>
+                    <ul class="mb-0">
+                        @foreach (var rowError in _importRowErrors)
+                        {
+                            <li>Row @rowError.RowNumber: @rowError.Message</li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">1. Select Employees</h5>
+        </div>
+        <div class="card-body">
+            <div class="mb-3 col-md-4 px-0">
+                <HrTextBox Value="@_employeeSearch" ValueChanged="@OnEmployeeSearchChanged" Placeholder="Search by name or email" />
+            </div>
+
+            @if (_loadingEmployees)
+            {
+                <HrLoadingIndicator Label="Loading employees…" />
+            }
+            else
+            {
+                <div class="d-flex gap-2 mb-2">
+                    <SfButton OnClick="SelectAllFiltered">Select All Filtered</SfButton>
+                    <SfButton OnClick="ClearSelection">Clear Selection</SfButton>
+                </div>
+                <div class="employee-picker-list border rounded p-2 mb-2">
+                    @foreach (var emp in FilteredEmployees)
+                    {
+                        <div class="form-check" @key="emp.Id">
+                            <input class="form-check-input" id="@($"emp-{emp.Id}")" type="checkbox"
+                                   checked="@emp.Selected"
+                                   @onchange="@(e => OnEmployeeCheckChanged(emp, (bool)e.Value!))" />
+                            <label class="form-check-label" for="@($"emp-{emp.Id}")">
+                                @emp.Employee.FirstName @emp.Employee.LastName (@emp.Employee.WorkEmail)
+                            </label>
+                        </div>
+                    }
+                </div>
+                <p class="text-muted mb-0">@SelectedCount employee(s) selected.</p>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">2. Adjustment Details</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Adjustment Mode <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="CompensationAdjustmentMode" TItem="AdjustmentModeChoice"
+                                    DataSource="@ModeOptions"
+                                    @bind-Value="_mode">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">
+                        @(_mode == CompensationAdjustmentMode.PercentageIncrease ? "Percentage Increase (%)" :
+                          _mode == CompensationAdjustmentMode.FixedAmountIncrease ? "Fixed Amount Increase" :
+                          "New Salary (applies to each row unless edited below)")
+                        <span class="text-danger">*</span>
+                    </label>
+                    <SfNumericTextBox TValue="decimal?" @bind-Value="_adjustmentValue" Min="0" ShowSpinButton="false"
+                                      FloatLabelType="FloatLabelType.Auto" Placeholder="e.g. 5" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Effective Date <span class="text-danger">*</span></label>
+                    <SfDatePicker TValue="DateOnly?" @bind-Value="_effectiveDate" Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Reason <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="string" TItem="CompensationChangeReasonChoice"
+                                    DataSource="@ReasonOptions"
+                                    @bind-Value="_reason">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Notes</label>
+                    <textarea class="form-control" rows="2" maxlength="4000" @bind="_notes" placeholder="Optional notes…"></textarea>
+                </div>
+            </div>
+            <div class="d-flex gap-2 mt-3">
+                <SfButton IsPrimary="true" Disabled="@(SelectedCount == 0 || _loadingPreview)" OnClick="BuildPreviewAsync">
+                    @if (_loadingPreview)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Build Preview
+                </SfButton>
+            </div>
+        </div>
+    </div>
+
+    @if (_previewRows.Count > 0)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">3. Preview &amp; Confirm</h5>
+            </div>
+            <div class="card-body">
+                @if (_excludedEmployees.Count > 0)
+                {
+                    <div class="alert alert-warning">
+                        @_excludedEmployees.Count employee(s) were excluded because they have no current compensation record:
+                        @string.Join(", ", _excludedEmployees)
+                    </div>
+                }
+
+                <HrGrid TValue="PreviewRow" DataSource="@_previewRows" AllowPaging="true" AllowSorting="true" class="mb-3">
+                    <GridPageSettings PageSize="20" />
+                    <GridColumns>
+                        <GridColumn Field="@nameof(PreviewRow.EmployeeName)" HeaderText="Employee" Width="180" />
+                        <GridColumn Field="@nameof(PreviewRow.CurrentSalary)" HeaderText="Current Salary" Width="130" Format="N2" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+                        <GridColumn HeaderText="Proposed Salary" Width="160">
+                            <Template>
+                                @{
+                                    var row = (context as PreviewRow)!;
+                                    <SfNumericTextBox TValue="decimal" Value="@row.ProposedSalary" Min="0" ShowSpinButton="false"
+                                                      ValueChanged="@(v => OnProposedSalaryChanged(row, v))" />
+                                }
+                            </Template>
+                        </GridColumn>
+                        <GridColumn Field="@nameof(PreviewRow.Difference)" HeaderText="Difference" Width="130" Format="N2" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+                        <GridColumn HeaderText="% Change" Width="110">
+                            <Template>
+                                @{
+                                    var row = (context as PreviewRow)!;
+                                    <span>@(row.PercentageChange is { } pct ? $"{pct:0.##}%" : "—")</span>
+                                }
+                            </Template>
+                        </GridColumn>
+                    </GridColumns>
+                </HrGrid>
+
+                <p class="text-muted">@_previewRows.Count employee(s) will be updated. This is a single atomic operation — if any employee fails validation, no changes are applied to anyone.</p>
+
+                <div class="d-flex gap-2">
+                    <SfButton IsPrimary="true" Disabled="@_applying" OnClick="ConfirmApplyAsync">
+                        @if (_applying)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Confirm Apply
+                    </SfButton>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    public sealed record AdjustmentModeChoice(CompensationAdjustmentMode Value, string Label);
+    public sealed record CompensationChangeReasonChoice(string Value, string Label);
+
+    public static readonly AdjustmentModeChoice[] ModeOptions =
+    [
+        new(CompensationAdjustmentMode.PercentageIncrease, "Percentage Increase"),
+        new(CompensationAdjustmentMode.FixedAmountIncrease, "Fixed Amount Increase"),
+        new(CompensationAdjustmentMode.SetDirectly, "Set Salary Directly")
+    ];
+
+    public static readonly CompensationChangeReasonChoice[] ReasonOptions =
+    [
+        new("NewHire", "New Hire"),
+        new("AnnualReview", "Annual Review"),
+        new("Promotion", "Promotion"),
+        new("MarketAdjustment", "Market Adjustment"),
+        new("RoleChange", "Role Change"),
+        new("Correction", "Correction"),
+        new("Other", "Other")
+    ];
+
+    private sealed class SelectableEmployee
+    {
+        public required EmployeeListItemModel Employee { get; init; }
+        public Guid Id => Employee.Id;
+        public bool Selected { get; set; }
+    }
+
+    public sealed class PreviewRow
+    {
+        public required Guid EmployeeId { get; init; }
+        public required string EmployeeName { get; init; }
+        public required decimal CurrentSalary { get; init; }
+        public required string SalaryType { get; init; }
+        public required string Currency { get; init; }
+        public decimal? HoursPerWeek { get; init; }
+        public decimal? FTE { get; init; }
+        public decimal ProposedSalary { get; set; }
+        public decimal Difference { get; set; }
+        public decimal? PercentageChange { get; set; }
+    }
+
+    private List<SelectableEmployee> _employees = [];
+    private string _employeeSearch = string.Empty;
+    private bool _loadingEmployees = true;
+
+    private CompensationAdjustmentMode _mode = CompensationAdjustmentMode.PercentageIncrease;
+    private decimal? _adjustmentValue;
+    private DateOnly? _effectiveDate = DateOnly.FromDateTime(DateTime.Today);
+    private string _reason = "AnnualReview";
+    private string? _notes;
+
+    private bool _loadingPreview;
+    private bool _applying;
+    private List<PreviewRow> _previewRows = [];
+    private List<string> _excludedEmployees = [];
+
+    private bool _downloadingTemplate;
+
+    private IBrowserFile? _importFile;
+    private bool _importing;
+    private ImportCompensationChangesResponse? _importResult;
+    private IReadOnlyList<CompensationImportRowError>? _importRowErrors;
+
+    private string? _globalError;
+    private string? _successMessage;
+
+    private int SelectedCount => _employees.Count(e => e.Selected);
+
+    private IEnumerable<SelectableEmployee> FilteredEmployees =>
+        string.IsNullOrWhiteSpace(_employeeSearch)
+            ? _employees
+            : _employees.Where(e =>
+                e.Employee.FirstName.Contains(_employeeSearch, StringComparison.OrdinalIgnoreCase) ||
+                e.Employee.LastName.Contains(_employeeSearch, StringComparison.OrdinalIgnoreCase) ||
+                e.Employee.WorkEmail.Contains(_employeeSearch, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.CanManageEmployees)
+        {
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            return;
+        }
+
+        await LoadEmployeesAsync();
+    }
+
+    private async Task LoadEmployeesAsync()
+    {
+        _loadingEmployees = true;
+        try
+        {
+            var result = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 1000);
+            _employees = (result?.Items ?? []).Select(e => new SelectableEmployee { Employee = e }).ToList();
+        }
+        finally
+        {
+            _loadingEmployees = false;
+        }
+    }
+
+    private void OnEmployeeSearchChanged(string value) => _employeeSearch = value;
+
+    private void OnEmployeeCheckChanged(SelectableEmployee employee, bool isChecked) => employee.Selected = isChecked;
+
+    private void SelectAllFiltered()
+    {
+        foreach (var emp in FilteredEmployees)
+            emp.Selected = true;
+    }
+
+    private void ClearSelection()
+    {
+        foreach (var emp in _employees)
+            emp.Selected = false;
+    }
+
+    private async Task BuildPreviewAsync()
+    {
+        _globalError = null;
+        _successMessage = null;
+        _previewRows = [];
+        _excludedEmployees = [];
+
+        if (_adjustmentValue is null)
+        {
+            _globalError = "Please enter an adjustment value.";
+            return;
+        }
+
+        if (_effectiveDate is null)
+        {
+            _globalError = "Please select an effective date.";
+            return;
+        }
+
+        _loadingPreview = true;
+        try
+        {
+            var selected = _employees.Where(e => e.Selected).ToList();
+            var rows = new List<PreviewRow>();
+            var excluded = new List<string>();
+
+            foreach (var emp in selected)
+            {
+                var current = await CompensationService.GetCurrentCompensationAsync(CompanyId, emp.Id);
+                if (current is null)
+                {
+                    excluded.Add($"{emp.Employee.FirstName} {emp.Employee.LastName}");
+                    continue;
+                }
+
+                var proposed = CompensationAdjustmentCalculator.CalculateProposedSalary(current.Salary, _mode, _adjustmentValue.Value);
+
+                rows.Add(new PreviewRow
+                {
+                    EmployeeId = emp.Id,
+                    EmployeeName = $"{emp.Employee.FirstName} {emp.Employee.LastName}",
+                    CurrentSalary = current.Salary,
+                    SalaryType = current.SalaryType,
+                    Currency = current.Currency,
+                    HoursPerWeek = current.HoursPerWeek,
+                    FTE = current.FTE,
+                    ProposedSalary = proposed,
+                    Difference = CompensationAdjustmentCalculator.CalculateDifference(current.Salary, proposed),
+                    PercentageChange = CompensationAdjustmentCalculator.CalculatePercentageChange(current.Salary, proposed)
+                });
+            }
+
+            _previewRows = rows;
+            _excludedEmployees = excluded;
+
+            if (rows.Count == 0)
+                _globalError = "None of the selected employees have a current compensation record to adjust.";
+        }
+        finally
+        {
+            _loadingPreview = false;
+        }
+    }
+
+    private void OnProposedSalaryChanged(PreviewRow row, decimal value)
+    {
+        row.ProposedSalary = value;
+        row.Difference = CompensationAdjustmentCalculator.CalculateDifference(row.CurrentSalary, value);
+        row.PercentageChange = CompensationAdjustmentCalculator.CalculatePercentageChange(row.CurrentSalary, value);
+    }
+
+    private async Task ConfirmApplyAsync()
+    {
+        if (_previewRows.Count == 0 || _effectiveDate is null) return;
+
+        _globalError = null;
+        _successMessage = null;
+        _applying = true;
+        try
+        {
+            var request = new BulkApplyCompensationAdjustmentsRequest(
+                CompanyId,
+                _effectiveDate.Value,
+                _reason,
+                string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim(),
+                _mode.ToString(),
+                _previewRows.Select(r => new BulkCompensationAdjustmentItem(
+                    r.EmployeeId,
+                    r.ProposedSalary,
+                    r.SalaryType,
+                    r.Currency,
+                    r.HoursPerWeek,
+                    r.FTE)).ToList());
+
+            var (result, error) = await CompensationService.BulkApplyCompensationAdjustmentsAsync(CompanyId, request);
+
+            if (result is null)
+            {
+                _globalError = $"No changes were applied. {error ?? "Failed to apply bulk compensation adjustment."}";
+                return;
+            }
+
+            _successMessage = $"Updated compensation for {result.Items.Count} employee(s).";
+            _previewRows = [];
+            _excludedEmployees = [];
+            ClearSelection();
+            _adjustmentValue = null;
+            _notes = null;
+        }
+        finally
+        {
+            _applying = false;
+        }
+    }
+
+    private async Task DownloadTemplateAsync()
+    {
+        _globalError = null;
+        _downloadingTemplate = true;
+        try
+        {
+            var (bytes, error) = await CompensationService.DownloadImportTemplateAsync(CompanyId);
+            if (bytes is null)
+            {
+                _globalError = error ?? "Failed to download the compensation import template.";
+                return;
+            }
+
+            await JS.InvokeVoidAsync(
+                "downloadFileFromBase64",
+                "compensation-import-template.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                Convert.ToBase64String(bytes));
+        }
+        finally
+        {
+            _downloadingTemplate = false;
+        }
+    }
+
+    private void OnImportFileSelected(InputFileChangeEventArgs e)
+    {
+        _importFile = e.File;
+        _importResult = null;
+        _importRowErrors = null;
+    }
+
+    private async Task ImportAsync()
+    {
+        if (_importFile is null) return;
+
+        _globalError = null;
+        _successMessage = null;
+        _importResult = null;
+        _importRowErrors = null;
+        _importing = true;
+        try
+        {
+            await using var stream = _importFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            var (result, error, rowErrors) = await CompensationService.ImportCompensationChangesAsync(CompanyId, stream, _importFile.Name);
+
+            if (result is not null)
+            {
+                _importResult = result;
+                return;
+            }
+
+            if (rowErrors is { Count: > 0 })
+            {
+                _importRowErrors = rowErrors;
+                return;
+            }
+
+            _globalError = error ?? "Failed to import compensation changes.";
+        }
+        finally
+        {
+            _importing = false;
+            _importFile = null;
+        }
+    }
+}

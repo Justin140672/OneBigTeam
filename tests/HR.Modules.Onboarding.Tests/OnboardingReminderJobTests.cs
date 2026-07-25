@@ -45,8 +45,16 @@ public class OnboardingReminderJobTests
     }
 
     private static OnboardingReminderJob BuildJob(
-        OnboardingDbContext dbContext, FakeNotificationWriter notifications, Guid? managerId = null) =>
-        new(dbContext, new FakeManagerReader(managerId), notifications, new FakeClock(FixedUtcNow));
+        OnboardingDbContext dbContext,
+        FakeNotificationWriter notifications,
+        Guid? managerId = null,
+        DateTime? fixedUtcNow = null,
+        FakeCompanyTimeZoneReader? companyTimeZoneReader = null) =>
+        new(dbContext,
+            new FakeManagerReader(managerId),
+            notifications,
+            companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
+            new FakeClock(fixedUtcNow ?? FixedUtcNow));
 
     [Fact]
     public async Task ExecuteAsync_Notifies_Manager_For_Overdue_Manager_Assigned_Task()

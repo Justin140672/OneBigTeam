@@ -38,7 +38,9 @@ public class AmendLeavingProcessHandlerTests
         FakeAuditPublisher? auditPublisher = null,
         FakeOffboardingStatusReader? offboardingStatusReader = null,
         FakeCompanyLeavingSettingsReader? leavingSettingsReader = null,
-        FakeNotificationWriter? notificationWriter = null)
+        FakeNotificationWriter? notificationWriter = null,
+        DateTime? fixedUtcNow = null,
+        FakeCompanyTimeZoneReader? companyTimeZoneReader = null)
     {
         auditPublisher ??= new FakeAuditPublisher();
         offboardingStatusReader ??= new FakeOffboardingStatusReader();
@@ -52,7 +54,8 @@ public class AmendLeavingProcessHandlerTests
 
         return new(
             context,
-            new FakeClock(FixedUtcNow),
+            new FakeClock(fixedUtcNow ?? FixedUtcNow),
+            companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
             auditPublisher,
             offboardingStatusReader,
             departureFinalizer);

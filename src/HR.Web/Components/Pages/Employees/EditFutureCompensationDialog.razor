@@ -44,6 +44,15 @@
                         <ValidationMessage For="@(() => Model.Currency)" />
                     </div>
                     <div class="col-6">
+                        <label class="form-label">Reason <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="string" TItem="AddCompensationDialog.CompensationChangeReasonChoice"
+                                        DataSource="@AddCompensationDialog.ReasonOptions"
+                                        @bind-Value="Model.Reason">
+                            <DropDownListFieldSettings Value="Value" Text="Label" />
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => Model.Reason)" />
+                    </div>
+                    <div class="col-6">
                         <label class="form-label">Hours Per Week</label>
                         <SfNumericTextBox TValue="decimal?" @bind-Value="Model.HoursPerWeek" Min="0" Max="168" ShowSpinButton="false"
                                           FloatLabelType="FloatLabelType.Auto" Placeholder="e.g. 37.5" />
@@ -84,6 +93,7 @@
             Model.HoursPerWeek = Record.HoursPerWeek;
             Model.FTE = Record.FTE;
             Model.Notes = Record.Notes;
+            Model.Reason = Record.Reason;
         }
 
         return Task.CompletedTask;
@@ -103,7 +113,8 @@
             Model.Currency.Trim().ToUpperInvariant(),
             Model.HoursPerWeek,
             Model.FTE,
-            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim());
+            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim(),
+            Model.Reason);
 
         var (updated, error) = await CompensationService.UpdateFutureCompensationRecordAsync(
             CompanyId, EmployeeId, Record.Id, request);
@@ -119,6 +130,7 @@
         Model.HoursPerWeek = null;
         Model.FTE = null;
         Model.Notes = null;
+        Model.Reason = "NewHire";
     }
 
     public sealed class EditFutureCompensationFormModel
@@ -133,5 +145,7 @@
         public decimal? HoursPerWeek { get; set; }
         public decimal? FTE { get; set; }
         public string? Notes { get; set; }
+        [Required(ErrorMessage = "Please select a reason.")]
+        public string Reason { get; set; } = "NewHire";
     }
 }

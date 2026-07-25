@@ -13,4 +13,5 @@ internal sealed record CreateCompensationRecordRequest
     public decimal? HoursPerWeek { get; init; }
     public decimal? FTE { get; init; }
     public string? Notes { get; init; }
+    public CompensationChangeReason Reason { get; init; }
 }

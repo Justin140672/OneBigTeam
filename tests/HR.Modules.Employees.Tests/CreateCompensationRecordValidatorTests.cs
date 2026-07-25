@@ -12,7 +12,8 @@ public class CreateCompensationRecordValidatorTests
         EffectiveFrom = new DateOnly(2026, 1, 1),
         SalaryType = SalaryType.Annual,
         Salary = 45000m,
-        Currency = "GBP"
+        Currency = "GBP",
+        Reason = CompensationChangeReason.NewHire
     };
 
     [Fact]
@@ -87,6 +88,15 @@ public class CreateCompensationRecordValidatorTests
         var result = v.Validate(ValidRequest() with { HoursPerWeek = 0 });
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateCompensationRecordRequest.HoursPerWeek));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Reason_Is_Not_A_Defined_Value()
+    {
+        var v = new CreateCompensationRecordValidator();
+        var result = v.Validate(ValidRequest() with { Reason = (CompensationChangeReason)999 });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateCompensationRecordRequest.Reason));
     }
 
     [Fact]

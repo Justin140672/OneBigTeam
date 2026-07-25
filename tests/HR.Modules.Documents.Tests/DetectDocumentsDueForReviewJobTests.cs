@@ -24,9 +24,12 @@ public class DetectDocumentsDueForReviewJobTests
         FakeTaskCreator? taskCreator = null,
         FakeOpenTaskBySourceEntityReader? openTaskReader = null,
         FakeEmployeeNameReader? employeeNameReader = null,
-        FakeNotificationWriter? notificationWriter = null) =>
+        FakeNotificationWriter? notificationWriter = null,
+        DateTime? fixedUtcNow = null,
+        ICompanyTimeZoneReader? companyTimeZoneReader = null) =>
         new(db,
-            new FakeClock(FixedUtcNow),
+            new FakeClock(fixedUtcNow ?? FixedUtcNow),
+            companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
             taskCreator ?? new FakeTaskCreator(),
             openTaskReader ?? new FakeOpenTaskBySourceEntityReader(),
             employeeNameReader ?? new FakeEmployeeNameReader(),
@@ -362,5 +365,47 @@ public class DetectDocumentsDueForReviewJobTests
         var taskB = Assert.Single(taskCreator.Created, t => t.SourceEntityId == docB.Id);
         Assert.Equal(companyB, taskB.CompanyId);
         Assert.Equal(reviewOwnerB, taskB.AssignedEmployeeId);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Resolves_ReviewDate_Due_Boundary_Per_Company_Timezone()
+    {
+        // At 2026-07-16T23:30:00Z the UTC day is still Jul 16. A company in a fixed UTC+12 zone
+        // (no DST) has a local day of Jul 17 at that instant, so a ReviewDate of Jul 17 is already
+        // due for it, while a UTC company's ReviewDate of Jul 17 is still one day away.
+        var fixedUtcNow = new DateTime(2026, 7, 16, 23, 30, 0, DateTimeKind.Utc);
+
+        await using var db = BuildContext();
+        var companyAhead = Guid.NewGuid();
+        var companyUtc = Guid.NewGuid();
+        var reviewOwnerAhead = Guid.NewGuid();
+        var reviewOwnerUtc = Guid.NewGuid();
+        var categoryAhead = await SeedCategoryAsync(db, companyAhead);
+        var categoryUtc = await SeedCategoryAsync(db, companyUtc);
+
+        var docAhead = CreateDoc(companyAhead, categoryAhead.Id, new DateOnly(2026, 7, 17), reviewOwnerEmployeeId: reviewOwnerAhead);
+        var docUtc = CreateDoc(companyUtc, categoryUtc.Id, new DateOnly(2026, 7, 17), reviewOwnerEmployeeId: reviewOwnerUtc);
+        db.SharedCompanyDocuments.AddRange(docAhead, docUtc);
+        await db.SaveChangesAsync();
+
+        var timeZoneReaderStub = new PerCompanyTimeZoneReader(new Dictionary<Guid, string>
+        {
+            [companyAhead] = "Etc/GMT-12",
+            [companyUtc] = "UTC"
+        });
+
+        var logger = new FakeLogger<DetectDocumentsDueForReviewJob>();
+        var taskCreator = new FakeTaskCreator();
+
+        await BuildJob(db, logger, taskCreator, fixedUtcNow: fixedUtcNow, companyTimeZoneReader: timeZoneReaderStub).ExecuteAsync();
+
+        var task = Assert.Single(taskCreator.Created);
+        Assert.Equal(docAhead.Id, task.SourceEntityId);
+    }
+
+    private sealed class PerCompanyTimeZoneReader(IReadOnlyDictionary<Guid, string> timeZonesByCompany) : ICompanyTimeZoneReader
+    {
+        public Task<string> GetTimeZoneAsync(Guid companyId, CancellationToken cancellationToken) =>
+            Task.FromResult(timeZonesByCompany.TryGetValue(companyId, out var tz) ? tz : "UTC");
     }
 }

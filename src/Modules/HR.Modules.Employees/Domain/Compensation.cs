@@ -15,6 +15,8 @@ internal sealed class Compensation
     public decimal? HoursPerWeek { get; private set; }
     public decimal? FTE { get; private set; }
     public string? Notes { get; private set; }
+    public CompensationChangeReason Reason { get; private set; }
+    public Guid CreatedBy { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -29,6 +31,8 @@ internal sealed class Compensation
         decimal? hoursPerWeek,
         decimal? fte,
         string? notes,
+        CompensationChangeReason reason,
+        Guid createdBy,
         DateTimeOffset now)
     {
         return new Compensation
@@ -43,6 +47,8 @@ internal sealed class Compensation
             HoursPerWeek = hoursPerWeek,
             FTE = fte,
             Notes = notes,
+            Reason = reason,
+            CreatedBy = createdBy,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -67,14 +73,19 @@ internal sealed class Compensation
         decimal? hoursPerWeek,
         decimal? fte,
         string? notes,
+        CompensationChangeReason reason,
         DateTimeOffset now)
     {
+        // CreatedBy is intentionally not touched here — it records who originally created the
+        // record, matching how CreatedAt behaves. Editing a future-dated record doesn't change
+        // who created it.
         SalaryType = salaryType;
         Salary = salary;
         Currency = currency;
         HoursPerWeek = hoursPerWeek;
         FTE = fte;
         Notes = notes;
+        Reason = reason;
         UpdatedAt = now;
     }
 

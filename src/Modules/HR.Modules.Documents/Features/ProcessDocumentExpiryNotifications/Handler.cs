@@ -8,6 +8,7 @@ namespace HR.Modules.Documents.Features.ProcessDocumentExpiryNotifications;
 internal sealed class ProcessDocumentExpiryNotificationsHandler(
     DocumentsDbContext db,
     IClock clock,
+    ICompanyTimeZoneReader timeZoneReader,
     IAuditEventPublisher auditPublisher,
     ITaskCreator taskCreator)
 {
@@ -19,7 +20,8 @@ internal sealed class ProcessDocumentExpiryNotificationsHandler(
         CancellationToken cancellationToken)
     {
         var now       = clock.UtcNowOffset();
-        var today     = DateOnly.FromDateTime(clock.UtcNow);
+        var timeZoneId = await timeZoneReader.GetTimeZoneAsync(request.CompanyId, cancellationToken);
+        var today     = clock.TodayIn(timeZoneId);
         var threshold = today.AddDays(ExpirySoonThresholdDays);
 
         // Read-only projection to gather event data — no change tracking needed.

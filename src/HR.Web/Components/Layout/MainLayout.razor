@@ -71,6 +71,7 @@ else
                                         <MenuItem Text="Employment Types" Url="@_menuItems["EmploymentTypes"]" />
                                         <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
                                         <MenuItem Text="Shared Documents" Url="@_menuItems["SharedDocuments"]" />
+                                        <MenuItem Text="Bulk Compensation Update" Url="@_menuItems["BulkCompensationUpdate"]" />
                                         <MenuItem Text="Data Import" Url="@_menuItems["DataImport"]" />
                                         <MenuItem Text="Import History" Url="@_menuItems["ImportHistory"]" />
                                         <MenuItem Text="Organisation Chart" Url="@_menuItems["OrganisationChart"]" />
@@ -281,6 +282,7 @@ else
     private readonly Dictionary<string, string> _menuItems = new()
     {
         ["Employees"] = "/",
+        ["BulkCompensationUpdate"] = "/",
         ["Departments"] = "/",
         ["LocationTypes"] = "/",
         ["Locations"] = "/",
@@ -327,6 +329,7 @@ else
         _menuItems["DocumentTypes"] = $"/companies/{companyId}/document-types";
         _menuItems["SharedDocuments"] = $"/companies/{companyId}/shared-documents";
         _menuItems["DataImport"] = $"/companies/{companyId}/data-import/employees";
+        _menuItems["BulkCompensationUpdate"] = $"/companies/{companyId}/employees/compensation/bulk-update";
         _menuItems["ImportHistory"] = $"/companies/{companyId}/data-import/history";
         _menuItems["SicknessCategories"] = $"/companies/{companyId}/sickness-categories";
         _menuItems["OrganisationChart"] = $"/companies/{companyId}/organisation-chart";

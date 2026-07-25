@@ -10,24 +10,26 @@ internal sealed class OffboardingReminderJob(
     OffboardingDbContext dbContext,
     IManagerReader managerReader,
     INotificationWriter notificationWriter,
+    ICompanyTimeZoneReader timeZoneReader,
     IClock clock)
 {
     public async Task ExecuteAsync()
     {
-        var today = DateOnly.FromDateTime(clock.UtcNow);
         var now = clock.UtcNowOffset();
 
-        var overdueTasks = await dbContext.OffboardingTasks
+        // DueDate due-ness depends on each company's own configured time zone, so pending/
+        // in-progress tasks with any past-or-present due date are fetched broadly first and then
+        // filtered per company below using that company's "today".
+        var candidateTasks = await dbContext.OffboardingTasks
             .AsNoTracking()
             .Where(t => t.DueDate != null
-                && t.DueDate < today
                 && (t.Status == OffboardingTaskStatus.Pending || t.Status == OffboardingTaskStatus.InProgress))
             .ToListAsync();
 
-        if (overdueTasks.Count == 0)
+        if (candidateTasks.Count == 0)
             return;
 
-        var planIds = overdueTasks.Select(t => t.OffboardingPlanId).Distinct().ToList();
+        var planIds = candidateTasks.Select(t => t.OffboardingPlanId).Distinct().ToList();
 
         var plans = await dbContext.OffboardingPlans
             .AsNoTracking()
@@ -35,6 +37,25 @@ internal sealed class OffboardingReminderJob(
             .ToListAsync();
 
         var plansById = plans.ToDictionary(p => p.Id);
+
+        var todayByCompany = new Dictionary<Guid, DateOnly>();
+        var overdueTasks = new List<OffboardingTask>();
+
+        foreach (var task in candidateTasks)
+        {
+            if (!plansById.TryGetValue(task.OffboardingPlanId, out var plan))
+                continue;
+
+            if (!todayByCompany.TryGetValue(plan.CompanyId, out var today))
+            {
+                var timeZoneId = await timeZoneReader.GetTimeZoneAsync(plan.CompanyId, CancellationToken.None);
+                today = clock.TodayIn(timeZoneId);
+                todayByCompany[plan.CompanyId] = today;
+            }
+
+            if (task.DueDate < today)
+                overdueTasks.Add(task);
+        }
 
         foreach (var task in overdueTasks)
         {

@@ -62,7 +62,9 @@ public class ProcessLeavingEmployeesJobTests
         FakeAuditPublisher? auditPublisher = null,
         FakeOffboardingStatusReader? offboardingStatusReader = null,
         FakeCompanyLeavingSettingsReader? leavingSettingsReader = null,
-        FakeNotificationWriter? notificationWriter = null)
+        FakeNotificationWriter? notificationWriter = null,
+        DateTime? fixedUtcNow = null,
+        FakeCompanyTimeZoneReader? companyTimeZoneReader = null)
     {
         var departureFinalizer = new EmployeeDepartureFinalizer(
             dbContext,
@@ -73,7 +75,8 @@ public class ProcessLeavingEmployeesJobTests
 
         return new(
             dbContext,
-            new FakeClock(FixedUtcNow),
+            new FakeClock(fixedUtcNow ?? FixedUtcNow),
+            companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
             departureFinalizer,
             NullLogger<ProcessLeavingEmployeesJob>.Instance);
     }
@@ -344,5 +347,38 @@ public class ProcessLeavingEmployeesJobTests
 
         var auditEvent = Assert.IsType<EmployeeDepartureFinalisedAuditEvent>(Assert.Single(auditPublisher.Published));
         Assert.Equal(okEmployee.Id, auditEvent.EmployeeId);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Uses_Company_Local_Day_Not_UTC_Day_When_Determining_LeavingDate_Is_Due()
+    {
+        // 2026-07-25T23:30:00Z is still 2026-07-25 in UTC, but already 2026-07-26 00:30 in
+        // Europe/London (BST, UTC+1). A leaving date of 2026-07-26 must be treated as "today" (due)
+        // once the company's local timezone is applied, even though the UTC day is still the 25th.
+        var fixedUtcNow = new DateTime(2026, 7, 25, 23, 30, 0, DateTimeKind.Utc);
+        var localNow = new DateTimeOffset(fixedUtcNow, TimeSpan.Zero);
+
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var employee = CreateLeavingEmployee(companyId, localNow);
+        context.Employees.Add(employee);
+
+        var process = CreateLeavingProcess(companyId, employee.Id, new DateOnly(2026, 7, 26), localNow);
+        context.EmployeeLeavingProcesses.Add(process);
+        await context.SaveChangesAsync();
+
+        var job = BuildJob(
+            context,
+            fixedUtcNow: fixedUtcNow,
+            companyTimeZoneReader: new FakeCompanyTimeZoneReader("Europe/London"));
+
+        await job.ExecuteAsync();
+
+        var savedEmployee = await context.Employees.SingleAsync();
+        Assert.Equal(EmploymentStatus.FormerEmployee, savedEmployee.Status);
+
+        var savedProcess = await context.EmployeeLeavingProcesses.SingleAsync();
+        Assert.Equal(LeavingProcessStatus.Completed, savedProcess.Status);
     }
 }

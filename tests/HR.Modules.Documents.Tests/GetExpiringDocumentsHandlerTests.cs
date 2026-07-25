@@ -17,8 +17,11 @@ public class GetExpiringDocumentsHandlerTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 
-    private static GetExpiringDocumentsHandler BuildHandler(DocumentsDbContext db) =>
-        new(db, new FakeClock(FixedUtcNow));
+    private static GetExpiringDocumentsHandler BuildHandler(
+        DocumentsDbContext db,
+        DateTime? fixedUtcNow = null,
+        FakeCompanyTimeZoneReader? companyTimeZoneReader = null) =>
+        new(db, new FakeClock(fixedUtcNow ?? FixedUtcNow), companyTimeZoneReader ?? new FakeCompanyTimeZoneReader());
 
     private static readonly DateTimeOffset Now = new(FixedUtcNow, TimeSpan.Zero);
 
@@ -256,5 +259,34 @@ public class GetExpiringDocumentsHandlerTests
         Assert.Equal(2, result.Value!.Items.Count);
         Assert.Contains(result.Value.Items, i => i.EmployeeId == employeeA);
         Assert.Contains(result.Value.Items, i => i.EmployeeId == employeeB);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Uses_Company_Local_Day_Not_UTC_Day_For_Expired_Vs_ExpiringSoon()
+    {
+        // At 2026-06-17T23:30:00Z the UTC day is still Jun 17, so an expiry of Jun 17 would still
+        // read as "today" (ExpiringSoon) under UTC. But in a fixed UTC+12 zone (no DST) the local
+        // day is already Jun 18 — the same document should read as Expired once the company's
+        // timezone is applied.
+        var fixedUtcNow = new DateTime(2026, 6, 17, 23, 30, 0, DateTimeKind.Utc);
+
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var dt         = SeedDocumentType(db, companyId);
+        var doc        = SeedDocument(db, companyId, employeeId, dt.Id);
+        SeedEmployeeDocument(db, companyId, employeeId, doc.Id, expiryDate: new DateOnly(2026, 6, 17));
+        await db.SaveChangesAsync();
+
+        var result = await BuildHandler(
+            db,
+            fixedUtcNow: fixedUtcNow,
+            companyTimeZoneReader: new FakeCompanyTimeZoneReader("Etc/GMT-12")).HandleAsync(
+            new GetExpiringDocumentsRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value!.Items);
+        Assert.Equal(DocumentExpiryStatus.Expired, result.Value.Items[0].ExpiryStatus);
     }
 }

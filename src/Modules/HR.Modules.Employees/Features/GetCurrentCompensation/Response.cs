@@ -13,5 +13,7 @@ internal sealed record GetCurrentCompensationResponse(
     decimal? HoursPerWeek,
     decimal? FTE,
     string? Notes,
+    string Reason,
+    Guid CreatedBy,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

@@ -59,6 +59,16 @@ internal sealed class CompensationConfiguration : IEntityTypeConfiguration<Compe
             .HasColumnName("notes")
             .HasMaxLength(4000);
 
+        builder.Property(c => c.Reason)
+            .HasColumnName("reason")
+            .HasConversion<string>()
+            .HasMaxLength(30)
+            .IsRequired();
+
+        builder.Property(c => c.CreatedBy)
+            .HasColumnName("created_by")
+            .IsRequired();
+
         builder.Property(c => c.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

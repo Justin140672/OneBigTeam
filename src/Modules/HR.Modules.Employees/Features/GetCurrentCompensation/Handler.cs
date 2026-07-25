@@ -1,10 +1,15 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Features.GetCurrentCompensation;
 
-internal sealed class GetCurrentCompensationHandler(EmployeesDbContext dbContext, IClock clock)
+internal sealed class GetCurrentCompensationHandler(
+    EmployeesDbContext dbContext,
+    IClock clock,
+    ICompanyTimeZoneReader timeZoneReader)
 {
     public async Task<Result<GetCurrentCompensationResponse>> HandleAsync(
         Guid companyId,
@@ -18,7 +23,7 @@ internal sealed class GetCurrentCompensationHandler(EmployeesDbContext dbContext
             return Result.Failure<GetCurrentCompensationResponse>(
                 Error.NotFound($"Employee '{employeeId}' was not found."));
 
-        var today = DateOnly.FromDateTime(clock.UtcNow);
+        var today = await CompanyToday.ResolveAsync(companyId, clock, timeZoneReader, cancellationToken);
 
         var current = await dbContext.Compensations
             .Where(c => c.CompanyId == companyId && c.EmployeeId == employeeId &&
@@ -44,6 +49,8 @@ internal sealed class GetCurrentCompensationHandler(EmployeesDbContext dbContext
             current.HoursPerWeek,
             current.FTE,
             current.Notes,
+            current.Reason.ToString(),
+            current.CreatedBy,
             current.CreatedAt,
             current.UpdatedAt));
     }

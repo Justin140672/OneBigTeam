@@ -9,13 +9,18 @@ namespace HR.Modules.Employees.Tests;
 public class UpdateFutureCompensationRecordHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 8, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly Guid ActorEmployeeId = Guid.NewGuid();
+
+    private static UpdateFutureCompensationRecordHandler BuildHandler(
+        EmployeesDbContext context, FakeAuditPublisher publisher) =>
+        new(context, new FakeClock(FixedUtcNow), new FakeCompanyTimeZoneReader(), publisher);
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Record_Does_Not_Exist()
     {
         await using var context = BuildContext();
         var publisher = new FakeAuditPublisher();
-        var handler = new UpdateFutureCompensationRecordHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = BuildHandler(context, publisher);
 
         var result = await handler.HandleAsync(
             new UpdateFutureCompensationRecordRequest
@@ -25,8 +30,10 @@ public class UpdateFutureCompensationRecordHandlerTests
                 Id = Guid.NewGuid(),
                 SalaryType = SalaryType.Annual,
                 Salary = 45000m,
-                Currency = "GBP"
+                Currency = "GBP",
+                Reason = CompensationChangeReason.Correction
             },
+            ActorEmployeeId,
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -44,12 +51,12 @@ public class UpdateFutureCompensationRecordHandlerTests
         context.Employees.Add(employee);
 
         // EffectiveFrom == today (2026-06-08) — already in effect, not future.
-        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2026, 6, 8), SalaryType.Annual, 40000m, "GBP", null, null, null, now);
+        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2026, 6, 8), SalaryType.Annual, 40000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), now);
         context.Compensations.Add(record);
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new UpdateFutureCompensationRecordHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = BuildHandler(context, publisher);
 
         var result = await handler.HandleAsync(
             new UpdateFutureCompensationRecordRequest
@@ -59,8 +66,10 @@ public class UpdateFutureCompensationRecordHandlerTests
                 Id = record.Id,
                 SalaryType = SalaryType.Annual,
                 Salary = 41000m,
-                Currency = "GBP"
+                Currency = "GBP",
+                Reason = CompensationChangeReason.Correction
             },
+            ActorEmployeeId,
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -80,12 +89,12 @@ public class UpdateFutureCompensationRecordHandlerTests
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2020, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Employees.Add(employee);
 
-        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2024, 1, 1), SalaryType.Annual, 35000m, "GBP", null, null, null, now);
+        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2024, 1, 1), SalaryType.Annual, 35000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), now);
         context.Compensations.Add(record);
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new UpdateFutureCompensationRecordHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = BuildHandler(context, publisher);
 
         var result = await handler.HandleAsync(
             new UpdateFutureCompensationRecordRequest
@@ -95,8 +104,10 @@ public class UpdateFutureCompensationRecordHandlerTests
                 Id = record.Id,
                 SalaryType = SalaryType.Annual,
                 Salary = 36000m,
-                Currency = "GBP"
+                Currency = "GBP",
+                Reason = CompensationChangeReason.Correction
             },
+            ActorEmployeeId,
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -112,12 +123,12 @@ public class UpdateFutureCompensationRecordHandlerTests
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2020, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Employees.Add(employee);
 
-        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 45000m, "GBP", 37.5m, 1m, "Original", now);
+        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 45000m, "GBP", 37.5m, 1m, "Original", CompensationChangeReason.NewHire, Guid.NewGuid(), now);
         context.Compensations.Add(record);
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new UpdateFutureCompensationRecordHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = BuildHandler(context, publisher);
 
         var result = await handler.HandleAsync(
             new UpdateFutureCompensationRecordRequest
@@ -130,8 +141,10 @@ public class UpdateFutureCompensationRecordHandlerTests
                 Currency = " usd ",
                 HoursPerWeek = 20m,
                 FTE = 0.5m,
-                Notes = "  Corrected  "
+                Notes = "  Corrected  ",
+                Reason = CompensationChangeReason.Correction
             },
+            ActorEmployeeId,
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -141,6 +154,7 @@ public class UpdateFutureCompensationRecordHandlerTests
         Assert.Equal(20m, result.Value.HoursPerWeek);
         Assert.Equal(0.5m, result.Value.FTE);
         Assert.Equal("Corrected", result.Value.Notes);
+        Assert.Equal("Correction", result.Value.Reason);
         // EffectiveFrom is not editable through this slice.
         Assert.Equal(new DateOnly(2027, 1, 1), result.Value.EffectiveFrom);
 
@@ -150,6 +164,8 @@ public class UpdateFutureCompensationRecordHandlerTests
         var updatedEvent = Assert.IsType<CompensationRecordUpdatedAuditEvent>(Assert.Single(publisher.Published));
         Assert.Equal(record.Id, updatedEvent.CompensationRecordId);
         Assert.Equal("Hourly", updatedEvent.SalaryType);
+        Assert.Equal(ActorEmployeeId, updatedEvent.ActorEmployeeId);
+        Assert.Equal("Correction", updatedEvent.Reason);
     }
 
     [Fact]
@@ -162,12 +178,12 @@ public class UpdateFutureCompensationRecordHandlerTests
         var otherEmployee = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", new DateOnly(2020, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Employees.AddRange(employee, otherEmployee);
 
-        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, now);
+        var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), now);
         context.Compensations.Add(record);
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new UpdateFutureCompensationRecordHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = BuildHandler(context, publisher);
 
         var result = await handler.HandleAsync(
             new UpdateFutureCompensationRecordRequest
@@ -177,8 +193,10 @@ public class UpdateFutureCompensationRecordHandlerTests
                 Id = record.Id,
                 SalaryType = SalaryType.Annual,
                 Salary = 99999m,
-                Currency = "GBP"
+                Currency = "GBP",
+                Reason = CompensationChangeReason.Correction
             },
+            ActorEmployeeId,
             CancellationToken.None);
 
         Assert.True(result.IsFailure);

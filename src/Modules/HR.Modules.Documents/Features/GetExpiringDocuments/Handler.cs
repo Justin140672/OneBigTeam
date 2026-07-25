@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.SharedKernel;
@@ -5,13 +6,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Features.GetExpiringDocuments;
 
-internal sealed class GetExpiringDocumentsHandler(DocumentsDbContext db, IClock clock)
+internal sealed class GetExpiringDocumentsHandler(
+    DocumentsDbContext db,
+    IClock clock,
+    ICompanyTimeZoneReader timeZoneReader)
 {
     public async Task<Result<GetExpiringDocumentsResponse>> HandleAsync(
         GetExpiringDocumentsRequest request,
         CancellationToken cancellationToken)
     {
-        var today     = DateOnly.FromDateTime(clock.UtcNow);
+        var timeZoneId = await timeZoneReader.GetTimeZoneAsync(request.CompanyId, cancellationToken);
+        var today     = clock.TodayIn(timeZoneId);
         var threshold = today.AddDays(30);
 
         var rows = await (

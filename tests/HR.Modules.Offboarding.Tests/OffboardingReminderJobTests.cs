@@ -46,8 +46,16 @@ public class OffboardingReminderJobTests
     }
 
     private static OffboardingReminderJob BuildJob(
-        OffboardingDbContext dbContext, FakeNotificationWriter notifications, Guid? managerId = null) =>
-        new(dbContext, new FakeManagerReader(managerId), notifications, new FakeClock(FixedUtcNow));
+        OffboardingDbContext dbContext,
+        FakeNotificationWriter notifications,
+        Guid? managerId = null,
+        DateTime? fixedUtcNow = null,
+        FakeCompanyTimeZoneReader? companyTimeZoneReader = null) =>
+        new(dbContext,
+            new FakeManagerReader(managerId),
+            notifications,
+            companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
+            new FakeClock(fixedUtcNow ?? FixedUtcNow));
 
     [Fact]
     public async Task ExecuteAsync_Notifies_Manager_For_Overdue_Manager_Assigned_Task()
@@ -238,5 +246,57 @@ public class OffboardingReminderJobTests
         Assert.Equal(2, notifications.Written.Count);
         Assert.Contains(notifications.Written, n => n.EmployeeId == employeeIdA && n.SourceEntityId == taskA.Id);
         Assert.Contains(notifications.Written, n => n.EmployeeId == employeeIdB && n.SourceEntityId == taskB.Id);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Resolves_Overdue_Boundary_Per_Company_Timezone()
+    {
+        // At 2026-07-11T23:30:00Z the UTC day is still Jul 11. Company A is in a fixed UTC+12 zone
+        // so its local day is already Jul 12 — a task due Jul 12 is therefore NOT yet overdue there.
+        // Company B stays on UTC, so for it Jul 12 is still in the future too — but a task due Jul
+        // 11 (already past in both zones) IS overdue for company B while being not-yet-due if it
+        // were UTC+12. This proves each company's own timezone drives its own "today".
+        var fixedUtcNow = new DateTime(2026, 7, 11, 23, 30, 0, DateTimeKind.Utc);
+
+        await using var dbContext = BuildContext();
+
+        var companyIdAheadOfUtc = Guid.NewGuid();
+        var employeeIdAhead = Guid.NewGuid();
+        var planAhead = SeedPlan(dbContext, companyIdAheadOfUtc, employeeIdAhead);
+        // Local day for this company is already Jul 12, so a task due Jul 11 (yesterday locally) is overdue.
+        var taskAhead = SeedTask(dbContext, companyIdAheadOfUtc, planAhead.Id, OffboardingTaskAssignTo.Employee, new DateOnly(2026, 7, 11), "Ahead task");
+
+        var companyIdUtc = Guid.NewGuid();
+        var employeeIdUtc = Guid.NewGuid();
+        var planUtc = SeedPlan(dbContext, companyIdUtc, employeeIdUtc);
+        // Local day for this company is still Jul 11, so a task due Jul 11 (today) is NOT yet overdue.
+        SeedTask(dbContext, companyIdUtc, planUtc.Id, OffboardingTaskAssignTo.Employee, new DateOnly(2026, 7, 11), "UTC task");
+
+        await dbContext.SaveChangesAsync();
+
+        var timeZoneReaderStub = new PerCompanyTimeZoneReader(new Dictionary<Guid, string>
+        {
+            [companyIdAheadOfUtc] = "Etc/GMT-12",
+            [companyIdUtc] = "UTC"
+        });
+
+        var notifications = new FakeNotificationWriter();
+        var job = new OffboardingReminderJob(
+            dbContext,
+            new FakeManagerReader(),
+            notifications,
+            timeZoneReaderStub,
+            new FakeClock(fixedUtcNow));
+
+        await job.ExecuteAsync();
+
+        var notification = Assert.Single(notifications.Written);
+        Assert.Equal(taskAhead.Id, notification.SourceEntityId);
+    }
+
+    private sealed class PerCompanyTimeZoneReader(IReadOnlyDictionary<Guid, string> timeZonesByCompany) : ICompanyTimeZoneReader
+    {
+        public Task<string> GetTimeZoneAsync(Guid companyId, CancellationToken cancellationToken) =>
+            Task.FromResult(timeZonesByCompany.TryGetValue(companyId, out var tz) ? tz : "UTC");
     }
 }

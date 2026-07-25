@@ -19,10 +19,14 @@
         data-testid="compensation-history-grid">
     <GridColumns>
         <GridColumn Field="@nameof(CompensationHistoryItemModel.EffectiveFrom)"
-                    HeaderText="Effective From" Width="150">
+                    HeaderText="Effective From" Width="170">
             <Template>
                 @{ var item = (context as CompensationHistoryItemModel)!; }
                 @item.EffectiveFrom.ToString("d MMM yyyy")
+                @if (IsFutureDated(item))
+                {
+                    <span class="badge bg-info-subtle text-info-emphasis ms-1" data-testid="future-compensation-badge">Future</span>
+                }
             </Template>
         </GridColumn>
 
@@ -49,6 +53,16 @@
             <Template>
                 @{ var item = (context as CompensationHistoryItemModel)!; }
                 <span class="text-muted small">@(item.FTE.HasValue ? $"{item.FTE.Value:P0}" : "—")</span>
+            </Template>
+        </GridColumn>
+
+        <GridColumn Field="@nameof(CompensationHistoryItemModel.Reason)"
+                    HeaderText="Reason" Width="140" />
+
+        <GridColumn HeaderText="Created By" Width="140" AllowSorting="false" AllowFiltering="false">
+            <Template>
+                @{ var item = (context as CompensationHistoryItemModel)!; }
+                <span class="text-muted small" title="@item.CreatedBy">@item.CreatedBy.ToString()[..8]</span>
             </Template>
         </GridColumn>
 

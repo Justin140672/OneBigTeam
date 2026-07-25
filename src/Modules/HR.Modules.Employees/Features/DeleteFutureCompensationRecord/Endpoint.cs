@@ -17,7 +17,13 @@ internal sealed class Endpoint(DeleteFutureCompensationRecordHandler handler) : 
         var employeeId = Route<Guid>("employeeId");
         var id         = Route<Guid>("id");
 
-        var result = await handler.HandleAsync(companyId, employeeId, id, cancellationToken);
+        if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var actorEmployeeId))
+        {
+            await Send.ResultAsync(TypedResults.Unauthorized());
+            return;
+        }
+
+        var result = await handler.HandleAsync(companyId, employeeId, id, actorEmployeeId, cancellationToken);
 
         if (result.IsFailure)
         {

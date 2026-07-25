@@ -16,7 +16,13 @@ internal sealed class Endpoint(UpdateFutureCompensationRecordHandler handler)
         UpdateFutureCompensationRecordRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var actorEmployeeId))
+        {
+            await Send.ResultAsync(TypedResults.Unauthorized());
+            return;
+        }
+
+        var result = await handler.HandleAsync(request, actorEmployeeId, cancellationToken);
 
         if (result.IsFailure)
         {

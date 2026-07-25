@@ -48,7 +48,9 @@ public class StartLeavingProcessHandlerTests
         FakeOffboardingPlanCoordinator? offboardingPlanCoordinator = null,
         EffectiveNoticePeriod? effectiveNoticePeriod = null,
         FakeOffboardingStatusReader? offboardingStatusReader = null,
-        FakeCompanyLeavingSettingsReader? leavingSettingsReader = null)
+        FakeCompanyLeavingSettingsReader? leavingSettingsReader = null,
+        DateTime? fixedUtcNow = null,
+        FakeCompanyTimeZoneReader? companyTimeZoneReader = null)
     {
         auditPublisher ??= new FakeAuditPublisher();
         notificationWriter ??= new FakeNotificationWriter();
@@ -62,7 +64,8 @@ public class StartLeavingProcessHandlerTests
 
         return new(
             context,
-            new FakeClock(FixedUtcNow),
+            new FakeClock(fixedUtcNow ?? FixedUtcNow),
+            companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
             new FakeEffectiveNoticePeriodResolver(effectiveNoticePeriod),
             auditPublisher,
             notificationWriter,
