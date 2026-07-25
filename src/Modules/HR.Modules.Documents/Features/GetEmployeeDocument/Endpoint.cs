@@ -9,7 +9,7 @@ internal sealed class Endpoint(GetEmployeeDocumentHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees/{employeeId:guid}/documents/{employeeDocumentId:guid}");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(

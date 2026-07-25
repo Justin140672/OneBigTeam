@@ -9,7 +9,7 @@ internal sealed class Endpoint(ListDocumentTypesHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/document-types");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(

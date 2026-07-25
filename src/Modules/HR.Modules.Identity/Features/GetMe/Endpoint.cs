@@ -12,7 +12,7 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Get("/api/me");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(CancellationToken ct)

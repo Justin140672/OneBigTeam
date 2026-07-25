@@ -11,7 +11,7 @@ internal sealed class Endpoint(ApproveProfilePhotoHandler handler, IAuthorizatio
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/profile-photo/pending/approve");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(

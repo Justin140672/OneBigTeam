@@ -507,6 +507,65 @@ namespace HR.Modules.Employees.Migrations
                     b.ToTable("employee_leaving_processes", "employees");
                 });
 
+            modelBuilder.Entity("HR.Modules.Employees.Domain.EmployeeNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("category");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_date");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.Property<bool>("IsImportant")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_important");
+
+                    b.Property<bool>("IsSuperseded")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_superseded");
+
+                    b.Property<string>("NoteText")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("note_text");
+
+                    b.Property<Guid?>("SupersededByNoteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("superseded_by_note_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("SupersededByNoteId");
+
+                    b.HasIndex("CompanyId", "EmployeeId");
+
+                    b.ToTable("employee_notes", "employees");
+                });
+
             modelBuilder.Entity("HR.Modules.Employees.Domain.EmploymentType", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1020,6 +1079,14 @@ namespace HR.Modules.Employees.Migrations
                         .HasForeignKey("LocationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("HR.Modules.Employees.Domain.EmployeeNote", b =>
+                {
+                    b.HasOne("HR.Modules.Employees.Domain.EmployeeNote", null)
+                        .WithMany()
+                        .HasForeignKey("SupersededByNoteId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("HR.Modules.Employees.Domain.OnboardingTemplateTask", b =>

@@ -11,7 +11,7 @@ internal sealed class Endpoint(UploadRequestedDocumentHandler handler, IAuthoriz
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/document-requests/{documentRequestId:guid}/upload");
-        Policies("authenticated");
+        Policies("role:employee");
         AllowFileUploads();
     }
 

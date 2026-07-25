@@ -18,8 +18,10 @@ public class UploadEmployeeProfilePhotoEndpointTests : IClassFixture<ApiWebAppli
     {
         _factory = factory;
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]
@@ -75,7 +77,7 @@ public class UploadEmployeeProfilePhotoEndpointTests : IClassFixture<ApiWebAppli
         // UploadMyProfilePhoto instead (see UploadMyProfilePhotoEndpointTests).
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = SelfClient(companyId, employeeId);
+        using var client = await SelfClient(companyId, employeeId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo",
@@ -234,11 +236,12 @@ public class UploadEmployeeProfilePhotoEndpointTests : IClassFixture<ApiWebAppli
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
-    private HttpClient SelfClient(Guid companyId, Guid employeeId)
+    private async Task<HttpClient> SelfClient(Guid companyId, Guid employeeId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }
 

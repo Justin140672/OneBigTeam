@@ -9,7 +9,7 @@ internal sealed class Endpoint(ListLeaveTypesHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/leave-types");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(ListLeaveTypesRequest request, CancellationToken cancellationToken)

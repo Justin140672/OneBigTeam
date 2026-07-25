@@ -25,8 +25,10 @@ public class GetRecentLeaveRequestsEndpointTests : IClassFixture<ApiWebApplicati
         // predates viewer scoping — seed UserId as HR Administrator so that behavior is preserved
         // (mirrors AuditHistoryIntegrationTests/GetTeamTasksEndpointTests constructors).
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     private HttpClient AuthenticatedClient(Guid companyId)

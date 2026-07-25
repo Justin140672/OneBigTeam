@@ -60,11 +60,6 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.SicknessRead),
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.SicknessManage),
 
-            // Finance: self.read, employee.read, company.read
-            RolePermission.Create(SystemRoles.Finance, SystemPermissions.SelfRead),
-            RolePermission.Create(SystemRoles.Finance, SystemPermissions.EmployeeRead),
-            RolePermission.Create(SystemRoles.Finance, SystemPermissions.CompanyRead),
-
             // Company Administrator: scoped to company profile/settings management only.
             // HR-facing permissions (employee, leave, document, sickness) belong to
             // HR Administrator/Manager/Employee roles, not Company Administrator.

@@ -11,7 +11,7 @@ internal sealed class Endpoint(RequestAdditionalEmployeeDocumentHandler handler,
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/document-requests");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(

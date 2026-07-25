@@ -22,15 +22,17 @@ public class UploadRequestedDocumentEndpointTests : IClassFixture<ApiWebApplicat
     {
         _factory = factory;
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]
     public async Task Upload_Fulfils_DocumentRequest_And_Creates_EmployeeDocument()
     {
         var (companyId, employeeId, requestId) = await SetupAsync();
-        using var client = EmployeeClient(companyId, employeeId);
+        using var client = await EmployeeClient(companyId, employeeId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests/{requestId}/upload",
@@ -52,7 +54,7 @@ public class UploadRequestedDocumentEndpointTests : IClassFixture<ApiWebApplicat
     public async Task Upload_Completes_The_Associated_Upload_Task()
     {
         var (companyId, employeeId, requestId) = await SetupAsync();
-        using var client = EmployeeClient(companyId, employeeId);
+        using var client = await EmployeeClient(companyId, employeeId);
 
         await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests/{requestId}/upload",
@@ -74,7 +76,7 @@ public class UploadRequestedDocumentEndpointTests : IClassFixture<ApiWebApplicat
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = EmployeeClient(companyId, employeeId);
+        using var client = await EmployeeClient(companyId, employeeId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests/{Guid.NewGuid()}/upload",
@@ -87,7 +89,7 @@ public class UploadRequestedDocumentEndpointTests : IClassFixture<ApiWebApplicat
     public async Task Upload_Returns_Conflict_When_Request_Already_Uploaded()
     {
         var (companyId, employeeId, requestId) = await SetupAsync();
-        using var client = EmployeeClient(companyId, employeeId);
+        using var client = await EmployeeClient(companyId, employeeId);
         var url = $"/api/companies/{companyId}/employees/{employeeId}/document-requests/{requestId}/upload";
 
         await client.PostAsync(url, BuildPdfUpload("First Upload"));
@@ -101,7 +103,7 @@ public class UploadRequestedDocumentEndpointTests : IClassFixture<ApiWebApplicat
     {
         var (companyId, ownerEmployeeId, requestId) = await SetupAsync();
         var otherEmployeeId = Guid.NewGuid();
-        using var client = EmployeeClient(companyId, otherEmployeeId);
+        using var client = await EmployeeClient(companyId, otherEmployeeId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{ownerEmployeeId}/document-requests/{requestId}/upload",
@@ -163,11 +165,12 @@ public class UploadRequestedDocumentEndpointTests : IClassFixture<ApiWebApplicat
         return (companyId, employeeId, request.Id);
     }
 
-    private HttpClient EmployeeClient(Guid companyId, Guid employeeId)
+    private async Task<HttpClient> EmployeeClient(Guid companyId, Guid employeeId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }
 

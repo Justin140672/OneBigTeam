@@ -1,8 +1,6 @@
 @page "/companies/{CompanyId:guid}/shared-documents/{DocumentId:guid}/acknowledgement-progress"
 @rendermode InteractiveServer
 @inject DocumentService DocumentService
-@inject DepartmentService DepartmentService
-@inject LocationService LocationService
 @inject AppSession Session
 @inject NavigationManager Navigation
 
@@ -61,54 +59,9 @@
             </div>
         </div>
 
-        <div class="row g-3 mb-3">
-            <div class="col-md-3">
-                <label class="form-label">Department</label>
-                <SfDropDownList TValue="Guid?" TItem="DepartmentListItemModel"
-                                DataSource="@_departments"
-                                @bind-Value="_departmentFilter"
-                                ValueChange="@(async () => await LoadProgressAsync())"
-                                Placeholder="All departments"
-                                AllowFiltering="true">
-                    <DropDownListFieldSettings Value="Id" Text="Name" />
-                </SfDropDownList>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Location</label>
-                <SfDropDownList TValue="Guid?" TItem="LocationListItemModel"
-                                DataSource="@_locations"
-                                @bind-Value="_locationFilter"
-                                ValueChange="@(async () => await LoadProgressAsync())"
-                                Placeholder="All locations"
-                                AllowFiltering="true">
-                    <DropDownListFieldSettings Value="Id" Text="Name" />
-                </SfDropDownList>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Acknowledgement Status</label>
-                <SfDropDownList TValue="bool?" TItem="FilterOption"
-                                DataSource="@_acknowledgedOptions"
-                                @bind-Value="_isAcknowledgedFilter"
-                                ValueChange="@(async () => await LoadProgressAsync())"
-                                Placeholder="Any">
-                    <DropDownListFieldSettings Value="Value" Text="Label" />
-                </SfDropDownList>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Overdue Status</label>
-                <SfDropDownList TValue="bool?" TItem="FilterOption"
-                                DataSource="@_overdueOptions"
-                                @bind-Value="_isOverdueFilter"
-                                ValueChange="@(async () => await LoadProgressAsync())"
-                                Placeholder="Any">
-                    <DropDownListFieldSettings Value="Value" Text="Label" />
-                </SfDropDownList>
-            </div>
-        </div>
-
         @if (_progress.Items.Count == 0)
         {
-            <p class="text-muted">No employees match the current filters.</p>
+            <p class="text-muted">No employees to show.</p>
         }
         else
         {
@@ -203,24 +156,12 @@
     [Parameter] public Guid DocumentId { get; set; }
 
     private SharedCompanyDocumentAcknowledgementProgressResponse? _progress;
-    private List<DepartmentListItemModel> _departments = [];
-    private List<LocationListItemModel> _locations = [];
     private bool _loading = true;
     private string? _error;
     private HrGrid<SharedCompanyDocumentAcknowledgementProgressItem>? _grid;
 
-    private Guid? _departmentFilter;
-    private Guid? _locationFilter;
-    private bool? _isAcknowledgedFilter;
-    private bool? _isOverdueFilter;
-
     private bool _statementDialogOpen;
     private SharedCompanyDocumentAcknowledgementProgressItem? _selectedItem;
-
-    private readonly List<FilterOption> _acknowledgedOptions =
-        [new("Acknowledged", true), new("Not Acknowledged", false)];
-    private readonly List<FilterOption> _overdueOptions =
-        [new("Overdue", true), new("Not Overdue", false)];
 
     protected override async Task OnInitializedAsync()
     {
@@ -229,9 +170,6 @@
             Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
             return;
         }
-
-        _departments = (await DepartmentService.ListDepartmentsAsync(CompanyId))?.Items ?? [];
-        _locations   = (await LocationService.ListLocationsAsync(CompanyId))?.Items ?? [];
 
         await LoadProgressAsync();
     }
@@ -242,12 +180,7 @@
         StateHasChanged();
         try
         {
-            var result = await DocumentService.GetSharedCompanyDocumentAcknowledgementProgressAsync(
-                CompanyId, DocumentId,
-                departmentId: _departmentFilter,
-                locationId: _locationFilter,
-                isAcknowledged: _isAcknowledgedFilter,
-                isOverdue: _isOverdueFilter);
+            var result = await DocumentService.GetSharedCompanyDocumentAcknowledgementProgressAsync(CompanyId, DocumentId);
 
             if (result is null)
             {
@@ -276,6 +209,4 @@
         "Overdue"      => "bg-danger",
         _              => "bg-warning text-dark",
     };
-
-    public sealed record FilterOption(string Label, bool? Value);
 }

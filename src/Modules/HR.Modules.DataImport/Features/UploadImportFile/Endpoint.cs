@@ -16,7 +16,7 @@ internal sealed class Endpoint(UploadImportFileHandler handler, IAuthorizationSe
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/data-import/sessions");
-        Policies("authenticated");
+        Policies("role:employee");
         AllowFileUploads();
     }
 

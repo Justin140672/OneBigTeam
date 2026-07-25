@@ -13,54 +13,6 @@
     </div>
     <p class="text-muted mb-4">Company-wide documents such as policies and handbooks.</p>
 
-    <div class="row g-3 mb-3">
-        <div class="col-md-2">
-            <label class="form-label">Search</label>
-            <HrTextBox Value="@_search" ValueChanged="OnSearchChangedAsync" Placeholder="Search by title…" />
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Status</label>
-            <SfDropDownList TValue="string" TItem="string"
-                            DataSource="@_statusOptions"
-                            Value="@_statusFilter"
-                            Placeholder="All statuses">
-                <DropDownListEvents TValue="string" TItem="string" ValueChange="OnStatusFilterChanged" />
-            </SfDropDownList>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Review Status</label>
-            <SfDropDownList TValue="string" TItem="string"
-                            DataSource="@_reviewStatusOptions"
-                            Value="@_reviewStatusFilterDisplay"
-                            Placeholder="All review statuses">
-                <DropDownListEvents TValue="string" TItem="string" ValueChange="OnReviewStatusFilterChanged" />
-            </SfDropDownList>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Category</label>
-            <SfDropDownList TValue="Guid?" TItem="CompanyDocumentCategoryItem"
-                            DataSource="@_categories"
-                            Value="@_categoryFilter"
-                            Placeholder="All categories"
-                            AllowFiltering="true">
-                <DropDownListFieldSettings Value="Id" Text="Name" />
-                <DropDownListEvents TValue="Guid?" TItem="CompanyDocumentCategoryItem" ValueChange="OnCategoryFilterChanged" />
-            </SfDropDownList>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Next Review Date From</label>
-            <SfDatePicker TValue="DateOnly?" @bind-Value="_reviewDateFrom"
-                          ValueChange="@(async () => await LoadDocumentsAsync())"
-                          Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" ShowClearButton="true" />
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Next Review Date To</label>
-            <SfDatePicker TValue="DateOnly?" @bind-Value="_reviewDateTo"
-                          ValueChange="@(async () => await LoadDocumentsAsync())"
-                          Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" ShowClearButton="true" />
-        </div>
-    </div>
-
     @if (_loading)
     {
         <HrLoadingIndicator Label="Loading documents…" />
@@ -71,7 +23,7 @@
     }
     else if (_documents.Count == 0)
     {
-        <p class="text-muted">No shared documents match the current filters.</p>
+        <p class="text-muted">No shared documents yet.</p>
     }
     else
     {
@@ -116,28 +68,9 @@
     [Parameter] public Guid CompanyId { get; set; }
 
     private List<SharedCompanyDocumentListItem> _documents = [];
-    private List<CompanyDocumentCategoryItem> _categories = [];
-    private readonly List<string> _statusOptions = ["Draft", "Published", "Archived"];
-    private readonly List<string> _reviewStatusOptions = ["Due Soon", "Overdue", "No Review", "Expired"];
     private bool _loading = true;
     private string? _error;
     private bool _uploadOpen;
-
-    private string? _search;
-    private string? _statusFilter;
-    private Guid? _categoryFilter;
-    private DateOnly? _reviewDateFrom;
-    private DateOnly? _reviewDateTo;
-    private string? _reviewStatusFilterDisplay;
-    private string? _reviewStatusFilter;
-
-    private static readonly Dictionary<string, string> ReviewStatusFilterMap = new()
-    {
-        ["Due Soon"] = "DueSoon",
-        ["Overdue"] = "Overdue",
-        ["No Review"] = "NoReview",
-        ["Expired"] = "Expired",
-    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -147,40 +80,6 @@
             return;
         }
 
-        _categories = (await DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId))?.Items.ToList() ?? [];
-        await LoadDocumentsAsync();
-    }
-
-    private async Task OnSearchChangedAsync(string? value)
-    {
-        _search = value;
-        await LoadDocumentsAsync();
-    }
-
-    // Explicit typed ValueChange handlers rather than @bind-Value + a separate inline ValueChange
-    // lambda — the two can fire in an order where the reload runs before the bound field has
-    // actually been updated, reloading with the *previous* filter value (see EmployeeEdit.razor's
-    // OnPositionProfileChanged / VacancyList.razor's OnPositionProfileFilterChanged for the same
-    // established pattern: set the field from args.Value first, then reload, so there's no
-    // ambiguity about ordering).
-    private async Task OnStatusFilterChanged(ChangeEventArgs<string, string> args)
-    {
-        _statusFilter = args.Value;
-        await LoadDocumentsAsync();
-    }
-
-    private async Task OnReviewStatusFilterChanged(ChangeEventArgs<string, string> args)
-    {
-        _reviewStatusFilterDisplay = args.Value;
-        _reviewStatusFilter = _reviewStatusFilterDisplay is not null && ReviewStatusFilterMap.TryGetValue(_reviewStatusFilterDisplay, out var mapped)
-            ? mapped
-            : null;
-        await LoadDocumentsAsync();
-    }
-
-    private async Task OnCategoryFilterChanged(ChangeEventArgs<Guid?, CompanyDocumentCategoryItem> args)
-    {
-        _categoryFilter = args.Value;
         await LoadDocumentsAsync();
     }
 
@@ -190,14 +89,7 @@
         StateHasChanged();
         try
         {
-            var result = await DocumentService.ListSharedCompanyDocumentsAsync(
-                CompanyId,
-                status: _statusFilter,
-                categoryId: _categoryFilter,
-                reviewDateFrom: _reviewDateFrom,
-                reviewDateTo: _reviewDateTo,
-                search: _search,
-                reviewStatusFilter: _reviewStatusFilter);
+            var result = await DocumentService.ListSharedCompanyDocumentsAsync(CompanyId);
 
             if (result is null)
             {

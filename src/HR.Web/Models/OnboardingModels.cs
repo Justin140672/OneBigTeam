@@ -41,7 +41,7 @@ public sealed record ProbationSummaryItem(
     DateOnly ExpectedEndDate,
     DateOnly? DecisionDate);
 
-// Self-scoped, backed by the "authenticated"-only employees/me/onboarding-status endpoint — see
+// Self-scoped, backed by the "role:employee"-only employees/me/onboarding-status endpoint — see
 // OnboardingService.GetMyOnboardingStatusAsync. Backs MyProfileOverviewTab's Onboarding Progress card.
 public sealed record MyOnboardingStatusModel(
     bool HasPlan,

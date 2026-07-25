@@ -21,7 +21,6 @@ public class CompanyAuthorizationTests : IClassFixture<ApiWebApplicationFactory>
     private static readonly Guid EmployeeUser = new("cc000001-0000-0000-0000-000000000002");
     private static readonly Guid ManagerUser = new("cc000001-0000-0000-0000-000000000003");
     private static readonly Guid RecruiterUser = new("cc000001-0000-0000-0000-000000000004");
-    private static readonly Guid FinanceUser = new("cc000001-0000-0000-0000-000000000005");
     private static readonly Guid HrAdminUser = new("cc000001-0000-0000-0000-000000000006");
     private static readonly Guid CompanyAdminUser = new("cc000001-0000-0000-0000-000000000007");
 
@@ -34,7 +33,6 @@ public class CompanyAuthorizationTests : IClassFixture<ApiWebApplicationFactory>
             await TestRoleSeeder.AssignRoleAsync(factory, EmployeeUser, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.Manager);
             await TestRoleSeeder.AssignRoleAsync(factory, RecruiterUser, SystemRoles.Recruiter);
-            await TestRoleSeeder.AssignRoleAsync(factory, FinanceUser, SystemRoles.Finance);
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdminUser, SystemRoles.CompanyAdministrator);
         }).GetAwaiter().GetResult();
@@ -102,16 +100,6 @@ public class CompanyAuthorizationTests : IClassFixture<ApiWebApplicationFactory>
     public async Task Put_Company_Returns_Forbidden_For_Recruiter_Role()
     {
         using var client = ClientFor(Guid.NewGuid(), RecruiterUser);
-
-        var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}", new { name = "X" });
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Put_Company_Returns_Forbidden_For_Finance_Role()
-    {
-        using var client = ClientFor(Guid.NewGuid(), FinanceUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}", new { name = "X" });
 

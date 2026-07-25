@@ -9,7 +9,7 @@ internal sealed class Endpoint(ListRequiredAssetsHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/position-profiles/{positionProfileId:guid}/required-assets");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(

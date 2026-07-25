@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Documents.Persistence;
+using HR.Modules.Identity.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -46,7 +47,7 @@ public class CancelPendingProfilePhotoEndpointTests : IClassFixture<ApiWebApplic
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = SelfClient(companyId, employeeId);
+        using var client = await SelfClient(companyId, employeeId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/employees/me/profile-photo/pending");
@@ -59,7 +60,7 @@ public class CancelPendingProfilePhotoEndpointTests : IClassFixture<ApiWebApplic
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = SelfClient(companyId, employeeId);
+        using var client = await SelfClient(companyId, employeeId);
 
         var upload = await client.PostAsync(
             $"/api/companies/{companyId}/employees/me/profile-photo",
@@ -79,11 +80,12 @@ public class CancelPendingProfilePhotoEndpointTests : IClassFixture<ApiWebApplic
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
-    private HttpClient SelfClient(Guid companyId, Guid employeeId)
+    private async Task<HttpClient> SelfClient(Guid companyId, Guid employeeId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }
 

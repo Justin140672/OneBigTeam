@@ -1,0 +1,89 @@
+@using System.ComponentModel.DataAnnotations
+@using HR.Web.Models
+@inject EmployeeNoteService EmployeeNoteService
+@inherits EditDialogBase<AddEmployeeNoteDialog.AddEmployeeNoteFormModel>
+
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="520px" ShowCloseIcon="true" CssClass="add-employee-note-dialog">
+    <DialogEvents Closed="HandleDialogClosed" />
+    <DialogTemplates>
+        <Header>Add Note</Header>
+        <Content>
+            @if (!string.IsNullOrEmpty(GlobalError))
+            {
+                <div class="alert alert-danger alert-dismissible mb-3">
+                    @GlobalError
+                    <button type="button" class="btn-close" @onclick="@(() => GlobalError = null)"></button>
+                </div>
+            }
+            <EditForm EditContext="EditContext">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Category <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="string" TItem="string"
+                                        DataSource="@EmployeeNoteCategories.All"
+                                        @bind-Value="Model.Category"
+                                        AllowFiltering="true">
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => Model.Category)" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Note <span class="text-danger">*</span></label>
+                        <textarea class="form-control" rows="4" maxlength="4000" data-testid="add-note-text"
+                                  @bind="Model.NoteText" placeholder="Enter note details…"></textarea>
+                        <ValidationMessage For="@(() => Model.NoteText)" />
+                    </div>
+                    <div class="col-12">
+                        <SfCheckBox TChecked="bool" Label="Important" @bind-Checked="Model.IsImportant" />
+                    </div>
+                </div>
+            </EditForm>
+        </Content>
+        <FooterTemplate>
+            <HrDialogButtonBar SaveLabel="Add" Saving="Saving" OnSave="SubmitAsync" OnCancel="CancelAsync" />
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    protected override async Task<string?> SaveCoreAsync()
+    {
+        var request = new CreateEmployeeNoteRequest(
+            CompanyId,
+            EmployeeId,
+            Model.Category,
+            Model.NoteText.Trim(),
+            Model.IsImportant);
+
+        var (created, error) = await EmployeeNoteService.CreateEmployeeNoteAsync(CompanyId, EmployeeId, request);
+
+        return created is not null ? null : error ?? "Failed to create employee note.";
+    }
+
+    protected override Task OnOpenedAsync()
+    {
+        GlobalError = null;
+        return Task.CompletedTask;
+    }
+
+    protected override void ResetForm()
+    {
+        Model.Category = "General";
+        Model.NoteText = string.Empty;
+        Model.IsImportant = false;
+    }
+
+    public sealed class AddEmployeeNoteFormModel
+    {
+        [Required(ErrorMessage = "Please select a category.")]
+        public string Category { get; set; } = "General";
+
+        [Required(ErrorMessage = "Please enter the note text.")]
+        public string NoteText { get; set; } = string.Empty;
+
+        public bool IsImportant { get; set; }
+    }
+}

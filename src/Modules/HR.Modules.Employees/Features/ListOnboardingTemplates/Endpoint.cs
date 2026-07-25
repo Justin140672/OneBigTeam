@@ -9,7 +9,7 @@ internal sealed class Endpoint(ListOnboardingTemplatesHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/onboarding-templates");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(

@@ -40,7 +40,6 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
             Role.Create(SystemRoles.Manager,              "Manager",               seedDate),
             Role.Create(SystemRoles.Recruiter,            "Recruiter",             seedDate),
             Role.Create(SystemRoles.HrAdministrator,      "HR Administrator",      seedDate),
-            Role.Create(SystemRoles.Finance,              "Finance",               seedDate),
             Role.Create(SystemRoles.CompanyAdministrator, "Company Administrator", seedDate)
         );
     }

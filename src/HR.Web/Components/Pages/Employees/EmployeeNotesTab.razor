@@ -1,0 +1,80 @@
+@using HR.Web.Models
+@inject EmployeeNoteService EmployeeNoteService
+
+<AddEmployeeNoteDialog CompanyId="CompanyId"
+                        EmployeeId="EmployeeId"
+                        IsOpen="_addOpen"
+                        OnSaved="OnNoteAdded"
+                        OnCancelled="@(() => _addOpen = false)" />
+
+<SupersedeEmployeeNoteDialog CompanyId="CompanyId"
+                             EmployeeId="EmployeeId"
+                             Original="_supersedeTarget"
+                             IsOpen="_supersedeOpen"
+                             OnSaved="OnNoteSuperseded"
+                             OnCancelled="@(() => _supersedeOpen = false)" />
+
+@if (_loading)
+{
+    <HrLoadingIndicator />
+}
+else
+{
+    <div class="d-flex justify-content-end mb-3">
+        <SfButton CssClass="e-primary e-small" OnClick="@(() => _addOpen = true)" data-testid="add-note-btn">
+            <i class="fa-solid fa-plus me-1"></i> Add Note
+        </SfButton>
+    </div>
+
+    @if (_notes.Count == 0)
+    {
+        <p class="text-muted small mb-0" data-testid="no-notes-message">No notes recorded for this employee.</p>
+    }
+    else
+    {
+        <EmployeeNotesGrid Items="_sortedNotes" OnEdit="StartSupersede" />
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    private bool _loading = true;
+    private bool _addOpen;
+    private bool _supersedeOpen;
+    private EmployeeNoteItemModel? _supersedeTarget;
+    private IReadOnlyList<EmployeeNoteItemModel> _notes = [];
+    private IReadOnlyList<EmployeeNoteItemModel> _sortedNotes = [];
+
+    protected override async Task OnParametersSetAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _loading = _notes.Count == 0;
+
+        _notes = await EmployeeNoteService.GetEmployeeNotesAsync(CompanyId, EmployeeId);
+        _sortedNotes = EmployeeNoteService.GroupAndSort(_notes);
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task OnNoteAdded()
+    {
+        _addOpen = false;
+        await ReloadAsync();
+    }
+
+    private void StartSupersede(EmployeeNoteItemModel note)
+    {
+        _supersedeTarget = note;
+        _supersedeOpen = true;
+    }
+
+    private async Task OnNoteSuperseded()
+    {
+        _supersedeOpen = false;
+        await ReloadAsync();
+    }
+}

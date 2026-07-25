@@ -11,7 +11,7 @@ internal sealed class Endpoint(RejectProfilePhotoHandler handler, IAuthorization
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/profile-photo/pending/reject");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(

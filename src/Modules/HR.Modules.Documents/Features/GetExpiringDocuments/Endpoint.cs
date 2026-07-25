@@ -9,7 +9,7 @@ internal sealed class Endpoint(GetExpiringDocumentsHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/documents/expiring");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(

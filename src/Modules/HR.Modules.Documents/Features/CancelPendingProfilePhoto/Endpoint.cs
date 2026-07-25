@@ -10,7 +10,7 @@ internal sealed class Endpoint(CancelPendingProfilePhotoHandler handler)
     public override void Configure()
     {
         Delete("/api/companies/{companyId:guid}/employees/me/profile-photo/pending");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(CancelPendingProfilePhotoRequest request, CancellationToken cancellationToken)

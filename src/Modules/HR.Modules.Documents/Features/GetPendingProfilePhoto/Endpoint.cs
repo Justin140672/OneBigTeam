@@ -11,7 +11,7 @@ internal sealed class Endpoint(GetPendingProfilePhotoHandler handler, IAuthoriza
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees/{employeeId:guid}/profile-photo/pending");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(

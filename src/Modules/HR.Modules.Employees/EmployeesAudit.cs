@@ -174,6 +174,55 @@ internal sealed record CompensationRecordReopenedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
+// Employee notes are confidential HR content (performance/conduct/wellbeing notes) and audit
+// history is readable more broadly than the employee:manage-gated notes feature itself
+// (see GetEmployeeAuditHistory/AuditHistoryReader), so the raw NoteText is deliberately excluded
+// from both audit payloads below — only a safe category/importance summary is recorded.
+internal sealed record EmployeeNoteCreatedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid NoteId,
+    string Category,
+    bool IsImportant,
+    Guid? ActorUserId,
+    Guid? ActorEmployeeId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "employee.note.created";
+    string IAuditEvent.EntityType => "EmployeeNote";
+    Guid IAuditEvent.EntityId => NoteId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => ActorUserId;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Employee note created";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { Category, IsImportant };
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record EmployeeNoteSupersededAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid OriginalNoteId,
+    Guid NewNoteId,
+    Guid? ActorUserId,
+    Guid? ActorEmployeeId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "employee.note.superseded";
+    string IAuditEvent.EntityType => "EmployeeNote";
+    Guid IAuditEvent.EntityId => OriginalNoteId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => ActorUserId;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Employee note superseded";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { NewNoteId };
+    object? IAuditEvent.Metadata => null;
+}
+
 internal sealed record EmployeeCreatedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,

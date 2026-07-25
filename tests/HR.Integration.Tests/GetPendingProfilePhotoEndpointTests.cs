@@ -15,8 +15,10 @@ public class GetPendingProfilePhotoEndpointTests : IClassFixture<ApiWebApplicati
     {
         _factory = factory;
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]
@@ -97,7 +99,7 @@ public class GetPendingProfilePhotoEndpointTests : IClassFixture<ApiWebApplicati
         var companyB   = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        using (var selfClientB = SelfClient(companyB, employeeId))
+        using (var selfClientB = await SelfClient(companyB, employeeId))
         {
             var upload = await selfClientB.PostAsync(
                 $"/api/companies/{companyB}/employees/me/profile-photo",
@@ -122,7 +124,7 @@ public class GetPendingProfilePhotoEndpointTests : IClassFixture<ApiWebApplicati
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        using (var selfClient = SelfClient(companyId, employeeId))
+        using (var selfClient = await SelfClient(companyId, employeeId))
         {
             var upload = await selfClient.PostAsync(
                 $"/api/companies/{companyId}/employees/me/profile-photo",
@@ -149,11 +151,12 @@ public class GetPendingProfilePhotoEndpointTests : IClassFixture<ApiWebApplicati
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
-    private HttpClient SelfClient(Guid companyId, Guid employeeId)
+    private async Task<HttpClient> SelfClient(Guid companyId, Guid employeeId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }
 

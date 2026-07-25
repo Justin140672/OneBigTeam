@@ -15,8 +15,10 @@ public class GetEmployeeProfilePhotoEndpointTests : IClassFixture<ApiWebApplicat
     {
         _factory = factory;
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]

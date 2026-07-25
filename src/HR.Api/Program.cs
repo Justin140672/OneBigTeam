@@ -65,7 +65,6 @@ else
 
 builder.Services
 	.AddAuthorizationBuilder()
-	.AddPolicy("authenticated", policy => policy.RequireAuthenticatedUser())
 	.AddRolePolicies();
 
 var app = builder.Build();

@@ -11,7 +11,7 @@ internal sealed class Endpoint(GetDocumentRequestHandler handler, IAuthorization
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees/{employeeId:guid}/document-requests/{id:guid}");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(

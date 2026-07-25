@@ -9,7 +9,7 @@ internal sealed class Endpoint(ListNationalitiesHandler handler)
     public override void Configure()
     {
         Get("/api/nationalities");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(CancellationToken cancellationToken)

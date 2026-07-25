@@ -20,8 +20,11 @@ public class GetLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationFac
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, User1, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User1, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, User2, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User2, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, User3, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User3, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
 
@@ -125,11 +128,12 @@ public class GetLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationFac
 
     // Unlike StartLeavingProcess/AmendLeavingProcess/CancelLeavingProcess (all gated by the
     // employee:manage policy — HrAdministrator only), GetLeavingProcess is gated by the broader
-    // "authenticated" policy (see IdentityModule/Program.cs: RequireAuthenticatedUser(), no role
-    // requirement at all). This test locks in that real behavioural difference: a caller with zero
-    // assigned roles must still be able to read it, and must not get 403.
+    // "role:employee" policy (see IdentityModule.AddRolePolicies) — every real user always carries
+    // the Employee role (AcceptInvite always assigns it), so this is still broad read access, just
+    // no longer satisfied by an authenticated-but-completely-role-less caller. This test locks in
+    // that a caller with zero assigned roles at all must now get 403, not 200.
     [Fact]
-    public async Task Get_LeavingProcess_Succeeds_For_User_With_No_Roles_Because_Policy_Is_Authenticated_Only()
+    public async Task Get_LeavingProcess_Returns_Forbidden_For_User_With_No_Roles()
     {
         using var hrAdminClient = _factory.CreateClient();
         var companyId = Guid.NewGuid();
@@ -148,7 +152,7 @@ public class GetLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationFac
         var response = await noRoleClient.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leaving-process");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     private sealed record IdPayload(Guid Id);

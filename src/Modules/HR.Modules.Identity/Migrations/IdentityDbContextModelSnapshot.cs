@@ -358,13 +358,6 @@ namespace HR.Modules.Identity.Migrations
                         },
                         new
                         {
-                            Id = new Guid("00000000-0000-0000-0000-000000000005"),
-                            CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            Name = "Finance",
-                            NormalizedName = "FINANCE"
-                        },
-                        new
-                        {
                             Id = new Guid("00000000-0000-0000-0000-000000000006"),
                             CreatedAt = new DateTimeOffset(new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             Name = "Company Administrator",
@@ -503,21 +496,6 @@ namespace HR.Modules.Identity.Migrations
                         {
                             RoleId = new Guid("00000000-0000-0000-0000-000000000004"),
                             PermissionId = new Guid("00000000-0000-0000-0001-000000000015")
-                        },
-                        new
-                        {
-                            RoleId = new Guid("00000000-0000-0000-0000-000000000005"),
-                            PermissionId = new Guid("00000000-0000-0000-0001-000000000001")
-                        },
-                        new
-                        {
-                            RoleId = new Guid("00000000-0000-0000-0000-000000000005"),
-                            PermissionId = new Guid("00000000-0000-0000-0001-000000000003")
-                        },
-                        new
-                        {
-                            RoleId = new Guid("00000000-0000-0000-0000-000000000005"),
-                            PermissionId = new Guid("00000000-0000-0000-0001-000000000011")
                         },
                         new
                         {

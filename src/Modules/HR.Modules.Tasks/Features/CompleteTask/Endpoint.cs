@@ -8,7 +8,7 @@ internal sealed class Endpoint(CompleteTaskHandler handler) : Endpoint<CompleteT
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/tasks/{id:guid}/complete");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(CompleteTaskRequest request, CancellationToken cancellationToken)

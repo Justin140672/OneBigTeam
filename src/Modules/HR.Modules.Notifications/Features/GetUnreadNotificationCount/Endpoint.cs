@@ -9,7 +9,7 @@ internal sealed class Endpoint(GetUnreadNotificationCountHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/notifications/unread-count");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(GetUnreadNotificationCountRequest request, CancellationToken cancellationToken)

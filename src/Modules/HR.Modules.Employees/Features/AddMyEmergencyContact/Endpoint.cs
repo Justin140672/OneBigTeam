@@ -9,7 +9,7 @@ internal sealed class Endpoint(AddMyEmergencyContactHandler handler)
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/employees/me/emergency-contacts");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(

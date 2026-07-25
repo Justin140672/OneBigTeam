@@ -9,7 +9,7 @@ internal sealed class Endpoint(GetMyNotificationsHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/notifications/my");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(GetMyNotificationsRequest request, CancellationToken cancellationToken)

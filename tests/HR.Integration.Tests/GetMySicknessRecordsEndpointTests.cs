@@ -17,11 +17,12 @@ public class GetMySicknessRecordsEndpointTests : IClassFixture<ApiWebApplication
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient EmployeeClient(Guid companyId, Guid employeeId)
+    private async Task<HttpClient> EmployeeClient(Guid companyId, Guid employeeId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }
 
@@ -62,7 +63,7 @@ public class GetMySicknessRecordsEndpointTests : IClassFixture<ApiWebApplication
         var authenticatedEmployeeId = Guid.NewGuid();
         var targetEmployeeId = Guid.NewGuid();
 
-        using var client = EmployeeClient(companyId, authenticatedEmployeeId);
+        using var client = await EmployeeClient(companyId, authenticatedEmployeeId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{targetEmployeeId}/sickness-records/my");
@@ -79,7 +80,7 @@ public class GetMySicknessRecordsEndpointTests : IClassFixture<ApiWebApplication
         using var adminClient = AdminClient(companyId);
         var categoryId = await CreateCategory(adminClient, companyId);
 
-        using var client = EmployeeClient(companyId, employeeId);
+        using var client = await EmployeeClient(companyId, employeeId);
 
         var createResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/my",
@@ -108,7 +109,7 @@ public class GetMySicknessRecordsEndpointTests : IClassFixture<ApiWebApplication
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = EmployeeClient(companyId, employeeId);
+        using var client = await EmployeeClient(companyId, employeeId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/my");

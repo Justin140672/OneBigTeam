@@ -9,7 +9,7 @@ internal sealed class Endpoint(ListEmploymentTypesHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employment-types");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(ListEmploymentTypesRequest request, CancellationToken cancellationToken)

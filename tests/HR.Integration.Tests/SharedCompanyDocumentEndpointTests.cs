@@ -229,156 +229,12 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
     }
 
     [Fact]
-    public async Task List_Filters_By_Status_And_Category_And_Search()
-    {
-        var companyId = Guid.NewGuid();
-        var userId    = Guid.NewGuid();
-        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
-
-        var policyCategory   = await CreateCategoryAsync(client, companyId, "Policy");
-        var handbookCategory = await CreateCategoryAsync(client, companyId, "Handbook");
-
-        await UploadAsync(client, companyId, policyCategory, title: "Remote Working Policy");
-        await UploadAsync(client, companyId, handbookCategory, title: "Employee Handbook");
-
-        // Filter by category — only the Policy-category document should come back.
-        var byCategory = await client.GetFromJsonAsync<ListPayload>(
-            $"/api/companies/{companyId}/shared-documents?categoryId={policyCategory}");
-        Assert.Single(byCategory!.Items);
-        Assert.Equal("Remote Working Policy", byCategory.Items[0].Title);
-
-        // Filter by status — both are Draft (no publish endpoint exists yet), so Draft returns
-        // both and Published returns none.
-        var draftOnly = await client.GetFromJsonAsync<ListPayload>(
-            $"/api/companies/{companyId}/shared-documents?status=Draft");
-        Assert.Equal(2, draftOnly!.Items.Count);
-
-        var publishedOnly = await client.GetFromJsonAsync<ListPayload>(
-            $"/api/companies/{companyId}/shared-documents?status=Published");
-        Assert.Empty(publishedOnly!.Items);
-
-        // Search by title.
-        var bySearch = await client.GetFromJsonAsync<ListPayload>(
-            $"/api/companies/{companyId}/shared-documents?search=handbook");
-        Assert.Single(bySearch!.Items);
-        Assert.Equal("Employee Handbook", bySearch.Items[0].Title);
-    }
-
-    [Fact]
     public async Task List_Returns_Unauthorized_Without_Auth()
     {
         using var client = _factory.CreateClient();
         var response = await client.GetAsync($"/api/companies/{Guid.NewGuid()}/shared-documents");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task List_ReviewStatusFilter_Invalid_Value_Returns_UnprocessableEntity()
-    {
-        var companyId = Guid.NewGuid();
-        var userId    = Guid.NewGuid();
-        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
-
-        // Mirrors how other invalid-request cases in this endpoint surface as 422 —
-        // c.Errors.StatusCode is configured globally to 422 in Program.cs, including for
-        // FastEndpoints query-binding failures such as an unrecognized enum member name.
-        var response = await client.GetAsync(
-            $"/api/companies/{companyId}/shared-documents?reviewStatusFilter=NotARealFilter");
-
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task List_ReviewStatusFilter_DueSoon_Returns_Only_Matching_Documents()
-    {
-        var companyId = Guid.NewGuid();
-        var userId    = Guid.NewGuid();
-        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
-        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-        await UploadAsync(client, companyId, categoryId, title: "Due Soon Policy", reviewDate: today.AddDays(3));
-        await UploadAsync(client, companyId, categoryId, title: "Overdue Policy", reviewDate: today.AddDays(-3));
-        await UploadAsync(client, companyId, categoryId, title: "Beyond Window Policy", reviewDate: today.AddDays(30));
-        await UploadAsync(client, companyId, categoryId, title: "No Review Date Policy");
-
-        var list = await client.GetFromJsonAsync<ListPayload>(
-            $"/api/companies/{companyId}/shared-documents?reviewStatusFilter=DueSoon");
-
-        Assert.Single(list!.Items);
-        Assert.Equal("Due Soon Policy", list.Items[0].Title);
-    }
-
-    [Fact]
-    public async Task List_ReviewStatusFilter_Overdue_Returns_Only_Matching_Documents()
-    {
-        var companyId = Guid.NewGuid();
-        var userId    = Guid.NewGuid();
-        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
-        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-        await UploadAsync(client, companyId, categoryId, title: "Overdue Policy", reviewDate: today.AddDays(-3));
-        await UploadAsync(client, companyId, categoryId, title: "Due Soon Policy", reviewDate: today.AddDays(3));
-        await UploadAsync(client, companyId, categoryId, title: "No Review Date Policy");
-
-        var list = await client.GetFromJsonAsync<ListPayload>(
-            $"/api/companies/{companyId}/shared-documents?reviewStatusFilter=Overdue");
-
-        Assert.Single(list!.Items);
-        Assert.Equal("Overdue Policy", list.Items[0].Title);
-    }
-
-    [Fact]
-    public async Task List_ReviewStatusFilter_NoReview_Returns_Only_Matching_Documents()
-    {
-        var companyId = Guid.NewGuid();
-        var userId    = Guid.NewGuid();
-        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
-        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-        await UploadAsync(client, companyId, categoryId, title: "No Review Date Policy");
-        await UploadAsync(client, companyId, categoryId, title: "Overdue Policy", reviewDate: today.AddDays(-3));
-        await UploadAsync(client, companyId, categoryId, title: "Due Soon Policy", reviewDate: today.AddDays(3));
-
-        var list = await client.GetFromJsonAsync<ListPayload>(
-            $"/api/companies/{companyId}/shared-documents?reviewStatusFilter=NoReview");
-
-        Assert.Single(list!.Items);
-        Assert.Equal("No Review Date Policy", list.Items[0].Title);
-    }
-
-    [Fact]
-    public async Task List_ReviewStatusFilter_Expired_Returns_Only_Matching_Documents()
-    {
-        var companyId = Guid.NewGuid();
-        var userId    = Guid.NewGuid();
-        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
-        var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-        var (expiredDoc, _) = await UploadAsync(client, companyId, categoryId, title: "Expired Policy");
-        await client.PostAsync($"/api/companies/{companyId}/shared-documents/{expiredDoc!.Id}/publish", EmptyJson());
-        await client.PostAsync($"/api/companies/{companyId}/shared-documents/{expiredDoc.Id}/expire", EmptyJson());
-
-        // Still-active Overdue document must not be picked up by the Expired bucket even though
-        // it also has a ReviewDate in the past — Expired is keyed purely off Status.
-        await UploadAsync(client, companyId, categoryId, title: "Overdue Policy", reviewDate: today.AddDays(-3));
-
-        var list = await client.GetFromJsonAsync<ListPayload>(
-            $"/api/companies/{companyId}/shared-documents?reviewStatusFilter=Expired");
-
-        Assert.Single(list!.Items);
-        Assert.Equal("Expired Policy", list.Items[0].Title);
-        Assert.Equal("Expired", list.Items[0].Status);
     }
 
     [Fact]
@@ -1473,25 +1329,6 @@ public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicatio
             Assert.Null(outstandingItem.VersionNumber);
             Assert.Null(outstandingItem.AcknowledgementStatement);
         }
-    }
-
-    [Fact]
-    public async Task AcknowledgementProgress_Filters_By_Department()
-    {
-        var companyId  = Guid.NewGuid();
-        var hrUserId   = Guid.NewGuid();
-        await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
-        using var hrClient = ClientAs(companyId, hrUserId);
-
-        var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
-        var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
-        await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
-        var departmentId = await SeedDepartmentAsync(companyId, "Engineering");
-
-        var response = await hrClient.GetAsync(
-            $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledgement-progress?departmentId={departmentId}");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]

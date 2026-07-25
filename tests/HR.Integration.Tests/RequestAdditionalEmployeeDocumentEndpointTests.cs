@@ -18,8 +18,10 @@ public class RequestAdditionalEmployeeDocumentEndpointTests : IClassFixture<ApiW
     {
         _factory = factory;
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     // ── Happy path ───────────────────────────────────────────────────────────────

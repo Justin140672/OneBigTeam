@@ -11,7 +11,7 @@ internal sealed class Endpoint(CancelDocumentRequestHandler handler, IAuthorizat
     public override void Configure()
     {
         Delete("/api/companies/{companyId:guid}/employees/{employeeId:guid}/document-requests/{documentRequestId:guid}");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(CancelDocumentRequestRequest request, CancellationToken cancellationToken)

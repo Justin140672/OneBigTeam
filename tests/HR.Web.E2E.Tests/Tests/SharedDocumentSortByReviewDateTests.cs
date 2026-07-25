@@ -19,12 +19,9 @@ namespace HR.Web.E2E.Tests.Tests;
 /// 5=Next Review Date, 6=Review Frequency, 7=Review Owner, 8=Last Updated, 9=Updated By.
 ///
 /// The list endpoint's default (unsorted) order is <c>OrderByDescending(d =&gt; d.CreatedAt)</c>
-/// (see ListSharedCompanyDocumentsHandler) — i.e. most-recently-created first. Each test below
-/// scopes the visible dataset with the existing "Next Review Date From"/"To" filters (same
-/// interaction pattern as the Category/Review Status filters — see
-/// SharedDocumentReviewStatusFilterTests) to a review-date window (today+140..today+190) that no
-/// other test in this suite uses (the widest offset used elsewhere is AddYears(1)/AddDays(60)),
-/// to minimize interference from other seeded/persisted documents. Because the backend database
+/// (see ListSharedCompanyDocumentsHandler) — i.e. most-recently-created first. The list filter bar
+/// (Search/Status/Review Status/Category/Next Review Date range) has been removed, so these tests
+/// no longer scope the visible dataset with a review-date range filter. Because the backend database
 /// is shared across the whole "E2E" collection (DisableParallelization = true, so tests run
 /// strictly sequentially — see E2ECollection) and the date window alone can't
 /// guarantee only this test's rows are visible, row-order assertions never assume the grid
@@ -55,8 +52,6 @@ public sealed class SharedDocumentSortByReviewDateTests(AppFixture fixture) : E2
     private static readonly DateOnly EarlyReviewDate = DateOnly.FromDateTime(DateTime.Today.AddDays(150));
     private static readonly DateOnly MiddleReviewDate = DateOnly.FromDateTime(DateTime.Today.AddDays(165));
     private static readonly DateOnly LateReviewDate = DateOnly.FromDateTime(DateTime.Today.AddDays(180));
-    private static readonly DateOnly FilterFrom = DateOnly.FromDateTime(DateTime.Today.AddDays(140));
-    private static readonly DateOnly FilterTo = DateOnly.FromDateTime(DateTime.Today.AddDays(190));
 
     [Fact]
     public async Task ReviewDateHeader_ClickedOnce_SortsRowsByReviewDateAscending()
@@ -76,7 +71,6 @@ public sealed class SharedDocumentSortByReviewDateTests(AppFixture fixture) : E2
             await UploadDocumentWithReviewDateAsync(lateTitle, NewTempFile(files), LateReviewDate);
 
             await GoToListPageAsync();
-            await ApplyReviewDateRangeFilterAsync(FilterFrom, FilterTo);
 
             await ClickReviewDateHeaderAsync(expectedDirectionClass: "e-ascending");
 
@@ -109,7 +103,6 @@ public sealed class SharedDocumentSortByReviewDateTests(AppFixture fixture) : E2
             await UploadDocumentWithReviewDateAsync(lateTitle, NewTempFile(files), LateReviewDate);
 
             await GoToListPageAsync();
-            await ApplyReviewDateRangeFilterAsync(FilterFrom, FilterTo);
 
             // First click -> ascending, second click -> descending (Syncfusion's native 3-click
             // single-column sort cycle: ascending -> descending -> none/original).
@@ -145,7 +138,6 @@ public sealed class SharedDocumentSortByReviewDateTests(AppFixture fixture) : E2
             await UploadDocumentWithReviewDateAsync(lateTitle, NewTempFile(files), LateReviewDate);
 
             await GoToListPageAsync();
-            await ApplyReviewDateRangeFilterAsync(FilterFrom, FilterTo);
 
             var ourTitles = new[] { earlyTitle, middleTitle, lateTitle };
 
@@ -182,30 +174,6 @@ public sealed class SharedDocumentSortByReviewDateTests(AppFixture fixture) : E2
     {
         await _page.GotoAsync(_fixture.WebBaseUrl + $"/companies/{AcmeId}/shared-documents");
         await _page.WaitForSelectorAsync("h1:has-text('Shared Documents')", new() { Timeout = 15_000 });
-        await _page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 15_000 });
-    }
-
-    // Narrows the visible grid to the "Next Review Date From"/"To" window using the plain
-    // (non-dialog) SfDatePicker filters already on SharedDocuments.razor's filter toolbar — same
-    // ".e-date-wrapper input.e-input" fill pattern as the upload dialog's "Next Review Date"
-    // field, scoped to each filter's own ".col-md-2" label group so "From" and "To" (whose label
-    // text doesn't overlap) resolve unambiguously.
-    private async Task ApplyReviewDateRangeFilterAsync(DateOnly from, DateOnly to)
-    {
-        var fromInput = _page.Locator(".col-md-2")
-            .Filter(new() { HasText = "Next Review Date From" })
-            .Locator(".e-date-wrapper input.e-input");
-        await fromInput.ClickAsync();
-        await fromInput.FillAsync(from.ToString("dd/MM/yyyy"));
-        await _page.Keyboard.PressAsync("Tab");
-        await _page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 15_000 });
-
-        var toInput = _page.Locator(".col-md-2")
-            .Filter(new() { HasText = "Next Review Date To" })
-            .Locator(".e-date-wrapper input.e-input");
-        await toInput.ClickAsync();
-        await toInput.FillAsync(to.ToString("dd/MM/yyyy"));
-        await _page.Keyboard.PressAsync("Tab");
         await _page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 15_000 });
     }
 
@@ -286,7 +254,6 @@ public sealed class SharedDocumentSortByReviewDateTests(AppFixture fixture) : E2
 
     // Uploads a shared document from the Shared Documents list page with a Next Review Date —
     // same upload-dialog interaction pattern as
-    // SharedDocumentReviewStatusFilterTests.UploadDocumentWithReviewDateAsync /
     // HrDashboardTests.UploadDocumentWithReviewDateAsync / SharedDocumentListReviewColumnsTests.
     // UploadDocumentAsync.
     private async Task UploadDocumentWithReviewDateAsync(string title, string filePath, DateOnly reviewDate)

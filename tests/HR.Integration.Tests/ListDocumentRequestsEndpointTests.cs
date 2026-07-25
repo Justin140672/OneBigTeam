@@ -17,8 +17,10 @@ public class ListDocumentRequestsEndpointTests : IClassFixture<ApiWebApplication
     {
         _factory = factory;
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]
@@ -52,7 +54,7 @@ public class ListDocumentRequestsEndpointTests : IClassFixture<ApiWebApplication
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        using var client = EmployeeClient(companyId, employeeId);
+        using var client = await EmployeeClient(companyId, employeeId);
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests");
 
@@ -67,7 +69,7 @@ public class ListDocumentRequestsEndpointTests : IClassFixture<ApiWebApplication
     {
         var (companyId, employeeId, _, _) = await SetupAsync(count: 2);
 
-        using var client = EmployeeClient(companyId, employeeId);
+        using var client = await EmployeeClient(companyId, employeeId);
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests");
 
@@ -93,7 +95,7 @@ public class ListDocumentRequestsEndpointTests : IClassFixture<ApiWebApplication
         req!.MarkUploaded(employeeId, DateTimeOffset.UtcNow);
         await db.SaveChangesAsync();
 
-        using var client = EmployeeClient(companyId, employeeId);
+        using var client = await EmployeeClient(companyId, employeeId);
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests");
 
@@ -125,7 +127,7 @@ public class ListDocumentRequestsEndpointTests : IClassFixture<ApiWebApplication
         var (companyId, employeeId, _, _) = await SetupAsync(count: 1);
         var otherEmployee = Guid.NewGuid();
 
-        using var client = EmployeeClient(companyId, otherEmployee);
+        using var client = await EmployeeClient(companyId, otherEmployee);
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{otherEmployee}/document-requests");
 
@@ -165,11 +167,12 @@ public class ListDocumentRequestsEndpointTests : IClassFixture<ApiWebApplication
         return (companyId, employeeId, requestIds[0], requestIds);
     }
 
-    private HttpClient EmployeeClient(Guid companyId, Guid employeeId)
+    private async Task<HttpClient> EmployeeClient(Guid companyId, Guid employeeId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader,   employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }
 

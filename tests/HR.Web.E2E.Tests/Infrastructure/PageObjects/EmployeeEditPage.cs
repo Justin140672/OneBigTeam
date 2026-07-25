@@ -852,4 +852,101 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await card.GetByRole(AriaRole.Button, new() { Name = "Approve" }).ClickAsync();
         await card.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
+
+    // ── Notes Tab ───────────────────────────────────────────────────────────────
+    // Only rendered when Session.IsHrAdministrator (see EmployeeEdit.razor, wrapped in an
+    // @if(Session.IsHrAdministrator) around the "Notes" TabHeader/TabContent, in addition to the
+    // page-level Session.CanManageEmployees guard applied to the whole edit page).
+
+    public async Task OpenNotesTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Notes" }).ClickAsync();
+        await page.WaitForSelectorAsync(
+            "[data-testid='add-note-btn'], [data-testid='no-notes-message']",
+            new() { Timeout = 15_000 });
+    }
+
+    public Task<bool> HasNotesTabAsync() =>
+        page.GetByRole(AriaRole.Tab, new() { Name = "Notes" }).IsVisibleAsync();
+
+    public async Task ClickAddNoteAsync()
+    {
+        await page.Locator("[data-testid='add-note-btn']").ClickAsync();
+        await page.Locator("[role='dialog'].add-employee-note-dialog").WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+    }
+
+    public async Task SelectAddNoteCategoryAsync(string categoryLabel)
+    {
+        await page.Locator(".add-employee-note-dialog span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = categoryLabel })
+            .First
+            .ClickAsync();
+    }
+
+    public Task FillAddNoteTextAsync(string text) =>
+        page.Locator("[data-testid='add-note-text']").FillAsync(text);
+
+    public Task CheckAddNoteImportantAsync() =>
+        page.Locator(".add-employee-note-dialog").GetByLabel("Important").CheckAsync();
+
+    public async Task SubmitAddNoteDialogAsync()
+    {
+        await page.Locator(".add-employee-note-dialog .e-footer-content button:has-text('Add')").ClickAsync();
+        await page.Locator("[role='dialog'].add-employee-note-dialog").WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    public Task<bool> HasAddNoteDialogErrorAsync() =>
+        page.Locator(".add-employee-note-dialog .alert-danger").IsVisibleAsync();
+
+    /// <summary>Returns the notes grid row whose rendered text contains <paramref name="textFragment"/>.</summary>
+    public ILocator NoteCard(string textFragment) =>
+        page.Locator("[data-testid='employee-notes-grid'] .e-row").Filter(new() { HasText = textFragment });
+
+    public async Task ClickSupersedeNoteAsync(string originalTextFragment)
+    {
+        await NoteCard(originalTextFragment).First
+            .Locator("[data-testid='edit-note-btn']")
+            .ClickAsync();
+        await page.Locator("[role='dialog'].supersede-employee-note-dialog").WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+    }
+
+    public Task FillSupersedeNoteTextAsync(string text) =>
+        page.Locator("[data-testid='supersede-note-text']").FillAsync(text);
+
+    public async Task SelectSupersedeNoteCategoryAsync(string categoryLabel)
+    {
+        await page.Locator(".supersede-employee-note-dialog span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = categoryLabel })
+            .First
+            .ClickAsync();
+    }
+
+    public async Task SubmitSupersedeNoteDialogAsync()
+    {
+        await page.Locator(".supersede-employee-note-dialog .e-footer-content button:has-text('Save')").ClickAsync();
+        await page.Locator("[role='dialog'].supersede-employee-note-dialog").WaitForAsync(
+            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    /// <summary>True if the note card containing <paramref name="textFragment"/> shows the "Superseded" badge.</summary>
+    public Task<bool> NoteCardHasSupersededBadgeAsync(string textFragment) =>
+        NoteCard(textFragment).First.Locator("[data-testid='note-superseded-badge']").IsVisibleAsync();
+
+    /// <summary>True if the note card containing <paramref name="textFragment"/> shows the "Important" badge.</summary>
+    public Task<bool> NoteCardHasImportantBadgeAsync(string textFragment) =>
+        NoteCard(textFragment).First.Locator("[data-testid='note-important-badge']").IsVisibleAsync();
+
+    /// <summary>Returns the bounding-box Y position of the note card containing <paramref name="textFragment"/> — used to assert relative ordering (important notes pinned above standard notes).</summary>
+    public async Task<float?> GetNoteCardYPositionAsync(string textFragment)
+    {
+        var box = await NoteCard(textFragment).First.BoundingBoxAsync();
+        return box?.Y;
+    }
 }

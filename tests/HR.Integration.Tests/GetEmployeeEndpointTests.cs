@@ -21,8 +21,11 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, GetEmpUser1, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, GetEmpUser1, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, GetEmpUser2, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, GetEmpUser2, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, GetEmpUser3, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, GetEmpUser3, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
 

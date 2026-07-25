@@ -139,7 +139,7 @@ else
                             <span class="badge @css">@label</span>
                         </Template>
                     </GridColumn>
-                    <GridColumn HeaderText="" Width="140" AllowSorting="false" AllowFiltering="false"
+                    <GridColumn HeaderText="" Width="220" AllowSorting="false" AllowFiltering="false"
                                 TextAlign="TextAlign.Right">
                         <Template>
                             @{ var r = (context as EmployeeDocumentListItem)!; }
@@ -155,16 +155,14 @@ else
                             else
                             {
                                 <SfButton CssClass="e-outline e-small me-1"
-                                          OnClick="() => DownloadAsync(r.EmployeeDocumentId)"
-                                          title="Download">
-                                    <i class="fa-solid fa-download"></i>
+                                          OnClick="() => DownloadAsync(r.EmployeeDocumentId)">
+                                    Download
                                 </SfButton>
                                 @if (!EmployeeSelfUpload)
                                 {
                                     <SfButton CssClass="e-danger e-outline e-small"
-                                              OnClick="() => StartDelete(r.EmployeeDocumentId)"
-                                              title="Delete">
-                                        <i class="fa-solid fa-trash"></i>
+                                              OnClick="() => StartDelete(r.EmployeeDocumentId)">
+                                        Delete
                                     </SfButton>
                                 }
                             }

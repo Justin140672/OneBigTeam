@@ -17,11 +17,12 @@ public class RecordMySicknessEndpointTests : IClassFixture<ApiWebApplicationFact
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient EmployeeClient(Guid companyId, Guid employeeId)
+    private async Task<HttpClient> EmployeeClient(Guid companyId, Guid employeeId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }
 
@@ -66,7 +67,7 @@ public class RecordMySicknessEndpointTests : IClassFixture<ApiWebApplicationFact
         using var adminClient = AdminClient(companyId);
         var categoryId = await CreateCategory(adminClient, companyId);
 
-        using var client = EmployeeClient(companyId, employeeId);
+        using var client = await EmployeeClient(companyId, employeeId);
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/my",
             new
@@ -100,7 +101,7 @@ public class RecordMySicknessEndpointTests : IClassFixture<ApiWebApplicationFact
         var authenticatedEmployeeId = Guid.NewGuid();
         var targetEmployeeId = Guid.NewGuid(); // different employee
 
-        using var client = EmployeeClient(companyId, authenticatedEmployeeId);
+        using var client = await EmployeeClient(companyId, authenticatedEmployeeId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{targetEmployeeId}/sickness-records/my",
@@ -121,7 +122,7 @@ public class RecordMySicknessEndpointTests : IClassFixture<ApiWebApplicationFact
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = EmployeeClient(companyId, employeeId);
+        using var client = await EmployeeClient(companyId, employeeId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/my",
@@ -142,7 +143,7 @@ public class RecordMySicknessEndpointTests : IClassFixture<ApiWebApplicationFact
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = EmployeeClient(companyId, employeeId);
+        using var client = await EmployeeClient(companyId, employeeId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/my",
@@ -163,7 +164,7 @@ public class RecordMySicknessEndpointTests : IClassFixture<ApiWebApplicationFact
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = EmployeeClient(companyId, employeeId);
+        using var client = await EmployeeClient(companyId, employeeId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/my",
@@ -187,7 +188,7 @@ public class RecordMySicknessEndpointTests : IClassFixture<ApiWebApplicationFact
         using var adminClient = AdminClient(companyId);
         var categoryId = await CreateCategory(adminClient, companyId);
 
-        using var client = EmployeeClient(companyId, employeeId);
+        using var client = await EmployeeClient(companyId, employeeId);
 
         // Create the first open record
         var firstResponse = await client.PostAsJsonAsync(

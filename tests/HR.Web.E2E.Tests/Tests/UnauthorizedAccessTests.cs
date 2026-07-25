@@ -18,6 +18,28 @@ public sealed class UnauthorizedAccessTests(AppFixture fixture) : E2ETestBase(fi
     private static readonly Guid JamesId = Guid.Parse("30000000-0000-0000-0000-000000000002");
 
     private const string TomEmail = "tom.williams@acme.example";
+    private const string JamesEmail = "james.okafor@acme.example";
+
+    [Fact]
+    public async Task Manager_CannotAccess_AnotherEmployeesAdminProfile()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        // ── Step 1: Login as James (Manager-only — no HrAdministrator role) ───
+        await login.GoToAsync();
+        await login.LoginAsync(JamesEmail);
+
+        // ── Step 2: Attempt to navigate to Tom's admin edit page ──────────────
+        // James manages Tom directly, so this is a realistic "manager trying to view a direct
+        // report's full HR record" scenario, not an arbitrary stranger's profile.
+        await _page.GotoAsync(
+            $"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees/{TomId}");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        // ── Step 3: Must be redirected away from the admin edit URL ───────────
+        var finalUrl = _page.Url;
+        Assert.DoesNotContain($"/employees/{TomId}", finalUrl);
+    }
 
     [Fact]
     public async Task Employee_CannotAccess_HrInbox()

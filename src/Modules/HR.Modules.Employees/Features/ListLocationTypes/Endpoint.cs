@@ -9,7 +9,7 @@ internal sealed class Endpoint(ListLocationTypesHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/location-types");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(ListLocationTypesRequest request, CancellationToken cancellationToken)

@@ -22,10 +22,15 @@ public class ListEmployeesEndpointTests : IClassFixture<ApiWebApplicationFactory
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, ListEmpUser1, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ListEmpUser1, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, ListEmpUser2, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ListEmpUser2, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, ListEmpUser3, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ListEmpUser3, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, ListEmpUser4, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ListEmpUser4, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, ListEmpUser5, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ListEmpUser5, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
 

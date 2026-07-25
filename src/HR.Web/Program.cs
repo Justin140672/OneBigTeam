@@ -47,6 +47,7 @@ builder.Services.AddScoped<ProbationService>();
 builder.Services.AddScoped<OnboardingService>();
 builder.Services.AddScoped<OffboardingService>();
 builder.Services.AddScoped<CompensationService>();
+builder.Services.AddScoped<EmployeeNoteService>();
 builder.Services.AddScoped<AuditHistoryService>();
 builder.Services.AddScoped<OrganisationHierarchyBuilder>();
 builder.Services.AddScoped<OrganisationChartService>();

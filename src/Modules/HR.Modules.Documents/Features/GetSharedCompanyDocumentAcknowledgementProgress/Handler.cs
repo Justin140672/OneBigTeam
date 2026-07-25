@@ -77,11 +77,7 @@ internal sealed class GetSharedCompanyDocumentAcknowledgementProgressHandler(
         var outstandingCount = allItems.Count(i => i.Status == StatusOutstanding);
         var percentage = totalAssigned == 0 ? 0m : Math.Round(acknowledgedCount * 100m / totalAssigned, 1);
 
-        var filteredItems = allItems.Where(i =>
-                (request.DepartmentId is null || i.DepartmentId == request.DepartmentId) &&
-                (request.LocationId is null || i.LocationId == request.LocationId) &&
-                (request.IsAcknowledged is null || (i.Status == StatusAcknowledged) == request.IsAcknowledged) &&
-                (request.IsOverdue is null || (i.Status == StatusOverdue) == request.IsOverdue))
+        var orderedItems = allItems
             .OrderBy(i => i.EmployeeName)
             .ToList();
 
@@ -93,6 +89,6 @@ internal sealed class GetSharedCompanyDocumentAcknowledgementProgressHandler(
             outstandingCount,
             overdueCount,
             percentage,
-            filteredItems));
+            orderedItems));
     }
 }

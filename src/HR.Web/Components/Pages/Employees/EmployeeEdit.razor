@@ -670,6 +670,18 @@
                     </TabItem>
                 }
 
+                @if (Session.IsHrAdministrator)
+                {
+                    <TabItem>
+                        <ChildContent><TabHeader Text="Notes" /></ChildContent>
+                        <ContentTemplate>
+                            <div class="mt-4">
+                                <EmployeeNotesTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+                }
+
             </TabItems>
         </SfTab>
 

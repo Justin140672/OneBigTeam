@@ -32,7 +32,9 @@ public class SicknessAuthorizationTests : IClassFixture<ApiWebApplicationFactory
             await TestRoleSeeder.AssignRoleAsync(factory, OtherManagerUser, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, OtherManagerUser, SystemRoles.Manager);
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdministratorUser, SystemRoles.CompanyAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdministratorUser, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
 
@@ -47,7 +49,7 @@ public class SicknessAuthorizationTests : IClassFixture<ApiWebApplicationFactory
     // --- sickness:manage — plain Employee is denied on HR-only endpoints ---
 
     // ListSicknessCategories is read-only reference data (category names) shared with employee
-    // self-service "notify sickness" — same pattern as ListDocumentTypes — so it's "authenticated"
+    // self-service "notify sickness" — same pattern as ListDocumentTypes — so it's "role:employee"
     // rather than "sickness:manage" and a plain employee is allowed to list it.
     [Fact]
     public async Task PlainEmployee_Gets_Ok_Listing_Sickness_Categories()

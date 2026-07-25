@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
+using HR.Modules.Identity.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -50,7 +51,7 @@ public class UploadMyProfilePhotoEndpointTests : IClassFixture<ApiWebApplication
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = SelfClient(companyId, employeeId);
+        using var client = await SelfClient(companyId, employeeId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/me/profile-photo",
@@ -78,7 +79,7 @@ public class UploadMyProfilePhotoEndpointTests : IClassFixture<ApiWebApplication
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = SelfClient(companyId, employeeId);
+        using var client = await SelfClient(companyId, employeeId);
 
         var oversized = new byte[6 * 1024 * 1024]; // exceeds the default 5 MB limit
 
@@ -94,7 +95,7 @@ public class UploadMyProfilePhotoEndpointTests : IClassFixture<ApiWebApplication
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = SelfClient(companyId, employeeId);
+        using var client = await SelfClient(companyId, employeeId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/me/profile-photo",
@@ -108,7 +109,7 @@ public class UploadMyProfilePhotoEndpointTests : IClassFixture<ApiWebApplication
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = SelfClient(companyId, employeeId);
+        using var client = await SelfClient(companyId, employeeId);
 
         // Extension/content type claim PNG, but the bytes are not a PNG (spoofed/renamed file).
         var spoofed = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
@@ -125,7 +126,7 @@ public class UploadMyProfilePhotoEndpointTests : IClassFixture<ApiWebApplication
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = SelfClient(companyId, employeeId);
+        using var client = await SelfClient(companyId, employeeId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/me/profile-photo",
@@ -139,7 +140,7 @@ public class UploadMyProfilePhotoEndpointTests : IClassFixture<ApiWebApplication
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = SelfClient(companyId, employeeId);
+        using var client = await SelfClient(companyId, employeeId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/me/profile-photo",
@@ -153,7 +154,7 @@ public class UploadMyProfilePhotoEndpointTests : IClassFixture<ApiWebApplication
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = SelfClient(companyId, employeeId);
+        using var client = await SelfClient(companyId, employeeId);
 
         var first = await client.PostAsync(
             $"/api/companies/{companyId}/employees/me/profile-photo",
@@ -196,7 +197,7 @@ public class UploadMyProfilePhotoEndpointTests : IClassFixture<ApiWebApplication
             await db.SaveChangesAsync();
         }
 
-        using var client = SelfClient(companyId, employeeId);
+        using var client = await SelfClient(companyId, employeeId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/me/profile-photo",
@@ -216,11 +217,12 @@ public class UploadMyProfilePhotoEndpointTests : IClassFixture<ApiWebApplication
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
-    private HttpClient SelfClient(Guid companyId, Guid employeeId)
+    private async Task<HttpClient> SelfClient(Guid companyId, Guid employeeId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }
 

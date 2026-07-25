@@ -9,7 +9,7 @@ internal sealed class Endpoint(UpdateMyEmergencyContactHandler handler)
     public override void Configure()
     {
         Put("/api/companies/{companyId:guid}/employees/me/emergency-contacts/{contactId:guid}");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(

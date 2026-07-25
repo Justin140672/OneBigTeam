@@ -8,7 +8,7 @@ internal sealed class Endpoint(GetEmployeeTasksHandler handler) : Endpoint<GetEm
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees/{employeeId:guid}/tasks");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(GetEmployeeTasksRequest request, CancellationToken cancellationToken)

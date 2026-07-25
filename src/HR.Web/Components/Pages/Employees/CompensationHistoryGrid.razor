@@ -79,12 +79,8 @@
                     }
                     else
                     {
-                        <SfButton CssClass="e-outline e-small me-1" title="Edit" OnClick="() => OnEdit.InvokeAsync(item)">
-                            <i class="fa-solid fa-pen"></i>
-                        </SfButton>
-                        <SfButton CssClass="e-danger e-outline e-small" title="Delete" OnClick="() => StartDelete(item.Id)">
-                            <i class="fa-solid fa-trash"></i>
-                        </SfButton>
+                        <SfButton CssClass="e-outline e-small me-1" OnClick="() => OnEdit.InvokeAsync(item)">Edit</SfButton>
+                        <SfButton CssClass="e-danger e-outline e-small" OnClick="() => StartDelete(item.Id)">Delete</SfButton>
                     }
                 }
             </Template>

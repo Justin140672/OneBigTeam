@@ -1,0 +1,68 @@
+@using HR.Web.Models
+@using Syncfusion.Blazor.Grids
+
+<HrGrid TValue="EmployeeNoteItemModel"
+        DataSource="@Items"
+        AllowFiltering="false"
+        AllowPaging="false"
+        data-testid="employee-notes-grid">
+    <GridColumns>
+        <GridColumn HeaderText="Category" Width="130" AllowSorting="false" AllowFiltering="false">
+            <Template>
+                @{ var item = (context as EmployeeNoteItemModel)!; }
+                @EmployeeNoteCategories.Label(item.Category)
+            </Template>
+        </GridColumn>
+
+        <GridColumn Field="@nameof(EmployeeNoteItemModel.CreatedDate)"
+                    HeaderText="Created Date" Width="150">
+            <Template>
+                @{ var item = (context as EmployeeNoteItemModel)!; }
+                @item.CreatedDate.ToString("d MMM yyyy")
+            </Template>
+        </GridColumn>
+
+        <GridColumn HeaderText="Created By" Width="140" AllowSorting="false" AllowFiltering="false">
+            <Template>
+                @{ var item = (context as EmployeeNoteItemModel)!; }
+                <span class="text-muted small" title="@item.CreatedByUserId">@item.CreatedByUserId.ToString()[..8]</span>
+            </Template>
+        </GridColumn>
+
+        <GridColumn HeaderText="Status" Width="160" AllowSorting="false" AllowFiltering="false">
+            <Template>
+                @{ var item = (context as EmployeeNoteItemModel)!; }
+                @if (item.IsImportant)
+                {
+                    <span class="badge bg-warning-subtle text-warning-emphasis me-1" data-testid="note-important-badge">Important</span>
+                }
+                @if (item.IsSuperseded)
+                {
+                    <span class="badge bg-secondary-subtle text-secondary-emphasis" data-testid="note-superseded-badge">Superseded</span>
+                }
+            </Template>
+        </GridColumn>
+
+        <GridColumn HeaderText="Note">
+            <Template>
+                @{ var item = (context as EmployeeNoteItemModel)!; }
+                <span class="note-text-cell">@item.NoteText</span>
+            </Template>
+        </GridColumn>
+
+        <GridColumn HeaderText="" Width="100" AllowSorting="false" AllowFiltering="false" TextAlign="TextAlign.Right">
+            <Template>
+                @{ var item = (context as EmployeeNoteItemModel)!; }
+                @if (!item.IsSuperseded)
+                {
+                    <SfButton CssClass="e-outline e-small" OnClick="() => OnEdit.InvokeAsync(item)" data-testid="edit-note-btn">Edit</SfButton>
+                }
+            </Template>
+        </GridColumn>
+    </GridColumns>
+</HrGrid>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<EmployeeNoteItemModel> Items { get; set; } = [];
+    [Parameter] public EventCallback<EmployeeNoteItemModel> OnEdit { get; set; }
+}

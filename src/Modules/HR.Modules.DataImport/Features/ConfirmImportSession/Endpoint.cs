@@ -13,7 +13,7 @@ internal sealed class Endpoint(ConfirmImportSessionHandler handler, IAuthorizati
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/data-import/sessions/{importSessionId:guid}/confirm");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(

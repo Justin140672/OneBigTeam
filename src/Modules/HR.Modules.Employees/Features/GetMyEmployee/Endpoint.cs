@@ -8,7 +8,7 @@ internal sealed class Endpoint(GetMyEmployeeHandler handler) : EndpointWithoutRe
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees/me");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(CancellationToken cancellationToken)

@@ -15,7 +15,7 @@ internal sealed class Endpoint(GetMyProbationStatusHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees/me/probation-status");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(CancellationToken cancellationToken)

@@ -11,7 +11,7 @@ internal sealed class Endpoint(UploadEmployeeProfilePhotoHandler handler, IAutho
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/profile-photo");
-        Policies("authenticated");
+        Policies("role:employee");
         AllowFileUploads();
     }
 

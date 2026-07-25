@@ -11,7 +11,7 @@ internal sealed class Endpoint(UploadEmployeeDocumentHandler handler, IAuthoriza
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/documents");
-        Policies("authenticated");
+        Policies("role:employee");
         AllowFileUploads();
     }
 

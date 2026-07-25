@@ -20,8 +20,11 @@ public class UpdateMyContactDetailsEndpointTests : IClassFixture<ApiWebApplicati
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, ContactUser1, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ContactUser1, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, ContactUser2, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ContactUser2, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, ContactUser3, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ContactUser3, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
 

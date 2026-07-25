@@ -11,6 +11,9 @@ using HR.Modules.Employees.Features.GetCompensationHistory;
 using HR.Modules.Employees.Features.GetEmployeeAuditHistory;
 using HR.Modules.Employees.Features.GetRecentEmployeeChanges;
 using HR.Modules.Employees.Features.CreateCompensationRecord;
+using HR.Modules.Employees.Features.CreateEmployeeNote;
+using HR.Modules.Employees.Features.SupersedeEmployeeNote;
+using HR.Modules.Employees.Features.GetEmployeeNotes;
 using HR.Modules.Employees.Features.UpdateFutureCompensationRecord;
 using HR.Modules.Employees.Features.DeleteFutureCompensationRecord;
 using HR.Modules.Employees.Features.BulkApplyCompensationAdjustments;
@@ -220,6 +223,12 @@ public static class EmployeesModule
         services.AddScoped<GetCompensationImportTemplateHandler>();
         services.AddScoped<ImportCompensationChangesHandler>();
         services.AddScoped<IValidator<ImportCompensationChangesRequest>, ImportCompensationChangesValidator>();
+
+        services.AddScoped<CreateEmployeeNoteHandler>();
+        services.AddScoped<IValidator<CreateEmployeeNoteRequest>, CreateEmployeeNoteValidator>();
+        services.AddScoped<SupersedeEmployeeNoteHandler>();
+        services.AddScoped<IValidator<SupersedeEmployeeNoteRequest>, SupersedeEmployeeNoteValidator>();
+        services.AddScoped<GetEmployeeNotesHandler>();
 
         services.AddScoped<ListEmploymentTypesHandler>();
         services.AddScoped<IValidator<ListEmploymentTypesRequest>, ListEmploymentTypesValidator>();

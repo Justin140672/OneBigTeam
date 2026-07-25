@@ -9,7 +9,7 @@ internal sealed class Endpoint(GetEmployeeEmergencyContactsHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees/{employeeId:guid}/emergency-contacts");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(CancellationToken cancellationToken)

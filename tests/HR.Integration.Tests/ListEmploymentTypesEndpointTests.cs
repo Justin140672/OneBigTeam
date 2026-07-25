@@ -15,6 +15,8 @@ public class ListEmploymentTypesEndpointTests : IClassFixture<ApiWebApplicationF
         _factory = factory;
         Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator))
             .GetAwaiter().GetResult();
+        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.Employee))
+            .GetAwaiter().GetResult();
     }
 
     private HttpClient AdminClient(Guid companyId)

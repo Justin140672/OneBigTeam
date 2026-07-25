@@ -10,7 +10,7 @@ internal sealed class Endpoint(UploadMyProfilePhotoHandler handler)
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/employees/me/profile-photo");
-        Policies("authenticated");
+        Policies("role:employee");
         AllowFileUploads();
     }
 

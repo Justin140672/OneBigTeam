@@ -8,7 +8,7 @@ internal sealed class Endpoint(GetMyTeamHandler handler) : Endpoint<GetMyTeamReq
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees/me/team");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(GetMyTeamRequest request, CancellationToken cancellationToken)

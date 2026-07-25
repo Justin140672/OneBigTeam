@@ -18,8 +18,10 @@ public class UploadEmployeeDocumentEndpointTests : IClassFixture<ApiWebApplicati
     {
         _factory = factory;
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, UploadAdmin, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, UploadAdmin, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, UploadAdmin, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]

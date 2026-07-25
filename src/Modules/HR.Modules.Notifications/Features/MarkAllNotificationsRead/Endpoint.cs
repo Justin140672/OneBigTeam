@@ -8,7 +8,7 @@ internal sealed class Endpoint(MarkAllNotificationsReadHandler handler)
     public override void Configure()
     {
         Put("/api/companies/{companyId:guid}/employees/{employeeId:guid}/notifications/read-all");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(MarkAllNotificationsReadRequest request, CancellationToken cancellationToken)

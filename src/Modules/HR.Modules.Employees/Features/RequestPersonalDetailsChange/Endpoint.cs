@@ -9,7 +9,7 @@ internal sealed class Endpoint(RequestPersonalDetailsChangeHandler handler)
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/personal-details-change-requests");
-        Policies("authenticated");
+        Policies("role:employee");
     }
 
     public override async Task HandleAsync(
