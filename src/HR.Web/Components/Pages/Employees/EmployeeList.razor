@@ -2,9 +2,12 @@
 @rendermode InteractiveServer
 @inherits SearchPageBase<EmployeeListItemModel>
 @using HR.SharedKernel
+@using HR.Web.Services
 @inject EmployeeService EmployeeService
 @inject UserService UserService
 @inject AppSession Session
+@inject CompensationService CompensationService
+@inject IJSRuntime JS
 
 <PageTitle>Employees</PageTitle>
 
@@ -28,15 +31,33 @@
     }
     else
     {
+        @if (_actionError is not null)
+        {
+            <div class="alert alert-danger alert-dismissible">
+                @_actionError
+                <button type="button" class="btn-close" @onclick="@(() => _actionError = null)"></button>
+            </div>
+        }
+
+        @if (_actionSuccess is not null)
+        {
+            <div class="alert alert-success alert-dismissible">
+                @_actionSuccess
+                <button type="button" class="btn-close" @onclick="@(() => _actionSuccess = null)"></button>
+            </div>
+        }
+
         <HrGrid @ref="Grid"
                 TValue="EmployeeListItemModel"
                 DataSource="@Items"
-                Toolbar="@GridToolbar"
+                Toolbar="@EmployeeToolbar"
                 AllowFiltering="true">
             <GridEvents TValue="EmployeeListItemModel" OnToolbarClick="OnToolbarClick"
                         RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
+            <GridSelectionSettings Type="Syncfusion.Blazor.Grids.SelectionType.Multiple" Mode="Syncfusion.Blazor.Grids.SelectionMode.Row"></GridSelectionSettings>
             <GridPageSettings PageSize="20" />
             <GridColumns>
+                <GridColumn Type="Syncfusion.Blazor.Grids.ColumnType.CheckBox" Width="50"></GridColumn>
                 <GridColumn HeaderText="" Width="50" AllowSorting="false" AllowFiltering="false">
                     <Template>
                         @{
@@ -69,11 +90,27 @@
                 </GridColumn>
             </GridColumns>
         </HrGrid>
+
+        <BulkCompensationUpdateDialog CompanyId="CompanyId"
+                                       Employees="@_bulkUpdateEmployees"
+                                       IsOpen="_showBulkUpdateDialog"
+                                       OnClosed="HandleBulkUpdateDialogClosed"
+                                       OnApplied="HandleBulkUpdateApplied" />
+
+        <BulkCompensationImportDialog CompanyId="CompanyId"
+                                      IsOpen="_showImportDialog"
+                                      OnClosed="HandleImportDialogClosed"
+                                      OnImported="HandleImportDialogImported" />
     }
 </div>
 
 @code {
     private bool _canCreateEmployee;
+    private bool _showBulkUpdateDialog;
+    private bool _showImportDialog;
+    private List<EmployeeListItemModel> _bulkUpdateEmployees = [];
+    private string? _actionError;
+    private string? _actionSuccess;
 
     protected override async Task OnBeforeLoadAsync()
     {
@@ -83,6 +120,113 @@
             return;
         }
         _canCreateEmployee = await UserService.HasPermissionAsync(SystemPermissions.EmployeeCreate);
+    }
+
+    protected override void ConfigureToolbar()
+    {
+        AddToolbarAction(
+            id:      "hr-bulk-update",
+            text:    "Bulk Update",
+            icon:    "fa-solid fa-money-bill-wave",
+            onClick: OnBulkUpdateClicked,
+            tooltip: "Bulk update compensation for selected employees");
+    }
+
+    private async Task OnBulkUpdateClicked(EmployeeListItemModel _)
+    {
+        if (Grid is null) return;
+
+        var selected = await Grid.GetSelectedRecordsAsync();
+        if (selected.Count == 0) return;
+
+        _actionError = null;
+        _actionSuccess = null;
+        _bulkUpdateEmployees = selected.ToList();
+        _showBulkUpdateDialog = true;
+    }
+
+    // Swaps the plain "hr-bulk-update" toolbar button (registered via ConfigureToolbar/
+    // AddToolbarAction, so its Disabled state still tracks selection via
+    // SearchPageBase.SelectionDependentToolbarIds) for a Template-based dropdown mounting
+    // BulkUpdateMenu, mirroring how GridToolbar itself mounts ExportMenu for "hr-export".
+    private IEnumerable<object> EmployeeToolbar =>
+        GridToolbar.Select(item => item is Syncfusion.Blazor.Navigations.ItemModel im && im.Id == "hr-bulk-update"
+            ? new Syncfusion.Blazor.Navigations.ItemModel
+            {
+                Id          = "hr-bulk-update",
+                Type        = Syncfusion.Blazor.Navigations.ItemType.Input,
+                Template    = BulkUpdateMenuTemplate,
+                TooltipText = "Bulk update compensation for selected employees",
+            }
+            : item);
+
+    private RenderFragment BulkUpdateMenuTemplate => builder =>
+    {
+        builder.OpenComponent<HR.Web.Components.Controls.BulkUpdateMenu>(0);
+        builder.AddAttribute(1, nameof(HR.Web.Components.Controls.BulkUpdateMenu.OnItemSelected),
+            EventCallback.Factory.Create<string>(this, HandleBulkUpdateMenuItemSelected));
+        builder.CloseComponent();
+    };
+
+    private async Task HandleBulkUpdateMenuItemSelected(string id)
+    {
+        switch (id)
+        {
+            case "hr-bulk-selected":
+                await OnBulkUpdateClicked(null!);
+                break;
+            case "hr-bulk-import":
+                _actionError = null;
+                _actionSuccess = null;
+                _showImportDialog = true;
+                break;
+            case "hr-bulk-download-template":
+                await DownloadImportTemplateAsync();
+                break;
+        }
+    }
+
+    private async Task DownloadImportTemplateAsync()
+    {
+        _actionError = null;
+        var (bytes, error) = await CompensationService.DownloadImportTemplateAsync(CompanyId);
+        if (bytes is null)
+        {
+            _actionError = error ?? "Failed to download the compensation import template.";
+            return;
+        }
+
+        await JS.InvokeVoidAsync(
+            "downloadFileFromBase64",
+            "compensation-import-template.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            Convert.ToBase64String(bytes));
+    }
+
+    private async Task HandleBulkUpdateDialogClosed()
+    {
+        _showBulkUpdateDialog = false;
+        if (Grid is not null)
+            await Grid.ClearSelectionAsync();
+    }
+
+    private async Task HandleBulkUpdateApplied()
+    {
+        _actionSuccess = $"Updated compensation for {_bulkUpdateEmployees.Count} employee(s).";
+        _showBulkUpdateDialog = false;
+        if (Grid is not null)
+            await Grid.ClearSelectionAsync();
+    }
+
+    private void HandleImportDialogClosed()
+    {
+        _showImportDialog = false;
+    }
+
+    private void HandleImportDialogImported(ImportCompensationChangesResponse result)
+    {
+        _actionSuccess = $"Imported compensation changes for {result.Items.Count} employee(s).";
+        _showImportDialog = false;
     }
 
     protected override async Task<IReadOnlyList<EmployeeListItemModel>?> FetchItemsAsync(string? search)

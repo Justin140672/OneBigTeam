@@ -90,6 +90,20 @@ public sealed class RecruitmentDashboardPage(IPage page, string baseUrl)
         await page.WaitForURLAsync(new Regex("/vacancies"), new() { Timeout = 15_000 });
     }
 
+    // ── Vacancies / Candidates action buttons ────────────────────────────────
+
+    public async Task ClickVacanciesButtonAsync()
+    {
+        await page.Locator("[data-testid='recruitment-dashboard-vacancies-btn']").ClickAsync();
+        await page.WaitForURLAsync(new Regex("/vacancies"), new() { Timeout = 15_000 });
+    }
+
+    public async Task ClickCandidatesButtonAsync()
+    {
+        await page.Locator("[data-testid='recruitment-dashboard-candidates-btn']").ClickAsync();
+        await page.WaitForURLAsync(new Regex("/candidates"), new() { Timeout = 15_000 });
+    }
+
     // ── Upcoming Interviews / Offers & Recent Hires / Stale Vacancies ────────
 
     public async Task<IReadOnlyList<string>> GetUpcomingInterviewCandidateNamesAsync()

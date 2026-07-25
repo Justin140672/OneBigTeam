@@ -70,6 +70,98 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         return names;
     }
 
+    /// <summary>
+    /// Checks the row-selection checkbox (GridColumn Type="CheckBox") for the employee whose row
+    /// contains <paramref name="nameFragment"/>. Clicking the Syncfusion checkbox's own wrapper
+    /// span (rather than the underlying hidden native input) mirrors a real user click and is the
+    /// documented way to toggle a grid checkbox column.
+    /// </summary>
+    public async Task CheckEmployeeRowAsync(string nameFragment)
+    {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+
+        var row = page.Locator(".e-grid .e-row").Filter(new() { HasText = nameFragment }).First;
+        await row.Locator(".e-checkbox-wrapper").First.ClickAsync();
+    }
+
+    /// <summary>
+    /// Returns true if the "Bulk Update" toolbar dropdown button (id "hr-bulk-update", added via
+    /// EmployeeList.ConfigureToolbar, now rendered as a BulkUpdateMenu SfDropDownButton via
+    /// EmployeeList.EmployeeToolbar) is currently disabled — it tracks row selection the same way
+    /// as the built-in Edit/View actions (SearchPageBase.OnRowSelected/OnRowDeselected), so it's
+    /// disabled with zero rows selected and enabled once 1+ rows are selected.
+    /// </summary>
+    public async Task<bool> IsBulkUpdateButtonDisabledAsync()
+    {
+        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Bulk Update" });
+        return await btn.IsDisabledAsync();
+    }
+
+    /// <summary>
+    /// Opens the "Bulk Update" toolbar dropdown (BulkUpdateMenu) and clicks its "Selected
+    /// Employees" item, reaching BulkCompensationUpdateDialog for whichever row(s) are currently
+    /// checked — the same destination the old plain "Bulk Update" button used to open directly.
+    /// Waits for the SfDialog (identified by its own CssClass, scoped to the role="dialog" element
+    /// to avoid matching any other node that shares the class — see the Playwright locator
+    /// conventions note re: Syncfusion CssClass reuse) to become visible.
+    /// </summary>
+    public async Task ClickBulkUpdateAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Bulk Update" }).ClickAsync();
+        await page.GetByRole(AriaRole.Menuitem, new() { Name = "Selected Employees" }).ClickAsync();
+        await page.WaitForSelectorAsync(
+            "[role='dialog'].bulk-compensation-update-dialog",
+            new() { Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// The page's own success banner (_actionSuccess), shown after a bulk update dialog applies
+    /// successfully and closes (see EmployeeList.HandleBulkUpdateApplied).
+    /// </summary>
+    public async Task<string?> GetActionSuccessMessageAsync()
+    {
+        var banner = page.Locator(".alert-success");
+        return await banner.IsVisibleAsync() ? (await banner.TextContentAsync())?.Trim() : null;
+    }
+
+    /// <summary>
+    /// The page's own error banner (_actionError), e.g. shown if downloading the compensation
+    /// import template fails.
+    /// </summary>
+    public async Task<string?> GetActionErrorMessageAsync()
+    {
+        var banner = page.Locator(".alert-danger");
+        return await banner.IsVisibleAsync() ? (await banner.TextContentAsync())?.Trim() : null;
+    }
+
+    /// <summary>
+    /// Opens the "Bulk Update" toolbar dropdown (BulkUpdateMenu) and clicks "Download Template",
+    /// triggering a browser download of the compensation import template — mirrors
+    /// BulkCompensationUpdatePage.ClickDownloadTemplateAsync for the full-page equivalent.
+    /// </summary>
+    public async Task<string> ClickDownloadTemplateAsync()
+    {
+        var downloadTask = page.WaitForDownloadAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Bulk Update" }).ClickAsync();
+        await page.GetByRole(AriaRole.Menuitem, new() { Name = "Download Template" }).ClickAsync();
+        var download = await downloadTask;
+        return download.SuggestedFilename;
+    }
+
+    /// <summary>
+    /// Opens the "Bulk Update" toolbar dropdown and clicks "Import", reaching
+    /// BulkCompensationImportDialog (identified by its own CssClass,
+    /// "bulk-compensation-import-dialog") for the Import from Excel flow.
+    /// </summary>
+    public async Task ClickBulkImportAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Bulk Update" }).ClickAsync();
+        await page.GetByRole(AriaRole.Menuitem, new() { Name = "Import", Exact = true }).ClickAsync();
+        await page.WaitForSelectorAsync(
+            "[role='dialog'].bulk-compensation-import-dialog",
+            new() { Timeout = 15_000 });
+    }
+
     public async Task ClickEmployeeAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
@@ -87,10 +179,14 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
 
     public async Task SearchAsync(string query)
     {
-        var searchInput = page.GetByPlaceholder("Search by name or email");
+        // EmployeeList.razor's search placeholder is "Search by name, email or employee number"
+        // (see EmployeeList.razor) — matches HasEmployeeAsync's placeholder text above.
+        var searchInput = page.GetByPlaceholder("Search by name, email or employee number");
         await searchInput.ClearAsync();
         await searchInput.FillAsync(query);
-        // Syncfusion grid filters on input change.
-        await page.WaitForTimeoutAsync(500);
+        // OnSearchChanged debounces 300ms before reloading — wait past that, then for the grid to
+        // settle on the filtered result (row or empty state) rather than the pre-search rows.
+        await page.WaitForTimeoutAsync(400);
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 }

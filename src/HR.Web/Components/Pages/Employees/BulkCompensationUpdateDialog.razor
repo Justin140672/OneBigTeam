@@ -1,0 +1,57 @@
+@using HR.Web.Models
+
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="900px" ShowCloseIcon="true" CssClass="bulk-compensation-update-dialog">
+    <DialogEvents Closed="HandleDialogClosed" />
+    <DialogTemplates>
+        <Header>Bulk Update Compensation</Header>
+        <Content>
+            <p class="text-muted">
+                Applying to @Employees.Count selected employee(s):
+                @string.Join(", ", Employees.Select(e => $"{e.FirstName} {e.LastName}"))
+            </p>
+            <BulkCompensationAdjustmentPanel @ref="_panel"
+                                             CompanyId="CompanyId"
+                                             Employees="@Employees"
+                                             SectionHeading="Adjustment Details"
+                                             OnApplied="HandleAppliedAsync" />
+        </Content>
+        <FooterTemplate>
+            <SfButton OnClick="HandleCloseAsync">Close</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<EmployeeListItemModel> Employees { get; set; } = [];
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+    [Parameter] public EventCallback OnApplied { get; set; }
+
+    private bool Visible { get; set; }
+    private BulkCompensationAdjustmentPanel? _panel;
+
+    protected override void OnParametersSet()
+    {
+        var wasOpen = Visible;
+        Visible = IsOpen;
+
+        if (IsOpen && !wasOpen)
+            _panel?.ResetState();
+    }
+
+    private async Task HandleAppliedAsync()
+    {
+        await OnApplied.InvokeAsync();
+        Visible = false;
+        await OnClosed.InvokeAsync();
+    }
+
+    private async Task HandleCloseAsync()
+    {
+        Visible = false;
+        await OnClosed.InvokeAsync();
+    }
+
+    private Task HandleDialogClosed() => HandleCloseAsync();
+}

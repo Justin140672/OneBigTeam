@@ -1,5 +1,4 @@
 @inject LeaveService LeaveService
-@inject NavigationManager Navigation
 @inject AppSession Session
 
 @if (_loading)
@@ -51,7 +50,7 @@ else
                 @foreach (var item in _items.Take(5))
                 {
                     var i = item;
-                    <div @key="i.LeaveRequestId" class="task-widget-item" @onclick="() => NavigateToRequest(i)">
+                    <div @key="i.LeaveRequestId" class="task-widget-item @(IsActionable(i) ? "" : "task-widget-item--static")" @onclick="() => OnRequestClicked(i)">
                         <div class="task-widget-content">
                             <span class="task-widget-title">@i.EmployeeName</span>
                             <span class="task-widget-meta">@i.LeaveTypeName · @i.StartDate.ToString("d MMM") – @i.EndDate.ToString("d MMM")</span>
@@ -86,19 +85,16 @@ else
         _          => "normal",
     };
 
-    private async Task NavigateToRequest(RecentLeaveRequestItem item)
-    {
-        if (item.TaskId.HasValue && OnOpenTask.HasDelegate)
-        {
-            await OnOpenTask.InvokeAsync(item.TaskId.Value);
-            return;
-        }
+    // Only a Pending request has an approval decision to make — anything else (Approved, Declined,
+    // Rejected, etc.) is a past outcome with nothing actionable behind it, so clicking it does
+    // nothing rather than falling through to some other navigation.
+    private static bool IsActionable(RecentLeaveRequestItem item) => item.Status == "Pending";
 
-        // Not the self-service "/profile" route — MyProfile.razor hard-redirects to "/" whenever
-        // the route's EmployeeId doesn't match the signed-in user's own (see its OnParametersSetAsync
-        // guard), which for an HR admin viewing someone else's request just bounces straight back to
-        // their dashboard. This is the admin-facing employee view (EmployeeEdit.razor), same route
-        // TeamOnboardingWidget already uses successfully for its own "?tab=" deep link.
-        Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/{item.EmployeeId}?tab=leave");
+    private async Task OnRequestClicked(RecentLeaveRequestItem item)
+    {
+        if (!IsActionable(item)) return;
+
+        if (item.TaskId.HasValue && OnOpenTask.HasDelegate)
+            await OnOpenTask.InvokeAsync(item.TaskId.Value);
     }
 }

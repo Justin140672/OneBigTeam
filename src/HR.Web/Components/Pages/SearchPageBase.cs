@@ -142,9 +142,15 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
 
     protected async Task OnRowDeselected(RowDeselectEventArgs<TItem> args)
     {
-        _hasSelection = false;
-        if (Grid is not null)
-            await Grid.EnableToolbarItemsAsync(SelectionDependentToolbarIds, false);
+        if (Grid is null) return;
+
+        // On a multi-select grid, deselecting one row doesn't necessarily mean nothing is
+        // selected anymore — check what's actually still selected rather than assuming zero
+        // (which only happened to be safe back when every grid using this base class was
+        // single-select, where deselecting the one selected row always left none behind).
+        var remaining = await Grid.GetSelectedRecordsAsync();
+        _hasSelection = remaining.Count > 0;
+        await Grid.EnableToolbarItemsAsync(SelectionDependentToolbarIds, _hasSelection);
     }
 
     protected async Task OnToolbarClick(ClickEventArgs args)

@@ -153,6 +153,39 @@ public sealed class RecruitmentDashboardTests(AppFixture fixture) : E2ETestBase(
     }
 
     [Fact]
+    public async Task ClickingVacanciesButton_NavigatesToVacanciesList()
+    {
+        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard   = new RecruitmentDashboardPage(_page, _fixture.WebBaseUrl);
+        var vacancyList = new VacancyListPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(MarcusEmail);
+        await dashboard.GoToAsync();
+
+        await dashboard.ClickVacanciesButtonAsync();
+
+        Assert.Contains("/vacancies", _page.Url);
+        Assert.True(await vacancyList.HasVacancyAsync("Senior Software Engineer"),
+            "Expected the seeded 'Senior Software Engineer' vacancy to be visible after navigating from the dashboard button");
+    }
+
+    [Fact]
+    public async Task ClickingCandidatesButton_NavigatesToCandidatesList()
+    {
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new RecruitmentDashboardPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(MarcusEmail);
+        await dashboard.GoToAsync();
+
+        await dashboard.ClickCandidatesButtonAsync();
+
+        Assert.Contains("/candidates", _page.Url);
+    }
+
+    [Fact]
     public async Task UpcomingInterviewsWidget_LoadsWithoutError()
     {
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);

@@ -17,6 +17,15 @@
 
         <DashboardSwitcher />
 
+        <div class="recruitment-dashboard-actions mb-4">
+            <SfButton IsPrimary="true" CssClass="recruitment-dashboard-action-btn" OnClick="NavigateToVacancies" data-testid="recruitment-dashboard-vacancies-btn">
+                <i class="fa-solid fa-briefcase me-2"></i>Vacancies
+            </SfButton>
+            <SfButton CssClass="recruitment-dashboard-action-btn" OnClick="NavigateToCandidates" data-testid="recruitment-dashboard-candidates-btn">
+                <i class="fa-solid fa-user-tie me-2"></i>Candidates
+            </SfButton>
+        </div>
+
         <div class="dashboard-overview-row">
             <HiringPipelineChart />
             <NewHiresTrendChart />
@@ -51,6 +60,12 @@
 
         _ready = true;
     }
+
+    private void NavigateToVacancies() =>
+        Navigation.NavigateTo($"/companies/{Session.CompanyId}/vacancies");
+
+    private void NavigateToCandidates() =>
+        Navigation.NavigateTo($"/companies/{Session.CompanyId}/candidates");
 
     private static string Greeting()
     {

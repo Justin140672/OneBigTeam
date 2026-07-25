@@ -17,6 +17,11 @@ internal sealed class GetEmployeeAuditHistoryHandler(
     private const string PositionProfileIdField = "PositionProfileId";
     private const string LocationIdField = "LocationId";
 
+    // Compensation's Reason snapshot field carries a PascalCase enum value (e.g. "AnnualReview")
+    // rather than a human-readable one — reuse the same Humanize() already applied to field names
+    // below rather than hardcoding a separate value-to-label table.
+    private const string ReasonField = "Reason";
+
     private static readonly IReadOnlyDictionary<string, string> ModuleMap = new Dictionary<string, string>
     {
         ["Employee"] = "Employees",
@@ -169,6 +174,9 @@ internal sealed class GetEmployeeAuditHistoryHandler(
             if (lookup is not null)
                 return lookup.TryGetValue(id, out var name) ? name : "Unknown";
         }
+
+        if (fieldName == ReasonField && element.ValueKind == JsonValueKind.String)
+            return Humanize(element.GetString()!);
 
         return element.ToString();
     }

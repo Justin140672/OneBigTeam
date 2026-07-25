@@ -1,0 +1,311 @@
+@using HR.Web.Models
+@using HR.Web.Services
+@inject CompensationService CompensationService
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">@SectionHeading</h5>
+    </div>
+    <div class="card-body">
+        @if (_globalError is not null)
+        {
+            <div class="alert alert-danger alert-dismissible mb-3">
+                @_globalError
+                <button type="button" class="btn-close" @onclick="@(() => _globalError = null)"></button>
+            </div>
+        }
+
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Adjustment Mode <span class="text-danger">*</span></label>
+                <SfDropDownList TValue="CompensationAdjustmentMode" TItem="AdjustmentModeChoice"
+                                DataSource="@ModeOptions"
+                                @bind-Value="_mode">
+                    <DropDownListFieldSettings Value="Value" Text="Label" />
+                </SfDropDownList>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">
+                    @(_mode == CompensationAdjustmentMode.PercentageIncrease ? "Percentage Increase (%)" :
+                      _mode == CompensationAdjustmentMode.FixedAmountIncrease ? "Fixed Amount Increase" :
+                      "New Salary (applies to each row unless edited below)")
+                    <span class="text-danger">*</span>
+                </label>
+                <SfNumericTextBox TValue="decimal?" @bind-Value="_adjustmentValue" Min="0" ShowSpinButton="false"
+                                  Placeholder="e.g. 5" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Effective Date <span class="text-danger">*</span></label>
+                <SfDatePicker TValue="DateOnly?" @bind-Value="_effectiveDate" Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Reason <span class="text-danger">*</span></label>
+                <SfDropDownList TValue="string" TItem="CompensationChangeReasonChoice"
+                                DataSource="@ReasonOptions"
+                                @bind-Value="_reason">
+                    <DropDownListFieldSettings Value="Value" Text="Label" />
+                </SfDropDownList>
+            </div>
+            <div class="col-12">
+                <label class="form-label">Notes</label>
+                <textarea class="form-control" rows="2" maxlength="4000" @bind="_notes" placeholder="Optional notes…"></textarea>
+            </div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+            <SfButton IsPrimary="true" Disabled="@(Employees.Count == 0 || _loadingPreview)" OnClick="BuildPreviewAsync">
+                @if (_loadingPreview)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Build Preview
+            </SfButton>
+        </div>
+    </div>
+</div>
+
+@if (_previewRows.Count > 0)
+{
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Preview &amp; Confirm</h5>
+        </div>
+        <div class="card-body">
+            @if (_excludedEmployees.Count > 0)
+            {
+                <div class="alert alert-warning">
+                    @_excludedEmployees.Count employee(s) were excluded because they have no current compensation record:
+                    @string.Join(", ", _excludedEmployees)
+                </div>
+            }
+
+            <HrGrid TValue="PreviewRow" DataSource="@_previewRows" AllowPaging="true" AllowSorting="true" class="mb-3">
+                <GridPageSettings PageSize="20" />
+                <GridColumns>
+                    <GridColumn Field="@nameof(PreviewRow.EmployeeName)" HeaderText="Employee" Width="180" />
+                    <GridColumn Field="@nameof(PreviewRow.CurrentSalary)" HeaderText="Current Salary" Width="130" Format="N2" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+                    <GridColumn HeaderText="Proposed Salary" Width="160">
+                        <Template>
+                            @{
+                                var row = (context as PreviewRow)!;
+                                <SfNumericTextBox TValue="decimal" Value="@row.ProposedSalary" Min="0" ShowSpinButton="false"
+                                                  ValueChanged="@(v => OnProposedSalaryChanged(row, v))" />
+                            }
+                        </Template>
+                    </GridColumn>
+                    <GridColumn Field="@nameof(PreviewRow.Difference)" HeaderText="Difference" Width="130" Format="N2" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+                    <GridColumn HeaderText="% Change" Width="110">
+                        <Template>
+                            @{
+                                var row = (context as PreviewRow)!;
+                                <span>@(row.PercentageChange is { } pct ? $"{pct:0.##}%" : "—")</span>
+                            }
+                        </Template>
+                    </GridColumn>
+                </GridColumns>
+            </HrGrid>
+
+            <p class="text-muted">@_previewRows.Count employee(s) will be updated. This is a single atomic operation — if any employee fails validation, no changes are applied to anyone.</p>
+
+            <div class="d-flex gap-2">
+                <SfButton IsPrimary="true" Disabled="@_applying" OnClick="ConfirmApplyAsync">
+                    @if (_applying)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Confirm Apply
+                </SfButton>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<EmployeeListItemModel> Employees { get; set; } = [];
+    [Parameter] public EventCallback OnApplied { get; set; }
+    [Parameter] public string SectionHeading { get; set; } = "Adjustment Details";
+
+    public sealed record AdjustmentModeChoice(CompensationAdjustmentMode Value, string Label);
+    public sealed record CompensationChangeReasonChoice(string Value, string Label);
+
+    public static readonly AdjustmentModeChoice[] ModeOptions =
+    [
+        new(CompensationAdjustmentMode.PercentageIncrease, "Percentage Increase"),
+        new(CompensationAdjustmentMode.FixedAmountIncrease, "Fixed Amount Increase"),
+        new(CompensationAdjustmentMode.SetDirectly, "Set Salary Directly")
+    ];
+
+    public static readonly CompensationChangeReasonChoice[] ReasonOptions =
+    [
+        new("NewHire", "New Hire"),
+        new("AnnualReview", "Annual Review"),
+        new("Promotion", "Promotion"),
+        new("MarketAdjustment", "Market Adjustment"),
+        new("RoleChange", "Role Change"),
+        new("Correction", "Correction"),
+        new("Other", "Other")
+    ];
+
+    public sealed class PreviewRow
+    {
+        public required Guid EmployeeId { get; init; }
+        public required string EmployeeName { get; init; }
+        public required decimal CurrentSalary { get; init; }
+        public required string SalaryType { get; init; }
+        public required string Currency { get; init; }
+        public decimal? HoursPerWeek { get; init; }
+        public decimal? FTE { get; init; }
+        public decimal ProposedSalary { get; set; }
+        public decimal Difference { get; set; }
+        public decimal? PercentageChange { get; set; }
+    }
+
+    private CompensationAdjustmentMode _mode = CompensationAdjustmentMode.PercentageIncrease;
+    private decimal? _adjustmentValue;
+    private DateOnly? _effectiveDate = DateOnly.FromDateTime(DateTime.Today);
+    private string _reason = "AnnualReview";
+    private string? _notes;
+
+    private bool _loadingPreview;
+    private bool _applying;
+    private List<PreviewRow> _previewRows = [];
+    private List<string> _excludedEmployees = [];
+
+    private string? _globalError;
+
+    private HashSet<Guid>? _lastEmployeeIds;
+
+    protected override void OnParametersSet()
+    {
+        var currentIds = Employees.Select(e => e.Id).ToHashSet();
+        if (_lastEmployeeIds is not null && !_lastEmployeeIds.SetEquals(currentIds))
+        {
+            // Selection changed since last render — the previously-built preview no longer applies.
+            _previewRows = [];
+            _excludedEmployees = [];
+            _globalError = null;
+        }
+        _lastEmployeeIds = currentIds;
+    }
+
+    public void ResetState()
+    {
+        _previewRows = [];
+        _excludedEmployees = [];
+        _globalError = null;
+        _adjustmentValue = null;
+        _notes = null;
+    }
+
+    private async Task BuildPreviewAsync()
+    {
+        _globalError = null;
+        _previewRows = [];
+        _excludedEmployees = [];
+
+        if (_adjustmentValue is null)
+        {
+            _globalError = "Please enter an adjustment value.";
+            return;
+        }
+
+        if (_effectiveDate is null)
+        {
+            _globalError = "Please select an effective date.";
+            return;
+        }
+
+        _loadingPreview = true;
+        try
+        {
+            var rows = new List<PreviewRow>();
+            var excluded = new List<string>();
+
+            foreach (var emp in Employees)
+            {
+                var current = await CompensationService.GetCurrentCompensationAsync(CompanyId, emp.Id);
+                if (current is null)
+                {
+                    excluded.Add($"{emp.FirstName} {emp.LastName}");
+                    continue;
+                }
+
+                var proposed = CompensationAdjustmentCalculator.CalculateProposedSalary(current.Salary, _mode, _adjustmentValue.Value);
+
+                rows.Add(new PreviewRow
+                {
+                    EmployeeId = emp.Id,
+                    EmployeeName = $"{emp.FirstName} {emp.LastName}",
+                    CurrentSalary = current.Salary,
+                    SalaryType = current.SalaryType,
+                    Currency = current.Currency,
+                    HoursPerWeek = current.HoursPerWeek,
+                    FTE = current.FTE,
+                    ProposedSalary = proposed,
+                    Difference = CompensationAdjustmentCalculator.CalculateDifference(current.Salary, proposed),
+                    PercentageChange = CompensationAdjustmentCalculator.CalculatePercentageChange(current.Salary, proposed)
+                });
+            }
+
+            _previewRows = rows;
+            _excludedEmployees = excluded;
+
+            if (rows.Count == 0)
+                _globalError = "None of the selected employees have a current compensation record to adjust.";
+        }
+        finally
+        {
+            _loadingPreview = false;
+        }
+    }
+
+    private void OnProposedSalaryChanged(PreviewRow row, decimal value)
+    {
+        row.ProposedSalary = value;
+        row.Difference = CompensationAdjustmentCalculator.CalculateDifference(row.CurrentSalary, value);
+        row.PercentageChange = CompensationAdjustmentCalculator.CalculatePercentageChange(row.CurrentSalary, value);
+    }
+
+    private async Task ConfirmApplyAsync()
+    {
+        if (_previewRows.Count == 0 || _effectiveDate is null) return;
+
+        _globalError = null;
+        _applying = true;
+        try
+        {
+            var request = new BulkApplyCompensationAdjustmentsRequest(
+                CompanyId,
+                _effectiveDate.Value,
+                _reason,
+                string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim(),
+                _mode.ToString(),
+                _previewRows.Select(r => new BulkCompensationAdjustmentItem(
+                    r.EmployeeId,
+                    r.ProposedSalary,
+                    r.SalaryType,
+                    r.Currency,
+                    r.HoursPerWeek,
+                    r.FTE)).ToList());
+
+            var (result, error) = await CompensationService.BulkApplyCompensationAdjustmentsAsync(CompanyId, request);
+
+            if (result is null)
+            {
+                _globalError = $"No changes were applied. {error ?? "Failed to apply bulk compensation adjustment."}";
+                return;
+            }
+
+            _previewRows = [];
+            _excludedEmployees = [];
+            _adjustmentValue = null;
+            _notes = null;
+
+            await OnApplied.InvokeAsync();
+        }
+        finally
+        {
+            _applying = false;
+        }
+    }
+}

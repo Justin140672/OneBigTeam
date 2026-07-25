@@ -36,7 +36,7 @@
                     <div class="col-6">
                         <label class="form-label">Salary <span class="text-danger">*</span></label>
                         <SfNumericTextBox TValue="decimal?" @bind-Value="Model.Salary" Min="0" ShowSpinButton="false"
-                                          FloatLabelType="FloatLabelType.Auto" Placeholder="e.g. 45000" />
+                                          Placeholder="e.g. 45000" />
                         <ValidationMessage For="@(() => Model.Salary)" />
                     </div>
                     <div class="col-6">

@@ -57,7 +57,12 @@
         </GridColumn>
 
         <GridColumn Field="@nameof(CompensationHistoryItemModel.Reason)"
-                    HeaderText="Reason" Width="140" />
+                    HeaderText="Reason" Width="140">
+            <Template>
+                @{ var item = (context as CompensationHistoryItemModel)!; }
+                @CompensationChangeReasons.Label(item.Reason)
+            </Template>
+        </GridColumn>
 
         <GridColumn HeaderText="Created By" Width="140" AllowSorting="false" AllowFiltering="false">
             <Template>

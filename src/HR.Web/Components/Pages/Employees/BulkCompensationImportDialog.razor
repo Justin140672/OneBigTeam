@@ -1,0 +1,50 @@
+@using HR.Web.Models
+
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="700px" ShowCloseIcon="true" CssClass="bulk-compensation-import-dialog">
+    <DialogEvents Closed="HandleDialogClosed" />
+    <DialogTemplates>
+        <Header>Import Compensation Changes</Header>
+        <Content>
+            <BulkCompensationImportPanel @ref="_panel"
+                                          CompanyId="CompanyId"
+                                          OnImported="HandleImportedAsync" />
+        </Content>
+        <FooterTemplate>
+            <SfButton OnClick="HandleCloseAsync">Close</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+    [Parameter] public EventCallback<ImportCompensationChangesResponse> OnImported { get; set; }
+
+    private bool Visible { get; set; }
+    private BulkCompensationImportPanel? _panel;
+
+    protected override void OnParametersSet()
+    {
+        var wasOpen = Visible;
+        Visible = IsOpen;
+
+        if (IsOpen && !wasOpen)
+            _panel?.ResetState();
+    }
+
+    private async Task HandleImportedAsync(ImportCompensationChangesResponse result)
+    {
+        await OnImported.InvokeAsync(result);
+        Visible = false;
+        await OnClosed.InvokeAsync();
+    }
+
+    private async Task HandleCloseAsync()
+    {
+        Visible = false;
+        await OnClosed.InvokeAsync();
+    }
+
+    private Task HandleDialogClosed() => HandleCloseAsync();
+}

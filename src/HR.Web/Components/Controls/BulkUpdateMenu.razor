@@ -1,0 +1,22 @@
+@using Syncfusion.Blazor.SplitButtons
+
+<SfDropDownButton Content="Bulk Update" IconCss="fa-solid fa-money-bill-wave" CssClass="e-flat hr-toolbar-bulk-update-btn" Items="_items">
+    <DropDownButtonEvents ItemSelected="HandleItemSelected" />
+</SfDropDownButton>
+
+@code {
+    [Parameter] public EventCallback<string> OnItemSelected { get; set; }
+
+    private static readonly List<DropDownMenuItem> _items =
+    [
+        new() { Id = "hr-bulk-selected",           Text = "Selected Employees", IconCss = "fa-solid fa-users" },
+        new() { Id = "hr-bulk-import",             Text = "Import",             IconCss = "fa-solid fa-file-import" },
+        new() { Id = "hr-bulk-download-template",  Text = "Download Template",  IconCss = "fa-solid fa-file-arrow-down" },
+    ];
+
+    private async Task HandleItemSelected(MenuEventArgs args)
+    {
+        if (args.Item?.Id is { } id)
+            await OnItemSelected.InvokeAsync(id);
+    }
+}

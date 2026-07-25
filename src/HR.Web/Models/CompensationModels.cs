@@ -34,6 +34,24 @@ public sealed record CompensationHistoryItemModel(
 
 public sealed record GetCompensationHistoryResponse(IReadOnlyList<CompensationHistoryItemModel> Items);
 
+// Matches the CompensationChangeReason enum's raw string values — used wherever a Reason needs a
+// human-readable label instead of the enum's PascalCase serialized form (e.g. "Compensation
+// History" grid). Follows the same convention as EmployeeNoteCategories.Label.
+public static class CompensationChangeReasons
+{
+    public static string Label(string reason) => reason switch
+    {
+        "NewHire" => "New Hire",
+        "AnnualReview" => "Annual Review",
+        "Promotion" => "Promotion",
+        "MarketAdjustment" => "Market Adjustment",
+        "RoleChange" => "Role Change",
+        "Correction" => "Correction",
+        "Other" => "Other",
+        _ => reason
+    };
+}
+
 // ── CREATE ────────────────────────────────────────────────────────────────────
 
 public sealed record CreateCompensationRecordRequest(

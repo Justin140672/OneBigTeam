@@ -34,10 +34,11 @@
                         <tbody>
                             @foreach (var change in Record.Changes)
                             {
+                                var isChanged = !string.Equals(change.Before, change.After, StringComparison.Ordinal);
                                 <tr>
                                     <td>@change.Field</td>
-                                    <td class="text-muted text-decoration-line-through">@change.Before</td>
-                                    <td class="fw-semibold text-success">@change.After</td>
+                                    <td class="@(isChanged ? "text-muted text-decoration-line-through" : null)">@change.Before</td>
+                                    <td class="@(isChanged ? "fw-semibold" : null)">@change.After</td>
                                 </tr>
                             }
                         </tbody>

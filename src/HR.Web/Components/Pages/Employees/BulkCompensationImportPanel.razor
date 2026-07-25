@@ -1,0 +1,110 @@
+@using HR.Web.Models
+@using HR.Web.Services
+@inject CompensationService CompensationService
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Import from Excel</h5>
+    </div>
+    <div class="card-body">
+        <p class="text-muted">Upload a spreadsheet (use the template above) to update many employees' compensation in one step.</p>
+        <InputFile class="form-control mb-2" OnChange="OnImportFileSelected" accept=".xlsx" disabled="@_importing" />
+        <SfButton IsPrimary="true" Disabled="@(_importFile is null || _importing)" OnClick="ImportAsync">
+            @if (_importing)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            }
+            Import from Excel
+        </SfButton>
+
+        @if (_importResult is not null)
+        {
+            <div class="alert alert-success mt-3 mb-0">
+                Imported compensation changes for @_importResult.Items.Count employee(s).
+            </div>
+        }
+
+        @if (_importRowErrors is { Count: > 0 })
+        {
+            <div class="alert alert-danger mt-3 mb-0">
+                <p class="mb-2">Nothing was imported. Fix the following row(s) and re-upload:</p>
+                <ul class="mb-0">
+                    @foreach (var rowError in _importRowErrors)
+                    {
+                        <li>Row @rowError.RowNumber: @rowError.Message</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @if (_globalError is not null)
+        {
+            <div class="alert alert-danger mt-3 mb-0">
+                @_globalError
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter] public EventCallback<ImportCompensationChangesResponse> OnImported { get; set; }
+
+    private IBrowserFile? _importFile;
+    private bool _importing;
+    private ImportCompensationChangesResponse? _importResult;
+    private IReadOnlyList<CompensationImportRowError>? _importRowErrors;
+    private string? _globalError;
+
+    public void ResetState()
+    {
+        _importFile = null;
+        _importing = false;
+        _importResult = null;
+        _importRowErrors = null;
+        _globalError = null;
+    }
+
+    private void OnImportFileSelected(InputFileChangeEventArgs e)
+    {
+        _importFile = e.File;
+        _importResult = null;
+        _importRowErrors = null;
+        _globalError = null;
+    }
+
+    private async Task ImportAsync()
+    {
+        if (_importFile is null) return;
+
+        _globalError = null;
+        _importResult = null;
+        _importRowErrors = null;
+        _importing = true;
+        try
+        {
+            await using var stream = _importFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            var (result, error, rowErrors) = await CompensationService.ImportCompensationChangesAsync(CompanyId, stream, _importFile.Name);
+
+            if (result is not null)
+            {
+                _importResult = result;
+                await OnImported.InvokeAsync(result);
+                return;
+            }
+
+            if (rowErrors is { Count: > 0 })
+            {
+                _importRowErrors = rowErrors;
+                return;
+            }
+
+            _globalError = error ?? "Failed to import compensation changes.";
+        }
+        finally
+        {
+            _importing = false;
+            _importFile = null;
+        }
+    }
+}

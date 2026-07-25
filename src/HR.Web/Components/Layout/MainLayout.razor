@@ -71,7 +71,6 @@ else
                                         <MenuItem Text="Employment Types" Url="@_menuItems["EmploymentTypes"]" />
                                         <MenuItem Text="Document Types" Url="@_menuItems["DocumentTypes"]" />
                                         <MenuItem Text="Shared Documents" Url="@_menuItems["SharedDocuments"]" />
-                                        <MenuItem Text="Bulk Compensation Update" Url="@_menuItems["BulkCompensationUpdate"]" />
                                         <MenuItem Text="Data Import" Url="@_menuItems["DataImport"]" />
                                         <MenuItem Text="Import History" Url="@_menuItems["ImportHistory"]" />
                                         <MenuItem Text="Organisation Chart" Url="@_menuItems["OrganisationChart"]" />
@@ -91,11 +90,6 @@ else
                                         <MenuItem Text="Sickness Categories" Url="@_menuItems["SicknessCategories"]" />
                                     </MenuItems>
                                 </MenuItem>
-                            }
-                            @if (Session.IsRecruiter)
-                            {
-                                <MenuItem Text="Vacancies" Url="@_menuItems["Vacancies"]" IconCss="fa-solid fa-briefcase" />
-                                <MenuItem Text="Candidates" Url="@_menuItems["Candidates"]" IconCss="fa-solid fa-user-tie" />
                             }
                             @if (Session.CanManageCompany)
                             {
@@ -262,13 +256,14 @@ else
     private bool IsDark { get; set; }
 
     // Shown whenever the signed-in user has a role with actual menu content below — a plain
-    // Employee, and a plain Manager (whose dashboard IS their home, with no separate admin
-    // sections), get no sidebar at all, same as pre-dashboards behavior for Employees. Individual
-    // menu sections inside the sidebar are independently role-gated so combined roles (e.g. an
-    // HR Administrator who is also a Manager) merge without duplicates.
+    // Employee, a plain Manager (whose dashboard IS their home, with no separate admin
+    // sections), and a plain Recruiter (whose Recruitment Dashboard is their home, with
+    // Vacancies/Candidates reached via buttons on that dashboard instead of the sidebar) all
+    // get no sidebar at all, same as pre-dashboards behavior for Employees. Individual menu
+    // sections inside the sidebar are independently role-gated so combined roles (e.g. an
+    // HR Administrator who is also a Manager or Recruiter) merge without duplicates.
     private bool ShowSidebar =>
-        Session.CanManageEmployees || Session.CanManageCompany ||
-        Session.IsRecruiter || Session.IsHrAdministrator;
+        Session.CanManageEmployees || Session.CanManageCompany || Session.IsHrAdministrator;
 
     private int _unreadCount;
     private List<NotificationDto> _notifications = [];
@@ -282,7 +277,6 @@ else
     private readonly Dictionary<string, string> _menuItems = new()
     {
         ["Employees"] = "/",
-        ["BulkCompensationUpdate"] = "/",
         ["Departments"] = "/",
         ["LocationTypes"] = "/",
         ["Locations"] = "/",
@@ -291,8 +285,6 @@ else
         ["EmploymentTypes"] = "/",
         ["Assets"] = "/",
         ["AssetCategories"] = "/",
-        ["Vacancies"] = "/",
-        ["Candidates"] = "/",
         ["LeaveTypes"] = "/",
         ["LeavePolicies"] = "/",
         ["PublicHolidays"] = "/",
@@ -321,15 +313,12 @@ else
         _menuItems["EmploymentTypes"] = $"/companies/{companyId}/employment-types";
         _menuItems["Assets"] = $"/companies/{companyId}/assets";
         _menuItems["AssetCategories"] = $"/companies/{companyId}/asset-categories";
-        _menuItems["Vacancies"] = $"/companies/{companyId}/vacancies";
-        _menuItems["Candidates"] = $"/companies/{companyId}/candidates";
         _menuItems["LeaveTypes"] = $"/companies/{companyId}/leave-types";
         _menuItems["LeavePolicies"] = $"/companies/{companyId}/leave-policies";
         _menuItems["PublicHolidays"] = $"/companies/{companyId}/public-holidays";
         _menuItems["DocumentTypes"] = $"/companies/{companyId}/document-types";
         _menuItems["SharedDocuments"] = $"/companies/{companyId}/shared-documents";
         _menuItems["DataImport"] = $"/companies/{companyId}/data-import/employees";
-        _menuItems["BulkCompensationUpdate"] = $"/companies/{companyId}/employees/compensation/bulk-update";
         _menuItems["ImportHistory"] = $"/companies/{companyId}/data-import/history";
         _menuItems["SicknessCategories"] = $"/companies/{companyId}/sickness-categories";
         _menuItems["OrganisationChart"] = $"/companies/{companyId}/organisation-chart";

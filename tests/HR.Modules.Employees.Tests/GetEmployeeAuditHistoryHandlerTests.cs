@@ -451,6 +451,60 @@ public class GetEmployeeAuditHistoryHandlerTests
         Assert.Equal("—", change.After);
     }
 
+    // ── Reason field humanization ────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("AnnualReview", "Annual Review")]
+    [InlineData("NewHire", "New Hire")]
+    [InlineData("MarketAdjustment", "Market Adjustment")]
+    [InlineData("RoleChange", "Role Change")]
+    [InlineData("Promotion", "Promotion")]
+    [InlineData("Correction", "Correction")]
+    [InlineData("Other", "Other")]
+    public async Task HandleAsync_Humanizes_Reason_Field_Value(string rawReason, string expectedLabel)
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.compensation.created", "Compensation", null, null, "Compensation record created",
+                null, $$"""{"Reason":"{{rawReason}}"}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        var change = Assert.Single(item.Changes);
+        Assert.Equal("Reason", change.Field);
+        Assert.Equal(expectedLabel, change.After);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Handles_Null_Reason_Value_Without_Throwing()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.compensation.created", "Compensation", null, null, "Compensation record created",
+                null, """{"Reason":null}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        var change = Assert.Single(item.Changes);
+        Assert.Equal("—", change.After);
+    }
+
     private static EmployeesDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<EmployeesDbContext>()
