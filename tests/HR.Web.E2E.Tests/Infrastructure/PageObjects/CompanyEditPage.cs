@@ -321,6 +321,109 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     public Task<string> GetDefaultAcknowledgementStatementAsync() =>
         DefaultAcknowledgementStatementTextArea.InputValueAsync();
 
+    /// <summary>
+    /// Selects a preset from the "Default Notice Period" dropdown — one of "1 week", "2 weeks",
+    /// "1 month", "2 months", "3 months", "6 months", or "Custom duration" (which reveals the
+    /// Unit/Length controls; see <see cref="WaitForNoticePeriodCustomControlsAsync"/>).
+    /// </summary>
+    public async Task SelectNoticePeriodPresetAsync(string presetLabel)
+    {
+        var group = page.Locator(".col-md-4")
+            .Filter(new() { HasText = "Default Notice Period" })
+            .First;
+        await group.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = presetLabel })
+            .First
+            .ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    /// <summary>Returns the currently displayed value of the "Default Notice Period" dropdown.</summary>
+    public async Task<string> GetNoticePeriodPresetAsync()
+    {
+        var group = page.Locator(".col-md-4")
+            .Filter(new() { HasText = "Default Notice Period" })
+            .First;
+        var combobox = group.Locator("span[role='combobox']").First;
+        return (await combobox.Locator("input").InputValueAsync()).Trim();
+    }
+
+    /// <summary>
+    /// Waits for the custom-duration Unit/Length controls to render after selecting the
+    /// "Custom duration" notice period preset. They're conditionally rendered (@if in the
+    /// Razor markup) based on server-side state, so there's a Blazor round-trip after the
+    /// preset dropdown's popup closes before they appear.
+    /// </summary>
+    public Task WaitForNoticePeriodCustomControlsAsync() =>
+        page.Locator(".col-md-4").Filter(new() { HasText = "Unit" }).First
+            .WaitForAsync(new() { Timeout = 10_000 });
+
+    /// <summary>
+    /// Selects a value ("Weeks" or "Months") from the custom-duration "Unit" dropdown. Only
+    /// present once "Custom duration" has been selected in the notice period preset dropdown —
+    /// call <see cref="WaitForNoticePeriodCustomControlsAsync"/> first.
+    /// </summary>
+    public async Task SelectNoticePeriodUnitAsync(string unitLabel)
+    {
+        var group = page.Locator(".col-md-4")
+            .Filter(new() { HasText = "Unit" })
+            .First;
+        await group.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = unitLabel })
+            .First
+            .ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    /// <summary>Returns the currently displayed value of the custom-duration "Unit" dropdown.</summary>
+    public async Task<string> GetNoticePeriodUnitAsync()
+    {
+        var group = page.Locator(".col-md-4")
+            .Filter(new() { HasText = "Unit" })
+            .First;
+        var combobox = group.Locator("span[role='combobox']").First;
+        return (await combobox.Locator("input").InputValueAsync()).Trim();
+    }
+
+    /// <summary>Sets the custom-duration "Length" numeric field. Only present once "Custom duration" is selected.</summary>
+    public async Task SetNoticePeriodLengthAsync(int length) =>
+        await FillNumericAndVerifyAsync(NumericBoxByLabel(".col-md-4", "Length"), length.ToString(), length);
+
+    /// <summary>Returns the current value of the custom-duration "Length" numeric field.</summary>
+    public async Task<int> GetNoticePeriodLengthAsync()
+    {
+        var input = NumericBoxByLabel(".col-md-4", "Length");
+        var value = await input.InputValueAsync();
+        return int.Parse(value);
+    }
+
+    /// <summary>Returns true if the "Automatically disable system access on the employee's leaving date" checkbox is currently checked.</summary>
+    public async Task<bool> IsAutoDisableAccessOnLeavingDateCheckedAsync()
+    {
+        var wrapper = page.Locator(".e-checkbox-wrapper")
+            .Filter(new() { HasText = "Automatically disable system access on the employee's leaving date" });
+        return await wrapper.Locator("input[type='checkbox']").IsCheckedAsync();
+    }
+
+    /// <summary>
+    /// Sets the "Automatically disable system access on the employee's leaving date" checkbox to
+    /// the desired checked state. Only clicks if the current state differs from the requested one.
+    /// </summary>
+    public async Task SetAutoDisableAccessOnLeavingDateAsync(bool isChecked)
+    {
+        var current = await IsAutoDisableAccessOnLeavingDateCheckedAsync();
+        if (current != isChecked)
+        {
+            var wrapper = page.Locator(".e-checkbox-wrapper")
+                .Filter(new() { HasText = "Automatically disable system access on the employee's leaving date" });
+            await wrapper.Locator("label").ClickAsync();
+        }
+    }
+
     // ── Save ───────────────────────────────────────────────────────────────────
 
     public async Task SaveAsync()

@@ -32,7 +32,7 @@ internal sealed class DeactivatePositionProfileHandler
             .CountAsync(
                 e => e.PositionProfileId == request.Id
                   && e.CompanyId == request.CompanyId
-                  && e.Status != EmploymentStatus.Terminated,
+                  && e.Status != EmploymentStatus.FormerEmployee,
                 cancellationToken);
 
         if (currentEmployeeCount > 0)

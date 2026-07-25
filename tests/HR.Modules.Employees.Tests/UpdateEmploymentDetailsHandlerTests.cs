@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.UpdateEmploymentDetails;
 using HR.Modules.Employees.Persistence;
@@ -72,6 +73,74 @@ public class UpdateEmploymentDetailsHandlerTests
         Assert.Null(result.Value!.ProbationEndDate);
         var saved = await context.Employees.SingleAsync();
         Assert.Null(saved.ProbationEndDate);
+    }
+
+    // ── notice period override ───────────────────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_Persists_NoticePeriodOverride_When_Both_Fields_Provided()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
+        {
+            CompanyId = companyId,
+            Id = employee.Id,
+            Status = EmploymentStatus.Active,
+            StartDate = StartDate,
+            NoticePeriodUnitOverride = NoticePeriodUnit.Weeks,
+            NoticePeriodLengthOverride = 4
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(NoticePeriodUnit.Weeks, result.Value!.NoticePeriodUnitOverride);
+        Assert.Equal(4, result.Value.NoticePeriodLengthOverride);
+        var saved = await context.Employees.SingleAsync();
+        Assert.Equal(NoticePeriodUnit.Weeks, saved.NoticePeriodUnitOverride);
+        Assert.Equal(4, saved.NoticePeriodLengthOverride);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Clears_NoticePeriodOverride_When_Null_Fields_Supplied()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        employee.UpdateEmploymentDetails(
+            employee.EmployeeNumber, employee.EmploymentTypeId, employee.StartDate,
+            employee.ContinuousServiceDate, employee.ProbationEndDate, employee.LeavingDate,
+            employee.Notes, now, NoticePeriodUnit.Months, 2);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
+        {
+            CompanyId = companyId,
+            Id = employee.Id,
+            Status = EmploymentStatus.Active,
+            StartDate = StartDate,
+            NoticePeriodUnitOverride = null,
+            NoticePeriodLengthOverride = null
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.NoticePeriodUnitOverride);
+        Assert.Null(result.Value.NoticePeriodLengthOverride);
+        var saved = await context.Employees.SingleAsync();
+        Assert.Null(saved.NoticePeriodUnitOverride);
+        Assert.Null(saved.NoticePeriodLengthOverride);
     }
 
     // ── baseline handler behaviour ────────────────────────────────────────────

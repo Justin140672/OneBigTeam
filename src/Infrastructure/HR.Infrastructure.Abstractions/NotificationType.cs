@@ -36,4 +36,6 @@ public enum NotificationType
     SharedCompanyDocumentAcknowledgementOverdue  = 32,
     SharedCompanyDocumentReviewDue                = 33,
     SharedCompanyDocumentManagerEscalation        = 34,
+    LeavingProcessStarted                         = 35,
+    IncompleteOffboardingAtDeparture              = 36,
 }

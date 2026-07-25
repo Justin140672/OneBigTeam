@@ -24,6 +24,7 @@ internal sealed class EmployeesDbContext : DbContext
     public DbSet<OnboardingTemplateTask> OnboardingTemplateTasks => Set<OnboardingTemplateTask>();
     public DbSet<LocationType> LocationTypes => Set<LocationType>();
     public DbSet<Location> Locations => Set<Location>();
+    public DbSet<EmployeeLeavingProcess> EmployeeLeavingProcesses => Set<EmployeeLeavingProcess>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

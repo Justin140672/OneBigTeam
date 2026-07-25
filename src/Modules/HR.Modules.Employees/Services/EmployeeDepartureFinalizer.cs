@@ -1,0 +1,68 @@
+using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Domain;
+using HR.Modules.Employees.Persistence;
+using HR.SharedKernel;
+
+namespace HR.Modules.Employees.Services;
+
+// Extracted from ProcessLeavingEmployeesJob so the exact same finalisation steps (status
+// transition, conditional access disabling, offboarding-completeness check, manager notification,
+// audit publish) run whether triggered by the daily job reaching a due LeavingDate, or by HR
+// confirming a backdated LeavingDate via Start/AmendLeavingProcess. Both Employee/EmployeeLeavingProcess
+// guard their own state transitions (Complete throws unless InProgress), which is what keeps
+// repeated calls for the same process safe.
+internal sealed class EmployeeDepartureFinalizer(
+    EmployeesDbContext dbContext,
+    IAuditEventPublisher auditEventPublisher,
+    IOffboardingStatusReader offboardingStatusReader,
+    ICompanyLeavingSettingsReader leavingSettingsReader,
+    INotificationWriter notificationWriter) : IEmployeeDepartureFinalizer
+{
+    public async Task FinalizeAsync(
+        Employee employee,
+        EmployeeLeavingProcess process,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        employee.SetFormerEmployee(now);
+        process.Complete(now);
+
+        var accessDisabled = false;
+        if (await leavingSettingsReader.GetAutoDisableAccessOnLeavingDateAsync(employee.CompanyId, cancellationToken))
+        {
+            employee.SetSystemAccess(false, now);
+            accessDisabled = true;
+        }
+
+        var offboardingStatus = await offboardingStatusReader.GetStatusAsync(
+            employee.CompanyId, employee.Id, cancellationToken);
+        var offboardingIncomplete = offboardingStatus is null || offboardingStatus.Status != "Completed";
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (offboardingIncomplete && employee.ManagerId.HasValue)
+        {
+            await notificationWriter.WriteAsync(
+                Guid.NewGuid(),
+                employee.CompanyId,
+                employee.ManagerId.Value,
+                "Offboarding incomplete at departure",
+                $"{employee.FirstName} {employee.LastName} has left the company but has outstanding offboarding tasks.",
+                employee.Id,
+                NotificationType.IncompleteOffboardingAtDeparture,
+                NotificationPriority.High,
+                now,
+                cancellationToken);
+        }
+
+        await auditEventPublisher.PublishAsync(
+            new EmployeeDepartureFinalisedAuditEvent(
+                employee.CompanyId,
+                employee.Id,
+                process.Id,
+                now,
+                accessDisabled,
+                offboardingIncomplete),
+            cancellationToken);
+    }
+}

@@ -84,6 +84,22 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             .ClickAsync();
     }
 
+    // ── Employee Overview header ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the text of the employee status badge shown next to the employee's name at the
+    /// top of the page (e.g. "Active", "Leaving", "Former Employee" — see EmployeeEdit.razor's
+    /// StatusDisplayName). Scoped to the "rounded-pill" class combo distinguishing it from the
+    /// Reporting Chain card's own "Current Employee" badge and every lifecycle tab's own status
+    /// badge further down the page — see the Playwright locator conventions around bare-class
+    /// locators for why a plain ".badge" alone would be ambiguous here.
+    /// </summary>
+    public async Task<string?> GetEmployeeStatusBadgeTextAsync()
+    {
+        var badge = page.Locator(".badge.rounded-pill").First;
+        return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
+    }
+
     // ── Employment Tab ─────────────────────────────────────────────────────────
 
     public async Task OpenEmploymentTabAsync()
@@ -244,6 +260,103 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     /// <summary>Fills the Employee Number field on the Employment tab.</summary>
     public async Task FillEmployeeNumberAsync(string value) =>
         await page.GetByPlaceholder("e.g. EMP-001").FillAsync(value);
+
+    // ── Notice period override (Employment tab, "Dates" card) ──────────────────
+    //
+    // Mirrors the "Override company default notice period" toggle on the Position Profile
+    // edit page (see PositionProfileEditPage's own "Notice period override" section) — the
+    // same three Syncfusion component types (SfCheckBox/SfDropDownList/SfNumericTextBox),
+    // used the same way, just a different checkbox label ("Override notice period" rather
+    // than "...company default...") and an additional read-only "Notice source" summary
+    // alongside it (see EmployeeEmploymentTab.razor's Dates card).
+
+    /// <summary>
+    /// The "row g-3 mt-2" div containing the Unit dropdown and Length numeric field, which
+    /// is only present in the DOM while "Override notice period" is checked. Same xpath
+    /// sibling-traversal approach as PositionProfileEditPage.NoticePeriodOverrideRow, since
+    /// the Unit dropdown here has no adjacent &lt;label&gt; to scope by either.
+    /// </summary>
+    private ILocator NoticePeriodOverrideRow =>
+        page.Locator(".e-checkbox-wrapper")
+            .Filter(new() { HasText = "Override notice period" })
+            .Locator("xpath=following-sibling::div[contains(@class,'row')]");
+
+    /// <summary>Checks/unchecks "Override notice period" and waits for the reveal/hide of its fields.</summary>
+    public async Task SetOverrideNoticePeriodAsync(bool overrideEnabled)
+    {
+        var checkbox = page.GetByLabel("Override notice period");
+        var isChecked = await checkbox.IsCheckedAsync();
+        if (overrideEnabled && !isChecked)
+        {
+            await checkbox.CheckAsync();
+            await NoticePeriodOverrideRow.WaitForAsync(new() { Timeout = 10_000 });
+        }
+        if (!overrideEnabled && isChecked)
+        {
+            await checkbox.UncheckAsync();
+            await NoticePeriodOverrideRow.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        }
+    }
+
+    public Task<bool> IsOverrideNoticePeriodCheckedAsync() =>
+        page.GetByLabel("Override notice period").IsCheckedAsync();
+
+    /// <summary>True once the Unit/Length fields have rendered (i.e. the override checkbox is checked).</summary>
+    public Task<bool> IsNoticePeriodOverrideFieldsVisibleAsync() =>
+        NoticePeriodOverrideRow.IsVisibleAsync();
+
+    /// <summary>Selects a value ("Weeks" or "Months") from the notice period override's Unit dropdown. Only present once the override checkbox is checked.</summary>
+    public async Task SelectNoticePeriodUnitAsync(string unitLabel)
+    {
+        await NoticePeriodOverrideRow.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = unitLabel })
+            .First
+            .ClickAsync(new() { Timeout = 10_000 });
+        await page.WaitForSelectorAsync(".e-popup.e-ddl", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    /// <summary>Returns the currently displayed value of the notice period override's Unit dropdown.</summary>
+    public async Task<string> GetNoticePeriodUnitTextAsync()
+    {
+        var combobox = NoticePeriodOverrideRow.Locator("span[role='combobox']").First;
+        return (await combobox.Locator("input").InputValueAsync()).Trim();
+    }
+
+    /// <summary>Sets the notice period override's Length numeric field. Only present once the override checkbox is checked.</summary>
+    public Task FillNoticePeriodLengthAsync(int length) =>
+        NoticePeriodOverrideRow.Locator("input.e-numerictextbox").First.FillAsync(length.ToString());
+
+    /// <summary>Returns the current value of the notice period override's Length numeric field.</summary>
+    public async Task<int> GetNoticePeriodLengthAsync()
+    {
+        var value = await NoticePeriodOverrideRow.Locator("input.e-numerictextbox").First.InputValueAsync();
+        return int.Parse(value);
+    }
+
+    /// <summary>
+    /// The read-only "Notice source" summary card (a small &lt;dl&gt;) sitting alongside the
+    /// override toggle — shows the resolved Source ("Employee"/"Position Profile"/"Company
+    /// Default") and Notice Period (length + unit), reflecting EffectiveNoticePeriodResolver's
+    /// server-side resolution regardless of whether this employee's own override is set.
+    /// </summary>
+    private ILocator NoticeSourceSummary =>
+        page.Locator(".col-md-6").Filter(new() { HasText = "Notice source" }).First;
+
+    /// <summary>Returns the "Source" value from the Notice source summary (e.g. "Employee", "Position Profile", "Company Default").</summary>
+    public async Task<string?> GetNoticeSourceLabelAsync()
+    {
+        var dd = NoticeSourceSummary.Locator("dd").First;
+        return (await dd.TextContentAsync())?.Trim();
+    }
+
+    /// <summary>Returns the "Notice Period" value from the Notice source summary (e.g. "3 Weeks").</summary>
+    public async Task<string?> GetEffectiveNoticePeriodTextAsync()
+    {
+        var dd = NoticeSourceSummary.Locator("dd").Nth(1);
+        return (await dd.TextContentAsync())?.Trim();
+    }
 
     // ── Close / unsaved-changes prompt (EditPageBase) ──────────────────────────
 

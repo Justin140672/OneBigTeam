@@ -29,6 +29,42 @@ public sealed class EmployeeLifecycleTabVisibilityTests(AppFixture fixture) : E2
 
     private const string LauraEmail = "laura.bennett@acme.example";
 
+    /// <summary>
+    /// Drives the (already-open-via-OpenAsync) Start Leaving Process wizard end to end, exactly
+    /// mirroring EmployeeLeavingProcessTests.StartLeavingProcessViaWizardAsync. Offboarding no
+    /// longer has a manual trigger — it's only ever started as a side effect of confirming this
+    /// wizard (StartLeavingProcessHandler calls IOffboardingPlanCoordinator.StartAsync
+    /// internally), so this is used purely to reach an active-offboarding-plan state.
+    /// </summary>
+    private async Task StartLeavingProcessViaWizardAsync(
+        StartLeavingProcessDialog dialog, string resignationDdMMyyyy, string reasonLabel)
+    {
+        await dialog.OpenAsync();
+        await dialog.FillResignationReceivedDateAsync(resignationDdMMyyyy);
+        await dialog.ClickNextAsync();
+
+        var leavingDateRaw = await dialog.GetLeavingDateTextAsync();
+        Assert.False(string.IsNullOrWhiteSpace(leavingDateRaw),
+            "Expected step 2 to auto-populate a proposed leaving date from the employee's effective notice period");
+
+        await dialog.ClickNextAsync();
+
+        await dialog.FillLastWorkingDayAsync(leavingDateRaw!);
+        await dialog.ClickNextAsync();
+
+        await dialog.SelectLeavingReasonAsync(reasonLabel);
+        await dialog.ClickNextAsync();
+
+        await dialog.ConfirmAsync();
+        Assert.False(await dialog.IsVisibleAsync(),
+            "Expected the Start Leaving Process dialog to close after a successful submission");
+
+        // StartLeavingProcessDialog's OnCompleted callback force-navigates the parent page to
+        // "?tab=leaving" — wait for the resulting full page reload to reconnect before the caller
+        // reads anything else off the page.
+        await _page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
+    }
+
     private async Task<Guid> CreateEmployeeAsync(
         EmployeeListPage empList, EmployeeEditPage empEdit, string suffix)
     {
@@ -82,11 +118,11 @@ public sealed class EmployeeLifecycleTabVisibilityTests(AppFixture fixture) : E2
             await _page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" }).IsVisibleAsync(),
             "Expected no 'Offboarding' tab for an employee who never had a plan");
 
-        // The entry point to *start* offboarding should still be reachable even though no
-        // lifecycle tabs are currently shown.
-        Assert.True(
+        // There is no manual entry point to start offboarding anywhere in the UI anymore —
+        // offboarding only ever starts as a side effect of the Start Leaving Process wizard.
+        Assert.False(
             await _page.GetByRole(AriaRole.Button, new() { Name = "Start Offboarding" }).IsVisibleAsync(),
-            "Expected the header 'Start Offboarding' button to remain visible");
+            "Expected no manual 'Start Offboarding' entry point anywhere");
     }
 
     [Fact]
@@ -95,7 +131,7 @@ public sealed class EmployeeLifecycleTabVisibilityTests(AppFixture fixture) : E2
         var login       = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList     = new EmployeeListPage(_page, _fixture.WebBaseUrl);
         var empEdit     = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
-        var offboarding = new EmployeeOffboardingTab(_page);
+        var startDialog = new StartLeavingProcessDialog(_page);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
@@ -112,12 +148,11 @@ public sealed class EmployeeLifecycleTabVisibilityTests(AppFixture fixture) : E2
             await _page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" }).IsVisibleAsync(),
             "Expected no Offboarding tab yet");
 
-        // Start offboarding via the header button — Onboarding and Offboarding should now both
-        // be visible at once for the same employee.
-        await offboarding.OpenAsync();
-        await offboarding.OpenStartDialogAsync();
-        await offboarding.FillLastWorkingDayAsync("01/12/2026");
-        await offboarding.SubmitStartAsync();
+        // Drive the Start Leaving Process wizard — offboarding only ever starts as a side effect
+        // of it (StartLeavingProcessHandler calls IOffboardingPlanCoordinator.StartAsync
+        // internally) — Onboarding and Offboarding should now both be visible at once for the
+        // same employee.
+        await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
 
         Assert.True(
             await _page.GetByRole(AriaRole.Tab, new() { Name = "Onboarding" }).IsVisibleAsync(),
@@ -133,7 +168,7 @@ public sealed class EmployeeLifecycleTabVisibilityTests(AppFixture fixture) : E2
         var login       = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList     = new EmployeeListPage(_page, _fixture.WebBaseUrl);
         var empEdit     = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
-        var offboarding = new EmployeeOffboardingTab(_page);
+        var startDialog = new StartLeavingProcessDialog(_page);
         var inbox       = new HrInboxPage(_page, _fixture.WebBaseUrl);
         var profile     = new MyProfilePage(_page, _fixture.WebBaseUrl);
         var taskView    = new TaskViewPage(_page, _fixture.WebBaseUrl);
@@ -143,10 +178,9 @@ public sealed class EmployeeLifecycleTabVisibilityTests(AppFixture fixture) : E2
 
         var employeeId = await CreateEmployeeAsync(empList, empEdit, "OffComplete");
 
-        await offboarding.OpenAsync();
-        await offboarding.OpenStartDialogAsync();
-        await offboarding.FillLastWorkingDayAsync("01/12/2026");
-        await offboarding.SubmitStartAsync();
+        // Offboarding no longer has a manual trigger — it only ever starts as a side effect of
+        // confirming the Start Leaving Process wizard.
+        await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
 
         Assert.True(await _page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" }).IsVisibleAsync(),
             "Expected the Offboarding tab to be visible once started");
@@ -206,15 +240,16 @@ public sealed class EmployeeLifecycleTabVisibilityTests(AppFixture fixture) : E2
             }
         }
 
-        // Revisiting the employee's profile should no longer show an Offboarding tab, and the
-        // header "Start Offboarding" button should be back.
+        // Revisiting the employee's profile should no longer show an Offboarding tab. There is no
+        // manual "Start Offboarding" entry point to reappear anymore — that button no longer
+        // exists anywhere in the UI.
         await empEdit.GoToAsync(AcmeId, employeeId);
 
         Assert.False(
             await _page.GetByRole(AriaRole.Tab, new() { Name = "Offboarding" }).IsVisibleAsync(),
             "Expected the Offboarding tab to be hidden once the plan is Completed");
-        Assert.True(
+        Assert.False(
             await _page.GetByRole(AriaRole.Button, new() { Name = "Start Offboarding" }).IsVisibleAsync(),
-            "Expected the header 'Start Offboarding' button to reappear once the plan is Completed");
+            "Expected no manual 'Start Offboarding' entry point anywhere");
     }
 }

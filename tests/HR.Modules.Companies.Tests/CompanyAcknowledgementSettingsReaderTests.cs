@@ -19,7 +19,8 @@ public class CompanyAcknowledgementSettingsReaderTests
             "UTC", "en-GB", WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
                              WorkingDays.Thursday | WorkingDays.Friday,
             7.5m, 1, 25, 6, true, false, false, null, null,
-            "Custom company acknowledgement statement.", 3, now);
+            "Custom company acknowledgement statement.", 3,
+            NoticePeriodUnit.Months, 1, true, now);
         company.SetSettings(settings, now);
         context.Companies.Add(company);
         await context.SaveChangesAsync();

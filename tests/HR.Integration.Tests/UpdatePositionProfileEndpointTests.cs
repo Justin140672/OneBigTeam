@@ -282,6 +282,122 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Put_PositionProfile_Updates_NoticePeriodOverride()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
+        var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
+
+        var updateResponse = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles/{created.Id}", new
+            {
+                companyId,
+                id = created.Id,
+                departmentId,
+                locationId,
+                defaultLeavePolicyId = leavePolicyId,
+                title = "Original Title",
+                noticePeriodUnitOverride = "Months",
+                noticePeriodLengthOverride = 2
+            });
+
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+
+        var payload = await updateResponse.Content.ReadFromJsonAsync<UpdatedPositionProfilePayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("Months", payload!.NoticePeriodUnitOverride);
+        Assert.Equal(2, payload.NoticePeriodLengthOverride);
+    }
+
+    [Fact]
+    public async Task Put_PositionProfile_Clears_NoticePeriodOverride_Back_To_Null()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
+        var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
+
+        var firstUpdate = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles/{created.Id}", new
+            {
+                companyId,
+                id = created.Id,
+                departmentId,
+                locationId,
+                defaultLeavePolicyId = leavePolicyId,
+                title = "Original Title",
+                noticePeriodUnitOverride = "Weeks",
+                noticePeriodLengthOverride = 4
+            });
+        firstUpdate.EnsureSuccessStatusCode();
+
+        var clearResponse = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles/{created.Id}", new
+            {
+                companyId,
+                id = created.Id,
+                departmentId,
+                locationId,
+                defaultLeavePolicyId = leavePolicyId,
+                title = "Original Title"
+            });
+
+        Assert.Equal(HttpStatusCode.OK, clearResponse.StatusCode);
+
+        var payload = await clearResponse.Content.ReadFromJsonAsync<UpdatedPositionProfilePayload>();
+        Assert.NotNull(payload);
+        Assert.Null(payload!.NoticePeriodUnitOverride);
+        Assert.Null(payload.NoticePeriodLengthOverride);
+    }
+
+    [Fact]
+    public async Task Put_PositionProfile_Returns_BadRequest_When_Only_NoticePeriodUnitOverride_Is_Set()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
+        var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles/{created.Id}", new
+            {
+                companyId,
+                id = created.Id,
+                departmentId,
+                locationId,
+                defaultLeavePolicyId = leavePolicyId,
+                title = "Original Title",
+                noticePeriodUnitOverride = "Weeks"
+            });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_PositionProfile_Returns_BadRequest_When_Only_NoticePeriodLengthOverride_Is_Set()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
+        var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles/{created.Id}", new
+            {
+                companyId,
+                id = created.Id,
+                departmentId,
+                locationId,
+                defaultLeavePolicyId = leavePolicyId,
+                title = "Original Title",
+                noticePeriodLengthOverride = 4
+            });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
     private sealed record IdPayload(Guid Id);
 
     private sealed record PositionProfilePayload(
@@ -304,5 +420,7 @@ public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicatio
         string? Description,
         Guid DefaultLeavePolicyId,
         bool IsActive,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        string? NoticePeriodUnitOverride,
+        int? NoticePeriodLengthOverride);
 }

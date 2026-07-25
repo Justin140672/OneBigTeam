@@ -24,7 +24,7 @@ internal sealed class DeactivateEmploymentTypeHandler(EmployeesDbContext db, ICl
             .CountAsync(
                 e => e.EmploymentTypeId == request.Id
                   && e.CompanyId == request.CompanyId
-                  && e.Status != EmploymentStatus.Terminated,
+                  && e.Status != EmploymentStatus.FormerEmployee,
                 cancellationToken);
 
         if (currentEmployeeCount > 0)

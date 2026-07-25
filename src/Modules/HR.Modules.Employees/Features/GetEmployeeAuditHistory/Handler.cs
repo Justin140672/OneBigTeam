@@ -21,6 +21,7 @@ internal sealed class GetEmployeeAuditHistoryHandler(
     {
         ["Employee"] = "Employees",
         ["Compensation"] = "Employees",
+        ["EmployeeLeavingProcess"] = "Employees",
         ["SicknessRecord"] = "Sickness",
         ["SicknessEvidenceRequest"] = "Sickness",
         ["ReturnToWorkReview"] = "Sickness",

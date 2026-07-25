@@ -32,6 +32,9 @@ internal sealed class CompanySettings
 
     public string DefaultAcknowledgementStatement { get; private set; } = DefaultAcknowledgementStatementText;
     public int AcknowledgementReminderIntervalDays { get; private set; } = 3;
+    public NoticePeriodUnit NoticePeriodUnit { get; private set; }
+    public int NoticePeriodLength { get; private set; }
+    public bool AutoDisableAccessOnLeavingDate { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -58,6 +61,9 @@ internal sealed class CompanySettings
             MobileRegex = UkContactRegexDefaults.Mobile,
             DefaultAcknowledgementStatement = DefaultAcknowledgementStatementText,
             AcknowledgementReminderIntervalDays = 3,
+            NoticePeriodUnit = NoticePeriodUnit.Months,
+            NoticePeriodLength = 1,
+            AutoDisableAccessOnLeavingDate = true,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -78,6 +84,9 @@ internal sealed class CompanySettings
         int? returnToWorkRequiredAfterDays,
         string defaultAcknowledgementStatement,
         int acknowledgementReminderIntervalDays,
+        NoticePeriodUnit noticePeriodUnit,
+        int noticePeriodLength,
+        bool autoDisableAccessOnLeavingDate,
         DateTimeOffset now)
     {
         TimeZone = timeZone;
@@ -96,6 +105,9 @@ internal sealed class CompanySettings
             ? DefaultAcknowledgementStatementText
             : defaultAcknowledgementStatement;
         AcknowledgementReminderIntervalDays = acknowledgementReminderIntervalDays;
+        NoticePeriodUnit = noticePeriodUnit;
+        NoticePeriodLength = noticePeriodLength;
+        AutoDisableAccessOnLeavingDate = autoDisableAccessOnLeavingDate;
         UpdatedAt = now;
     }
 }

@@ -41,6 +41,8 @@ internal sealed class Employee
     public DateOnly? ContinuousServiceDate { get; private set; }
     public DateOnly? ProbationEndDate { get; private set; }
     public DateOnly? LeavingDate { get; private set; }
+    public NoticePeriodUnit? NoticePeriodUnitOverride { get; private set; }
+    public int? NoticePeriodLengthOverride { get; private set; }
     public string? Notes { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -154,9 +156,15 @@ internal sealed class Employee
         UpdatedAt = now;
     }
 
-    public void Terminate(DateTimeOffset now)
+    public void SetLeaving(DateTimeOffset now)
     {
-        Status = EmploymentStatus.Terminated;
+        Status = EmploymentStatus.Leaving;
+        UpdatedAt = now;
+    }
+
+    public void SetFormerEmployee(DateTimeOffset now)
+    {
+        Status = EmploymentStatus.FormerEmployee;
         UpdatedAt = now;
     }
 
@@ -208,16 +216,20 @@ internal sealed class Employee
         DateOnly? probationEndDate,
         DateOnly? leavingDate,
         string? notes,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        NoticePeriodUnit? noticePeriodUnitOverride = null,
+        int? noticePeriodLengthOverride = null)
     {
-        EmployeeNumber        = employeeNumber.Trim();
-        EmploymentTypeId      = employmentTypeId;
-        StartDate             = startDate;
-        ContinuousServiceDate = continuousServiceDate;
-        ProbationEndDate      = probationEndDate;
-        LeavingDate           = leavingDate;
-        Notes                 = Norm(notes);
-        UpdatedAt             = now;
+        EmployeeNumber             = employeeNumber.Trim();
+        EmploymentTypeId           = employmentTypeId;
+        StartDate                  = startDate;
+        ContinuousServiceDate      = continuousServiceDate;
+        ProbationEndDate           = probationEndDate;
+        LeavingDate                = leavingDate;
+        NoticePeriodUnitOverride   = noticePeriodUnitOverride;
+        NoticePeriodLengthOverride = noticePeriodLengthOverride;
+        Notes                      = Norm(notes);
+        UpdatedAt                  = now;
     }
 
     private static string? Norm(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();

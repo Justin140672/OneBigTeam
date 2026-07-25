@@ -47,6 +47,14 @@ internal sealed class PositionProfileConfiguration : IEntityTypeConfiguration<Po
             .HasColumnName("hours_per_day_override")
             .HasPrecision(4, 2);
 
+        builder.Property(p => p.NoticePeriodUnitOverride)
+            .HasColumnName("notice_period_unit_override")
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        builder.Property(p => p.NoticePeriodLengthOverride)
+            .HasColumnName("notice_period_length_override");
+
         builder.Property(p => p.SalaryMin)
             .HasColumnName("salary_min")
             .HasPrecision(12, 2);

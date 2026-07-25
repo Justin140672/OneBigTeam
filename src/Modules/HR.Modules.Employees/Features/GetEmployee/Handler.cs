@@ -1,5 +1,6 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Services;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -12,17 +13,20 @@ internal sealed class GetEmployeeHandler
     private readonly IOnboardingStatusReader _onboardingStatusReader;
     private readonly IProbationStatusReader _probationStatusReader;
     private readonly IOffboardingStatusReader _offboardingStatusReader;
+    private readonly IEffectiveNoticePeriodResolver _effectiveNoticePeriodResolver;
 
     public GetEmployeeHandler(
         EmployeesDbContext dbContext,
         IOnboardingStatusReader onboardingStatusReader,
         IProbationStatusReader probationStatusReader,
-        IOffboardingStatusReader offboardingStatusReader)
+        IOffboardingStatusReader offboardingStatusReader,
+        IEffectiveNoticePeriodResolver effectiveNoticePeriodResolver)
     {
         _dbContext = dbContext;
         _onboardingStatusReader = onboardingStatusReader;
         _probationStatusReader = probationStatusReader;
         _offboardingStatusReader = offboardingStatusReader;
+        _effectiveNoticePeriodResolver = effectiveNoticePeriodResolver;
     }
 
     public async Task<Result<GetEmployeeResponse>> HandleAsync(
@@ -71,6 +75,8 @@ internal sealed class GetEmployeeHandler
                 e.ContinuousServiceDate,
                 e.ProbationEndDate,
                 e.LeavingDate,
+                e.NoticePeriodUnitOverride,
+                e.NoticePeriodLengthOverride,
                 e.Notes,
                 e.CreatedAt,
                 e.UpdatedAt,
@@ -86,12 +92,20 @@ internal sealed class GetEmployeeHandler
                     .Where(p => p.Id == e.PositionProfileId)
                     .Select(p => p.Title)
                     .FirstOrDefault(),
+                PositionNoticePeriodUnitOverride = _dbContext.PositionProfiles
+                    .Where(p => p.Id == e.PositionProfileId)
+                    .Select(p => p.NoticePeriodUnitOverride)
+                    .FirstOrDefault(),
+                PositionNoticePeriodLengthOverride = _dbContext.PositionProfiles
+                    .Where(p => p.Id == e.PositionProfileId)
+                    .Select(p => p.NoticePeriodLengthOverride)
+                    .FirstOrDefault(),
                 ManagerFullName = _dbContext.Employees
                     .Where(m => m.Id == e.ManagerId)
                     .Select(m => m.FirstName + " " + m.LastName)
                     .FirstOrDefault(),
                 DirectReportsCount = _dbContext.Employees
-                    .Count(r => r.ManagerId == e.Id && r.Status != EmploymentStatus.Terminated)
+                    .Count(r => r.ManagerId == e.Id && r.Status != EmploymentStatus.FormerEmployee)
             })
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -101,21 +115,44 @@ internal sealed class GetEmployeeHandler
                 Error.NotFound($"Employee with id '{request.Id}' was not found."));
         }
 
-        var reportingChainTask = BuildReportingChainAsync(
-            request.CompanyId, result.Id, result.ManagerId, cancellationToken);
         var onboardingStatusTask = _onboardingStatusReader.GetStatusAsync(
             request.CompanyId, result.Id, cancellationToken);
         var probationStatusTask = _probationStatusReader.GetStatusAsync(
             request.CompanyId, result.Id, cancellationToken);
         var offboardingStatusTask = _offboardingStatusReader.GetStatusAsync(
             request.CompanyId, result.Id, cancellationToken);
+        var effectiveNoticePeriodTask = _effectiveNoticePeriodResolver.ResolveAsync(
+            request.CompanyId,
+            result.NoticePeriodUnitOverride,
+            result.NoticePeriodLengthOverride,
+            result.PositionNoticePeriodUnitOverride,
+            result.PositionNoticePeriodLengthOverride,
+            cancellationToken);
 
-        await Task.WhenAll(reportingChainTask, onboardingStatusTask, probationStatusTask, offboardingStatusTask);
+        // These four all go through other modules' own DbContexts (or no DbContext at all), so
+        // they're safe to run concurrently.
+        await Task.WhenAll(onboardingStatusTask, probationStatusTask, offboardingStatusTask, effectiveNoticePeriodTask);
 
-        var reportingChain = reportingChainTask.Result;
         var onboardingStatus = onboardingStatusTask.Result;
         var probationStatus = probationStatusTask.Result;
         var offboardingStatus = offboardingStatusTask.Result;
+        var effectiveNoticePeriod = effectiveNoticePeriodTask.Result;
+
+        // Sequential — both hit this same EmployeesDbContext instance, which EF Core does not
+        // allow to be used by more than one in-flight operation at a time.
+        var reportingChain = await BuildReportingChainAsync(
+            request.CompanyId, result.Id, result.ManagerId, cancellationToken);
+        // EmployeeLeavingProcess is owned by this same module/DbContext (unlike onboarding/
+        // probation/offboarding status, which live in other modules and are read through
+        // Infrastructure.Abstractions reader ports), so this is a direct query rather than a
+        // cross-module reader.
+        var hasActiveLeavingProcess = await _dbContext.EmployeeLeavingProcesses
+            .AsNoTracking()
+            .AnyAsync(
+                p => p.CompanyId == request.CompanyId
+                    && p.EmployeeId == result.Id
+                    && p.Status == LeavingProcessStatus.InProgress,
+                cancellationToken);
 
         // Single source of truth for "should the employee profile show this lifecycle tab" — the
         // frontend reads these fields rather than re-deriving them from separately-fetched status
@@ -125,6 +162,7 @@ internal sealed class GetEmployeeHandler
             && probationStatus.Status is "Active" or "ReviewDue" or "Extended";
         var showOffboardingTab = offboardingStatus is not null
             && offboardingStatus.Status is not ("Completed" or "Cancelled");
+        var showLeavingTab = hasActiveLeavingProcess;
 
         return Result.Success(new GetEmployeeResponse(
             result.Id,
@@ -167,12 +205,18 @@ internal sealed class GetEmployeeHandler
             result.ContinuousServiceDate,
             result.ProbationEndDate,
             result.LeavingDate,
+            result.NoticePeriodUnitOverride,
+            result.NoticePeriodLengthOverride,
             result.Notes,
             result.CreatedAt,
             result.UpdatedAt,
             showOnboardingTab,
             showProbationTab,
-            showOffboardingTab));
+            showOffboardingTab,
+            showLeavingTab,
+            effectiveNoticePeriod.Unit,
+            effectiveNoticePeriod.Length,
+            effectiveNoticePeriod.Source));
     }
 
     // Walks the ManagerId chain from the employee's own manager up to the root, using an

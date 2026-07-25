@@ -30,8 +30,8 @@
                         <GridColumn HeaderText="" Width="100" AllowSorting="false" AllowFiltering="false" TextAlign="TextAlign.Right">
                             <Template>
                                 @{ var item = (context as DocumentAuditHistoryItemModel)!; }
-                                <SfButton CssClass="e-outline e-small" title="View" OnClick="() => HandleView(item)">
-                                    <i class="fa-solid fa-eye"></i>
+                                <SfButton CssClass="e-outline e-small" OnClick="() => HandleView(item)">
+                                    View
                                 </SfButton>
                             </Template>
                         </GridColumn>

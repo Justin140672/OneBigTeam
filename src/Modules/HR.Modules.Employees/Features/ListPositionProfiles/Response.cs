@@ -1,3 +1,5 @@
+using HR.Infrastructure.Abstractions;
+
 namespace HR.Modules.Employees.Features.ListPositionProfiles;
 
 internal sealed record ListPositionProfilesResponse(IReadOnlyList<PositionProfileListItem> Items);
@@ -10,4 +12,6 @@ internal sealed record PositionProfileListItem(
     bool IsActive,
     decimal? SalaryMin,
     decimal? SalaryMax,
-    string? SalaryType);
+    string? SalaryType,
+    NoticePeriodUnit? NoticePeriodUnitOverride,
+    int? NoticePeriodLengthOverride);

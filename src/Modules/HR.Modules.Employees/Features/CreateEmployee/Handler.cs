@@ -135,7 +135,7 @@ internal sealed class CreateEmployeeHandler
                 .AnyAsync(
                     e => e.Id == request.ManagerId &&
                          e.CompanyId == request.CompanyId &&
-                         e.Status != EmploymentStatus.Terminated,
+                         e.Status != EmploymentStatus.FormerEmployee,
                     cancellationToken);
 
             if (!managerExists)

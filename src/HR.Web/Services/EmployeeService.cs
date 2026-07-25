@@ -385,5 +385,94 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         return (null, "Failed to create employee.");
     }
 
+    public async Task<(StartLeavingProcessResponse? Result, string? Error)> StartLeavingProcessAsync(
+        Guid companyId, Guid employeeId, StartLeavingProcessRequest request)
+    {
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/employees/{employeeId}/leaving-process", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var created = await response.Content.ReadFromJsonAsync<StartLeavingProcessResponse>(HrApiJsonOptions.Default);
+            return (created, null);
+        }
+
+        // Same reasoning as UpdateEmploymentDetailsAsync above — 404 (not found)/409 (conflict —
+        // already an in-progress leaving process) send the { error } shape, but FluentValidation
+        // failures short-circuit with FastEndpoints' own 422 { statusCode, message, errors } shape
+        // instead. Check both known shapes before falling back to a generic message.
+        var raw = await response.Content.ReadAsStringAsync();
+
+        if (TryDeserialize<ErrorEnvelope>(raw)?.Error is { } businessMessage)
+            return (null, businessMessage);
+
+        if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
+            return (null, string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
+
+        return (null, $"Failed to start leaving process ({(int)response.StatusCode} {response.StatusCode}).");
+    }
+
+    public async Task<LeavingProcessResponse?> GetLeavingProcessAsync(Guid companyId, Guid employeeId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<LeavingProcessResponse>(
+                $"api/companies/{companyId}/employees/{employeeId}/leaving-process", HrApiJsonOptions.Default);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<(AmendLeavingProcessResponse? Result, string? Error)> AmendLeavingProcessAsync(
+        Guid companyId, Guid employeeId, AmendLeavingProcessRequest request)
+    {
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{companyId}/employees/{employeeId}/leaving-process", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var amended = await response.Content.ReadFromJsonAsync<AmendLeavingProcessResponse>(HrApiJsonOptions.Default);
+            return (amended, null);
+        }
+
+        // Same reasoning as StartLeavingProcessAsync above — 404 (no in-progress leaving process)/409
+        // (other business conflict) send the { error } shape, but FluentValidation failures short-circuit
+        // with FastEndpoints' own 422 { statusCode, message, errors } shape instead.
+        var raw = await response.Content.ReadAsStringAsync();
+
+        if (TryDeserialize<ErrorEnvelope>(raw)?.Error is { } businessMessage)
+            return (null, businessMessage);
+
+        if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
+            return (null, string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
+
+        return (null, $"Failed to amend leaving process ({(int)response.StatusCode} {response.StatusCode}).");
+    }
+
+    public async Task<(CancelLeavingProcessResponse? Result, string? Error)> CancelLeavingProcessAsync(
+        Guid companyId, Guid employeeId, CancelLeavingProcessRequest request)
+    {
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/employees/{employeeId}/leaving-process/cancel", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var cancelled = await response.Content.ReadFromJsonAsync<CancelLeavingProcessResponse>(HrApiJsonOptions.Default);
+            return (cancelled, null);
+        }
+
+        var raw = await response.Content.ReadAsStringAsync();
+
+        if (TryDeserialize<ErrorEnvelope>(raw)?.Error is { } businessMessage)
+            return (null, businessMessage);
+
+        if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
+            return (null, string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
+
+        return (null, $"Failed to cancel leaving process ({(int)response.StatusCode} {response.StatusCode}).");
+    }
+
     private sealed record ErrorEnvelope(string? Error);
 }

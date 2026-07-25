@@ -11,7 +11,7 @@ internal sealed class CurrentEmployeeReader(EmployeesDbContext dbContext) : ICur
     {
         return await dbContext.Employees
             .AsNoTracking()
-            .Where(e => e.CompanyId == companyId && e.Status != EmploymentStatus.Terminated)
+            .Where(e => e.CompanyId == companyId && e.Status != EmploymentStatus.FormerEmployee)
             .Select(e => e.Id)
             .ToListAsync(cancellationToken);
     }

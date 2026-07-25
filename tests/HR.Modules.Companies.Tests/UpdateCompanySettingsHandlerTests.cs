@@ -347,6 +347,97 @@ public class UpdateCompanySettingsHandlerTests
 		Assert.Equal("New acknowledgement statement.", auditEvent.CurrentSettings.DefaultAcknowledgementStatement);
 	}
 
+	[Fact]
+	public async Task HandleAsync_Persists_NoticePeriodSettings_And_Returns_Them_In_Response()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 7, 24, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var handler = new UpdateCompanySettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 7, 24, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher());
+
+		var result = await handler.HandleAsync(
+			new UpdateCompanySettingsRequest
+			{
+				Id = company.Id,
+				TimeZone = "UTC",
+				Locale = "en-GB",
+				WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+				              WorkingDays.Thursday | WorkingDays.Friday,
+				HoursPerDay = 7.5m,
+				LeaveYearStartMonth = 1,
+				DefaultHolidayAllowance = 25,
+				ProbationMonths = 6,
+				NoticePeriodUnit = NoticePeriodUnit.Weeks,
+				NoticePeriodLength = 4,
+				AutoDisableAccessOnLeavingDate = false,
+			},
+			CancellationToken.None);
+
+		Assert.True(result.IsSuccess);
+		Assert.Equal(NoticePeriodUnit.Weeks, result.Value!.NoticePeriodUnit);
+		Assert.Equal(4, result.Value.NoticePeriodLength);
+		Assert.False(result.Value.AutoDisableAccessOnLeavingDate);
+
+		var savedSettings = await context.CompanySettings.SingleAsync();
+		Assert.Equal(NoticePeriodUnit.Weeks, savedSettings.NoticePeriodUnit);
+		Assert.Equal(4, savedSettings.NoticePeriodLength);
+		Assert.False(savedSettings.AutoDisableAccessOnLeavingDate);
+	}
+
+	[Fact]
+	public async Task HandleAsync_Includes_NoticePeriodSettings_In_AuditEvent_BeforeAndAfter_Snapshots()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 7, 24, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var auditPublisher = new CapturingAuditEventPublisher();
+		var updateTime = new DateTime(2026, 7, 24, 11, 0, 0, DateTimeKind.Utc);
+		var handler = new UpdateCompanySettingsHandler(context, new FakeClock(updateTime), auditPublisher);
+
+		await handler.HandleAsync(
+			new UpdateCompanySettingsRequest
+			{
+				Id = company.Id,
+				TimeZone = "UTC",
+				Locale = "en-GB",
+				WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+				              WorkingDays.Thursday | WorkingDays.Friday,
+				HoursPerDay = 7.5m,
+				LeaveYearStartMonth = 1,
+				DefaultHolidayAllowance = 25,
+				ProbationMonths = 6,
+				NoticePeriodUnit = NoticePeriodUnit.Weeks,
+				NoticePeriodLength = 2,
+				AutoDisableAccessOnLeavingDate = false,
+			},
+			CancellationToken.None);
+
+		var auditEvt = Assert.Single(auditPublisher.Published);
+		var auditEvent = Assert.IsType<CompanySettingsUpdatedAuditEvent>(auditEvt);
+
+		Assert.NotNull(auditEvent.PreviousSettings);
+		Assert.Equal(NoticePeriodUnit.Months, auditEvent.PreviousSettings!.NoticePeriodUnit);
+		Assert.Equal(1, auditEvent.PreviousSettings.NoticePeriodLength);
+		Assert.True(auditEvent.PreviousSettings.AutoDisableAccessOnLeavingDate);
+
+		Assert.Equal(NoticePeriodUnit.Weeks, auditEvent.CurrentSettings.NoticePeriodUnit);
+		Assert.Equal(2, auditEvent.CurrentSettings.NoticePeriodLength);
+		Assert.False(auditEvent.CurrentSettings.AutoDisableAccessOnLeavingDate);
+	}
+
 	private static CompaniesDbContext BuildContext()
 	{
 		var options = new DbContextOptionsBuilder<CompaniesDbContext>()

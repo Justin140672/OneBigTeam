@@ -1,0 +1,119 @@
+@using HR.Web.Models
+@using HR.Infrastructure.Abstractions
+@using Microsoft.AspNetCore.WebUtilities
+@inject EmployeeService EmployeeService
+@inject NavigationManager Navigation
+
+@if (_loading)
+{
+    <HrLoadingIndicator />
+}
+else if (_leavingProcess is null)
+{
+    <HrEmptyState Message="No leaving process found for this employee." Icon="fa-solid fa-door-open" />
+}
+else
+{
+    @if (_showOffboardingAlreadyStartedWarning)
+    {
+        <div class="alert alert-warning">
+            Offboarding has already started for this employee — review the Offboarding tab for outstanding tasks.
+        </div>
+    }
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Leaving Details</h5>
+            <div class="d-flex align-items-center gap-2">
+                @if (_leavingProcess.Status == "InProgress")
+                {
+                    <SfButton CssClass="e-outline e-small" OnClick="@(() => OnAmendRequested.InvokeAsync())">Amend</SfButton>
+                    <SfButton CssClass="e-outline e-danger e-small" OnClick="@(() => OnCancelRequested.InvokeAsync())">Cancel Leaving Process</SfButton>
+                }
+                <span class="badge fs-6 px-3 py-2 @StatusBadgeClass(_leavingProcess.Status)">@StatusLabel(_leavingProcess.Status)</span>
+            </div>
+        </div>
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-4 text-muted fw-normal">Resignation Received Date</dt>
+                <dd class="col-sm-8">@_leavingProcess.ResignationReceivedDate.ToString("dd MMM yyyy")</dd>
+                <dt class="col-sm-4 text-muted fw-normal">Leaving Date</dt>
+                <dd class="col-sm-8">@_leavingProcess.LeavingDate.ToString("dd MMM yyyy")</dd>
+                <dt class="col-sm-4 text-muted fw-normal">Last Working Day</dt>
+                <dd class="col-sm-8">@_leavingProcess.LastWorkingDay.ToString("dd MMM yyyy")</dd>
+                <dt class="col-sm-4 text-muted fw-normal">Notice Period</dt>
+                <dd class="col-sm-8">@_leavingProcess.NoticePeriodLength @NoticePeriodUnitLabel(_leavingProcess.NoticePeriodUnit)</dd>
+                <dt class="col-sm-4 text-muted fw-normal">Notice Source</dt>
+                <dd class="col-sm-8">@NoticePeriodSourceLabel(_leavingProcess.NoticeSource)</dd>
+                <dt class="col-sm-4 text-muted fw-normal">Leaving Reason</dt>
+                <dd class="col-sm-8">@LeavingReasonLabel(_leavingProcess.LeavingReason)</dd>
+            </dl>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter] public EventCallback OnAmendRequested { get; set; }
+    [Parameter] public EventCallback OnCancelRequested { get; set; }
+
+    private bool _loading = true;
+    private LeavingProcessResponse? _leavingProcess;
+    private bool _showOffboardingAlreadyStartedWarning;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _leavingProcess = await EmployeeService.GetLeavingProcessAsync(CompanyId, EmployeeId);
+
+        // EmployeeEdit's OnLeavingProcessAmended appends this flag to the forceLoad navigation it
+        // does after a successful Amend, since AmendLeavingProcessResponse.OffboardingAlreadyStarted
+        // otherwise wouldn't survive that full-page reload — this is the simplest way to carry it
+        // across, consistent with the ?tab= query-string pattern EmployeeEdit already uses.
+        var query = QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
+        _showOffboardingAlreadyStartedWarning =
+            query.TryGetValue("offboardingAlreadyStarted", out var flag) && flag == "true";
+
+        _loading = false;
+    }
+
+    // Same convention as EmployeeEmploymentTab.NoticePeriodSourceLabel.
+    private static string NoticePeriodSourceLabel(string source) => source switch
+    {
+        "Employee"        => "Employee",
+        "PositionProfile" => "Position Profile",
+        "CompanyDefault"  => "Company Default",
+        _                 => source
+    };
+
+    private static string NoticePeriodUnitLabel(NoticePeriodUnit unit) => unit switch
+    {
+        NoticePeriodUnit.Weeks  => "Weeks",
+        NoticePeriodUnit.Months => "Months",
+        _                       => unit.ToString()
+    };
+
+    internal static string LeavingReasonLabel(string reason) => reason switch
+    {
+        "EndOfContract"    => "End of Contract",
+        "MutualAgreement"  => "Mutual Agreement",
+        _                  => reason
+    };
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "InProgress" => "In Progress",
+        "Cancelled"  => "Cancelled",
+        "Completed"  => "Completed",
+        _            => status
+    };
+
+    private static string StatusBadgeClass(string status) => status switch
+    {
+        "InProgress" => "bg-warning text-dark",
+        "Cancelled"  => "bg-danger",
+        "Completed"  => "bg-success",
+        _            => "bg-secondary"
+    };
+}

@@ -40,6 +40,9 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
                 defaults.MobileRegex,
                 defaults.DefaultAcknowledgementStatement,
                 defaults.AcknowledgementReminderIntervalDays,
+                defaults.NoticePeriodUnit,
+                defaults.NoticePeriodLength,
+                defaults.AutoDisableAccessOnLeavingDate,
                 defaults.UpdatedAt));
         }
 
@@ -56,6 +59,9 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
             settings.MobileRegex,
             settings.DefaultAcknowledgementStatement,
             settings.AcknowledgementReminderIntervalDays,
+            settings.NoticePeriodUnit,
+            settings.NoticePeriodLength,
+            settings.AutoDisableAccessOnLeavingDate,
             settings.UpdatedAt));
     }
 }

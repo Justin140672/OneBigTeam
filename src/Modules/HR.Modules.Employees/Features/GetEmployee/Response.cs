@@ -1,4 +1,5 @@
 using HR.Modules.Employees.Domain;
+using HR.Modules.Employees.Services;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 
@@ -45,12 +46,18 @@ internal sealed record GetEmployeeResponse(
     DateOnly? ContinuousServiceDate,
     DateOnly? ProbationEndDate,
     DateOnly? LeavingDate,
+    NoticePeriodUnit? NoticePeriodUnitOverride,
+    int? NoticePeriodLengthOverride,
     string? Notes,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     bool ShowOnboardingTab,
     bool ShowProbationTab,
-    bool ShowOffboardingTab);
+    bool ShowOffboardingTab,
+    bool ShowLeavingTab,
+    NoticePeriodUnit EffectiveNoticePeriodUnit,
+    int EffectiveNoticePeriodLength,
+    NoticePeriodSource EffectiveNoticePeriodSource);
 
 // Ordered from the top of the org (no manager) down to the employee's immediate manager;
 // does not include the employee themselves.

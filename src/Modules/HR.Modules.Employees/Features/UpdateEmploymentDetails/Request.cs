@@ -19,6 +19,8 @@ internal sealed record UpdateEmploymentDetailsRequest
     public DateOnly? ContinuousServiceDate { get; init; }
     public DateOnly? ProbationEndDate { get; init; }
     public DateOnly? LeavingDate { get; init; }
+    public NoticePeriodUnit? NoticePeriodUnitOverride { get; init; }
+    public int? NoticePeriodLengthOverride { get; init; }
     public WorkingDays? WorkingDaysOverride { get; init; }
     public decimal? HoursPerDayOverride { get; init; }
     public string? Notes { get; init; }

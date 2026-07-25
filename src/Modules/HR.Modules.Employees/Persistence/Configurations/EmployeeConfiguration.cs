@@ -165,6 +165,14 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.Property(e => e.LeavingDate)
             .HasColumnName("leaving_date");
 
+        builder.Property(e => e.NoticePeriodUnitOverride)
+            .HasColumnName("notice_period_unit_override")
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        builder.Property(e => e.NoticePeriodLengthOverride)
+            .HasColumnName("notice_period_length_override");
+
         builder.Property(e => e.Notes)
             .HasColumnName("notes")
             .HasMaxLength(4000);

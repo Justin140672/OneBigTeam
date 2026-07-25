@@ -293,13 +293,13 @@
             {
                 <span class="badge rounded-pill px-3 py-2 fs-6 fw-normal @StatusBadgeClass(_employee.Status)">@StatusDisplayName(_employee.Status)</span>
             }
-            @if (!_showOffboardingTab)
+            @if (!_showLeavingTab)
             {
-                <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" @onclick="GoToStartOffboarding">
-                    <i class="fa-solid fa-person-walking-arrow-right me-1"></i>Start Offboarding
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" @onclick="OpenStartLeavingProcessDialog">
+                    <i class="fa-solid fa-right-from-bracket me-1"></i>Start Leaving Process
                 </button>
             }
-            <a class="btn btn-outline-secondary btn-sm @(_showOffboardingTab ? "ms-auto" : "")" href="/companies/@CompanyId/organisation-chart?employeeId=@Id">
+            <a class="btn btn-outline-secondary btn-sm @(_showLeavingTab ? "ms-auto" : "")" href="/companies/@CompanyId/organisation-chart?employeeId=@Id">
                 <i class="fa-solid fa-sitemap me-1"></i>View Org Chart
             </a>
         </div>
@@ -656,6 +656,20 @@
                     </TabItem>
                 }
 
+                @if (_showLeavingTab)
+                {
+                    <TabItem>
+                        <ChildContent><TabHeader Text="Leaving" /></ChildContent>
+                        <ContentTemplate>
+                            <div class="mt-4">
+                                <EmployeeLeavingTab CompanyId="CompanyId" EmployeeId="Id!.Value"
+                                                     OnAmendRequested="OpenAmendLeavingProcessDialog"
+                                                     OnCancelRequested="OpenCancelLeavingProcessDialog" />
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+                }
+
             </TabItems>
         </SfTab>
 
@@ -672,6 +686,30 @@
             }
             <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
         </div>
+
+        @if (_employee is not null)
+        {
+            <StartLeavingProcessDialog IsOpen="_showStartLeavingProcessDialog"
+                                        CompanyId="CompanyId"
+                                        EmployeeId="Id!.Value"
+                                        EffectiveNoticePeriodUnit="_employee.EffectiveNoticePeriodUnit"
+                                        EffectiveNoticePeriodLength="_employee.EffectiveNoticePeriodLength"
+                                        OnCancelled="CloseStartLeavingProcessDialog"
+                                        OnCompleted="OnLeavingProcessStarted" />
+
+            <AmendLeavingProcessDialog IsOpen="_showAmendLeavingProcessDialog"
+                                        CompanyId="CompanyId"
+                                        EmployeeId="Id!.Value"
+                                        OnCancelled="CloseAmendLeavingProcessDialog"
+                                        OnCompleted="OnLeavingProcessAmended" />
+
+            <CancelLeavingProcessDialog IsOpen="_showCancelLeavingProcessDialog"
+                                         CompanyId="CompanyId"
+                                         EmployeeId="Id!.Value"
+                                         ShowOffboardingTab="_showOffboardingTab"
+                                         OnCancelled="CloseCancelLeavingProcessDialog"
+                                         OnCompleted="OnLeavingProcessCancelled" />
+        }
     }
 
     <NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" />
@@ -735,15 +773,30 @@
     // OnboardingPlanCompletedAuditEvent). Offboarding's tab index shifts whenever Onboarding's (or
     // Probation's) tab isn't rendered, since Syncfusion's SfTab indexes by however many <TabItem>
     // elements actually render, not by their position in this markup.
+    //
+    // Counted directly from the markup above (Details, Employment, Compensation, [Probation],
+    // Emergency Contacts, Leave, Sickness, Tasks, Documents, Assets, Acknowledgement History,
+    // Audit = 11 always-rendered tabs before Onboarding, plus 1 more when Probation renders), not
+    // trusted from any older constant — this file has picked up tabs (e.g. Acknowledgement
+    // History) since these indices were last set, so re-derive them from the actual <TabItem>
+    // count rather than assuming the previous numbers still held.
     private bool _showOnboardingTab;
-    private int OnboardingTabIndex => 11 + ProbationOffset;
-    private int OffboardingTabIndex => (_showOnboardingTab ? 12 : 11) + ProbationOffset;
+    private int OnboardingTabIndex => 12 + ProbationOffset;
+    private int OffboardingTabIndex => (_showOnboardingTab ? 13 : 12) + ProbationOffset;
 
     // Offboarding only gets a tab once a plan has been started, and loses it again once that
     // plan is Completed/Cancelled — completed history remains visible via the Audit tab instead
-    // (see OffboardingPlanCompletedAuditEvent). It's the last tab, so its own visibility never
-    // affects any other tab's index.
+    // (see OffboardingPlanCompletedAuditEvent). It sits directly before Leaving in this markup, so
+    // its own visibility still needs to be accounted for by LeavingTabIndex below, but nothing
+    // after Leaving depends on it.
     private bool _showOffboardingTab;
+
+    // Leaving only gets a tab once a leaving process has been started for this employee (i.e.
+    // Employee.Status has moved to "Leaving" — see GetEmployeeHandler.ShowLeavingTab). It's the
+    // last tab in this markup, immediately after Offboarding, so its index is simply
+    // OffboardingTabIndex plus one more slot if Offboarding itself is currently rendered.
+    private bool _showLeavingTab;
+    private int LeavingTabIndex => OffboardingTabIndex + (_showOffboardingTab ? 1 : 0);
 
     protected override async Task LoadAsync()
     {
@@ -814,6 +867,7 @@
                 _showProbationTab = _employee.ShowProbationTab;
                 _showOnboardingTab = _employee.ShowOnboardingTab;
                 _showOffboardingTab = _employee.ShowOffboardingTab;
+                _showLeavingTab = _employee.ShowLeavingTab;
             }
 
             var uri = new Uri(Navigation.Uri);
@@ -826,7 +880,7 @@
 
             var managerResult = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
             _managerOptions = (managerResult?.Items ?? [])
-                .Where(e => e.Status != "Draft" && e.Status != "Terminated")
+                .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
                 .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
                 .OrderBy(e => e.Name)
                 .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
@@ -842,27 +896,65 @@
         {
             var tabValue = tab.ToString();
 
-            // Unlike Onboarding/Probation, Offboarding has no other entry point once its tab is
-            // hidden — starting one happens *inside* the tab itself (EmployeeOffboardingTab's own
-            // empty-state "Start Offboarding" button). The header button (GoToStartOffboarding)
-            // deep-links here specifically so that flow stays reachable for an employee with no
-            // active plan yet.
-            if (tabValue == "offboarding")
-                _showOffboardingTab = true;
-
             _activeTabIndex = tabValue switch
             {
                 "probation" => _showProbationTab ? 3 : 0,
                 "leave" => LeaveTabIndex,
                 "onboarding" => _showOnboardingTab ? OnboardingTabIndex : 0,
                 "offboarding" => OffboardingTabIndex,
+                "leaving" => _showLeavingTab ? LeavingTabIndex : 0,
                 _ => 0
             };
         }
     }
 
-    private void GoToStartOffboarding() =>
-        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{Id}?tab=offboarding", forceLoad: true);
+    private bool _showStartLeavingProcessDialog;
+
+    private void OpenStartLeavingProcessDialog() => _showStartLeavingProcessDialog = true;
+
+    private void CloseStartLeavingProcessDialog() => _showStartLeavingProcessDialog = false;
+
+    // This doesn't deep-link into a tab first — the whole flow is
+    // captured by the wizard dialog itself. Once it succeeds, a forceLoad navigate to
+    // ?tab=leaving is the simplest way to re-trigger LoadAsync and re-derive every tab
+    // flag/index (including the now-true _showLeavingTab) from a freshly-fetched employee.
+    private void OnLeavingProcessStarted()
+    {
+        _showStartLeavingProcessDialog = false;
+        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{Id}?tab=leaving", forceLoad: true);
+    }
+
+    private bool _showAmendLeavingProcessDialog;
+
+    private void OpenAmendLeavingProcessDialog() => _showAmendLeavingProcessDialog = true;
+
+    private void CloseAmendLeavingProcessDialog() => _showAmendLeavingProcessDialog = false;
+
+    // Same forceLoad-to-?tab=leaving pattern as OnLeavingProcessStarted, but also carries the
+    // OffboardingAlreadyStarted flag through as its own query-string flag — that's the simplest way
+    // for EmployeeLeavingTab to still know about it after this full-page reload, since the value only
+    // exists on the AmendLeavingProcessResponse from this one request and wouldn't otherwise survive.
+    private void OnLeavingProcessAmended(bool offboardingAlreadyStarted)
+    {
+        _showAmendLeavingProcessDialog = false;
+        var suffix = offboardingAlreadyStarted ? "&offboardingAlreadyStarted=true" : string.Empty;
+        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{Id}?tab=leaving{suffix}", forceLoad: true);
+    }
+
+    private bool _showCancelLeavingProcessDialog;
+
+    private void OpenCancelLeavingProcessDialog() => _showCancelLeavingProcessDialog = true;
+
+    private void CloseCancelLeavingProcessDialog() => _showCancelLeavingProcessDialog = false;
+
+    // Unlike Start/Amend, no ?tab= is needed here — cancelling flips the employee's status back to
+    // Active, so GetEmployeeHandler will derive ShowLeavingTab as false on the next fetch and the tab
+    // itself disappears; a plain forceLoad reload lands back on the default (Details) tab.
+    private void OnLeavingProcessCancelled()
+    {
+        _showCancelLeavingProcessDialog = false;
+        Navigation.NavigateTo($"/companies/{CompanyId}/employees/{Id}", forceLoad: true);
+    }
 
     // Same pattern as EmployeeEmploymentTab.OnManagerFilteringAsync — the manager list can't be
     // preloaded in one bounded page, so search server-side as the user types.
@@ -871,7 +963,7 @@
         args.PreventDefaultAction = true;
         var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         _managerOptions = (result?.Items ?? [])
-            .Where(e => e.Status != "Draft" && e.Status != "Terminated")
+            .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
@@ -1068,19 +1160,21 @@
 
     private static string StatusBadgeClass(string status) => status switch
     {
-        "Active"     => "bg-success",
-        "OnLeave"    => "bg-warning text-dark",
-        "Suspended"  => "bg-danger",
-        "Terminated" => "bg-secondary",
-        _            => "bg-light text-dark"
+        "Active"         => "bg-success",
+        "OnLeave"        => "bg-warning text-dark",
+        "Suspended"      => "bg-danger",
+        "Leaving"        => "bg-warning text-dark",
+        "FormerEmployee" => "bg-secondary",
+        _                => "bg-light text-dark"
     };
 
     private static string StatusDisplayName(string status) => status switch
     {
-        "Active"     => "Active",
-        "OnLeave"    => "On Leave",
-        "Suspended"  => "Suspended",
-        "Terminated" => "Leaver",
-        _            => status
+        "Active"         => "Active",
+        "OnLeave"        => "On Leave",
+        "Suspended"      => "Suspended",
+        "Leaving"        => "Leaving",
+        "FormerEmployee" => "Former Employee",
+        _                => status
     };
 }

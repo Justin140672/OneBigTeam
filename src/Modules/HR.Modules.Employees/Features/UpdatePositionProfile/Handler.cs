@@ -10,16 +10,23 @@ internal sealed class UpdatePositionProfileHandler
     private readonly EmployeesDbContext _dbContext;
     private readonly IClock _clock;
     private readonly ILeavePolicyReader _leavePolicyReader;
+    private readonly IAuditEventPublisher _auditEventPublisher;
 
-    public UpdatePositionProfileHandler(EmployeesDbContext dbContext, IClock clock, ILeavePolicyReader leavePolicyReader)
+    public UpdatePositionProfileHandler(
+        EmployeesDbContext dbContext,
+        IClock clock,
+        ILeavePolicyReader leavePolicyReader,
+        IAuditEventPublisher auditEventPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
         _leavePolicyReader = leavePolicyReader;
+        _auditEventPublisher = auditEventPublisher;
     }
 
     public async Task<Result<UpdatePositionProfileResponse>> HandleAsync(
         UpdatePositionProfileRequest request,
+        Guid actorEmployeeId,
         CancellationToken cancellationToken)
     {
         var profile = await _dbContext.PositionProfiles
@@ -105,6 +112,23 @@ internal sealed class UpdatePositionProfileHandler
 
         var now = _clock.UtcNowOffset();
 
+        var before = new PositionProfileSnapshot(
+            profile.DepartmentId,
+            profile.LocationId,
+            profile.Title,
+            profile.Description,
+            profile.ProbationMonthsOverride,
+            profile.WorkingDaysOverride,
+            profile.HoursPerDayOverride,
+            profile.NoticePeriodUnitOverride,
+            profile.NoticePeriodLengthOverride,
+            profile.SalaryMin,
+            profile.SalaryMax,
+            profile.SalaryType,
+            profile.DefaultLeavePolicyId,
+            profile.OnboardingTemplateId,
+            profile.IsActive);
+
         profile.Update(
             request.DepartmentId,
             request.LocationId,
@@ -118,9 +142,32 @@ internal sealed class UpdatePositionProfileHandler
             request.SalaryType,
             request.DefaultLeavePolicyId,
             now,
-            request.OnboardingTemplateId);
+            request.OnboardingTemplateId,
+            request.NoticePeriodUnitOverride,
+            request.NoticePeriodLengthOverride);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var after = new PositionProfileSnapshot(
+            profile.DepartmentId,
+            profile.LocationId,
+            profile.Title,
+            profile.Description,
+            profile.ProbationMonthsOverride,
+            profile.WorkingDaysOverride,
+            profile.HoursPerDayOverride,
+            profile.NoticePeriodUnitOverride,
+            profile.NoticePeriodLengthOverride,
+            profile.SalaryMin,
+            profile.SalaryMax,
+            profile.SalaryType,
+            profile.DefaultLeavePolicyId,
+            profile.OnboardingTemplateId,
+            profile.IsActive);
+
+        await _auditEventPublisher.PublishAsync(
+            new PositionProfileUpdatedAuditEvent(profile.CompanyId, profile.Id, actorEmployeeId, now, before, after),
+            cancellationToken);
 
         return Result.Success(new UpdatePositionProfileResponse(
             profile.Id,
@@ -132,6 +179,8 @@ internal sealed class UpdatePositionProfileHandler
             profile.ProbationMonthsOverride,
             profile.WorkingDaysOverride,
             profile.HoursPerDayOverride,
+            profile.NoticePeriodUnitOverride,
+            profile.NoticePeriodLengthOverride,
             profile.SalaryMin,
             profile.SalaryMax,
             profile.SalaryType,

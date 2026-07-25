@@ -43,5 +43,14 @@ internal sealed class UpdateEmploymentDetailsValidator : AbstractValidator<Updat
         RuleFor(r => r.WorkingDaysOverride)
             .NotEqual(WorkingDays.None)
             .When(r => r.WorkingDaysOverride.HasValue);
+
+        RuleFor(r => r)
+            .Must(r => r.NoticePeriodUnitOverride.HasValue == r.NoticePeriodLengthOverride.HasValue)
+            .WithMessage("Notice period unit and length overrides must both be set or both be empty.");
+
+        RuleFor(r => r.NoticePeriodLengthOverride)
+            .GreaterThan(0)
+            .When(r => r.NoticePeriodLengthOverride.HasValue)
+            .WithMessage("NoticePeriodLengthOverride must be greater than 0.");
     }
 }

@@ -11,16 +11,23 @@ internal sealed class CreatePositionProfileHandler
     private readonly EmployeesDbContext _dbContext;
     private readonly IClock _clock;
     private readonly ILeavePolicyReader _leavePolicyReader;
+    private readonly IAuditEventPublisher _auditEventPublisher;
 
-    public CreatePositionProfileHandler(EmployeesDbContext dbContext, IClock clock, ILeavePolicyReader leavePolicyReader)
+    public CreatePositionProfileHandler(
+        EmployeesDbContext dbContext,
+        IClock clock,
+        ILeavePolicyReader leavePolicyReader,
+        IAuditEventPublisher auditEventPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
         _leavePolicyReader = leavePolicyReader;
+        _auditEventPublisher = auditEventPublisher;
     }
 
     public async Task<Result<CreatePositionProfileResponse>> HandleAsync(
         CreatePositionProfileRequest request,
+        Guid actorEmployeeId,
         CancellationToken cancellationToken)
     {
         var departmentExists = await _dbContext.Departments
@@ -104,10 +111,36 @@ internal sealed class CreatePositionProfileHandler
             request.SalaryType,
             request.DefaultLeavePolicyId,
             now,
-            request.OnboardingTemplateId);
+            request.OnboardingTemplateId,
+            request.NoticePeriodUnitOverride,
+            request.NoticePeriodLengthOverride);
 
         _dbContext.PositionProfiles.Add(profile);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await _auditEventPublisher.PublishAsync(
+            new PositionProfileCreatedAuditEvent(
+                profile.CompanyId,
+                profile.Id,
+                actorEmployeeId,
+                now,
+                new PositionProfileSnapshot(
+                    profile.DepartmentId,
+                    profile.LocationId,
+                    profile.Title,
+                    profile.Description,
+                    profile.ProbationMonthsOverride,
+                    profile.WorkingDaysOverride,
+                    profile.HoursPerDayOverride,
+                    profile.NoticePeriodUnitOverride,
+                    profile.NoticePeriodLengthOverride,
+                    profile.SalaryMin,
+                    profile.SalaryMax,
+                    profile.SalaryType,
+                    profile.DefaultLeavePolicyId,
+                    profile.OnboardingTemplateId,
+                    profile.IsActive)),
+            cancellationToken);
 
         return Result.Success(new CreatePositionProfileResponse(
             profile.Id,
@@ -119,6 +152,8 @@ internal sealed class CreatePositionProfileHandler
             profile.ProbationMonthsOverride,
             profile.WorkingDaysOverride,
             profile.HoursPerDayOverride,
+            profile.NoticePeriodUnitOverride,
+            profile.NoticePeriodLengthOverride,
             profile.SalaryMin,
             profile.SalaryMax,
             profile.SalaryType,

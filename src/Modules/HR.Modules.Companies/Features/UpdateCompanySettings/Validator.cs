@@ -42,5 +42,8 @@ internal sealed class UpdateCompanySettingsValidator : AbstractValidator<UpdateC
 
 		RuleFor(request => request.AcknowledgementReminderIntervalDays)
 			.GreaterThanOrEqualTo(1);
+
+		RuleFor(request => request.NoticePeriodLength)
+			.GreaterThan(0);
 	}
 }

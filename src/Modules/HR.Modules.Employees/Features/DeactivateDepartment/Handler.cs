@@ -32,7 +32,7 @@ internal sealed class DeactivateDepartmentHandler
             .CountAsync(
                 e => e.DepartmentId == request.Id
                   && e.CompanyId == request.CompanyId
-                  && e.Status != EmploymentStatus.Terminated,
+                  && e.Status != EmploymentStatus.FormerEmployee,
                 cancellationToken);
 
         if (currentEmployeeCount > 0)

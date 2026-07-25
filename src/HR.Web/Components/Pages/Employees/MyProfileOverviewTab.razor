@@ -448,11 +448,12 @@ else
 
     private static string StatusDisplayName(string status) => status switch
     {
-        "Active"     => "Active",
-        "OnLeave"    => "On Leave",
-        "Suspended"  => "Suspended",
-        "Terminated" => "Leaver",
-        _            => status
+        "Active"         => "Active",
+        "OnLeave"        => "On Leave",
+        "Suspended"      => "Suspended",
+        "Leaving"        => "Leaving",
+        "FormerEmployee" => "Former Employee",
+        _                => status
     };
 
     private string WorkingPatternSummary()

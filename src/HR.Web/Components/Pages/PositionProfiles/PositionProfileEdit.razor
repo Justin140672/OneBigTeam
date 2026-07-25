@@ -231,6 +231,14 @@
     private static readonly string[] _allDays =
         ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+    private static readonly NoticePeriodUnitChoice[] NoticePeriodUnitOptions =
+    [
+        new(NoticePeriodUnit.Weeks, "Weeks"),
+        new(NoticePeriodUnit.Months, "Months")
+    ];
+
+    private sealed record NoticePeriodUnitChoice(NoticePeriodUnit Value, string Label);
+
     protected override async Task LoadAsync()
     {
         var deptTask = DepartmentService.ListDepartmentsAsync(CompanyId);
@@ -277,6 +285,17 @@
                 {
                     Model.UseCompanyWorkingPattern = true;
                 }
+
+                if (profile.NoticePeriodUnitOverride.HasValue && profile.NoticePeriodLengthOverride.HasValue)
+                {
+                    Model.OverrideNoticePeriod = true;
+                    Model.NoticePeriodUnit = profile.NoticePeriodUnitOverride.Value;
+                    Model.NoticePeriodLength = profile.NoticePeriodLengthOverride.Value;
+                }
+                else
+                {
+                    Model.OverrideNoticePeriod = false;
+                }
             }
         }
     }
@@ -293,6 +312,9 @@
             hoursPerDayOverride = Model.HoursPerDay;
         }
 
+        NoticePeriodUnit? noticePeriodUnitOverride = Model.OverrideNoticePeriod ? Model.NoticePeriodUnit : null;
+        int? noticePeriodLengthOverride = Model.OverrideNoticePeriod ? Model.NoticePeriodLength : null;
+
         if (IsNew)
         {
             var request = new CreatePositionProfileRequest(
@@ -308,7 +330,9 @@
                 Model.SalaryMax,
                 Model.SalaryType,
                 Model.DefaultLeavePolicyId!.Value,
-                Model.OnboardingTemplateId == Guid.Empty ? null : Model.OnboardingTemplateId);
+                Model.OnboardingTemplateId == Guid.Empty ? null : Model.OnboardingTemplateId,
+                NoticePeriodUnitOverride: noticePeriodUnitOverride,
+                NoticePeriodLengthOverride: noticePeriodLengthOverride);
 
             var (created, error) = await PositionProfileService.CreatePositionProfileAsync(CompanyId, request);
             return created is not null ? null : error ?? "Failed to create position profile.";
@@ -329,7 +353,9 @@
                 Model.SalaryMax,
                 Model.SalaryType,
                 Model.DefaultLeavePolicyId!.Value,
-                Model.OnboardingTemplateId == Guid.Empty ? null : Model.OnboardingTemplateId);
+                Model.OnboardingTemplateId == Guid.Empty ? null : Model.OnboardingTemplateId,
+                NoticePeriodUnitOverride: noticePeriodUnitOverride,
+                NoticePeriodLengthOverride: noticePeriodLengthOverride);
 
             var (success, error) = await PositionProfileService.UpdatePositionProfileAsync(CompanyId, Id!.Value, request);
             return success ? null : error;
@@ -395,7 +421,7 @@
                     <DropDownListFieldSettings Value="Id" Text="Name" />
                 </SfDropDownList>
             </div>
-            <div>
+            <div class="mb-3">
                 <SfCheckBox TChecked="bool"
                             Label="Use company working pattern"
                             Checked="@Model.UseCompanyWorkingPattern"
@@ -421,6 +447,33 @@
                                               ShowSpinButton="false"
                                               Min="0.5m" Max="24m" Step="0.5m" />
                             <ValidationMessage For="@(() => Model.HoursPerDay)" />
+                        </div>
+                    </div>
+                }
+            </div>
+            <div>
+                <SfCheckBox TChecked="bool"
+                            Label="Override company default notice period"
+                            Checked="@Model.OverrideNoticePeriod"
+                            CheckedChanged="@((bool v) => Model.OverrideNoticePeriod = v)" />
+                @if (Model.OverrideNoticePeriod)
+                {
+                    <div class="row g-3 mt-2">
+                        <div class="col-md-4">
+                            <SfDropDownList TValue="NoticePeriodUnit" TItem="NoticePeriodUnitChoice"
+                                            DataSource="@NoticePeriodUnitOptions"
+                                            @bind-Value="Model.NoticePeriodUnit"
+                                            Placeholder="Unit">
+                                <DropDownListFieldSettings Value="Value" Text="Label" />
+                            </SfDropDownList>
+                        </div>
+                        <div class="col-md-4">
+                            <SfNumericTextBox TValue="int" @bind-Value="Model.NoticePeriodLength"
+                                              Placeholder="Length"
+                                              FloatLabelType="FloatLabelType.Auto"
+                                              ShowSpinButton="false"
+                                              Min="1" />
+                            <ValidationMessage For="@(() => Model.NoticePeriodLength)" />
                         </div>
                     </div>
                 }

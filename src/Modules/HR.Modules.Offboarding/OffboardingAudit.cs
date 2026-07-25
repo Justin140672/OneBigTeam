@@ -28,3 +28,28 @@ internal sealed record OffboardingPlanCompletedAuditEvent(
     object? IAuditEvent.After           => new { Status = "Completed", LastWorkingDay, TotalTasks, CompletedTasks, SkippedTasks };
     object? IAuditEvent.Metadata        => null;
 }
+
+// Published when an offboarding plan is cancelled as a side effect of the employee's Leaving
+// Process being cancelled (see IOffboardingPlanCoordinator.CancelOutstandingTasksAsync). Like
+// OffboardingPlanCompletedAuditEvent above, this is what lets HR still find the cancelled
+// offboarding history in the Audit tab afterward — no OffboardingPlan/OffboardingTask rows are
+// deleted, only their statuses change.
+internal sealed record OffboardingPlanCancelledAuditEvent(
+    Guid CompanyId,
+    Guid OffboardingPlanId,
+    Guid EmployeeId,
+    int OutstandingTasksCancelled,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType        => "offboarding-plan.cancelled";
+    string IAuditEvent.EntityType       => "OffboardingPlan";
+    Guid   IAuditEvent.EntityId         => OffboardingPlanId;
+    Guid?  IAuditEvent.EmployeeId       => EmployeeId;
+    Guid?  IAuditEvent.ActorUserId      => null;
+    Guid?  IAuditEvent.ActorEmployeeId  => null;
+    Guid?  IAuditEvent.CorrelationId    => null;
+    string? IAuditEvent.Summary         => $"Offboarding cancelled ({OutstandingTasksCancelled} outstanding task(s) cancelled) — employee's leaving process was withdrawn";
+    object? IAuditEvent.Before          => new { Status = "InProgress" };
+    object? IAuditEvent.After           => new { Status = "Cancelled", OutstandingTasksCancelled };
+    object? IAuditEvent.Metadata        => null;
+}

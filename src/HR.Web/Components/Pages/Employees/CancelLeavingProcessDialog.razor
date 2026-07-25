@@ -1,0 +1,104 @@
+@using HR.Web.Models
+@using HR.Infrastructure.Abstractions
+@inject EmployeeService EmployeeService
+
+<SfDialog Visible="IsOpen" IsModal="true" Width="480px" ShowCloseIcon="false">
+    <DialogTemplates>
+        <Header>Cancel Leaving Process</Header>
+        <Content>
+            <p class="text-muted">
+                This will cancel the leaving process and return this employee's status to Active.
+            </p>
+            @if (ShowOffboardingTab)
+            {
+                <div class="alert alert-warning py-2">
+                    Offboarding has already started for this employee. Cancelling the leaving process
+                    will also cancel the outstanding offboarding tasks.
+                </div>
+            }
+            <div class="mb-3">
+                <label class="form-label">Cancellation Reason <span class="text-danger">*</span></label>
+                <textarea class="form-control" rows="3" maxlength="1000"
+                          @bind="_cancellationReason" placeholder="Why is the leaving process being cancelled?"></textarea>
+            </div>
+
+            @if (!string.IsNullOrEmpty(_globalError))
+            {
+                <div class="alert alert-danger py-2">@_globalError</div>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton CssClass="e-danger" IsPrimary="true" Disabled="@_submitting" OnClick="ConfirmAsync">
+                @if (_submitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Cancel Leaving Process
+            </SfButton>
+            <SfButton Disabled="@_submitting" OnClick="DismissAsync">Close</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    // Passed straight from EmployeeEdit's _employee.ShowOffboardingTab — when true, an offboarding
+    // plan is already in progress for this employee, so cancelling here needs stronger copy about
+    // its outstanding tasks also being cancelled (see AmendLeavingProcess/CancelLeavingProcess ticket).
+    [Parameter] public bool ShowOffboardingTab { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private bool _wasOpen;
+    private bool _submitting;
+    private string? _globalError;
+    private string _cancellationReason = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && !_wasOpen)
+            ResetState();
+
+        _wasOpen = IsOpen;
+    }
+
+    private void ResetState()
+    {
+        _submitting = false;
+        _globalError = null;
+        _cancellationReason = string.Empty;
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_cancellationReason))
+        {
+            _globalError = "Please provide a reason for cancelling the leaving process.";
+            return;
+        }
+
+        _submitting = true;
+        _globalError = null;
+
+        var request = new CancelLeavingProcessRequest(CompanyId, EmployeeId, _cancellationReason.Trim());
+
+        var (result, error) = await EmployeeService.CancelLeavingProcessAsync(CompanyId, EmployeeId, request);
+
+        _submitting = false;
+
+        if (result is null)
+        {
+            _globalError = error ?? "Failed to cancel the leaving process.";
+            return;
+        }
+
+        await OnCompleted.InvokeAsync();
+    }
+
+    private async Task DismissAsync()
+    {
+        await OnCancelled.InvokeAsync();
+    }
+}

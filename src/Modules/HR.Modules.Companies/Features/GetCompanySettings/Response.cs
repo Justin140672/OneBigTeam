@@ -1,3 +1,5 @@
+using HR.Infrastructure.Abstractions;
+
 namespace HR.Modules.Companies.Features.GetCompanySettings;
 
 internal sealed record GetCompanySettingsResponse(
@@ -19,4 +21,7 @@ internal sealed record GetCompanySettingsResponse(
     string MobileRegex,
     string DefaultAcknowledgementStatement,
     int AcknowledgementReminderIntervalDays,
+    NoticePeriodUnit NoticePeriodUnit,
+    int NoticePeriodLength,
+    bool AutoDisableAccessOnLeavingDate,
     DateTimeOffset UpdatedAt);

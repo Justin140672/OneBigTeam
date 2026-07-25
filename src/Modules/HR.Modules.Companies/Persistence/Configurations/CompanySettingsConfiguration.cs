@@ -1,4 +1,5 @@
 using HR.Modules.Companies.Domain;
+using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -102,6 +103,23 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .HasColumnName("acknowledgement_reminder_interval_days")
             .IsRequired()
             .HasDefaultValue(3);
+
+        builder.Property(settings => settings.NoticePeriodUnit)
+            .HasColumnName("notice_period_unit")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired()
+            .HasDefaultValue(NoticePeriodUnit.Months);
+
+        builder.Property(settings => settings.NoticePeriodLength)
+            .HasColumnName("notice_period_length")
+            .IsRequired()
+            .HasDefaultValue(1);
+
+        builder.Property(settings => settings.AutoDisableAccessOnLeavingDate)
+            .HasColumnName("auto_disable_access_on_leaving_date")
+            .IsRequired()
+            .HasDefaultValue(true);
 
         builder.Property(settings => settings.CreatedAt)
             .HasColumnName("created_at")

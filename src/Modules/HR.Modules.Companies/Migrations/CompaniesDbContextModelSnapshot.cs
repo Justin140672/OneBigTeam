@@ -163,6 +163,12 @@ namespace HR.Modules.Companies.Migrations
                         .HasDefaultValue(3)
                         .HasColumnName("acknowledgement_reminder_interval_days");
 
+                    b.Property<bool>("AutoDisableAccessOnLeavingDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("auto_disable_access_on_leaving_date");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -224,6 +230,20 @@ namespace HR.Modules.Companies.Migrations
                         .HasColumnType("character varying(500)")
                         .HasDefaultValue("^(?:\\+44\\s?|0)7\\d{3}(?:\\s?\\d{3}){2}$")
                         .HasColumnName("mobile_regex");
+
+                    b.Property<int>("NoticePeriodLength")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("notice_period_length");
+
+                    b.Property<string>("NoticePeriodUnit")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Months")
+                        .HasColumnName("notice_period_unit");
 
                     b.Property<string>("PostcodeRegex")
                         .IsRequired()

@@ -71,7 +71,7 @@ internal sealed class UpdateEmploymentDetailsHandler
                 .AnyAsync(
                     e => e.Id == request.ManagerId &&
                          e.CompanyId == request.CompanyId &&
-                         e.Status != EmploymentStatus.Terminated,
+                         e.Status != EmploymentStatus.FormerEmployee,
                     cancellationToken);
 
             if (!managerExists)
@@ -109,6 +109,16 @@ internal sealed class UpdateEmploymentDetailsHandler
             return Result.Failure<UpdateEmploymentDetailsResponse>(
                 Error.Validation("Cannot set employment status to Draft."));
 
+        // Leaving and FormerEmployee are not settable through this generic edit form — they are
+        // only ever entered via the dedicated Employee Leaving Process action (Leaving) and the
+        // scheduled job that follows it (FormerEmployee). Same shape as the Draft guard above:
+        // only rejects an actual attempted transition, so an employee already in one of these
+        // states can still have their other fields edited without the request being rejected.
+        if ((request.Status == EmploymentStatus.Leaving || request.Status == EmploymentStatus.FormerEmployee) &&
+            employee.Status != request.Status)
+            return Result.Failure<UpdateEmploymentDetailsResponse>(
+                Error.Validation("Cannot set employment status to Leaving or Former Employee directly."));
+
         var now = _clock.UtcNowOffset();
 
         if (employee.Status != request.Status)
@@ -118,7 +128,6 @@ internal sealed class UpdateEmploymentDetailsHandler
                 case EmploymentStatus.Active:     employee.Activate(now);    break;
                 case EmploymentStatus.OnLeave:    employee.SetOnLeave(now);  break;
                 case EmploymentStatus.Suspended:  employee.Suspend(now);     break;
-                case EmploymentStatus.Terminated: employee.Terminate(now);   break;
             }
         }
 
@@ -142,7 +151,9 @@ internal sealed class UpdateEmploymentDetailsHandler
             request.ProbationEndDate,
             request.LeavingDate,
             request.Notes,
-            now);
+            now,
+            request.NoticePeriodUnitOverride,
+            request.NoticePeriodLengthOverride);
 
         employee.Assign(
             request.DepartmentId ?? employee.DepartmentId,
@@ -168,6 +179,8 @@ internal sealed class UpdateEmploymentDetailsHandler
             employee.ContinuousServiceDate,
             employee.ProbationEndDate,
             employee.LeavingDate,
+            employee.NoticePeriodUnitOverride,
+            employee.NoticePeriodLengthOverride,
             employee.WorkingDaysOverride,
             employee.HoursPerDayOverride,
             employee.Notes,

@@ -185,4 +185,71 @@ public class UpdatePositionProfileValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdatePositionProfileRequest.SalaryType));
     }
+
+    [Fact]
+    public void Validate_Fails_When_NoticePeriodUnitOverride_Set_Without_Length()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with
+        {
+            NoticePeriodUnitOverride = NoticePeriodUnit.Weeks,
+            NoticePeriodLengthOverride = null
+        });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.ErrorMessage == "Notice period unit and length overrides must both be set or both be empty.");
+    }
+
+    [Fact]
+    public void Validate_Fails_When_NoticePeriodLengthOverride_Set_Without_Unit()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with
+        {
+            NoticePeriodUnitOverride = null,
+            NoticePeriodLengthOverride = 4
+        });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.ErrorMessage == "Notice period unit and length overrides must both be set or both be empty.");
+    }
+
+    [Fact]
+    public void Validate_Passes_When_NoticePeriodOverrides_Are_Both_Null()
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with
+        {
+            NoticePeriodUnitOverride = null,
+            NoticePeriodLengthOverride = null
+        });
+        Assert.True(result.IsValid);
+    }
+
+    [Theory]
+    [InlineData(NoticePeriodUnit.Weeks, 4)]
+    [InlineData(NoticePeriodUnit.Months, 1)]
+    public void Validate_Passes_When_NoticePeriodOverrides_Are_Both_Set(NoticePeriodUnit unit, int length)
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with
+        {
+            NoticePeriodUnitOverride = unit,
+            NoticePeriodLengthOverride = length
+        });
+        Assert.True(result.IsValid);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Validate_Fails_When_NoticePeriodLengthOverride_Is_Not_Greater_Than_Zero(int length)
+    {
+        var v = new UpdatePositionProfileValidator();
+        var result = v.Validate(ValidRequest() with
+        {
+            NoticePeriodUnitOverride = NoticePeriodUnit.Weeks,
+            NoticePeriodLengthOverride = length
+        });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.ErrorMessage == "NoticePeriodLengthOverride must be greater than 0.");
+    }
 }

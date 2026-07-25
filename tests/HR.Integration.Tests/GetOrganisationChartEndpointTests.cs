@@ -99,8 +99,11 @@ public class GetOrganisationChartEndpointTests : IClassFixture<ApiWebApplication
         var locationId = await PostForIdAsync(client, $"/api/companies/{companyId}/locations",
             new { companyId, name = "London Office", locationTypeId });
 
+        var leavePolicyId = await PostForIdAsync(client, $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = "Standard", carryOverDays = 0, allowNegativeBalance = false });
+
         var positionProfileId = await PostForIdAsync(client, $"/api/companies/{companyId}/position-profiles",
-            new { companyId, departmentId, locationId, title = "Senior Software Engineer" });
+            new { companyId, departmentId, locationId, title = "Senior Software Engineer", defaultLeavePolicyId = leavePolicyId });
 
         var employmentTypeId = await PostForIdAsync(client, $"/api/companies/{companyId}/employment-types",
             new { companyId, name = "Permanent" });

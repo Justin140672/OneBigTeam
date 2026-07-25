@@ -527,7 +527,7 @@
 
         _employmentTypes = (await employmentTypeTask)?.Items ?? [];
         _hireManagerOptions = ((await managerTask)?.Items ?? [])
-            .Where(e => e.Status != "Draft" && e.Status != "Terminated")
+            .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
@@ -543,7 +543,7 @@
         args.PreventDefaultAction = true;
         var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         _hireManagerOptions = (result?.Items ?? [])
-            .Where(e => e.Status != "Draft" && e.Status != "Terminated")
+            .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "No Manager"))

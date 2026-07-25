@@ -18,6 +18,8 @@ internal sealed record UpdateEmploymentDetailsResponse(
     DateOnly? ContinuousServiceDate,
     DateOnly? ProbationEndDate,
     DateOnly? LeavingDate,
+    NoticePeriodUnit? NoticePeriodUnitOverride,
+    int? NoticePeriodLengthOverride,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,
     string? Notes,

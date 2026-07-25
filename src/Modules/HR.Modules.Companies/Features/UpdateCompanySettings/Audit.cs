@@ -17,7 +17,10 @@ internal sealed record CompanySettingsAuditSnapshot(
     int? FitNoteRequiredAfterDays,
     int? ReturnToWorkRequiredAfterDays,
     string DefaultAcknowledgementStatement,
-    int AcknowledgementReminderIntervalDays);
+    int AcknowledgementReminderIntervalDays,
+    NoticePeriodUnit NoticePeriodUnit,
+    int NoticePeriodLength,
+    bool AutoDisableAccessOnLeavingDate);
 
 internal sealed record CompanySettingsUpdatedAuditEvent(
     Guid CompanyId,

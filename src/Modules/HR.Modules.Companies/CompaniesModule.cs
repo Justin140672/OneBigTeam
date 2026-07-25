@@ -117,6 +117,8 @@ public static class CompaniesModule
         services.AddScoped<IBrandingStorage, StubBrandingStorage>();
         services.AddScoped<ICompanyLeaveSettingsReader, CompanyLeaveSettingsReader>();
         services.AddScoped<ICompanyProbationSettingsReader, CompanyProbationSettingsReader>();
+        services.AddScoped<ICompanyNoticePeriodSettingsReader, CompanyNoticePeriodSettingsReader>();
+        services.AddScoped<ICompanyLeavingSettingsReader, CompanyLeavingSettingsReader>();
         services.AddScoped<ICompanySicknessSettingsReader, CompanySicknessSettingsReader>();
         services.AddScoped<ICompanyAcknowledgementSettingsReader, CompanyAcknowledgementSettingsReader>();
         services.AddScoped<ICompanyContactValidationReader, CompanyContactValidationReader>();

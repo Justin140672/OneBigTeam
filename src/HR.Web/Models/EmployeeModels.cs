@@ -75,12 +75,18 @@ public record GetEmployeeResponse(
     DateOnly? ContinuousServiceDate,
     DateOnly? ProbationEndDate,
     DateOnly? LeavingDate,
+    NoticePeriodUnit? NoticePeriodUnitOverride,
+    int? NoticePeriodLengthOverride,
     string? Notes,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     bool ShowOnboardingTab,
     bool ShowProbationTab,
-    bool ShowOffboardingTab);
+    bool ShowOffboardingTab,
+    bool ShowLeavingTab,
+    NoticePeriodUnit EffectiveNoticePeriodUnit,
+    int EffectiveNoticePeriodLength,
+    string EffectiveNoticePeriodSource);
 
 // Ordered from the top of the org down to the employee's immediate manager; does not include
 // the employee themselves.
@@ -321,7 +327,79 @@ public record UpdateEmploymentDetailsRequest(
     DateOnly? LeavingDate,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,
-    string? Notes);
+    string? Notes,
+    NoticePeriodUnit? NoticePeriodUnitOverride = null,
+    int? NoticePeriodLengthOverride = null);
+
+// ── LEAVING PROCESS ────────────────────────────────────────────────────────────
+
+public sealed record StartLeavingProcessRequest(
+    Guid CompanyId,
+    Guid EmployeeId,
+    DateOnly ResignationReceivedDate,
+    DateOnly LeavingDate,
+    DateOnly LastWorkingDay,
+    string LeavingReason,
+    bool ConfirmBackdatedLeavingDate = false);
+
+public sealed record StartLeavingProcessResponse(
+    Guid Id,
+    Guid CompanyId,
+    Guid EmployeeId,
+    DateOnly ResignationReceivedDate,
+    DateOnly LeavingDate,
+    DateOnly LastWorkingDay,
+    NoticePeriodUnit NoticePeriodUnit,
+    int NoticePeriodLength,
+    string NoticeSource,
+    string LeavingReason,
+    string Status,
+    DateTimeOffset StartedAt);
+
+public sealed record LeavingProcessResponse(
+    Guid Id,
+    DateOnly ResignationReceivedDate,
+    DateOnly LeavingDate,
+    DateOnly LastWorkingDay,
+    NoticePeriodUnit NoticePeriodUnit,
+    int NoticePeriodLength,
+    string NoticeSource,
+    string LeavingReason,
+    string Status);
+
+public sealed record AmendLeavingProcessRequest(
+    Guid CompanyId,
+    Guid EmployeeId,
+    DateOnly LeavingDate,
+    DateOnly LastWorkingDay,
+    string LeavingReason,
+    bool ConfirmBackdatedLeavingDate = false);
+
+public sealed record AmendLeavingProcessResponse(
+    Guid Id,
+    Guid CompanyId,
+    Guid EmployeeId,
+    DateOnly ResignationReceivedDate,
+    DateOnly LeavingDate,
+    DateOnly LastWorkingDay,
+    NoticePeriodUnit NoticePeriodUnit,
+    int NoticePeriodLength,
+    string NoticeSource,
+    string LeavingReason,
+    string Status,
+    bool OffboardingAlreadyStarted);
+
+public sealed record CancelLeavingProcessRequest(
+    Guid CompanyId,
+    Guid EmployeeId,
+    string CancellationReason);
+
+public sealed record CancelLeavingProcessResponse(
+    Guid Id,
+    Guid CompanyId,
+    Guid EmployeeId,
+    string Status,
+    bool OffboardingTasksCancelled);
 
 // ── NATIONALITIES ─────────────────────────────────────────────────────────────
 

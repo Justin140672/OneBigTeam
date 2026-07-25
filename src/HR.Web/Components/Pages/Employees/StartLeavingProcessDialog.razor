@@ -1,0 +1,329 @@
+@using HR.Web.Models
+@using HR.Infrastructure.Abstractions
+@inject EmployeeService EmployeeService
+
+<SfDialog Visible="IsOpen" IsModal="true" Width="560px" ShowCloseIcon="false">
+    <DialogTemplates>
+        <Header>Start Leaving Process</Header>
+        <Content>
+            <ul class="nav nav-pills mb-3">
+                @foreach (var step in _steps)
+                {
+                    <li class="nav-item">
+                        <span class="nav-link @(step.Number == _step ? "active" : (step.Number < _step ? "text-success" : "text-muted"))">
+                            @step.Number. @step.Label
+                        </span>
+                    </li>
+                }
+            </ul>
+
+            @if (_step == 1)
+            {
+                <div class="mb-3">
+                    <label class="form-label">Resignation Received Date <span class="text-danger">*</span></label>
+                    <SfDatePicker TValue="DateOnly?"
+                                  @bind-Value="_resignationReceivedDate"
+                                  Format="dd/MM/yyyy"
+                                  Placeholder="dd/mm/yyyy" />
+                </div>
+            }
+            else if (_step == 2)
+            {
+                <p class="text-muted small">
+                    Proposed based on this employee's effective notice period
+                    (@EffectiveNoticePeriodLength @NoticePeriodUnitLabel(EffectiveNoticePeriodUnit)). Amend if needed.
+                </p>
+                <div class="mb-3">
+                    <label class="form-label">Leaving Date <span class="text-danger">*</span></label>
+                    <SfDatePicker TValue="DateOnly?"
+                                  Value="_leavingDate"
+                                  ValueChanged="OnLeavingDateChanged"
+                                  Format="dd/MM/yyyy"
+                                  Placeholder="dd/mm/yyyy" />
+                </div>
+                @if (IsBackdated(_leavingDate))
+                {
+                    <div class="mb-3">
+                        <SfCheckBox TChecked="bool"
+                                    Label="This leaving date is in the past. Confirming will immediately finalise this employee's departure (status will become Former Employee)."
+                                    Checked="@_confirmBackdatedLeavingDate"
+                                    CheckedChanged="@((bool v) => _confirmBackdatedLeavingDate = v)" />
+                    </div>
+                }
+            }
+            else if (_step == 3)
+            {
+                <div class="mb-3">
+                    <label class="form-label">Last Working Day <span class="text-danger">*</span></label>
+                    <SfDatePicker TValue="DateOnly?"
+                                  @bind-Value="_lastWorkingDay"
+                                  Format="dd/MM/yyyy"
+                                  Placeholder="dd/mm/yyyy" />
+                </div>
+            }
+            else if (_step == 4)
+            {
+                <div class="mb-3">
+                    <label class="form-label">Leaving Reason <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="string"
+                                    TItem="LeavingReasonOption"
+                                    DataSource="@_leavingReasonOptions"
+                                    @bind-Value="_leavingReason"
+                                    Placeholder="Select leaving reason">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+            }
+            else if (_step == 5)
+            {
+                <dl class="row mb-0">
+                    <dt class="col-sm-5 text-muted fw-normal">Resignation Received Date</dt>
+                    <dd class="col-sm-7">@_resignationReceivedDate?.ToString("dd MMM yyyy")</dd>
+                    <dt class="col-sm-5 text-muted fw-normal">Leaving Date</dt>
+                    <dd class="col-sm-7">@_leavingDate?.ToString("dd MMM yyyy")</dd>
+                    <dt class="col-sm-5 text-muted fw-normal">Last Working Day</dt>
+                    <dd class="col-sm-7">@_lastWorkingDay?.ToString("dd MMM yyyy")</dd>
+                    <dt class="col-sm-5 text-muted fw-normal">Leaving Reason</dt>
+                    <dd class="col-sm-7">@EmployeeLeavingTab.LeavingReasonLabel(_leavingReason)</dd>
+                </dl>
+            }
+
+            @if (!string.IsNullOrEmpty(_stepError))
+            {
+                <div class="alert alert-danger py-2">@_stepError</div>
+            }
+            @if (!string.IsNullOrEmpty(_globalError))
+            {
+                <div class="alert alert-danger py-2">@_globalError</div>
+            }
+        </Content>
+        <FooterTemplate>
+            @if (_step > 1)
+            {
+                <SfButton Disabled="@_submitting" OnClick="GoBack">Back</SfButton>
+            }
+            @if (_step < 5)
+            {
+                <SfButton IsPrimary="true" Disabled="@_submitting" OnClick="GoNext">Next</SfButton>
+            }
+            else
+            {
+                <SfButton IsPrimary="true" Disabled="@_submitting" OnClick="ConfirmAsync">
+                    @if (_submitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Confirm
+                </SfButton>
+            }
+            <SfButton Disabled="@_submitting" OnClick="CancelAsync">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter, EditorRequired] public NoticePeriodUnit EffectiveNoticePeriodUnit { get; set; }
+    [Parameter, EditorRequired] public int EffectiveNoticePeriodLength { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private bool _wasOpen;
+    private int _step = 1;
+    private bool _submitting;
+    private string? _stepError;
+    private string? _globalError;
+
+    private DateOnly? _resignationReceivedDate;
+    private DateOnly? _leavingDate;
+    private bool _leavingDateManuallyEdited;
+    private bool _confirmBackdatedLeavingDate;
+    private DateOnly? _lastWorkingDay;
+    private string _leavingReason = string.Empty;
+
+    private static readonly (int Number, string Label)[] _steps =
+    [
+        (1, "Resignation Date"),
+        (2, "Leaving Date"),
+        (3, "Last Working Day"),
+        (4, "Reason"),
+        (5, "Confirm"),
+    ];
+
+    // No clear button and no "None" item, per this codebase's convention for required dropdowns
+    // (see Model.Gender in EmployeeEdit.razor) — the empty default simply shows the Placeholder
+    // until the user picks one.
+    private static readonly LeavingReasonOption[] _leavingReasonOptions =
+    [
+        new("Resignation",     EmployeeLeavingTab.LeavingReasonLabel("Resignation")),
+        new("Redundancy",      EmployeeLeavingTab.LeavingReasonLabel("Redundancy")),
+        new("Dismissal",       EmployeeLeavingTab.LeavingReasonLabel("Dismissal")),
+        new("Retirement",      EmployeeLeavingTab.LeavingReasonLabel("Retirement")),
+        new("EndOfContract",   EmployeeLeavingTab.LeavingReasonLabel("EndOfContract")),
+        new("MutualAgreement", EmployeeLeavingTab.LeavingReasonLabel("MutualAgreement")),
+        new("Other",           EmployeeLeavingTab.LeavingReasonLabel("Other")),
+    ];
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && !_wasOpen)
+            ResetState();
+
+        _wasOpen = IsOpen;
+    }
+
+    private void ResetState()
+    {
+        _step = 1;
+        _submitting = false;
+        _stepError = null;
+        _globalError = null;
+        _resignationReceivedDate = null;
+        _leavingDate = null;
+        _leavingDateManuallyEdited = false;
+        _confirmBackdatedLeavingDate = false;
+        _lastWorkingDay = null;
+        _leavingReason = string.Empty;
+    }
+
+    private void OnLeavingDateChanged(DateOnly? value)
+    {
+        _leavingDate = value;
+        _leavingDateManuallyEdited = true;
+
+        // Don't let a stale confirmation silently carry over once the date no longer needs it.
+        if (!IsBackdated(_leavingDate))
+            _confirmBackdatedLeavingDate = false;
+    }
+
+    private static bool IsBackdated(DateOnly? date) => date is not null && date < DateOnly.FromDateTime(DateTime.Today);
+
+    private void GoNext()
+    {
+        _stepError = null;
+
+        switch (_step)
+        {
+            case 1:
+                if (_resignationReceivedDate is null || _resignationReceivedDate == default(DateOnly))
+                {
+                    _stepError = "Please select the resignation received date.";
+                    return;
+                }
+                // Auto-calculate a proposed leaving date the first time this step is reached (or
+                // any time it's revisited without the user having amended it themselves) — see
+                // step 2's own editable picker, which lets HR override this before continuing.
+                if (!_leavingDateManuallyEdited)
+                    _leavingDate = ComputeProposedLeavingDate(_resignationReceivedDate.Value);
+                break;
+
+            case 2:
+                if (_leavingDate is null || _leavingDate == default(DateOnly))
+                {
+                    _stepError = "Please select a leaving date.";
+                    return;
+                }
+                if (_leavingDate < _resignationReceivedDate)
+                {
+                    _stepError = "Leaving date must be on or after the resignation received date.";
+                    return;
+                }
+                if (IsBackdated(_leavingDate) && !_confirmBackdatedLeavingDate)
+                {
+                    _stepError = "Please confirm you want to backdate and finalise this employee's departure.";
+                    return;
+                }
+                break;
+
+            case 3:
+                if (_lastWorkingDay is null || _lastWorkingDay == default(DateOnly))
+                {
+                    _stepError = "Please select the last working day.";
+                    return;
+                }
+                if (_lastWorkingDay > _leavingDate)
+                {
+                    _stepError = "Last working day must be on or before the leaving date.";
+                    return;
+                }
+                break;
+
+            case 4:
+                if (string.IsNullOrEmpty(_leavingReason))
+                {
+                    _stepError = "Please select a leaving reason.";
+                    return;
+                }
+                break;
+        }
+
+        _step++;
+    }
+
+    private void GoBack()
+    {
+        _stepError = null;
+        if (_step > 1)
+            _step--;
+    }
+
+    private DateOnly ComputeProposedLeavingDate(DateOnly resignationDate) => EffectiveNoticePeriodUnit switch
+    {
+        NoticePeriodUnit.Weeks  => resignationDate.AddDays(EffectiveNoticePeriodLength * 7),
+        NoticePeriodUnit.Months => resignationDate.AddMonths(EffectiveNoticePeriodLength),
+        _                       => resignationDate
+    };
+
+    private static string NoticePeriodUnitLabel(NoticePeriodUnit unit) => unit switch
+    {
+        NoticePeriodUnit.Weeks  => "Weeks",
+        NoticePeriodUnit.Months => "Months",
+        _                       => unit.ToString()
+    };
+
+    private async Task ConfirmAsync()
+    {
+        if (_resignationReceivedDate is null || _leavingDate is null || _lastWorkingDay is null ||
+            string.IsNullOrEmpty(_leavingReason))
+        {
+            _globalError = "Please complete all steps before confirming.";
+            return;
+        }
+
+        _submitting = true;
+        _globalError = null;
+
+        var request = new StartLeavingProcessRequest(
+            CompanyId,
+            EmployeeId,
+            _resignationReceivedDate.Value,
+            _leavingDate.Value,
+            _lastWorkingDay.Value,
+            _leavingReason,
+            _confirmBackdatedLeavingDate);
+
+        var (result, error) = await EmployeeService.StartLeavingProcessAsync(CompanyId, EmployeeId, request);
+
+        _submitting = false;
+
+        if (result is null)
+        {
+            // Left on the confirmation step (rather than closing) so the user can go Back and
+            // fix whatever the server rejected, or just retry — matches this codebase's pattern
+            // of surfacing server errors inline instead of dismissing an in-progress dialog.
+            _globalError = error ?? "Failed to start the leaving process.";
+            return;
+        }
+
+        await OnCompleted.InvokeAsync();
+    }
+
+    private async Task CancelAsync()
+    {
+        await OnCancelled.InvokeAsync();
+    }
+
+    private sealed record LeavingReasonOption(string Value, string Label);
+}

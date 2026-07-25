@@ -41,7 +41,9 @@ internal sealed class ListPositionProfilesHandler
                     x.Profile.IsActive,
                     x.Profile.SalaryMin,
                     x.Profile.SalaryMax,
-                    x.Profile.SalaryType == null ? null : x.Profile.SalaryType.Value.ToString()))
+                    x.Profile.SalaryType == null ? null : x.Profile.SalaryType.Value.ToString(),
+                    x.Profile.NoticePeriodUnitOverride,
+                    x.Profile.NoticePeriodLengthOverride))
             .ToListAsync(cancellationToken);
 
         return Result.Success(new ListPositionProfilesResponse(items));

@@ -32,7 +32,7 @@ internal sealed class DeactivateLocationHandler
             .CountAsync(
                 e => e.LocationId == request.Id
                   && e.CompanyId == request.CompanyId
-                  && e.Status != EmploymentStatus.Terminated,
+                  && e.Status != EmploymentStatus.FormerEmployee,
                 cancellationToken);
 
         if (currentEmployeeCount > 0)

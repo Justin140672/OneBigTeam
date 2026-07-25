@@ -1,4 +1,5 @@
 using FluentValidation;
+using Hangfire;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.AddMyEmergencyContact;
 using HR.Modules.Employees.Features.AssignManager;
@@ -66,10 +67,16 @@ using HR.Modules.Employees.Features.UpdateLocation;
 using HR.Modules.Employees.Features.DeactivateLocation;
 using HR.Modules.Employees.Features.GetLocation;
 using HR.Modules.Employees.Features.ListLocations;
+using HR.Modules.Employees.Features.StartLeavingProcess;
+using HR.Modules.Employees.Features.GetLeavingProcess;
+using HR.Modules.Employees.Features.AmendLeavingProcess;
+using HR.Modules.Employees.Features.CancelLeavingProcess;
+using HR.Modules.Employees.Jobs;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -88,6 +95,16 @@ public static class EmployeesModule
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "employees")));
 
         return services;
+    }
+
+    public static WebApplication UseEmployeesRecurringJobs(this WebApplication app)
+    {
+        var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+        jobManager.AddOrUpdate<ProcessLeavingEmployeesJob>(
+            "process-leaving-employees",
+            job => job.ExecuteAsync(),
+            Cron.Daily(0));
+        return app;
     }
 
     private static void AddFeatureServices(IServiceCollection services)
@@ -247,7 +264,22 @@ public static class EmployeesModule
         services.AddScoped<ListLocationsHandler>();
         services.AddScoped<IValidator<ListLocationsRequest>, ListLocationsValidator>();
 
+        services.AddScoped<StartLeavingProcessHandler>();
+        services.AddScoped<IValidator<StartLeavingProcessRequest>, StartLeavingProcessValidator>();
+
+        services.AddScoped<GetLeavingProcessHandler>();
+
+        services.AddScoped<AmendLeavingProcessHandler>();
+        services.AddScoped<IValidator<AmendLeavingProcessRequest>, AmendLeavingProcessValidator>();
+
+        services.AddScoped<CancelLeavingProcessHandler>();
+        services.AddScoped<IValidator<CancelLeavingProcessRequest>, CancelLeavingProcessValidator>();
+
+        services.AddScoped<ProcessLeavingEmployeesJob>();
+
         services.AddScoped<IProbationDateResolver, ProbationDateResolver>();
+        services.AddScoped<IEffectiveNoticePeriodResolver, EffectiveNoticePeriodResolver>();
+        services.AddScoped<IEmployeeDepartureFinalizer, EmployeeDepartureFinalizer>();
         services.AddScoped<IWorkingPatternProvider, WorkingPatternProvider>();
         services.AddScoped<IDirectReportsReader, DirectReportsReader>();
         services.AddScoped<IEmployeeNameReader, EmployeeNameReader>();

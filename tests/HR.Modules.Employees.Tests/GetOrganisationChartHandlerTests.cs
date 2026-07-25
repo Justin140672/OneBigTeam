@@ -75,7 +75,7 @@ public class GetOrganisationChartHandlerTests
         var terminated = Employee.Create(Guid.NewGuid(), companyId, "Tom", "Terminated", "tom@example.com", StartDate,
             hasSystemAccess: true, Dob, "British", "Male", "EMP-0003", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         terminated.Activate(now);
-        terminated.Terminate(now);
+        terminated.SetStatusForTesting(EmploymentStatus.FormerEmployee, now);
 
         context.Employees.AddRange(draft, active, terminated);
         await context.SaveChangesAsync();
@@ -122,7 +122,7 @@ public class GetOrganisationChartHandlerTests
         await AssertStatusFilteredAsync(employee =>
         {
             employee.Activate(default);
-            employee.Terminate(default);
+            employee.SetStatusForTesting(EmploymentStatus.FormerEmployee, default);
         });
     }
 

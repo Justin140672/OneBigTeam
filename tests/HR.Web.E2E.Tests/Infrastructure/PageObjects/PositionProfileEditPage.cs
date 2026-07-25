@@ -92,6 +92,81 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
         if (!useCompanyDefault && isChecked) await checkbox.UncheckAsync();
     }
 
+    // ── Notice period override (Defaults card) ────────────────────────────────
+    //
+    // The "Override company default notice period" checkbox reveals a Unit dropdown +
+    // Length numeric field, mirroring the "Use company working pattern" toggle above it.
+    // Unlike Department/Location/Default Leave Policy/Onboarding Template, the Unit
+    // dropdown has no adjacent <label> element (just a bare Placeholder="Unit" with the
+    // default, non-floating FloatLabelType), so it can't be scoped via visible label text
+    // the way NumericBoxByLabel-style helpers do elsewhere in this suite. Instead, scope to
+    // the conditionally-rendered row via an xpath sibling traversal from the checkbox's
+    // rendered .e-checkbox-wrapper, which is a reliable structural anchor regardless of
+    // whether the dropdown/numeric box render their placeholders as visible text.
+
+    /// <summary>
+    /// The "row g-3 mt-2" div containing the Unit dropdown and Length numeric field, which
+    /// is only present in the DOM while "Override company default notice period" is checked.
+    /// </summary>
+    private ILocator NoticePeriodOverrideRow =>
+        page.Locator(".e-checkbox-wrapper")
+            .Filter(new() { HasText = "Override company default notice period" })
+            .Locator("xpath=following-sibling::div[contains(@class,'row')]");
+
+    /// <summary>Checks/unchecks "Override company default notice period" and waits for the reveal/hide of its fields.</summary>
+    public async Task SetOverrideNoticePeriodAsync(bool overrideEnabled)
+    {
+        var checkbox = page.GetByLabel("Override company default notice period");
+        var isChecked = await checkbox.IsCheckedAsync();
+        if (overrideEnabled && !isChecked)
+        {
+            await checkbox.CheckAsync();
+            await NoticePeriodOverrideRow.WaitForAsync(new() { Timeout = 10_000 });
+        }
+        if (!overrideEnabled && isChecked)
+        {
+            await checkbox.UncheckAsync();
+            await NoticePeriodOverrideRow.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        }
+    }
+
+    public Task<bool> IsOverrideNoticePeriodCheckedAsync() =>
+        page.GetByLabel("Override company default notice period").IsCheckedAsync();
+
+    /// <summary>True once the Unit/Length fields have rendered (i.e. the override checkbox is checked).</summary>
+    public Task<bool> IsNoticePeriodOverrideFieldsVisibleAsync() =>
+        NoticePeriodOverrideRow.IsVisibleAsync();
+
+    /// <summary>Selects a value ("Weeks" or "Months") from the notice period override's Unit dropdown. Only present once the override checkbox is checked.</summary>
+    public async Task SelectNoticePeriodUnitOverrideAsync(string unitLabel)
+    {
+        await NoticePeriodOverrideRow.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = unitLabel })
+            .First
+            .ClickAsync(new() { Timeout = 10_000 });
+        await page.WaitForSelectorAsync(".e-popup.e-ddl", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    /// <summary>Returns the currently displayed value of the notice period override's Unit dropdown.</summary>
+    public async Task<string> GetNoticePeriodUnitOverrideTextAsync()
+    {
+        var combobox = NoticePeriodOverrideRow.Locator("span[role='combobox']").First;
+        return (await combobox.Locator("input").InputValueAsync()).Trim();
+    }
+
+    /// <summary>Sets the notice period override's Length numeric field. Only present once the override checkbox is checked.</summary>
+    public Task FillNoticePeriodLengthOverrideAsync(int length) =>
+        NoticePeriodOverrideRow.Locator("input.e-numerictextbox").First.FillAsync(length.ToString());
+
+    /// <summary>Returns the current value of the notice period override's Length numeric field.</summary>
+    public async Task<int> GetNoticePeriodLengthOverrideAsync()
+    {
+        var value = await NoticePeriodOverrideRow.Locator("input.e-numerictextbox").First.InputValueAsync();
+        return int.Parse(value);
+    }
+
     public async Task SelectDefaultLeavePolicyAsync(string leavePolicyName)
     {
         // The Defaults card now has three comboboxes (Salary Type, Default Leave Policy,

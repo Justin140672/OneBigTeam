@@ -7,10 +7,7 @@
 }
 else if (_overview is null || !_overview.HasPlan)
 {
-    <div class="mb-3">
-        <SfButton IsPrimary="true" OnClick="OpenStartDialog">Start Offboarding</SfButton>
-    </div>
-    <HrEmptyState Message="No offboarding plan found for this employee." Icon="fa-solid fa-person-walking-arrow-right" />
+    <HrEmptyState Message="Offboarding starts automatically when the leaving process begins." Icon="fa-solid fa-person-walking-arrow-right" />
 }
 else
 {
@@ -92,36 +89,6 @@ else
     </div>
 }
 
-@if (_showStartDialog)
-{
-    <SfDialog Width="480px" IsModal="true" @bind-Visible="_showStartDialog" Header="Start Offboarding">
-        <DialogTemplates>
-            <Content>
-                <div class="mb-3">
-                    <label class="form-label">Last Working Day <span class="text-danger">*</span></label>
-                    <SfDatePicker TValue="DateOnly?"
-                                  @bind-Value="_lastWorkingDay"
-                                  Format="dd/MM/yyyy"
-                                  Placeholder="dd/mm/yyyy" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Notes</label>
-                    <textarea class="form-control" rows="3" maxlength="1000"
-                              @bind="_notes" placeholder="Optional notes…"></textarea>
-                </div>
-                @if (!string.IsNullOrEmpty(_dialogError))
-                {
-                    <div class="alert alert-danger py-2">@_dialogError</div>
-                }
-            </Content>
-        </DialogTemplates>
-        <DialogButtons>
-            <DialogButton Content="Start" IsPrimary="true" OnClick="ConfirmStartAsync" Disabled="@_starting" />
-            <DialogButton Content="Cancel" OnClick="CloseStartDialog" Disabled="@_starting" />
-        </DialogButtons>
-    </SfDialog>
-}
-
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
@@ -129,55 +96,12 @@ else
     private bool _loading = true;
     private OffboardingOverviewModel? _overview;
 
-    private bool _showStartDialog;
-    private DateOnly? _lastWorkingDay;
-    private string? _notes;
-    private string? _dialogError;
-    private bool _starting;
-
     private int TotalCount => _overview?.Tasks.Count ?? 0;
     private int CompletedCount => _overview?.Tasks.Count(t => t.Status is "Completed" or "Skipped") ?? 0;
     private int ProgressPercent => TotalCount == 0 ? 0 : (int)Math.Round(CompletedCount * 100.0 / TotalCount);
 
     protected override async Task OnParametersSetAsync()
     {
-        _loading = true;
-        _overview = await OffboardingService.GetOverviewAsync(CompanyId, EmployeeId);
-        _loading = false;
-    }
-
-    private void OpenStartDialog()
-    {
-        _lastWorkingDay = null;
-        _notes = null;
-        _dialogError = null;
-        _showStartDialog = true;
-    }
-
-    private void CloseStartDialog() => _showStartDialog = false;
-
-    private async Task ConfirmStartAsync()
-    {
-        if (_lastWorkingDay is null)
-        {
-            _dialogError = "Please select a last working day.";
-            return;
-        }
-
-        _starting = true;
-        _dialogError = null;
-
-        var error = await OffboardingService.StartOffboardingAsync(CompanyId, EmployeeId, _lastWorkingDay.Value, _notes);
-
-        _starting = false;
-
-        if (error is not null)
-        {
-            _dialogError = error;
-            return;
-        }
-
-        _showStartDialog = false;
         _loading = true;
         _overview = await OffboardingService.GetOverviewAsync(CompanyId, EmployeeId);
         _loading = false;

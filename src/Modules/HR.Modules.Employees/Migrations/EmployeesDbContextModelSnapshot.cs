@@ -319,6 +319,15 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("character varying(4000)")
                         .HasColumnName("notes");
 
+                    b.Property<int?>("NoticePeriodLengthOverride")
+                        .HasColumnType("integer")
+                        .HasColumnName("notice_period_length_override");
+
+                    b.Property<string>("NoticePeriodUnitOverride")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("notice_period_unit_override");
+
                     b.Property<string>("PersonalEmail")
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)")
@@ -396,6 +405,96 @@ namespace HR.Modules.Employees.Migrations
                         .IsUnique();
 
                     b.ToTable("employees", "employees");
+                });
+
+            modelBuilder.Entity("HR.Modules.Employees.Domain.EmployeeLeavingProcess", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("cancellation_reason");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.Property<DateOnly>("LastWorkingDay")
+                        .HasColumnType("date")
+                        .HasColumnName("last_working_day");
+
+                    b.Property<DateOnly>("LeavingDate")
+                        .HasColumnType("date")
+                        .HasColumnName("leaving_date");
+
+                    b.Property<string>("LeavingReason")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("leaving_reason");
+
+                    b.Property<int>("NoticePeriodLength")
+                        .HasColumnType("integer")
+                        .HasColumnName("notice_period_length");
+
+                    b.Property<string>("NoticePeriodUnit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("notice_period_unit");
+
+                    b.Property<string>("NoticeSource")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("notice_source");
+
+                    b.Property<DateOnly>("ResignationReceivedDate")
+                        .HasColumnType("date")
+                        .HasColumnName("resignation_received_date");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<Guid>("StartedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("started_by_user_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("CompanyId", "EmployeeId");
+
+                    b.HasIndex("CompanyId", "EmployeeId", "Status");
+
+                    b.ToTable("employee_leaving_processes", "employees");
                 });
 
             modelBuilder.Entity("HR.Modules.Employees.Domain.EmploymentType", b =>
@@ -693,6 +792,15 @@ namespace HR.Modules.Employees.Migrations
                     b.Property<Guid>("LocationId")
                         .HasColumnType("uuid")
                         .HasColumnName("location_id");
+
+                    b.Property<int?>("NoticePeriodLengthOverride")
+                        .HasColumnType("integer")
+                        .HasColumnName("notice_period_length_override");
+
+                    b.Property<string>("NoticePeriodUnitOverride")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("notice_period_unit_override");
 
                     b.Property<Guid?>("OnboardingTemplateId")
                         .HasColumnType("uuid")

@@ -13,6 +13,8 @@ internal sealed record GetPositionProfileResponse(
     int? ProbationMonthsOverride,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,
+    NoticePeriodUnit? NoticePeriodUnitOverride,
+    int? NoticePeriodLengthOverride,
     decimal? SalaryMin,
     decimal? SalaryMax,
     SalaryType? SalaryType,

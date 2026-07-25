@@ -128,12 +128,25 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         deptResponse.EnsureSuccessStatusCode();
         var dept = await deptResponse.Content.ReadFromJsonAsync<DeptPayload>();
 
+        // Create a leave policy (mandatory FK on Position Profile creation)
+        var leavePolicyResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/leave-policies", new
+        {
+            companyId,
+            name = $"Policy-{Guid.NewGuid():N}",
+            carryOverDays = 0,
+            allowNegativeBalance = false
+        });
+        leavePolicyResponse.EnsureSuccessStatusCode();
+        var leavePolicyId = (await leavePolicyResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
         // Create position profile
         var posResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
             companyId,
             departmentId = dept!.Id,
-            title = "Senior Developer"
+            locationId = refData.LocationId,
+            title = "Senior Developer",
+            defaultLeavePolicyId = leavePolicyId
         });
         posResponse.EnsureSuccessStatusCode();
         var pos = await posResponse.Content.ReadFromJsonAsync<PosPayload>();
@@ -216,9 +229,15 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         locResponse.EnsureSuccessStatusCode();
         var locationId = (await locResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 
+        var leavePolicyResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = $"Policy-{Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false });
+        leavePolicyResponse.EnsureSuccessStatusCode();
+        var defaultLeavePolicyId = (await leavePolicyResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
         var posResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles",
-            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}" });
+            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}", defaultLeavePolicyId });
         posResponse.EnsureSuccessStatusCode();
         var positionProfileId = (await posResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 
@@ -313,9 +332,15 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         locResponse.EnsureSuccessStatusCode();
         var locationId = (await locResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 
+        var leavePolicyResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = $"Policy-{Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false });
+        leavePolicyResponse.EnsureSuccessStatusCode();
+        var defaultLeavePolicyId = (await leavePolicyResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
         var posResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles",
-            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}" });
+            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}", defaultLeavePolicyId });
         posResponse.EnsureSuccessStatusCode();
         var positionProfileId = (await posResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 
@@ -512,9 +537,15 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         locResponse.EnsureSuccessStatusCode();
         var locationId = (await locResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 
+        var leavePolicyResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = $"Policy-{Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false });
+        leavePolicyResponse.EnsureSuccessStatusCode();
+        var defaultLeavePolicyId = (await leavePolicyResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
         var posResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles",
-            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}" });
+            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}", defaultLeavePolicyId });
         posResponse.EnsureSuccessStatusCode();
         var positionProfileId = (await posResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 
@@ -557,6 +588,135 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         Assert.False(employee.ShowOffboardingTab);
     }
 
+    // ── ShowLeavingTab ────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Get_Employee_ShowLeavingTab_Flips_True_After_Leaving_Process_Started()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser3.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+
+        var createResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Leah", "Leaver", $"leah.{Guid.NewGuid():N}@example.com"));
+        createResponse.EnsureSuccessStatusCode();
+        var created = await createResponse.Content.ReadFromJsonAsync<EmployeePayload>();
+        Assert.NotNull(created);
+
+        var beforeStart = await client.GetAsync($"/api/companies/{companyId}/employees/{created!.Id}");
+        beforeStart.EnsureSuccessStatusCode();
+        var beforePayload = await beforeStart.Content.ReadFromJsonAsync<EmployeePayload>();
+        Assert.NotNull(beforePayload);
+        Assert.False(beforePayload!.ShowLeavingTab);
+
+        var startResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{created.Id}/leaving-process",
+            new
+            {
+                companyId,
+                employeeId = created.Id,
+                resignationReceivedDate = "2026-07-01",
+                leavingDate = "2026-08-01",
+                lastWorkingDay = "2026-07-31",
+                leavingReason = "Resignation"
+            });
+        startResponse.EnsureSuccessStatusCode();
+
+        var afterStart = await client.GetAsync($"/api/companies/{companyId}/employees/{created.Id}");
+        afterStart.EnsureSuccessStatusCode();
+        var afterPayload = await afterStart.Content.ReadFromJsonAsync<EmployeePayload>();
+        Assert.NotNull(afterPayload);
+        Assert.True(afterPayload!.ShowLeavingTab);
+        Assert.Equal("Leaving", afterPayload.Status);
+    }
+
+    // ── notice period override / effective resolution ───────────────────────────
+    // Resolver priority-order logic itself is covered by EffectiveNoticePeriodResolverTests
+    // (unit) — these prove the endpoint round-trips the employee's own override and surfaces
+    // the resolved Effective* fields end-to-end.
+
+    [Fact]
+    public async Task Get_Employee_Returns_Employee_NoticePeriodOverride_And_Effective_Values_When_Set()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser1.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+
+        var createResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Nora", "Notice", $"nora.{Guid.NewGuid():N}@example.com"));
+        createResponse.EnsureSuccessStatusCode();
+        var created = await createResponse.Content.ReadFromJsonAsync<EmployeePayload>();
+        Assert.NotNull(created);
+
+        var putResponse = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{created!.Id}/employment",
+            new
+            {
+                companyId,
+                id = created.Id,
+                employeeNumber = "EMP-NOTICE-001",
+                employmentTypeId = (Guid?)null,
+                status = "Active",
+                startDate = "2026-01-01",
+                noticePeriodUnitOverride = "Weeks",
+                noticePeriodLengthOverride = 3
+            });
+        putResponse.EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/employees/{created.Id}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<EmployeePayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("Weeks", payload!.NoticePeriodUnitOverride);
+        Assert.Equal(3, payload.NoticePeriodLengthOverride);
+        Assert.Equal("Weeks", payload.EffectiveNoticePeriodUnit);
+        Assert.Equal(3, payload.EffectiveNoticePeriodLength);
+        Assert.Equal("Employee", payload.EffectiveNoticePeriodSource);
+    }
+
+    [Fact]
+    public async Task Get_Employee_Falls_Back_To_Company_Default_NoticePeriod_When_No_Override_Set()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser2.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+
+        var createResponse = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Owen", "Default", $"owen.{Guid.NewGuid():N}@example.com"));
+        createResponse.EnsureSuccessStatusCode();
+        var created = await createResponse.Content.ReadFromJsonAsync<EmployeePayload>();
+        Assert.NotNull(created);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/employees/{created!.Id}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<EmployeePayload>();
+        Assert.NotNull(payload);
+        Assert.Null(payload!.NoticePeriodUnitOverride);
+        Assert.Null(payload.NoticePeriodLengthOverride);
+        // No CompanySettings row has been created for this company — CompanyNoticePeriodSettingsReader
+        // falls back to its hard-coded default of Months/1 (see CompanyNoticePeriodSettingsReader.cs).
+        Assert.Equal("Months", payload.EffectiveNoticePeriodUnit);
+        Assert.Equal(1, payload.EffectiveNoticePeriodLength);
+        Assert.Equal("CompanyDefault", payload.EffectiveNoticePeriodSource);
+    }
+
     private sealed record UnassignedTasksPayload(IReadOnlyList<UnassignedTaskPayload> Items);
 
     private sealed record UnassignedTaskPayload(Guid Id, string Title, string? Source);
@@ -586,7 +746,13 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
         DateTimeOffset UpdatedAt,
         bool ShowOnboardingTab,
         bool ShowProbationTab,
-        bool ShowOffboardingTab);
+        bool ShowOffboardingTab,
+        bool ShowLeavingTab,
+        string? NoticePeriodUnitOverride,
+        int? NoticePeriodLengthOverride,
+        string EffectiveNoticePeriodUnit,
+        int EffectiveNoticePeriodLength,
+        string EffectiveNoticePeriodSource);
 
     private sealed record ReportingChainItemPayload(Guid EmployeeId, string Name, string? JobTitle);
 

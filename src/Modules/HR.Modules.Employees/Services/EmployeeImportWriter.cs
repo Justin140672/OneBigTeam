@@ -133,7 +133,7 @@ internal sealed class EmployeeImportWriter(
 
         var manager = await dbContext.Employees
             .SingleOrDefaultAsync(
-                e => e.Id == managerId && e.CompanyId == companyId && e.Status != EmploymentStatus.Terminated,
+                e => e.Id == managerId && e.CompanyId == companyId && e.Status != EmploymentStatus.FormerEmployee,
                 cancellationToken);
 
         if (manager is null)

@@ -78,7 +78,7 @@ public class GetHeadcountSummaryEndpointTests : IClassFixture<ApiWebApplicationF
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.OnLeave);
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Draft);
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Suspended);
-            AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Terminated);
+            AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.FormerEmployee);
             AddEmployee(db, companyId, null, refData, EmploymentStatus.Active); // Unassigned — a
             // department id that was never seeded as a real Department row, so the handler's
             // "Unassigned" fallback (no matching Departments row) kicks in.
@@ -156,9 +156,9 @@ public class GetHeadcountSummaryEndpointTests : IClassFixture<ApiWebApplicationF
                 employee.Activate(now);
                 employee.Suspend(now);
                 break;
-            case EmploymentStatus.Terminated:
+            case EmploymentStatus.FormerEmployee:
                 employee.Activate(now);
-                employee.Terminate(now);
+                employee.SetStatusForTesting(EmploymentStatus.FormerEmployee, now);
                 break;
         }
 

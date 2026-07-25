@@ -470,6 +470,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHangfireBackgroundJobs();
+app.UseEmployeesRecurringJobs();
 app.UseProbationRecurringJobs();
 app.UseAssetsRecurringJobs();
 app.UseSicknessRecurringJobs();

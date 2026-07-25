@@ -1,6 +1,7 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.GetHeadcountSummary;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Tests;
@@ -86,7 +87,7 @@ public class GetHeadcountSummaryHandlerTests
         var terminated = NewEmployee(companyId, "Terminated", "Employee");
         terminated.Assign(department.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now);
         terminated.Activate(Now);
-        terminated.Terminate(Now);
+        terminated.SetStatusForTesting(EmploymentStatus.FormerEmployee, Now);
 
         var active = NewEmployee(companyId, "Active", "Employee");
         active.Assign(department.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now);

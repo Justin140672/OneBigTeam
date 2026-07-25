@@ -2,6 +2,7 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.GetEmployee;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Services;
 using HR.Modules.Employees.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,11 +17,13 @@ public class GetEmployeeHandlerTests
         EmployeesDbContext context,
         OnboardingStatusSummary? onboardingStatus = null,
         ProbationStatusSummary? probationStatus = null,
-        OffboardingStatusSummary? offboardingStatus = null) =>
+        OffboardingStatusSummary? offboardingStatus = null,
+        IEffectiveNoticePeriodResolver? effectiveNoticePeriodResolver = null) =>
         new(context,
             new FakeOnboardingStatusReader(onboardingStatus),
             new FakeProbationStatusReader(probationStatus),
-            new FakeOffboardingStatusReader(offboardingStatus));
+            new FakeOffboardingStatusReader(offboardingStatus),
+            effectiveNoticePeriodResolver ?? new FakeEffectiveNoticePeriodResolver());
 
     [Fact]
     public async Task HandleAsync_Returns_Employee_When_Found()
@@ -204,7 +207,7 @@ public class GetEmployeeHandlerTests
 
         var terminatedReport = Employee.Create(Guid.NewGuid(), companyId, "Carl", "Leaver", "carl@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0004", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         terminatedReport.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), manager.Id, now);
-        terminatedReport.Terminate(now);
+        terminatedReport.SetStatusForTesting(EmploymentStatus.FormerEmployee, now);
 
         context.Employees.AddRange(reportOne, reportTwo, terminatedReport);
         await context.SaveChangesAsync();
@@ -450,6 +453,129 @@ public class GetEmployeeHandlerTests
         Assert.False(result.Value!.ShowOnboardingTab);
         Assert.False(result.Value.ShowProbationTab);
         Assert.False(result.Value.ShowOffboardingTab);
+    }
+
+    // ── ShowLeavingTab ────────────────────────────────────────────────────────
+    // Unlike the other lifecycle tabs, EmployeeLeavingProcess lives in this same module/DbContext
+    // (see GetEmployeeHandler.HandleAsync), so these tests seed the entity directly rather than
+    // going through a fake reader.
+
+    [Fact]
+    public async Task HandleAsync_ShowLeavingTab_False_When_No_LeavingProcess_Exists()
+    {
+        await using var context = BuildContext();
+        var employee = SeedEmployee(context, Guid.NewGuid());
+
+        var handler = BuildHandler(context);
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.ShowLeavingTab);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShowLeavingTab_True_When_InProgress_LeavingProcess_Exists()
+    {
+        await using var context = BuildContext();
+        var employee = SeedEmployee(context, Guid.NewGuid());
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leavingProcess = EmployeeLeavingProcess.Create(
+            Guid.NewGuid(), employee.CompanyId, employee.Id,
+            new DateOnly(2026, 7, 1), new DateOnly(2026, 8, 1), new DateOnly(2026, 7, 31),
+            NoticePeriodUnit.Weeks, 4, NoticePeriodSource.Employee, LeavingReason.Resignation,
+            Guid.NewGuid(), now);
+        context.EmployeeLeavingProcesses.Add(leavingProcess);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(context);
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.ShowLeavingTab);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShowLeavingTab_False_When_LeavingProcess_Belongs_To_Different_Employee()
+    {
+        await using var context = BuildContext();
+        var employee = SeedEmployee(context, Guid.NewGuid());
+        var otherEmployee = SeedEmployee(context, employee.CompanyId);
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var leavingProcess = EmployeeLeavingProcess.Create(
+            Guid.NewGuid(), employee.CompanyId, otherEmployee.Id,
+            new DateOnly(2026, 7, 1), new DateOnly(2026, 8, 1), new DateOnly(2026, 7, 31),
+            NoticePeriodUnit.Weeks, 4, NoticePeriodSource.Employee, LeavingReason.Resignation,
+            Guid.NewGuid(), now);
+        context.EmployeeLeavingProcesses.Add(leavingProcess);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(context);
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.ShowLeavingTab);
+    }
+
+    // ── effective notice period ──────────────────────────────────────────────
+    // The resolver's own resolution-order logic is covered by EffectiveNoticePeriodResolverTests —
+    // this class only needs to prove GetEmployeeHandler surfaces whatever the injected
+    // IEffectiveNoticePeriodResolver returns in the response.
+
+    [Fact]
+    public async Task HandleAsync_Returns_EffectiveNoticePeriod_From_Resolver()
+    {
+        await using var context = BuildContext();
+        var employee = SeedEmployee(context, Guid.NewGuid());
+
+        var expected = new EffectiveNoticePeriod(NoticePeriodUnit.Weeks, 6, NoticePeriodSource.PositionProfile);
+        var handler = BuildHandler(context, effectiveNoticePeriodResolver: new FakeEffectiveNoticePeriodResolver(expected));
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(NoticePeriodUnit.Weeks, result.Value!.EffectiveNoticePeriodUnit);
+        Assert.Equal(6, result.Value.EffectiveNoticePeriodLength);
+        Assert.Equal(NoticePeriodSource.PositionProfile, result.Value.EffectiveNoticePeriodSource);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Employees_Own_Raw_NoticePeriodOverride_Alongside_Resolved_Values()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        employee.UpdateEmploymentDetails(
+            employee.EmployeeNumber, employee.EmploymentTypeId, employee.StartDate,
+            employee.ContinuousServiceDate, employee.ProbationEndDate, employee.LeavingDate,
+            employee.Notes, now, NoticePeriodUnit.Months, 2);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var expected = new EffectiveNoticePeriod(NoticePeriodUnit.Months, 2, NoticePeriodSource.Employee);
+        var handler = BuildHandler(context, effectiveNoticePeriodResolver: new FakeEffectiveNoticePeriodResolver(expected));
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(NoticePeriodUnit.Months, result.Value!.NoticePeriodUnitOverride);
+        Assert.Equal(2, result.Value.NoticePeriodLengthOverride);
+        Assert.Equal(NoticePeriodUnit.Months, result.Value.EffectiveNoticePeriodUnit);
+        Assert.Equal(2, result.Value.EffectiveNoticePeriodLength);
+        Assert.Equal(NoticePeriodSource.Employee, result.Value.EffectiveNoticePeriodSource);
     }
 
     private static Employee SeedEmployee(EmployeesDbContext context, Guid companyId)

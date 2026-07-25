@@ -98,7 +98,7 @@ public class DeactivateEmploymentTypeHandlerTests
             Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", DateOnly.FromDateTime(FixedUtcNow),
             hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001",
             entity.Id, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
-        employee.Terminate(now);
+        employee.SetStatusForTesting(EmploymentStatus.FormerEmployee, now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 

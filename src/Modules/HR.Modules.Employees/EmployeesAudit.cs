@@ -1,3 +1,6 @@
+using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Domain;
+using HR.Modules.Employees.Services;
 using HR.SharedKernel;
 
 namespace HR.Modules.Employees;
@@ -247,4 +250,161 @@ internal sealed record ContactDetailsUpdatedAuditEvent(
     object? IAuditEvent.Before => Before;
     object? IAuditEvent.After => After;
     object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record PositionProfileSnapshot(
+    Guid DepartmentId,
+    Guid LocationId,
+    string Title,
+    string? Description,
+    int? ProbationMonthsOverride,
+    WorkingDays? WorkingDaysOverride,
+    decimal? HoursPerDayOverride,
+    NoticePeriodUnit? NoticePeriodUnitOverride,
+    int? NoticePeriodLengthOverride,
+    decimal? SalaryMin,
+    decimal? SalaryMax,
+    SalaryType? SalaryType,
+    Guid DefaultLeavePolicyId,
+    Guid? OnboardingTemplateId,
+    bool IsActive);
+
+internal sealed record PositionProfileCreatedAuditEvent(
+    Guid CompanyId,
+    Guid PositionProfileId,
+    Guid ActorEmployeeId,
+    DateTimeOffset OccurredAt,
+    PositionProfileSnapshot After) : IAuditEvent
+{
+    string IAuditEvent.EventType => "position-profile.created";
+    string IAuditEvent.EntityType => "PositionProfile";
+    Guid IAuditEvent.EntityId => PositionProfileId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Position profile created";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => After;
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record PositionProfileUpdatedAuditEvent(
+    Guid CompanyId,
+    Guid PositionProfileId,
+    Guid ActorEmployeeId,
+    DateTimeOffset OccurredAt,
+    PositionProfileSnapshot Before,
+    PositionProfileSnapshot After) : IAuditEvent
+{
+    string IAuditEvent.EventType => "position-profile.updated";
+    string IAuditEvent.EntityType => "PositionProfile";
+    Guid IAuditEvent.EntityId => PositionProfileId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Position profile updated";
+    object? IAuditEvent.Before => Before;
+    object? IAuditEvent.After => After;
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record LeavingProcessSnapshot(
+    DateOnly ResignationReceivedDate,
+    DateOnly LeavingDate,
+    DateOnly LastWorkingDay,
+    NoticePeriodUnit NoticePeriodUnit,
+    int NoticePeriodLength,
+    NoticePeriodSource NoticeSource,
+    LeavingReason LeavingReason,
+    LeavingProcessStatus Status);
+
+internal sealed record LeavingProcessStartedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid LeavingProcessId,
+    Guid ActorEmployeeId,
+    DateTimeOffset OccurredAt,
+    LeavingProcessSnapshot After) : IAuditEvent
+{
+    string IAuditEvent.EventType => "employee.leaving-process.started";
+    string IAuditEvent.EntityType => "EmployeeLeavingProcess";
+    Guid IAuditEvent.EntityId => LeavingProcessId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Leaving process started";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => After;
+    object? IAuditEvent.Metadata => new { EmployeeStatusChangedTo = "Leaving" };
+}
+
+internal sealed record LeavingProcessAmendedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid LeavingProcessId,
+    Guid ActorEmployeeId,
+    DateTimeOffset OccurredAt,
+    LeavingProcessSnapshot Before,
+    LeavingProcessSnapshot After,
+    bool OffboardingAlreadyStarted) : IAuditEvent
+{
+    string IAuditEvent.EventType => "employee.leaving-process.amended";
+    string IAuditEvent.EntityType => "EmployeeLeavingProcess";
+    Guid IAuditEvent.EntityId => LeavingProcessId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Leaving process amended";
+    object? IAuditEvent.Before => Before;
+    object? IAuditEvent.After => After;
+    object? IAuditEvent.Metadata => new { OffboardingAlreadyStarted };
+}
+
+internal sealed record LeavingProcessCancelledAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid LeavingProcessId,
+    Guid ActorEmployeeId,
+    DateTimeOffset OccurredAt,
+    string CancellationReason,
+    bool OffboardingTasksCancelled) : IAuditEvent
+{
+    string IAuditEvent.EventType => "employee.leaving-process.cancelled";
+    string IAuditEvent.EntityType => "EmployeeLeavingProcess";
+    Guid IAuditEvent.EntityId => LeavingProcessId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Leaving process cancelled";
+    object? IAuditEvent.Before => new { Status = "InProgress" };
+    object? IAuditEvent.After => new { Status = "Cancelled", CancellationReason };
+    object? IAuditEvent.Metadata => new { EmployeeStatusChangedTo = "Active", OffboardingTasksCancelled };
+}
+
+// Published by ProcessLeavingEmployeesJob (Hangfire) once an employee's leaving date has passed
+// and their departure has been finalised. There is no ActorUserId/ActorEmployeeId — this is a
+// system-driven transition, not a user action — mirroring how other unattended-job audit events
+// in this codebase represent the system as the actor (null).
+internal sealed record EmployeeDepartureFinalisedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid LeavingProcessId,
+    DateTimeOffset OccurredAt,
+    bool AccessDisabled,
+    bool OffboardingIncomplete) : IAuditEvent
+{
+    string IAuditEvent.EventType => "employee.departure.finalised";
+    string IAuditEvent.EntityType => "Employee";
+    Guid IAuditEvent.EntityId => EmployeeId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Employee departure finalised";
+    object? IAuditEvent.Before => new { Status = "Leaving" };
+    object? IAuditEvent.After => new { Status = "FormerEmployee" };
+    object? IAuditEvent.Metadata => new { AccessDisabled, OffboardingIncomplete };
 }

@@ -55,7 +55,10 @@ internal sealed class UpdateCompanySettingsHandler
 				company.Settings.FitNoteRequiredAfterDays,
 				company.Settings.ReturnToWorkRequiredAfterDays,
 				company.Settings.DefaultAcknowledgementStatement,
-				company.Settings.AcknowledgementReminderIntervalDays);
+				company.Settings.AcknowledgementReminderIntervalDays,
+				company.Settings.NoticePeriodUnit,
+				company.Settings.NoticePeriodLength,
+				company.Settings.AutoDisableAccessOnLeavingDate);
 
 		var settings = company.Settings ?? CompanySettings.CreateDefault(company.Id, now);
 		settings.Update(
@@ -73,6 +76,9 @@ internal sealed class UpdateCompanySettingsHandler
 			request.ReturnToWorkRequiredAfterDays,
 			request.DefaultAcknowledgementStatement.Trim(),
 			request.AcknowledgementReminderIntervalDays,
+			request.NoticePeriodUnit,
+			request.NoticePeriodLength,
+			request.AutoDisableAccessOnLeavingDate,
 			now);
 
 		company.SetSettings(settings, now);
@@ -123,7 +129,10 @@ internal sealed class UpdateCompanySettingsHandler
 					settings.FitNoteRequiredAfterDays,
 					settings.ReturnToWorkRequiredAfterDays,
 					settings.DefaultAcknowledgementStatement,
-					settings.AcknowledgementReminderIntervalDays)),
+					settings.AcknowledgementReminderIntervalDays,
+					settings.NoticePeriodUnit,
+					settings.NoticePeriodLength,
+					settings.AutoDisableAccessOnLeavingDate)),
 			cancellationToken);
 
 		return Result.Success(new UpdateCompanySettingsResponse(
@@ -142,6 +151,9 @@ internal sealed class UpdateCompanySettingsHandler
 			settings.ReturnToWorkRequiredAfterDays,
 			settings.DefaultAcknowledgementStatement,
 			settings.AcknowledgementReminderIntervalDays,
+			settings.NoticePeriodUnit,
+			settings.NoticePeriodLength,
+			settings.AutoDisableAccessOnLeavingDate,
 			settings.UpdatedAt));
 	}
 }

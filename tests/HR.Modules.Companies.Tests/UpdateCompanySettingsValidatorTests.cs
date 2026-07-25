@@ -105,4 +105,30 @@ public class UpdateCompanySettingsValidatorTests
 		Assert.False(result.IsValid);
 		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateCompanySettingsRequest.DefaultAcknowledgementStatement));
 	}
+
+	[Fact]
+	public void Validate_Passes_For_Valid_NoticePeriodLength()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { NoticePeriodUnit = NoticePeriodUnit.Weeks, NoticePeriodLength = 2 });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Fails_When_NoticePeriodLength_Is_Zero()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { NoticePeriodLength = 0 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateCompanySettingsRequest.NoticePeriodLength));
+	}
+
+	[Fact]
+	public void Validate_Fails_When_NoticePeriodLength_Is_Negative()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { NoticePeriodLength = -1 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateCompanySettingsRequest.NoticePeriodLength));
+	}
 }

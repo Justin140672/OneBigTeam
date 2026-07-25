@@ -49,6 +49,15 @@ internal sealed class UpdatePositionProfileValidator : AbstractValidator<UpdateP
                 .LessThanOrEqualTo(24);
         });
 
+        RuleFor(r => r)
+            .Must(r => r.NoticePeriodUnitOverride.HasValue == r.NoticePeriodLengthOverride.HasValue)
+            .WithMessage("Notice period unit and length overrides must both be set or both be empty.");
+
+        RuleFor(r => r.NoticePeriodLengthOverride)
+            .GreaterThan(0)
+            .When(r => r.NoticePeriodLengthOverride.HasValue)
+            .WithMessage("NoticePeriodLengthOverride must be greater than 0.");
+
         RuleFor(r => r.SalaryMin)
             .GreaterThanOrEqualTo(0)
             .When(r => r.SalaryMin.HasValue);

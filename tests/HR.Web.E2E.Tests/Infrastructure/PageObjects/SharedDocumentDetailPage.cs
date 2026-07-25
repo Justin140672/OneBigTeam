@@ -446,15 +446,19 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     public async Task<string> GetAuditDetailDialogTextAsync() =>
         (await AuditDetailDialog.InnerTextAsync()).Trim();
 
+    // Scoped to .e-footer-content rather than GetByRole(Button, Name="Close") — the dialog's own
+    // ShowCloseIcon header button also carries an accessible name of "Close", so a role/name match
+    // resolves to two elements. Mirrors EmployeeEditPage.CloseAuditDetailDialogAsync's established
+    // fix for the identical ambiguity on the employee-side audit detail dialog.
     public async Task CloseAuditDetailDialogAsync()
     {
-        await AuditDetailDialog.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+        await AuditDetailDialog.Locator(".e-footer-content button:has-text('Close')").ClickAsync();
         await AuditDetailDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
     public async Task CloseAuditHistoryDialogAsync()
     {
-        await AuditHistoryDialog.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+        await AuditHistoryDialog.Locator(".e-footer-content button:has-text('Close')").ClickAsync();
         await AuditHistoryDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 

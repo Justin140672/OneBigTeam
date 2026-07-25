@@ -13,6 +13,8 @@ internal sealed record CreatePositionProfileRequest
     public int? ProbationMonthsOverride { get; init; }
     public WorkingDays? WorkingDaysOverride { get; init; }
     public decimal? HoursPerDayOverride { get; init; }
+    public NoticePeriodUnit? NoticePeriodUnitOverride { get; init; }
+    public int? NoticePeriodLengthOverride { get; init; }
     public decimal? SalaryMin { get; init; }
     public decimal? SalaryMax { get; init; }
     public SalaryType? SalaryType { get; init; }

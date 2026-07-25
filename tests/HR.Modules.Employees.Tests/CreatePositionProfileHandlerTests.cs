@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.CreatePositionProfile;
 using HR.Modules.Employees.Persistence;
@@ -31,7 +32,7 @@ public class CreatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -42,6 +43,7 @@ public class CreatePositionProfileHandlerTests
                 DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Software Developer"
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -63,7 +65,7 @@ public class CreatePositionProfileHandlerTests
         var companyId = Guid.NewGuid();
         var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -74,6 +76,7 @@ public class CreatePositionProfileHandlerTests
                 DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Engineering Manager"
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -92,7 +95,8 @@ public class CreatePositionProfileHandlerTests
             PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Software Developer", null, null, null, null, null, null, null, Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+        var auditPublisher = new FakeAuditPublisher();
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), auditPublisher);
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -103,10 +107,12 @@ public class CreatePositionProfileHandlerTests
                 DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Software Developer"
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("conflict", result.Error.Code);
+        Assert.Empty(auditPublisher.Published);
     }
 
     [Fact]
@@ -115,7 +121,7 @@ public class CreatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var (_, location) = await SeedDepartmentAndLocationAsync(context, companyId);
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -126,6 +132,7 @@ public class CreatePositionProfileHandlerTests
                 DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Software Developer"
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -145,7 +152,7 @@ public class CreatePositionProfileHandlerTests
         context.Departments.Add(department);
         await context.SaveChangesAsync();
 
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -156,6 +163,7 @@ public class CreatePositionProfileHandlerTests
                 DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Software Developer"
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -168,7 +176,7 @@ public class CreatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var (department, _) = await SeedDepartmentAndLocationAsync(context, companyId);
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -179,6 +187,7 @@ public class CreatePositionProfileHandlerTests
                 DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Software Developer"
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -200,7 +209,7 @@ public class CreatePositionProfileHandlerTests
             PositionProfile.Create(Guid.NewGuid(), companyA, departmentA.Id, locationA.Id, "Software Developer", null, null, null, null, null, null, null, Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -211,6 +220,7 @@ public class CreatePositionProfileHandlerTests
                 DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Software Developer"
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -222,7 +232,7 @@ public class CreatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(exists: true));
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(exists: true), new FakeAuditPublisher());
         var leavePolicyId = Guid.NewGuid();
 
         var result = await handler.HandleAsync(
@@ -234,6 +244,7 @@ public class CreatePositionProfileHandlerTests
                 Title = "Software Developer",
                 DefaultLeavePolicyId = leavePolicyId
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -246,7 +257,7 @@ public class CreatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(exists: false));
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(exists: false), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -257,6 +268,7 @@ public class CreatePositionProfileHandlerTests
                 Title = "Software Developer",
                 DefaultLeavePolicyId = Guid.NewGuid()
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -269,7 +281,7 @@ public class CreatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -284,6 +296,7 @@ public class CreatePositionProfileHandlerTests
                 SalaryMin = 40000,
                 SalaryMax = 60000
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -299,7 +312,7 @@ public class CreatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -313,6 +326,7 @@ public class CreatePositionProfileHandlerTests
                 SalaryMax = 60000,
                 SalaryType = SalaryType.Annual
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -328,7 +342,7 @@ public class CreatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -339,6 +353,7 @@ public class CreatePositionProfileHandlerTests
                 DefaultLeavePolicyId = Guid.NewGuid(),
                 Title = "Software Developer"
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -357,7 +372,7 @@ public class CreatePositionProfileHandlerTests
         context.OnboardingTemplates.Add(template);
         await context.SaveChangesAsync();
 
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -369,6 +384,7 @@ public class CreatePositionProfileHandlerTests
                 Title = "Software Developer",
                 OnboardingTemplateId = template.Id,
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -381,7 +397,7 @@ public class CreatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
-        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
 
         var result = await handler.HandleAsync(
             new CreatePositionProfileRequest
@@ -393,10 +409,119 @@ public class CreatePositionProfileHandlerTests
                 Title = "Software Developer",
                 OnboardingTemplateId = Guid.NewGuid(),
             },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creates_PositionProfile_With_NoticePeriodOverride()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
+
+        var result = await handler.HandleAsync(
+            new CreatePositionProfileRequest
+            {
+                CompanyId = companyId,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
+                Title = "Software Developer",
+                NoticePeriodUnitOverride = NoticePeriodUnit.Weeks,
+                NoticePeriodLengthOverride = 4
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(NoticePeriodUnit.Weeks, result.Value!.NoticePeriodUnitOverride);
+        Assert.Equal(4, result.Value.NoticePeriodLengthOverride);
+
+        var saved = await context.PositionProfiles.SingleAsync();
+        Assert.Equal(NoticePeriodUnit.Weeks, saved.NoticePeriodUnitOverride);
+        Assert.Equal(4, saved.NoticePeriodLengthOverride);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creates_PositionProfile_With_Null_NoticePeriodOverride()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher());
+
+        var result = await handler.HandleAsync(
+            new CreatePositionProfileRequest
+            {
+                CompanyId = companyId,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = Guid.NewGuid(),
+                Title = "Software Developer"
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.NoticePeriodUnitOverride);
+        Assert.Null(result.Value.NoticePeriodLengthOverride);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_PositionProfileCreatedAuditEvent_On_Success()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
+        var auditPublisher = new FakeAuditPublisher();
+        var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), auditPublisher);
+        var actorEmployeeId = Guid.NewGuid();
+        var defaultLeavePolicyId = Guid.NewGuid();
+
+        var result = await handler.HandleAsync(
+            new CreatePositionProfileRequest
+            {
+                CompanyId = companyId,
+                DepartmentId = department.Id,
+                LocationId = location.Id,
+                DefaultLeavePolicyId = defaultLeavePolicyId,
+                Title = "Software Developer",
+                Description = "Builds things",
+                WorkingDaysOverride = WorkingDays.Monday | WorkingDays.Tuesday,
+                HoursPerDayOverride = 7.5m,
+                SalaryMin = 40000,
+                SalaryMax = 60000,
+                SalaryType = SalaryType.Annual,
+                NoticePeriodUnitOverride = NoticePeriodUnit.Weeks,
+                NoticePeriodLengthOverride = 4
+            },
+            actorEmployeeId,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var auditEvent = Assert.IsType<PositionProfileCreatedAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.Equal(companyId, auditEvent.CompanyId);
+        Assert.Equal(result.Value!.Id, auditEvent.PositionProfileId);
+        Assert.Equal(actorEmployeeId, auditEvent.ActorEmployeeId);
+        Assert.Equal(department.Id, auditEvent.After.DepartmentId);
+        Assert.Equal(location.Id, auditEvent.After.LocationId);
+        Assert.Equal("Software Developer", auditEvent.After.Title);
+        Assert.Equal("Builds things", auditEvent.After.Description);
+        Assert.Equal(WorkingDays.Monday | WorkingDays.Tuesday, auditEvent.After.WorkingDaysOverride);
+        Assert.Equal(7.5m, auditEvent.After.HoursPerDayOverride);
+        Assert.Equal(NoticePeriodUnit.Weeks, auditEvent.After.NoticePeriodUnitOverride);
+        Assert.Equal(4, auditEvent.After.NoticePeriodLengthOverride);
+        Assert.Equal(40000, auditEvent.After.SalaryMin);
+        Assert.Equal(60000, auditEvent.After.SalaryMax);
+        Assert.Equal(SalaryType.Annual, auditEvent.After.SalaryType);
+        Assert.Equal(defaultLeavePolicyId, auditEvent.After.DefaultLeavePolicyId);
+        Assert.True(auditEvent.After.IsActive);
     }
 
     private static EmployeesDbContext BuildContext()

@@ -16,7 +16,9 @@ public record PositionProfileListItemModel(
     bool IsActive,
     decimal? SalaryMin,
     decimal? SalaryMax,
-    string? SalaryType);
+    string? SalaryType,
+    NoticePeriodUnit? NoticePeriodUnitOverride = null,
+    int? NoticePeriodLengthOverride = null);
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 
@@ -39,7 +41,9 @@ public record GetPositionProfileResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     IReadOnlyList<PositionProfileRequiredDocumentModel> RequiredDocuments,
-    IReadOnlyList<PositionProfileRequiredAssetModel> RequiredAssets);
+    IReadOnlyList<PositionProfileRequiredAssetModel> RequiredAssets,
+    NoticePeriodUnit? NoticePeriodUnitOverride = null,
+    int? NoticePeriodLengthOverride = null);
 
 public record PositionProfileRequiredDocumentModel(
     Guid Id,
@@ -71,6 +75,10 @@ public sealed class PositionProfileEditModel
     public HashSet<string> WorkingWeek { get; set; } = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
     [Range(0.5, 24, ErrorMessage = "Hours per day must be between 0.5 and 24.")]
     public decimal HoursPerDay { get; set; } = 7.5m;
+    public bool OverrideNoticePeriod { get; set; }
+    public NoticePeriodUnit NoticePeriodUnit { get; set; } = NoticePeriodUnit.Weeks;
+    [Range(1, int.MaxValue, ErrorMessage = "Notice period length must be greater than 0.")]
+    public int NoticePeriodLength { get; set; } = 1;
     public decimal? SalaryMin { get; set; }
     public decimal? SalaryMax { get; set; }
     public string? SalaryType { get; set; } = "Annual";
@@ -94,7 +102,9 @@ public record CreatePositionProfileRequest(
     decimal? SalaryMax,
     string? SalaryType,
     Guid DefaultLeavePolicyId,
-    Guid? OnboardingTemplateId);
+    Guid? OnboardingTemplateId,
+    NoticePeriodUnit? NoticePeriodUnitOverride = null,
+    int? NoticePeriodLengthOverride = null);
 
 public record CreatePositionProfileResponse(
     Guid Id,
@@ -185,7 +195,9 @@ public record UpdatePositionProfileRequest(
     decimal? SalaryMax,
     string? SalaryType,
     Guid DefaultLeavePolicyId,
-    Guid? OnboardingTemplateId);
+    Guid? OnboardingTemplateId,
+    NoticePeriodUnit? NoticePeriodUnitOverride = null,
+    int? NoticePeriodLengthOverride = null);
 
 public record UpdatePositionProfileResponse(
     Guid Id,

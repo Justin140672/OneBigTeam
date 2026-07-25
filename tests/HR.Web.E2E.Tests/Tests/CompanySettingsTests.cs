@@ -11,7 +11,11 @@ namespace HR.Web.E2E.Tests.Tests;
 ///
 /// as well as the pre-existing settings (working week, HoursPerDay,
 /// LeaveYearStartMonth, DefaultHolidayAllowance, ProbationMonths,
-/// ExcludePublicHolidaysFromLeave).
+/// ExcludePublicHolidaysFromLeave), and the "Leaving Process" section
+/// (slice 1 of the Employee Leaving Process feature):
+/// - Notice period preset dropdown (fixed presets, or "Custom duration"
+///   revealing a Unit dropdown + Length numeric)
+/// - AutoDisableAccessOnLeavingDate (checkbox)
 ///
 /// TimeZone and Locale are saved via UpdateCompanySettingsRequest on the
 /// backend but are no longer editable from this tab's UI, so they're not
@@ -157,6 +161,141 @@ public sealed class CompanySettingsTests(AppFixture fixture) : E2ETestBase(fixtu
         // Restore the original value so this test doesn't leak state into other
         // tests/fixtures that rely on the seeded default for this company.
         await companyEdit.SetDisplaySalaryOnEmployeeProfileAsync(initialDisplaySalary);
+        await companyEdit.SaveAsync();
+    }
+
+    [Fact]
+    public async Task LeavingProcessSection_IsVisibleOnSettingsTab()
+    {
+        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
+        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(CompanyAdminEmail);
+
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenSettingsTabAsync();
+
+        // The preset dropdown always shows some selected value (either a fixed preset or
+        // "Custom duration"), so simply reading it confirms the control rendered.
+        var preset = await companyEdit.GetNoticePeriodPresetAsync();
+        Assert.False(string.IsNullOrWhiteSpace(preset));
+
+        // The checkbox is always present and reflects a concrete boolean value either way,
+        // so just calling the getter without it throwing confirms the control rendered.
+        await companyEdit.IsAutoDisableAccessOnLeavingDateCheckedAsync();
+    }
+
+    [Fact]
+    public async Task UpdateNoticePeriodPreset_PersistsAfterReload()
+    {
+        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
+        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(CompanyAdminEmail);
+
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenSettingsTabAsync();
+
+        // Capture the initial preset so the test can restore it afterwards — this is a new,
+        // still-evolving feature (slice 1 of 8) and later slices may rely on Acme's seeded
+        // notice period, so avoid leaking a changed value into other tests/fixtures.
+        var initialPreset = await companyEdit.GetNoticePeriodPresetAsync();
+
+        await companyEdit.SelectNoticePeriodPresetAsync("3 months");
+
+        await companyEdit.SaveAsync();
+        Assert.False(await companyEdit.HasErrorAsync(),
+            "Expected no error after saving the notice period preset");
+
+        // Reload the page for real (re-navigate) to exercise the settings-hydration
+        // path in CompanyEdit.OnInitializedAsync, not just in-memory Blazor state.
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenSettingsTabAsync();
+
+        Assert.Equal("3 months", await companyEdit.GetNoticePeriodPresetAsync());
+
+        // Restore the original preset so this test doesn't leak state into other
+        // tests/fixtures that rely on the seeded default for this company.
+        await companyEdit.SelectNoticePeriodPresetAsync(initialPreset);
+        await companyEdit.SaveAsync();
+    }
+
+    [Fact]
+    public async Task UpdateNoticePeriodCustomDuration_PersistsAfterReload()
+    {
+        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
+        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(CompanyAdminEmail);
+
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenSettingsTabAsync();
+
+        // Capture the initial preset so the test can restore it afterwards (see comment in
+        // UpdateNoticePeriodPreset_PersistsAfterReload).
+        var initialPreset = await companyEdit.GetNoticePeriodPresetAsync();
+
+        await companyEdit.SelectNoticePeriodPresetAsync("Custom duration");
+        await companyEdit.WaitForNoticePeriodCustomControlsAsync();
+
+        await companyEdit.SelectNoticePeriodUnitAsync("Weeks");
+        await companyEdit.SetNoticePeriodLengthAsync(5);
+
+        await companyEdit.SaveAsync();
+        Assert.False(await companyEdit.HasErrorAsync(),
+            "Expected no error after saving a custom-duration notice period");
+
+        // Reload the page for real (re-navigate) to exercise the settings-hydration
+        // path in CompanyEdit.OnInitializedAsync, not just in-memory Blazor state.
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenSettingsTabAsync();
+        await companyEdit.WaitForNoticePeriodCustomControlsAsync();
+
+        Assert.Equal("Custom duration", await companyEdit.GetNoticePeriodPresetAsync());
+        Assert.Equal("Weeks", await companyEdit.GetNoticePeriodUnitAsync());
+        Assert.Equal(5, await companyEdit.GetNoticePeriodLengthAsync());
+
+        // Restore the original preset so this test doesn't leak state into other
+        // tests/fixtures that rely on the seeded default for this company.
+        await companyEdit.SelectNoticePeriodPresetAsync(initialPreset);
+        await companyEdit.SaveAsync();
+    }
+
+    [Fact]
+    public async Task UpdateAutoDisableAccessOnLeavingDate_PersistsAfterReload()
+    {
+        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
+        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(CompanyAdminEmail);
+
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenSettingsTabAsync();
+
+        // Capture the initial checkbox state so we can toggle it to the opposite value.
+        var initialAutoDisableAccess = await companyEdit.IsAutoDisableAccessOnLeavingDateCheckedAsync();
+        var desiredAutoDisableAccess = !initialAutoDisableAccess;
+
+        await companyEdit.SetAutoDisableAccessOnLeavingDateAsync(desiredAutoDisableAccess);
+
+        await companyEdit.SaveAsync();
+        Assert.False(await companyEdit.HasErrorAsync(),
+            "Expected no error after saving the 'auto-disable access on leaving date' setting");
+
+        // Reload the page for real (re-navigate) to exercise the settings-hydration
+        // path in CompanyEdit.OnInitializedAsync, not just in-memory Blazor state.
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenSettingsTabAsync();
+
+        Assert.Equal(desiredAutoDisableAccess, await companyEdit.IsAutoDisableAccessOnLeavingDateCheckedAsync());
+
+        // Restore the original value so this test doesn't leak state into other
+        // tests/fixtures that rely on the seeded default for this company.
+        await companyEdit.SetAutoDisableAccessOnLeavingDateAsync(initialAutoDisableAccess);
         await companyEdit.SaveAsync();
     }
 }

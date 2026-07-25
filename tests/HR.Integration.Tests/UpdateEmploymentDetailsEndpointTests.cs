@@ -123,6 +123,92 @@ public class UpdateEmploymentDetailsEndpointTests : IClassFixture<ApiWebApplicat
     }
 
     [Fact]
+    public async Task Put_Employment_Persists_NoticePeriodOverride()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var employee = await CreateEmployeeAsync(client, companyId);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employee.Id}/employment",
+            new
+            {
+                companyId,
+                id = employee.Id,
+                employeeNumber = "EMP-001",
+                employmentTypeId = (Guid?)null,
+                status = "Active",
+                startDate = "2026-01-15",
+                noticePeriodUnitOverride = "Weeks",
+                noticePeriodLengthOverride = 4
+            });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<EmploymentPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("Weeks", payload!.NoticePeriodUnitOverride);
+        Assert.Equal(4, payload.NoticePeriodLengthOverride);
+    }
+
+    [Fact]
+    public async Task Put_Employment_Returns_UnprocessableEntity_When_Only_NoticePeriodUnitOverride_Set()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var employee = await CreateEmployeeAsync(client, companyId);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employee.Id}/employment",
+            new
+            {
+                companyId,
+                id = employee.Id,
+                employeeNumber = "EMP-001",
+                employmentTypeId = (Guid?)null,
+                status = "Active",
+                startDate = "2026-01-15",
+                noticePeriodUnitOverride = "Weeks",
+                noticePeriodLengthOverride = (int?)null
+            });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_Employment_Returns_UnprocessableEntity_When_Only_NoticePeriodLengthOverride_Set()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var employee = await CreateEmployeeAsync(client, companyId);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employee.Id}/employment",
+            new
+            {
+                companyId,
+                id = employee.Id,
+                employeeNumber = "EMP-001",
+                employmentTypeId = (Guid?)null,
+                status = "Active",
+                startDate = "2026-01-15",
+                noticePeriodUnitOverride = (string?)null,
+                noticePeriodLengthOverride = 4
+            });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Put_Employment_Returns_NotFound_For_Unknown_Employee()
     {
         using var client = _factory.CreateClient();
@@ -169,5 +255,7 @@ public class UpdateEmploymentDetailsEndpointTests : IClassFixture<ApiWebApplicat
         string Status,
         DateOnly StartDate,
         DateOnly? ContinuousServiceDate,
+        string? NoticePeriodUnitOverride,
+        int? NoticePeriodLengthOverride,
         DateTimeOffset UpdatedAt);
 }

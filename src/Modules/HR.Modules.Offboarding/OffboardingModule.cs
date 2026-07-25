@@ -27,6 +27,7 @@ public static class OffboardingModule
         services.AddScoped<GetOffboardingOverviewHandler>();
         services.AddScoped<GetOffboardingStatusHandler>();
         services.AddScoped<IOffboardingStatusReader, OffboardingStatusReader>();
+        services.AddScoped<IOffboardingPlanCoordinator, OffboardingPlanCoordinator>();
         services.AddScoped<IValidator<StartOffboardingRequest>, StartOffboardingValidator>();
         services.AddScoped<OffboardingReminderJob>();
 

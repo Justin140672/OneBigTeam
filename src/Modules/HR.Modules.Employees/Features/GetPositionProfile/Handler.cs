@@ -51,6 +51,8 @@ internal sealed class GetPositionProfileHandler
             profile.ProbationMonthsOverride,
             profile.WorkingDaysOverride,
             profile.HoursPerDayOverride,
+            profile.NoticePeriodUnitOverride,
+            profile.NoticePeriodLengthOverride,
             profile.SalaryMin,
             profile.SalaryMax,
             profile.SalaryType,

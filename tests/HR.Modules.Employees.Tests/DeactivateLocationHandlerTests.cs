@@ -116,7 +116,7 @@ public class DeactivateLocationHandlerTests
             Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", DateOnly.FromDateTime(FixedUtcNow),
             hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001",
             Guid.NewGuid(), Guid.NewGuid(), location.Id, Guid.NewGuid(), FixedOffset);
-        employee.Terminate(FixedOffset);
+        employee.SetStatusForTesting(EmploymentStatus.FormerEmployee, FixedOffset);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 

@@ -18,6 +18,8 @@ internal sealed class PositionProfile
     public int? ProbationMonthsOverride { get; private set; }
     public WorkingDays? WorkingDaysOverride { get; private set; }
     public decimal? HoursPerDayOverride { get; private set; }
+    public NoticePeriodUnit? NoticePeriodUnitOverride { get; private set; }
+    public int? NoticePeriodLengthOverride { get; private set; }
     public decimal? SalaryMin { get; private set; }
     public decimal? SalaryMax { get; private set; }
     public SalaryType? SalaryType { get; private set; }
@@ -45,7 +47,9 @@ internal sealed class PositionProfile
         SalaryType? salaryType,
         Guid defaultLeavePolicyId,
         DateTimeOffset now,
-        Guid? onboardingTemplateId = null)
+        Guid? onboardingTemplateId = null,
+        NoticePeriodUnit? noticePeriodUnitOverride = null,
+        int? noticePeriodLengthOverride = null)
     {
         return new PositionProfile
         {
@@ -58,6 +62,8 @@ internal sealed class PositionProfile
             ProbationMonthsOverride = probationMonthsOverride,
             WorkingDaysOverride = workingDaysOverride,
             HoursPerDayOverride = hoursPerDayOverride,
+            NoticePeriodUnitOverride = noticePeriodUnitOverride,
+            NoticePeriodLengthOverride = noticePeriodLengthOverride,
             SalaryMin = salaryMin,
             SalaryMax = salaryMax,
             SalaryType = salaryType,
@@ -82,7 +88,9 @@ internal sealed class PositionProfile
         SalaryType? salaryType,
         Guid defaultLeavePolicyId,
         DateTimeOffset now,
-        Guid? onboardingTemplateId = null)
+        Guid? onboardingTemplateId = null,
+        NoticePeriodUnit? noticePeriodUnitOverride = null,
+        int? noticePeriodLengthOverride = null)
     {
         DepartmentId = departmentId;
         LocationId = locationId;
@@ -91,6 +99,8 @@ internal sealed class PositionProfile
         ProbationMonthsOverride = probationMonthsOverride;
         WorkingDaysOverride = workingDaysOverride;
         HoursPerDayOverride = hoursPerDayOverride;
+        NoticePeriodUnitOverride = noticePeriodUnitOverride;
+        NoticePeriodLengthOverride = noticePeriodLengthOverride;
         SalaryMin = salaryMin;
         SalaryMax = salaryMax;
         SalaryType = salaryType;

@@ -77,7 +77,10 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
             excludePublicHolidaysFromSickness = true,
             displaySalaryOnEmployeeProfile = true,
             fitNoteRequiredAfterDays = 7,
-            returnToWorkRequiredAfterDays = 3
+            returnToWorkRequiredAfterDays = 3,
+            noticePeriodUnit = "Weeks",
+            noticePeriodLength = 4,
+            autoDisableAccessOnLeavingDate = false
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -91,6 +94,46 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
         Assert.True(payload.DisplaySalaryOnEmployeeProfile);
         Assert.Equal(7, payload.FitNoteRequiredAfterDays);
         Assert.Equal(3, payload.ReturnToWorkRequiredAfterDays);
+        Assert.Equal("Weeks", payload.NoticePeriodUnit);
+        Assert.Equal(4, payload.NoticePeriodLength);
+        Assert.False(payload.AutoDisableAccessOnLeavingDate);
+    }
+
+    [Fact]
+    public async Task Put_Company_Settings_Returns_UnprocessableEntity_When_NoticePeriodLength_Is_Not_Positive()
+    {
+        using var client = AuthenticatedClient(UserId);
+
+        var createResponse = await client.PostAsJsonAsync("/api/companies", new
+        {
+            name = $"Settings Test {Guid.NewGuid():N}",
+            addresses = new[]
+            {
+                new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", countryCode = "GB" }
+            }
+        });
+        createResponse.EnsureSuccessStatusCode();
+
+        var createdCompany = await createResponse.Content.ReadFromJsonAsync<CreateCompanyPayload>();
+        Assert.NotNull(createdCompany);
+
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, createdCompany!.Id.ToString());
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{createdCompany.Id}/settings", new
+        {
+            timeZone = "UTC",
+            locale = "en-GB",
+            workingDays = 31,
+            hoursPerDay = 7.5,
+            leaveYearStartMonth = 1,
+            defaultHolidayAllowance = 25,
+            probationMonths = 6,
+            noticePeriodUnit = "Months",
+            noticePeriodLength = 0
+        });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
     [Fact]
@@ -167,5 +210,8 @@ public class UpdateCompanySettingsEndpointTests : IClassFixture<ApiWebApplicatio
         bool DisplaySalaryOnEmployeeProfile,
         int? FitNoteRequiredAfterDays,
         int? ReturnToWorkRequiredAfterDays,
+        string NoticePeriodUnit,
+        int NoticePeriodLength,
+        bool AutoDisableAccessOnLeavingDate,
         DateTimeOffset UpdatedAt);
 }

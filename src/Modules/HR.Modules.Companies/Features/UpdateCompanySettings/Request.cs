@@ -20,4 +20,7 @@ internal sealed record UpdateCompanySettingsRequest
 	public int? ReturnToWorkRequiredAfterDays { get; init; }
 	public string DefaultAcknowledgementStatement { get; init; } = string.Empty;
 	public int AcknowledgementReminderIntervalDays { get; init; } = 3;
+	public NoticePeriodUnit NoticePeriodUnit { get; init; } = NoticePeriodUnit.Months;
+	public int NoticePeriodLength { get; init; } = 1;
+	public bool AutoDisableAccessOnLeavingDate { get; init; } = true;
 }

@@ -1,0 +1,194 @@
+@using HR.Web.Models
+@using HR.Infrastructure.Abstractions
+@inject EmployeeService EmployeeService
+
+<SfDialog Visible="IsOpen" IsModal="true" Width="480px" ShowCloseIcon="false">
+    <DialogTemplates>
+        <Header>Amend Leaving Process</Header>
+        <Content>
+            @if (_loading)
+            {
+                <HrLoadingIndicator />
+            }
+            else
+            {
+                <div class="mb-3">
+                    <label class="form-label">Leaving Date <span class="text-danger">*</span></label>
+                    <SfDatePicker TValue="DateOnly?"
+                                  Value="_leavingDate"
+                                  ValueChanged="OnLeavingDateChanged"
+                                  Format="dd/MM/yyyy"
+                                  Placeholder="dd/mm/yyyy" />
+                </div>
+                @if (IsBackdated(_leavingDate))
+                {
+                    <div class="mb-3">
+                        <SfCheckBox TChecked="bool"
+                                    Label="This leaving date is in the past. Confirming will immediately finalise this employee's departure (status will become Former Employee)."
+                                    Checked="@_confirmBackdatedLeavingDate"
+                                    CheckedChanged="@((bool v) => _confirmBackdatedLeavingDate = v)" />
+                    </div>
+                }
+                <div class="mb-3">
+                    <label class="form-label">Last Working Day <span class="text-danger">*</span></label>
+                    <SfDatePicker TValue="DateOnly?"
+                                  @bind-Value="_lastWorkingDay"
+                                  Format="dd/MM/yyyy"
+                                  Placeholder="dd/mm/yyyy" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Leaving Reason <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="string"
+                                    TItem="LeavingReasonOption"
+                                    DataSource="@_leavingReasonOptions"
+                                    @bind-Value="_leavingReason"
+                                    Placeholder="Select leaving reason">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_globalError))
+                {
+                    <div class="alert alert-danger py-2">@_globalError</div>
+                }
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton IsPrimary="true" Disabled="@(_submitting || _loading)" OnClick="ConfirmAsync">
+                @if (_submitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Save Changes
+            </SfButton>
+            <SfButton Disabled="@_submitting" OnClick="CancelAsync">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+    [Parameter] public EventCallback<bool> OnCompleted { get; set; }
+
+    private bool _wasOpen;
+    private bool _loading;
+    private bool _submitting;
+    private string? _globalError;
+
+    private DateOnly? _leavingDate;
+    private bool _confirmBackdatedLeavingDate;
+    private DateOnly? _lastWorkingDay;
+    private string _leavingReason = string.Empty;
+
+    // Same 7 options as StartLeavingProcessDialog._leavingReasonOptions — no clear button/"None"
+    // item since this is a required field (see this codebase's convention noted there).
+    private static readonly LeavingReasonOption[] _leavingReasonOptions =
+    [
+        new("Resignation",     EmployeeLeavingTab.LeavingReasonLabel("Resignation")),
+        new("Redundancy",      EmployeeLeavingTab.LeavingReasonLabel("Redundancy")),
+        new("Dismissal",       EmployeeLeavingTab.LeavingReasonLabel("Dismissal")),
+        new("Retirement",      EmployeeLeavingTab.LeavingReasonLabel("Retirement")),
+        new("EndOfContract",   EmployeeLeavingTab.LeavingReasonLabel("EndOfContract")),
+        new("MutualAgreement", EmployeeLeavingTab.LeavingReasonLabel("MutualAgreement")),
+        new("Other",           EmployeeLeavingTab.LeavingReasonLabel("Other")),
+    ];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && !_wasOpen)
+            await LoadCurrentValuesAsync();
+
+        _wasOpen = IsOpen;
+    }
+
+    // Unlike StartLeavingProcessDialog (which always starts blank), Amend needs to be pre-populated
+    // with the leaving process' current values — fetch them fresh every time the dialog opens rather
+    // than relying on values the parent tab may have loaded earlier.
+    private async Task LoadCurrentValuesAsync()
+    {
+        _loading = true;
+        _submitting = false;
+        _globalError = null;
+        _leavingDate = null;
+        _confirmBackdatedLeavingDate = false;
+        _lastWorkingDay = null;
+        _leavingReason = string.Empty;
+
+        var current = await EmployeeService.GetLeavingProcessAsync(CompanyId, EmployeeId);
+        if (current is not null)
+        {
+            _leavingDate = current.LeavingDate;
+            _lastWorkingDay = current.LastWorkingDay;
+            _leavingReason = current.LeavingReason;
+        }
+
+        _loading = false;
+    }
+
+    private void OnLeavingDateChanged(DateOnly? value)
+    {
+        _leavingDate = value;
+
+        // Don't let a stale confirmation silently carry over once the date no longer needs it.
+        if (!IsBackdated(_leavingDate))
+            _confirmBackdatedLeavingDate = false;
+    }
+
+    private static bool IsBackdated(DateOnly? date) => date is not null && date < DateOnly.FromDateTime(DateTime.Today);
+
+    private async Task ConfirmAsync()
+    {
+        if (_leavingDate is null || _lastWorkingDay is null || string.IsNullOrEmpty(_leavingReason))
+        {
+            _globalError = "Please complete all fields before saving.";
+            return;
+        }
+
+        if (_lastWorkingDay > _leavingDate)
+        {
+            _globalError = "Last working day must be on or before the leaving date.";
+            return;
+        }
+
+        if (IsBackdated(_leavingDate) && !_confirmBackdatedLeavingDate)
+        {
+            _globalError = "Please confirm you want to backdate and finalise this employee's departure.";
+            return;
+        }
+
+        _submitting = true;
+        _globalError = null;
+
+        var request = new AmendLeavingProcessRequest(
+            CompanyId,
+            EmployeeId,
+            _leavingDate.Value,
+            _lastWorkingDay.Value,
+            _leavingReason,
+            _confirmBackdatedLeavingDate);
+
+        var (result, error) = await EmployeeService.AmendLeavingProcessAsync(CompanyId, EmployeeId, request);
+
+        _submitting = false;
+
+        if (result is null)
+        {
+            // Left open (rather than closing) so the user can fix whatever the server rejected —
+            // same convention as StartLeavingProcessDialog.ConfirmAsync.
+            _globalError = error ?? "Failed to amend the leaving process.";
+            return;
+        }
+
+        await OnCompleted.InvokeAsync(result.OffboardingAlreadyStarted);
+    }
+
+    private async Task CancelAsync()
+    {
+        await OnCancelled.InvokeAsync();
+    }
+
+    private sealed record LeavingReasonOption(string Value, string Label);
+}

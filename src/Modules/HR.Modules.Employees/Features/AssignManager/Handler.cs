@@ -39,7 +39,7 @@ internal sealed class AssignManagerHandler
                 .SingleOrDefaultAsync(
                     e => e.Id == request.ManagerId &&
                          e.CompanyId == request.CompanyId &&
-                         e.Status != EmploymentStatus.Terminated,
+                         e.Status != EmploymentStatus.FormerEmployee,
                     cancellationToken);
 
             if (manager is null)

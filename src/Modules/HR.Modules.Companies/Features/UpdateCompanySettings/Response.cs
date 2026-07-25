@@ -19,4 +19,7 @@ internal sealed record UpdateCompanySettingsResponse(
 	int? ReturnToWorkRequiredAfterDays,
 	string DefaultAcknowledgementStatement,
 	int AcknowledgementReminderIntervalDays,
+	NoticePeriodUnit NoticePeriodUnit,
+	int NoticePeriodLength,
+	bool AutoDisableAccessOnLeavingDate,
 	DateTimeOffset UpdatedAt);

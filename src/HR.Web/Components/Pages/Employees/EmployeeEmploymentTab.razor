@@ -89,6 +89,47 @@ else
                                 <SfDatePicker TValue="DateOnly?" @bind-Value="Model.LeavingDate" Format="dd/MM/yyyy" ShowClearButton="true" />
                             </div>
                         </div>
+
+                        <hr class="my-3" />
+
+                        <div class="row g-3 align-items-start">
+                            <div class="col-md-6">
+                                <SfCheckBox TChecked="bool"
+                                            Label="Override notice period"
+                                            Checked="@Model.OverrideNoticePeriod"
+                                            CheckedChanged="@((bool v) => Model.OverrideNoticePeriod = v)" />
+                                @if (Model.OverrideNoticePeriod)
+                                {
+                                    <div class="row g-3 mt-2">
+                                        <div class="col-md-6">
+                                            <SfDropDownList TValue="NoticePeriodUnit" TItem="NoticePeriodUnitChoice"
+                                                            DataSource="@NoticePeriodUnitOptions"
+                                                            @bind-Value="Model.NoticePeriodUnit"
+                                                            Placeholder="Unit">
+                                                <DropDownListFieldSettings Value="Value" Text="Label" />
+                                            </SfDropDownList>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <SfNumericTextBox TValue="int" @bind-Value="Model.NoticePeriodLength"
+                                                              Placeholder="Length"
+                                                              FloatLabelType="FloatLabelType.Auto"
+                                                              ShowSpinButton="false"
+                                                              Min="1" />
+                                            <ValidationMessage For="@(() => Model.NoticePeriodLength)" />
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            <div class="col-md-6">
+                                <div class="text-muted small mb-1">Notice source</div>
+                                <dl class="row mb-0 small">
+                                    <dt class="col-6 text-muted fw-normal">Source</dt>
+                                    <dd class="col-6">@NoticePeriodSourceLabel(_effectiveNoticePeriodSource)</dd>
+                                    <dt class="col-6 text-muted fw-normal">Notice Period</dt>
+                                    <dd class="col-6">@_effectiveNoticePeriodLength @(_effectiveNoticePeriodUnit)</dd>
+                                </dl>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -250,25 +291,51 @@ else
 
     private ProbationRecordModel? _probationRecord;
 
+    private NoticePeriodUnit _effectiveNoticePeriodUnit;
+    private int _effectiveNoticePeriodLength;
+    private string _effectiveNoticePeriodSource = "CompanyDefault";
+
     private static readonly string[] _allDays =
         ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-    // Draft must be a real option here even though nobody should ever *pick* it (a brand-new
-    // employee's Employment tab loads with Model.Status == "Draft" — see PopulateModel below —
-    // and if that value has no matching item in the dropdown's own DataSource, the widget clears
-    // its selection and, via @bind-Value, silently overwrites Model.Status back to the client with
-    // an empty string. That corrupts the field on first render, before the user has touched
-    // anything, and the empty value then fails server-side deserialization on save regardless of
-    // which field they actually meant to edit. UpdateEmploymentDetailsHandler still rejects any
-    // attempt to actively transition a non-Draft employee back to Draft, so including it here only
-    // fixes the display/round-trip of an already-Draft employee — it doesn't relax that rule.
+    private static readonly NoticePeriodUnitChoice[] NoticePeriodUnitOptions =
+    [
+        new(NoticePeriodUnit.Weeks, "Weeks"),
+        new(NoticePeriodUnit.Months, "Months")
+    ];
+
+    private sealed record NoticePeriodUnitChoice(NoticePeriodUnit Value, string Label);
+
+    private static string NoticePeriodSourceLabel(string source) => source switch
+    {
+        "Employee"        => "Employee",
+        "PositionProfile" => "Position Profile",
+        "CompanyDefault"  => "Company Default",
+        _                 => source
+    };
+
+    // Draft, Leaving, and FormerEmployee must be real options here even though nobody should ever
+    // *pick* them (a brand-new employee's Employment tab loads with Model.Status == "Draft" — see
+    // PopulateModel below — an employee mid-way through the leaving process loads with
+    // Model.Status == "Leaving", and a former employee's tab loads with Model.Status ==
+    // "FormerEmployee"). If any of those values has no matching item in the dropdown's own
+    // DataSource, the widget clears its selection and, via @bind-Value, silently overwrites
+    // Model.Status back to the client with an empty string. That corrupts the field on first
+    // render, before the user has touched anything, and the empty value then fails server-side
+    // deserialization on save regardless of which field they actually meant to edit.
+    // UpdateEmploymentDetailsHandler still rejects any attempt to actively transition into Draft,
+    // Leaving, or FormerEmployee via this form, so including them here only fixes the
+    // display/round-trip of an already-Draft, already-Leaving, or already-FormerEmployee
+    // employee — it doesn't relax those rules. Leaving is only ever actively entered via the
+    // dedicated Start Leaving Process action, not this generic edit form.
     private static readonly Option[] _statusOptions =
     [
-        new("Draft",      "Draft"),
-        new("Active",     "Active"),
-        new("OnLeave",    "On Leave"),
-        new("Suspended",  "Suspended"),
-        new("Terminated", "Leaver"),
+        new("Draft",          "Draft"),
+        new("Active",         "Active"),
+        new("OnLeave",        "On Leave"),
+        new("Suspended",      "Suspended"),
+        new("Leaving",        "Leaving"),
+        new("FormerEmployee", "Former Employee"),
     ];
 
     protected override async Task LoadAsync()
@@ -299,7 +366,7 @@ else
         // exhaustive. The currently-assigned manager is merged in explicitly in case they don't
         // happen to fall within this first page, so their name always renders rather than blank.
         _managerOptions = ((await empListTask)?.Items ?? [])
-            .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "Terminated")
+            .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .ToList();
 
@@ -321,7 +388,7 @@ else
         args.PreventDefaultAction = true;
         var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         _managerOptions = (result?.Items ?? [])
-            .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "Terminated")
+            .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
@@ -333,7 +400,7 @@ else
     {
         Model.EmployeeNumber        = e.EmployeeNumber ?? string.Empty;
         Model.EmploymentTypeId      = e.EmploymentTypeId;
-        Model.Status                = e.Status is "Draft" or "Active" or "OnLeave" or "Suspended" or "Terminated"
+        Model.Status                = e.Status is "Draft" or "Active" or "OnLeave" or "Suspended" or "Leaving" or "FormerEmployee"
                                            ? e.Status
                                            : "Active";
         Model.DepartmentId          = e.DepartmentId;
@@ -345,6 +412,21 @@ else
         Model.ProbationEndDate      = e.ProbationEndDate;
         Model.LeavingDate           = e.LeavingDate;
         Model.Notes                 = e.Notes ?? string.Empty;
+
+        _effectiveNoticePeriodUnit   = e.EffectiveNoticePeriodUnit;
+        _effectiveNoticePeriodLength = e.EffectiveNoticePeriodLength;
+        _effectiveNoticePeriodSource = e.EffectiveNoticePeriodSource;
+
+        if (e.NoticePeriodUnitOverride.HasValue && e.NoticePeriodLengthOverride.HasValue)
+        {
+            Model.OverrideNoticePeriod = true;
+            Model.NoticePeriodUnit = e.NoticePeriodUnitOverride.Value;
+            Model.NoticePeriodLength = e.NoticePeriodLengthOverride.Value;
+        }
+        else
+        {
+            Model.OverrideNoticePeriod = false;
+        }
 
         if (e.WorkingDaysOverride.HasValue || e.HoursPerDayOverride.HasValue)
         {
@@ -378,6 +460,9 @@ else
             hoursPerDayOverride = Model.HoursPerDay;
         }
 
+        NoticePeriodUnit? noticePeriodUnitOverride = Model.OverrideNoticePeriod ? Model.NoticePeriodUnit : null;
+        int? noticePeriodLengthOverride = Model.OverrideNoticePeriod ? Model.NoticePeriodLength : null;
+
         var request = new UpdateEmploymentDetailsRequest(
             CompanyId,
             EmployeeId,
@@ -394,7 +479,9 @@ else
             Model.LeavingDate,
             workingDaysOverride,
             hoursPerDayOverride,
-            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim());
+            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim(),
+            NoticePeriodUnitOverride: noticePeriodUnitOverride,
+            NoticePeriodLengthOverride: noticePeriodLengthOverride);
 
         var (success, error) = await EmployeeService.UpdateEmploymentDetailsAsync(CompanyId, EmployeeId, request);
 
@@ -457,6 +544,10 @@ else
         public HashSet<string> WorkingWeek { get; set; } = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
         [Range(0.5, 24, ErrorMessage = "Hours per day must be between 0.5 and 24.")]
         public decimal HoursPerDay { get; set; } = 7.5m;
+        public bool OverrideNoticePeriod { get; set; }
+        public NoticePeriodUnit NoticePeriodUnit { get; set; } = NoticePeriodUnit.Weeks;
+        [Range(1, int.MaxValue, ErrorMessage = "Notice period length must be greater than 0.")]
+        public int NoticePeriodLength { get; set; } = 1;
         public string Notes { get; set; } = string.Empty;
     }
 

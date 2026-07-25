@@ -296,6 +296,124 @@ public class AuditHistoryIntegrationTests : IClassFixture<ApiWebApplicationFacto
         Assert.Contains("Europe/London", auditRecord.AfterJson);
     }
 
+    [Fact]
+    public async Task CreatePositionProfile_Persists_Audit_Record()
+    {
+        // PositionProfileCreatedAuditEvent is scoped by ActorEmployeeId, not EmployeeId (it records
+        // who managed the position profile, not an employee the profile belongs to), so like
+        // CompanySettings it can never appear via GetEmployeeAuditHistory. Read the audit table
+        // directly via the test host's own DI container instead.
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = AuthenticatedClient(companyId);
+
+        var (departmentId, locationId, leavePolicyId) = await CreatePositionProfileReferenceDataAsync(hrAdminClient, companyId);
+
+        var createResp = await hrAdminClient.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
+        {
+            companyId,
+            departmentId,
+            locationId,
+            defaultLeavePolicyId = leavePolicyId,
+            title = $"Audit Role {Guid.NewGuid():N}"
+        });
+        createResp.EnsureSuccessStatusCode();
+        var positionProfile = await createResp.Content.ReadFromJsonAsync<IdPayload>();
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecord = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "position-profile.created")
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(auditRecord);
+        Assert.Equal("PositionProfile", auditRecord!.EntityType);
+        Assert.Equal(positionProfile!.Id, auditRecord.EntityId);
+        Assert.Equal(HrAdminUser, auditRecord.ActorEmployeeId);
+        Assert.Null(auditRecord.BeforeJson);
+        Assert.NotNull(auditRecord.AfterJson);
+    }
+
+    [Fact]
+    public async Task UpdatePositionProfile_Persists_Audit_Record_With_Before_And_After()
+    {
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = AuthenticatedClient(companyId);
+
+        var (departmentId, locationId, leavePolicyId) = await CreatePositionProfileReferenceDataAsync(hrAdminClient, companyId);
+
+        var createResp = await hrAdminClient.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
+        {
+            companyId,
+            departmentId,
+            locationId,
+            defaultLeavePolicyId = leavePolicyId,
+            title = $"Audit Role {Guid.NewGuid():N}"
+        });
+        createResp.EnsureSuccessStatusCode();
+        var positionProfile = await createResp.Content.ReadFromJsonAsync<IdPayload>();
+
+        var newTitle = $"Updated Audit Role {Guid.NewGuid():N}";
+        var updateResp = await hrAdminClient.PutAsJsonAsync(
+            $"/api/companies/{companyId}/position-profiles/{positionProfile!.Id}",
+            new
+            {
+                companyId,
+                id = positionProfile.Id,
+                departmentId,
+                locationId,
+                defaultLeavePolicyId = leavePolicyId,
+                title = newTitle
+            });
+        updateResp.EnsureSuccessStatusCode();
+
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+
+        var auditRecord = await auditDb.AuditEvents
+            .Where(e => e.CompanyId == companyId && e.EventType == "position-profile.updated")
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(auditRecord);
+        Assert.Equal("PositionProfile", auditRecord!.EntityType);
+        Assert.Equal(positionProfile.Id, auditRecord.EntityId);
+        Assert.Equal(HrAdminUser, auditRecord.ActorEmployeeId);
+        Assert.NotNull(auditRecord.BeforeJson);
+        Assert.NotNull(auditRecord.AfterJson);
+        Assert.Contains(newTitle, auditRecord.AfterJson);
+    }
+
+    private static async Task<(Guid DepartmentId, Guid LocationId, Guid LeavePolicyId)> CreatePositionProfileReferenceDataAsync(HttpClient client, Guid companyId)
+    {
+        var deptResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/departments",
+            new { companyId, name = $"Dept-{Guid.NewGuid():N}" });
+        deptResp.EnsureSuccessStatusCode();
+        var departmentId = (await deptResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locTypeResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/location-types",
+            new { companyId, name = $"LocType-{Guid.NewGuid():N}" });
+        locTypeResp.EnsureSuccessStatusCode();
+        var locationTypeId = (await locTypeResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var locResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/locations",
+            new { companyId, name = $"Loc-{Guid.NewGuid():N}", locationTypeId });
+        locResp.EnsureSuccessStatusCode();
+        var locationId = (await locResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var leavePolicyResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = $"Policy-{Guid.NewGuid():N}", carryOverDays = 5, allowNegativeBalance = false });
+        leavePolicyResp.EnsureSuccessStatusCode();
+        var leavePolicyId = (await leavePolicyResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        return (departmentId, locationId, leavePolicyId);
+    }
+
     private HttpClient AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
@@ -365,9 +483,15 @@ public class AuditHistoryIntegrationTests : IClassFixture<ApiWebApplicationFacto
         locResp.EnsureSuccessStatusCode();
         var locationId = (await locResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 
+        var leavePolicyResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = $"Policy-{Guid.NewGuid():N}", carryOverDays = 5, allowNegativeBalance = false });
+        leavePolicyResp.EnsureSuccessStatusCode();
+        var defaultLeavePolicyId = (await leavePolicyResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
         var ppResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles",
-            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}" });
+            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}", defaultLeavePolicyId });
         ppResp.EnsureSuccessStatusCode();
         var positionProfileId = (await ppResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using HR.Infrastructure.Abstractions;
 
 namespace HR.Web.Models;
 
@@ -52,4 +53,8 @@ public sealed class CompanySettingsEditModel
     public string? DefaultAcknowledgementStatement { get; set; }
     [Range(1, int.MaxValue, ErrorMessage = "Reminder interval must be at least 1 day.")]
     public int AcknowledgementReminderIntervalDays { get; set; } = 3;
+    public NoticePeriodUnit NoticePeriodUnit { get; set; } = NoticePeriodUnit.Months;
+    [Range(1, int.MaxValue, ErrorMessage = "Notice period length must be greater than 0.")]
+    public int NoticePeriodLength { get; set; } = 1;
+    public bool AutoDisableAccessOnLeavingDate { get; set; } = true;
 }

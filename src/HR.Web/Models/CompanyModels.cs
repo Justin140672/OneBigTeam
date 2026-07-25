@@ -68,6 +68,9 @@ public record GetCompanySettingsResponse(
     string MobileRegex,
     string DefaultAcknowledgementStatement,
     int AcknowledgementReminderIntervalDays,
+    NoticePeriodUnit NoticePeriodUnit,
+    int NoticePeriodLength,
+    bool AutoDisableAccessOnLeavingDate,
     DateTime UpdatedAt);
 
 public record UpdateCompanySettingsRequest(
@@ -85,7 +88,10 @@ public record UpdateCompanySettingsRequest(
     int? FitNoteRequiredAfterDays,
     int? ReturnToWorkRequiredAfterDays,
     string? DefaultAcknowledgementStatement,
-    int AcknowledgementReminderIntervalDays);
+    int AcknowledgementReminderIntervalDays,
+    NoticePeriodUnit NoticePeriodUnit,
+    int NoticePeriodLength,
+    bool AutoDisableAccessOnLeavingDate);
 
 public record UpdateCompanySettingsResponse(
     Guid CompanyId,
@@ -103,6 +109,9 @@ public record UpdateCompanySettingsResponse(
     int? ReturnToWorkRequiredAfterDays,
     string DefaultAcknowledgementStatement,
     int AcknowledgementReminderIntervalDays,
+    NoticePeriodUnit NoticePeriodUnit,
+    int NoticePeriodLength,
+    bool AutoDisableAccessOnLeavingDate,
     DateTime UpdatedAt);
 
 // ── LOGO UPLOAD ───────────────────────────────────────────────────────────────

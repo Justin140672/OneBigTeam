@@ -101,4 +101,74 @@ public class UpdateEmploymentDetailsValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmploymentDetailsRequest.WorkingDaysOverride));
     }
+
+    // ── notice period override (both-or-neither) ────────────────────────────────
+
+    [Fact]
+    public void Validate_Passes_When_NoticePeriodOverride_Is_Entirely_Absent()
+    {
+        var result = _validator.Validate(ValidRequest() with
+        {
+            NoticePeriodUnitOverride = null,
+            NoticePeriodLengthOverride = null
+        });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Passes_When_NoticePeriodOverride_Unit_And_Length_Are_Both_Set()
+    {
+        var result = _validator.Validate(ValidRequest() with
+        {
+            NoticePeriodUnitOverride = NoticePeriodUnit.Weeks,
+            NoticePeriodLengthOverride = 4
+        });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_NoticePeriodUnitOverride_Set_Without_Length()
+    {
+        var result = _validator.Validate(ValidRequest() with
+        {
+            NoticePeriodUnitOverride = NoticePeriodUnit.Months,
+            NoticePeriodLengthOverride = null
+        });
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_NoticePeriodLengthOverride_Set_Without_Unit()
+    {
+        var result = _validator.Validate(ValidRequest() with
+        {
+            NoticePeriodUnitOverride = null,
+            NoticePeriodLengthOverride = 4
+        });
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_NoticePeriodLengthOverride_Is_Zero()
+    {
+        var result = _validator.Validate(ValidRequest() with
+        {
+            NoticePeriodUnitOverride = NoticePeriodUnit.Months,
+            NoticePeriodLengthOverride = 0
+        });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmploymentDetailsRequest.NoticePeriodLengthOverride));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_NoticePeriodLengthOverride_Is_Negative()
+    {
+        var result = _validator.Validate(ValidRequest() with
+        {
+            NoticePeriodUnitOverride = NoticePeriodUnit.Months,
+            NoticePeriodLengthOverride = -1
+        });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmploymentDetailsRequest.NoticePeriodLengthOverride));
+    }
 }
