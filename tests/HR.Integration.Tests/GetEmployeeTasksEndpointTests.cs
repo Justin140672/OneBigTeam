@@ -40,9 +40,12 @@ public class GetEmployeeTasksEndpointTests : IClassFixture<ApiWebApplicationFact
     [Fact]
     public async Task Get_EmployeeTasks_Returns_Ok_For_Authenticated_User_With_No_Role()
     {
-        // Endpoint requires only authentication, not a specific role, so employees
-        // can view their own tasks without needing employee:manage.
+        // Endpoint requires only the baseline "role:employee" policy (any authenticated
+        // employee), not employee:manage, so employees can view their own tasks without
+        // needing management permissions.
         var unprivilegedUser = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, unprivilegedUser, SystemRoles.Employee);
+
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, unprivilegedUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());

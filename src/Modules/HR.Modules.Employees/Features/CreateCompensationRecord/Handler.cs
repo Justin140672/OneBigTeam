@@ -5,7 +5,8 @@ namespace HR.Modules.Employees.Features.CreateCompensationRecord;
 
 internal sealed class CreateCompensationRecordHandler(
     CompensationRecordWriter writer,
-    IAuditEventPublisher auditEventPublisher)
+    IAuditEventPublisher auditEventPublisher,
+    IIntegrationEventPublisher integrationEventPublisher)
 {
     public async Task<Result<CreateCompensationRecordResponse>> HandleAsync(
         CreateCompensationRecordRequest request,
@@ -43,6 +44,12 @@ internal sealed class CreateCompensationRecordHandler(
             new CompensationRecordCreatedAuditEvent(
                 request.CompanyId, request.EmployeeId, record.Id, actorEmployeeId, record.EffectiveFrom,
                 record.SalaryType.ToString(), record.Salary, record.Currency, record.Reason.ToString(), record.CreatedAt),
+            cancellationToken);
+
+        await integrationEventPublisher.PublishAsync(
+            new CompensationChangedIntegrationEvent(
+                request.CompanyId, request.EmployeeId, record.Id, record.EffectiveFrom,
+                record.SalaryType.ToString(), record.Reason.ToString(), record.CreatedAt),
             cancellationToken);
 
         return Result.Success(new CreateCompensationRecordResponse(

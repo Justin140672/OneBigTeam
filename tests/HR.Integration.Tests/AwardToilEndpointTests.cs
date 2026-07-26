@@ -23,6 +23,7 @@ public class AwardToilEndpointTests : IClassFixture<ApiWebApplicationFactory>
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUserId, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUserId, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, ManagerUserId, SystemRoles.Manager);
             await TestRoleSeeder.AssignRoleAsync(factory, EmployeeUserId, SystemRoles.Employee);
         }).GetAwaiter().GetResult();

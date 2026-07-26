@@ -3,6 +3,7 @@ using HR.Modules.Employees.Features.BulkApplyCompensationAdjustments;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
 using HR.Modules.Employees.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -143,8 +144,55 @@ public class BulkApplyCompensationAdjustmentsHandlerTests
         Assert.Empty(publisher.Published);
     }
 
-    private static BulkApplyCompensationAdjustmentsHandler BuildHandler(EmployeesDbContext context, FakeAuditPublisher publisher) =>
-        new(context, new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), new FakeClock(FixedUtcNow), publisher);
+    [Fact]
+    public async Task HandleAsync_Publishes_CompensationChanged_IntegrationEvent_Per_Item_With_No_Salary_Figure()
+    {
+        await using var context = BuildContext();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var companyId = Guid.NewGuid();
+
+        var employee1 = CreateEmployee(companyId, now);
+        var employee2 = CreateEmployee(companyId, now);
+        context.Employees.AddRange(employee1, employee2);
+        await context.SaveChangesAsync();
+
+        var integrationPublisher = new CapturingIntegrationEventPublisher();
+        var handler = BuildHandler(context, new FakeAuditPublisher(), integrationPublisher);
+
+        var request = new BulkApplyCompensationAdjustmentsRequest
+        {
+            CompanyId = companyId,
+            EffectiveDate = new DateOnly(2026, 1, 1),
+            Reason = CompensationChangeReason.AnnualReview,
+            AdjustmentMode = CompensationAdjustmentMode.PercentageIncrease,
+            Items =
+            [
+                new BulkCompensationAdjustmentItem { EmployeeId = employee1.Id, ProposedSalary = 42000m, SalaryType = SalaryType.Annual, Currency = "GBP" },
+                new BulkCompensationAdjustmentItem { EmployeeId = employee2.Id, ProposedSalary = 52500m, SalaryType = SalaryType.Annual, Currency = "GBP" }
+            ]
+        };
+
+        var result = await handler.HandleAsync(request, ActorId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var compensationEvents = integrationPublisher.Published.OfType<CompensationChangedIntegrationEvent>().ToList();
+        Assert.Equal(2, compensationEvents.Count);
+        Assert.Contains(compensationEvents, e => e.EmployeeId == employee1.Id);
+        Assert.Contains(compensationEvents, e => e.EmployeeId == employee2.Id);
+
+        // Redaction: no salary/amount figure exists on this event type at all (no such field) —
+        // assert the serialized form never contains either proposed salary as a defence-in-depth check.
+        foreach (var evt in compensationEvents)
+        {
+            var json = System.Text.Json.JsonSerializer.Serialize(evt);
+            Assert.DoesNotContain("42000", json);
+            Assert.DoesNotContain("52500", json);
+        }
+    }
+
+    private static BulkApplyCompensationAdjustmentsHandler BuildHandler(
+        EmployeesDbContext context, FakeAuditPublisher publisher, HR.SharedKernel.IIntegrationEventPublisher? integrationEventPublisher = null) =>
+        new(context, new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), new FakeClock(FixedUtcNow), publisher, integrationEventPublisher ?? new NoOpIntegrationEventPublisher());
 
     private static Employee CreateEmployee(Guid companyId, DateTimeOffset now) =>
         Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com", new DateOnly(2024, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", $"EMP-{Guid.NewGuid():N}"[..12], Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);

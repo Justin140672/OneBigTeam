@@ -58,13 +58,42 @@ public class EmployeeDepartureFinalizerTests
         FakeAuditPublisher? auditPublisher = null,
         FakeOffboardingStatusReader? offboardingStatusReader = null,
         FakeCompanyLeavingSettingsReader? leavingSettingsReader = null,
-        FakeNotificationWriter? notificationWriter = null) =>
+        FakeNotificationWriter? notificationWriter = null,
+        FakeEmployeeTimelineWriter? timelineWriter = null) =>
         new(
             dbContext,
             auditPublisher ?? new FakeAuditPublisher(),
             offboardingStatusReader ?? new FakeOffboardingStatusReader(new OffboardingStatusSummary("Completed")),
             leavingSettingsReader ?? new FakeCompanyLeavingSettingsReader(),
-            notificationWriter ?? new FakeNotificationWriter());
+            notificationWriter ?? new FakeNotificationWriter(),
+            timelineWriter ?? new FakeEmployeeTimelineWriter());
+
+    [Fact]
+    public async Task FinalizeAsync_Writes_EmploymentEnded_Timeline_Entry_With_Correct_Fields()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var employee = CreateLeavingEmployee(companyId, Now);
+        context.Employees.Add(employee);
+        var process = CreateLeavingProcess(companyId, employee.Id, DateOnly.FromDateTime(FixedUtcNow).AddDays(-1), Now);
+        context.EmployeeLeavingProcesses.Add(process);
+        await context.SaveChangesAsync();
+
+        var timelineWriter = new FakeEmployeeTimelineWriter();
+        var finalizer = BuildFinalizer(context, timelineWriter: timelineWriter);
+
+        await finalizer.FinalizeAsync(employee, process, Now, CancellationToken.None);
+
+        var entry = Assert.Single(timelineWriter.Added);
+        Assert.Equal(companyId, entry.CompanyId);
+        Assert.Equal(employee.Id, entry.EmployeeId);
+        Assert.Equal(EmployeeTimelineEventType.EmploymentEnded, entry.EventType);
+        Assert.Equal(EmployeeTimelineCategory.Employment, entry.Category);
+        Assert.Equal(EmployeeTimelineVisibility.AuthorisedInternal, entry.Visibility);
+        Assert.Equal(process.Id, entry.SourceRecordId);
+        Assert.Equal("Employees", entry.SourceModule);
+    }
 
     [Fact]
     public async Task FinalizeAsync_Sets_Employee_FormerEmployee_And_Completes_Process()

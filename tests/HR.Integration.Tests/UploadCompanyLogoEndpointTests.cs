@@ -13,8 +13,11 @@ public class UploadCompanyLogoEndpointTests : IClassFixture<ApiWebApplicationFac
     public UploadCompanyLogoEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.CompanyAdministrator))
-            .GetAwaiter().GetResult();
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.CompanyAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     private HttpClient AuthenticatedClient(Guid tenantId)

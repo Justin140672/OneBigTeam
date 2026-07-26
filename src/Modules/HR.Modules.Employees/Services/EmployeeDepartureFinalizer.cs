@@ -16,7 +16,8 @@ internal sealed class EmployeeDepartureFinalizer(
     IAuditEventPublisher auditEventPublisher,
     IOffboardingStatusReader offboardingStatusReader,
     ICompanyLeavingSettingsReader leavingSettingsReader,
-    INotificationWriter notificationWriter) : IEmployeeDepartureFinalizer
+    INotificationWriter notificationWriter,
+    IEmployeeTimelineWriter timelineWriter) : IEmployeeDepartureFinalizer
 {
     public async Task FinalizeAsync(
         Employee employee,
@@ -63,6 +64,23 @@ internal sealed class EmployeeDepartureFinalizer(
                 now,
                 accessDisabled,
                 offboardingIncomplete),
+            cancellationToken);
+
+        await timelineWriter.TryAddAsync(
+            EmployeeTimelineEntry.Create(
+                Guid.NewGuid(),
+                employee.CompanyId,
+                employee.Id,
+                DateOnly.FromDateTime(now.DateTime),
+                EmployeeTimelineEventType.EmploymentEnded,
+                EmployeeTimelineCategory.Employment,
+                "Employment ended",
+                $"{employee.FirstName} {employee.LastName}'s employment ended.",
+                performedByUserId: null,
+                "Employees",
+                process.Id,
+                EmployeeTimelineVisibility.AuthorisedInternal,
+                now),
             cancellationToken);
     }
 }

@@ -648,6 +648,85 @@ namespace HR.Modules.Employees.Migrations
                     b.ToTable("employee_promotions", "employees");
                 });
 
+            modelBuilder.Entity("HR.Modules.Employees.Domain.EmployeeTimelineEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("integer")
+                        .HasColumnName("category");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_date");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.Property<DateOnly>("EventDate")
+                        .HasColumnType("date")
+                        .HasColumnName("event_date");
+
+                    b.Property<int>("EventType")
+                        .HasColumnType("integer")
+                        .HasColumnName("event_type");
+
+                    b.Property<Guid?>("PerformedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("performed_by_user_id");
+
+                    b.Property<string>("SourceModule")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("source_module");
+
+                    b.Property<Guid?>("SourceRecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_record_id");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("summary");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<int>("Visibility")
+                        .HasColumnType("integer")
+                        .HasColumnName("visibility");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("CompanyId", "EmployeeId");
+
+                    b.HasIndex("CompanyId", "EmployeeId", "EventType", "EventDate")
+                        .IsUnique()
+                        .HasFilter("source_record_id IS NULL");
+
+                    b.HasIndex("CompanyId", "SourceModule", "EventType", "SourceRecordId")
+                        .IsUnique()
+                        .HasFilter("source_record_id IS NOT NULL");
+
+                    b.ToTable("employee_timeline_entries", "employees");
+                });
+
             modelBuilder.Entity("HR.Modules.Employees.Domain.EmploymentType", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1203,6 +1282,15 @@ namespace HR.Modules.Employees.Migrations
                     b.HasOne("HR.Modules.Employees.Domain.PositionProfile", null)
                         .WithMany()
                         .HasForeignKey("PreviousPositionProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HR.Modules.Employees.Domain.EmployeeTimelineEntry", b =>
+                {
+                    b.HasOne("HR.Modules.Employees.Domain.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

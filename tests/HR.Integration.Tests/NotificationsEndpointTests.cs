@@ -182,6 +182,8 @@ public class NotificationsEndpointTests : IClassFixture<ApiWebApplicationFactory
 
     private HttpClient AuthenticatedClient(Guid userId)
     {
+        TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
+
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());

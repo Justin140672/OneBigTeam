@@ -13,8 +13,11 @@ public class RemoveRequiredDocumentFromPositionProfileEndpointTests : IClassFixt
     public RemoveRequiredDocumentFromPositionProfileEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     private HttpClient AuthenticatedClient(Guid companyId)
@@ -113,9 +116,60 @@ public class RemoveRequiredDocumentFromPositionProfileEndpointTests : IClassFixt
 
     private async Task<Guid> CreatePositionProfileAsync(HttpClient client, Guid companyId, string title)
     {
+        var departmentId = await CreateDepartmentAsync(client, companyId);
+        var locationId = await CreateLocationAsync(client, companyId);
+        var leavePolicyId = await CreateLeavePolicyAsync(client, companyId);
+
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles",
-            new { companyId, title });
+            new { companyId, departmentId, locationId, defaultLeavePolicyId = leavePolicyId, title });
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<IdPayload>();
+        return payload!.Id;
+    }
+
+    private static async Task<Guid> CreateDepartmentAsync(HttpClient client, Guid companyId, string name = "Engineering")
+    {
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
+        {
+            companyId,
+            name = $"{name} {Guid.NewGuid():N}"
+        });
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<IdPayload>();
+        return payload!.Id;
+    }
+
+    private static async Task<Guid> CreateLocationAsync(HttpClient client, Guid companyId, string name = "Head Office")
+    {
+        var locationTypeResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/location-types", new
+        {
+            companyId,
+            name = $"Office Type {Guid.NewGuid():N}"
+        });
+        locationTypeResponse.EnsureSuccessStatusCode();
+        var locationType = await locationTypeResponse.Content.ReadFromJsonAsync<IdPayload>();
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/locations", new
+        {
+            companyId,
+            name = $"{name} {Guid.NewGuid():N}",
+            locationTypeId = locationType!.Id
+        });
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<IdPayload>();
+        return payload!.Id;
+    }
+
+    private static async Task<Guid> CreateLeavePolicyAsync(HttpClient client, Guid companyId, string name = "Standard Leave")
+    {
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/leave-policies", new
+        {
+            companyId,
+            name = $"{name} {Guid.NewGuid():N}",
+            carryOverDays = 5,
+            allowNegativeBalance = false
+        });
         response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<IdPayload>();
         return payload!.Id;

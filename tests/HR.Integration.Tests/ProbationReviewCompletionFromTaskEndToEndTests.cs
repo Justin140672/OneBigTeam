@@ -26,8 +26,11 @@ public class ProbationReviewCompletionFromTaskEndToEndTests : IClassFixture<ApiW
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, User1, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User1, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, User2, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User2, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, User3, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User3, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
 

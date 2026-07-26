@@ -15,8 +15,10 @@ public class GetOnboardingStatusEndpointTests : IClassFixture<ApiWebApplicationF
     {
         _factory = factory;
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]
@@ -160,9 +162,15 @@ public class GetOnboardingStatusEndpointTests : IClassFixture<ApiWebApplicationF
         locResp.EnsureSuccessStatusCode();
         var locationId = (await locResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 
+        var leavePolicyResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = $"RefLeavePolicy-{Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false });
+        leavePolicyResp.EnsureSuccessStatusCode();
+        var defaultLeavePolicyId = (await leavePolicyResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
         var ppResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles",
-            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}" });
+            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}", defaultLeavePolicyId });
         ppResp.EnsureSuccessStatusCode();
         var positionProfileId = (await ppResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 

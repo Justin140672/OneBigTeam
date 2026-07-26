@@ -17,8 +17,10 @@ public class DeleteEmployeeDocumentEndpointTests : IClassFixture<ApiWebApplicati
     {
         _factory = factory;
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, DeleteAdmin, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, DeleteAdmin, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, DeleteAdmin, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]

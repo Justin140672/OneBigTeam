@@ -16,8 +16,10 @@ public class ProcessDocumentExpiryNotificationsEndpointTests : IClassFixture<Api
     {
         _factory = factory;
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, ExpiryAdmin, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, ExpiryAdmin, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ExpiryAdmin, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]

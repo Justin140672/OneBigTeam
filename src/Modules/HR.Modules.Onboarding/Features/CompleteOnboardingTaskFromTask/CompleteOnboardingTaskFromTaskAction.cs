@@ -13,7 +13,8 @@ internal sealed class CompleteOnboardingTaskFromTaskAction(
     IEmployeeNameReader employeeNameReader,
     INotificationWriter notificationWriter,
     ITaskCreator taskCreator,
-    IAuditEventPublisher auditPublisher) : ITaskCompletionAction
+    IAuditEventPublisher auditPublisher,
+    IIntegrationEventPublisher integrationEventPublisher) : ITaskCompletionAction
 {
     private static readonly Guid SystemUserId = Guid.Empty;
 
@@ -81,6 +82,10 @@ internal sealed class CompleteOnboardingTaskFromTaskAction(
                 planTasks.Count(t => t.Status == OnboardingTaskStatus.Completed),
                 planTasks.Count(t => t.Status == OnboardingTaskStatus.Skipped),
                 now), cancellationToken);
+
+            await integrationEventPublisher.PublishAsync(
+                new OnboardingCompletedIntegrationEvent(plan.CompanyId, plan.EmployeeId, plan.Id, now),
+                cancellationToken);
         }
     }
 

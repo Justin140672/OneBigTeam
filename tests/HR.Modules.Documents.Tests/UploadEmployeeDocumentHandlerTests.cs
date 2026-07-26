@@ -24,13 +24,39 @@ public class UploadEmployeeDocumentHandlerTests
         FakeDocumentStorageService? storage = null,
         FakeVirusScanService? scanner = null,
         FileUploadOptions? options = null,
-        FakeAuditPublisher? auditPublisher = null) =>
+        FakeAuditPublisher? auditPublisher = null,
+        HR.SharedKernel.IIntegrationEventPublisher? integrationEventPublisher = null) =>
         new(db,
             storage ?? new FakeDocumentStorageService(),
             new FileUploadValidator(Options.Create(options ?? new FileUploadOptions())),
             scanner ?? new FakeVirusScanService(),
             new FakeClock(FixedUtcNow),
-            auditPublisher ?? new FakeAuditPublisher());
+            auditPublisher ?? new FakeAuditPublisher(),
+            integrationEventPublisher ?? new NoOpIntegrationEventPublisher());
+
+    [Fact]
+    public async Task HandleAsync_Publishes_EmployeeDocumentUploaded_IntegrationEvent()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var uploadedBy = Guid.NewGuid();
+        var docType    = await SeedDocumentType(db, companyId);
+        var integrationPublisher = new CapturingIntegrationEventPublisher();
+        var handler = BuildHandler(db, integrationEventPublisher: integrationPublisher);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, employeeId, docType.Id),
+            uploadedBy,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<HR.SharedKernel.EmployeeDocumentUploadedIntegrationEvent>(Assert.Single(integrationPublisher.Published));
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(employeeId, evt.EmployeeId);
+        Assert.Equal(result.Value!.EmployeeDocumentId, evt.EmployeeDocumentId);
+        Assert.Equal("Contract", evt.DocumentTypeName);
+    }
 
     private static async Task<DocumentType> SeedDocumentType(
         DocumentsDbContext db,

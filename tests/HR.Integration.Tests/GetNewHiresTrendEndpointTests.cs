@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
+using HR.SharedKernel;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
@@ -15,6 +17,9 @@ public class GetNewHiresTrendEndpointTests : IClassFixture<ApiWebApplicationFact
     public GetNewHiresTrendEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+
+        TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.Employee)
+            .GetAwaiter().GetResult();
     }
 
     private HttpClient AuthenticatedClient(Guid companyId)

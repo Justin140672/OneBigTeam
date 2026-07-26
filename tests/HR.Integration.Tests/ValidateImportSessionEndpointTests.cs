@@ -27,6 +27,7 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
     {
         var companyId = Guid.NewGuid();
         using var client = AdminClient(companyId);
+        await EnsureDefaultLeavePolicyAsync(client, companyId);
 
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
 
@@ -59,6 +60,7 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
             "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n" +
             "Jane,,jane.doe@example.com,2026-01-02,EMP002,1991-02-02,British,Female,Sales,London,Permanent,Software Developer\n";
 
+        await EnsureDefaultLeavePolicyAsync(client, companyId);
         var sessionId = await UploadAsync(client, companyId, csv);
 
         var response = await client.PostAsync(ValidateUrl(companyId, sessionId), EmptyJson());
@@ -86,6 +88,7 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
             "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n" +
             "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002,1991-02-02,British,Female,Sales,London,Permanent,Software Developer\n";
 
+        await EnsureDefaultLeavePolicyAsync(client, companyId);
         var sessionId = await UploadAsync(client, companyId, csv);
 
         var response = await client.PostAsync(ValidateUrl(companyId, sessionId), EmptyJson());
@@ -135,6 +138,7 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
             "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
             "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n";
 
+        await EnsureDefaultLeavePolicyAsync(client, companyId);
         var sessionId = await UploadAsync(client, companyId, csv);
 
         var response = await client.PostAsync(ValidateUrl(companyId, sessionId), EmptyJson());
@@ -162,6 +166,7 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
             "Given Name,Family Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
             "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n";
 
+        await EnsureDefaultLeavePolicyAsync(client, companyId);
         var sessionId = await UploadAsync(client, companyId, csv);
 
         var mappingBody = new StringContent(
@@ -272,6 +277,22 @@ public class ValidateImportSessionEndpointTests : IClassFixture<ApiWebApplicatio
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         return client;
+    }
+
+    /// <summary>
+    /// DefaultLeavePolicyId is now mandatory on PositionProfile, so
+    /// ImportLookupResolver.GetOrCreatePositionProfileAsync can only auto-create a position
+    /// profile for a CSV row when the company already has a default leave policy configured
+    /// (the first policy created for a company is automatically its default — see
+    /// CreateLeavePolicyHandler). Without this, rows referencing a not-yet-existing position
+    /// profile are silently skipped and the row fails.
+    /// </summary>
+    private static async Task EnsureDefaultLeavePolicyAsync(HttpClient client, Guid companyId)
+    {
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = $"Default Policy {Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false });
+        response.EnsureSuccessStatusCode();
     }
 
     private static string ValidateUrl(Guid companyId, Guid sessionId) =>

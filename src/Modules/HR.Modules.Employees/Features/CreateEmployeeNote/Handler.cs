@@ -1,6 +1,7 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,7 +10,8 @@ namespace HR.Modules.Employees.Features.CreateEmployeeNote;
 internal sealed class CreateEmployeeNoteHandler(
     EmployeesDbContext dbContext,
     IClock clock,
-    IAuditEventPublisher auditEventPublisher)
+    IAuditEventPublisher auditEventPublisher,
+    IEmployeeTimelineWriter timelineWriter)
 {
     public async Task<Result<CreateEmployeeNoteResponse>> HandleAsync(
         CreateEmployeeNoteRequest request,
@@ -48,6 +50,26 @@ internal sealed class CreateEmployeeNoteHandler(
                 note.IsImportant,
                 actorUserId,
                 actorEmployeeId,
+                now),
+            cancellationToken);
+
+        // HR notes are confidential — the timeline entry must never carry the note's category or
+        // text, only a fixed generic phrase, and must always be HrOnly regardless of the note's
+        // own IsImportant/category values (see EmployeeTimelineVisibility doc comment).
+        await timelineWriter.TryAddAsync(
+            EmployeeTimelineEntry.Create(
+                Guid.NewGuid(),
+                request.CompanyId,
+                request.EmployeeId,
+                DateOnly.FromDateTime(now.DateTime),
+                EmployeeTimelineEventType.HrNoteAdded,
+                EmployeeTimelineCategory.HrNotes,
+                "HR note added",
+                "HR note added",
+                actorUserId,
+                "Employees",
+                note.Id,
+                EmployeeTimelineVisibility.HrOnly,
                 now),
             cancellationToken);
 

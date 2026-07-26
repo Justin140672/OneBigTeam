@@ -9,11 +9,14 @@ internal sealed class UpdateEmploymentDetailsHandler
 {
     private readonly EmployeesDbContext _dbContext;
     private readonly IClock _clock;
+    private readonly IIntegrationEventPublisher _integrationEventPublisher;
 
-    public UpdateEmploymentDetailsHandler(EmployeesDbContext dbContext, IClock clock)
+    public UpdateEmploymentDetailsHandler(
+        EmployeesDbContext dbContext, IClock clock, IIntegrationEventPublisher integrationEventPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
+        _integrationEventPublisher = integrationEventPublisher;
     }
 
     public async Task<Result<UpdateEmploymentDetailsResponse>> HandleAsync(
@@ -155,6 +158,10 @@ internal sealed class UpdateEmploymentDetailsHandler
             request.NoticePeriodUnitOverride,
             request.NoticePeriodLengthOverride);
 
+        var previousPositionProfileId = employee.PositionProfileId;
+        var previousLocationId = employee.LocationId;
+        var previousManagerId = employee.ManagerId;
+
         employee.Assign(
             request.DepartmentId ?? employee.DepartmentId,
             request.PositionProfileId ?? employee.PositionProfileId,
@@ -164,6 +171,30 @@ internal sealed class UpdateEmploymentDetailsHandler
         employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        if (previousPositionProfileId != employee.PositionProfileId)
+        {
+            await _integrationEventPublisher.PublishAsync(
+                new EmployeePositionChangedIntegrationEvent(
+                    employee.CompanyId, employee.Id, previousPositionProfileId, employee.PositionProfileId, now),
+                cancellationToken);
+        }
+
+        if (previousLocationId != employee.LocationId)
+        {
+            await _integrationEventPublisher.PublishAsync(
+                new EmployeeLocationChangedIntegrationEvent(
+                    employee.CompanyId, employee.Id, previousLocationId, employee.LocationId, now),
+                cancellationToken);
+        }
+
+        if (previousManagerId != employee.ManagerId)
+        {
+            await _integrationEventPublisher.PublishAsync(
+                new EmployeeManagerChangedIntegrationEvent(
+                    employee.CompanyId, employee.Id, previousManagerId, employee.ManagerId, now),
+                cancellationToken);
+        }
 
         return Result.Success(new UpdateEmploymentDetailsResponse(
             employee.Id,

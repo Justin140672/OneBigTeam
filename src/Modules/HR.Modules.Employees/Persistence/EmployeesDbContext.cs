@@ -27,6 +27,7 @@ internal sealed class EmployeesDbContext : DbContext
     public DbSet<EmployeeLeavingProcess> EmployeeLeavingProcesses => Set<EmployeeLeavingProcess>();
     public DbSet<EmployeeNote> EmployeeNotes => Set<EmployeeNote>();
     public DbSet<EmployeePromotion> EmployeePromotions => Set<EmployeePromotion>();
+    public DbSet<EmployeeTimelineEntry> EmployeeTimelineEntries => Set<EmployeeTimelineEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

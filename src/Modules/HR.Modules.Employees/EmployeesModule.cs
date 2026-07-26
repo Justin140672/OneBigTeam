@@ -79,6 +79,19 @@ using HR.Modules.Employees.Features.AmendLeavingProcess;
 using HR.Modules.Employees.Features.CancelLeavingProcess;
 using HR.Modules.Employees.Features.PromoteEmployee;
 using HR.Modules.Employees.Features.GetEmployeePromotionHistory;
+using HR.Modules.Employees.Features.GetEmployeeTimeline;
+using HR.Modules.Employees.Features.CreateTimelineEntryOnEmployeeCreated;
+using HR.Modules.Employees.Features.CreateTimelineEntryOnEmployeePromoted;
+using HR.Modules.Employees.Features.CreateTimelineEntryOnManagerChanged;
+using HR.Modules.Employees.Features.CreateTimelineEntryOnLocationChanged;
+using HR.Modules.Employees.Features.CreateTimelineEntryOnPositionChanged;
+using HR.Modules.Employees.Features.CreateTimelineEntryOnCompensationChanged;
+using HR.Modules.Employees.Features.CreateTimelineEntryOnOnboardingCompleted;
+using HR.Modules.Employees.Features.CreateTimelineEntryOnProbationPassed;
+using HR.Modules.Employees.Features.CreateTimelineEntryOnSharedCompanyDocumentAcknowledged;
+using HR.Modules.Employees.Features.CreateTimelineEntryOnEmployeeDocumentUploaded;
+using HR.Modules.Employees.Features.CreateTimelineEntryOnEmployeeDetailsCorrected;
+using HR.Modules.Employees.Features.CreateTimelineEntryOnOffboardingStarted;
 using HR.Modules.Employees.Jobs;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
@@ -307,6 +320,26 @@ public static class EmployeesModule
         services.AddScoped<GetEmployeePromotionHistoryHandler>();
 
         services.AddScoped<ProcessPromotionsJob>();
+
+        services.AddScoped<GetEmployeeTimelineHandler>();
+        services.AddScoped<IValidator<GetEmployeeTimelineRequest>, GetEmployeeTimelineValidator>();
+        services.AddScoped<IEmployeeTimelineWriter, EmployeeTimelineWriter>();
+
+        // Wave 2a: cross-module timeline-populating integration event handlers. All handlers live
+        // in Employees regardless of which module publishes the event (see architecture note in
+        // GetEmployeeTimeline/EmployeeTimelineWriter).
+        services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
+        services.AddScoped<IIntegrationEventHandler<EmployeePromotedIntegrationEvent>, EmployeePromotedHandler>();
+        services.AddScoped<IIntegrationEventHandler<EmployeeManagerChangedIntegrationEvent>, ManagerChangedHandler>();
+        services.AddScoped<IIntegrationEventHandler<EmployeeLocationChangedIntegrationEvent>, LocationChangedHandler>();
+        services.AddScoped<IIntegrationEventHandler<EmployeePositionChangedIntegrationEvent>, PositionChangedHandler>();
+        services.AddScoped<IIntegrationEventHandler<CompensationChangedIntegrationEvent>, CompensationChangedHandler>();
+        services.AddScoped<IIntegrationEventHandler<OnboardingCompletedIntegrationEvent>, OnboardingCompletedHandler>();
+        services.AddScoped<IIntegrationEventHandler<ProbationPassedIntegrationEvent>, ProbationPassedHandler>();
+        services.AddScoped<IIntegrationEventHandler<SharedCompanyDocumentAcknowledgedIntegrationEvent>, SharedCompanyDocumentAcknowledgedHandler>();
+        services.AddScoped<IIntegrationEventHandler<EmployeeDocumentUploadedIntegrationEvent>, EmployeeDocumentUploadedHandler>();
+        services.AddScoped<IIntegrationEventHandler<EmployeeDetailsCorrectedIntegrationEvent>, EmployeeDetailsCorrectedHandler>();
+        services.AddScoped<IIntegrationEventHandler<OffboardingStartedIntegrationEvent>, OffboardingStartedHandler>();
 
         services.AddScoped<IProbationDateResolver, ProbationDateResolver>();
         services.AddScoped<IEffectiveNoticePeriodResolver, EffectiveNoticePeriodResolver>();

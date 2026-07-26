@@ -23,9 +23,13 @@ public class CancelLeavingProcessEndpointTests : IClassFixture<ApiWebApplication
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, User1, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User1, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, User2, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User2, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, User3, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User3, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, User4, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User4, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, EmployeeRoleUser, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, ManagerRoleUser, SystemRoles.Manager);
         }).GetAwaiter().GetResult();

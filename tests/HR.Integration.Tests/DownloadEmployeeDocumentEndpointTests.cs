@@ -1,5 +1,7 @@
 using System.Net;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace HR.Integration.Tests;
@@ -49,16 +51,22 @@ public class DownloadEmployeeDocumentEndpointTests(ApiWebApplicationFactory fact
 
     private HttpClient AuthenticatedClient(Guid companyId)
     {
+        var userId = Guid.NewGuid();
+        TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
+
         var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, Guid.NewGuid().ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         return client;
     }
 
     private HttpClient NoRedirectClient(Guid companyId)
     {
+        var userId = Guid.NewGuid();
+        TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
+
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, Guid.NewGuid().ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         return client;
     }

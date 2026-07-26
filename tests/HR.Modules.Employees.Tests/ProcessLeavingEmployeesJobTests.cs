@@ -71,7 +71,8 @@ public class ProcessLeavingEmployeesJobTests
             auditPublisher ?? new FakeAuditPublisher(),
             offboardingStatusReader ?? new FakeOffboardingStatusReader(new OffboardingStatusSummary("Completed")),
             leavingSettingsReader ?? new FakeCompanyLeavingSettingsReader(),
-            notificationWriter ?? new FakeNotificationWriter());
+            notificationWriter ?? new FakeNotificationWriter(),
+            new FakeEmployeeTimelineWriter());
 
         return new(
             dbContext,

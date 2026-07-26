@@ -23,8 +23,10 @@ public class AssetLifecycleEndToEndTests : IClassFixture<ApiWebApplicationFactor
     {
         _factory = factory;
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]
@@ -32,6 +34,8 @@ public class AssetLifecycleEndToEndTests : IClassFixture<ApiWebApplicationFactor
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
+
         using var adminClient    = AuthenticatedClient(AdminUser, companyId);
         using var employeeClient = AuthenticatedClient(employeeId, companyId);
 

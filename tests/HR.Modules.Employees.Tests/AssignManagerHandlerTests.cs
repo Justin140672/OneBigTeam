@@ -23,7 +23,7 @@ public class AssignManagerHandlerTests
         context.Employees.AddRange(manager, employee);
         await context.SaveChangesAsync();
 
-        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new AssignManagerRequest { CompanyId = companyId, Id = employee.Id, ManagerId = manager.Id },
@@ -50,7 +50,7 @@ public class AssignManagerHandlerTests
         context.Employees.AddRange(manager, employee);
         await context.SaveChangesAsync();
 
-        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new AssignManagerRequest { CompanyId = companyId, Id = employee.Id, ManagerId = null },
@@ -75,7 +75,7 @@ public class AssignManagerHandlerTests
         context.Employees.AddRange(manager, employee);
         await context.SaveChangesAsync();
 
-        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new AssignManagerRequest { CompanyId = companyId, Id = employee.Id, ManagerId = manager.Id },
@@ -92,7 +92,7 @@ public class AssignManagerHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Employee_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new AssignManagerRequest { CompanyId = Guid.NewGuid(), Id = Guid.NewGuid(), ManagerId = null },
@@ -112,7 +112,7 @@ public class AssignManagerHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new AssignManagerRequest { CompanyId = Guid.NewGuid(), Id = employee.Id, ManagerId = null },
@@ -133,7 +133,7 @@ public class AssignManagerHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new AssignManagerRequest { CompanyId = companyId, Id = employee.Id, ManagerId = Guid.NewGuid() },
@@ -156,7 +156,7 @@ public class AssignManagerHandlerTests
         context.Employees.AddRange(manager, employee);
         await context.SaveChangesAsync();
 
-        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new AssignManagerRequest { CompanyId = companyId, Id = employee.Id, ManagerId = manager.Id },
@@ -181,7 +181,7 @@ public class AssignManagerHandlerTests
         context.Employees.AddRange(empA, empB);
         await context.SaveChangesAsync();
 
-        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         // Try to assign B as manager of A — circular
         var result = await handler.HandleAsync(
@@ -209,7 +209,7 @@ public class AssignManagerHandlerTests
         context.Employees.AddRange(empA, empB, empC);
         await context.SaveChangesAsync();
 
-        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         // Try to assign C as manager of A — would create A→B→C→A cycle
         var result = await handler.HandleAsync(
@@ -236,7 +236,7 @@ public class AssignManagerHandlerTests
         context.Employees.AddRange(empA, empB, empC);
         await context.SaveChangesAsync();
 
-        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow));
+        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new AssignManagerRequest { CompanyId = companyId, Id = empC.Id, ManagerId = empA.Id },
@@ -244,6 +244,57 @@ public class AssignManagerHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(empA.Id, result.Value!.ManagerId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_ManagerChanged_When_Manager_Actually_Changes()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.AddRange(manager, employee);
+        await context.SaveChangesAsync();
+
+        var publisher = new CapturingIntegrationEventPublisher();
+        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), publisher);
+
+        var result = await handler.HandleAsync(
+            new AssignManagerRequest { CompanyId = companyId, Id = employee.Id, ManagerId = manager.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<HR.SharedKernel.EmployeeManagerChangedIntegrationEvent>(Assert.Single(publisher.Published));
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(employee.Id, evt.EmployeeId);
+        Assert.Null(evt.PreviousManagerId);
+        Assert.Equal(manager.Id, evt.NewManagerId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_ManagerChanged_When_Manager_Is_Unchanged()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        employee.Assign(employee.DepartmentId, employee.PositionProfileId, employee.LocationId, manager.Id, now);
+        context.Employees.AddRange(manager, employee);
+        await context.SaveChangesAsync();
+
+        var publisher = new CapturingIntegrationEventPublisher();
+        var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), publisher);
+
+        var result = await handler.HandleAsync(
+            new AssignManagerRequest { CompanyId = companyId, Id = employee.Id, ManagerId = manager.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(publisher.Published);
     }
 
     private static EmployeesDbContext BuildContext()

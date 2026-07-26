@@ -32,7 +32,8 @@ public class OffboardingPlanCoordinatorTests
             new FakeAssignedAssetReader(),
             new FakeOutstandingDocumentRequestReader(),
             new FakeTaskCreator(),
-            new FakeNotificationWriter());
+            new FakeNotificationWriter(),
+            new NoOpIntegrationEventPublisher());
 
     private static OffboardingPlanCoordinator BuildCoordinator(
         OffboardingDbContext dbContext, FakeAuditPublisher? auditPublisher = null) =>

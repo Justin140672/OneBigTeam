@@ -182,6 +182,7 @@ public class GetRecentLeaveRequestsEndpointTests : IClassFixture<ApiWebApplicati
         var managerId = await SeedEmployeeAsync(companyId, "Meredith", "Manager");
         var reportId = await SeedEmployeeAsync(companyId, "Ricky", "Report");
         var outsiderId = await SeedEmployeeAsync(companyId, "Olly", "Outsider");
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Employee);
         await AssignManagerAsync(hrAdminClient, companyId, reportId, managerId);
 
         var leaveTypeId = await SeedLeaveTypeAsync(companyId);

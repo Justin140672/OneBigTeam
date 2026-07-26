@@ -31,9 +31,18 @@ internal sealed class SetDefaultLeavePolicyHandler(LeaveDbContext dbContext, ICl
                 p => p.CompanyId == request.CompanyId && p.IsDefault,
                 cancellationToken);
 
-        currentDefault?.UnmarkAsDefault(now);
-        policy.MarkAsDefault(now);
+        // Two separate SaveChanges calls, not one batch: the partial unique index on
+        // (company_id) WHERE is_default only defers/checks per-statement, not per-transaction, so
+        // if both the unmark and the mark went through in the same batch there'd be a moment where
+        // EF could send "mark new default" before "unmark old default" has committed, transiently
+        // violating uniqueness even though the end state is valid.
+        if (currentDefault is not null)
+        {
+            currentDefault.UnmarkAsDefault(now);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
+        policy.MarkAsDefault(now);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

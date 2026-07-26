@@ -10,7 +10,8 @@ internal sealed class BulkApplyCompensationAdjustmentsHandler(
     EmployeesDbContext dbContext,
     CompensationRecordWriter writer,
     IClock clock,
-    IAuditEventPublisher auditEventPublisher)
+    IAuditEventPublisher auditEventPublisher,
+    IIntegrationEventPublisher integrationEventPublisher)
 {
     public async Task<Result<BulkApplyCompensationAdjustmentsResponse>> HandleAsync(
         BulkApplyCompensationAdjustmentsRequest request,
@@ -87,6 +88,12 @@ internal sealed class BulkApplyCompensationAdjustmentsHandler(
                     request.CompanyId, record.EmployeeId, record.Id, actorEmployeeId, record.EffectiveFrom,
                     record.SalaryType.ToString(), record.Salary, previousSalary, record.Currency, record.Reason.ToString(),
                     request.AdjustmentMode.ToString(), bulkOperationId, now),
+                cancellationToken);
+
+            await integrationEventPublisher.PublishAsync(
+                new CompensationChangedIntegrationEvent(
+                    request.CompanyId, record.EmployeeId, record.Id, record.EffectiveFrom,
+                    record.SalaryType.ToString(), record.Reason.ToString(), now),
                 cancellationToken);
         }
 

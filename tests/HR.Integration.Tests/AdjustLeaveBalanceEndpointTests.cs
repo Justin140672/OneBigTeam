@@ -29,6 +29,7 @@ public class AdjustLeaveBalanceEndpointTests : IClassFixture<ApiWebApplicationFa
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.Manager);
         }).GetAwaiter().GetResult();
     }
@@ -183,9 +184,16 @@ public class AdjustLeaveBalanceEndpointTests : IClassFixture<ApiWebApplicationFa
         var companyId = Guid.NewGuid();
         using var hrAdminClient = AuthenticatedClient(HrAdminUser, companyId);
 
-        var leaveTypeId = await CreateLeaveTypeAsync(companyId);
+        // NOTE: PositionProfile.DefaultLeavePolicyId is now a mandatory field, and employee
+        // creation auto-initialises a LeaveBalance row (via EmployeeCreatedHandler) for every
+        // leave type that is active *at the time the employee is created*, using the position
+        // profile's default leave policy assignment. So an employee always ends up with an
+        // implicit policy assignment now, and "no policy assigned" alone no longer guarantees
+        // "no balance". To genuinely exercise the no-balance path, create the employee first and
+        // only add the leave type afterwards — it won't have existed yet when the
+        // EmployeeCreatedIntegrationEvent was handled, so no LeaveBalance row is created for it.
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
-        // Deliberately do NOT assign a leave policy, so no LeaveBalance row is ever created.
+        var leaveTypeId = await CreateLeaveTypeAsync(companyId);
 
         var response = await hrAdminClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-balance-adjustments",
@@ -330,9 +338,15 @@ public class AdjustLeaveBalanceEndpointTests : IClassFixture<ApiWebApplicationFa
         locResp.EnsureSuccessStatusCode();
         var locationId = (await locResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 
+        var leavePolicyResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = $"RefLeavePolicy-{Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false });
+        leavePolicyResp.EnsureSuccessStatusCode();
+        var defaultLeavePolicyId = (await leavePolicyResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
         var ppResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles",
-            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}" });
+            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}", defaultLeavePolicyId });
         ppResp.EnsureSuccessStatusCode();
         var positionProfileId = (await ppResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 

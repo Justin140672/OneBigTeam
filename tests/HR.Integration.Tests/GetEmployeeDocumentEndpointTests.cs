@@ -100,8 +100,11 @@ public class GetEmployeeDocumentEndpointTests : IClassFixture<ApiWebApplicationF
 
     private HttpClient AuthenticatedClient()
     {
+        var userId = Guid.NewGuid();
+        TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
+
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, Guid.NewGuid().ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
         return client;
     }

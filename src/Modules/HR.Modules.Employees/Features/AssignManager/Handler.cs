@@ -9,11 +9,13 @@ internal sealed class AssignManagerHandler
 {
     private readonly EmployeesDbContext _dbContext;
     private readonly IClock _clock;
+    private readonly IIntegrationEventPublisher _integrationEventPublisher;
 
-    public AssignManagerHandler(EmployeesDbContext dbContext, IClock clock)
+    public AssignManagerHandler(EmployeesDbContext dbContext, IClock clock, IIntegrationEventPublisher integrationEventPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
+        _integrationEventPublisher = integrationEventPublisher;
     }
 
     public async Task<Result<AssignManagerResponse>> HandleAsync(
@@ -77,10 +79,19 @@ internal sealed class AssignManagerHandler
         }
 
         var now = _clock.UtcNowOffset();
+        var previousManagerId = employee.ManagerId;
 
         employee.Assign(employee.DepartmentId, employee.PositionProfileId, employee.LocationId, request.ManagerId, now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        if (previousManagerId != employee.ManagerId)
+        {
+            await _integrationEventPublisher.PublishAsync(
+                new EmployeeManagerChangedIntegrationEvent(
+                    employee.CompanyId, employee.Id, previousManagerId, employee.ManagerId, now),
+                cancellationToken);
+        }
 
         return Result.Success(new AssignManagerResponse(
             employee.Id,

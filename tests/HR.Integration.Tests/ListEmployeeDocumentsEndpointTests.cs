@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
+using HR.SharedKernel;
 
 namespace HR.Integration.Tests;
 
@@ -56,8 +58,11 @@ public class ListEmployeeDocumentsEndpointTests(ApiWebApplicationFactory factory
 
     private HttpClient AuthenticatedClient(Guid companyId)
     {
+        var userId = Guid.NewGuid();
+        TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
+
         var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, Guid.NewGuid().ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         return client;
     }

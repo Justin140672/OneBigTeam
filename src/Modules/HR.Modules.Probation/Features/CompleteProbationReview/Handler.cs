@@ -10,12 +10,18 @@ internal sealed class CompleteProbationReviewHandler
     private readonly ProbationDbContext _dbContext;
     private readonly IClock _clock;
     private readonly IAuditEventPublisher _auditPublisher;
+    private readonly IIntegrationEventPublisher _integrationEventPublisher;
 
-    public CompleteProbationReviewHandler(ProbationDbContext dbContext, IClock clock, IAuditEventPublisher auditPublisher)
+    public CompleteProbationReviewHandler(
+        ProbationDbContext dbContext,
+        IClock clock,
+        IAuditEventPublisher auditPublisher,
+        IIntegrationEventPublisher integrationEventPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
         _auditPublisher = auditPublisher;
+        _integrationEventPublisher = integrationEventPublisher;
     }
 
     public async Task<Result<CompleteProbationReviewResponse>> HandleAsync(
@@ -84,6 +90,15 @@ internal sealed class CompleteProbationReviewHandler
             review.Outcome?.ToString(),
             review.Notes,
             now), cancellationToken);
+
+        // Only a Pass outcome maps to the timeline's ProbationPassed event this wave — Fail and
+        // Extend outcomes do not get a dedicated timeline entry (see Wave 2a scope notes).
+        if (request.Outcome == ProbationOutcome.Pass)
+        {
+            await _integrationEventPublisher.PublishAsync(
+                new ProbationPassedIntegrationEvent(record.CompanyId, record.EmployeeId, record.Id, now),
+                cancellationToken);
+        }
 
         return Result.Success(new CompleteProbationReviewResponse(
             review.Id,

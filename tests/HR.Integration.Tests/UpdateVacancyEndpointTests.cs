@@ -19,8 +19,11 @@ public class UpdateVacancyEndpointTests : IClassFixture<ApiWebApplicationFactory
     public UpdateVacancyEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, RecruiterUser, SystemRoles.Recruiter))
-            .GetAwaiter().GetResult();
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, RecruiterUser, SystemRoles.Recruiter);
+            await TestRoleSeeder.AssignRoleAsync(factory, RecruiterUser, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     private HttpClient AuthenticatedClient(Guid companyId)

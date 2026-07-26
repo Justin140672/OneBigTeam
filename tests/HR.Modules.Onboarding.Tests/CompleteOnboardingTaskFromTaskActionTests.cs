@@ -75,9 +75,17 @@ public class CompleteOnboardingTaskFromTaskActionTests
     private static (CompleteOnboardingTaskFromTaskAction Action, FakeNotificationWriter Notifications, FakeTaskCreator TaskCreator, FakeAuditPublisher AuditPublisher)
         BuildAction(OnboardingDbContext dbContext, Guid? managerId = null)
     {
+        var (action, notifications, taskCreator, auditPublisher, _) = BuildActionWithIntegrationEvents(dbContext, managerId);
+        return (action, notifications, taskCreator, auditPublisher);
+    }
+
+    private static (CompleteOnboardingTaskFromTaskAction Action, FakeNotificationWriter Notifications, FakeTaskCreator TaskCreator, FakeAuditPublisher AuditPublisher, Infrastructure.CapturingIntegrationEventPublisher IntegrationPublisher)
+        BuildActionWithIntegrationEvents(OnboardingDbContext dbContext, Guid? managerId = null)
+    {
         var notifications = new FakeNotificationWriter();
         var taskCreator = new FakeTaskCreator();
         var auditPublisher = new FakeAuditPublisher();
+        var integrationPublisher = new Infrastructure.CapturingIntegrationEventPublisher();
         var action = new CompleteOnboardingTaskFromTaskAction(
             dbContext,
             new FakeClock(FixedUtcNow),
@@ -85,8 +93,52 @@ public class CompleteOnboardingTaskFromTaskActionTests
             new FakeEmployeeNameReader(),
             notifications,
             taskCreator,
-            auditPublisher);
-        return (action, notifications, taskCreator, auditPublisher);
+            auditPublisher,
+            integrationPublisher);
+        return (action, notifications, taskCreator, auditPublisher, integrationPublisher);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_Last_Remaining_Task_Publishes_OnboardingCompleted_IntegrationEvent()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OnboardingStatus.InProgress);
+        var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, OnboardingTaskStatus.Completed, "Task B");
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, _, _, integrationPublisher) = BuildActionWithIntegrationEvents(dbContext);
+        var context = BuildTaskContext(companyId, taskToComplete.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        var evt = Assert.IsType<OnboardingCompletedIntegrationEvent>(Assert.Single(integrationPublisher.Published));
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(plan.EmployeeId, evt.EmployeeId);
+        Assert.Equal(plan.Id, evt.OnboardingPlanId);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Completing_A_NonLast_Task_Does_Not_Publish_OnboardingCompleted_IntegrationEvent()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var seedAt = Now.AddDays(-1);
+        var plan = SeedPlan(dbContext, companyId, seedAt, OnboardingStatus.InProgress);
+        var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
+        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B"); // still Pending afterwards
+        await dbContext.SaveChangesAsync();
+
+        var (action, _, _, _, integrationPublisher) = BuildActionWithIntegrationEvents(dbContext);
+        var context = BuildTaskContext(companyId, taskToComplete.Id);
+
+        await action.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.Empty(integrationPublisher.Published);
     }
 
     [Fact]

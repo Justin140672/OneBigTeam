@@ -14,7 +14,8 @@ internal sealed class StartOffboardingHandler(
     IAssignedAssetReader assignedAssetReader,
     IOutstandingDocumentRequestReader documentReader,
     ITaskCreator taskCreator,
-    INotificationWriter notificationWriter)
+    INotificationWriter notificationWriter,
+    IIntegrationEventPublisher integrationEventPublisher)
 {
     public async Task<Result<StartOffboardingResponse>> HandleAsync(
         StartOffboardingRequest request,
@@ -56,6 +57,10 @@ internal sealed class StartOffboardingHandler(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await NotifyOffboardingStartedAsync(plan, employeeName, managerId, now, cancellationToken);
+
+        await integrationEventPublisher.PublishAsync(
+            new OffboardingStartedIntegrationEvent(plan.CompanyId, plan.EmployeeId, now),
+            cancellationToken);
 
         return Result.Success(new StartOffboardingResponse(
             plan.Id,

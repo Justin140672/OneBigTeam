@@ -150,6 +150,8 @@ public class SelfServiceReadEndpointTests : IClassFixture<ApiWebApplicationFacto
 
     private HttpClient SelfClient(Guid userId)
     {
+        TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
+
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());

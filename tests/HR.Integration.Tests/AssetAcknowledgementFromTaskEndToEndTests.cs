@@ -26,7 +26,9 @@ public class AssetAcknowledgementFromTaskEndToEndTests : IClassFixture<ApiWebApp
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, User1, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User1, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, User2, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, User2, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
 

@@ -531,16 +531,70 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
         Assert.False(published.IsConfirmed);
     }
 
+    [Fact]
+    public async Task HandleAsync_Publishes_SharedCompanyDocumentAcknowledged_IntegrationEvent_For_A_New_Acknowledgement()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+        var integrationPublisher = new CapturingIntegrationEventPublisher();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Expenses Policy", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db, integrationEventPublisher: integrationPublisher).HandleAsync(
+            new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id }, caller,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<SharedCompanyDocumentAcknowledgedIntegrationEvent>(Assert.Single(integrationPublisher.Published));
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(caller, evt.EmployeeId);
+        Assert.Equal(doc.Id, evt.DocumentId);
+        Assert.Equal("Expenses Policy", evt.DocumentTitle);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_A_Second_IntegrationEvent_When_Acknowledging_Idempotently()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var category  = await SeedCategory(db, companyId);
+        var caller     = Guid.NewGuid();
+        var integrationPublisher = new CapturingIntegrationEventPublisher();
+
+        var doc = SharedCompanyDocument.Create(
+            Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
+            null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, null, null, Guid.NewGuid(), Now);
+        doc.Publish(Guid.NewGuid(), Now);
+        db.SharedCompanyDocuments.Add(doc);
+        await db.SaveChangesAsync();
+
+        var handler = Handler(db, integrationEventPublisher: integrationPublisher);
+        var request = new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id };
+        await handler.HandleAsync(request, caller, CancellationToken.None);
+        await handler.HandleAsync(request, caller, CancellationToken.None);
+
+        Assert.Single(integrationPublisher.Published);
+    }
+
     private static AcknowledgeSharedCompanyDocumentHandler Handler(
         DocumentsDbContext db,
         FakeEmployeeAudienceReader? audienceReader = null,
         FakeTaskCompleter? taskCompleter = null,
-        FakeAuditPublisher? auditPublisher = null) =>
+        FakeAuditPublisher? auditPublisher = null,
+        IIntegrationEventPublisher? integrationEventPublisher = null) =>
         new(db, new SharedCompanyDocumentAudienceMatcher(db, audienceReader ?? new FakeEmployeeAudienceReader()),
             taskCompleter ?? new FakeTaskCompleter(),
             auditPublisher ?? new FakeAuditPublisher(),
             new FakeCompanyAcknowledgementSettingsReader(),
-            new FakeClock(FixedUtcNow));
+            new FakeClock(FixedUtcNow),
+            integrationEventPublisher ?? new NoOpIntegrationEventPublisher());
 
     private static async Task<CompanyDocumentCategory> SeedCategory(
         DocumentsDbContext db, Guid companyId, string name = "Policy")

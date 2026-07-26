@@ -13,8 +13,11 @@ public class ListPositionProfilesEndpointTests : IClassFixture<ApiWebApplication
     public ListPositionProfilesEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     private HttpClient AdminClient(Guid companyId)

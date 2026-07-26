@@ -17,6 +17,7 @@ public class DeactivateOnboardingTemplateEndpointTests : IClassFixture<ApiWebApp
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdministratorUserId, SystemRoles.CompanyAdministrator);
         }).GetAwaiter().GetResult();
     }

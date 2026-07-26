@@ -25,7 +25,8 @@ public class StartOffboardingHandlerTests
     private sealed record Harness(
         StartOffboardingHandler Handler,
         FakeNotificationWriter Notifications,
-        FakeTaskCreator TaskCreator);
+        FakeTaskCreator TaskCreator,
+        CapturingIntegrationEventPublisher IntegrationPublisher);
 
     private static Harness BuildHandler(
         OffboardingDbContext dbContext,
@@ -36,6 +37,7 @@ public class StartOffboardingHandlerTests
     {
         var notifications = new FakeNotificationWriter();
         var taskCreator = new FakeTaskCreator();
+        var integrationPublisher = new CapturingIntegrationEventPublisher();
         var handler = new StartOffboardingHandler(
             dbContext,
             new FakeClock(FixedUtcNow),
@@ -44,8 +46,41 @@ public class StartOffboardingHandlerTests
             new FakeAssignedAssetReader(assignedAssets),
             new FakeOutstandingDocumentRequestReader(outstandingDocuments),
             taskCreator,
-            notifications);
-        return new Harness(handler, notifications, taskCreator);
+            notifications,
+            integrationPublisher);
+        return new Harness(handler, notifications, taskCreator, integrationPublisher);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_OffboardingStarted_IntegrationEvent_On_Successful_Start()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var names = new Dictionary<Guid, string> { [employeeId] = "Jamie Smith" };
+        var harness = BuildHandler(dbContext, names);
+
+        var request = BuildRequest(companyId, employeeId);
+
+        var result = await harness.Handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<OffboardingStartedIntegrationEvent>(Assert.Single(harness.IntegrationPublisher.Published));
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(employeeId, evt.EmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_IntegrationEvent_When_Employee_Not_Found()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var harness = BuildHandler(dbContext, employeeNames: null);
+
+        await harness.Handler.HandleAsync(BuildRequest(companyId, employeeId), CancellationToken.None);
+
+        Assert.Empty(harness.IntegrationPublisher.Published);
     }
 
     [Fact]

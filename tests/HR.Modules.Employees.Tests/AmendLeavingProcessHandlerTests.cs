@@ -50,7 +50,8 @@ public class AmendLeavingProcessHandlerTests
             auditPublisher,
             offboardingStatusReader,
             leavingSettingsReader ?? new FakeCompanyLeavingSettingsReader(),
-            notificationWriter ?? new FakeNotificationWriter());
+            notificationWriter ?? new FakeNotificationWriter(),
+            new FakeEmployeeTimelineWriter());
 
         return new(
             context,

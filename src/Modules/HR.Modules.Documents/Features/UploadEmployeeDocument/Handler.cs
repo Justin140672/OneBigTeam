@@ -12,7 +12,8 @@ internal sealed class UploadEmployeeDocumentHandler(
     IFileUploadValidator fileValidator,
     IVirusScanService virusScanner,
     IClock clock,
-    IAuditEventPublisher auditPublisher)
+    IAuditEventPublisher auditPublisher,
+    IIntegrationEventPublisher integrationEventPublisher)
 {
     // Backward-compatible overload used by existing tests — treats the caller as a manager.
     public Task<Result<UploadEmployeeDocumentResponse>> HandleAsync(
@@ -128,6 +129,11 @@ internal sealed class UploadEmployeeDocumentHandler(
             uploadedBy,
             isManagerUpload,
             now), cancellationToken);
+
+        await integrationEventPublisher.PublishAsync(
+            new EmployeeDocumentUploadedIntegrationEvent(
+                document.CompanyId, request.EmployeeId, employeeDocument.Id, documentType.Name, now),
+            cancellationToken);
 
         return Result.Success(new UploadEmployeeDocumentResponse(
             document.Id,

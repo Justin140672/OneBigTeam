@@ -137,10 +137,23 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         deptResponse.EnsureSuccessStatusCode();
         var dept = await deptResponse.Content.ReadFromJsonAsync<DepartmentPayload>();
 
+        var leavePolicyResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/leave-policies", new
+        {
+            companyId,
+            name = $"RefLeavePolicy-{Guid.NewGuid():N}",
+            carryOverDays = 0,
+            allowNegativeBalance = false
+        });
+        leavePolicyResponse.EnsureSuccessStatusCode();
+        var leavePolicy = await leavePolicyResponse.Content.ReadFromJsonAsync<IdPayload>();
+
         var ppResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
             companyId,
-            title = $"Developer {Guid.NewGuid():N}"
+            departmentId = dept!.Id,
+            locationId = refData.LocationId,
+            title = $"Developer {Guid.NewGuid():N}",
+            defaultLeavePolicyId = leavePolicy!.Id
         });
         ppResponse.EnsureSuccessStatusCode();
         var pp = await ppResponse.Content.ReadFromJsonAsync<PositionProfilePayload>();

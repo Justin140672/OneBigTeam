@@ -33,8 +33,13 @@ public class ImportCompensationChangesEndpointTests : IClassFixture<ApiWebApplic
     }
 
     [Fact]
-    public async Task Post_Import_Returns_BadRequest_For_Wrong_File_Extension()
+    public async Task Post_Import_Returns_UnprocessableEntity_For_Wrong_File_Extension()
     {
+        // File extension/content-type checks live in ImportCompensationChangesValidator
+        // (FluentValidation), not the handler's InvalidFile path — this codebase's established
+        // convention is that FastEndpoints validator failures return 422, not 400 (Program.cs —
+        // c.Errors.StatusCode = 422; see also CreateAssetCategoryEndpointTests for the equivalent
+        // convention on another endpoint).
         var companyId = Guid.NewGuid();
         using var client = AdminClient(companyId);
 
@@ -48,7 +53,7 @@ public class ImportCompensationChangesEndpointTests : IClassFixture<ApiWebApplic
 
         var response = await client.PostAsync($"/api/companies/{companyId}/compensation/import", content);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
     [Fact]

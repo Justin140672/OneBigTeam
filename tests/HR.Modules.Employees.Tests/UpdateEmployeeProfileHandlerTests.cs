@@ -23,7 +23,7 @@ public class UpdateEmployeeProfileHandlerTests
         await context.SaveChangesAsync();
 
         var updateTime = new DateTime(2026, 6, 8, 12, 0, 0, DateTimeKind.Utc);
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(updateTime), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(updateTime), new FakeCompanyContactValidationReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -65,7 +65,8 @@ public class UpdateEmployeeProfileHandlerTests
 
         var auditPublisher = new FakeAuditPublisher();
         var handler = new UpdateEmployeeProfileHandler(
-            context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), auditPublisher);
+            context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), auditPublisher,
+            new NoOpIntegrationEventPublisher());
 
         var actorId = Guid.NewGuid();
 
@@ -114,7 +115,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Locations.Add(location);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -148,7 +149,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -171,7 +172,7 @@ public class UpdateEmployeeProfileHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Employee_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -200,7 +201,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -231,7 +232,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.AddRange(emp1, emp2);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -261,7 +262,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -291,7 +292,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -325,7 +326,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -345,6 +346,147 @@ public class UpdateEmployeeProfileHandlerTests
         Assert.True(result.Value!.HasSystemAccess);
     }
 
+    [Fact]
+    public async Task HandleAsync_Publishes_LocationChanged_When_LocationId_Changes()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var previousLocationId = Guid.NewGuid();
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), previousLocationId, Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var newLocationId = Guid.NewGuid();
+        var publisher = new CapturingIntegrationEventPublisher();
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher(), publisher);
+
+        var result = await handler.HandleAsync(
+            new UpdateEmployeeProfileRequest
+            {
+                CompanyId = companyId,
+                Id = employee.Id,
+                LocationId = newLocationId,
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<HR.SharedKernel.EmployeeLocationChangedIntegrationEvent>(Assert.Single(publisher.Published));
+        Assert.Equal(previousLocationId, evt.PreviousLocationId);
+        Assert.Equal(newLocationId, evt.NewLocationId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_PositionChanged_When_PositionProfileId_Changes()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var previousPositionId = Guid.NewGuid();
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), previousPositionId, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var newPositionId = Guid.NewGuid();
+        var publisher = new CapturingIntegrationEventPublisher();
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher(), publisher);
+
+        var result = await handler.HandleAsync(
+            new UpdateEmployeeProfileRequest
+            {
+                CompanyId = companyId,
+                Id = employee.Id,
+                PositionProfileId = newPositionId,
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<HR.SharedKernel.EmployeePositionChangedIntegrationEvent>(Assert.Single(publisher.Published));
+        Assert.Equal(previousPositionId, evt.PreviousPositionProfileId);
+        Assert.Equal(newPositionId, evt.NewPositionProfileId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_EmployeeDetailsCorrected_When_Generic_Fields_Change_Without_Leaking_Field_Detail()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var publisher = new CapturingIntegrationEventPublisher();
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher(), publisher);
+
+        var result = await handler.HandleAsync(
+            new UpdateEmployeeProfileRequest
+            {
+                CompanyId = companyId,
+                Id = employee.Id,
+                FirstName = "Alicia",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<HR.SharedKernel.EmployeeDetailsCorrectedIntegrationEvent>(Assert.Single(publisher.Published));
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(employee.Id, evt.EmployeeId);
+
+        // The event carries no field-level detail — verify the serialized ToString/record doesn't
+        // surface the changed field name anywhere (defence-in-depth for the redaction rule).
+        Assert.DoesNotContain("FirstName", evt.ToString());
+        Assert.DoesNotContain("Alicia", evt.ToString());
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_No_Integration_Events_When_Nothing_Relevant_Changed()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var publisher = new CapturingIntegrationEventPublisher();
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyContactValidationReader(), new FakeAuditPublisher(), publisher);
+
+        var result = await handler.HandleAsync(
+            new UpdateEmployeeProfileRequest
+            {
+                CompanyId = companyId,
+                Id = employee.Id,
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(publisher.Published);
+    }
+
     private static FakeCompanyContactValidationReader UkContactRules() => new(
         UkTestRegexPatterns.Postcode, UkTestRegexPatterns.Telephone, UkTestRegexPatterns.Mobile);
 
@@ -359,7 +501,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules(), new FakeAuditPublisher());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -390,7 +532,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules(), new FakeAuditPublisher());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -421,7 +563,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules(), new FakeAuditPublisher());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
@@ -452,7 +594,7 @@ public class UpdateEmployeeProfileHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules(), new FakeAuditPublisher());
+        var handler = new UpdateEmployeeProfileHandler(context, new FakeClock(FixedUtcNow), UkContactRules(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest

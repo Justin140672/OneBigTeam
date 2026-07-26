@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
+using HR.SharedKernel;
 
 namespace HR.Integration.Tests;
 
@@ -90,6 +92,8 @@ public class GetMyTasksEndpointTests(ApiWebApplicationFactory factory) : IClassF
 
     private HttpClient AuthenticatedClient(Guid userId)
     {
+        TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
+
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());

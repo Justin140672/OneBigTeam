@@ -35,7 +35,9 @@ public class AuditHistoryIntegrationTests : IClassFixture<ApiWebApplicationFacto
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdminUser, SystemRoles.CompanyAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdminUser, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
 
@@ -127,6 +129,8 @@ public class AuditHistoryIntegrationTests : IClassFixture<ApiWebApplicationFacto
         using var hrAdminClient = AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
+
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
 
         using var employeeClient = _factory.CreateClient();
         employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());

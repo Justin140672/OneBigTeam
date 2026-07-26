@@ -24,8 +24,10 @@ public class LeaveSubmittedCreatesTaskTests : IClassFixture<ApiWebApplicationFac
     {
         _factory = factory;
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]
@@ -166,6 +168,8 @@ public class LeaveSubmittedCreatesTaskTests : IClassFixture<ApiWebApplicationFac
 
     private HttpClient AsEmployee(Guid employeeId)
     {
+        TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee).GetAwaiter().GetResult();
+
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());

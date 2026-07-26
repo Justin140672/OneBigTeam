@@ -20,8 +20,10 @@ public class DocumentExpiryTasksEndToEndTests : IClassFixture<ApiWebApplicationF
     {
         _factory = factory;
         Task.Run(async () =>
-            await TestRoleSeeder.AssignRoleAsync(factory, ExpiryE2EAdmin, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, ExpiryE2EAdmin, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ExpiryE2EAdmin, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     [Fact]

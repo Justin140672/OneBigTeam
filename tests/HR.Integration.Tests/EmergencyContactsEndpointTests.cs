@@ -22,9 +22,13 @@ public class EmergencyContactsEndpointTests : IClassFixture<ApiWebApplicationFac
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, EcUser1, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, EcUser1, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, EcUser2, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, EcUser2, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, EcUser3, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, EcUser3, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, EcUser4, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, EcUser4, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
 
@@ -60,6 +64,8 @@ public class EmergencyContactsEndpointTests : IClassFixture<ApiWebApplicationFac
 
         var created = await createResponse.Content.ReadFromJsonAsync<EmployeeIdPayload>();
 
+        await TestRoleSeeder.AssignRoleAsync(_factory, created!.Id, SystemRoles.Employee);
+
         // Return a client that acts as the created employee (sub = employee ID)
         // so /me/ endpoints can find the record.
         var employeeClient = _factory.CreateClient();
@@ -90,9 +96,15 @@ public class EmergencyContactsEndpointTests : IClassFixture<ApiWebApplicationFac
         locResp.EnsureSuccessStatusCode();
         var locationId = (await locResp.Content.ReadFromJsonAsync<EmployeeIdPayload>())!.Id;
 
+        var leavePolicyResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = $"RefLeavePolicy-{Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false });
+        leavePolicyResp.EnsureSuccessStatusCode();
+        var defaultLeavePolicyId = (await leavePolicyResp.Content.ReadFromJsonAsync<EmployeeIdPayload>())!.Id;
+
         var ppResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles",
-            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}" });
+            new { companyId, departmentId, locationId, title = $"Role-{Guid.NewGuid():N}", defaultLeavePolicyId });
         ppResp.EnsureSuccessStatusCode();
         var positionProfileId = (await ppResp.Content.ReadFromJsonAsync<EmployeeIdPayload>())!.Id;
 

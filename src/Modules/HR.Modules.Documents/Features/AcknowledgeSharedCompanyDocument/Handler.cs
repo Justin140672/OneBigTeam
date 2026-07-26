@@ -13,7 +13,8 @@ internal sealed class AcknowledgeSharedCompanyDocumentHandler(
     ITaskCompleter taskCompleter,
     IAuditEventPublisher auditPublisher,
     ICompanyAcknowledgementSettingsReader companyAcknowledgementSettingsReader,
-    IClock clock)
+    IClock clock,
+    IIntegrationEventPublisher integrationEventPublisher)
 {
     public async Task<Result<AcknowledgeSharedCompanyDocumentResponse>> HandleAsync(
         AcknowledgeSharedCompanyDocumentRequest request,
@@ -102,6 +103,11 @@ internal sealed class AcknowledgeSharedCompanyDocumentHandler(
             request.Confirmed,
             acknowledgementStatement,
             now), cancellationToken);
+
+        await integrationEventPublisher.PublishAsync(
+            new SharedCompanyDocumentAcknowledgedIntegrationEvent(
+                document.CompanyId, callerEmployeeId, document.Id, document.Title, now),
+            cancellationToken);
 
         return Result.Success(new AcknowledgeSharedCompanyDocumentResponse(
             document.Id, document.VersionNumber, acknowledgement.AcknowledgedAt));

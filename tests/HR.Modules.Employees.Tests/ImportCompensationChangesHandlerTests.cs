@@ -4,6 +4,7 @@ using HR.Modules.Employees.Features.ImportCompensationChanges;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
 using HR.Modules.Employees.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -279,8 +280,38 @@ public class ImportCompensationChangesHandlerTests
         Assert.Contains(closedEvents, e => e.CompensationRecordId == existingForEmployee2.Id);
     }
 
-    private static ImportCompensationChangesHandler BuildHandler(EmployeesDbContext context, FakeAuditPublisher publisher) =>
-        new(context, new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), new FakeClock(FixedUtcNow), publisher);
+    [Fact]
+    public async Task HandleAsync_Publishes_CompensationChanged_IntegrationEvent_With_No_Salary_Figure()
+    {
+        await using var context = BuildContext();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var companyId = Guid.NewGuid();
+        var employee = CreateEmployee(companyId, "EMP-001", now);
+        context.Employees.Add(employee);
+
+        var existing = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2025, 1, 1), SalaryType.Annual, 40000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), now);
+        context.Compensations.Add(existing);
+        await context.SaveChangesAsync();
+
+        var integrationPublisher = new CapturingIntegrationEventPublisher();
+        var handler = BuildHandler(context, new FakeAuditPublisher(), integrationPublisher);
+        var stream = BuildWorkbook(("EMP-001", "60000", "Annual", "2027-01-01", "AnnualReview", null));
+
+        var outcome = await handler.HandleAsync(companyId, stream, ActorId, CancellationToken.None);
+
+        Assert.Equal(ImportCompensationOutcomeType.Success, outcome.Type);
+        var evt = Assert.IsType<CompensationChangedIntegrationEvent>(Assert.Single(integrationPublisher.Published));
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(employee.Id, evt.EmployeeId);
+        Assert.Equal(new DateOnly(2027, 1, 1), evt.EffectiveFrom);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(evt);
+        Assert.DoesNotContain("60000", json);
+    }
+
+    private static ImportCompensationChangesHandler BuildHandler(
+        EmployeesDbContext context, FakeAuditPublisher publisher, HR.SharedKernel.IIntegrationEventPublisher? integrationEventPublisher = null) =>
+        new(context, new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), new FakeClock(FixedUtcNow), publisher, integrationEventPublisher ?? new NoOpIntegrationEventPublisher());
 
     private static Employee CreateEmployee(Guid companyId, string employeeNumber, DateTimeOffset now) =>
         Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com", new DateOnly(2024, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", employeeNumber, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);

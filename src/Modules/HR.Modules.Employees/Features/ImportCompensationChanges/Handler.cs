@@ -10,7 +10,8 @@ internal sealed class ImportCompensationChangesHandler(
     EmployeesDbContext dbContext,
     CompensationRecordWriter writer,
     IClock clock,
-    IAuditEventPublisher auditEventPublisher)
+    IAuditEventPublisher auditEventPublisher,
+    IIntegrationEventPublisher integrationEventPublisher)
 {
     private sealed record ValidatedRow(
         int RowNumber,
@@ -205,6 +206,12 @@ internal sealed class ImportCompensationChangesHandler(
                     companyId, row.EmployeeId, record.Id, actorEmployeeId, record.EffectiveFrom,
                     record.SalaryType.ToString(), record.Salary, record.Currency, record.Reason.ToString(),
                     importBatchId, now),
+                cancellationToken);
+
+            await integrationEventPublisher.PublishAsync(
+                new CompensationChangedIntegrationEvent(
+                    companyId, row.EmployeeId, record.Id, record.EffectiveFrom,
+                    record.SalaryType.ToString(), record.Reason.ToString(), now),
                 cancellationToken);
         }
 

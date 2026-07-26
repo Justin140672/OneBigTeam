@@ -27,6 +27,7 @@ public class ConfirmImportSessionEndpointTests : IClassFixture<ApiWebApplication
     {
         var companyId = Guid.NewGuid();
         using var client = AdminClient(companyId);
+        await EnsureDefaultLeavePolicyAsync(client, companyId);
 
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
         var validateResponse = await client.PostAsync(
@@ -129,6 +130,7 @@ public class ConfirmImportSessionEndpointTests : IClassFixture<ApiWebApplication
     {
         var companyId = Guid.NewGuid();
         using var client = AdminClient(companyId);
+        await EnsureDefaultLeavePolicyAsync(client, companyId);
 
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
         await client.PostAsync($"/api/companies/{companyId}/data-import/sessions/{sessionId}/validate", EmptyJson());
@@ -149,6 +151,22 @@ public class ConfirmImportSessionEndpointTests : IClassFixture<ApiWebApplication
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         return client;
+    }
+
+    /// <summary>
+    /// DefaultLeavePolicyId is now mandatory on PositionProfile, so
+    /// ImportLookupResolver.GetOrCreatePositionProfileAsync can only auto-create a position
+    /// profile for a CSV row when the company already has a default leave policy configured
+    /// (the first policy created for a company is automatically its default — see
+    /// CreateLeavePolicyHandler). Without this, rows referencing a not-yet-existing position
+    /// profile are silently skipped and the row fails.
+    /// </summary>
+    private static async Task EnsureDefaultLeavePolicyAsync(HttpClient client, Guid companyId)
+    {
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = $"Default Policy {Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false });
+        response.EnsureSuccessStatusCode();
     }
 
     private static string ConfirmUrl(Guid companyId, Guid sessionId) =>

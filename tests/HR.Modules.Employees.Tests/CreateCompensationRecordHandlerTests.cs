@@ -17,7 +17,7 @@ public class CreateCompensationRecordHandlerTests
     {
         await using var context = BuildContext();
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher);
+        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher, new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new CreateCompensationRecordRequest
@@ -49,7 +49,7 @@ public class CreateCompensationRecordHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher);
+        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher, new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new CreateCompensationRecordRequest
@@ -106,7 +106,7 @@ public class CreateCompensationRecordHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher);
+        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher, new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new CreateCompensationRecordRequest
@@ -155,7 +155,7 @@ public class CreateCompensationRecordHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher);
+        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher, new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new CreateCompensationRecordRequest
@@ -195,7 +195,7 @@ public class CreateCompensationRecordHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher);
+        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher, new NoOpIntegrationEventPublisher());
 
         // Backdated into the middle of the already-closed 2024 record — must be rejected even though
         // it's chronologically before the currently open record.
@@ -238,7 +238,7 @@ public class CreateCompensationRecordHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher);
+        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher, new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new CreateCompensationRecordRequest
@@ -273,7 +273,7 @@ public class CreateCompensationRecordHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher);
+        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher, new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new CreateCompensationRecordRequest
@@ -312,7 +312,7 @@ public class CreateCompensationRecordHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher);
+        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher, new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new CreateCompensationRecordRequest
@@ -347,7 +347,7 @@ public class CreateCompensationRecordHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher);
+        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher, new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new CreateCompensationRecordRequest
@@ -383,7 +383,7 @@ public class CreateCompensationRecordHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher);
+        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), publisher, new NoOpIntegrationEventPublisher());
 
         var result = await handler.HandleAsync(
             new CreateCompensationRecordRequest
@@ -407,6 +407,45 @@ public class CreateCompensationRecordHandlerTests
 
         var stillClosed = await context.Compensations.SingleAsync(c => c.Id == alreadyClosed.Id);
         Assert.Equal(new DateOnly(2024, 12, 31), stillClosed.EffectiveTo);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_CompensationChanged_IntegrationEvent_With_No_Salary_Figure()
+    {
+        await using var context = BuildContext();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var companyId = Guid.NewGuid();
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2024, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var integrationPublisher = new CapturingIntegrationEventPublisher();
+        var handler = new CreateCompensationRecordHandler(new CompensationRecordWriter(context, new FakeClock(FixedUtcNow)), new FakeAuditPublisher(), integrationPublisher);
+
+        var result = await handler.HandleAsync(
+            new CreateCompensationRecordRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employee.Id,
+                EffectiveFrom = new DateOnly(2026, 1, 1),
+                SalaryType = SalaryType.Annual,
+                Salary = 99000m,
+                Currency = "GBP",
+                Reason = CompensationChangeReason.NewHire
+            },
+            ActorEmployeeId,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var evt = Assert.IsType<HR.SharedKernel.CompensationChangedIntegrationEvent>(Assert.Single(integrationPublisher.Published));
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(employee.Id, evt.EmployeeId);
+        Assert.Equal(result.Value!.Id, evt.CompensationId);
+
+        // CompensationChangedIntegrationEvent has no field capable of carrying a salary figure —
+        // verify the serialized form never contains the actual salary as a defence-in-depth check.
+        var json = System.Text.Json.JsonSerializer.Serialize(evt);
+        Assert.DoesNotContain("99000", json);
     }
 
     private static EmployeesDbContext BuildContext()

@@ -60,7 +60,8 @@ public class StartLeavingProcessHandlerTests
             auditPublisher,
             offboardingStatusReader ?? new FakeOffboardingStatusReader(new OffboardingStatusSummary("Completed")),
             leavingSettingsReader ?? new FakeCompanyLeavingSettingsReader(),
-            notificationWriter);
+            notificationWriter,
+            new FakeEmployeeTimelineWriter());
 
         return new(
             context,

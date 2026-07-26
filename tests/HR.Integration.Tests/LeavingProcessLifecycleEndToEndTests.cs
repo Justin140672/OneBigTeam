@@ -28,8 +28,11 @@ public class LeavingProcessLifecycleEndToEndTests : IClassFixture<ApiWebApplicat
     public LeavingProcessLifecycleEndToEndTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     private HttpClient AuthenticatedClient(Guid companyId)
@@ -195,6 +198,9 @@ public class LeavingProcessLifecycleEndToEndTests : IClassFixture<ApiWebApplicat
         var yesterday = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
         var resignationReceived = yesterday.AddDays(-14);
 
+        // LeavingDate is in the past here (deliberately, to exercise the finalisation job),
+        // so ConfirmBackdatedLeavingDate must be set — StartLeavingProcessHandler returns 409
+        // Conflict for an unconfirmed backdated LeavingDate (see the isBackdated check there).
         var startResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leaving-process",
             new
@@ -204,7 +210,8 @@ public class LeavingProcessLifecycleEndToEndTests : IClassFixture<ApiWebApplicat
                 resignationReceivedDate = resignationReceived.ToString("yyyy-MM-dd"),
                 leavingDate = yesterday.ToString("yyyy-MM-dd"),
                 lastWorkingDay = yesterday.ToString("yyyy-MM-dd"),
-                leavingReason = "Resignation"
+                leavingReason = "Resignation",
+                confirmBackdatedLeavingDate = true
             });
         startResp.EnsureSuccessStatusCode();
 

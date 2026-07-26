@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
 using HR.Modules.Identity;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
@@ -43,9 +45,12 @@ public class RequireTenantMiddlewareTests : IClassFixture<ApiWebApplicationFacto
     [Fact]
     public async Task Authenticated_Request_With_Tenant_Passes_Guard()
     {
+        var userId = new Guid("aa000005-0000-0000-0000-000000000001");
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee);
+
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "user-with-tenant");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, "tenant-abc");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
 
         // We only care that the tenant guard passes (not 403). The actual endpoint
         // response (200, 404, etc.) is tested in the endpoint-specific tests.

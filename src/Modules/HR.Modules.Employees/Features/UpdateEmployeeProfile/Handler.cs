@@ -12,17 +12,20 @@ internal sealed class UpdateEmployeeProfileHandler
     private readonly IClock _clock;
     private readonly ICompanyContactValidationReader _contactValidationReader;
     private readonly IAuditEventPublisher _auditEventPublisher;
+    private readonly IIntegrationEventPublisher _integrationEventPublisher;
 
     public UpdateEmployeeProfileHandler(
         EmployeesDbContext dbContext,
         IClock clock,
         ICompanyContactValidationReader contactValidationReader,
-        IAuditEventPublisher auditEventPublisher)
+        IAuditEventPublisher auditEventPublisher,
+        IIntegrationEventPublisher integrationEventPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
         _contactValidationReader = contactValidationReader;
         _auditEventPublisher = auditEventPublisher;
+        _integrationEventPublisher = integrationEventPublisher;
     }
 
     public async Task<Result<UpdateEmployeeProfileResponse>> HandleAsync(
@@ -149,6 +152,49 @@ internal sealed class UpdateEmployeeProfileHandler
         await _auditEventPublisher.PublishAsync(
             new EmployeeProfileUpdatedAuditEvent(employee.CompanyId, employee.Id, actorEmployeeId, now, before, after),
             cancellationToken);
+
+        // Timeline granularity: publish a specific event only for the field that actually
+        // changed rather than a bundled "profile updated" for everything. Manager is not
+        // touched by this feature (Assign is called with the employee's existing ManagerId), so
+        // only Position/Location are checked here alongside a catch-all "details corrected" for
+        // anything else that changed (name, email, personal details, etc.) — kept deliberately
+        // generic per EmployeeDetailsCorrectedIntegrationEvent's doc comment.
+        if (before.PositionProfileId != after.PositionProfileId && after.PositionProfileId is not null && before.PositionProfileId is not null)
+        {
+            await _integrationEventPublisher.PublishAsync(
+                new EmployeePositionChangedIntegrationEvent(
+                    employee.CompanyId, employee.Id, before.PositionProfileId.Value, after.PositionProfileId.Value, now),
+                cancellationToken);
+        }
+
+        if (before.LocationId != after.LocationId && after.LocationId is not null && before.LocationId is not null)
+        {
+            await _integrationEventPublisher.PublishAsync(
+                new EmployeeLocationChangedIntegrationEvent(
+                    employee.CompanyId, employee.Id, before.LocationId.Value, after.LocationId.Value, now),
+                cancellationToken);
+        }
+
+        var otherFieldsChanged =
+            before.FirstName != after.FirstName ||
+            before.LastName != after.LastName ||
+            before.WorkEmail != after.WorkEmail ||
+            before.PersonalEmail != after.PersonalEmail ||
+            before.StartDate != after.StartDate ||
+            before.PreferredName != after.PreferredName ||
+            before.DateOfBirth != after.DateOfBirth ||
+            before.Nationality != after.Nationality ||
+            before.Gender != after.Gender ||
+            before.GenderOther != after.GenderOther ||
+            before.DepartmentId != after.DepartmentId ||
+            before.HasSystemAccess != after.HasSystemAccess;
+
+        if (otherFieldsChanged)
+        {
+            await _integrationEventPublisher.PublishAsync(
+                new EmployeeDetailsCorrectedIntegrationEvent(employee.CompanyId, employee.Id, now),
+                cancellationToken);
+        }
 
         return Result.Success(new UpdateEmployeeProfileResponse(
             employee.Id,

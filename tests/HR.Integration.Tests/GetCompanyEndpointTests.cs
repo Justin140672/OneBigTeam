@@ -1,16 +1,22 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
+using HR.SharedKernel;
 
 namespace HR.Integration.Tests;
 
 public class GetCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
+    private static readonly Guid AuthenticatedUser = new("ee000002-0000-0000-0000-000000000001");
 
     public GetCompanyEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+
+        TestRoleSeeder.AssignRoleAsync(factory, AuthenticatedUser, SystemRoles.Employee)
+            .GetAwaiter().GetResult();
     }
 
     [Fact]
@@ -27,8 +33,8 @@ public class GetCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory>
     public async Task Get_Company_Returns_Company_For_Authenticated_Request()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "user-3");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, "tenant-3");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AuthenticatedUser.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
 
         var createResponse = await client.PostAsJsonAsync("/api/companies", new
         {
@@ -67,8 +73,8 @@ public class GetCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory>
     public async Task Get_Company_Returns_NotFound_For_Unknown_Id()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "user-4");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, "tenant-4");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AuthenticatedUser.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
 
         var response = await client.GetAsync($"/api/companies/{Guid.NewGuid()}");
 

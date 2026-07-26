@@ -17,7 +17,7 @@ public class CreateEmployeeNoteHandlerTests
     {
         await using var context = BuildContext();
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeEmployeeTimelineWriter());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeNoteRequest(Guid.NewGuid(), Guid.NewGuid(), NoteCategory.General, "Some note.", false),
@@ -41,7 +41,7 @@ public class CreateEmployeeNoteHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeEmployeeTimelineWriter());
 
         var result = await handler.HandleAsync(
             new CreateEmployeeNoteRequest(companyId, employee.Id, NoteCategory.Performance, "  Great quarter.  ", true),
@@ -79,12 +79,53 @@ public class CreateEmployeeNoteHandlerTests
         Assert.DoesNotContain("Great quarter.", eventJson);
     }
 
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, true)]
+    internal async Task HandleAsync_Writes_Generic_HrOnly_Timeline_Entry_Never_Containing_Note_Text_Or_Category(
+        int categoryValue, bool isImportant)
+    {
+        var category = (NoteCategory)categoryValue;
+        await using var context = BuildContext();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var companyId = Guid.NewGuid();
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2024, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var timelineWriter = new FakeEmployeeTimelineWriter();
+        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), timelineWriter);
+
+        var confidentialText = "Highly confidential performance concerns about the employee.";
+        var result = await handler.HandleAsync(
+            new CreateEmployeeNoteRequest(companyId, employee.Id, category, confidentialText, isImportant),
+            ActorEmployeeId,
+            ActorUserId,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var entry = Assert.Single(timelineWriter.Added);
+        Assert.Equal(companyId, entry.CompanyId);
+        Assert.Equal(employee.Id, entry.EmployeeId);
+        Assert.Equal(EmployeeTimelineEventType.HrNoteAdded, entry.EventType);
+        Assert.Equal(EmployeeTimelineCategory.HrNotes, entry.Category);
+        Assert.Equal(EmployeeTimelineVisibility.HrOnly, entry.Visibility);
+
+        // Redaction rule: note text and category must never leak into Title/Summary, regardless
+        // of the note's own category/importance.
+        Assert.DoesNotContain(confidentialText, entry.Title);
+        Assert.DoesNotContain(confidentialText, entry.Summary);
+        Assert.DoesNotContain(category.ToString(), entry.Title);
+        Assert.DoesNotContain(category.ToString(), entry.Summary);
+    }
+
     [Fact]
     public async Task HandleAsync_Does_Not_Publish_Event_When_Employee_Does_Not_Exist()
     {
         await using var context = BuildContext();
         var publisher = new FakeAuditPublisher();
-        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = new CreateEmployeeNoteHandler(context, new FakeClock(FixedUtcNow), publisher, new FakeEmployeeTimelineWriter());
 
         await handler.HandleAsync(
             new CreateEmployeeNoteRequest(Guid.NewGuid(), Guid.NewGuid(), NoteCategory.General, "Some note.", false),

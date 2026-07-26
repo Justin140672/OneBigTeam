@@ -18,7 +18,7 @@ public class CompleteProbationReviewFromTaskActionTests
     public void Source_Is_Probation()
     {
         using var context = BuildContext();
-        var action = new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher());
+        var action = new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
 
         Assert.Equal(TaskSource.Probation, action.Source);
         Assert.Equal(TaskActionType.Review, action.ActionType);
@@ -35,7 +35,7 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, completedBy, review.Id, notes: "Good progress.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var saved = await context.ProbationReviews.SingleAsync();
@@ -56,7 +56,7 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, completedBy, review.Id, outcomeDecision: "Pass", notes: "Excellent.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var savedRecord = await context.ProbationRecords.SingleAsync();
@@ -80,7 +80,7 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, completedBy, review.Id, outcomeDecision: "Fail", notes: "Did not meet targets.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var savedRecord = await context.ProbationRecords.SingleAsync();
@@ -105,7 +105,7 @@ public class CompleteProbationReviewFromTaskActionTests
             outcomeDecision: $"Extend|{newEndDate:yyyy-MM-dd}",
             notes: "Needs more time to demonstrate improvement.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var savedRecord = await context.ProbationRecords.SingleAsync();
@@ -129,7 +129,7 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, Guid.NewGuid(), review.Id);
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var savedRecord = await context.ProbationRecords.SingleAsync();
@@ -149,7 +149,7 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, Guid.NewGuid(), sourceEntityId: null);
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var review = await context.ProbationReviews.SingleAsync();
@@ -166,7 +166,7 @@ public class CompleteProbationReviewFromTaskActionTests
 
         var taskContext = BuildContext(companyId, Guid.NewGuid(), sourceEntityId: Guid.NewGuid());
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var review = await context.ProbationReviews.SingleAsync();
@@ -186,11 +186,71 @@ public class CompleteProbationReviewFromTaskActionTests
         var completedBy = Guid.NewGuid();
         var taskContext = BuildContext(companyId, completedBy, review.Id, notes: "Late completion.");
 
-        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher())
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
         var saved = await context.ProbationReviews.SingleAsync();
         Assert.NotEqual(completedBy, saved.CompletedByEmployeeId);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Publishes_ProbationPassed_IntegrationEvent_On_Pass_Outcome()
+    {
+        await using var context = BuildContext();
+        var companyId   = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+
+        var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+
+        var taskContext = BuildContext(companyId, completedBy, review.Id, outcomeDecision: "Pass", notes: "Excellent.");
+        var integrationPublisher = new Infrastructure.CapturingIntegrationEventPublisher();
+
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), integrationPublisher)
+            .ExecuteAsync(taskContext, CancellationToken.None);
+
+        var evt = Assert.IsType<ProbationPassedIntegrationEvent>(Assert.Single(integrationPublisher.Published));
+        Assert.Equal(companyId, evt.CompanyId);
+        Assert.Equal(record.EmployeeId, evt.EmployeeId);
+        Assert.Equal(record.Id, evt.ProbationRecordId);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Does_Not_Publish_ProbationPassed_IntegrationEvent_On_Fail_Outcome()
+    {
+        await using var context = BuildContext();
+        var companyId   = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+
+        var (_, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+
+        var taskContext = BuildContext(companyId, completedBy, review.Id, outcomeDecision: "Fail", notes: "Did not meet targets.");
+        var integrationPublisher = new Infrastructure.CapturingIntegrationEventPublisher();
+
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), integrationPublisher)
+            .ExecuteAsync(taskContext, CancellationToken.None);
+
+        Assert.Empty(integrationPublisher.Published);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Does_Not_Publish_ProbationPassed_IntegrationEvent_On_Extend_Outcome()
+    {
+        await using var context = BuildContext();
+        var companyId   = Guid.NewGuid();
+        var completedBy = Guid.NewGuid();
+        var newEndDate  = new DateOnly(2026, 10, 7);
+
+        var (_, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
+
+        var taskContext = BuildContext(companyId, completedBy, review.Id,
+            outcomeDecision: $"Extend|{newEndDate:yyyy-MM-dd}",
+            notes: "Needs more time.");
+        var integrationPublisher = new Infrastructure.CapturingIntegrationEventPublisher();
+
+        await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), integrationPublisher)
+            .ExecuteAsync(taskContext, CancellationToken.None);
+
+        Assert.Empty(integrationPublisher.Published);
     }
 
     private static TaskCompletionContext BuildContext(

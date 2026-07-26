@@ -25,7 +25,9 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdminUserId, SystemRoles.CompanyAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdminUserId, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUserId, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUserId, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
 
@@ -164,9 +166,15 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
         locResp.EnsureSuccessStatusCode();
         var locationId = (await locResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 
+        var leavePolicyResp = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/leave-policies",
+            new { companyId, name = $"RefLeavePolicy {Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false });
+        leavePolicyResp.EnsureSuccessStatusCode();
+        var defaultLeavePolicyId = (await leavePolicyResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
         var posResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles",
-            new { companyId, departmentId, locationId, title = $"Title {Guid.NewGuid():N}" });
+            new { companyId, departmentId, locationId, title = $"Title {Guid.NewGuid():N}", defaultLeavePolicyId });
         posResp.EnsureSuccessStatusCode();
         var positionProfileId = (await posResp.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 

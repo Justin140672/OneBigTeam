@@ -1,16 +1,22 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
+using HR.SharedKernel;
 
 namespace HR.Integration.Tests;
 
 public class CreateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory>
 {
     private readonly ApiWebApplicationFactory _factory;
+    private static readonly Guid AuthenticatedUser = new("dd000001-0000-0000-0000-000000000001");
 
     public CreateCompanyEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+
+        TestRoleSeeder.AssignRoleAsync(factory, AuthenticatedUser, SystemRoles.Employee)
+            .GetAwaiter().GetResult();
     }
 
     [Fact]
@@ -40,8 +46,8 @@ public class CreateCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory
     public async Task Post_Companies_Creates_Company_For_Authenticated_Request()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "user-1");
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, "tenant-1");
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AuthenticatedUser.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
 
         var response = await client.PostAsJsonAsync("/api/companies", new
         {
