@@ -547,6 +547,16 @@
                     </ContentTemplate>
                 </TabItem>
 
+                <TabItem>
+                    <ChildContent><TabHeader Text="Promotion History" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <EmployeePromotionHistoryTab CompanyId="CompanyId" EmployeeId="Id!.Value"
+                                                          CurrentPositionProfileTitle="@CurrentPositionProfileTitle" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
                 @if (_showProbationTab)
                 {
                     <TabItem>
@@ -741,6 +751,9 @@
 
     private GetEmployeeResponse? _employee;
 
+    private string CurrentPositionProfileTitle =>
+        _positionProfiles.FirstOrDefault(p => p.Id == _employee?.PositionProfileId)?.Title ?? "—";
+
     private string EmployeeInitials => string.Concat(
         (_employee?.FirstName?.Length > 0 ? _employee.FirstName[0].ToString() : ""),
         (_employee?.LastName?.Length  > 0 ? _employee.LastName[0].ToString()  : "")).ToUpperInvariant()
@@ -778,7 +791,7 @@
 
     // Leave is always rendered (not conditional like Probation/Onboarding/Offboarding), but its
     // own index still shifts by ProbationOffset since it sits after Probation in this markup.
-    private int LeaveTabIndex => 5 + ProbationOffset;
+    private int LeaveTabIndex => 6 + ProbationOffset;
 
     // Onboarding only gets a tab once a plan exists, and loses it again once that plan is
     // Completed — completed history remains visible via the Audit tab instead (see
@@ -786,15 +799,15 @@
     // Probation's) tab isn't rendered, since Syncfusion's SfTab indexes by however many <TabItem>
     // elements actually render, not by their position in this markup.
     //
-    // Counted directly from the markup above (Details, Employment, Compensation, [Probation],
-    // Emergency Contacts, Leave, Sickness, Tasks, Documents, Assets, Acknowledgement History,
-    // Audit = 11 always-rendered tabs before Onboarding, plus 1 more when Probation renders), not
-    // trusted from any older constant — this file has picked up tabs (e.g. Acknowledgement
-    // History) since these indices were last set, so re-derive them from the actual <TabItem>
-    // count rather than assuming the previous numbers still held.
+    // Counted directly from the markup above (Details, Employment, Compensation, Promotion
+    // History, [Probation], Emergency Contacts, Leave, Sickness, Tasks, Documents, Assets,
+    // Acknowledgement History, Audit = 12 always-rendered tabs before Onboarding, plus 1 more when
+    // Probation renders), not trusted from any older constant — this file has picked up tabs (e.g.
+    // Promotion History) since these indices were last set, so re-derive them from the actual
+    // <TabItem> count rather than assuming the previous numbers still held.
     private bool _showOnboardingTab;
-    private int OnboardingTabIndex => 12 + ProbationOffset;
-    private int OffboardingTabIndex => (_showOnboardingTab ? 13 : 12) + ProbationOffset;
+    private int OnboardingTabIndex => 13 + ProbationOffset;
+    private int OffboardingTabIndex => (_showOnboardingTab ? 14 : 13) + ProbationOffset;
 
     // Offboarding only gets a tab once a plan has been started, and loses it again once that
     // plan is Completed/Cancelled — completed history remains visible via the Audit tab instead
@@ -910,7 +923,7 @@
 
             _activeTabIndex = tabValue switch
             {
-                "probation" => _showProbationTab ? 3 : 0,
+                "probation" => _showProbationTab ? 4 : 0,
                 "leave" => LeaveTabIndex,
                 "onboarding" => _showOnboardingTab ? OnboardingTabIndex : 0,
                 "offboarding" => OffboardingTabIndex,

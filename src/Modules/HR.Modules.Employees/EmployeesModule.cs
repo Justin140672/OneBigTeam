@@ -77,6 +77,8 @@ using HR.Modules.Employees.Features.StartLeavingProcess;
 using HR.Modules.Employees.Features.GetLeavingProcess;
 using HR.Modules.Employees.Features.AmendLeavingProcess;
 using HR.Modules.Employees.Features.CancelLeavingProcess;
+using HR.Modules.Employees.Features.PromoteEmployee;
+using HR.Modules.Employees.Features.GetEmployeePromotionHistory;
 using HR.Modules.Employees.Jobs;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
@@ -108,6 +110,10 @@ public static class EmployeesModule
         var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
         jobManager.AddOrUpdate<ProcessLeavingEmployeesJob>(
             "process-leaving-employees",
+            job => job.ExecuteAsync(),
+            Cron.Daily(0));
+        jobManager.AddOrUpdate<ProcessPromotionsJob>(
+            "process-promotions",
             job => job.ExecuteAsync(),
             Cron.Daily(0));
         return app;
@@ -295,9 +301,17 @@ public static class EmployeesModule
 
         services.AddScoped<ProcessLeavingEmployeesJob>();
 
+        services.AddScoped<PromoteEmployeeHandler>();
+        services.AddScoped<IValidator<PromoteEmployeeRequest>, PromoteEmployeeValidator>();
+
+        services.AddScoped<GetEmployeePromotionHistoryHandler>();
+
+        services.AddScoped<ProcessPromotionsJob>();
+
         services.AddScoped<IProbationDateResolver, ProbationDateResolver>();
         services.AddScoped<IEffectiveNoticePeriodResolver, EffectiveNoticePeriodResolver>();
         services.AddScoped<IEmployeeDepartureFinalizer, EmployeeDepartureFinalizer>();
+        services.AddScoped<IEmployeePromotionFinalizer, EmployeePromotionFinalizer>();
         services.AddScoped<IWorkingPatternProvider, WorkingPatternProvider>();
         services.AddScoped<IDirectReportsReader, DirectReportsReader>();
         services.AddScoped<IEmployeeNameReader, EmployeeNameReader>();

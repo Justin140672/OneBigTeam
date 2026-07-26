@@ -494,6 +494,56 @@ internal sealed record LeavingProcessCancelledAuditEvent(
     object? IAuditEvent.Metadata => new { EmployeeStatusChangedTo = "Active", OffboardingTasksCancelled };
 }
 
+internal sealed record EmployeePromotionRequestedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid PromotionId,
+    Guid ActorEmployeeId,
+    DateTimeOffset OccurredAt,
+    Guid PreviousPositionProfileId,
+    Guid NewPositionProfileId,
+    DateOnly EffectiveDate,
+    string Reason) : IAuditEvent
+{
+    string IAuditEvent.EventType => "employee.promotion.requested";
+    string IAuditEvent.EntityType => "EmployeePromotion";
+    Guid IAuditEvent.EntityId => PromotionId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Employee promotion requested";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { PreviousPositionProfileId, NewPositionProfileId, EffectiveDate, Reason };
+    object? IAuditEvent.Metadata => null;
+}
+
+// Published by EmployeePromotionFinalizer once a promotion has been applied to the employee
+// (either immediately from PromoteEmployeeHandler for a same-day/backdated effective date, or
+// later by ProcessPromotionsJob) — system-attributed (no actor), mirroring
+// EmployeeDepartureFinalisedAuditEvent's convention exactly.
+internal sealed record EmployeePromotionCompletedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid PromotionId,
+    DateTimeOffset OccurredAt,
+    Guid PreviousPositionProfileId,
+    Guid NewPositionProfileId,
+    DateOnly EffectiveDate) : IAuditEvent
+{
+    string IAuditEvent.EventType => "employee.promotion.completed";
+    string IAuditEvent.EntityType => "EmployeePromotion";
+    Guid IAuditEvent.EntityId => PromotionId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Employee promotion completed";
+    object? IAuditEvent.Before => new { PositionProfileId = PreviousPositionProfileId };
+    object? IAuditEvent.After => new { PositionProfileId = NewPositionProfileId, EffectiveDate };
+    object? IAuditEvent.Metadata => null;
+}
+
 // Published by ProcessLeavingEmployeesJob (Hangfire) once an employee's leaving date has passed
 // and their departure has been finalised. There is no ActorUserId/ActorEmployeeId — this is a
 // system-driven transition, not a user action — mirroring how other unattended-job audit events

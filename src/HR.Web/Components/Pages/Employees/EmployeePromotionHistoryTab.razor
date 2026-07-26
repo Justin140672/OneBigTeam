@@ -1,0 +1,68 @@
+@using HR.Web.Models
+@using HR.Web.Components.Controls
+@inject PromotionService PromotionService
+
+<PromoteEmployeeDialog CompanyId="CompanyId"
+                        EmployeeId="EmployeeId"
+                        CurrentPositionProfileTitle="CurrentPositionProfileTitle"
+                        IsOpen="_promoteOpen"
+                        OnSaved="OnPromoted"
+                        OnCancelled="@(() => _promoteOpen = false)" />
+
+@if (_loading)
+{
+    <HrLoadingIndicator />
+}
+else
+{
+    <div class="d-flex justify-content-end mb-3">
+        <SfButton CssClass="e-primary e-small" OnClick="@(() => _promoteOpen = true)" data-testid="promote-employee-btn">
+            <i class="fa-solid fa-arrow-up-right-dots me-1"></i> Promote
+        </SfButton>
+    </div>
+
+    @if (_items.Count == 0)
+    {
+        <HrEmptyState Message="No promotions recorded for this employee." Icon="fa-solid fa-arrow-up-right-dots" />
+    }
+    else
+    {
+        <HrGrid TValue="EmployeePromotionHistoryItemModel" DataSource="@_items" AllowPaging="true" AllowSorting="true">
+            <GridPageSettings PageSize="10" />
+            <GridColumns>
+                <GridColumn Field="@nameof(EmployeePromotionHistoryItemModel.PreviousPositionProfileTitle)" HeaderText="Previous Position" Width="160" />
+                <GridColumn Field="@nameof(EmployeePromotionHistoryItemModel.NewPositionProfileTitle)" HeaderText="New Position" Width="160" />
+                <GridColumn Field="@nameof(EmployeePromotionHistoryItemModel.EffectiveDate)" HeaderText="Effective Date" Width="130" Format="d" />
+                <GridColumn Field="@nameof(EmployeePromotionHistoryItemModel.Reason)" HeaderText="Reason" Width="200" />
+                <GridColumn Field="@nameof(EmployeePromotionHistoryItemModel.CreatedByName)" HeaderText="Created By" Width="150" />
+            </GridColumns>
+        </HrGrid>
+
+        <p class="text-muted small mt-2 mb-0">@_items.Count promotion(s)</p>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter] public string CurrentPositionProfileTitle { get; set; } = "—";
+
+    private bool _loading = true;
+    private bool _promoteOpen;
+    private IReadOnlyList<EmployeePromotionHistoryItemModel> _items = [];
+
+    protected override async Task OnParametersSetAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _loading = _items.Count == 0;
+        _items = await PromotionService.GetPromotionHistoryAsync(CompanyId, EmployeeId);
+        _loading = false;
+    }
+
+    private async Task OnPromoted()
+    {
+        _promoteOpen = false;
+        await ReloadAsync();
+    }
+}

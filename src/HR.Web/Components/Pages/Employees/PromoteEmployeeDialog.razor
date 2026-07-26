@@ -1,0 +1,452 @@
+@using System.ComponentModel.DataAnnotations
+@using HR.Web.Models
+@inject PromotionService PromotionService
+@inject PositionProfileService PositionProfileService
+@inject LocationService LocationService
+@inject EmployeeService EmployeeService
+@inherits EditDialogBase<PromoteEmployeeDialog.PromoteEmployeeFormModel>
+
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="640px" ShowCloseIcon="true" CssClass="promote-employee-dialog">
+    <DialogEvents Closed="HandleDialogClosed" />
+    <DialogTemplates>
+        <Header>Promote Employee</Header>
+        <Content>
+            <ul class="nav nav-pills mb-3">
+                @foreach (var step in _steps)
+                {
+                    <li class="nav-item">
+                        <span class="nav-link @(step.Number == _step ? "active" : (step.Number < _step ? "text-success" : "text-muted"))">
+                            @step.Number. @step.Label
+                        </span>
+                    </li>
+                }
+            </ul>
+
+            @if (!string.IsNullOrEmpty(GlobalError))
+            {
+                <div class="alert alert-danger alert-dismissible mb-3">
+                    @GlobalError
+                    <button type="button" class="btn-close" @onclick="@(() => GlobalError = null)"></button>
+                </div>
+            }
+
+            <EditForm EditContext="EditContext">
+                <DataAnnotationsValidator />
+
+                @if (_step == 1)
+                {
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Current Position</label>
+                            <input class="form-control" readonly value="@CurrentPositionProfileTitle" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">New Position Profile <span class="text-danger">*</span></label>
+                            <SfDropDownList TValue="Guid?" TItem="PositionProfileListItemModel"
+                                            DataSource="@_positionProfiles"
+                                            @bind-Value="Model.NewPositionProfileId"
+                                            Placeholder="Select new position"
+                                            AllowFiltering="true">
+                                <DropDownListFieldSettings Value="Id" Text="Title" />
+                            </SfDropDownList>
+                            <ValidationMessage For="@(() => Model.NewPositionProfileId)" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Effective Date <span class="text-danger">*</span></label>
+                            <SfDatePicker TValue="DateOnly?" @bind-Value="Model.EffectiveDate" Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" />
+                            <ValidationMessage For="@(() => Model.EffectiveDate)" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Reason <span class="text-danger">*</span></label>
+                            <HrTextBox @bind-Value="Model.Reason" Placeholder="e.g. Annual review promotion" />
+                            <ValidationMessage For="@(() => Model.Reason)" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" rows="3" maxlength="4000" @bind="Model.Notes" placeholder="Optional notes…"></textarea>
+                        </div>
+                    </div>
+                }
+                else if (_step == 2)
+                {
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <SfCheckBox TChecked="bool" Label="Change manager" @bind-Checked="Model.ChangeManager" />
+                        </div>
+                        @if (Model.ChangeManager)
+                        {
+                            <div class="col-12">
+                                <label class="form-label">New Manager</label>
+                                <SfDropDownList @ref="_managerDropdown"
+                                                TValue="Guid?" TItem="ManagerOption"
+                                                DataSource="@_managerOptions"
+                                                @bind-Value="Model.NewManagerId"
+                                                Placeholder="Select manager"
+                                                AllowFiltering="true">
+                                    <DropDownListFieldSettings Value="Id" Text="Name" />
+                                    <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnManagerFilteringAsync" />
+                                </SfDropDownList>
+                            </div>
+                        }
+                        <div class="col-12">
+                            <SfCheckBox TChecked="bool" Label="Change location" @bind-Checked="Model.ChangeLocation" />
+                        </div>
+                        @if (Model.ChangeLocation)
+                        {
+                            <div class="col-12">
+                                <label class="form-label">New Location</label>
+                                <SfDropDownList TValue="Guid?" TItem="LocationOption"
+                                                DataSource="@_locationOptions"
+                                                @bind-Value="Model.NewLocationId"
+                                                Placeholder="Select location"
+                                                AllowFiltering="true">
+                                    <DropDownListFieldSettings Value="Id" Text="Name" />
+                                </SfDropDownList>
+                            </div>
+                        }
+                    </div>
+                }
+                else if (_step == 3)
+                {
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <SfCheckBox TChecked="bool" Label="Create compensation change" @bind-Checked="Model.CreateCompensationChange" />
+                        </div>
+                        @if (Model.CreateCompensationChange)
+                        {
+                            <div class="col-6">
+                                <label class="form-label">Salary Type <span class="text-danger">*</span></label>
+                                <SfDropDownList TValue="string" TItem="SalaryTypeChoice"
+                                                DataSource="@SalaryTypeOptions"
+                                                @bind-Value="Model.CompensationSalaryType">
+                                    <DropDownListFieldSettings Value="Value" Text="Label" />
+                                </SfDropDownList>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Salary <span class="text-danger">*</span></label>
+                                <SfNumericTextBox TValue="decimal?" @bind-Value="Model.CompensationSalary" Min="0" ShowSpinButton="false"
+                                                  Placeholder="e.g. 45000" />
+                                <ValidationMessage For="@(() => Model.CompensationSalary)" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Currency <span class="text-danger">*</span></label>
+                                <HrTextBox @bind-Value="Model.CompensationCurrency" Placeholder="e.g. GBP" />
+                                <ValidationMessage For="@(() => Model.CompensationCurrency)" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Hours Per Week</label>
+                                <SfNumericTextBox TValue="decimal?" @bind-Value="Model.CompensationHoursPerWeek" Min="0" Max="168" ShowSpinButton="false"
+                                                  Placeholder="e.g. 37.5" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">FTE</label>
+                                <SfNumericTextBox TValue="decimal?" @bind-Value="Model.CompensationFte" Min="0" Max="1" Step="0.05m" ShowSpinButton="false"
+                                                  Placeholder="e.g. 1.0" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Compensation Notes</label>
+                                <textarea class="form-control" rows="2" maxlength="4000" @bind="Model.CompensationNotes" placeholder="Optional notes…"></textarea>
+                            </div>
+                        }
+                    </div>
+                }
+                else if (_step == 4)
+                {
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">New Position</dt>
+                        <dd class="col-sm-8">@SelectedPositionProfileTitle</dd>
+
+                        <dt class="col-sm-4">Effective Date</dt>
+                        <dd class="col-sm-8">@(Model.EffectiveDate?.ToString("d MMM yyyy") ?? "—")</dd>
+
+                        <dt class="col-sm-4">Reason</dt>
+                        <dd class="col-sm-8">@Model.Reason</dd>
+
+                        @if (!string.IsNullOrWhiteSpace(Model.Notes))
+                        {
+                            <dt class="col-sm-4">Notes</dt>
+                            <dd class="col-sm-8">@Model.Notes</dd>
+                        }
+
+                        @if (Model.ChangeManager)
+                        {
+                            <dt class="col-sm-4">New Manager</dt>
+                            <dd class="col-sm-8">@SelectedManagerName</dd>
+                        }
+
+                        @if (Model.ChangeLocation)
+                        {
+                            <dt class="col-sm-4">New Location</dt>
+                            <dd class="col-sm-8">@SelectedLocationName</dd>
+                        }
+
+                        @if (Model.CreateCompensationChange)
+                        {
+                            <dt class="col-sm-4">Compensation Change</dt>
+                            <dd class="col-sm-8">
+                                @Model.CompensationSalary @Model.CompensationCurrency (@Model.CompensationSalaryType)
+                            </dd>
+                        }
+                    </dl>
+                }
+            </EditForm>
+        </Content>
+        <FooterTemplate>
+            <div class="d-flex gap-2">
+                @if (_step > 1)
+                {
+                    <SfButton OnClick="GoBack" Disabled="Saving">Back</SfButton>
+                }
+                <div class="ms-auto d-flex gap-2">
+                    @if (_step < 4)
+                    {
+                        <SfButton IsPrimary="true" OnClick="GoNext" Disabled="Saving">Next</SfButton>
+                    }
+                    else
+                    {
+                        <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="Saving">
+                            @if (Saving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            @(_awaitingBackdateConfirmation ? "Confirm & Promote" : "Promote")
+                        </SfButton>
+                    }
+                    <SfButton OnClick="CancelAsync" Disabled="Saving">Cancel</SfButton>
+                </div>
+            </div>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter] public string CurrentPositionProfileTitle { get; set; } = "—";
+
+    public sealed record SalaryTypeChoice(string Value, string Label);
+
+    public static readonly SalaryTypeChoice[] SalaryTypeOptions =
+    [
+        new("Annual", "Annual"),
+        new("Hourly", "Hourly"),
+        new("Daily", "Daily")
+    ];
+
+    private static readonly (int Number, string Label)[] _steps =
+    [
+        (1, "Position"),
+        (2, "Manager & Location"),
+        (3, "Compensation"),
+        (4, "Confirm"),
+    ];
+
+    private int _step = 1;
+    private bool _awaitingBackdateConfirmation;
+
+    private List<PositionProfileListItemModel> _positionProfiles = [];
+    private List<LocationOption> _locationOptions = [];
+    private SfDropDownList<Guid?, ManagerOption> _managerDropdown = default!;
+    private List<ManagerOption> _managerOptions = [];
+
+    public sealed record ManagerOption(Guid Id, string Name);
+    public sealed record LocationOption(Guid Id, string Name);
+
+    private string SelectedPositionProfileTitle =>
+        _positionProfiles.FirstOrDefault(p => p.Id == Model.NewPositionProfileId)?.Title ?? "—";
+
+    private string SelectedManagerName =>
+        Model.NewManagerId is Guid id && id != Guid.Empty
+            ? _managerOptions.FirstOrDefault(m => m.Id == id)?.Name ?? "—"
+            : "Not assigned";
+
+    private string SelectedLocationName =>
+        Model.NewLocationId is Guid id && id != Guid.Empty
+            ? _locationOptions.FirstOrDefault(l => l.Id == id)?.Name ?? "—"
+            : "Not assigned";
+
+    protected override async Task OnOpenedAsync()
+    {
+        GlobalError = null;
+        _step = 1;
+        _awaitingBackdateConfirmation = false;
+
+        var profileResult = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
+        _positionProfiles = profileResult?.Items.ToList() ?? [];
+
+        var locationResult = await LocationService.ListLocationsAsync(CompanyId);
+        _locationOptions = (locationResult?.Items ?? [])
+            .Select(l => new LocationOption(l.Id, l.Name))
+            .OrderBy(l => l.Name)
+            .Prepend(new LocationOption(Guid.Empty, "Not assigned"))
+            .ToList();
+
+        var managerResult = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
+        _managerOptions = (managerResult?.Items ?? [])
+            .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
+            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(e => e.Name)
+            .Prepend(new ManagerOption(Guid.Empty, "Not assigned"))
+            .ToList();
+    }
+
+    private async Task OnManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        _managerOptions = (result?.Items ?? [])
+            .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
+            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(e => e.Name)
+            .Prepend(new ManagerOption(Guid.Empty, "Not assigned"))
+            .ToList();
+        await _managerDropdown.FilterAsync(_managerOptions, new Syncfusion.Blazor.Data.Query());
+    }
+
+    private void GoNext()
+    {
+        GlobalError = null;
+
+        if (_step == 1)
+        {
+            if (Model.NewPositionProfileId is null || Model.EffectiveDate is null || string.IsNullOrWhiteSpace(Model.Reason))
+            {
+                GlobalError = "Please complete the required fields before continuing.";
+                EditContext.Validate();
+                return;
+            }
+        }
+
+        if (_step == 3 && Model.CreateCompensationChange)
+        {
+            var compError = ValidateCompensation();
+            if (compError is not null)
+            {
+                GlobalError = compError;
+                return;
+            }
+        }
+
+        _step = Math.Min(_step + 1, 4);
+    }
+
+    private void GoBack()
+    {
+        GlobalError = null;
+        _step = Math.Max(_step - 1, 1);
+    }
+
+    private string? ValidateCompensation()
+    {
+        if (string.IsNullOrWhiteSpace(Model.CompensationSalaryType))
+            return "Please select a salary type.";
+        if (Model.CompensationSalary is null || Model.CompensationSalary <= 0)
+            return "Please enter a salary greater than 0.";
+        if (string.IsNullOrWhiteSpace(Model.CompensationCurrency))
+            return "Please enter a currency code.";
+        return null;
+    }
+
+    protected override string? ValidateExtra()
+    {
+        if (Model.NewPositionProfileId is null)
+            return "Please select a new position profile.";
+        if (Model.EffectiveDate is null)
+            return "Please select an effective date.";
+        if (string.IsNullOrWhiteSpace(Model.Reason))
+            return "Please enter a reason.";
+        if (Model.CreateCompensationChange)
+        {
+            var compError = ValidateCompensation();
+            if (compError is not null)
+                return compError;
+        }
+        return null;
+    }
+
+    protected override async Task<string?> SaveCoreAsync()
+    {
+        var request = new PromoteEmployeeRequest(
+            CompanyId,
+            EmployeeId,
+            Model.NewPositionProfileId!.Value,
+            Model.EffectiveDate!.Value,
+            Model.Reason.Trim(),
+            string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim(),
+            Model.ChangeManager && Model.NewManagerId is Guid mId && mId != Guid.Empty ? mId : null,
+            Model.ChangeLocation && Model.NewLocationId is Guid lId && lId != Guid.Empty ? lId : null,
+            _awaitingBackdateConfirmation,
+            Model.CreateCompensationChange,
+            Model.CreateCompensationChange ? Model.CompensationSalaryType : null,
+            Model.CreateCompensationChange ? Model.CompensationSalary : null,
+            Model.CreateCompensationChange && !string.IsNullOrWhiteSpace(Model.CompensationCurrency)
+                ? Model.CompensationCurrency.Trim().ToUpperInvariant() : null,
+            Model.CreateCompensationChange ? Model.CompensationHoursPerWeek : null,
+            Model.CreateCompensationChange ? Model.CompensationFte : null,
+            Model.CreateCompensationChange && !string.IsNullOrWhiteSpace(Model.CompensationNotes)
+                ? Model.CompensationNotes.Trim() : null);
+
+        var (result, error, requiresConfirmation) = await PromotionService.PromoteEmployeeAsync(CompanyId, EmployeeId, request);
+
+        if (result is not null)
+            return null;
+
+        if (requiresConfirmation)
+        {
+            _awaitingBackdateConfirmation = true;
+            return error;
+        }
+
+        return error ?? "Failed to promote employee.";
+    }
+
+    protected override void ResetForm()
+    {
+        Model.NewPositionProfileId = null;
+        Model.EffectiveDate = null;
+        Model.Reason = string.Empty;
+        Model.Notes = null;
+        Model.ChangeManager = false;
+        Model.NewManagerId = Guid.Empty;
+        Model.ChangeLocation = false;
+        Model.NewLocationId = Guid.Empty;
+        Model.CreateCompensationChange = false;
+        Model.CompensationSalaryType = "Annual";
+        Model.CompensationSalary = null;
+        Model.CompensationCurrency = "GBP";
+        Model.CompensationHoursPerWeek = null;
+        Model.CompensationFte = null;
+        Model.CompensationNotes = null;
+        _step = 1;
+        _awaitingBackdateConfirmation = false;
+    }
+
+    public sealed class PromoteEmployeeFormModel
+    {
+        [Required(ErrorMessage = "Please select a new position profile.")]
+        public Guid? NewPositionProfileId { get; set; }
+
+        [Required(ErrorMessage = "Please select an effective date.")]
+        public DateOnly? EffectiveDate { get; set; }
+
+        [Required(ErrorMessage = "Please enter a reason.")]
+        [StringLength(500, ErrorMessage = "Reason must be 500 characters or fewer.")]
+        public string Reason { get; set; } = string.Empty;
+
+        public string? Notes { get; set; }
+
+        public bool ChangeManager { get; set; }
+        public Guid? NewManagerId { get; set; } = Guid.Empty;
+
+        public bool ChangeLocation { get; set; }
+        public Guid? NewLocationId { get; set; } = Guid.Empty;
+
+        public bool CreateCompensationChange { get; set; }
+        public string CompensationSalaryType { get; set; } = "Annual";
+        public decimal? CompensationSalary { get; set; }
+        public string CompensationCurrency { get; set; } = "GBP";
+        public decimal? CompensationHoursPerWeek { get; set; }
+        public decimal? CompensationFte { get; set; }
+        public string? CompensationNotes { get; set; }
+    }
+}

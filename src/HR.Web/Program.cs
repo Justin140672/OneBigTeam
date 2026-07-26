@@ -49,6 +49,7 @@ builder.Services.AddScoped<OffboardingService>();
 builder.Services.AddScoped<CompensationService>();
 builder.Services.AddScoped<EmployeeNoteService>();
 builder.Services.AddScoped<AuditHistoryService>();
+builder.Services.AddScoped<PromotionService>();
 builder.Services.AddScoped<OrganisationHierarchyBuilder>();
 builder.Services.AddScoped<OrganisationChartService>();
 builder.Services.AddScoped<SicknessService>();

@@ -525,6 +525,34 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             $"Numeric input value did not stick after {maxAttempts} attempts: expected '{expected}', got '{await input.InputValueAsync()}'.");
     }
 
+    // ── Promotion History Tab ───────────────────────────────────────────────────
+
+    public async Task OpenPromotionHistoryTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Promotion History" }).ClickAsync();
+        await page.WaitForSelectorAsync(
+            "[data-testid='promote-employee-btn']",
+            new() { Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// Returns true if the "No promotions recorded for this employee." empty state (HrEmptyState)
+    /// is visible — i.e. the employee has no promotion history yet.
+    /// </summary>
+    public Task<bool> HasNoPromotionsMessageAsync() =>
+        page.Locator(".hr-empty-state").Filter(new() { HasText = "No promotions recorded for this employee." }).IsVisibleAsync();
+
+    /// <summary>Returns true if the promotion history grid is currently rendered (i.e. at least one promotion exists).</summary>
+    public Task<bool> HasPromotionHistoryGridAsync() =>
+        page.Locator(".e-grid").IsVisibleAsync();
+
+    /// <summary>
+    /// Returns the promotion history grid row whose rendered text contains
+    /// <paramref name="textFragment"/> (e.g. a Reason or a position title).
+    /// </summary>
+    public ILocator PromotionHistoryRow(string textFragment) =>
+        page.Locator(".e-grid .e-row").Filter(new() { HasText = textFragment });
+
     // ── Audit Tab ───────────────────────────────────────────────────────────────
 
     public async Task OpenAuditTabAsync()
