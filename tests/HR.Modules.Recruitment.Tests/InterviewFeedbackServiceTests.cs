@@ -78,7 +78,7 @@ public class InterviewFeedbackServiceTests
     }
 
     private static InterviewFeedbackService service(RecruitmentDbContext db) =>
-        new(db, new InterviewOutcomeRecorder(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher()));
+        new(db, new InterviewOutcomeRecorder(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new RecruitmentStageChangeRecorder(db, new FakeIntegrationEventPublisher(), new FakeAuditPublisher())));
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

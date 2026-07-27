@@ -2,6 +2,7 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.ScheduleInterview;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Modules.Recruitment.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -82,6 +83,83 @@ public class ScheduleInterviewHandlerTests
 
         var interviewCount = await db.Interviews.CountAsync(i => i.ApplicationId == application.Id);
         Assert.Equal(1, interviewCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_StageChanged_Events_When_First_Interview_Moves_Application_To_InterviewScheduled()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var eventPublisher = new FakeIntegrationEventPublisher();
+        var auditPublisher = new FakeAuditPublisher();
+        var performedBy = Guid.NewGuid();
+
+        var result = await handler(db, eventPublisher: eventPublisher, auditPublisher: auditPublisher).HandleAsync(
+            new ScheduleInterviewRequest
+            {
+                CompanyId             = companyId,
+                VacancyId             = vacancy.Id,
+                ApplicationId         = application.Id,
+                InterviewerEmployeeId = Guid.NewGuid(),
+                ScheduledAt           = Now.AddDays(3),
+            },
+            performedBy,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var stageChanged = Assert.IsType<HR.SharedKernel.ApplicantStageChangedIntegrationEvent>(Assert.Single(eventPublisher.PublishedEvents));
+        Assert.Equal(ApplicationStatus.Applied.ToString(), stageChanged.PreviousStage);
+        Assert.Equal(ApplicationStatus.InterviewScheduled.ToString(), stageChanged.NewStage);
+        Assert.Equal(performedBy, stageChanged.ChangedBy);
+
+        var stageChangedAudit = Assert.IsType<ApplicationStageChangedAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.Equal(ApplicationStatus.Applied, stageChangedAudit.PreviousStage);
+        Assert.Equal(ApplicationStatus.InterviewScheduled, stageChangedAudit.NewStage);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_StageChanged_Events_When_Additional_Round_Booked_On_Already_InterviewScheduled_Application()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        application.MoveToScreening(Now);
+        application.ScheduleInterview(Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var eventPublisher = new FakeIntegrationEventPublisher();
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, eventPublisher: eventPublisher, auditPublisher: auditPublisher).HandleAsync(
+            new ScheduleInterviewRequest
+            {
+                CompanyId             = companyId,
+                VacancyId             = vacancy.Id,
+                ApplicationId         = application.Id,
+                InterviewerEmployeeId = Guid.NewGuid(),
+                ScheduledAt           = Now.AddDays(5),
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(eventPublisher.PublishedEvents);
+        Assert.Empty(auditPublisher.Published);
+        Assert.Empty(await db.ApplicationStageHistoryEntries.ToListAsync());
     }
 
     [Fact]
@@ -345,8 +423,10 @@ public class ScheduleInterviewHandlerTests
         RecruitmentDbContext db,
         FakeTaskCreator? taskCreator = null,
         FakeNotificationWriter? notificationWriter = null,
-        IPositionProfileReader? positionProfileReader = null) =>
-        new(db, taskCreator ?? new FakeTaskCreator(), notificationWriter ?? new FakeNotificationWriter(), new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader());
+        IPositionProfileReader? positionProfileReader = null,
+        FakeIntegrationEventPublisher? eventPublisher = null,
+        FakeAuditPublisher? auditPublisher = null) =>
+        new(db, taskCreator ?? new FakeTaskCreator(), notificationWriter ?? new FakeNotificationWriter(), new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader(), new RecruitmentStageChangeRecorder(db, eventPublisher ?? new FakeIntegrationEventPublisher(), auditPublisher ?? new FakeAuditPublisher()));
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

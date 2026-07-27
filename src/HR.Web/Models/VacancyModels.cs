@@ -12,6 +12,7 @@ public record VacancyListItemModel(
     string? AdvertTitle,
     string Status,
     Guid HiringManagerId,
+    Guid? AssignedRecruiterId,
     DateOnly? OpenedAt,
     DateOnly? ClosedAt,
     DateTimeOffset CreatedAt,
@@ -43,6 +44,7 @@ public record GetVacancyResponse(
     string? AdvertDescription,
     string Status,
     Guid HiringManagerId,
+    Guid? AssignedRecruiterId,
     DateOnly? OpenedAt,
     DateOnly? ClosedAt,
     DateTimeOffset CreatedAt,
@@ -63,7 +65,8 @@ public record CreateVacancyRequest(
     Guid PositionProfileId,
     string? AdvertTitle,
     string? AdvertDescription,
-    Guid HiringManagerId);
+    Guid HiringManagerId,
+    Guid? AssignedRecruiterId = null);
 
 public record CreateVacancyResponse(
     Guid Id,
@@ -73,6 +76,7 @@ public record CreateVacancyResponse(
     string? AdvertDescription,
     string Status,
     Guid HiringManagerId,
+    Guid? AssignedRecruiterId,
     DateOnly? OpenedAt,
     DateOnly? ClosedAt,
     DateTimeOffset CreatedAt,
@@ -87,6 +91,7 @@ public record UpdateVacancyRequest(
     string? AdvertTitle,
     string? AdvertDescription,
     Guid HiringManagerId,
+    Guid? AssignedRecruiterId = null,
     bool IsAuthorisedCorrection = false,
     string? CorrectionReason = null);
 
@@ -98,6 +103,7 @@ public record UpdateVacancyResponse(
     string? AdvertDescription,
     string Status,
     Guid HiringManagerId,
+    Guid? AssignedRecruiterId,
     DateOnly? OpenedAt,
     DateOnly? ClosedAt,
     DateTimeOffset CreatedAt,

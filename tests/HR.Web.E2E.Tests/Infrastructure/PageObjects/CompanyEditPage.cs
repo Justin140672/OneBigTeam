@@ -184,23 +184,8 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     /// <summary>
     /// Selects a value from the "Leave Year Start Month" dropdown.
     /// </summary>
-    public async Task SelectLeaveYearStartMonthAsync(string monthName)
-    {
-        var group = page.Locator(".col-md-3")
-            .Filter(new() { HasText = "Leave Year Start Month" })
-            .First;
-        await group.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = monthName })
-            .First
-            .ClickAsync();
-
-        // The popup (and its full-viewport click-away layer) can take a moment to detach after
-        // selection — without waiting for it, a later click elsewhere on the page (e.g. Save)
-        // can get blocked by the still-present overlay and time out looking "not found".
-        await page.WaitForSelectorAsync(".e-popup.e-ddl", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
-    }
+    public Task SelectLeaveYearStartMonthAsync(string monthName) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".col-md-3").Filter(new() { HasText = "Leave Year Start Month" }).First, monthName);
 
     /// <summary>Returns the currently displayed value of the "Leave Year Start Month" dropdown.</summary>
     public async Task<string> GetLeaveYearStartMonthAsync()
@@ -326,19 +311,8 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     /// "1 month", "2 months", "3 months", "6 months", or "Custom duration" (which reveals the
     /// Unit/Length controls; see <see cref="WaitForNoticePeriodCustomControlsAsync"/>).
     /// </summary>
-    public async Task SelectNoticePeriodPresetAsync(string presetLabel)
-    {
-        var group = page.Locator(".col-md-4")
-            .Filter(new() { HasText = "Default Notice Period" })
-            .First;
-        await group.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = presetLabel })
-            .First
-            .ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
-    }
+    public Task SelectNoticePeriodPresetAsync(string presetLabel) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".col-md-4").Filter(new() { HasText = "Default Notice Period" }).First, presetLabel);
 
     /// <summary>Returns the currently displayed value of the "Default Notice Period" dropdown.</summary>
     public async Task<string> GetNoticePeriodPresetAsync()
@@ -365,19 +339,8 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     /// present once "Custom duration" has been selected in the notice period preset dropdown —
     /// call <see cref="WaitForNoticePeriodCustomControlsAsync"/> first.
     /// </summary>
-    public async Task SelectNoticePeriodUnitAsync(string unitLabel)
-    {
-        var group = page.Locator(".col-md-4")
-            .Filter(new() { HasText = "Unit" })
-            .First;
-        await group.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = unitLabel })
-            .First
-            .ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
-    }
+    public Task SelectNoticePeriodUnitAsync(string unitLabel) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".col-md-4").Filter(new() { HasText = "Unit" }).First, unitLabel);
 
     /// <summary>Returns the currently displayed value of the custom-duration "Unit" dropdown.</summary>
     public async Task<string> GetNoticePeriodUnitAsync()
@@ -427,19 +390,8 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     // ── Employee Numbering ──────────────────────────────────────────────────────
 
     /// <summary>Selects a value ("Manual" or "Automatic") from the "Numbering Mode" dropdown.</summary>
-    public async Task SelectEmployeeNumberModeAsync(string modeLabel)
-    {
-        var group = page.Locator(".col-md-4")
-            .Filter(new() { HasText = "Numbering Mode" })
-            .First;
-        await group.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = modeLabel })
-            .First
-            .ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
-    }
+    public Task SelectEmployeeNumberModeAsync(string modeLabel) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".col-md-4").Filter(new() { HasText = "Numbering Mode" }).First, modeLabel);
 
     /// <summary>Returns the currently displayed value of the "Numbering Mode" dropdown.</summary>
     public async Task<string> GetEmployeeNumberModeAsync()

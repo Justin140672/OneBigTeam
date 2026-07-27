@@ -68,6 +68,63 @@ public class GetApplicationHandlerTests
         Assert.Equal("not_found", result.Error.Code);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Empty_StageHistory_For_Freshly_Created_Application()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await new GetApplicationHandler(db).HandleAsync(
+            new GetApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.StageHistory);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_StageHistory_Ordered_Oldest_First_After_Transitions()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+
+        var changedBy = Guid.NewGuid();
+        var laterEntry = ApplicationStageHistoryEntry.Create(
+            Guid.NewGuid(), companyId, application.Id, ApplicationStatus.Screening, ApplicationStatus.InterviewScheduled,
+            changedBy, "Scheduled first round.", Now.AddDays(2));
+        var earlierEntry = ApplicationStageHistoryEntry.Create(
+            Guid.NewGuid(), companyId, application.Id, ApplicationStatus.Applied, ApplicationStatus.Screening,
+            changedBy, "Passed CV screen.", Now.AddDays(1));
+        db.ApplicationStageHistoryEntries.AddRange(laterEntry, earlierEntry);
+        await db.SaveChangesAsync();
+
+        var result = await new GetApplicationHandler(db).HandleAsync(
+            new GetApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(
+            [earlierEntry.Id, laterEntry.Id],
+            result.Value!.StageHistory.Select(h => h.Id));
+        Assert.Equal(ApplicationStatus.Applied, result.Value.StageHistory[0].PreviousStage);
+        Assert.Equal(ApplicationStatus.Screening, result.Value.StageHistory[0].NewStage);
+        Assert.Equal(changedBy, result.Value.StageHistory[0].ChangedByUserId);
+        Assert.Equal("Passed CV screen.", result.Value.StageHistory[0].Notes);
+    }
+
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))

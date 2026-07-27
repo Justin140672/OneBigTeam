@@ -99,7 +99,7 @@
                                 TValue="Guid?" TItem="CandidateListItemModel"
                                 DataSource="@_candidates" @bind-Value="_selectedCandidateId"
                                 Placeholder="Select a candidate" AllowFiltering="true">
-                    <DropDownListFieldSettings Value="Id" Text="Email" />
+                    <DropDownListFieldSettings Value="Id" Text="FullName" />
                     <DropDownListEvents TValue="Guid?" TItem="CandidateListItemModel" Filtering="OnCandidateFilteringAsync" />
                     <DropDownListTemplates TItem="CandidateListItemModel">
                         <ItemTemplate>
@@ -133,7 +133,7 @@
                 <SfDropDownList TValue="Guid?" TItem="EmployeeListItemModel"
                                 DataSource="@_employees" @bind-Value="_interviewerId"
                                 Placeholder="Select interviewer" AllowFiltering="true">
-                    <DropDownListFieldSettings Value="Id" Text="WorkEmail" />
+                    <DropDownListFieldSettings Value="Id" Text="FullName" />
                     <DropDownListTemplates TItem="EmployeeListItemModel">
                         <ItemTemplate>
                             @{ var e = (EmployeeListItemModel)context; }

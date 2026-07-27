@@ -121,17 +121,10 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await EditMetadataDialog.GetByPlaceholder("Optional description").FillAsync(description);
 
         var categoryGroup = EditMetadataDialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
-        await categoryGroup.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = categoryLabel })
-            .First
-            .ClickAsync();
+        await DropDownSelector.SelectAsync(page, categoryGroup, categoryLabel);
 
-        // Popup-hidden alone isn't proof the Blazor round-trip committed Model.CategoryId yet —
-        // wait for the combobox's own input value too (same pattern as SetReviewFrequencyAsync).
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
-            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        // Confirms the Blazor round-trip committed Model.CategoryId, not just that the popup
+        // closed client-side (same pattern as SetReviewFrequencyAsync).
         await Assertions.Expect(categoryGroup.Locator(".e-input-group input").First)
             .ToHaveValueAsync(new Regex(Regex.Escape(categoryLabel)), new() { Timeout = 10_000 });
 
@@ -199,20 +192,12 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         // click-item interaction pattern used for Category elsewhere in this test suite (see
         // SharedDocumentUploadTests).
         var reviewFrequencyGroup = EditMetadataDialog.Locator(".col-md-6").Filter(new() { HasText = "Review Frequency" });
-        await reviewFrequencyGroup.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = frequencyLabel })
-            .First
-            .ClickAsync();
+        await DropDownSelector.SelectAsync(page, reviewFrequencyGroup, frequencyLabel);
 
-        // Popup-hidden alone can be a purely client-side JS close animation and isn't proof that
-        // Blazor's ValueChanged round-trip to the server actually committed the selection yet —
-        // wait for the combobox's own input value too (same pattern as the Review Owner selector
-        // below / EmployeeEditPage.SelectManagerAsync). Without this, an immediate Save can race
-        // the round-trip.
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
-            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        // Confirms the Blazor round-trip committed the selection, not just that the popup closed
+        // client-side (same pattern as the Review Owner selector below /
+        // EmployeeEditPage.SelectManagerAsync). Without this, an immediate Save can race the
+        // round-trip.
         await Assertions.Expect(reviewFrequencyGroup.Locator(".e-input-group input").First)
             .ToHaveValueAsync(new Regex(Regex.Escape(frequencyLabel)), new() { Timeout = 10_000 });
 
@@ -270,25 +255,10 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
         var reviewOwnerGroup = EditMetadataDialog.Locator(".col-md-6").Filter(new() { HasText = "Review Owner" });
-        await reviewOwnerGroup.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await DropDownSelector.SelectAsync(page, reviewOwnerGroup, employeeNameFragment);
 
-        // Type into the filter input — required for AllowFiltering dropdowns (same pattern as
-        // EmployeeEditPage.SelectManagerAsync).
-        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
-        await filterInput.FillAsync(employeeNameFragment);
-        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
-            .Filter(new() { HasText = employeeNameFragment })
-            .First
-            .ClickAsync();
-
-        // Popup-hidden alone can be a purely client-side JS close animation and isn't proof that
-        // Blazor's ValueChanged round-trip to the server actually committed
-        // Model.ReviewOwnerEmployeeId yet — wait for the combobox's own input value too (same
-        // reasoning as EmployeeEditPage.SelectManagerAsync).
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
-            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        // Confirms the Blazor round-trip committed Model.ReviewOwnerEmployeeId, not just that the
+        // popup closed client-side (same reasoning as EmployeeEditPage.SelectManagerAsync).
         await Assertions.Expect(reviewOwnerGroup.Locator(".e-input-group input").First)
             .ToHaveValueAsync(employeeNameFragment, new() { Timeout = 10_000 });
 
@@ -325,15 +295,8 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
         var reviewOwnerGroup = EditMetadataDialog.Locator(".col-md-6").Filter(new() { HasText = "Review Owner" });
-        await reviewOwnerGroup.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = "Not assigned" })
-            .First
-            .ClickAsync();
+        await DropDownSelector.SelectAsync(page, reviewOwnerGroup, "Not assigned");
 
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
-            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
         await Assertions.Expect(reviewOwnerGroup.Locator(".e-input-group input").First)
             .ToHaveValueAsync("Not assigned", new() { Timeout = 10_000 });
 

@@ -1,5 +1,6 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -12,10 +13,12 @@ internal sealed class HireCandidateHandler(
     IPositionProfileReader positionProfileReader,
     IClock clock,
     IIntegrationEventPublisher eventPublisher,
-    IAuditEventPublisher auditPublisher)
+    IAuditEventPublisher auditPublisher,
+    RecruitmentStageChangeRecorder recorder)
 {
     public async Task<Result<HireCandidateResponse>> HandleAsync(
         HireCandidateRequest request,
+        Guid performedBy,
         CancellationToken cancellationToken)
     {
         var vacancy = await db.Vacancies
@@ -100,9 +103,11 @@ internal sealed class HireCandidateHandler(
             return Result.Failure<HireCandidateResponse>(provisioningResult.Error);
 
         var now = clock.UtcNowOffset();
+        var previousStatus = application.Status;
 
         application.Hire(now);
         candidate.LinkToEmployee(provisioningResult.Value!, now);
+        recorder.AddHistoryEntry(application, previousStatus, performedBy, now);
         await db.SaveChangesAsync(cancellationToken);
 
         await eventPublisher.PublishAsync(new CandidateHiredIntegrationEvent(
@@ -112,6 +117,8 @@ internal sealed class HireCandidateHandler(
             provisioningResult.Value!,
             application.VacancyId,
             now), cancellationToken);
+
+        await recorder.PublishStageChangedEventsAsync(application, previousStatus, performedBy, now, cancellationToken);
 
         await auditPublisher.PublishAsync(
             new CandidateHiredAuditEvent(

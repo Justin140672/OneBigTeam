@@ -1,0 +1,52 @@
+.kanban-applicant-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    cursor: pointer;
+}
+
+.kanban-applicant-card--muted {
+    opacity: 0.6;
+}
+
+.kanban-applicant-card--danger {
+    border-left: 3px solid var(--bs-danger, #dc3545);
+}
+
+.kanban-applicant-card--success {
+    border-left: 3px solid var(--bs-success, #198754);
+}
+
+.kanban-applicant-card__top {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.kanban-applicant-card__name-block {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.kanban-applicant-card__name {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kanban-applicant-card__vacancy {
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kanban-applicant-card__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color, #6c757d);
+}

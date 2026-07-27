@@ -87,6 +87,7 @@ internal sealed class UpdateVacancyHandler(
             request.AdvertTitle,
             request.AdvertDescription,
             request.HiringManagerId,
+            request.AssignedRecruiterId,
             now);
 
         await db.SaveChangesAsync(cancellationToken);
@@ -131,6 +132,7 @@ internal sealed class UpdateVacancyHandler(
             vacancy.AdvertDescription,
             vacancy.Status,
             vacancy.HiringManagerId,
+            vacancy.AssignedRecruiterId,
             vacancy.OpenedAt,
             vacancy.ClosedAt,
             vacancy.CreatedAt,

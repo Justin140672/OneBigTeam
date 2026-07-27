@@ -1,0 +1,205 @@
+@using Syncfusion.Blazor.Inputs
+@inject RecruitmentKanbanService KanbanService
+@inject EmployeeService EmployeeService
+@inject CandidateService CandidateService
+@inject NavigationManager Navigation
+
+<div class="vacancy-kanban-board" data-testid="vacancy-kanban-board">
+    <div class="vacancy-kanban-board__toolbar mb-3">
+        <SfTextBox Placeholder="Search by name or email…"
+                   Value="@SearchText"
+                   ValueChange="OnSearchChanged"
+                   CssClass="vacancy-kanban-board__search"
+                   data-testid="kanban-search-box" />
+        @if (_vacancyTitle is not null)
+        {
+            <a href="/companies/@CompanyId/vacancies/@VacancyId" class="vacancy-kanban-board__vacancy-link">@_vacancyTitle</a>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger alert-dismissible" data-testid="kanban-error">
+            @_error
+            <button type="button" class="btn-close" @onclick="() => _error = null"></button>
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <HrLoadingIndicator Label="Loading Kanban board…" />
+    }
+    else
+    {
+        <SfKanban TValue="KanbanApplicantModel"
+                  DataSource="@FilteredCards"
+                  KeyField="Stage"
+                  Height="640px"
+                  CssClass="vacancy-kanban-board__kanban">
+            <KanbanCardSettings>
+                <Template>
+                    @{
+                        var applicant = (KanbanApplicantModel)context;
+                    }
+                    <KanbanApplicantCard Applicant="applicant" RecruiterName="@RecruiterName(applicant.AssignedRecruiterId)" OnOpen="OpenApplicant" />
+                </Template>
+            </KanbanCardSettings>
+            <KanbanColumns>
+                @foreach (var stage in ApplicationStatusTransitionRules.ColumnOrder)
+                {
+                    <KanbanColumn HeaderText="@stage" KeyField="@(new List<string> { stage })" ShowItemCount="true" />
+                }
+            </KanbanColumns>
+            <KanbanEvents TValue="KanbanApplicantModel" DragStop="OnDragStopAsync" CardClick="OnCardClickAsync" />
+        </SfKanban>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid VacancyId { get; set; }
+
+    // Session-scoped "remember filters" — the search text lives in the parent (Dashboard) when this
+    // component is reused there, so it survives switching between Kanban/List views without a new
+    // persistence mechanism. Falls back to local state when used standalone (e.g. the Vacancy Detail
+    // tab) via the getter/setter pair below.
+    [Parameter] public string SearchText { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> SearchTextChanged { get; set; }
+
+    private bool _loading = true;
+    private string? _error;
+    private string? _vacancyTitle;
+    private List<KanbanApplicantModel> _cards = [];
+    private Dictionary<Guid, string> _recruiterNames = [];
+    private Dictionary<Guid, string> _candidateEmails = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_prevVacancyId != VacancyId)
+        {
+            _prevVacancyId = VacancyId;
+            await LoadAsync();
+        }
+    }
+
+    private Guid _prevVacancyId;
+
+    private Task LoadAsync() => LoadAsync(showSpinner: true);
+
+    // showSpinner:false is used after a drag-and-drop move — swapping the whole board out for a
+    // spinner on every drop would be jarring, so the refresh happens quietly and the grid just
+    // re-renders with the corrected (or confirmed) card positions once the fresh data arrives.
+    private async Task LoadAsync(bool showSpinner)
+    {
+        if (showSpinner) _loading = true;
+        _error = null;
+
+        var kanbanTask = KanbanService.GetKanbanAsync(CompanyId, VacancyId);
+        var employeesTask = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
+        // Bulk-loaded once so the search box can match candidate email — the Kanban response itself
+        // only carries name/stage/dates (see GetRecruitmentKanbanResponse), no email or employee
+        // number field. See report: this is a known contract gap for ticket #69's email/employee
+        // number search scope.
+        var candidatesTask = CandidateService.ListCandidatesAsync(CompanyId, pageSize: 200);
+
+        await Task.WhenAll(kanbanTask, employeesTask, candidatesTask);
+
+        var kanban = await kanbanTask;
+        if (kanban is null)
+        {
+            _error = "Failed to load the recruitment Kanban board.";
+            _cards = [];
+            if (showSpinner) _loading = false;
+            return;
+        }
+
+        _vacancyTitle = kanban.VacancyTitle;
+        _cards = kanban.Columns.SelectMany(c => c.Applicants).ToList();
+
+        var employees = (await employeesTask)?.Items ?? [];
+        _recruiterNames = employees.ToDictionary(e => e.Id, e => e.FullName);
+
+        var candidates = (await candidatesTask)?.Items ?? [];
+        _candidateEmails = candidates.ToDictionary(c => c.Id, c => c.Email);
+
+        if (showSpinner) _loading = false;
+    }
+
+    private IEnumerable<KanbanApplicantModel> FilteredCards
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(SearchText))
+                return _cards;
+
+            var term = SearchText.Trim();
+            return _cards.Where(c =>
+                c.CandidateFullName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                (_candidateEmails.TryGetValue(c.CandidateId, out var email) &&
+                 email.Contains(term, StringComparison.OrdinalIgnoreCase)));
+        }
+    }
+
+    private string RecruiterName(Guid? recruiterId) =>
+        recruiterId is not null && _recruiterNames.TryGetValue(recruiterId.Value, out var name)
+            ? name
+            : "Unassigned";
+
+    private async Task OnSearchChanged(Syncfusion.Blazor.Inputs.ChangedEventArgs args)
+    {
+        SearchText = args.Value ?? string.Empty;
+        await SearchTextChanged.InvokeAsync(SearchText);
+    }
+
+    private Task OpenApplicant(KanbanApplicantModel applicant)
+    {
+        Navigation.NavigateTo($"/companies/{CompanyId}/candidates/{applicant.CandidateId}");
+        return Task.CompletedTask;
+    }
+
+    private Task OnCardClickAsync(CardClickEventArgs<KanbanApplicantModel> args) =>
+        args.Data is null ? Task.CompletedTask : OpenApplicant(args.Data);
+
+    // Judgement call: DragStop (not DragStart/Dragging) is the hook — by the time it fires, Syncfusion
+    // has already updated args.Data's KeyField (Stage) to the target column's key, and
+    // args.PreviousCardData holds the pre-drag record, so both the "from" and "to" stage are available
+    // without any extra bookkeeping. Client-side transition validity is checked first (mirrors
+    // ApplicationStatusTransitions) so an obviously-invalid drop never reaches the server. Regardless
+    // of outcome (invalid drop, 422 from the server, or success) the board is always re-fetched from
+    // the server afterwards — this is the "revert" mechanism: the card visually snaps back to its true
+    // server-side column because the DataSource is fully replaced, rather than relying on
+    // args.Cancel's own (unconfirmed for this Blazor wrapper) undo behaviour. args.Cancel is still set
+    // for invalid/failed moves as a defensive best-effort in case the engine also does its own revert.
+    private async Task OnDragStopAsync(Syncfusion.Blazor.Kanban.DragEventArgs<KanbanApplicantModel> args)
+    {
+        var moved = args.Data?.FirstOrDefault();
+        var previous = args.PreviousCardData?.FirstOrDefault();
+
+        if (moved is null || previous is null || moved.Stage == previous.Stage)
+            return;
+
+        var fromStage = previous.Stage;
+        var toStage = moved.Stage;
+
+        if (!ApplicationStatusTransitionRules.CanTransitionTo(fromStage, toStage))
+        {
+            args.Cancel = true;
+            _error = $"Cannot move an applicant from {fromStage} to {toStage}.";
+            await LoadAsync(showSpinner: false);
+            return;
+        }
+
+        var (result, error) = await KanbanService.MoveApplicationStageAsync(CompanyId, VacancyId, moved.ApplicationId, toStage);
+
+        if (result is null)
+        {
+            args.Cancel = true;
+            _error = error ?? "Failed to move applicant to the new stage.";
+            await LoadAsync(showSpinner: false);
+            return;
+        }
+
+        _error = null;
+        await LoadAsync(showSpinner: false);
+    }
+}

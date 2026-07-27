@@ -253,6 +253,20 @@ public class ConfirmImportSessionEndpointTests : IClassFixture<ApiWebApplication
         Assert.Equal("EMP-001", payload.CreatedRows[0].EmployeeNumber);
         Assert.Equal(3, payload.CreatedRows[1].RowNumber);
         Assert.Equal("EMP-002", payload.CreatedRows[1].EmployeeNumber);
+
+        // The confirm response reports what the writer/generator returned in-memory — re-fetch
+        // each employee to prove the generated number was actually persisted, not just echoed back.
+        var johnResponse = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{payload.CreatedRows[0].EmployeeId}");
+        johnResponse.EnsureSuccessStatusCode();
+        var john = await johnResponse.Content.ReadFromJsonAsync<EmployeeDetailPayload>();
+        Assert.Equal("EMP-001", john!.EmployeeNumber);
+
+        var janeResponse = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{payload.CreatedRows[1].EmployeeId}");
+        janeResponse.EnsureSuccessStatusCode();
+        var jane = await janeResponse.Content.ReadFromJsonAsync<EmployeeDetailPayload>();
+        Assert.Equal("EMP-002", jane!.EmployeeNumber);
     }
 
     private static async Task<Guid> CreateCompanyAsync(HttpClient client)
@@ -355,6 +369,8 @@ public class ConfirmImportSessionEndpointTests : IClassFixture<ApiWebApplication
     private sealed record IdPayload(Guid Id);
 
     private sealed record ConfirmedRowPayload(int RowNumber, Guid EmployeeId, string EmployeeNumber);
+
+    private sealed record EmployeeDetailPayload(Guid Id, string? EmployeeNumber);
 
     private sealed record ConfirmPayload(
         Guid ImportSessionId, string Status, int CreatedCount, int FailedCount,

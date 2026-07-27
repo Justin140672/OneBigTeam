@@ -137,8 +137,8 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
             string.IsNullOrWhiteSpace(model.AdvertTitle) ? null : model.AdvertTitle.Trim(),
             string.IsNullOrWhiteSpace(model.AdvertDescription) ? null : model.AdvertDescription.Trim(),
             model.HiringManagerId!.Value,
-            model.IsAuthorisedCorrection,
-            string.IsNullOrWhiteSpace(model.CorrectionReason) ? null : model.CorrectionReason.Trim());
+            IsAuthorisedCorrection: model.IsAuthorisedCorrection,
+            CorrectionReason: string.IsNullOrWhiteSpace(model.CorrectionReason) ? null : model.CorrectionReason.Trim());
 
         var (updated, error) = await UpdateVacancyAsync(companyId, id, request);
         return (updated is null ? null : model, error);

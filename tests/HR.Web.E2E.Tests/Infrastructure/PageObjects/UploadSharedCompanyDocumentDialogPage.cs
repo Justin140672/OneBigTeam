@@ -36,17 +36,8 @@ public sealed class UploadSharedCompanyDocumentDialogPage(IPage page, string bas
     /// click-item interaction pattern used throughout this test suite — see
     /// SharedDocumentDetailPage.EditTitleDescriptionCategoryAsync).
     /// </summary>
-    public async Task SelectCategoryAsync(string categoryLabel)
-    {
-        var categoryGroup = Dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
-        await categoryGroup.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = categoryLabel })
-            .First
-            .ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
-    }
+    public Task SelectCategoryAsync(string categoryLabel) =>
+        DropDownSelector.SelectAsync(page, Dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" }), categoryLabel);
 
     public Task SetFileAsync(string filePath) =>
         Dialog.Locator("input[type='file']").SetInputFilesAsync(filePath);

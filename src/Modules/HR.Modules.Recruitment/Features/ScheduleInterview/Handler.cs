@@ -1,5 +1,6 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +12,8 @@ internal sealed class ScheduleInterviewHandler(
     ITaskCreator taskCreator,
     INotificationWriter notificationWriter,
     IClock clock,
-    IPositionProfileReader positionProfileReader)
+    IPositionProfileReader positionProfileReader,
+    RecruitmentStageChangeRecorder recorder)
 {
     public async Task<Result<ScheduleInterviewResponse>> HandleAsync(
         ScheduleInterviewRequest request,
@@ -30,19 +32,26 @@ internal sealed class ScheduleInterviewHandler(
                 Error.NotFound($"Application '{request.ApplicationId}' was not found."));
 
         var now = clock.UtcNowOffset();
+        var previousStatus = application.Status;
+        var stageChanged = false;
 
         switch (application.Status)
         {
             case ApplicationStatus.Applied or ApplicationStatus.Screening:
                 application.ScheduleInterview(now);
+                stageChanged = true;
                 break;
             case ApplicationStatus.InterviewScheduled:
-                // Additional interview round for an application already in progress.
+                // Additional interview round for an application already in progress — no stage
+                // change, so no stage-history entry/integration event/audit event is recorded here.
                 break;
             default:
                 return Result.Failure<ScheduleInterviewResponse>(
                     Error.Validation($"Cannot schedule an interview for an application with status '{application.Status}'."));
         }
+
+        if (stageChanged)
+            recorder.AddHistoryEntry(application, previousStatus, scheduledBy, now);
 
         var interview = Interview.Create(
             Guid.NewGuid(),
@@ -56,6 +65,9 @@ internal sealed class ScheduleInterviewHandler(
 
         db.Interviews.Add(interview);
         await db.SaveChangesAsync(cancellationToken);
+
+        if (stageChanged)
+            await recorder.PublishStageChangedEventsAsync(application, previousStatus, scheduledBy, now, cancellationToken);
 
         var candidateName = await db.Candidates
             .Where(c => c.Id == application.CandidateId)

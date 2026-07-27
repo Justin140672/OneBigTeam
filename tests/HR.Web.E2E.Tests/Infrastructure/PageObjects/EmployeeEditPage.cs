@@ -71,18 +71,8 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     }
 
     /// <summary>Selects a value from a Syncfusion SfDropDownList identified by nearby label text.</summary>
-    public async Task SelectDropdownAsync(string labelText, string optionText)
-    {
-        var group = page.Locator(".col-md-6, .col-md-4")
-            .Filter(new() { HasText = labelText })
-            .First;
-        await group.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = optionText })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectDropdownAsync(string labelText, string optionText) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".col-md-6, .col-md-4").Filter(new() { HasText = labelText }).First, optionText);
 
     // ── Employee Overview header ────────────────────────────────────────────────
 
@@ -118,30 +108,13 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         var managerGroup = page.Locator(".col-md-4, .col-12")
             .Filter(new() { HasText = "Manager" })
             .First;
-        await managerGroup.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        // Type into the filter input — required for AllowFiltering dropdowns.
-        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
-        await filterInput.FillAsync(managerNameFragment);
-        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
-            .Filter(new() { HasText = managerNameFragment })
-            .First
-            .ClickAsync();
-        // Popup-hidden alone can be a purely client-side JS close animation and isn't proof that
-        // Blazor's ValueChanged round-trip to the server actually committed Model.ManagerId yet.
-        // Wait for that too, but the decisive signal is the combobox itself re-rendering to show
-        // the selected name — that can only happen once the server-side bound value has updated.
-        // Without this, a caller that immediately clicks Save can race the round-trip and save
-        // with the old (null) ManagerId — the employee never shows up as anyone's direct report.
-        //
-        // The selected text lives in the dropdown's own <input> VALUE, not as plain DOM text —
-        // Locator.Filter(HasText:...) matches against textContent, which never includes an
-        // <input>'s value attribute, so it can never see the update (same reason
-        // GetSelectedDepartmentTextAsync/GetSelectedLocationTextAsync below read via
-        // InputValueAsync() rather than text matching). Assert on the input's value instead.
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
-            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        await DropDownSelector.SelectAsync(page, managerGroup, managerNameFragment);
+
+        // Confirms Blazor's ValueChanged round-trip to the server actually committed
+        // Model.ManagerId, not just that the popup closed client-side — without this, a caller
+        // that immediately clicks Save can race the round-trip and save with the old (null)
+        // ManagerId. The selected text lives in the dropdown's own <input> VALUE, not as plain
+        // DOM text, so assert on InputValueAsync rather than text matching.
         await Assertions.Expect(managerGroup.Locator(".e-input-group input").First)
             .ToHaveValueAsync(managerNameFragment, new() { Timeout = 10_000 });
     }
@@ -158,17 +131,10 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         var managerGroup = page.Locator(".col-md-4, .col-12")
             .Filter(new() { HasText = "Manager" })
             .First;
-        await managerGroup.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = "No Manager" })
-            .First
-            .ClickAsync();
+        await DropDownSelector.SelectAsync(page, managerGroup, "No Manager");
 
-        // Same "popup-hidden isn't proof of the server round-trip" concern as SelectManagerAsync
-        // above — wait for the combobox's own input value too before returning.
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
-            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        // Same "not just a client-side popup close" concern as SelectManagerAsync above — wait
+        // for the combobox's own input value too before returning.
         await Assertions.Expect(managerGroup.Locator(".e-input-group input").First)
             .ToHaveValueAsync("No Manager", new() { Timeout = 10_000 });
     }
@@ -337,16 +303,8 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         NoticePeriodOverrideRow.IsVisibleAsync();
 
     /// <summary>Selects a value ("Weeks" or "Months") from the notice period override's Unit dropdown. Only present once the override checkbox is checked.</summary>
-    public async Task SelectNoticePeriodUnitAsync(string unitLabel)
-    {
-        await NoticePeriodOverrideRow.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = unitLabel })
-            .First
-            .ClickAsync(new() { Timeout = 10_000 });
-        await page.WaitForSelectorAsync(".e-popup.e-ddl", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
-    }
+    public Task SelectNoticePeriodUnitAsync(string unitLabel) =>
+        DropDownSelector.SelectAsync(page, NoticePeriodOverrideRow, unitLabel);
 
     /// <summary>Returns the currently displayed value of the notice period override's Unit dropdown.</summary>
     public async Task<string> GetNoticePeriodUnitTextAsync()
@@ -450,15 +408,8 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    public async Task SelectAddCompensationSalaryTypeAsync(string salaryType)
-    {
-        await page.Locator(".add-compensation-dialog span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = salaryType })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectAddCompensationSalaryTypeAsync(string salaryType) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".add-compensation-dialog"), salaryType);
 
     // Salary is an SfNumericTextBox with FloatLabelType.Auto, which renders its Placeholder
     // prop as a floating label rather than a native HTML placeholder attribute, so
@@ -714,18 +665,11 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     }
 
     /// <summary>Selects a category in the (currently open) Record Sickness dialog.</summary>
-    public async Task SelectRecordSicknessCategoryAsync(string categoryName)
-    {
-        var group = page.Locator("[role='dialog'].record-sickness-dialog .col-12")
-            .Filter(new() { HasText = "Category" })
-            .First;
-        await group.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = categoryName })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectRecordSicknessCategoryAsync(string categoryName) =>
+        DropDownSelector.SelectAsync(
+            page,
+            page.Locator("[role='dialog'].record-sickness-dialog .col-12").Filter(new() { HasText = "Category" }).First,
+            categoryName);
 
     /// <summary>Fills the Start Date field in the (currently open) Record Sickness dialog.</summary>
     public async Task FillRecordSicknessStartDateAsync(string ddMMyyyy)
@@ -935,15 +879,8 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
-    public async Task SelectAddNoteCategoryAsync(string categoryLabel)
-    {
-        await page.Locator(".add-employee-note-dialog span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = categoryLabel })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectAddNoteCategoryAsync(string categoryLabel) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".add-employee-note-dialog"), categoryLabel);
 
     public Task FillAddNoteTextAsync(string text) =>
         page.Locator("[data-testid='add-note-text']").FillAsync(text);
@@ -977,15 +914,8 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public Task FillSupersedeNoteTextAsync(string text) =>
         page.Locator("[data-testid='supersede-note-text']").FillAsync(text);
 
-    public async Task SelectSupersedeNoteCategoryAsync(string categoryLabel)
-    {
-        await page.Locator(".supersede-employee-note-dialog span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = categoryLabel })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectSupersedeNoteCategoryAsync(string categoryLabel) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".supersede-employee-note-dialog"), categoryLabel);
 
     public async Task SubmitSupersedeNoteDialogAsync()
     {

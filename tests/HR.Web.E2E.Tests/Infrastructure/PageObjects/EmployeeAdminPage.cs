@@ -103,13 +103,8 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         // Wait for the request-document dialog specifically (avoids matching the grid's column chooser dialog)
         await page.WaitForSelectorAsync(".request-document-dialog", new() { Timeout = 10_000 });
 
-        // Select document type from the Syncfusion dropdown (click the combobox span, not the hidden input)
-        await page.Locator(".request-document-dialog span[role='combobox']").ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = documentTypeName })
-            .First
-            .ClickAsync();
+        // Select document type from the Syncfusion dropdown.
+        await DropDownSelector.SelectAsync(page, page.Locator(".request-document-dialog"), documentTypeName);
 
         if (dueDate.HasValue)
         {
@@ -199,13 +194,7 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
     public async Task SelectAssetAndConfirmAsync(string assetFragment)
     {
         var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = "Assign Asset" });
-        var combobox = dialog.Locator("span[role='combobox']");
-        await combobox.ClickAsync();
-        var targetItem = page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = assetFragment })
-            .First;
-        await targetItem.WaitForAsync(new() { Timeout = 10_000 });
-        await targetItem.ClickAsync();
+        await DropDownSelector.SelectAsync(page, dialog, assetFragment);
         await page.GetByRole(AriaRole.Button, new() { Name = "Assign", Exact = true }).ClickAsync();
         await page.GetByRole(AriaRole.Dialog, new() { Name = "Assign Asset" })
             .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
@@ -354,12 +343,7 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
 
         if (!string.IsNullOrEmpty(reason))
         {
-            await dialog.Locator("span[role='combobox']").ClickAsync();
-            await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-            await page.Locator(".e-popup.e-ddl .e-list-item")
-                .Filter(new() { HasText = reason })
-                .First
-                .ClickAsync();
+            await DropDownSelector.SelectAsync(page, dialog, reason);
         }
 
         if (!string.IsNullOrEmpty(comments))

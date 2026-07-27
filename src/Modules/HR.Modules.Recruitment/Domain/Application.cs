@@ -100,4 +100,20 @@ internal sealed class Application
         Status    = ApplicationStatus.Withdrawn;
         UpdatedAt = now;
     }
+
+    /// <summary>
+    /// Generic stage transition validated against <see cref="ApplicationStatusTransitions"/>, needed
+    /// for Kanban drag-and-drop where the caller only knows the target column, not which named
+    /// transition method corresponds to it. Does not set InterviewOutcome/RejectionReason — those
+    /// remain the responsibility of the dedicated named methods/handlers when more context (an
+    /// outcome value, a rejection reason) is available.
+    /// </summary>
+    public void MoveToStage(ApplicationStatus newStatus, DateTimeOffset now)
+    {
+        if (!ApplicationStatusTransitions.CanTransitionTo(Status, newStatus))
+            throw new InvalidOperationException($"Cannot move from {Status} to {newStatus}.");
+
+        Status    = newStatus;
+        UpdatedAt = now;
+    }
 }

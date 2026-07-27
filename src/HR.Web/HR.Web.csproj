@@ -13,6 +13,7 @@
     <PackageReference Include="Syncfusion.Blazor.DropDowns" Version="34.1.30" />
     <PackageReference Include="Syncfusion.Blazor.Grid" Version="34.1.30" />
     <PackageReference Include="Syncfusion.Blazor.Inputs" Version="34.1.30" />
+    <PackageReference Include="Syncfusion.Blazor.Kanban" Version="34.1.30" />
     <PackageReference Include="Syncfusion.Blazor.Popups" Version="34.1.30" />
     <PackageReference Include="Syncfusion.Blazor.SplitButtons" Version="34.1.30" />
     <PackageReference Include="Syncfusion.Blazor.Themes" Version="34.1.30" />

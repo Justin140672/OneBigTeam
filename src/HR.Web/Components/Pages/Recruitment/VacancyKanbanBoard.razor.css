@@ -1,0 +1,20 @@
+.vacancy-kanban-board__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.vacancy-kanban-board__search {
+    max-width: 320px;
+}
+
+.vacancy-kanban-board__vacancy-link {
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.vacancy-kanban-board__kanban {
+    height: 640px;
+}

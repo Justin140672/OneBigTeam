@@ -23,15 +23,8 @@ public sealed class AssetEditPage(IPage page, string baseUrl)
         await page.GetByPlaceholder("e.g. Dell Laptop").FillAsync(value);
 
     /// <summary>Selects a category from the Category dropdown (no filtering support on this field).</summary>
-    public async Task SelectCategoryAsync(string categoryName)
-    {
-        await page.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = categoryName })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectCategoryAsync(string categoryName) =>
+        DropDownSelector.SelectAsync(page, page.Locator("body"), categoryName);
 
     public async Task SaveAsync()
     {

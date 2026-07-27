@@ -2,6 +2,7 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.HireCandidate;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Modules.Recruitment.Tests.Infrastructure;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -61,7 +62,7 @@ public class HireCandidateHandlerTests
         var auditPublisher = new FakeAuditPublisher();
 
         var result = await handler(db, provisioning, positionProfileReader: reader, auditPublisher: auditPublisher).HandleAsync(
-            BuildRequest(companyId, vacancy.Id, application.Id), CancellationToken.None);
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(ApplicationStatus.Hired, result.Value!.Status);
@@ -81,8 +82,10 @@ public class HireCandidateHandlerTests
         Assert.Equal(locationId, request.LocationId);
         Assert.Equal(vacancy.PositionProfileId, request.PositionProfileId);
 
-        var published = Assert.Single(auditPublisher.Published);
-        var auditEvent = Assert.IsType<CandidateHiredAuditEvent>(published);
+        // Two audit events are published on hire: CandidateHiredAuditEvent (this handler's own) and
+        // ApplicationStageChangedAuditEvent (RecruitmentStageChangeRecorder, ticket #67).
+        Assert.Equal(2, auditPublisher.Published.Count);
+        var auditEvent = Assert.IsType<CandidateHiredAuditEvent>(auditPublisher.Published.Single(e => e is CandidateHiredAuditEvent));
         Assert.Equal("candidate.hired", ((IAuditEvent)auditEvent).EventType);
         Assert.Equal("Candidate", ((IAuditEvent)auditEvent).EntityType);
         Assert.Equal(candidate.Id, ((IAuditEvent)auditEvent).EntityId);
@@ -111,12 +114,16 @@ public class HireCandidateHandlerTests
         await db.SaveChangesAsync();
 
         var result = await handler(db, provisioning, eventPublisher, positionProfileReader: reader).HandleAsync(
-            BuildRequest(companyId, vacancy.Id, application.Id), CancellationToken.None);
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
 
-        var publishedEvent = Assert.Single(eventPublisher.PublishedEvents);
-        var candidateHired = Assert.IsType<CandidateHiredIntegrationEvent>(publishedEvent);
+        // Two integration events are published on hire: CandidateHiredIntegrationEvent (this
+        // handler's own) and ApplicantStageChangedIntegrationEvent (RecruitmentStageChangeRecorder,
+        // ticket #65).
+        Assert.Equal(2, eventPublisher.PublishedEvents.Count);
+        var candidateHired = Assert.IsType<CandidateHiredIntegrationEvent>(
+            eventPublisher.PublishedEvents.Single(e => e is CandidateHiredIntegrationEvent));
         Assert.Equal(companyId, candidateHired.CompanyId);
         Assert.Equal(application.Id, candidateHired.ApplicationId);
         Assert.Equal(candidate.Id, candidateHired.CandidateId);
@@ -141,7 +148,7 @@ public class HireCandidateHandlerTests
         var auditPublisher = new FakeAuditPublisher();
 
         var result = await handler(db, eventPublisher: eventPublisher, auditPublisher: auditPublisher).HandleAsync(
-            BuildRequest(companyId, vacancy.Id, application.Id), CancellationToken.None);
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Empty(eventPublisher.PublishedEvents);
@@ -154,7 +161,7 @@ public class HireCandidateHandlerTests
         await using var db = BuildContext();
 
         var result = await handler(db).HandleAsync(
-            BuildRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+            BuildRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -174,7 +181,7 @@ public class HireCandidateHandlerTests
         await db.SaveChangesAsync();
 
         var result = await handler(db).HandleAsync(
-            BuildRequest(companyId, vacancy.Id, application.Id), CancellationToken.None);
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
@@ -198,7 +205,7 @@ public class HireCandidateHandlerTests
         await db.SaveChangesAsync();
 
         var result = await handler(db, positionProfileReader: reader).HandleAsync(
-            BuildRequest(companyId, vacancy.Id, application.Id), CancellationToken.None);
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("conflict", result.Error.Code);
@@ -222,7 +229,7 @@ public class HireCandidateHandlerTests
         await db.SaveChangesAsync();
 
         var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
-            BuildRequest(companyId, vacancy.Id, application.Id), CancellationToken.None);
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("conflict", result.Error.Code);
@@ -251,7 +258,7 @@ public class HireCandidateHandlerTests
         await db.SaveChangesAsync();
 
         var result = await handler(db).HandleAsync(
-            BuildRequest(companyId, vacancyId, application.Id), CancellationToken.None);
+            BuildRequest(companyId, vacancyId, application.Id), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -276,7 +283,7 @@ public class HireCandidateHandlerTests
 
         // No summaries dictionary supplied — the linked position profile cannot be resolved.
         var result = await handler(db, positionProfileReader: new FakePositionProfileReader()).HandleAsync(
-            BuildRequest(companyId, vacancy.Id, application.Id), CancellationToken.None);
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -306,7 +313,7 @@ public class HireCandidateHandlerTests
         };
 
         var result = await handler(db, positionProfileReader: new FakePositionProfileReader(summaries: summaries)).HandleAsync(
-            BuildRequest(companyId, vacancy.Id, application.Id), CancellationToken.None);
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
@@ -336,7 +343,7 @@ public class HireCandidateHandlerTests
         };
 
         var result = await handler(db, positionProfileReader: new FakePositionProfileReader(summaries: summaries)).HandleAsync(
-            BuildRequest(companyId, vacancy.Id, application.Id), CancellationToken.None);
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
@@ -354,7 +361,8 @@ public class HireCandidateHandlerTests
             positionProfileReader ?? new FakePositionProfileReader(),
             new FakeClock(FixedUtcNow),
             eventPublisher ?? new FakeIntegrationEventPublisher(),
-            auditPublisher ?? new FakeAuditPublisher());
+            auditPublisher ?? new FakeAuditPublisher(),
+            new RecruitmentStageChangeRecorder(db, eventPublisher ?? new FakeIntegrationEventPublisher(), auditPublisher ?? new FakeAuditPublisher()));
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

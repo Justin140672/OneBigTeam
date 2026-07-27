@@ -14,6 +14,7 @@ using HR.Modules.Recruitment.Features.GetApplicationsByStatus;
 using HR.Modules.Recruitment.Features.GetCandidate;
 using HR.Modules.Recruitment.Features.GetInterviewsTodayCount;
 using HR.Modules.Recruitment.Features.GetPipelineSummary;
+using HR.Modules.Recruitment.Features.GetRecruitmentKanban;
 using HR.Modules.Recruitment.Features.GetStaleVacancies;
 using HR.Modules.Recruitment.Features.GetVacanciesNeedingPositionProfileReview;
 using HR.Modules.Recruitment.Features.GetUpcomingInterviews;
@@ -24,6 +25,7 @@ using HR.Modules.Recruitment.Features.ListCandidateDocuments;
 using HR.Modules.Recruitment.Features.ListCandidates;
 using HR.Modules.Recruitment.Features.ListInterviewsForVacancy;
 using HR.Modules.Recruitment.Features.ListVacancies;
+using HR.Modules.Recruitment.Features.MoveApplicationStage;
 using HR.Modules.Recruitment.Features.OfferCandidate;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 using HR.Modules.Recruitment.Features.RejectCandidate;
@@ -70,6 +72,8 @@ public static class RecruitmentModule
 
     private static void AddFeatureServices(IServiceCollection services)
     {
+        services.AddScoped<RecruitmentStageChangeRecorder>();
+
         services.AddScoped<CreateVacancyHandler>();
         services.AddScoped<IValidator<CreateVacancyRequest>, CreateVacancyValidator>();
 
@@ -102,6 +106,12 @@ public static class RecruitmentModule
 
         services.AddScoped<ListApplicationsForVacancyHandler>();
         services.AddScoped<IValidator<ListApplicationsForVacancyRequest>, ListApplicationsForVacancyValidator>();
+
+        services.AddScoped<GetRecruitmentKanbanHandler>();
+        services.AddScoped<IValidator<GetRecruitmentKanbanRequest>, GetRecruitmentKanbanValidator>();
+
+        services.AddScoped<MoveApplicationStageHandler>();
+        services.AddScoped<IValidator<MoveApplicationStageRequest>, MoveApplicationStageValidator>();
 
         services.AddScoped<GetPipelineSummaryHandler>();
         services.AddScoped<IValidator<GetPipelineSummaryRequest>, GetPipelineSummaryValidator>();

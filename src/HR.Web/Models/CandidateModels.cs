@@ -17,7 +17,10 @@ public record CandidateListItemModel(
     string LastName,
     string Email,
     string? Phone,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt)
+{
+    public string FullName => $"{FirstName} {LastName}";
+}
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 

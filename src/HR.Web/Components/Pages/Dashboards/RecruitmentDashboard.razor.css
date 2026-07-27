@@ -6,3 +6,12 @@
 .recruitment-dashboard-action-btn {
     min-width: 160px;
 }
+
+.recruitment-dashboard-view-toggle {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.recruitment-dashboard-vacancy-picker {
+    max-width: 360px;
+}

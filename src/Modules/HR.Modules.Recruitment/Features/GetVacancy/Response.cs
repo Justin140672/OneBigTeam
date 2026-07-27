@@ -13,6 +13,7 @@ internal sealed record GetVacancyResponse(
     string? AdvertDescription,
     VacancyStatus Status,
     Guid HiringManagerId,
+    Guid? AssignedRecruiterId,
     DateOnly? OpenedAt,
     DateOnly? ClosedAt,
     DateTimeOffset CreatedAt,

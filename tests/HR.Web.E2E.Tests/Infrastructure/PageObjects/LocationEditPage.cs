@@ -37,18 +37,8 @@ public sealed class LocationEditPage(IPage page, string baseUrl)
     public async Task SelectLocationTypeAsync(string nameFragment)
     {
         var group = page.Locator(".mb-3").Filter(new() { HasText = "Location Type" }).First;
-        await group.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
-        await filterInput.FillAsync(nameFragment);
-        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
-            .Filter(new() { HasText = nameFragment })
-            .First
-            .ClickAsync();
+        await DropDownSelector.SelectAsync(page, group, nameFragment);
 
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
-            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
         await Assertions.Expect(group.Locator(".e-input-group input").First)
             .ToHaveValueAsync(new Regex(Regex.Escape(nameFragment)), new() { Timeout = 10_000 });
     }

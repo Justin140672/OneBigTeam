@@ -1,14 +1,16 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.WithdrawApplication;
 
-internal sealed class WithdrawApplicationHandler(RecruitmentDbContext db, IClock clock)
+internal sealed class WithdrawApplicationHandler(RecruitmentDbContext db, IClock clock, RecruitmentStageChangeRecorder recorder)
 {
     public async Task<Result<WithdrawApplicationResponse>> HandleAsync(
         WithdrawApplicationRequest request,
+        Guid performedBy,
         CancellationToken cancellationToken)
     {
         var application = await db.Applications
@@ -27,9 +29,12 @@ internal sealed class WithdrawApplicationHandler(RecruitmentDbContext db, IClock
                 Error.Validation($"Cannot withdraw an application with status '{application.Status}'."));
 
         var now = clock.UtcNowOffset();
+        var previousStatus = application.Status;
 
         application.Withdraw(now);
+        recorder.AddHistoryEntry(application, previousStatus, performedBy, now);
         await db.SaveChangesAsync(cancellationToken);
+        await recorder.PublishStageChangedEventsAsync(application, previousStatus, performedBy, now, cancellationToken);
 
         return Result.Success(new WithdrawApplicationResponse(
             application.Id,

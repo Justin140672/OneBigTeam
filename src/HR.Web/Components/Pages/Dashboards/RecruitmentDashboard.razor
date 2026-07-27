@@ -4,6 +4,7 @@
 @using HR.Web.Components.Pages.Employees
 @inject AppSession Session
 @inject NavigationManager Navigation
+@inject VacancyService VacancyService
 
 <PageTitle>Recruitment Dashboard</PageTitle>
 
@@ -32,6 +33,50 @@
         </div>
 
         <section class="dashboard-section">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <h2 class="dashboard-section-title mb-0">Recruitment Pipeline</h2>
+                <div class="recruitment-dashboard-view-toggle" data-testid="recruitment-view-toggle">
+                    <SfButton CssClass="@(_view == PipelineView.Board ? "e-active" : "")" OnClick="() => SetView(PipelineView.Board)" data-testid="recruitment-view-board-btn">
+                        <i class="fa-solid fa-table-columns me-1"></i>Board
+                    </SfButton>
+                    <SfButton CssClass="@(_view == PipelineView.List ? "e-active" : "")" OnClick="() => SetView(PipelineView.List)" data-testid="recruitment-view-list-btn">
+                        <i class="fa-solid fa-list me-1"></i>List
+                    </SfButton>
+                </div>
+            </div>
+
+            @if (_view == PipelineView.Board)
+            {
+                <div class="mb-3 recruitment-dashboard-vacancy-picker">
+                    <label class="form-label">Vacancy</label>
+                    <SfDropDownList TValue="Guid?" TItem="VacancyListItemModel"
+                                    DataSource="@_vacancies" @bind-Value="_selectedVacancyId"
+                                    Placeholder="Select a vacancy" AllowFiltering="true"
+                                    data-testid="recruitment-board-vacancy-picker">
+                        <DropDownListFieldSettings Value="Id" Text="EffectiveTitle" />
+                    </SfDropDownList>
+                </div>
+
+                @if (_vacanciesLoading)
+                {
+                    <HrLoadingIndicator Label="Loading vacancies…" />
+                }
+                else if (_vacancies.Count == 0)
+                {
+                    <p class="text-muted">No open vacancies to show on the board yet.</p>
+                }
+                else if (_selectedVacancyId is Guid vacancyId && vacancyId != Guid.Empty)
+                {
+                    <VacancyKanbanBoard CompanyId="Session.CompanyId" VacancyId="vacancyId" @bind-SearchText="_boardSearchText" />
+                }
+            }
+            else
+            {
+                <VacancyList CompanyId="Session.CompanyId" />
+            }
+        </section>
+
+        <section class="dashboard-section">
             <h2 class="dashboard-section-title">Recruitment</h2>
             <div class="dashboard-detail-grid">
                 <RecruitmentSummaryWidget />
@@ -48,6 +93,20 @@
     // Recruiter role bounces to MyProfileUrl. The switcher/redirect only pick a default.
     private bool _ready;
 
+    // Judgement call ("remembers filters"): the Kanban board is per-vacancy (see
+    // GetRecruitmentKanban's contract), so the dashboard needs a vacancy picker above it. Board/List
+    // toggle state, the selected vacancy, and the board's search text are all held here as plain
+    // in-memory fields — scoped to this component instance's circuit lifetime, same as any other
+    // Blazor Server page state. No new persistence mechanism (session storage, cookies, etc.) exists
+    // elsewhere in this codebase for "remember during session" UI state, so none was introduced here;
+    // navigating away and back within the same circuit keeps the selection, a full reload resets it.
+    private enum PipelineView { Board, List }
+    private PipelineView _view = PipelineView.Board;
+    private List<VacancyListItemModel> _vacancies = [];
+    private bool _vacanciesLoading = true;
+    private Guid? _selectedVacancyId;
+    private string _boardSearchText = string.Empty;
+
     protected override async Task OnInitializedAsync()
     {
         await Session.InitialiseAsync();
@@ -59,7 +118,14 @@
         }
 
         _ready = true;
+
+        var result = await VacancyService.ListVacanciesAsync(Session.CompanyId, status: "Open");
+        _vacancies = result?.Items.ToList() ?? [];
+        _selectedVacancyId = _vacancies.FirstOrDefault()?.Id;
+        _vacanciesLoading = false;
     }
+
+    private void SetView(PipelineView view) => _view = view;
 
     private void NavigateToVacancies() =>
         Navigation.NavigateTo($"/companies/{Session.CompanyId}/vacancies");

@@ -88,15 +88,8 @@ public sealed class StartLeavingProcessDialog(IPage page)
     /// "Redundancy", "End of Contract" — the friendly labels from
     /// EmployeeLeavingTab.LeavingReasonLabel, not the raw enum-like values).
     /// </summary>
-    public async Task SelectLeavingReasonAsync(string reasonLabel)
-    {
-        await Dialog.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = reasonLabel })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectLeavingReasonAsync(string reasonLabel) =>
+        DropDownSelector.SelectAsync(page, Dialog, reasonLabel);
 
     // ── Step 5: Confirmation summary ────────────────────────────────────────────
 

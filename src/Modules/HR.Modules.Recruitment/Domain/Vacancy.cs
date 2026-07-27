@@ -32,6 +32,16 @@ internal sealed class Vacancy
 
     public VacancyStatus Status { get; private set; }
     public Guid HiringManagerId { get; private set; }
+
+    // Recruiter assigned to run this vacancy through the recruitment pipeline. Nullable and set
+    // separately from HiringManagerId — per explicit product direction, the recruiter is assigned
+    // per-Vacancy (not per-Application, and not reusing HiringManagerId, which represents the hiring
+    // decision-maker rather than the person actively working the pipeline). May be null until HR
+    // assigns a recruiter. "Recruitment users" elsewhere in this module means whoever holds the
+    // recruitment:view/recruitment:manage policies — there is no separate "Recruiter" role/table to
+    // validate this value against, so (unlike PositionProfileId) it is not cross-module validated.
+    public Guid? AssignedRecruiterId { get; private set; }
+
     public DateOnly? OpenedAt { get; private set; }
     public DateOnly? ClosedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -44,29 +54,44 @@ internal sealed class Vacancy
         string? advertTitle,
         string? advertDescription,
         Guid hiringManagerId,
-        DateTimeOffset now) => new()
+        DateTimeOffset now,
+        Guid? assignedRecruiterId = null) => new()
     {
-        Id                = id,
-        CompanyId         = companyId,
-        PositionProfileId = positionProfileId,
-        AdvertTitle       = string.IsNullOrWhiteSpace(advertTitle) ? null : advertTitle.Trim(),
-        AdvertDescription = string.IsNullOrWhiteSpace(advertDescription) ? null : advertDescription.Trim(),
-        Status            = VacancyStatus.Draft,
-        HiringManagerId   = hiringManagerId,
-        CreatedAt         = now,
-        UpdatedAt         = now,
+        Id                 = id,
+        CompanyId          = companyId,
+        PositionProfileId  = positionProfileId,
+        AdvertTitle        = string.IsNullOrWhiteSpace(advertTitle) ? null : advertTitle.Trim(),
+        AdvertDescription  = string.IsNullOrWhiteSpace(advertDescription) ? null : advertDescription.Trim(),
+        Status             = VacancyStatus.Draft,
+        HiringManagerId    = hiringManagerId,
+        AssignedRecruiterId = assignedRecruiterId,
+        CreatedAt          = now,
+        UpdatedAt          = now,
     };
 
     public void UpdateDetails(
         string? advertTitle,
         string? advertDescription,
         Guid hiringManagerId,
+        Guid? assignedRecruiterId,
         DateTimeOffset now)
     {
-        AdvertTitle       = string.IsNullOrWhiteSpace(advertTitle) ? null : advertTitle.Trim();
-        AdvertDescription = string.IsNullOrWhiteSpace(advertDescription) ? null : advertDescription.Trim();
-        HiringManagerId   = hiringManagerId;
-        UpdatedAt         = now;
+        AdvertTitle        = string.IsNullOrWhiteSpace(advertTitle) ? null : advertTitle.Trim();
+        AdvertDescription  = string.IsNullOrWhiteSpace(advertDescription) ? null : advertDescription.Trim();
+        HiringManagerId    = hiringManagerId;
+        AssignedRecruiterId = assignedRecruiterId;
+        UpdatedAt          = now;
+    }
+
+    /// <summary>
+    /// Assigns (or clears) the recruiter running this vacancy's pipeline, independent of a full
+    /// details update. Used by a dedicated "assign recruiter" action if/when the UI phase adds one;
+    /// UpdateDetails above also accepts the recruiter for the standard edit-vacancy flow.
+    /// </summary>
+    public void AssignRecruiter(Guid? recruiterId, DateTimeOffset now)
+    {
+        AssignedRecruiterId = recruiterId;
+        UpdatedAt = now;
     }
 
     /// <summary>

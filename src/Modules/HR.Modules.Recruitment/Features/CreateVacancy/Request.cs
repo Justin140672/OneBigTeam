@@ -7,4 +7,5 @@ internal sealed record CreateVacancyRequest
     public string? AdvertTitle { get; init; }
     public string? AdvertDescription { get; init; }
     public Guid HiringManagerId { get; init; }
+    public Guid? AssignedRecruiterId { get; init; }
 }

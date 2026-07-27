@@ -2,6 +2,7 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.OfferCandidate;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Modules.Recruitment.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,6 +31,7 @@ public class OfferCandidateHandlerTests
 
         var result = await handler(db).HandleAsync(
             new OfferCandidateRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -73,6 +75,7 @@ public class OfferCandidateHandlerTests
 
         var result = await handler(db, new FakePositionProfileReader(employmentDefaults: employmentDefaults)).HandleAsync(
             new OfferCandidateRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -110,6 +113,7 @@ public class OfferCandidateHandlerTests
         // still succeeds; only the informational fields are null.
         var result = await handler(db, new FakePositionProfileReader()).HandleAsync(
             new OfferCandidateRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -125,12 +129,76 @@ public class OfferCandidateHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Publishes_StageChanged_IntegrationEvent_And_AuditEvent_On_Success()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        application.MoveToScreening(Now);
+        application.ScheduleInterview(Now);
+        application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var eventPublisher = new FakeIntegrationEventPublisher();
+        var auditPublisher = new FakeAuditPublisher();
+        var performedBy = Guid.NewGuid();
+
+        var result = await handler(db, eventPublisher: eventPublisher, auditPublisher: auditPublisher).HandleAsync(
+            new OfferCandidateRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            performedBy,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var stageChanged = Assert.IsType<HR.SharedKernel.ApplicantStageChangedIntegrationEvent>(Assert.Single(eventPublisher.PublishedEvents));
+        Assert.Equal(ApplicationStatus.Interviewed.ToString(), stageChanged.PreviousStage);
+        Assert.Equal(ApplicationStatus.Offered.ToString(), stageChanged.NewStage);
+        Assert.Equal(performedBy, stageChanged.ChangedBy);
+
+        var stageChangedAudit = Assert.IsType<ApplicationStageChangedAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.Equal(ApplicationStatus.Interviewed, stageChangedAudit.PreviousStage);
+        Assert.Equal(ApplicationStatus.Offered, stageChangedAudit.NewStage);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Publish_Events_When_Not_Interviewed()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", "olivia.grant@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var eventPublisher = new FakeIntegrationEventPublisher();
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, eventPublisher: eventPublisher, auditPublisher: auditPublisher).HandleAsync(
+            new OfferCandidateRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Empty(eventPublisher.PublishedEvents);
+        Assert.Empty(auditPublisher.Published);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Application_Missing()
     {
         await using var db = BuildContext();
 
         var result = await handler(db).HandleAsync(
             new OfferCandidateRequest { CompanyId = Guid.NewGuid(), VacancyId = Guid.NewGuid(), ApplicationId = Guid.NewGuid() },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -154,6 +222,7 @@ public class OfferCandidateHandlerTests
 
         var result = await handler(db).HandleAsync(
             new OfferCandidateRequest { CompanyId = companyId, VacancyId = vacancyId, ApplicationId = application.Id },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -175,14 +244,19 @@ public class OfferCandidateHandlerTests
 
         var result = await handler(db).HandleAsync(
             new OfferCandidateRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
     }
 
-    private static OfferCandidateHandler handler(RecruitmentDbContext db, FakePositionProfileReader? positionProfileReader = null) =>
-        new(db, new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader());
+    private static OfferCandidateHandler handler(
+        RecruitmentDbContext db,
+        FakePositionProfileReader? positionProfileReader = null,
+        FakeIntegrationEventPublisher? eventPublisher = null,
+        FakeAuditPublisher? auditPublisher = null) =>
+        new(db, new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader(), new RecruitmentStageChangeRecorder(db, eventPublisher ?? new FakeIntegrationEventPublisher(), auditPublisher ?? new FakeAuditPublisher()));
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

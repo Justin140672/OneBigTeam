@@ -43,6 +43,30 @@ public class CreateVacancyHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Propagates_AssignedRecruiterId_To_Response()
+    {
+        await using var db = BuildContext();
+        var recruiterId = Guid.NewGuid();
+
+        var result = await handler(db).HandleAsync(
+            new CreateVacancyRequest
+            {
+                CompanyId           = Guid.NewGuid(),
+                PositionProfileId   = Guid.NewGuid(),
+                AdvertTitle         = "Senior Software Engineer",
+                HiringManagerId     = Guid.NewGuid(),
+                AssignedRecruiterId = recruiterId,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(recruiterId, result.Value!.AssignedRecruiterId);
+
+        var saved = await db.Vacancies.SingleAsync();
+        Assert.Equal(recruiterId, saved.AssignedRecruiterId);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_NotFound_When_PositionProfile_Does_Not_Exist()
     {
         await using var db = BuildContext();

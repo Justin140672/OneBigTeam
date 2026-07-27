@@ -2,6 +2,7 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Modules.Recruitment.Tests.Infrastructure;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -57,8 +58,12 @@ public class RecordInterviewOutcomeHandlerTests
         Assert.Equal(ApplicationStatus.Interviewed, savedApplication.Status);
         Assert.Equal(InterviewOutcome.Passed, savedApplication.InterviewOutcome);
 
-        var published = Assert.Single(auditPublisher.Published);
-        var auditEvent = Assert.IsType<InterviewOutcomeRecordedAuditEvent>(published);
+        // Two audit events are published: InterviewOutcomeRecordedAuditEvent (this handler's own)
+        // and ApplicationStageChangedAuditEvent (RecruitmentStageChangeRecorder, ticket #67), since
+        // recording an outcome also transitions the application to Interviewed.
+        Assert.Equal(2, auditPublisher.Published.Count);
+        var auditEvent = Assert.IsType<InterviewOutcomeRecordedAuditEvent>(
+            auditPublisher.Published.Single(e => e is InterviewOutcomeRecordedAuditEvent));
         Assert.Equal("interview.outcome_recorded", ((IAuditEvent)auditEvent).EventType);
         Assert.Equal("Interview", ((IAuditEvent)auditEvent).EntityType);
         Assert.Equal(interview.Id, ((IAuditEvent)auditEvent).EntityId);
@@ -231,7 +236,7 @@ public class RecordInterviewOutcomeHandlerTests
         FakeTaskCompleter? taskCompleter = null,
         FakeAuditPublisher? auditPublisher = null) =>
         new(
-            new InterviewOutcomeRecorder(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher()),
+            new InterviewOutcomeRecorder(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher(), new RecruitmentStageChangeRecorder(db, new FakeIntegrationEventPublisher(), auditPublisher ?? new FakeAuditPublisher())),
             taskCompleter ?? new FakeTaskCompleter());
 
     private static RecruitmentDbContext BuildContext() =>

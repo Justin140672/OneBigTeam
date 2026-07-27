@@ -37,6 +37,19 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
             return Result.Failure<GetApplicationResponse>(
                 Error.NotFound($"Application '{request.ApplicationId}' was not found."));
 
+        var stageHistory = await db.ApplicationStageHistoryEntries
+            .AsNoTracking()
+            .Where(e => e.ApplicationId == request.ApplicationId && e.CompanyId == request.CompanyId)
+            .OrderBy(e => e.ChangedAt)
+            .Select(e => new ApplicationStageHistoryItem(
+                e.Id,
+                e.PreviousStage,
+                e.NewStage,
+                e.ChangedByUserId,
+                e.Notes,
+                e.ChangedAt))
+            .ToListAsync(cancellationToken);
+
         return Result.Success(new GetApplicationResponse(
             row.Id,
             row.VacancyId,
@@ -49,6 +62,7 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
             row.Notes,
             row.AppliedAt,
             row.CreatedAt,
-            row.UpdatedAt));
+            row.UpdatedAt,
+            stageHistory));
     }
 }

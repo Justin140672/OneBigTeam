@@ -41,6 +41,7 @@ internal sealed class GetVacancyHandler(RecruitmentDbContext db, IPositionProfil
             vacancy.AdvertDescription,
             vacancy.Status,
             vacancy.HiringManagerId,
+            vacancy.AssignedRecruiterId,
             vacancy.OpenedAt,
             vacancy.ClosedAt,
             vacancy.CreatedAt,

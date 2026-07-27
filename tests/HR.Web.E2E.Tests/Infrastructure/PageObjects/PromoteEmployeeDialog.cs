@@ -51,21 +51,8 @@ public sealed class PromoteEmployeeDialog(IPage page)
         return (await input.InputValueAsync())?.Trim();
     }
 
-    public async Task SelectNewPositionProfileAsync(string profileTitle)
-    {
-        var group = Dialog.Locator(".col-12").Filter(new() { HasText = "New Position Profile" }).First;
-        await group.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
-        await filterInput.FillAsync(profileTitle);
-        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
-            .Filter(new() { HasText = profileTitle })
-            .First
-            .ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
-            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
-    }
+    public Task SelectNewPositionProfileAsync(string profileTitle) =>
+        DropDownSelector.SelectAsync(page, Dialog.Locator(".col-12").Filter(new() { HasText = "New Position Profile" }).First, profileTitle);
 
     public async Task FillEffectiveDateAsync(string ddMMyyyy)
     {
@@ -87,53 +74,19 @@ public sealed class PromoteEmployeeDialog(IPage page)
 
     public Task CheckChangeLocationAsync() => Dialog.GetByLabel("Change location").CheckAsync();
 
-    public async Task SelectNewManagerAsync(string managerNameFragment)
-    {
-        var group = Dialog.Locator(".col-12").Filter(new() { HasText = "New Manager" }).First;
-        await group.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
-        await filterInput.FillAsync(managerNameFragment);
-        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
-            .Filter(new() { HasText = managerNameFragment })
-            .First
-            .ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
-            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
-    }
+    public Task SelectNewManagerAsync(string managerNameFragment) =>
+        DropDownSelector.SelectAsync(page, Dialog.Locator(".col-12").Filter(new() { HasText = "New Manager" }).First, managerNameFragment);
 
-    public async Task SelectNewLocationAsync(string locationNameFragment)
-    {
-        var group = Dialog.Locator(".col-12").Filter(new() { HasText = "New Location" }).First;
-        await group.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
-        await filterInput.FillAsync(locationNameFragment);
-        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
-            .Filter(new() { HasText = locationNameFragment })
-            .First
-            .ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
-            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
-    }
+    public Task SelectNewLocationAsync(string locationNameFragment) =>
+        DropDownSelector.SelectAsync(page, Dialog.Locator(".col-12").Filter(new() { HasText = "New Location" }).First, locationNameFragment);
 
     // ── Step 3: Compensation ─────────────────────────────────────────────────────
 
     public Task CheckCreateCompensationChangeAsync() =>
         Dialog.GetByLabel("Create compensation change").CheckAsync();
 
-    public async Task SelectCompensationSalaryTypeAsync(string salaryType)
-    {
-        var group = Dialog.Locator(".col-6").Filter(new() { HasText = "Salary Type" }).First;
-        await group.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = salaryType })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectCompensationSalaryTypeAsync(string salaryType) =>
+        DropDownSelector.SelectAsync(page, Dialog.Locator(".col-6").Filter(new() { HasText = "Salary Type" }).First, salaryType);
 
     // Salary/Hours Per Week/FTE are all SfNumericTextBox instances without an explicit
     // FloatLabelType override, so Syncfusion's default (Never) should render Placeholder as a

@@ -10,6 +10,7 @@ internal sealed record UpdateVacancyResponse(
     string? AdvertDescription,
     VacancyStatus Status,
     Guid HiringManagerId,
+    Guid? AssignedRecruiterId,
     DateOnly? OpenedAt,
     DateOnly? ClosedAt,
     DateTimeOffset CreatedAt,

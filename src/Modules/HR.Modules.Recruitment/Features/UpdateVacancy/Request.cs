@@ -11,6 +11,7 @@ internal sealed record UpdateVacancyRequest
     public string? AdvertTitle { get; init; }
     public string? AdvertDescription { get; init; }
     public Guid HiringManagerId { get; init; }
+    public Guid? AssignedRecruiterId { get; init; }
 
     // Authorised correction escape hatch: when the baseline change-control check
     // (UpdateVacancyHandler.CanChangePositionProfile) would otherwise reject a Position Profile

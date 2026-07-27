@@ -124,6 +124,15 @@
                         </div>
                     </ContentTemplate>
                 </TabItem>
+
+                <TabItem>
+                    <ChildContent><TabHeader Text="Kanban" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <VacancyKanbanBoard CompanyId="CompanyId" VacancyId="Id!.Value" @bind-SearchText="_kanbanSearchText" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
             </TabItems>
         </SfTab>
     }
@@ -148,6 +157,7 @@
     private GetPositionProfileResponse? _selectedProfileDefaults;
     private bool _closing;
     private string? _closeError;
+    private string _kanbanSearchText = string.Empty;
 
     private string PageTitle => IsNew ? "Add Vacancy"
         : _vacancy is not null ? _vacancy.EffectiveTitle
@@ -426,7 +436,7 @@
                                             @bind-Value="Model.HiringManagerId"
                                             Placeholder="Select hiring manager"
                                             AllowFiltering="true">
-                                <DropDownListFieldSettings Value="Id" Text="WorkEmail" />
+                                <DropDownListFieldSettings Value="Id" Text="FullName" />
                                 <DropDownListTemplates TItem="EmployeeListItemModel">
                                     <ItemTemplate>
                                         @{

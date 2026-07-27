@@ -130,20 +130,8 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     /// status filter (a Syncfusion SfDropDownList — same combobox-click-then-list-item-click
     /// interaction used throughout this suite, e.g. FillLeaveRequestAsync below).
     /// </summary>
-    public async Task SetCompanyDocumentsStatusFilterAsync(string option)
-    {
-        var combobox = page.Locator(".col-md-3").Filter(new() { HasText = "Status" })
-            .Locator("span[role='combobox']").First;
-        await combobox.ClickAsync();
-
-        var item = page.Locator(".e-popup.e-ddl .e-list-item").Filter(new() { HasText = option }).First;
-        await item.WaitForAsync(new() { Timeout = 10_000 });
-        await item.ClickAsync();
-
-        // Wait for the popup to close before returning — a later action elsewhere on the page
-        // could otherwise get blocked by the still-present overlay.
-        await page.WaitForSelectorAsync(".e-popup.e-ddl", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
-    }
+    public Task SetCompanyDocumentsStatusFilterAsync(string option) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".col-md-3").Filter(new() { HasText = "Status" }), option);
 
     /// <summary>
     /// Returns true if a document card with the given title is currently shown on the Company
@@ -365,18 +353,8 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     {
         var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = "Request Leave" });
 
-        // Syncfusion SfDropDownList renders a readonly <input> inside a <span role="combobox">.
-        // The span intercepts all pointer events, so we must click the span, not the input.
-        // Scope to the leave-type combobox via :has() on its input's unique placeholder.
-        var typeCombobox = dialog.Locator("span[role='combobox']:has([placeholder='Select leave type'])");
-        await typeCombobox.ClickAsync();
-        // Wait for the specific list item to exist in the popup — not just the popup container,
-        // because Syncfusion renders items asynchronously after the popup opens.
-        var targetItem = page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = leaveTypeName })
-            .First;
-        await targetItem.WaitForAsync(new() { Timeout = 10_000 });
-        await targetItem.ClickAsync();
+        // Leave Type is the only combobox in this dialog.
+        await DropDownSelector.SelectAsync(page, dialog, leaveTypeName);
 
         // Start date — fill into the first SfDatePicker input.
         var dateInputs = dialog.Locator(".e-date-wrapper input.e-input");

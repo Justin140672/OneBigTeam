@@ -1,4 +1,5 @@
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +17,11 @@ namespace HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 /// the Recruitment and Tasks modules (Tasks' task-completion dispatch can invoke recruitment
 /// feedback recording without that recording logic looping back into task completion).
 /// </summary>
-internal sealed class InterviewOutcomeRecorder(RecruitmentDbContext db, IClock clock, IAuditEventPublisher auditPublisher)
+internal sealed class InterviewOutcomeRecorder(
+    RecruitmentDbContext db,
+    IClock clock,
+    IAuditEventPublisher auditPublisher,
+    RecruitmentStageChangeRecorder stageChangeRecorder)
 {
     public async Task<Result<RecordInterviewOutcomeResponse>> RecordAsync(
         RecordInterviewOutcomeRequest request,
@@ -50,9 +55,11 @@ internal sealed class InterviewOutcomeRecorder(RecruitmentDbContext db, IClock c
                 Error.Validation($"Cannot record an outcome for an interview with outcome '{interview.Outcome}'."));
 
         var now = clock.UtcNowOffset();
+        var previousStatus = application.Status;
 
         interview.RecordOutcome(request.Outcome, request.Notes, now);
         application.RecordInterviewOutcome(request.Outcome, now);
+        stageChangeRecorder.AddHistoryEntry(application, previousStatus, recordedBy, now);
         await db.SaveChangesAsync(cancellationToken);
 
         await auditPublisher.PublishAsync(
@@ -67,6 +74,8 @@ internal sealed class InterviewOutcomeRecorder(RecruitmentDbContext db, IClock c
                 recordedBy,
                 now),
             cancellationToken);
+
+        await stageChangeRecorder.PublishStageChangedEventsAsync(application, previousStatus, recordedBy, now, cancellationToken);
 
         return Result.Success(new RecordInterviewOutcomeResponse(
             interview.Id,

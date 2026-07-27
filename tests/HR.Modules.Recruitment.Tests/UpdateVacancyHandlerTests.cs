@@ -53,6 +53,36 @@ public class UpdateVacancyHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Propagates_AssignedRecruiterId_To_Response()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Old Title", null, Guid.NewGuid(), Now);
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var recruiterId = Guid.NewGuid();
+
+        var result = await handler(db, new FakeAuditPublisher()).HandleAsync(
+            new UpdateVacancyRequest
+            {
+                CompanyId           = companyId,
+                VacancyId           = vacancy.Id,
+                AdvertTitle         = "New Title",
+                HiringManagerId     = Guid.NewGuid(),
+                AssignedRecruiterId = recruiterId,
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(recruiterId, result.Value!.AssignedRecruiterId);
+
+        var saved = await db.Vacancies.SingleAsync();
+        Assert.Equal(recruiterId, saved.AssignedRecruiterId);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Vacancy_Missing()
     {
         await using var db = BuildContext();

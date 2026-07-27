@@ -128,6 +128,32 @@ internal sealed record InterviewOutcomeRecordedAuditEvent(
     object? IAuditEvent.Metadata => new { ApplicationId, VacancyId, CandidateId };
 }
 
+// Deliberately separate from ApplicationStageHistoryEntry (a domain-specific record surfaced on the
+// applicant record via GetApplication.StageHistory): this is the cross-cutting "who changed
+// business data" audit log entry, published for every successful stage change (named transition
+// methods and the generic MoveToStage path alike) via RecruitmentStageChangeRecorder.
+internal sealed record ApplicationStageChangedAuditEvent(
+    Guid CompanyId,
+    Guid ApplicationId,
+    Guid VacancyId,
+    Guid CandidateId,
+    Domain.ApplicationStatus PreviousStage,
+    Domain.ApplicationStatus NewStage,
+    Guid ChangedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "application.stage_changed";
+    string IAuditEvent.EntityType => "Application";
+    Guid IAuditEvent.EntityId => ApplicationId;
+    Guid? IAuditEvent.ActorUserId => ChangedBy;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"Application moved from '{PreviousStage}' to '{NewStage}'";
+    object? IAuditEvent.Before => new { Stage = PreviousStage };
+    object? IAuditEvent.After => new { Stage = NewStage };
+    object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
+}
+
 internal sealed record CandidateHiredAuditEvent(
     Guid CompanyId,
     Guid CandidateId,

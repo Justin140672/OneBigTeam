@@ -92,4 +92,87 @@ public class ApplicationTests
 
         Assert.Equal(ApplicationStatus.Withdrawn, application.Status);
     }
+
+    [Theory]
+    [InlineData(ApplicationStatus.Applied, ApplicationStatus.Screening)]
+    [InlineData(ApplicationStatus.Applied, ApplicationStatus.InterviewScheduled)]
+    [InlineData(ApplicationStatus.Applied, ApplicationStatus.Rejected)]
+    [InlineData(ApplicationStatus.Applied, ApplicationStatus.Withdrawn)]
+    [InlineData(ApplicationStatus.Screening, ApplicationStatus.InterviewScheduled)]
+    [InlineData(ApplicationStatus.InterviewScheduled, ApplicationStatus.Interviewed)]
+    [InlineData(ApplicationStatus.Interviewed, ApplicationStatus.Offered)]
+    [InlineData(ApplicationStatus.Offered, ApplicationStatus.Hired)]
+    internal void MoveToStage_Valid_Transition_Updates_Status_And_UpdatedAt(ApplicationStatus from, ApplicationStatus to)
+    {
+        var application = CreateApplication();
+        MoveApplicationToStatus(application, from);
+        var later = Now.AddDays(1);
+
+        application.MoveToStage(to, later);
+
+        Assert.Equal(to, application.Status);
+        Assert.Equal(later, application.UpdatedAt);
+    }
+
+    [Fact]
+    public void MoveToStage_Invalid_Transition_Throws_With_Message_Naming_Both_Stages()
+    {
+        var application = CreateApplication();
+        application.MoveToScreening(Now);
+        application.ScheduleInterview(Now);
+        application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => application.MoveToStage(ApplicationStatus.Applied, Now.AddDays(1)));
+
+        Assert.Contains("Interviewed", ex.Message);
+        Assert.Contains("Applied", ex.Message);
+    }
+
+    [Fact]
+    public void MoveToStage_Invalid_Transition_Does_Not_Change_Status_Or_UpdatedAt()
+    {
+        var application = CreateApplication();
+        var originalUpdatedAt = application.UpdatedAt;
+
+        Assert.Throws<InvalidOperationException>(
+            () => application.MoveToStage(ApplicationStatus.Hired, Now.AddDays(1)));
+
+        Assert.Equal(ApplicationStatus.Applied, application.Status);
+        Assert.Equal(originalUpdatedAt, application.UpdatedAt);
+    }
+
+    [Fact]
+    public void MoveToStage_From_Terminal_Stage_Throws()
+    {
+        var application = CreateApplication();
+        application.Reject(Now);
+
+        Assert.Throws<InvalidOperationException>(
+            () => application.MoveToStage(ApplicationStatus.Screening, Now.AddDays(1)));
+    }
+
+    private static void MoveApplicationToStatus(Application application, ApplicationStatus target)
+    {
+        if (target == ApplicationStatus.Applied)
+            return;
+
+        application.MoveToScreening(Now);
+        if (target == ApplicationStatus.Screening)
+            return;
+
+        application.ScheduleInterview(Now);
+        if (target == ApplicationStatus.InterviewScheduled)
+            return;
+
+        application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
+        if (target == ApplicationStatus.Interviewed)
+            return;
+
+        application.Offer(Now);
+        if (target == ApplicationStatus.Offered)
+            return;
+
+        application.Hire(Now);
+    }
 }

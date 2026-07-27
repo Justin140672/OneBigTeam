@@ -28,20 +28,12 @@ public sealed class BulkCompensationUpdateDialogPage(IPage page)
     /// second is Reason). Value must match one of the ModeOptions labels exactly, e.g.
     /// "Percentage Increase", "Fixed Amount Increase", "Set Salary Directly".
     /// </summary>
-    public async Task SelectModeAsync(string modeLabel)
-    {
-        await Dialog.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item").Filter(new() { HasText = modeLabel }).First.ClickAsync();
-    }
+    public Task SelectModeAsync(string modeLabel) =>
+        DropDownSelector.SelectAsync(page, Dialog, modeLabel);
 
     /// <summary>Selects the Reason dropdown (the second of two SfDropDownLists in the panel).</summary>
-    public async Task SelectReasonAsync(string reasonLabel)
-    {
-        await Dialog.Locator("span[role='combobox']").Last.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item").Filter(new() { HasText = reasonLabel }).First.ClickAsync();
-    }
+    public Task SelectReasonAsync(string reasonLabel) =>
+        DropDownSelector.SelectAsync(page, Dialog, reasonLabel, index: 1);
 
     /// <summary>
     /// Fills the mode-specific adjustment value (Percentage / Fixed Amount / New Salary) — the

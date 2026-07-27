@@ -53,36 +53,14 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     }
 
     /// <summary>Selects a value from the Department dropdown on the position profile create/edit form.</summary>
-    public async Task SelectDepartmentAsync(string nameFragment)
-    {
-        var field = page.Locator(".mb-3", new PageLocatorOptions { HasText = "Department" }).First;
-        await field.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
-        await filterInput.FillAsync(nameFragment);
-        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
-            .Filter(new() { HasText = nameFragment })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectDepartmentAsync(string nameFragment) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".mb-3", new PageLocatorOptions { HasText = "Department" }).First, nameFragment);
 
     /// <summary>Selects a value from the Location dropdown on the position profile create/edit form.
     /// Location is now mandatory (see DepartmentId/LocationId/DefaultLeavePolicyId required-fields
     /// change), so every create/edit flow that saves successfully must call this.</summary>
-    public async Task SelectLocationAsync(string nameFragment)
-    {
-        var field = page.Locator(".mb-3", new PageLocatorOptions { HasText = "Location" }).First;
-        await field.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
-        await filterInput.FillAsync(nameFragment);
-        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
-            .Filter(new() { HasText = nameFragment })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectLocationAsync(string nameFragment) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".mb-3", new PageLocatorOptions { HasText = "Location" }).First, nameFragment);
 
     public async Task SetUseCompanyWorkingPatternAsync(bool useCompanyDefault)
     {
@@ -138,16 +116,8 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
         NoticePeriodOverrideRow.IsVisibleAsync();
 
     /// <summary>Selects a value ("Weeks" or "Months") from the notice period override's Unit dropdown. Only present once the override checkbox is checked.</summary>
-    public async Task SelectNoticePeriodUnitOverrideAsync(string unitLabel)
-    {
-        await NoticePeriodOverrideRow.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = unitLabel })
-            .First
-            .ClickAsync(new() { Timeout = 10_000 });
-        await page.WaitForSelectorAsync(".e-popup.e-ddl", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
-    }
+    public Task SelectNoticePeriodUnitOverrideAsync(string unitLabel) =>
+        DropDownSelector.SelectAsync(page, NoticePeriodOverrideRow, unitLabel);
 
     /// <summary>Returns the currently displayed value of the notice period override's Unit dropdown.</summary>
     public async Task<string> GetNoticePeriodUnitOverrideTextAsync()
@@ -167,30 +137,15 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
         return int.Parse(value);
     }
 
-    public async Task SelectDefaultLeavePolicyAsync(string leavePolicyName)
-    {
+    public Task SelectDefaultLeavePolicyAsync(string leavePolicyName) =>
         // The Defaults card now has three comboboxes (Salary Type, Default Leave Policy,
         // Onboarding Template), so scope to the specific field wrapper by its label rather
         // than taking .First within the whole card.
-        var field = page.Locator(".mb-3", new PageLocatorOptions { HasText = "Default Leave Policy" });
-        await field.Locator("span[role='combobox']").First.ClickAsync();
-        await page.Locator(".e-popup-open .e-list-item")
-            .Filter(new() { HasText = leavePolicyName })
-            .First
-            .ClickAsync(new() { Timeout = 10_000 });
-    }
+        DropDownSelector.SelectAsync(page, page.Locator(".mb-3", new PageLocatorOptions { HasText = "Default Leave Policy" }), leavePolicyName);
 
     /// <summary>Selects a value from the Onboarding Template dropdown on the position profile create/edit form.</summary>
-    public async Task SelectOnboardingTemplateAsync(string nameFragment)
-    {
-        var field = page.Locator(".mb-3", new PageLocatorOptions { HasText = "Onboarding Template" });
-        await field.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = nameFragment })
-            .First
-            .ClickAsync(new() { Timeout = 10_000 });
-    }
+    public Task SelectOnboardingTemplateAsync(string nameFragment) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".mb-3", new PageLocatorOptions { HasText = "Onboarding Template" }), nameFragment);
 
     /// <summary>
     /// Clears the Onboarding Template selection by opening its dropdown and selecting the
@@ -199,16 +154,8 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     /// PositionProfileEdit.razor's OnboardingTemplateListItemModel list, which prepends a
     /// Guid.Empty/"None" entry).
     /// </summary>
-    public async Task ClearOnboardingTemplateAsync()
-    {
-        var field = page.Locator(".mb-3", new PageLocatorOptions { HasText = "Onboarding Template" });
-        await field.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = "None" })
-            .First
-            .ClickAsync(new() { Timeout = 10_000 });
-    }
+    public Task ClearOnboardingTemplateAsync() =>
+        DropDownSelector.SelectAsync(page, page.Locator(".mb-3", new PageLocatorOptions { HasText = "Onboarding Template" }), "None");
 
     /// <summary>Reads the current value of the Onboarding Template dropdown's visible text.</summary>
     public async Task<string?> GetSelectedOnboardingTemplateTextAsync()
@@ -270,15 +217,7 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
         await page.Locator("[role='dialog']").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
 
-        // Syncfusion SfDropDownList puts role='combobox' on the outer SPAN wrapper, not the inner input.
-        // Clicking the span opens the popup.
-        await page.Locator("[role='dialog'] span[role='combobox']").First.ClickAsync();
-
-        // Click the matching item in the open popup.
-        await page.Locator(".e-popup-open .e-list-item")
-            .Filter(new() { HasText = documentTypeName })
-            .First
-            .ClickAsync(new() { Timeout = 10_000 });
+        await DropDownSelector.SelectAsync(page, page.Locator("[role='dialog']"), documentTypeName);
     }
 
     public async Task SubmitAddDialogAsync()

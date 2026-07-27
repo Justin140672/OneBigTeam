@@ -1,5 +1,6 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -9,10 +10,12 @@ namespace HR.Modules.Recruitment.Features.OfferCandidate;
 internal sealed class OfferCandidateHandler(
     RecruitmentDbContext db,
     IClock clock,
-    IPositionProfileReader positionProfileReader)
+    IPositionProfileReader positionProfileReader,
+    RecruitmentStageChangeRecorder recorder)
 {
     public async Task<Result<OfferCandidateResponse>> HandleAsync(
         OfferCandidateRequest request,
+        Guid performedBy,
         CancellationToken cancellationToken)
     {
         var application = await db.Applications
@@ -41,9 +44,12 @@ internal sealed class OfferCandidateHandler(
                 Error.NotFound($"Vacancy '{request.VacancyId}' was not found."));
 
         var now = clock.UtcNowOffset();
+        var previousStatus = application.Status;
 
         application.Offer(now);
+        recorder.AddHistoryEntry(application, previousStatus, performedBy, now);
         await db.SaveChangesAsync(cancellationToken);
+        await recorder.PublishStageChangedEventsAsync(application, previousStatus, performedBy, now, cancellationToken);
 
         // Cross-module read: informational-only employment defaults from the linked Position Profile
         // (owned by HR.Modules.Employees), resolved via the narrow IPositionProfileReader contract. See

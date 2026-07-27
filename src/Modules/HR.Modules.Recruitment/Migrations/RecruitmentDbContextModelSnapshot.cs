@@ -88,6 +88,54 @@ namespace HR.Modules.Recruitment.Migrations
                     b.ToTable("applications", "recruitment");
                 });
 
+            modelBuilder.Entity("HR.Modules.Recruitment.Domain.ApplicationStageHistoryEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<Guid?>("ChangedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("changed_by_user_id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("NewStage")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("new_stage");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("PreviousStage")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("previous_stage");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId");
+
+                    b.HasIndex("CompanyId");
+
+                    b.ToTable("application_stage_history_entries", "recruitment");
+                });
+
             modelBuilder.Entity("HR.Modules.Recruitment.Domain.Candidate", b =>
                 {
                     b.Property<Guid>("Id")
@@ -281,6 +329,10 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("advert_title");
 
+                    b.Property<Guid?>("AssignedRecruiterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_recruiter_id");
+
                     b.Property<DateOnly?>("ClosedAt")
                         .HasColumnType("date")
                         .HasColumnName("closed_at");
@@ -337,6 +389,15 @@ namespace HR.Modules.Recruitment.Migrations
                     b.HasOne("HR.Modules.Recruitment.Domain.Vacancy", null)
                         .WithMany()
                         .HasForeignKey("VacancyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HR.Modules.Recruitment.Domain.ApplicationStageHistoryEntry", b =>
+                {
+                    b.HasOne("HR.Modules.Recruitment.Domain.Application", null)
+                        .WithMany()
+                        .HasForeignKey("ApplicationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

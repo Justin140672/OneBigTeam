@@ -30,7 +30,10 @@ public record EmployeeListItemModel(
     DateOnly StartDate,
     string Status,
     DateTimeOffset CreatedAt,
-    string? ProfilePhotoUrl);
+    string? ProfilePhotoUrl)
+{
+    public string FullName => $"{FirstName} {LastName}";
+}
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 

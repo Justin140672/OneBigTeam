@@ -51,6 +51,11 @@ internal sealed class VacancyConfiguration : IEntityTypeConfiguration<Vacancy>
             .HasColumnName("hiring_manager_id")
             .IsRequired();
 
+        // Nullable: recruiter may not yet be assigned. Not cross-module validated (no FK / no
+        // Employees-existence check) — see Vacancy.AssignedRecruiterId's remarks.
+        builder.Property(v => v.AssignedRecruiterId)
+            .HasColumnName("assigned_recruiter_id");
+
         builder.Property(v => v.OpenedAt)
             .HasColumnName("opened_at");
 

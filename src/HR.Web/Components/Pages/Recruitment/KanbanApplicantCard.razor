@@ -1,0 +1,44 @@
+@* Card template used inside VacancyKanbanBoard's SfKanban. Rendered once per applicant. *@
+<div class="kanban-applicant-card @StageCssClass" @onclick="() => OnOpen.InvokeAsync(Applicant)">
+    <div class="kanban-applicant-card__top">
+        <ProfilePhotoAvatar PhotoUrl="@Applicant.CandidatePhotoUrl" Initials="@Initials" SizePx="36" />
+        <div class="kanban-applicant-card__name-block">
+            <div class="kanban-applicant-card__name">@Applicant.CandidateFullName</div>
+            <div class="kanban-applicant-card__vacancy text-muted">@Applicant.VacancyTitle</div>
+        </div>
+        <StatusBadge Variant="@StatusVariant(Applicant.Stage)">@Applicant.Stage</StatusBadge>
+    </div>
+    <div class="kanban-applicant-card__meta">
+        <span><i class="fa-regular fa-calendar me-1"></i>Applied @Applicant.AppliedAt.ToString("d MMM yyyy")</span>
+        <span><i class="fa-regular fa-user me-1"></i>@RecruiterName</span>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public KanbanApplicantModel Applicant { get; set; } = default!;
+    [Parameter] public string RecruiterName { get; set; } = "Unassigned";
+    [Parameter] public EventCallback<KanbanApplicantModel> OnOpen { get; set; }
+
+    private string Initials =>
+        $"{(Applicant.CandidateFirstName.Length > 0 ? Applicant.CandidateFirstName[0] : '?')}{(Applicant.CandidateLastName.Length > 0 ? Applicant.CandidateLastName[0] : '?')}"
+            .ToUpperInvariant();
+
+    // Withdrawn/Rejected/Hired get a visually distinct accent — see StatusBadge for the badge itself,
+    // this is the card container accent (muted/danger/success border).
+    private string StageCssClass => Applicant.Stage switch
+    {
+        "Withdrawn" => "kanban-applicant-card--muted",
+        "Rejected" => "kanban-applicant-card--danger",
+        "Hired" => "kanban-applicant-card--success",
+        _ => string.Empty,
+    };
+
+    private static StatusBadgeVariant StatusVariant(string status) => status switch
+    {
+        "Hired" => StatusBadgeVariant.Success,
+        "Offered" => StatusBadgeVariant.Primary,
+        "Interviewed" or "InterviewScheduled" => StatusBadgeVariant.Info,
+        "Rejected" or "Withdrawn" => StatusBadgeVariant.Danger,
+        _ => StatusBadgeVariant.Secondary,
+    };
+}

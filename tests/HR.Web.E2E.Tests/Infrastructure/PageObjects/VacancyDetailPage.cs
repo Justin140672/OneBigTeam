@@ -56,19 +56,8 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     /// "Refactor Duplicate Vacancy Fields" story — department is now shown only via the
     /// read-only "Linked Position Profile" card.
     /// </summary>
-    public async Task SelectHiringManagerAsync(string nameFragment)
-    {
-        var group = page.Locator(".col-md-4").Filter(new() { HasText = "Hiring Manager" }).First;
-        await group.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
-        await filterInput.FillAsync(nameFragment);
-        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
-            .Filter(new() { HasText = nameFragment })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectHiringManagerAsync(string nameFragment) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".col-md-4").Filter(new() { HasText = "Hiring Manager" }).First, nameFragment);
 
     /// <summary>
     /// Selects a value from the Position Profile dropdown (AllowFiltering enabled). Only usable
@@ -81,23 +70,11 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task SelectPositionProfileAsync(string titleFragment)
     {
         var group = page.Locator(".col-md-8").Filter(new() { HasText = "Position Profile" }).First;
-        await group.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
-        await filterInput.FillAsync(titleFragment);
-        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
-            .Filter(new() { HasText = titleFragment })
-            .First
-            .ClickAsync();
+        await DropDownSelector.SelectAsync(page, group, titleFragment);
 
-        // Popup-hidden alone can be a purely client-side JS close animation and isn't proof that
-        // Blazor's ValueChanged round-trip to the server actually committed
-        // Model.PositionProfileId yet — wait for the combobox's own input value too (same pattern
-        // as EmployeeEditPage.SelectManagerAsync / SharedDocumentDetailPage's Review Owner
-        // selector). Without this, a caller that immediately clicks Save can race the round-trip.
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible",
-            new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        // Confirms Blazor's ValueChanged round-trip to the server actually committed
+        // Model.PositionProfileId, not just that the popup closed client-side — without this, a
+        // caller that immediately clicks Save can race the round-trip.
         await Assertions.Expect(group.Locator(".e-input-group input").First)
             .ToHaveValueAsync(new Regex(Regex.Escape(titleFragment)), new() { Timeout = 10_000 });
     }
@@ -451,6 +428,17 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("[data-testid='vacancy-interviews-tab']", new() { Timeout = 15_000 });
     }
 
+    /// <summary>
+    /// Opens the "Kanban" tab (embeds VacancyKanbanBoard.razor inline — see "Recruitment Kanban"
+    /// tickets #69-#73). Waits for the board's own data-testid, not just the tab becoming active,
+    /// since the board does its own async load once mounted.
+    /// </summary>
+    public async Task OpenKanbanTabAsync()
+    {
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Kanban" }).ClickAsync();
+        await page.WaitForSelectorAsync("[data-testid='vacancy-kanban-board']", new() { Timeout = 15_000 });
+    }
+
     // ── Applications tab: Add Candidate ──────────────────────────────────────────
 
     public async Task ClickAddCandidateAsync()
@@ -460,19 +448,8 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
-    public async Task SelectCandidateInAddDialogAsync(string nameOrEmailFragment)
-    {
-        var dialog = page.Locator(".add-application-dialog");
-        await dialog.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
-        await filterInput.FillAsync(nameOrEmailFragment);
-        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
-            .Filter(new() { HasText = nameOrEmailFragment })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectCandidateInAddDialogAsync(string nameOrEmailFragment) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".add-application-dialog"), nameOrEmailFragment);
 
     public async Task SubmitAddApplicationAsync()
     {
@@ -513,19 +490,8 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.Locator("[role='dialog'].schedule-interview-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
-    public async Task SelectInterviewerAsync(string nameFragment)
-    {
-        var dialog = page.Locator(".schedule-interview-dialog");
-        await dialog.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
-        await filterInput.FillAsync(nameFragment);
-        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
-            .Filter(new() { HasText = nameFragment })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectInterviewerAsync(string nameFragment) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".schedule-interview-dialog"), nameFragment);
 
     /// <param name="ddMMyyyyHHmm">
     /// Must match the "Scheduled At" SfDateTimePicker's explicit Format="dd/MM/yyyy HH:mm" in
@@ -585,30 +551,11 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    public async Task SelectHireNationalityAsync(string nationality)
-    {
-        var dialog = page.Locator(".hire-candidate-dialog");
-        await dialog.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
-        await filterInput.FillAsync(nationality);
-        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item:not(.e-hide)", new() { Timeout = 15_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
-            .Filter(new() { HasText = nationality })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectHireNationalityAsync(string nationality) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".hire-candidate-dialog"), nationality);
 
-    public async Task SelectHireGenderAsync(string gender)
-    {
-        var dialog = page.Locator(".hire-candidate-dialog");
-        await dialog.Locator("span[role='combobox']").Nth(1).ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = gender })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectHireGenderAsync(string gender) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".hire-candidate-dialog"), gender, index: 1);
 
     /// <summary>Fills the Employee Number field in the (currently open) Hire Candidate dialog.</summary>
     public Task FillHireEmployeeNumberAsync(string value) =>
@@ -625,18 +572,11 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     /// <see cref="GetHireDerivedPositionProfileTextAsync"/> and
     /// <see cref="GetHireDerivedLocationTextAsync"/>.
     /// </summary>
-    public async Task SelectHireDropdownAsync(string labelText, string optionText)
-    {
-        var group = page.Locator(".hire-candidate-dialog .col-md-6")
-            .Filter(new() { HasText = labelText })
-            .First;
-        await group.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = optionText })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectHireDropdownAsync(string labelText, string optionText) =>
+        DropDownSelector.SelectAsync(
+            page,
+            page.Locator(".hire-candidate-dialog .col-md-6").Filter(new() { HasText = labelText }).First,
+            optionText);
 
     /// <summary>Reads the current value of a Hire Candidate dialog dropdown's visible text, identified by nearby label text.</summary>
     public async Task<string?> GetSelectedHireDropdownTextAsync(string labelText)
@@ -727,16 +667,8 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.Locator("[role='dialog'].record-outcome-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
-    public async Task SelectOutcomeAsync(string outcome)
-    {
-        var dialog = page.Locator(".record-outcome-dialog");
-        await dialog.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl .e-list-item")
-            .Filter(new() { HasText = outcome })
-            .First
-            .ClickAsync();
-    }
+    public Task SelectOutcomeAsync(string outcome) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".record-outcome-dialog"), outcome);
 
     public async Task SubmitOutcomeAsync()
     {

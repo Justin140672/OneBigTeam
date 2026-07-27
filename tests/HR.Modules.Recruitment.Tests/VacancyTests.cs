@@ -185,7 +185,7 @@ public class VacancyTests
         var hiringManagerId = Guid.NewGuid();
         var later = Now.AddDays(1);
 
-        vacancy.UpdateDetails("  New Title  ", "  New Description  ", hiringManagerId, later);
+        vacancy.UpdateDetails("  New Title  ", "  New Description  ", hiringManagerId, null, later);
 
         Assert.Equal("New Title", vacancy.AdvertTitle);
         Assert.Equal("New Description", vacancy.AdvertDescription);
@@ -201,7 +201,7 @@ public class VacancyTests
     {
         var vacancy = CreateVacancy();
 
-        vacancy.UpdateDetails(advertTitle, "Description", Guid.NewGuid(), Now.AddDays(1));
+        vacancy.UpdateDetails(advertTitle, "Description", Guid.NewGuid(), null, Now.AddDays(1));
 
         Assert.Null(vacancy.AdvertTitle);
     }
@@ -212,8 +212,74 @@ public class VacancyTests
         var vacancy = CreateVacancy();
         Assert.NotNull(vacancy.AdvertTitle);
 
-        vacancy.UpdateDetails(null, vacancy.AdvertDescription, vacancy.HiringManagerId, Now.AddDays(1));
+        vacancy.UpdateDetails(null, vacancy.AdvertDescription, vacancy.HiringManagerId, null, Now.AddDays(1));
 
         Assert.Null(vacancy.AdvertTitle);
+    }
+
+    [Fact]
+    public void Create_Sets_AssignedRecruiterId_When_Provided()
+    {
+        var recruiterId = Guid.NewGuid();
+
+        var vacancy = Vacancy.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "Senior Software Engineer", "Description", Guid.NewGuid(), Now, recruiterId);
+
+        Assert.Equal(recruiterId, vacancy.AssignedRecruiterId);
+    }
+
+    [Fact]
+    public void Create_Defaults_AssignedRecruiterId_To_Null()
+    {
+        var vacancy = CreateVacancy();
+
+        Assert.Null(vacancy.AssignedRecruiterId);
+    }
+
+    [Fact]
+    public void UpdateDetails_Sets_AssignedRecruiterId()
+    {
+        var vacancy = CreateVacancy();
+        var recruiterId = Guid.NewGuid();
+
+        vacancy.UpdateDetails(vacancy.AdvertTitle, vacancy.AdvertDescription, vacancy.HiringManagerId, recruiterId, Now.AddDays(1));
+
+        Assert.Equal(recruiterId, vacancy.AssignedRecruiterId);
+    }
+
+    [Fact]
+    public void UpdateDetails_Clears_AssignedRecruiterId_To_Null()
+    {
+        var vacancy = CreateVacancy();
+        vacancy.UpdateDetails(vacancy.AdvertTitle, vacancy.AdvertDescription, vacancy.HiringManagerId, Guid.NewGuid(), Now.AddDays(1));
+
+        vacancy.UpdateDetails(vacancy.AdvertTitle, vacancy.AdvertDescription, vacancy.HiringManagerId, null, Now.AddDays(2));
+
+        Assert.Null(vacancy.AssignedRecruiterId);
+    }
+
+    [Fact]
+    public void AssignRecruiter_Sets_AssignedRecruiterId_And_UpdatedAt()
+    {
+        var vacancy = CreateVacancy();
+        var recruiterId = Guid.NewGuid();
+        var later = Now.AddDays(1);
+
+        vacancy.AssignRecruiter(recruiterId, later);
+
+        Assert.Equal(recruiterId, vacancy.AssignedRecruiterId);
+        Assert.Equal(later, vacancy.UpdatedAt);
+    }
+
+    [Fact]
+    public void AssignRecruiter_Clears_AssignedRecruiterId_When_Passed_Null()
+    {
+        var vacancy = CreateVacancy();
+        vacancy.AssignRecruiter(Guid.NewGuid(), Now.AddDays(1));
+
+        vacancy.AssignRecruiter(null, Now.AddDays(2));
+
+        Assert.Null(vacancy.AssignedRecruiterId);
     }
 }
