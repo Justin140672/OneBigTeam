@@ -58,7 +58,11 @@ internal sealed class UpdateCompanySettingsHandler
 				company.Settings.AcknowledgementReminderIntervalDays,
 				company.Settings.NoticePeriodUnit,
 				company.Settings.NoticePeriodLength,
-				company.Settings.AutoDisableAccessOnLeavingDate);
+				company.Settings.AutoDisableAccessOnLeavingDate,
+				company.Settings.EmployeeNumberMode,
+				company.Settings.EmployeeNumberPrefix,
+				company.Settings.NextEmployeeNumber,
+				company.Settings.EmployeeNumberMinimumLength);
 
 		var settings = company.Settings ?? CompanySettings.CreateDefault(company.Id, now);
 		settings.Update(
@@ -79,6 +83,10 @@ internal sealed class UpdateCompanySettingsHandler
 			request.NoticePeriodUnit,
 			request.NoticePeriodLength,
 			request.AutoDisableAccessOnLeavingDate,
+			request.EmployeeNumberMode,
+			request.EmployeeNumberPrefix,
+			request.NextEmployeeNumber,
+			request.EmployeeNumberMinimumLength,
 			now);
 
 		company.SetSettings(settings, now);
@@ -132,7 +140,11 @@ internal sealed class UpdateCompanySettingsHandler
 					settings.AcknowledgementReminderIntervalDays,
 					settings.NoticePeriodUnit,
 					settings.NoticePeriodLength,
-					settings.AutoDisableAccessOnLeavingDate)),
+					settings.AutoDisableAccessOnLeavingDate,
+					settings.EmployeeNumberMode,
+					settings.EmployeeNumberPrefix,
+					settings.NextEmployeeNumber,
+					settings.EmployeeNumberMinimumLength)),
 			cancellationToken);
 
 		return Result.Success(new UpdateCompanySettingsResponse(
@@ -154,6 +166,10 @@ internal sealed class UpdateCompanySettingsHandler
 			settings.NoticePeriodUnit,
 			settings.NoticePeriodLength,
 			settings.AutoDisableAccessOnLeavingDate,
+			settings.EmployeeNumberMode,
+			settings.EmployeeNumberPrefix,
+			settings.NextEmployeeNumber,
+			settings.EmployeeNumberMinimumLength,
 			settings.UpdatedAt));
 	}
 }

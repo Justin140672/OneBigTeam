@@ -42,15 +42,6 @@ internal sealed class GetEmployeeTimelineHandler(
             .AsNoTracking()
             .Where(e => e.CompanyId == request.CompanyId && e.EmployeeId == request.EmployeeId);
 
-        if (request.Category is not null)
-            query = query.Where(e => e.Category == request.Category);
-
-        if (request.DateFrom is not null)
-            query = query.Where(e => e.EventDate >= request.DateFrom);
-
-        if (request.DateTo is not null)
-            query = query.Where(e => e.EventDate <= request.DateTo);
-
         // Push the three-tier visibility check into the query itself rather than materialising
         // rows the caller isn't allowed to see. Equivalent to
         // EmployeeTimelineVisibilityResolver.CanView but expressed so EF can translate it to SQL.

@@ -10,9 +10,17 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
     public void Configure(EntityTypeBuilder<CompanySettings> builder)
     {
         builder.ToTable("company_settings", tableBuilder =>
+        {
             tableBuilder.HasCheckConstraint(
                 "CK_company_settings_leave_year_start_month",
-                "leave_year_start_month BETWEEN 1 AND 12"));
+                "leave_year_start_month BETWEEN 1 AND 12");
+            tableBuilder.HasCheckConstraint(
+                "CK_company_settings_next_employee_number",
+                "next_employee_number > 0");
+            tableBuilder.HasCheckConstraint(
+                "CK_company_settings_employee_number_minimum_length",
+                "employee_number_minimum_length BETWEEN 1 AND 10");
+        });
 
         builder.HasKey(settings => settings.CompanyId);
 
@@ -120,6 +128,28 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .HasColumnName("auto_disable_access_on_leaving_date")
             .IsRequired()
             .HasDefaultValue(true);
+
+        builder.Property(settings => settings.EmployeeNumberMode)
+            .HasColumnName("employee_number_mode")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired()
+            .HasDefaultValue(EmployeeNumberMode.Manual);
+
+        builder.Property(settings => settings.EmployeeNumberPrefix)
+            .HasColumnName("employee_number_prefix")
+            .HasMaxLength(20)
+            .IsRequired(false);
+
+        builder.Property(settings => settings.NextEmployeeNumber)
+            .HasColumnName("next_employee_number")
+            .IsRequired()
+            .HasDefaultValue(1);
+
+        builder.Property(settings => settings.EmployeeNumberMinimumLength)
+            .HasColumnName("employee_number_minimum_length")
+            .IsRequired()
+            .HasDefaultValue(1);
 
         builder.Property(settings => settings.CreatedAt)
             .HasColumnName("created_at")

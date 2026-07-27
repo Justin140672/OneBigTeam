@@ -15,19 +15,25 @@ internal sealed class CreateEmployeeHandler
     private readonly IIntegrationEventPublisher _publisher;
     private readonly IProbationDateResolver _probationDateResolver;
     private readonly ICompanyContactValidationReader _contactValidationReader;
+    private readonly ICompanyEmployeeNumberSettingsReader _employeeNumberSettingsReader;
+    private readonly IEmployeeNumberGenerator _employeeNumberGenerator;
 
     public CreateEmployeeHandler(
         EmployeesDbContext dbContext,
         IClock clock,
         IIntegrationEventPublisher publisher,
         IProbationDateResolver probationDateResolver,
-        ICompanyContactValidationReader contactValidationReader)
+        ICompanyContactValidationReader contactValidationReader,
+        ICompanyEmployeeNumberSettingsReader employeeNumberSettingsReader,
+        IEmployeeNumberGenerator employeeNumberGenerator)
     {
         _dbContext = dbContext;
         _clock = clock;
         _publisher = publisher;
         _probationDateResolver = probationDateResolver;
         _contactValidationReader = contactValidationReader;
+        _employeeNumberSettingsReader = employeeNumberSettingsReader;
+        _employeeNumberGenerator = employeeNumberGenerator;
     }
 
     public async Task<Result<CreateEmployeeResponse>> HandleAsync(
@@ -62,12 +68,36 @@ internal sealed class CreateEmployeeHandler
                 Error.Conflict($"An employee with work email '{request.WorkEmail.Trim()}' already exists in this company."));
         }
 
-        var employeeNumber = request.EmployeeNumber.Trim();
+        var employeeNumberMode = await _employeeNumberSettingsReader.GetModeAsync(request.CompanyId, cancellationToken);
+
+        string employeeNumber;
+        if (string.IsNullOrWhiteSpace(request.EmployeeNumber))
+        {
+            if (employeeNumberMode == EmployeeNumberMode.Manual)
+            {
+                return Result.Failure<CreateEmployeeResponse>(
+                    Error.Validation("Employee number is required."));
+            }
+
+            // Automatic mode: caller didn't supply one, generate it via the atomic counter.
+            // If a later validation step in this handler fails, the claimed number is simply
+            // skipped — the same behaviour as a database SERIAL/IDENTITY column on a rolled-back
+            // transaction, and not something this wave needs to compensate for.
+            employeeNumber = await _employeeNumberGenerator.GenerateNextAsync(request.CompanyId, cancellationToken);
+        }
+        else
+        {
+            employeeNumber = request.EmployeeNumber.Trim();
+        }
+
+        // Normalized the same way Employee.Create/UpdateEmploymentDetails normalize it, so this
+        // pre-check compares like-for-like with what the unique index enforces at the DB level.
+        var normalizedEmployeeNumber = employeeNumber.ToUpperInvariant();
 
         var employeeNumberExists = await _dbContext.Employees
             .AnyAsync(
                 e => e.CompanyId == request.CompanyId &&
-                     e.EmployeeNumber == employeeNumber,
+                     e.EmployeeNumber == normalizedEmployeeNumber,
                 cancellationToken);
 
         if (employeeNumberExists)
@@ -199,7 +229,20 @@ internal sealed class CreateEmployeeHandler
         employee.SetProbationEndDate(probationEndDate, now);
 
         _dbContext.Employees.Add(employee);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // Backstop for the race between the AnyAsync pre-check above and this SaveChangesAsync:
+            // the (CompanyId, EmployeeNumber) unique index rejects the duplicate at the database
+            // level, and we surface that as the same Conflict error the pre-check would have
+            // returned, rather than propagating a raw DB exception.
+            return Result.Failure<CreateEmployeeResponse>(
+                Error.Conflict($"An employee with employee number '{employeeNumber}' already exists in this company."));
+        }
 
         await _publisher.PublishAsync(new EmployeeCreatedIntegrationEvent(
             employee.CompanyId, employee.Id, employee.StartDate, employee.ManagerId, probationEndDate,

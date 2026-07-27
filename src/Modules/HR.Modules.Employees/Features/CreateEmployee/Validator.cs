@@ -4,6 +4,11 @@ namespace HR.Modules.Employees.Features.CreateEmployee;
 
 internal sealed class CreateEmployeeValidator : AbstractValidator<CreateEmployeeRequest>
 {
+    // Letters, numbers, spaces, and a documented set of common separators. Kept permissive
+    // enough that legitimate real-world employee number schemes aren't rejected, while still
+    // excluding characters that would be awkward in exports/URLs/reports.
+    public const string EmployeeNumberPattern = @"^[A-Za-z0-9 \-_./]+$";
+
     public CreateEmployeeValidator()
     {
         RuleFor(r => r.CompanyId)
@@ -21,9 +26,15 @@ internal sealed class CreateEmployeeValidator : AbstractValidator<CreateEmployee
         RuleFor(r => r.EmploymentTypeId)
             .NotEmpty().WithMessage("Employment type is required.");
 
+        // NotEmpty is intentionally not enforced here: in Automatic employee-numbering mode the
+        // request may omit EmployeeNumber entirely and the handler generates one. Requiredness in
+        // Manual mode is enforced by the handler instead, since it depends on the company's
+        // CompanySettings.EmployeeNumberMode (a DB read the validator does not perform).
         RuleFor(r => r.EmployeeNumber)
-            .NotEmpty().WithMessage("Employee number is required.")
-            .MaximumLength(50);
+            .MaximumLength(50)
+            .Matches(EmployeeNumberPattern)
+                .WithMessage("Employee number may only contain letters, numbers, spaces, and the separators - _ . /")
+            .When(r => !string.IsNullOrWhiteSpace(r.EmployeeNumber));
 
         RuleFor(r => r.FirstName)
             .NotEmpty()

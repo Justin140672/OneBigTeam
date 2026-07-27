@@ -298,4 +298,115 @@ public sealed class CompanySettingsTests(AppFixture fixture) : E2ETestBase(fixtu
         await companyEdit.SetAutoDisableAccessOnLeavingDateAsync(initialAutoDisableAccess);
         await companyEdit.SaveAsync();
     }
+
+    // ── Employee Numbering ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task EmployeeNumberMode_TogglesVisibility_Of_AutomaticOnlyFields()
+    {
+        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
+        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(CompanyAdminEmail);
+
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenSettingsTabAsync();
+
+        var initialMode = await companyEdit.GetEmployeeNumberModeAsync();
+
+        await companyEdit.SelectEmployeeNumberModeAsync("Manual");
+        Assert.False(await companyEdit.IsEmployeeNumberAutomaticFieldsVisibleAsync());
+
+        await companyEdit.SelectEmployeeNumberModeAsync("Automatic");
+        Assert.True(await companyEdit.IsEmployeeNumberAutomaticFieldsVisibleAsync());
+
+        // Restore the original mode so this test doesn't leak state into other tests/fixtures.
+        await companyEdit.SelectEmployeeNumberModeAsync(initialMode);
+        await companyEdit.SaveAsync();
+    }
+
+    [Fact]
+    public async Task EmployeeNumberPreview_UpdatesAsPrefixNextNumberAndMinimumLengthChange()
+    {
+        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
+        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(CompanyAdminEmail);
+
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenSettingsTabAsync();
+
+        var initialMode = await companyEdit.GetEmployeeNumberModeAsync();
+
+        await companyEdit.SelectEmployeeNumberModeAsync("Automatic");
+
+        await companyEdit.SetEmployeeNumberPrefixAsync("EMP-");
+        await companyEdit.SetNextEmployeeNumberAsync(7);
+        await companyEdit.SetEmployeeNumberMinimumLengthAsync(4);
+
+        Assert.Equal("Preview: EMP-0007", await companyEdit.GetEmployeeNumberPreviewAsync());
+
+        await companyEdit.SetNextEmployeeNumberAsync(42);
+        Assert.Equal("Preview: EMP-0042", await companyEdit.GetEmployeeNumberPreviewAsync());
+
+        // Restore the original mode so this test doesn't leak state into other tests/fixtures.
+        await companyEdit.SelectEmployeeNumberModeAsync(initialMode);
+        await companyEdit.SaveAsync();
+    }
+
+    [Fact]
+    public async Task EmployeeNumberSettings_PersistAfterReload()
+    {
+        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
+        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(CompanyAdminEmail);
+
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenSettingsTabAsync();
+
+        var initialMode = await companyEdit.GetEmployeeNumberModeAsync();
+        var initialPrefix = await companyEdit.IsEmployeeNumberAutomaticFieldsVisibleAsync()
+            ? await companyEdit.GetEmployeeNumberPrefixAsync()
+            : null;
+        var initialNextNumber = await companyEdit.IsEmployeeNumberAutomaticFieldsVisibleAsync()
+            ? await companyEdit.GetNextEmployeeNumberAsync()
+            : (int?)null;
+        var initialMinLength = await companyEdit.IsEmployeeNumberAutomaticFieldsVisibleAsync()
+            ? await companyEdit.GetEmployeeNumberMinimumLengthAsync()
+            : (int?)null;
+
+        await companyEdit.SelectEmployeeNumberModeAsync("Automatic");
+        await companyEdit.SetEmployeeNumberPrefixAsync("STF-");
+        await companyEdit.SetNextEmployeeNumberAsync(15);
+        await companyEdit.SetEmployeeNumberMinimumLengthAsync(6);
+
+        await companyEdit.SaveAsync();
+        Assert.False(await companyEdit.HasErrorAsync(),
+            "Expected no error after saving the employee numbering settings");
+
+        // Reload the page for real (re-navigate) to exercise the settings-hydration
+        // path in CompanyEdit.OnInitializedAsync, not just in-memory Blazor state.
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenSettingsTabAsync();
+
+        Assert.Equal("Automatic", await companyEdit.GetEmployeeNumberModeAsync());
+        Assert.Equal("STF-", await companyEdit.GetEmployeeNumberPrefixAsync());
+        Assert.Equal(15, await companyEdit.GetNextEmployeeNumberAsync());
+        Assert.Equal(6, await companyEdit.GetEmployeeNumberMinimumLengthAsync());
+
+        // Restore the original values so this test doesn't leak state into other
+        // tests/fixtures that rely on the seeded default for this company.
+        await companyEdit.SelectEmployeeNumberModeAsync(initialMode);
+        if (initialMode == "Automatic")
+        {
+            await companyEdit.SetEmployeeNumberPrefixAsync(initialPrefix ?? "");
+            await companyEdit.SetNextEmployeeNumberAsync(initialNextNumber ?? 1);
+            await companyEdit.SetEmployeeNumberMinimumLengthAsync(initialMinLength ?? 1);
+        }
+        await companyEdit.SaveAsync();
+    }
 }

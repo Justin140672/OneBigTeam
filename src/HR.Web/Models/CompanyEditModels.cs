@@ -57,4 +57,11 @@ public sealed class CompanySettingsEditModel
     [Range(1, int.MaxValue, ErrorMessage = "Notice period length must be greater than 0.")]
     public int NoticePeriodLength { get; set; } = 1;
     public bool AutoDisableAccessOnLeavingDate { get; set; } = true;
+    public EmployeeNumberMode EmployeeNumberMode { get; set; } = EmployeeNumberMode.Manual;
+    [MaxLength(20)]
+    public string? EmployeeNumberPrefix { get; set; }
+    [Range(1, int.MaxValue, ErrorMessage = "Next employee number must be greater than 0.")]
+    public int NextEmployeeNumber { get; set; } = 1;
+    [Range(1, 10, ErrorMessage = "Minimum numeric length must be between 1 and 10.")]
+    public int EmployeeNumberMinimumLength { get; set; } = 1;
 }

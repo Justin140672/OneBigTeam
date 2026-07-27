@@ -26,7 +26,8 @@ public class CompanyServiceTests
             Guid.NewGuid(), "UTC", "en-GB", 31, 7.5m, 1, 25m, 6, true, false, false, null, null,
             "^[A-Za-z]{1,2}\\d[A-Za-z\\d]?\\s?\\d[A-Za-z]{2}$", "^0\\d{9,10}$", "^07\\d{9}$",
             "I confirm that I have read and understood this document.", 3,
-            NoticePeriodUnit.Months, 1, true, DateTime.UtcNow);
+            NoticePeriodUnit.Months, 1, true,
+            EmployeeNumberMode.Automatic, "EMP-", 1, 4, DateTime.UtcNow);
 
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
         var service = new CompanyService(factory);
@@ -125,7 +126,8 @@ public class CompanyServiceTests
         var response = new UpdateCompanySettingsResponse(
             Guid.NewGuid(), "UTC", "en-GB", WorkingDays.Monday, 7.5m, 1, 25m, 6, true, false, false, null, null,
             "I confirm that I have read and understood this document.", 3,
-            NoticePeriodUnit.Months, 1, true, DateTime.UtcNow);
+            NoticePeriodUnit.Months, 1, true,
+            EmployeeNumberMode.Automatic, "EMP-", 1, 4, DateTime.UtcNow);
 
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
         var service = new CompanyService(factory);
@@ -133,7 +135,8 @@ public class CompanyServiceTests
         var request = new UpdateCompanySettingsRequest(
             Guid.NewGuid(), "UTC", "en-GB", WorkingDays.Monday, 7.5m, 1, 25m, 6, true, false, false, null, null,
             "I confirm that I have read and understood this document.", 3,
-            NoticePeriodUnit.Months, 1, true);
+            NoticePeriodUnit.Months, 1, true,
+            EmployeeNumberMode.Automatic, "EMP-", 1, 4);
 
         var result = await service.UpdateCompanySettingsAsync(Guid.NewGuid(), request);
 
@@ -150,7 +153,8 @@ public class CompanyServiceTests
         var request = new UpdateCompanySettingsRequest(
             Guid.NewGuid(), "UTC", "en-GB", WorkingDays.Monday, 7.5m, 1, 25m, 6, true, false, false, null, null,
             "I confirm that I have read and understood this document.", 3,
-            NoticePeriodUnit.Months, 1, true);
+            NoticePeriodUnit.Months, 1, true,
+            EmployeeNumberMode.Automatic, "EMP-", 1, 4);
 
         var result = await service.UpdateCompanySettingsAsync(Guid.NewGuid(), request);
 

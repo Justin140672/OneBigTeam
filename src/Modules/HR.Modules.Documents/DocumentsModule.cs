@@ -240,6 +240,8 @@ public static class DocumentsModule
 
         services.AddScoped<SharedCompanyDocumentAcknowledgementReminderJob>();
         services.AddScoped<DetectDocumentsDueForReviewJob>();
+
+        services.AddScoped<ISharedCompanyDocumentAcknowledgementHistoryReplayer, SharedCompanyDocumentAcknowledgementHistoryReplayer>();
     }
 
     public static WebApplication UseDocumentsRecurringJobs(this WebApplication app)

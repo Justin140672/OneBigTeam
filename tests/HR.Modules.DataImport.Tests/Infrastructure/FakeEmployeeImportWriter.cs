@@ -35,6 +35,7 @@ internal sealed class FakeEmployeeImportWriter : IEmployeeImportWriter
 
         return Task.FromResult(new EmployeeImportCreateResult(
             request.Id,
+            string.IsNullOrWhiteSpace(request.EmployeeNumber) ? "AUTO-00001" : request.EmployeeNumber,
             request.StartDate,
             ManagerId: null,
             request.PositionProfileId,

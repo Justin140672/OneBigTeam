@@ -472,4 +472,113 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
         Assert.True(await empEdit.HasValidationMessageAsync("Position profile is required."),
             "Expected a validation message indicating Position Profile is required");
     }
+
+    // ── Employee Numbering (Wave 2) ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task CreateEmployee_WhenCompanyModeIsManual_ShowsRequiredEmployeeNumberInput()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Acme's seeded numbering mode is Manual by default — confirm the plain text input
+        // renders and is required (see EmployeeEdit.razor's Employee Number field).
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenSettingsTabAsync();
+        Assert.Equal("Manual", await companyEdit.GetEmployeeNumberModeAsync());
+
+        await empEdit.GoToNewAsync(AcmeId);
+
+        Assert.True(await empEdit.IsEmployeeNumberInputVisibleAsync(),
+            "Expected the Employee Number text input to be visible when the company's numbering mode is Manual");
+        Assert.False(await empEdit.HasEmployeeNumberAutoAssignedMessageAsync(),
+            "Did not expect the auto-assigned informational message while in Manual mode");
+    }
+
+    [Fact]
+    public async Task CreateEmployee_WhenCompanyModeIsAutomatic_HidesEmployeeNumberInput_And_AssignsNumberOnSave()
+    {
+        var unique    = Guid.NewGuid().ToString("N")[..8];
+        var lastName  = $"AutoNum{unique}";
+        var workEmail = $"e2e.autonum{unique}@acme.example";
+
+        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList     = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit     = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Switch Acme's numbering mode to Automatic for the duration of this test.
+        await companyEdit.GoToAsync(AcmeId);
+        await companyEdit.OpenSettingsTabAsync();
+        var initialMode = await companyEdit.GetEmployeeNumberModeAsync();
+        await companyEdit.SelectEmployeeNumberModeAsync("Automatic");
+        await companyEdit.SaveAsync();
+        Assert.False(await companyEdit.HasErrorAsync(),
+            "Expected no error after switching the company's numbering mode to Automatic");
+
+        try
+        {
+            await empEdit.GoToNewAsync(AcmeId);
+
+            Assert.False(await empEdit.IsEmployeeNumberInputVisibleAsync(),
+                "Did not expect the Employee Number text input to be visible when the company's numbering mode is Automatic");
+            Assert.True(await empEdit.HasEmployeeNumberAutoAssignedMessageAsync(),
+                "Expected the auto-assigned informational message while in Automatic mode");
+
+            await empEdit.FillFirstNameAsync("E2E");
+            await empEdit.FillLastNameAsync(lastName);
+            await empEdit.FillWorkEmailAsync(workEmail);
+            await empEdit.SelectDropdownAsync("Gender", "Male");
+            await empEdit.SelectDropdownAsync("Nationality", "British");
+            await empEdit.FillDateOfBirthAsync("15/06/1990");
+            await empEdit.FillStartDateAsync("01/03/2026");
+            await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+            await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+
+            await empEdit.SaveNewEmployeeAsync();
+
+            Assert.True(await empList.HasEmployeeAsync(lastName),
+                $"Expected the new employee '{lastName}' to appear in the employee list after creation");
+        }
+        finally
+        {
+            // Restore the original numbering mode so this test doesn't leak state into other
+            // tests/fixtures that rely on Acme's seeded default.
+            await companyEdit.GoToAsync(AcmeId);
+            await companyEdit.OpenSettingsTabAsync();
+            await companyEdit.SelectEmployeeNumberModeAsync(initialMode);
+            await companyEdit.SaveAsync();
+        }
+    }
+
+    [Fact]
+    public async Task EmploymentTab_EditingEmployeeNumber_PersistsNewValue()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        var unique = Guid.NewGuid().ToString("N")[..8];
+        var newEmployeeNumber = $"EMP-{unique}";
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // James Okafor is a pre-seeded employee — edit his Employment tab's Employee Number.
+        await empEdit.GoToAsync(AcmeId, JamesOkaforId);
+        await empEdit.OpenEmploymentTabAsync();
+
+        await empEdit.FillEmployeeNumberAsync(newEmployeeNumber);
+        await empEdit.ClickSaveChangesAsync();
+
+        // Re-navigate to confirm the new value persisted and shows in the header badge.
+        await empEdit.GoToAsync(AcmeId, JamesOkaforId);
+        Assert.Equal($"#{newEmployeeNumber}", await empEdit.GetEmployeeNumberHeaderTextAsync());
+    }
 }

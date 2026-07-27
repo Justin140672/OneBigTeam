@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
@@ -10,17 +11,23 @@ internal sealed class UpdateEmploymentDetailsHandler
     private readonly EmployeesDbContext _dbContext;
     private readonly IClock _clock;
     private readonly IIntegrationEventPublisher _integrationEventPublisher;
+    private readonly IAuditEventPublisher _auditEventPublisher;
 
     public UpdateEmploymentDetailsHandler(
-        EmployeesDbContext dbContext, IClock clock, IIntegrationEventPublisher integrationEventPublisher)
+        EmployeesDbContext dbContext,
+        IClock clock,
+        IIntegrationEventPublisher integrationEventPublisher,
+        IAuditEventPublisher auditEventPublisher)
     {
         _dbContext = dbContext;
         _clock = clock;
         _integrationEventPublisher = integrationEventPublisher;
+        _auditEventPublisher = auditEventPublisher;
     }
 
     public async Task<Result<UpdateEmploymentDetailsResponse>> HandleAsync(
         UpdateEmploymentDetailsRequest request,
+        Guid actorEmployeeId,
         CancellationToken cancellationToken)
     {
         var employee = await _dbContext.Employees
@@ -31,6 +38,26 @@ internal sealed class UpdateEmploymentDetailsHandler
         if (employee is null)
             return Result.Failure<UpdateEmploymentDetailsResponse>(
                 Error.NotFound($"Employee with id '{request.Id}' was not found."));
+
+        // Employee number can be corrected here by HR regardless of company numbering mode. This
+        // never touches CompanySettings.NextEmployeeNumber (it's a direct field edit, not the
+        // generator), but it must still satisfy the same uniqueness rule Wave 1 enforces on
+        // create, normalized the same way Employee.UpdateEmploymentDetails normalizes it.
+        var normalizedEmployeeNumber = request.EmployeeNumber?.Trim().ToUpperInvariant() ?? employee.EmployeeNumber;
+
+        if (!string.Equals(employee.EmployeeNumber, normalizedEmployeeNumber, StringComparison.Ordinal))
+        {
+            var employeeNumberTaken = await _dbContext.Employees
+                .AnyAsync(
+                    e => e.CompanyId == request.CompanyId &&
+                         e.Id != request.Id &&
+                         e.EmployeeNumber == normalizedEmployeeNumber,
+                    cancellationToken);
+
+            if (employeeNumberTaken)
+                return Result.Failure<UpdateEmploymentDetailsResponse>(
+                    Error.Conflict($"An employee with employee number '{request.EmployeeNumber}' already exists in this company."));
+        }
 
         if (request.DepartmentId.HasValue)
         {
@@ -146,6 +173,15 @@ internal sealed class UpdateEmploymentDetailsHandler
                     Error.NotFound($"Employment type '{request.EmploymentTypeId}' was not found or is inactive."));
         }
 
+        var employmentDetailsBefore = new EmploymentDetailsSnapshot(
+            employee.EmployeeNumber,
+            employee.EmploymentTypeId,
+            employee.StartDate,
+            employee.ContinuousServiceDate,
+            employee.ProbationEndDate,
+            employee.LeavingDate,
+            employee.Notes);
+
         employee.UpdateEmploymentDetails(
             request.EmployeeNumber ?? employee.EmployeeNumber,
             request.EmploymentTypeId ?? employee.EmploymentTypeId,
@@ -171,6 +207,20 @@ internal sealed class UpdateEmploymentDetailsHandler
         employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var employmentDetailsAfter = new EmploymentDetailsSnapshot(
+            employee.EmployeeNumber,
+            employee.EmploymentTypeId,
+            employee.StartDate,
+            employee.ContinuousServiceDate,
+            employee.ProbationEndDate,
+            employee.LeavingDate,
+            employee.Notes);
+
+        await _auditEventPublisher.PublishAsync(
+            new EmploymentDetailsUpdatedAuditEvent(
+                employee.CompanyId, employee.Id, actorEmployeeId, now, employmentDetailsBefore, employmentDetailsAfter),
+            cancellationToken);
 
         if (previousPositionProfileId != employee.PositionProfileId)
         {

@@ -25,6 +25,8 @@ using HR.Modules.Employees.Features.UpdateMyContactDetails;
 using HR.Modules.Employees.Features.UpdateMyEmergencyContact;
 using HR.Modules.Employees.Features.CreateDepartment;
 using HR.Modules.Employees.Features.CreateEmployee;
+using HR.Modules.Employees.Features.PreviewBackfillEmployeeNumbers;
+using HR.Modules.Employees.Features.CommitBackfillEmployeeNumbers;
 using HR.Modules.Employees.Features.CreatePositionProfile;
 using HR.Modules.Employees.Features.DeactivateDepartment;
 using HR.Modules.Employees.Features.DeactivatePositionProfile;
@@ -92,6 +94,7 @@ using HR.Modules.Employees.Features.CreateTimelineEntryOnSharedCompanyDocumentAc
 using HR.Modules.Employees.Features.CreateTimelineEntryOnEmployeeDocumentUploaded;
 using HR.Modules.Employees.Features.CreateTimelineEntryOnEmployeeDetailsCorrected;
 using HR.Modules.Employees.Features.CreateTimelineEntryOnOffboardingStarted;
+using HR.Modules.Employees.Features.BackfillEmployeeTimeline;
 using HR.Modules.Employees.Jobs;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
@@ -178,6 +181,15 @@ public static class EmployeesModule
 
         services.AddScoped<CreateEmployeeHandler>();
         services.AddScoped<IValidator<CreateEmployeeRequest>, CreateEmployeeValidator>();
+        // ICompanyEmployeeNumberSettingsReader and IEmployeeNumberGenerator are registered by
+        // CompaniesModule (they are implemented in HR.Modules.Companies, the owning module for
+        // company settings); Employees only depends on the Infrastructure.Abstractions interfaces.
+
+        services.AddScoped<PreviewBackfillEmployeeNumbersHandler>();
+        services.AddScoped<IValidator<PreviewBackfillEmployeeNumbersRequest>, PreviewBackfillEmployeeNumbersValidator>();
+
+        services.AddScoped<CommitBackfillEmployeeNumbersHandler>();
+        services.AddScoped<IValidator<CommitBackfillEmployeeNumbersRequest>, CommitBackfillEmployeeNumbersValidator>();
 
         services.AddScoped<GetEmployeeHandler>();
         services.AddScoped<GetMyEmployeeHandler>();
@@ -340,6 +352,9 @@ public static class EmployeesModule
         services.AddScoped<IIntegrationEventHandler<EmployeeDocumentUploadedIntegrationEvent>, EmployeeDocumentUploadedHandler>();
         services.AddScoped<IIntegrationEventHandler<EmployeeDetailsCorrectedIntegrationEvent>, EmployeeDetailsCorrectedHandler>();
         services.AddScoped<IIntegrationEventHandler<OffboardingStartedIntegrationEvent>, OffboardingStartedHandler>();
+
+        services.AddScoped<BackfillEmployeeTimelineHandler>();
+        services.AddScoped<IValidator<BackfillEmployeeTimelineRequest>, BackfillEmployeeTimelineValidator>();
 
         services.AddScoped<IProbationDateResolver, ProbationDateResolver>();
         services.AddScoped<IEffectiveNoticePeriodResolver, EffectiveNoticePeriodResolver>();

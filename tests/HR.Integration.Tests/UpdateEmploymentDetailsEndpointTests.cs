@@ -209,6 +209,70 @@ public class UpdateEmploymentDetailsEndpointTests : IClassFixture<ApiWebApplicat
     }
 
     [Fact]
+    public async Task Put_Employment_Returns_Conflict_When_EmployeeNumber_Already_Used_By_Another_Employee()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var employee1 = await CreateEmployeeAsync(client, companyId);
+        var employee2 = await CreateEmployeeAsync(client, companyId);
+
+        var setNumberResponse = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employee2.Id}/employment",
+            new
+            {
+                companyId,
+                id = employee2.Id,
+                employeeNumber = "EMP-TAKEN",
+                employmentTypeId = (Guid?)null,
+                status = "Active",
+                startDate = "2026-01-15"
+            });
+        Assert.Equal(HttpStatusCode.OK, setNumberResponse.StatusCode);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employee1.Id}/employment",
+            new
+            {
+                companyId,
+                id = employee1.Id,
+                employeeNumber = "EMP-TAKEN",
+                employmentTypeId = (Guid?)null,
+                status = "Active",
+                startDate = "2026-01-15"
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_Employment_Returns_UnprocessableEntity_When_EmployeeNumber_Has_Invalid_Format()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var employee = await CreateEmployeeAsync(client, companyId);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employee.Id}/employment",
+            new
+            {
+                companyId,
+                id = employee.Id,
+                employeeNumber = "EMP@001!",
+                employmentTypeId = (Guid?)null,
+                status = "Active",
+                startDate = "2026-01-15"
+            });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Put_Employment_Returns_NotFound_For_Unknown_Employee()
     {
         using var client = _factory.CreateClient();

@@ -1,0 +1,191 @@
+@using HR.Web.Models
+@inject EmployeeTimelineService EmployeeTimelineService
+
+@if (_loading)
+{
+    <HrLoadingIndicator Label="Loading timeline…" />
+}
+else if (_items.Count == 0)
+{
+    <HrEmptyState Message="No timeline entries found." Icon="fa-solid fa-timeline" />
+}
+else
+{
+    @* Syncfusion Blazor ships no standalone "Timeline" component (its only "Timeline" concept is a
+       Scheduler view, not usable stand-alone) — verified by inspecting every installed
+       Syncfusion.Blazor.* package's type metadata, none define anything named *Timeline*. This is
+       therefore a hand-rolled vertical timeline using this app's existing Bootstrap/FontAwesome
+       conventions, styled in EmployeeTimelineTab.razor.css. *@
+    <ul class="timeline-list" data-testid="employee-timeline">
+        @foreach (var item in _items)
+        {
+            <li class="timeline-entry">
+                <div class="timeline-dot">
+                    <i class="@CategoryIcon(item.Category)"></i>
+                </div>
+                <div class="card mb-1 timeline-card" data-testid="timeline-entry-card">
+                    <div class="card-body py-2 px-3">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="fw-semibold">@item.Title</span>
+                            @if (IsFutureDated(item))
+                            {
+                                <span class="badge bg-info-subtle text-info-emphasis" data-testid="upcoming-timeline-badge">Upcoming</span>
+                            }
+                            <span class="text-muted small ms-auto">@item.EventDate.ToString("d MMM yyyy")</span>
+                        </div>
+                        <p class="mb-1">@item.Summary</p>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-muted small">
+                                @(string.IsNullOrEmpty(item.PerformedBy) ? "System" : item.PerformedBy)
+                            </span>
+                            @{ var targetTab = MapToTabKey(item.EventType); }
+                            @if (targetTab is not null && HasCallbackFor(targetTab))
+                            {
+                                <button type="button" class="btn btn-link btn-sm p-0" @onclick="@(() => NavigateToSourceAsync(targetTab))">
+                                    View details
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </li>
+        }
+    </ul>
+
+    <p class="text-muted small mt-2 mb-2">@_totalCount timeline entr@(_totalCount == 1 ? "y" : "ies")</p>
+
+    @if (_items.Count < _totalCount)
+    {
+        <div class="d-flex justify-content-center">
+            <SfButton CssClass="e-outline e-small" Disabled="@_loadingMore" OnClick="LoadMoreAsync" data-testid="timeline-load-more">
+                @if (_loadingMore)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Load more
+            </SfButton>
+        </div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+
+    // Each callback maps to one destination tab this host page actually exposes to the current
+    // viewer. "View details" only renders when the corresponding callback has a delegate attached
+    // — MyProfile wires only the tabs self-service actually has (e.g. Documents), while
+    // EmployeeEdit (HR-only page) wires the full set, so no dead-end links are ever shown.
+    [Parameter] public EventCallback OnNavigateToPromotions { get; set; }
+    [Parameter] public EventCallback OnNavigateToCompensation { get; set; }
+    [Parameter] public EventCallback OnNavigateToProbation { get; set; }
+    [Parameter] public EventCallback OnNavigateToOnboarding { get; set; }
+    [Parameter] public EventCallback OnNavigateToDocuments { get; set; }
+    [Parameter] public EventCallback OnNavigateToAcknowledgements { get; set; }
+    [Parameter] public EventCallback OnNavigateToOffboarding { get; set; }
+    [Parameter] public EventCallback OnNavigateToNotes { get; set; }
+
+    private const int PageSize = 20;
+
+    private bool _loading = true;
+    private bool _loadingMore;
+    private int _pageNumber = 1;
+    private int _totalCount;
+    private List<EmployeeTimelineItemModel> _items = [];
+
+    protected override async Task OnParametersSetAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _loading = _items.Count == 0;
+        _pageNumber = 1;
+
+        var response = await EmployeeTimelineService.GetTimelineAsync(
+            CompanyId, EmployeeId,
+            pageNumber: _pageNumber, pageSize: PageSize);
+
+        _items = response?.Items.ToList() ?? [];
+        _totalCount = response?.TotalCount ?? 0;
+        _loading = false;
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        _loadingMore = true;
+
+        var response = await EmployeeTimelineService.GetTimelineAsync(
+            CompanyId, EmployeeId,
+            pageNumber: _pageNumber + 1, pageSize: PageSize);
+
+        if (response is not null)
+        {
+            _pageNumber++;
+            _items.AddRange(response.Items);
+            _totalCount = response.TotalCount;
+        }
+
+        _loadingMore = false;
+    }
+
+    private static bool IsFutureDated(EmployeeTimelineItemModel item) =>
+        item.EventDate > DateOnly.FromDateTime(DateTime.Today);
+
+    private static string CategoryIcon(string category) => category switch
+    {
+        "Employment" => "fa-solid fa-briefcase",
+        "Compensation" => "fa-solid fa-money-bill-wave",
+        "OnboardingAndProbation" => "fa-solid fa-clipboard-check",
+        "Documents" => "fa-solid fa-file-lines",
+        "Offboarding" => "fa-solid fa-right-from-bracket",
+        "HrNotes" => "fa-solid fa-note-sticky",
+        _ => "fa-solid fa-circle-dot",
+    };
+
+    // Event type -> destination tab key. Only events with a real, navigable destination tab get
+    // a mapping here; the rest (e.g. EmployeeJoined, ManagerChanged) are self-contained in their
+    // Title/Summary text and render with no "View details" action at all.
+    private static string? MapToTabKey(string eventType) => eventType switch
+    {
+        "EmployeePromoted" => "promotions",
+        "CompensationChanged" => "compensation",
+        "ProbationPassed" => "probation",
+        "OnboardingCompleted" => "onboarding",
+        "CompanyDocumentAcknowledged" => "acknowledgements",
+        "EmployeeDocumentAdded" => "documents",
+        "HrNoteAdded" => "notes",
+        "OffboardingStarted" or "EmploymentEnded" => "offboarding",
+        _ => null,
+    };
+
+    private bool HasCallbackFor(string tabKey) => tabKey switch
+    {
+        "promotions" => OnNavigateToPromotions.HasDelegate,
+        "compensation" => OnNavigateToCompensation.HasDelegate,
+        "probation" => OnNavigateToProbation.HasDelegate,
+        "onboarding" => OnNavigateToOnboarding.HasDelegate,
+        "documents" => OnNavigateToDocuments.HasDelegate,
+        "acknowledgements" => OnNavigateToAcknowledgements.HasDelegate,
+        "offboarding" => OnNavigateToOffboarding.HasDelegate,
+        "notes" => OnNavigateToNotes.HasDelegate,
+        _ => false,
+    };
+
+    private async Task NavigateToSourceAsync(string tabKey)
+    {
+        var callback = tabKey switch
+        {
+            "promotions" => OnNavigateToPromotions,
+            "compensation" => OnNavigateToCompensation,
+            "probation" => OnNavigateToProbation,
+            "onboarding" => OnNavigateToOnboarding,
+            "documents" => OnNavigateToDocuments,
+            "acknowledgements" => OnNavigateToAcknowledgements,
+            "offboarding" => OnNavigateToOffboarding,
+            "notes" => OnNavigateToNotes,
+            _ => default,
+        };
+
+        if (callback.HasDelegate)
+            await callback.InvokeAsync();
+    }
+}

@@ -23,4 +23,8 @@ internal sealed record UpdateCompanySettingsRequest
 	public NoticePeriodUnit NoticePeriodUnit { get; init; } = NoticePeriodUnit.Months;
 	public int NoticePeriodLength { get; init; } = 1;
 	public bool AutoDisableAccessOnLeavingDate { get; init; } = true;
+	public EmployeeNumberMode EmployeeNumberMode { get; init; } = EmployeeNumberMode.Manual;
+	public string? EmployeeNumberPrefix { get; init; }
+	public int NextEmployeeNumber { get; init; } = 1;
+	public int EmployeeNumberMinimumLength { get; init; } = 1;
 }

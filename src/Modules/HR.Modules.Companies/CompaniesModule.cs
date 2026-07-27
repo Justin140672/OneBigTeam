@@ -123,6 +123,8 @@ public static class CompaniesModule
         services.AddScoped<ICompanyAcknowledgementSettingsReader, CompanyAcknowledgementSettingsReader>();
         services.AddScoped<ICompanyContactValidationReader, CompanyContactValidationReader>();
         services.AddScoped<ICompanyTimeZoneReader, CompanyTimeZoneReader>();
+        services.AddScoped<ICompanyEmployeeNumberSettingsReader, CompanyEmployeeNumberSettingsReader>();
+        services.AddScoped<IEmployeeNumberGenerator, EmployeeNumberGenerator>();
         services.AddScoped<IPublicHolidayReader, PublicHolidayReader>();
         services.AddScoped<CreatePublicHolidayHandler>();
         services.AddScoped<IValidator<CreatePublicHolidayRequest>, CreatePublicHolidayValidator>();

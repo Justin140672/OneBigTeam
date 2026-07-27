@@ -34,6 +34,7 @@ public static class OnboardingModule
         services.AddScoped<IOnboardingStatusReader, OnboardingStatusReader>();
         services.AddScoped<GetTeamOnboardingHandler>();
         services.AddScoped<OnboardingReminderJob>();
+        services.AddScoped<IOnboardingHistoryReplayer, OnboardingHistoryReplayer>();
 
         return services;
     }

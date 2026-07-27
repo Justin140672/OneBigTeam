@@ -16,12 +16,16 @@ public sealed record EmployeeImportCreateRequest(
     Guid LocationId,
     Guid EmploymentTypeId,
     Guid PositionProfileId,
-    string EmployeeNumber,
+    // Null/blank when the company is in Automatic employee-numbering mode: the writer generates
+    // the number itself via IEmployeeNumberGenerator in that case. Always populated in Manual mode
+    // (guaranteed by EmployeeStagingRowValidator's mode-aware requiredness check at staging time).
+    string? EmployeeNumber,
     Guid ImportSessionId,
     Guid? ActorUserId);
 
 public sealed record EmployeeImportCreateResult(
     Guid EmployeeId,
+    string EmployeeNumber,
     DateOnly StartDate,
     Guid? ManagerId,
     Guid? PositionProfileId,

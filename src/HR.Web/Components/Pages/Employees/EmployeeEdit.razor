@@ -9,6 +9,7 @@
 @inject EmploymentTypeService EmploymentTypeService
 @inject LeavePolicyService LeavePolicyService
 @inject InviteService InviteService
+@inject CompanyService CompanyService
 @inject AppSession Session
 @inherits EditPageBase<EmployeeProfileEditModel>
 @using HR.Infrastructure.Abstractions
@@ -112,9 +113,22 @@
                                     <SfDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Employee Number <span class="text-danger">*</span></label>
-                                    <HrTextBox @bind-Value="Model.EmployeeNumber" Placeholder="e.g. EMP-001" />
-                                    <ValidationMessage For="@(() => Model.EmployeeNumber)" />
+                                    <label class="form-label">
+                                        Employee Number
+                                        @if (_companyEmployeeNumberMode != EmployeeNumberMode.Automatic)
+                                        {
+                                            <span class="text-danger">*</span>
+                                        }
+                                    </label>
+                                    @if (_companyEmployeeNumberMode == EmployeeNumberMode.Automatic)
+                                    {
+                                        <p class="text-muted small mb-0">An employee number will be assigned automatically when this employee is created.</p>
+                                    }
+                                    else
+                                    {
+                                        <HrTextBox @bind-Value="Model.EmployeeNumber" Placeholder="e.g. EMP-001" />
+                                        <ValidationMessage For="@(() => Model.EmployeeNumber)" />
+                                    }
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label">Employment Type <span class="text-danger">*</span></label>
@@ -292,6 +306,10 @@
             @if (_employee is not null)
             {
                 <span class="badge rounded-pill px-3 py-2 fs-6 fw-normal @StatusBadgeClass(_employee.Status)">@StatusDisplayName(_employee.Status)</span>
+                @if (!string.IsNullOrEmpty(_employee.EmployeeNumber))
+                {
+                    <span class="text-muted">#@_employee.EmployeeNumber</span>
+                }
             }
             @if (!_showLeavingTab)
             {
@@ -642,6 +660,23 @@
                     </ContentTemplate>
                 </TabItem>
 
+                <TabItem>
+                    <ChildContent><TabHeader Text="Timeline" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="mt-4">
+                            <EmployeeTimelineTab CompanyId="CompanyId" EmployeeId="Id!.Value"
+                                                  OnNavigateToPromotions="@(() => _activeTabIndex = 3)"
+                                                  OnNavigateToCompensation="@(() => _activeTabIndex = 2)"
+                                                  OnNavigateToProbation="@(() => { if (_showProbationTab) _activeTabIndex = 4; })"
+                                                  OnNavigateToOnboarding="@(() => { if (_showOnboardingTab) _activeTabIndex = OnboardingTabIndex; })"
+                                                  OnNavigateToDocuments="@(() => _activeTabIndex = 9 + ProbationOffset)"
+                                                  OnNavigateToAcknowledgements="@(() => _activeTabIndex = 11 + ProbationOffset)"
+                                                  OnNavigateToOffboarding="@(() => { if (_showOffboardingTab) _activeTabIndex = OffboardingTabIndex; })"
+                                                  OnNavigateToNotes="@(() => { if (Session.IsHrAdministrator) _activeTabIndex = NotesTabIndex; })" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+
                 @if (_showOnboardingTab)
                 {
                     <TabItem>
@@ -801,13 +836,13 @@
     //
     // Counted directly from the markup above (Details, Employment, Compensation, Promotion
     // History, [Probation], Emergency Contacts, Leave, Sickness, Tasks, Documents, Assets,
-    // Acknowledgement History, Audit = 12 always-rendered tabs before Onboarding, plus 1 more when
-    // Probation renders), not trusted from any older constant — this file has picked up tabs (e.g.
-    // Promotion History) since these indices were last set, so re-derive them from the actual
-    // <TabItem> count rather than assuming the previous numbers still held.
+    // Acknowledgement History, Audit, Timeline = 13 always-rendered tabs before Onboarding, plus 1
+    // more when Probation renders), not trusted from any older constant — this file has picked up
+    // tabs (e.g. Promotion History, Timeline) since these indices were last set, so re-derive them
+    // from the actual <TabItem> count rather than assuming the previous numbers still held.
     private bool _showOnboardingTab;
-    private int OnboardingTabIndex => 13 + ProbationOffset;
-    private int OffboardingTabIndex => (_showOnboardingTab ? 14 : 13) + ProbationOffset;
+    private int OnboardingTabIndex => 14 + ProbationOffset;
+    private int OffboardingTabIndex => (_showOnboardingTab ? 15 : 14) + ProbationOffset;
 
     // Offboarding only gets a tab once a plan has been started, and loses it again once that
     // plan is Completed/Cancelled — completed history remains visible via the Audit tab instead
@@ -822,6 +857,11 @@
     // OffboardingTabIndex plus one more slot if Offboarding itself is currently rendered.
     private bool _showLeavingTab;
     private int LeavingTabIndex => OffboardingTabIndex + (_showOffboardingTab ? 1 : 0);
+
+    // Notes (HR-only) is the very last tab, rendered after Leaving when Leaving itself is shown.
+    private int NotesTabIndex => LeavingTabIndex + (_showLeavingTab ? 1 : 0);
+
+    private EmployeeNumberMode _companyEmployeeNumberMode = EmployeeNumberMode.Manual;
 
     protected override async Task LoadAsync()
     {
@@ -903,6 +943,10 @@
         {
             Model.StartDate = DateOnly.FromDateTime(DateTime.Today);
 
+            var companySettings = await CompanyService.GetCompanySettingsAsync(CompanyId);
+            _companyEmployeeNumberMode = companySettings?.EmployeeNumberMode ?? EmployeeNumberMode.Manual;
+            Model.EmployeeNumberAutoAssigned = _companyEmployeeNumberMode == EmployeeNumberMode.Automatic;
+
             var managerResult = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
             _managerOptions = (managerResult?.Items ?? [])
                 .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
@@ -928,6 +972,7 @@
                 "onboarding" => _showOnboardingTab ? OnboardingTabIndex : 0,
                 "offboarding" => OffboardingTabIndex,
                 "leaving" => _showLeavingTab ? LeavingTabIndex : 0,
+                "timeline" => 13 + ProbationOffset,
                 _ => 0
             };
         }

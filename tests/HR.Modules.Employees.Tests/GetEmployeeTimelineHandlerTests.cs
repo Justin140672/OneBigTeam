@@ -49,18 +49,12 @@ public class GetEmployeeTimelineHandlerTests
     private static GetEmployeeTimelineRequest BuildRequest(
         Guid companyId,
         Guid employeeId,
-        EmployeeTimelineCategory? category = null,
-        DateOnly? dateFrom = null,
-        DateOnly? dateTo = null,
         int pageNumber = 1,
         int pageSize = 20) =>
         new()
         {
             CompanyId = companyId,
             EmployeeId = employeeId,
-            Category = category,
-            DateFrom = dateFrom,
-            DateTo = dateTo,
             PageNumber = pageNumber,
             PageSize = pageSize,
         };
@@ -208,61 +202,6 @@ public class GetEmployeeTimelineHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value!.Items);
         Assert.Equal(0, result.Value.TotalCount);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Filters_By_Category()
-    {
-        await using var context = BuildContext();
-        var companyId = Guid.NewGuid();
-        var employee = CreateEmployee(companyId);
-        context.Employees.Add(employee);
-
-        context.EmployeeTimelineEntries.AddRange(
-            CreateEntry(
-                companyId, employee.Id, EmployeeTimelineVisibility.AuthorisedInternal, new DateOnly(2026, 7, 1), Now,
-                category: EmployeeTimelineCategory.Employment),
-            CreateEntry(
-                companyId, employee.Id, EmployeeTimelineVisibility.AuthorisedInternal, new DateOnly(2026, 7, 2), Now,
-                category: EmployeeTimelineCategory.Compensation));
-        await context.SaveChangesAsync();
-
-        var handler = BuildHandler(context);
-
-        var result = await handler.HandleAsync(
-            BuildRequest(companyId, employee.Id, category: EmployeeTimelineCategory.Compensation),
-            Guid.NewGuid(), callerIsHr: true, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(1, result.Value!.TotalCount);
-        Assert.Equal(EmployeeTimelineCategory.Compensation, result.Value.Items[0].Category);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Filters_By_Date_Range()
-    {
-        await using var context = BuildContext();
-        var companyId = Guid.NewGuid();
-        var employee = CreateEmployee(companyId);
-        context.Employees.Add(employee);
-
-        context.EmployeeTimelineEntries.AddRange(
-            CreateEntry(companyId, employee.Id, EmployeeTimelineVisibility.AuthorisedInternal, new DateOnly(2026, 6, 1), Now),
-            CreateEntry(companyId, employee.Id, EmployeeTimelineVisibility.AuthorisedInternal, new DateOnly(2026, 7, 15), Now),
-            CreateEntry(companyId, employee.Id, EmployeeTimelineVisibility.AuthorisedInternal, new DateOnly(2026, 8, 1), Now));
-        await context.SaveChangesAsync();
-
-        var handler = BuildHandler(context);
-
-        var result = await handler.HandleAsync(
-            BuildRequest(
-                companyId, employee.Id,
-                dateFrom: new DateOnly(2026, 7, 1), dateTo: new DateOnly(2026, 7, 31)),
-            Guid.NewGuid(), callerIsHr: true, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(1, result.Value!.TotalCount);
-        Assert.Equal(new DateOnly(2026, 7, 15), result.Value.Items[0].EventDate);
     }
 
     [Fact]

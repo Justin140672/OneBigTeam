@@ -3,6 +3,7 @@ using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.UpdateEmploymentDetails;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Tests;
@@ -11,6 +12,17 @@ public class UpdateEmploymentDetailsHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 25, 10, 0, 0, DateTimeKind.Utc);
     private static readonly DateOnly StartDate = new(2026, 7, 1);
+
+    private static UpdateEmploymentDetailsHandler BuildHandler(
+        EmployeesDbContext context,
+        FakeClock clock,
+        IIntegrationEventPublisher? integrationEventPublisher = null,
+        FakeAuditPublisher? auditPublisher = null)
+        => new(
+            context,
+            clock,
+            integrationEventPublisher ?? new NoOpIntegrationEventPublisher(),
+            auditPublisher ?? new FakeAuditPublisher());
 
     // ── probation date — employee override ────────────────────────────────────
 
@@ -28,7 +40,7 @@ public class UpdateEmploymentDetailsHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow));
         var manualOverrideDate = new DateOnly(2027, 3, 15);
 
         var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
@@ -38,7 +50,7 @@ public class UpdateEmploymentDetailsHandlerTests
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             ProbationEndDate = manualOverrideDate
-        }, CancellationToken.None);
+        }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(manualOverrideDate, result.Value!.ProbationEndDate);
@@ -58,7 +70,7 @@ public class UpdateEmploymentDetailsHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
         {
@@ -67,7 +79,7 @@ public class UpdateEmploymentDetailsHandlerTests
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             ProbationEndDate = null
-        }, CancellationToken.None);
+        }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Null(result.Value!.ProbationEndDate);
@@ -88,7 +100,7 @@ public class UpdateEmploymentDetailsHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
         {
@@ -98,7 +110,7 @@ public class UpdateEmploymentDetailsHandlerTests
             StartDate = StartDate,
             NoticePeriodUnitOverride = NoticePeriodUnit.Weeks,
             NoticePeriodLengthOverride = 4
-        }, CancellationToken.None);
+        }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(NoticePeriodUnit.Weeks, result.Value!.NoticePeriodUnitOverride);
@@ -123,7 +135,7 @@ public class UpdateEmploymentDetailsHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
         {
@@ -133,7 +145,7 @@ public class UpdateEmploymentDetailsHandlerTests
             StartDate = StartDate,
             NoticePeriodUnitOverride = null,
             NoticePeriodLengthOverride = null
-        }, CancellationToken.None);
+        }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Null(result.Value!.NoticePeriodUnitOverride);
@@ -149,7 +161,7 @@ public class UpdateEmploymentDetailsHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Employee_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
         {
@@ -157,7 +169,7 @@ public class UpdateEmploymentDetailsHandlerTests
             Id = Guid.NewGuid(),
             Status = EmploymentStatus.Active,
             StartDate = StartDate
-        }, CancellationToken.None);
+        }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -173,7 +185,7 @@ public class UpdateEmploymentDetailsHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
         {
@@ -181,7 +193,7 @@ public class UpdateEmploymentDetailsHandlerTests
             Id = employee.Id,
             Status = EmploymentStatus.Active,
             StartDate = StartDate
-        }, CancellationToken.None);
+        }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -198,7 +210,7 @@ public class UpdateEmploymentDetailsHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
         {
@@ -206,7 +218,7 @@ public class UpdateEmploymentDetailsHandlerTests
             Id = employee.Id,
             Status = EmploymentStatus.Active,
             StartDate = StartDate
-        }, CancellationToken.None);
+        }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(EmploymentStatus.Active, result.Value!.Status);
@@ -227,7 +239,7 @@ public class UpdateEmploymentDetailsHandlerTests
         context.Departments.Add(otherCompanyDept);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
         {
@@ -236,7 +248,7 @@ public class UpdateEmploymentDetailsHandlerTests
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             DepartmentId = otherCompanyDept.Id
-        }, CancellationToken.None);
+        }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -257,7 +269,7 @@ public class UpdateEmploymentDetailsHandlerTests
         context.Locations.Add(location);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
         {
@@ -266,7 +278,7 @@ public class UpdateEmploymentDetailsHandlerTests
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             LocationId = location.Id
-        }, CancellationToken.None);
+        }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(location.Id, result.Value!.LocationId);
@@ -290,7 +302,7 @@ public class UpdateEmploymentDetailsHandlerTests
         context.Locations.Add(otherCompanyLocation);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
         {
@@ -299,7 +311,7 @@ public class UpdateEmploymentDetailsHandlerTests
             Status = EmploymentStatus.Active,
             StartDate = StartDate,
             LocationId = otherCompanyLocation.Id
-        }, CancellationToken.None);
+        }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -324,7 +336,7 @@ public class UpdateEmploymentDetailsHandlerTests
         context.Employees.AddRange(employee, manager);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
         {
@@ -333,7 +345,7 @@ public class UpdateEmploymentDetailsHandlerTests
             Status = EmploymentStatus.Draft,
             StartDate = StartDate,
             ManagerId = manager.Id
-        }, CancellationToken.None);
+        }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var saved = await context.Employees.SingleAsync(e => e.Id == employee.Id);
@@ -353,7 +365,7 @@ public class UpdateEmploymentDetailsHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
         {
@@ -361,7 +373,7 @@ public class UpdateEmploymentDetailsHandlerTests
             Id = employee.Id,
             Status = EmploymentStatus.Draft,
             StartDate = StartDate
-        }, CancellationToken.None);
+        }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
@@ -405,7 +417,7 @@ public class UpdateEmploymentDetailsHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new CapturingIntegrationEventPublisher();
-        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow), publisher);
 
         var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
         {
@@ -417,7 +429,7 @@ public class UpdateEmploymentDetailsHandlerTests
             PositionProfileId = newPositionId,
             LocationId = newLocationId,
             ManagerId = manager.Id
-        }, CancellationToken.None);
+        }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(3, publisher.Published.Count);
@@ -447,7 +459,7 @@ public class UpdateEmploymentDetailsHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new CapturingIntegrationEventPublisher();
-        var handler = new UpdateEmploymentDetailsHandler(context, new FakeClock(FixedUtcNow), publisher);
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow), publisher);
 
         var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
         {
@@ -455,10 +467,148 @@ public class UpdateEmploymentDetailsHandlerTests
             Id = employee.Id,
             Status = employee.Status,
             StartDate = StartDate
-        }, CancellationToken.None);
+        }, Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(publisher.Published);
+    }
+
+    // ── employee number correction ───────────────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_Updates_EmployeeNumber_To_Valid_Unused_Value()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
+        {
+            CompanyId = companyId,
+            Id = employee.Id,
+            Status = EmploymentStatus.Active,
+            StartDate = StartDate,
+            EmployeeNumber = "EMP-9999"
+        }, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("EMP-9999", result.Value!.EmployeeNumber);
+        var saved = await context.Employees.SingleAsync();
+        Assert.Equal("EMP-9999", saved.EmployeeNumber);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_EmployeeNumber_Already_Used_By_Another_Employee_In_Same_Company()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee1 = CreateEmployee(companyId, now);
+        var employee2 = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0002", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.AddRange(employee1, employee2);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
+        {
+            CompanyId = companyId,
+            Id = employee1.Id,
+            Status = EmploymentStatus.Active,
+            StartDate = StartDate,
+            EmployeeNumber = employee2.EmployeeNumber
+        }, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+
+        var saved = await context.Employees.SingleAsync(e => e.Id == employee1.Id);
+        Assert.Equal(employee1.EmployeeNumber, saved.EmployeeNumber);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Two_Different_Employees_To_Keep_Independent_Numbers()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee1 = CreateEmployee(companyId, now);
+        var employee2 = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0002", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.AddRange(employee1, employee2);
+        await context.SaveChangesAsync();
+
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow));
+
+        var result1 = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
+        {
+            CompanyId = companyId,
+            Id = employee1.Id,
+            Status = EmploymentStatus.Active,
+            StartDate = StartDate,
+            EmployeeNumber = "EMP-1111"
+        }, Guid.NewGuid(), CancellationToken.None);
+
+        var result2 = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
+        {
+            CompanyId = companyId,
+            Id = employee2.Id,
+            Status = EmploymentStatus.Active,
+            StartDate = StartDate,
+            EmployeeNumber = "EMP-2222"
+        }, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result1.IsSuccess);
+        Assert.True(result2.IsSuccess);
+
+        var saved1 = await context.Employees.SingleAsync(e => e.Id == employee1.Id);
+        var saved2 = await context.Employees.SingleAsync(e => e.Id == employee2.Id);
+        Assert.Equal("EMP-1111", saved1.EmployeeNumber);
+        Assert.Equal("EMP-2222", saved2.EmployeeNumber);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Publishes_EmploymentDetailsUpdatedAuditEvent_With_Before_And_After_EmployeeNumber()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow), auditPublisher: auditPublisher);
+
+        var actorId = Guid.NewGuid();
+
+        var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
+        {
+            CompanyId = companyId,
+            Id = employee.Id,
+            Status = EmploymentStatus.Active,
+            StartDate = StartDate,
+            EmployeeNumber = "EMP-8888"
+        }, actorId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var auditEvent = Assert.Single(auditPublisher.Published);
+        Assert.Equal("employee.employment-details.updated", auditEvent.EventType);
+        Assert.Equal(employee.Id, auditEvent.EntityId);
+        Assert.Equal(actorId, auditEvent.ActorEmployeeId);
+
+        var before = Assert.IsType<EmploymentDetailsSnapshot>(auditEvent.Before);
+        var after = Assert.IsType<EmploymentDetailsSnapshot>(auditEvent.After);
+        Assert.Equal("EMP-0001", before.EmployeeNumber);
+        Assert.Equal("EMP-8888", after.EmployeeNumber);
     }
 
     private static Employee CreateEmployee(Guid companyId, DateTimeOffset now)

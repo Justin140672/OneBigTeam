@@ -158,20 +158,6 @@ public class GetEmployeeTimelineEndpointTests : IClassFixture<ApiWebApplicationF
     }
 
     [Fact]
-    public async Task Get_Timeline_Returns_BadRequest_When_DateFrom_Is_After_DateTo()
-    {
-        var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser1, companyId);
-
-        var employee = await CreateEmployeeAsync(client, companyId);
-
-        var response = await client.GetAsync(
-            $"/api/companies/{companyId}/employees/{employee}/timeline?dateFrom=2026-08-01&dateTo=2026-07-01");
-
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-    }
-
-    [Fact]
     public async Task Get_Timeline_Returns_BadRequest_For_Invalid_PageSize()
     {
         var companyId = Guid.NewGuid();

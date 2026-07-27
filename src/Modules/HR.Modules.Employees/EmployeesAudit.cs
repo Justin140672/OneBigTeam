@@ -330,6 +330,43 @@ internal sealed record EmployeeProfileUpdatedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
+internal sealed record EmploymentDetailsSnapshot(
+    string EmployeeNumber,
+    Guid EmploymentTypeId,
+    DateOnly StartDate,
+    DateOnly? ContinuousServiceDate,
+    DateOnly? ProbationEndDate,
+    DateOnly? LeavingDate,
+    string? Notes);
+
+// Employee number changes made through the Employment tab are administrative corrections (per
+// the Employee Number ticket) and must be visible in Employee Audit History like any other
+// employment detail correction — reusing this single event rather than inventing a separate
+// "employee number changed" event type, consistent with EmployeeProfileUpdatedAuditEvent's
+// always-published convention for its own tab.
+internal sealed record EmploymentDetailsUpdatedAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid ActorEmployeeId,
+    DateTimeOffset OccurredAt,
+    EmploymentDetailsSnapshot Before,
+    EmploymentDetailsSnapshot After) : IAuditEvent
+{
+    string IAuditEvent.EventType => "employee.employment-details.updated";
+    string IAuditEvent.EntityType => "Employee";
+    Guid IAuditEvent.EntityId => EmployeeId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => Before.EmployeeNumber != After.EmployeeNumber
+        ? "Employee number corrected"
+        : "Employment details updated";
+    object? IAuditEvent.Before => Before;
+    object? IAuditEvent.After => After;
+    object? IAuditEvent.Metadata => null;
+}
+
 internal sealed record ContactDetailsSnapshot(
     string? PersonalEmail,
     string? PhoneNumber,
@@ -542,6 +579,30 @@ internal sealed record EmployeePromotionCompletedAuditEvent(
     object? IAuditEvent.Before => new { PositionProfileId = PreviousPositionProfileId };
     object? IAuditEvent.After => new { PositionProfileId = NewPositionProfileId, EffectiveDate };
     object? IAuditEvent.Metadata => null;
+}
+
+// Published by BackfillEmployeeNumbers' commit endpoint, one per employee, after the whole batch
+// transaction has committed successfully. Employee number is not a sensitive value in this
+// codebase's classification (salary/bank/NI numbers are), so it is safe to record in full.
+internal sealed record EmployeeNumberBackfilledAuditEvent(
+    Guid CompanyId,
+    Guid EmployeeId,
+    Guid ActorEmployeeId,
+    DateTimeOffset OccurredAt,
+    string AssignedEmployeeNumber,
+    Guid BackfillOperationId) : IAuditEvent
+{
+    string IAuditEvent.EventType => "employee.employee-number.backfilled";
+    string IAuditEvent.EntityType => "Employee";
+    Guid IAuditEvent.EntityId => EmployeeId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
+    Guid? IAuditEvent.CorrelationId => BackfillOperationId;
+    string? IAuditEvent.Summary => "Employee number backfilled";
+    object? IAuditEvent.Before => new { EmployeeNumber = "" };
+    object? IAuditEvent.After => new { EmployeeNumber = AssignedEmployeeNumber };
+    object? IAuditEvent.Metadata => new { BackfillOperationId };
 }
 
 // Published by ProcessLeavingEmployeesJob (Hangfire) once an employee's leaving date has passed

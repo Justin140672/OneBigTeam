@@ -62,6 +62,7 @@ public static class ProbationModule
         services.AddScoped<IProbationStatusReader, ProbationStatusReader>();
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddScoped<GenerateDueProbationReviewsJob>();
+        services.AddScoped<IProbationHistoryReplayer, ProbationHistoryReplayer>();
     }
 
     public static WebApplication UseProbationRecurringJobs(this WebApplication app)

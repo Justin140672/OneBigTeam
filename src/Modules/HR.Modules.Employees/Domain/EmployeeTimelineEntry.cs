@@ -23,6 +23,12 @@ internal sealed class EmployeeTimelineEntry
     public EmployeeTimelineVisibility Visibility { get; private set; }
     public DateTimeOffset CreatedDate { get; private set; }
 
+    // Null for every entry created via the live integration-event handlers. Set only when an
+    // entry is written by the BackfillEmployeeTimeline feature (or the cross-module history
+    // replayers it drives), so backfilled entries can be distinguished from live ones without
+    // affecting the append-only dedup rules in EmployeeTimelineEntryConfiguration.
+    public DateTimeOffset? BackfilledAt { get; private set; }
+
     public static EmployeeTimelineEntry Create(
         Guid id,
         Guid companyId,
@@ -36,7 +42,8 @@ internal sealed class EmployeeTimelineEntry
         string sourceModule,
         Guid? sourceRecordId,
         EmployeeTimelineVisibility visibility,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        DateTimeOffset? backfilledAt = null)
     {
         return new EmployeeTimelineEntry
         {
@@ -53,6 +60,7 @@ internal sealed class EmployeeTimelineEntry
             SourceRecordId = sourceRecordId,
             Visibility = visibility,
             CreatedDate = now,
+            BackfilledAt = backfilledAt,
         };
     }
 }

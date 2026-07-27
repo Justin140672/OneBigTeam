@@ -42,6 +42,43 @@ public class UpdateEmploymentDetailsValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmploymentDetailsRequest.EmployeeNumber));
     }
 
+    // ── employee number format — same regex CreateEmployee applies (Wave 1) ─────
+
+    [Theory]
+    [InlineData("EMP-001")]
+    [InlineData("EMP_001")]
+    [InlineData("EMP.001")]
+    [InlineData("EMP/001")]
+    [InlineData("EMP 001")]
+    [InlineData("abc123")]
+    [InlineData("123456")]
+    public void Validate_Passes_For_Valid_EmployeeNumber_Formats(string employeeNumber)
+    {
+        var result = _validator.Validate(ValidRequest() with { EmployeeNumber = employeeNumber });
+        Assert.True(result.IsValid);
+    }
+
+    [Theory]
+    [InlineData("EMP@001")]
+    [InlineData("EMP#001")]
+    [InlineData("EMP!001")]
+    [InlineData("EMP*001")]
+    [InlineData("EMP+001")]
+    [InlineData("EMP%001")]
+    public void Validate_Fails_For_Invalid_EmployeeNumber_Formats(string employeeNumber)
+    {
+        var result = _validator.Validate(ValidRequest() with { EmployeeNumber = employeeNumber });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmploymentDetailsRequest.EmployeeNumber));
+    }
+
+    [Fact]
+    public void Validate_Passes_When_EmployeeNumber_Is_Exactly_50_Characters()
+    {
+        var result = _validator.Validate(ValidRequest() with { EmployeeNumber = new string('A', 50) });
+        Assert.True(result.IsValid);
+    }
+
     [Fact]
     public void Validate_Passes_When_EmploymentTypeId_Is_Null()
     {

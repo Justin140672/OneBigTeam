@@ -192,6 +192,25 @@ namespace HR.Modules.Companies.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("display_salary_on_employee_profile");
 
+                    b.Property<int>("EmployeeNumberMinimumLength")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("employee_number_minimum_length");
+
+                    b.Property<string>("EmployeeNumberMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Manual")
+                        .HasColumnName("employee_number_mode");
+
+                    b.Property<string>("EmployeeNumberPrefix")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("employee_number_prefix");
+
                     b.Property<bool>("ExcludePublicHolidaysFromLeave")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -230,6 +249,12 @@ namespace HR.Modules.Companies.Migrations
                         .HasColumnType("character varying(500)")
                         .HasDefaultValue("^(?:\\+44\\s?|0)7\\d{3}(?:\\s?\\d{3}){2}$")
                         .HasColumnName("mobile_regex");
+
+                    b.Property<int>("NextEmployeeNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("next_employee_number");
 
                     b.Property<int>("NoticePeriodLength")
                         .ValueGeneratedOnAdd()
@@ -287,7 +312,11 @@ namespace HR.Modules.Companies.Migrations
 
                     b.ToTable("company_settings", "companies", t =>
                         {
+                            t.HasCheckConstraint("CK_company_settings_employee_number_minimum_length", "employee_number_minimum_length BETWEEN 1 AND 10");
+
                             t.HasCheckConstraint("CK_company_settings_leave_year_start_month", "leave_year_start_month BETWEEN 1 AND 12");
+
+                            t.HasCheckConstraint("CK_company_settings_next_employee_number", "next_employee_number > 0");
                         });
                 });
 

@@ -261,6 +261,37 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task FillEmployeeNumberAsync(string value) =>
         await page.GetByPlaceholder("e.g. EMP-001").FillAsync(value);
 
+    /// <summary>
+    /// Returns true if the Employee Number text input is visible on the new-employee form —
+    /// false when the company's numbering mode is Automatic, in which case the informational
+    /// message below is shown instead (see <see cref="HasEmployeeNumberAutoAssignedMessageAsync"/>).
+    /// </summary>
+    public Task<bool> IsEmployeeNumberInputVisibleAsync() =>
+        page.GetByPlaceholder("e.g. EMP-001").IsVisibleAsync();
+
+    /// <summary>
+    /// Returns true if the "An employee number will be assigned automatically when this employee
+    /// is created." informational message is visible on the new-employee form (Automatic mode).
+    /// </summary>
+    public Task<bool> HasEmployeeNumberAutoAssignedMessageAsync() =>
+        page.Locator("p").Filter(new() { HasText = "An employee number will be assigned automatically" }).First.IsVisibleAsync();
+
+    /// <summary>
+    /// Returns the "#EMP-001"-style employee number badge shown next to the status badge in the
+    /// header of an existing employee's edit page, or null if not present.
+    /// </summary>
+    public async Task<string?> GetEmployeeNumberHeaderTextAsync()
+    {
+        var spans = await page.Locator("span.text-muted").AllAsync();
+        foreach (var span in spans)
+        {
+            var text = (await span.TextContentAsync())?.Trim();
+            if (text is not null && text.StartsWith('#'))
+                return text;
+        }
+        return null;
+    }
+
     // ── Notice period override (Employment tab, "Dates" card) ──────────────────
     //
     // Mirrors the "Override company default notice period" toggle on the Position Profile

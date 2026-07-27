@@ -20,6 +20,30 @@ public sealed class FakeCompanyContactValidationReader(
         => Task.FromResult(new CompanyContactValidationRules(postcodeRegex, telephoneRegex, mobileRegex));
 }
 
+// Manual mode by default, matching the pre-existing behaviour where every employee number was
+// manually supplied — tests that don't care about automatic numbering aren't affected.
+public sealed class FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode mode = EmployeeNumberMode.Manual)
+    : ICompanyEmployeeNumberSettingsReader
+{
+    public Task<EmployeeNumberMode> GetModeAsync(Guid companyId, CancellationToken cancellationToken)
+        => Task.FromResult(mode);
+
+    public Task<EmployeeNumberSequencePreview> GetSequencePreviewAsync(Guid companyId, CancellationToken cancellationToken)
+        => Task.FromResult(new EmployeeNumberSequencePreview(null, 1, 1));
+}
+
+public sealed class FakeEmployeeNumberGenerator(Func<int, string>? format = null) : IEmployeeNumberGenerator
+{
+    private int _counter;
+
+    public Task<string> GenerateNextAsync(Guid companyId, CancellationToken cancellationToken)
+    {
+        _counter++;
+        var value = format is null ? $"AUTO-{_counter:D5}" : format(_counter);
+        return Task.FromResult(value);
+    }
+}
+
 public sealed class NoOpIntegrationEventPublisher : IIntegrationEventPublisher
 {
     public Task PublishAsync<TEvent>(TEvent integrationEvent, CancellationToken cancellationToken)

@@ -20,7 +20,7 @@ public class CompanyNoticePeriodSettingsReaderTests
                              WorkingDays.Thursday | WorkingDays.Friday,
             7.5m, 1, 25, 6, true, false, false, null, null,
             "Custom company acknowledgement statement.", 3,
-            NoticePeriodUnit.Weeks, 4, false, now);
+            NoticePeriodUnit.Weeks, 4, false, EmployeeNumberMode.Manual, null, 1, 1, now);
         company.SetSettings(settings, now);
         context.Companies.Add(company);
         await context.SaveChangesAsync();

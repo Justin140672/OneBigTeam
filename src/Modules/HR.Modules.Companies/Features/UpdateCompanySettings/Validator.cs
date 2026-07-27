@@ -45,5 +45,15 @@ internal sealed class UpdateCompanySettingsValidator : AbstractValidator<UpdateC
 
 		RuleFor(request => request.NoticePeriodLength)
 			.GreaterThan(0);
+
+		RuleFor(request => request.NextEmployeeNumber)
+			.GreaterThan(0);
+
+		RuleFor(request => request.EmployeeNumberMinimumLength)
+			.InclusiveBetween(1, 10);
+
+		RuleFor(request => request.EmployeeNumberPrefix)
+			.MaximumLength(20)
+			.When(request => !string.IsNullOrWhiteSpace(request.EmployeeNumberPrefix));
 	}
 }

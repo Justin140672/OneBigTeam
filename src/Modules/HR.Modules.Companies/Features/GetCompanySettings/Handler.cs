@@ -43,6 +43,10 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
                 defaults.NoticePeriodUnit,
                 defaults.NoticePeriodLength,
                 defaults.AutoDisableAccessOnLeavingDate,
+                defaults.EmployeeNumberMode,
+                defaults.EmployeeNumberPrefix,
+                defaults.NextEmployeeNumber,
+                defaults.EmployeeNumberMinimumLength,
                 defaults.UpdatedAt));
         }
 
@@ -62,6 +66,10 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
             settings.NoticePeriodUnit,
             settings.NoticePeriodLength,
             settings.AutoDisableAccessOnLeavingDate,
+            settings.EmployeeNumberMode,
+            settings.EmployeeNumberPrefix,
+            settings.NextEmployeeNumber,
+            settings.EmployeeNumberMinimumLength,
             settings.UpdatedAt));
     }
 }

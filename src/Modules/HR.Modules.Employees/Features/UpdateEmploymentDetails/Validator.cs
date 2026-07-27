@@ -1,5 +1,6 @@
 using FluentValidation;
 using HR.Modules.Employees.Domain;
+using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 
@@ -25,9 +26,14 @@ internal sealed class UpdateEmploymentDetailsValidator : AbstractValidator<Updat
         // to compare against and can distinguish an actual attempted transition into Draft from a
         // Draft employee simply staying Draft.
 
+        // Same format rule Wave 1 applied to CreateEmployee — an employee number changed here is a
+        // genuine administrative correction, so it must satisfy the same constraints a brand-new
+        // number would (uniqueness is enforced separately in the handler, which has DB access).
         RuleFor(r => r.EmployeeNumber)
             .NotEmpty().WithMessage("Employee number is required.")
-            .MaximumLength(50);
+            .MaximumLength(50)
+            .Matches(CreateEmployeeValidator.EmployeeNumberPattern)
+                .WithMessage("Employee number may only contain letters, numbers, spaces, and the separators - _ . /");
 
         RuleFor(r => r.EmploymentTypeId)
             .NotEqual(Guid.Empty).When(r => r.EmploymentTypeId.HasValue);

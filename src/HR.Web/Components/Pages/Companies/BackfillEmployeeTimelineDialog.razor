@@ -1,0 +1,120 @@
+@using HR.Web.Models
+@using HR.Web.Services
+@inject EmployeeTimelineService TimelineService
+
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="600px" ShowCloseIcon="true" CssClass="backfill-employee-timeline-dialog">
+    <DialogEvents Closed="HandleDialogClosed" />
+    <DialogTemplates>
+        <Header>Backfill Employee Timeline</Header>
+        <Content>
+            @if (_globalError is not null)
+            {
+                <div class="alert alert-danger mb-3">@_globalError</div>
+            }
+
+            @if (_result is not null)
+            {
+                <div class="alert alert-success mb-3">
+                    Timeline backfill complete: @_result.TotalCreated created, @_result.TotalSkipped skipped, @_result.TotalFailed failed.
+                </div>
+
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Source</th>
+                            <th>Created</th>
+                            <th>Skipped</th>
+                            <th>Failed</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var source in _result.Sources)
+                        {
+                            <tr>
+                                <td>@source.Source</td>
+                                <td>@source.Created</td>
+                                <td>@source.Skipped</td>
+                                <td>@source.Failed</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <p class="text-muted">
+                    This will generate historical timeline entries from existing employee data. This may take a
+                    moment and can be safely re-run without creating duplicates.
+                </p>
+            }
+        </Content>
+        <FooterTemplate>
+            @if (_result is null)
+            {
+                <SfButton IsPrimary="true" Disabled="@_committing" OnClick="ConfirmCommitAsync">
+                    @if (_committing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Confirm Backfill
+                </SfButton>
+            }
+            <SfButton Disabled="@_committing" OnClick="HandleCloseAsync">@(_result is null ? "Cancel" : "Close")</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+    [Parameter] public EventCallback OnCommitted { get; set; }
+
+    private bool Visible { get; set; }
+    private bool _committing;
+    private TimelineBackfillResponse? _result;
+    private string? _globalError;
+
+    protected override void OnParametersSet()
+    {
+        var wasOpen = Visible;
+        Visible = IsOpen;
+
+        if (IsOpen && !wasOpen)
+        {
+            _result = null;
+            _globalError = null;
+        }
+    }
+
+    private async Task ConfirmCommitAsync()
+    {
+        _globalError = null;
+        _committing = true;
+        try
+        {
+            var (result, error) = await TimelineService.CommitBackfillAsync(CompanyId);
+
+            if (result is null)
+            {
+                _globalError = error ?? "Unable to complete the employee timeline backfill.";
+                return;
+            }
+
+            _result = result;
+            await OnCommitted.InvokeAsync();
+        }
+        finally
+        {
+            _committing = false;
+        }
+    }
+
+    private async Task HandleCloseAsync()
+    {
+        Visible = false;
+        await OnClosed.InvokeAsync();
+    }
+
+    private Task HandleDialogClosed() => HandleCloseAsync();
+}

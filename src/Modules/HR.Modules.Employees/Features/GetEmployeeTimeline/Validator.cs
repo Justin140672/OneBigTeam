@@ -17,10 +17,5 @@ internal sealed class GetEmployeeTimelineValidator : AbstractValidator<GetEmploy
 
         RuleFor(r => r.PageSize)
             .InclusiveBetween(1, 500);
-
-        RuleFor(r => r.DateTo)
-            .GreaterThanOrEqualTo(r => r.DateFrom)
-            .When(r => r.DateFrom is not null && r.DateTo is not null)
-            .WithMessage("DateTo must not be before DateFrom.");
     }
 }

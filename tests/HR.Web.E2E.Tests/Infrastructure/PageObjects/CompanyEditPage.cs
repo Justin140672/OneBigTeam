@@ -424,6 +424,110 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
         }
     }
 
+    // ── Employee Numbering ──────────────────────────────────────────────────────
+
+    /// <summary>Selects a value ("Manual" or "Automatic") from the "Numbering Mode" dropdown.</summary>
+    public async Task SelectEmployeeNumberModeAsync(string modeLabel)
+    {
+        var group = page.Locator(".col-md-4")
+            .Filter(new() { HasText = "Numbering Mode" })
+            .First;
+        await group.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        await page.Locator(".e-popup.e-ddl .e-list-item")
+            .Filter(new() { HasText = modeLabel })
+            .First
+            .ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+    }
+
+    /// <summary>Returns the currently displayed value of the "Numbering Mode" dropdown.</summary>
+    public async Task<string> GetEmployeeNumberModeAsync()
+    {
+        var group = page.Locator(".col-md-4")
+            .Filter(new() { HasText = "Numbering Mode" })
+            .First;
+        var combobox = group.Locator("span[role='combobox']").First;
+        return (await combobox.Locator("input").InputValueAsync()).Trim();
+    }
+
+    /// <summary>
+    /// Returns true if the Automatic-only Employee Numbering fields (Prefix, Next Number,
+    /// Minimum Numeric Length, live preview) are visible — they're only rendered (@if in the
+    /// Razor markup) while Numbering Mode is "Automatic" (see CompanySettingsTab.razor).
+    /// </summary>
+    public Task<bool> IsEmployeeNumberAutomaticFieldsVisibleAsync() =>
+        page.GetByPlaceholder("e.g. EMP-").IsVisibleAsync();
+
+    /// <summary>Sets the "Prefix" HrTextBox. Only present while Numbering Mode is "Automatic".</summary>
+    public Task SetEmployeeNumberPrefixAsync(string value) =>
+        page.GetByPlaceholder("e.g. EMP-").FillAsync(value);
+
+    public Task<string> GetEmployeeNumberPrefixAsync() =>
+        page.GetByPlaceholder("e.g. EMP-").InputValueAsync();
+
+    /// <summary>Sets the "Next Number" numeric field. Only present while Numbering Mode is "Automatic".</summary>
+    public Task SetNextEmployeeNumberAsync(int value) =>
+        FillNumericAndVerifyAsync(NumericBoxByLabel(".col-md-4", "Next Number"), value.ToString(), value);
+
+    public async Task<int> GetNextEmployeeNumberAsync()
+    {
+        var input = NumericBoxByLabel(".col-md-4", "Next Number");
+        var value = await input.InputValueAsync();
+        return int.Parse(value);
+    }
+
+    /// <summary>Sets the "Minimum Numeric Length" numeric field. Only present while Numbering Mode is "Automatic".</summary>
+    public Task SetEmployeeNumberMinimumLengthAsync(int value) =>
+        FillNumericAndVerifyAsync(NumericBoxByLabel(".col-md-4", "Minimum Numeric Length"), value.ToString(), value);
+
+    public async Task<int> GetEmployeeNumberMinimumLengthAsync()
+    {
+        var input = NumericBoxByLabel(".col-md-4", "Minimum Numeric Length");
+        var value = await input.InputValueAsync();
+        return int.Parse(value);
+    }
+
+    /// <summary>
+    /// Returns the live "Preview: XXXX" text shown below the Employee Numbering fields while in
+    /// Automatic mode (see CompanySettingsTab.razor's PreviewEmployeeNumber computed property).
+    /// </summary>
+    public async Task<string?> GetEmployeeNumberPreviewAsync()
+    {
+        var paragraph = page.Locator("p").Filter(new() { HasText = "Preview:" }).First;
+        return await paragraph.IsVisibleAsync() ? (await paragraph.TextContentAsync())?.Trim() : null;
+    }
+
+    /// <summary>
+    /// The "Backfill Employee Numbers…" button in the Employee Numbering section. Only rendered
+    /// (@if in CompanySettingsTab.razor) while Numbering Mode is "Automatic" — see
+    /// <see cref="IsEmployeeNumberAutomaticFieldsVisibleAsync"/> for the same gating on the other
+    /// Automatic-only fields.
+    /// </summary>
+    private ILocator BackfillEmployeeNumbersButton =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Backfill Employee Numbers…" });
+
+    public Task<bool> IsBackfillEmployeeNumbersButtonVisibleAsync() =>
+        BackfillEmployeeNumbersButton.IsVisibleAsync();
+
+    public Task OpenBackfillEmployeeNumbersDialogAsync() =>
+        BackfillEmployeeNumbersButton.ClickAsync();
+
+    /// <summary>
+    /// The "Backfill Employee Timeline…" button in the "Employee Timeline" subsection. Only rendered
+    /// (@if in CompanySettingsTab.razor) while Session.CanManageEmployees is true (mirrors the
+    /// server-side "employee:manage" policy) — note this is a *different* gate than the
+    /// Session.CanManageCompany gate on the Settings tab itself.
+    /// </summary>
+    private ILocator BackfillEmployeeTimelineButton =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Backfill Employee Timeline…" });
+
+    public Task<bool> IsBackfillEmployeeTimelineButtonVisibleAsync() =>
+        BackfillEmployeeTimelineButton.IsVisibleAsync();
+
+    public Task OpenBackfillEmployeeTimelineDialogAsync() =>
+        BackfillEmployeeTimelineButton.ClickAsync();
+
     // ── Save ───────────────────────────────────────────────────────────────────
 
     public async Task SaveAsync()

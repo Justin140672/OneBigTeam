@@ -151,8 +151,13 @@ public sealed class EmployeeProfileEditModel
     public string? PostcodeRegexPattern { get; set; }
     public string? TelephoneRegexPattern { get; set; }
     public string? MobileRegexPattern { get; set; }
-    [Required(ErrorMessage = "Employee number is required.")]
+    [RequiredUnless(nameof(EmployeeNumberAutoAssigned), ErrorMessage = "Employee number is required.")]
     public string EmployeeNumber { get; set; } = string.Empty;
+
+    // Set by EmployeeEdit for a brand-new employee when the company's numbering mode is
+    // Automatic — the Employee Number field is hidden in that case and this flag lets
+    // RequiredUnless skip validation instead of blocking Save with an empty required field.
+    public bool EmployeeNumberAutoAssigned { get; set; }
     [Required(ErrorMessage = "Employment type is required.")]
     public Guid? EmploymentTypeId { get; set; }
     [Required(ErrorMessage = "Department is required.")]

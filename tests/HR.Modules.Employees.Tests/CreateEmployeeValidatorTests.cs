@@ -202,6 +202,139 @@ public class CreateEmployeeValidatorTests
     }
 
     [Fact]
+    public void Validate_Passes_When_EmployeeNumber_Is_Empty()
+    {
+        // NotEmpty was intentionally removed: in Automatic numbering mode the request may omit
+        // EmployeeNumber entirely, and requiredness in Manual mode is enforced by the handler
+        // (which can read CompanySettings), not the validator.
+        var validator = new CreateEmployeeValidator();
+
+        var result = validator.Validate(new CreateEmployeeRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            DepartmentId = Guid.NewGuid(),
+            LocationId = Guid.NewGuid(),
+            PositionProfileId = Guid.NewGuid(),
+            EmploymentTypeId = Guid.NewGuid(),
+            FirstName = "Alice",
+            LastName = "Smith",
+            WorkEmail = "alice@example.com",
+            StartDate = new DateOnly(2026, 7, 1),
+            DateOfBirth = new DateOnly(1990, 5, 20),
+            Nationality = "British",
+            Gender = "Female",
+            EmployeeNumber = string.Empty
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Theory]
+    [InlineData("EMP-001")]
+    [InlineData("EMP_001")]
+    [InlineData("EMP.001")]
+    [InlineData("EMP/001")]
+    [InlineData("EMP 001")]
+    [InlineData("emp001")]
+    [InlineData("007")]
+    public void Validate_Passes_For_Valid_EmployeeNumber_Formats(string employeeNumber)
+    {
+        var validator = new CreateEmployeeValidator();
+
+        var result = validator.Validate(new CreateEmployeeRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            DepartmentId = Guid.NewGuid(),
+            LocationId = Guid.NewGuid(),
+            PositionProfileId = Guid.NewGuid(),
+            EmploymentTypeId = Guid.NewGuid(),
+            FirstName = "Alice",
+            LastName = "Smith",
+            WorkEmail = "alice@example.com",
+            StartDate = new DateOnly(2026, 7, 1),
+            DateOfBirth = new DateOnly(1990, 5, 20),
+            Nationality = "British",
+            Gender = "Female",
+            EmployeeNumber = employeeNumber
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Theory]
+    [InlineData("EMP@001")]
+    [InlineData("EMP#001")]
+    [InlineData("EMP!001")]
+    [InlineData("EMP*001")]
+    public void Validate_Fails_For_Invalid_EmployeeNumber_Characters(string employeeNumber)
+    {
+        var validator = new CreateEmployeeValidator();
+
+        var result = validator.Validate(new CreateEmployeeRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            FirstName = "Alice",
+            LastName = "Smith",
+            WorkEmail = "alice@example.com",
+            StartDate = new DateOnly(2026, 7, 1),
+            DateOfBirth = new DateOnly(1990, 5, 20),
+            Nationality = "British",
+            Gender = "Female",
+            EmployeeNumber = employeeNumber
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateEmployeeRequest.EmployeeNumber));
+    }
+
+    [Fact]
+    public void Validate_Fails_When_EmployeeNumber_Exceeds_MaximumLength()
+    {
+        var validator = new CreateEmployeeValidator();
+
+        var result = validator.Validate(new CreateEmployeeRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            FirstName = "Alice",
+            LastName = "Smith",
+            WorkEmail = "alice@example.com",
+            StartDate = new DateOnly(2026, 7, 1),
+            DateOfBirth = new DateOnly(1990, 5, 20),
+            Nationality = "British",
+            Gender = "Female",
+            EmployeeNumber = new string('A', 51)
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateEmployeeRequest.EmployeeNumber));
+    }
+
+    [Fact]
+    public void Validate_Passes_When_EmployeeNumber_At_MaximumLength()
+    {
+        var validator = new CreateEmployeeValidator();
+
+        var result = validator.Validate(new CreateEmployeeRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            DepartmentId = Guid.NewGuid(),
+            LocationId = Guid.NewGuid(),
+            PositionProfileId = Guid.NewGuid(),
+            EmploymentTypeId = Guid.NewGuid(),
+            FirstName = "Alice",
+            LastName = "Smith",
+            WorkEmail = "alice@example.com",
+            StartDate = new DateOnly(2026, 7, 1),
+            DateOfBirth = new DateOnly(1990, 5, 20),
+            Nationality = "British",
+            Gender = "Female",
+            EmployeeNumber = new string('A', 50)
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
     public void Validate_Passes_For_Valid_Full_Request()
     {
         var validator = new CreateEmployeeValidator();

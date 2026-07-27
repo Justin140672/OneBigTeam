@@ -71,6 +71,10 @@ public record GetCompanySettingsResponse(
     NoticePeriodUnit NoticePeriodUnit,
     int NoticePeriodLength,
     bool AutoDisableAccessOnLeavingDate,
+    EmployeeNumberMode EmployeeNumberMode,
+    string? EmployeeNumberPrefix,
+    int NextEmployeeNumber,
+    int EmployeeNumberMinimumLength,
     DateTime UpdatedAt);
 
 public record UpdateCompanySettingsRequest(
@@ -91,7 +95,11 @@ public record UpdateCompanySettingsRequest(
     int AcknowledgementReminderIntervalDays,
     NoticePeriodUnit NoticePeriodUnit,
     int NoticePeriodLength,
-    bool AutoDisableAccessOnLeavingDate);
+    bool AutoDisableAccessOnLeavingDate,
+    EmployeeNumberMode EmployeeNumberMode,
+    string? EmployeeNumberPrefix,
+    int NextEmployeeNumber,
+    int EmployeeNumberMinimumLength);
 
 public record UpdateCompanySettingsResponse(
     Guid CompanyId,
@@ -112,6 +120,10 @@ public record UpdateCompanySettingsResponse(
     NoticePeriodUnit NoticePeriodUnit,
     int NoticePeriodLength,
     bool AutoDisableAccessOnLeavingDate,
+    EmployeeNumberMode EmployeeNumberMode,
+    string? EmployeeNumberPrefix,
+    int NextEmployeeNumber,
+    int EmployeeNumberMinimumLength,
     DateTime UpdatedAt);
 
 // ── LOGO UPLOAD ───────────────────────────────────────────────────────────────

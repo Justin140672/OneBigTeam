@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.DataImport.Services;
 using HR.Modules.DataImport.Tests.Infrastructure;
 
@@ -9,8 +10,12 @@ public class EmployeeStagingRowValidatorTests
 
     private static EmployeeStagingRowValidator BuildValidator(
         FakeEmployeeImportLookupReader? reader = null,
-        FakeImportLookupResolver? resolver = null) =>
-        new(reader ?? new FakeEmployeeImportLookupReader(), resolver ?? new FakeImportLookupResolver());
+        FakeImportLookupResolver? resolver = null,
+        FakeCompanyEmployeeNumberSettingsReader? employeeNumberSettingsReader = null) =>
+        new(
+            reader ?? new FakeEmployeeImportLookupReader(),
+            resolver ?? new FakeImportLookupResolver(),
+            employeeNumberSettingsReader ?? new FakeCompanyEmployeeNumberSettingsReader());
 
     // Builds a row that otherwise satisfies all required fields, with optional extras set.
     // DateOfBirth/Nationality/Gender/EmployeeNumber/DepartmentName/LocationName/
@@ -666,5 +671,196 @@ public class EmployeeStagingRowValidatorTests
         var result = Assert.Single(results);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.Contains("'HoursPerDay'"));
+    }
+
+    // --- EmployeeNumberMode-aware validation (Manual vs Automatic) ---
+
+    [Fact]
+    public async Task ValidateAsync_Manual_Mode_Flags_Missing_EmployeeNumber()
+    {
+        var validator = BuildValidator(
+            employeeNumberSettingsReader: new FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode.Manual));
+        var row = ValidRow(2, employeeNumber: null);
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("'EmployeeNumber' is required."));
+    }
+
+    [Theory]
+    [InlineData("EMP#001")]
+    [InlineData("EMP@001")]
+    public async Task ValidateAsync_Manual_Mode_Flags_Invalid_EmployeeNumber_Format(string employeeNumber)
+    {
+        var validator = BuildValidator(
+            employeeNumberSettingsReader: new FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode.Manual));
+        var row = ValidRow(2, employeeNumber: employeeNumber);
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Errors,
+            e => e.Contains("Employee number may only contain letters, numbers, spaces, and the separators - _ . / (max 50 characters)."));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Manual_Mode_Flags_EmployeeNumber_Exceeding_Max_Length()
+    {
+        var validator = BuildValidator(
+            employeeNumberSettingsReader: new FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode.Manual));
+        var row = ValidRow(2, employeeNumber: new string('A', 51));
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Errors,
+            e => e.Contains("Employee number may only contain letters, numbers, spaces, and the separators - _ . / (max 50 characters)."));
+    }
+
+    [Theory]
+    [InlineData("EMP-0001")]
+    [InlineData("EMP_0001")]
+    [InlineData("EMP 0001")]
+    [InlineData("EMP/0001")]
+    [InlineData("EMP.0001")]
+    public async Task ValidateAsync_Manual_Mode_Accepts_EmployeeNumber_With_Allowed_Separators(string employeeNumber)
+    {
+        var validator = BuildValidator(
+            employeeNumberSettingsReader: new FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode.Manual));
+        var row = ValidRow(2, employeeNumber: employeeNumber);
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        Assert.True(Assert.Single(results).IsValid);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Manual_Mode_Still_Flags_Duplicate_EmployeeNumber_Within_File()
+    {
+        var validator = BuildValidator(
+            employeeNumberSettingsReader: new FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode.Manual));
+        var row1 = ValidRow(2, workEmail: "row1@example.com", employeeNumber: "EMP1");
+        var row2 = ValidRow(3, workEmail: "row2@example.com", employeeNumber: "EMP1");
+
+        var results = await validator.ValidateAsync(CompanyId, [row1, row2], MappedFieldsFrom(row1, row2), CancellationToken.None);
+
+        Assert.All(results, r => Assert.False(r.IsValid));
+        Assert.All(results, r => Assert.Contains(r.Errors, e => e.Contains("Duplicate employee number")));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Manual_Mode_Still_Flags_EmployeeNumber_Already_Existing_In_Company()
+    {
+        var reader = new FakeEmployeeImportLookupReader();
+        reader.SeedExistingEmployeeNumber("EMP99");
+        var validator = BuildValidator(
+            reader,
+            employeeNumberSettingsReader: new FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode.Manual));
+        var row = ValidRow(2, employeeNumber: "EMP99");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("already exists in this company"));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Automatic_Mode_Accepts_Omitted_EmployeeNumber()
+    {
+        var validator = BuildValidator(
+            employeeNumberSettingsReader: new FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode.Automatic));
+        var row = ValidRow(2, employeeNumber: null);
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        Assert.True(Assert.Single(results).IsValid);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Automatic_Mode_Rejects_Supplied_EmployeeNumber()
+    {
+        var validator = BuildValidator(
+            employeeNumberSettingsReader: new FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode.Automatic));
+        var row = ValidRow(2, employeeNumber: "EMP-0001");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Errors,
+            e => e.Contains("Employee number is auto-generated for this company and must be left blank."));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Automatic_Mode_Does_Not_Duplicate_Check_EmployeeNumber_Within_File()
+    {
+        // Both rows omit EmployeeNumber entirely (valid in Automatic mode) — if duplicate
+        // checking still ran on the (blank) EmployeeNumber field in this mode, two blanks would
+        // incorrectly be flagged as duplicates of each other.
+        var validator = BuildValidator(
+            employeeNumberSettingsReader: new FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode.Automatic));
+        var row1 = ValidRow(2, workEmail: "row1@example.com", employeeNumber: null);
+        var row2 = ValidRow(3, workEmail: "row2@example.com", employeeNumber: null);
+
+        var results = await validator.ValidateAsync(CompanyId, [row1, row2], MappedFieldsFrom(row1, row2), CancellationToken.None);
+
+        Assert.All(results, r => Assert.True(r.IsValid));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Automatic_Mode_Does_Not_Check_EmployeeNumber_Against_Existing_Employees()
+    {
+        // Automatic-mode rows never carry a supplied EmployeeNumber to check (a supplied value is
+        // itself an error, asserted above) — this proves lookupReader.EmployeeNumberExistsAsync is
+        // never even consulted in this mode by seeding a value that would otherwise collide.
+        var reader = new FakeEmployeeImportLookupReader();
+        reader.SeedExistingEmployeeNumber("EMP99");
+        var validator = BuildValidator(
+            reader,
+            employeeNumberSettingsReader: new FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode.Automatic));
+        var row = ValidRow(2, employeeNumber: null);
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        Assert.True(Assert.Single(results).IsValid);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Automatic_Mode_Still_Checks_WorkEmail_Duplicates_Within_File()
+    {
+        var validator = BuildValidator(
+            employeeNumberSettingsReader: new FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode.Automatic));
+        var row1 = ValidRow(2, workEmail: "dup@example.com", employeeNumber: null);
+        var row2 = ValidRow(3, workEmail: "dup@example.com", employeeNumber: null);
+
+        var results = await validator.ValidateAsync(CompanyId, [row1, row2], MappedFieldsFrom(row1, row2), CancellationToken.None);
+
+        Assert.All(results, r => Assert.False(r.IsValid));
+        Assert.All(results, r => Assert.Contains(r.Errors, e => e.Contains("Duplicate work email")));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_Automatic_Mode_Still_Checks_WorkEmail_Against_Existing_Employees()
+    {
+        var reader = new FakeEmployeeImportLookupReader();
+        reader.SeedExistingWorkEmail("existing@example.com");
+        var validator = BuildValidator(
+            reader,
+            employeeNumberSettingsReader: new FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode.Automatic));
+        var row = ValidRow(2, workEmail: "existing@example.com", employeeNumber: null);
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("already exists in this company"));
     }
 }

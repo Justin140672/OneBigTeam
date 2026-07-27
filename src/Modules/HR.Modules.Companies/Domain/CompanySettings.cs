@@ -35,6 +35,15 @@ internal sealed class CompanySettings
     public NoticePeriodUnit NoticePeriodUnit { get; private set; }
     public int NoticePeriodLength { get; private set; }
     public bool AutoDisableAccessOnLeavingDate { get; private set; }
+
+    public EmployeeNumberMode EmployeeNumberMode { get; private set; }
+    public string? EmployeeNumberPrefix { get; private set; }
+    public int NextEmployeeNumber { get; private set; }
+
+    // Enforced range is 1-10: 1 allows no zero-padding at all (e.g. "1"), while 10 digits is
+    // generous enough for any realistic company size without being an absurd column width.
+    public int EmployeeNumberMinimumLength { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -64,6 +73,10 @@ internal sealed class CompanySettings
             NoticePeriodUnit = NoticePeriodUnit.Months,
             NoticePeriodLength = 1,
             AutoDisableAccessOnLeavingDate = true,
+            EmployeeNumberMode = EmployeeNumberMode.Manual,
+            EmployeeNumberPrefix = null,
+            NextEmployeeNumber = 1,
+            EmployeeNumberMinimumLength = 1,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -87,6 +100,10 @@ internal sealed class CompanySettings
         NoticePeriodUnit noticePeriodUnit,
         int noticePeriodLength,
         bool autoDisableAccessOnLeavingDate,
+        EmployeeNumberMode employeeNumberMode,
+        string? employeeNumberPrefix,
+        int nextEmployeeNumber,
+        int employeeNumberMinimumLength,
         DateTimeOffset now)
     {
         TimeZone = timeZone;
@@ -108,6 +125,10 @@ internal sealed class CompanySettings
         NoticePeriodUnit = noticePeriodUnit;
         NoticePeriodLength = noticePeriodLength;
         AutoDisableAccessOnLeavingDate = autoDisableAccessOnLeavingDate;
+        EmployeeNumberMode = employeeNumberMode;
+        EmployeeNumberPrefix = string.IsNullOrWhiteSpace(employeeNumberPrefix) ? null : employeeNumberPrefix.Trim();
+        NextEmployeeNumber = nextEmployeeNumber;
+        EmployeeNumberMinimumLength = employeeNumberMinimumLength;
         UpdatedAt = now;
     }
 }

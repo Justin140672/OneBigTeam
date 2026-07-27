@@ -70,6 +70,9 @@ internal sealed class EmployeeTimelineEntryConfiguration : IEntityTypeConfigurat
             .HasColumnName("created_date")
             .IsRequired();
 
+        builder.Property(e => e.BackfilledAt)
+            .HasColumnName("backfilled_at");
+
         builder.HasIndex(e => e.CompanyId);
         builder.HasIndex(e => new { e.CompanyId, e.EmployeeId });
 

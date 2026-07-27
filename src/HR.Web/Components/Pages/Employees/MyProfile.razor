@@ -85,6 +85,16 @@
                     <div class="mt-4"><MyProfileAcknowledgementHistoryTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
                 </ContentTemplate>
             </TabItem>
+            <TabItem>
+                <ChildContent><TabHeader Text="Timeline" /></ChildContent>
+                <ContentTemplate>
+                    <div class="mt-4">
+                        <EmployeeTimelineTab CompanyId="CompanyId" EmployeeId="EmployeeId"
+                                              OnNavigateToDocuments="@(() => _activeTabIndex = 6)"
+                                              OnNavigateToAcknowledgements="@(() => _activeTabIndex = 10)" />
+                    </div>
+                </ContentTemplate>
+            </TabItem>
         </TabItems>
     </SfTab>
 </div>
@@ -117,6 +127,7 @@
                 "companyDocuments" => 7,
                 "tasks"            => 8,
                 "assets"           => 9,
+                "timeline"         => 11,
                 _                  => 0
             };
         }

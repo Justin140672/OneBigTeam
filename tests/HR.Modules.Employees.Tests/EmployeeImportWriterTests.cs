@@ -22,12 +22,14 @@ public class EmployeeImportWriterTests
     private static EmployeeImportWriter BuildWriter(
         EmployeesDbContext context,
         FakeAuditPublisher? auditPublisher = null,
-        FakeProbationDateResolver? probationDateResolver = null) =>
+        FakeProbationDateResolver? probationDateResolver = null,
+        FakeEmployeeNumberGenerator? employeeNumberGenerator = null) =>
         new(
             context,
             new FakeClock(FixedUtcNow),
             probationDateResolver ?? new FakeProbationDateResolver(),
-            auditPublisher ?? new FakeAuditPublisher());
+            auditPublisher ?? new FakeAuditPublisher(),
+            employeeNumberGenerator ?? new FakeEmployeeNumberGenerator());
 
     private static EmployeeImportCreateRequest BuildCreateRequest(
         Guid companyId,
@@ -130,6 +132,88 @@ public class EmployeeImportWriterTests
         Assert.Equal(department.Id, saved.DepartmentId);
         Assert.Equal(location.Id, saved.LocationId);
         Assert.Equal(profile.Id, saved.PositionProfileId);
+    }
+
+    [Fact]
+    public async Task CreateEmployeeAsync_Generates_EmployeeNumber_When_Request_Omits_It()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var generator = new FakeEmployeeNumberGenerator(counter => $"AUTO-{counter:D5}");
+        var writer = BuildWriter(context, employeeNumberGenerator: generator);
+
+        // BuildCreateRequest's own `employeeNumber ?? "EMP-0001"` default is a test-authoring
+        // convenience for scenarios that don't care about the employee number — passing an
+        // explicit blank string is how this test simulates the real "no EmployeeNumber supplied"
+        // shape that EmployeeImportWriter actually receives for Automatic-mode rows (see
+        // ConfirmImportSessionHandler, which passes row.EmployeeNumber verbatim, and that staged
+        // value is "" rather than null for Automatic-mode rows).
+        var request = BuildCreateRequest(companyId, employeeNumber: "");
+
+        var result = await writer.CreateEmployeeAsync(request, CancellationToken.None);
+
+        Assert.Equal("AUTO-00001", result.EmployeeNumber);
+        var saved = await context.Employees.SingleAsync(e => e.Id == request.Id);
+        Assert.Equal("AUTO-00001", saved.EmployeeNumber);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task CreateEmployeeAsync_Calls_Generator_Only_When_EmployeeNumber_Is_Blank(string employeeNumber)
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var callCount = 0;
+        var generator = new FakeEmployeeNumberGenerator(counter =>
+        {
+            callCount++;
+            return $"AUTO-{counter:D5}";
+        });
+        var writer = BuildWriter(context, employeeNumberGenerator: generator);
+
+        var request = BuildCreateRequest(companyId, employeeNumber: employeeNumber);
+
+        await writer.CreateEmployeeAsync(request, CancellationToken.None);
+
+        Assert.Equal(1, callCount);
+    }
+
+    [Fact]
+    public async Task CreateEmployeeAsync_Does_Not_Call_Generator_When_EmployeeNumber_Is_Supplied()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var callCount = 0;
+        var generator = new FakeEmployeeNumberGenerator(counter =>
+        {
+            callCount++;
+            return $"AUTO-{counter:D5}";
+        });
+        var writer = BuildWriter(context, employeeNumberGenerator: generator);
+
+        var request = BuildCreateRequest(companyId, employeeNumber: "EMP-9999");
+
+        var result = await writer.CreateEmployeeAsync(request, CancellationToken.None);
+
+        Assert.Equal(0, callCount);
+        Assert.Equal("EMP-9999", result.EmployeeNumber);
+        var saved = await context.Employees.SingleAsync(e => e.Id == request.Id);
+        Assert.Equal("EMP-9999", saved.EmployeeNumber);
+    }
+
+    [Fact]
+    public async Task CreateEmployeeAsync_Trims_Supplied_EmployeeNumber()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var writer = BuildWriter(context);
+
+        var request = BuildCreateRequest(companyId, employeeNumber: "  EMP-0001  ");
+
+        var result = await writer.CreateEmployeeAsync(request, CancellationToken.None);
+
+        Assert.Equal("EMP-0001", result.EmployeeNumber);
     }
 
     [Fact]

@@ -78,7 +78,7 @@ internal sealed class Employee
             DateOfBirth = dateOfBirth,
             Nationality = nationality,
             Gender = gender,
-            EmployeeNumber = employeeNumber,
+            EmployeeNumber = NormalizeEmployeeNumber(employeeNumber),
             EmploymentTypeId = employmentTypeId,
             DepartmentId = departmentId,
             LocationId = locationId,
@@ -220,7 +220,7 @@ internal sealed class Employee
         NoticePeriodUnit? noticePeriodUnitOverride = null,
         int? noticePeriodLengthOverride = null)
     {
-        EmployeeNumber             = employeeNumber.Trim();
+        EmployeeNumber             = NormalizeEmployeeNumber(employeeNumber);
         EmploymentTypeId           = employmentTypeId;
         StartDate                  = startDate;
         ContinuousServiceDate      = continuousServiceDate;
@@ -232,5 +232,21 @@ internal sealed class Employee
         UpdatedAt                  = now;
     }
 
+    // One-off administrative assignment of an employee number to a legacy/edge-case employee
+    // record that has none (EmployeeNumber == ""), distinct from UpdateEmploymentDetails' general
+    // "correction" of an existing number and from Create's initial assignment.
+    public void AssignBackfilledEmployeeNumber(string employeeNumber, DateTimeOffset now)
+    {
+        EmployeeNumber = NormalizeEmployeeNumber(employeeNumber);
+        UpdatedAt = now;
+    }
+
     private static string? Norm(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    // Employee numbers are normalized to uppercase before storage, mirroring how WorkEmail is
+    // normalized (lowercased) before storage elsewhere in this entity — this keeps the
+    // case-insensitive uniqueness check a plain unique index on the stored value rather than a
+    // computed/expression index. Leading zeros are preserved since the value is never parsed as
+    // a number.
+    private static string NormalizeEmployeeNumber(string employeeNumber) => employeeNumber.Trim().ToUpperInvariant();
 }

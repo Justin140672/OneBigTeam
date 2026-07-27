@@ -35,7 +35,8 @@ public class AppSessionTests
             companyId, "Europe/London", "en-GB", 31, 7.5m, 1, 25m, 6, true, false, true, null, null,
             "^postcode$", "^telephone$", "^mobile$",
             "I confirm that I have read and understood this document.", 3,
-            NoticePeriodUnit.Months, 1, true, DateTime.UtcNow);
+            NoticePeriodUnit.Months, 1, true,
+            EmployeeNumberMode.Automatic, "EMP-", 1, 4, DateTime.UtcNow);
         var employee = new MyEmployeeResponse(employeeId, "Alice", "Smith", "Engineer", null, null, "avatar.png");
 
         return new RoutingHandler(new()

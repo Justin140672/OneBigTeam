@@ -22,4 +22,8 @@ internal sealed record UpdateCompanySettingsResponse(
 	NoticePeriodUnit NoticePeriodUnit,
 	int NoticePeriodLength,
 	bool AutoDisableAccessOnLeavingDate,
+	EmployeeNumberMode EmployeeNumberMode,
+	string? EmployeeNumberPrefix,
+	int NextEmployeeNumber,
+	int EmployeeNumberMinimumLength,
 	DateTimeOffset UpdatedAt);

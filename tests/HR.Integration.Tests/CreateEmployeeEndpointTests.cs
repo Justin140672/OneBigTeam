@@ -17,22 +17,67 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
     private static readonly Guid User5 = new("aaaaaaaa-0000-0000-0000-000000000005");
     private static readonly Guid User6 = new("aaaaaaaa-0000-0000-0000-000000000006");
     private static readonly Guid User7 = new("aaaaaaaa-0000-0000-0000-000000000007");
+    private static readonly Guid User8 = new("aaaaaaaa-0000-0000-0000-000000000008");
+    private static readonly Guid User9 = new("aaaaaaaa-0000-0000-0000-000000000009");
+    private static readonly Guid User10 = new("aaaaaaaa-0000-0000-0000-000000000010");
+    private static readonly Guid User11 = new("aaaaaaaa-0000-0000-0000-000000000011");
+    private static readonly Guid User12 = new("aaaaaaaa-0000-0000-0000-000000000012");
 
     public CreateEmployeeEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
 
-        // Seed HrAdministrator role for each test user so the permission check passes.
+        // Seed HrAdministrator (to create employees) and CompanyAdministrator + Employee (to
+        // update/read company settings via PUT/GET .../settings, which the employee-number
+        // scenarios below need) for each test user so the permission checks pass.
         Task.Run(async () =>
         {
-            await TestRoleSeeder.AssignRoleAsync(factory, User1, SystemRoles.HrAdministrator);
-            await TestRoleSeeder.AssignRoleAsync(factory, User2, SystemRoles.HrAdministrator);
-            await TestRoleSeeder.AssignRoleAsync(factory, User3, SystemRoles.HrAdministrator);
-            await TestRoleSeeder.AssignRoleAsync(factory, User4, SystemRoles.HrAdministrator);
-            await TestRoleSeeder.AssignRoleAsync(factory, User5, SystemRoles.HrAdministrator);
-            await TestRoleSeeder.AssignRoleAsync(factory, User6, SystemRoles.HrAdministrator);
-            await TestRoleSeeder.AssignRoleAsync(factory, User7, SystemRoles.HrAdministrator);
+            foreach (var userId in new[] { User1, User2, User3, User4, User5, User6, User7, User8, User9, User10, User11, User12 })
+            {
+                await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.HrAdministrator);
+                await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.CompanyAdministrator);
+                await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee);
+            }
         }).GetAwaiter().GetResult();
+    }
+
+    // UpdateCompanySettings (used by SetEmployeeNumberModeAsync below) requires a real
+    // companies.companies row to exist — unlike CreateEmployee, which never checks the Company
+    // table directly. Scenarios that call SetEmployeeNumberModeAsync must seed a real company via
+    // this helper rather than using an arbitrary Guid as companyId.
+    private static async Task<Guid> CreateCompanyAsync(HttpClient client, string? name = null)
+    {
+        var response = await client.PostAsJsonAsync("/api/companies", new
+        {
+            name = name ?? $"Employee Number Test Co {Guid.NewGuid():N}",
+            addresses = new[]
+            {
+                new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", countryCode = "GB" }
+            }
+        });
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<IdPayload>();
+        return payload!.Id;
+    }
+
+    private static async Task SetEmployeeNumberModeAsync(
+        HttpClient client, Guid companyId, string mode, string? prefix = null, int nextEmployeeNumber = 1, int minimumLength = 1)
+    {
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/settings", new
+        {
+            timeZone = "UTC",
+            locale = "en-GB",
+            workingDays = 31,
+            hoursPerDay = 7.5,
+            leaveYearStartMonth = 1,
+            defaultHolidayAllowance = 25,
+            probationMonths = 6,
+            employeeNumberMode = mode,
+            employeeNumberPrefix = prefix,
+            nextEmployeeNumber,
+            employeeNumberMinimumLength = minimumLength
+        });
+        response.EnsureSuccessStatusCode();
     }
 
     private static async Task<Guid> CreateLocationAsync(HttpClient client, Guid companyId, string name = "Head Office")
@@ -336,8 +381,324 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Post_Employees_Returns_ValidationError_In_Manual_Mode_When_EmployeeNumber_Omitted()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User8.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
+        var companyId = await CreateCompanyAsync(client);
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+        // Manual is the default mode, but set it explicitly for clarity.
+        await SetEmployeeNumberModeAsync(client, companyId, "Manual");
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
+        {
+            companyId,
+            departmentId = refData.DepartmentId,
+            locationId = refData.LocationId,
+            positionProfileId = refData.PositionProfileId,
+            employmentTypeId = refData.EmploymentTypeId,
+            firstName = "Alice",
+            lastName = "Smith",
+            workEmail = $"alice.{Guid.NewGuid():N}@example.com",
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-05-20",
+            nationality = "British",
+            gender = "Female"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_Employees_Succeeds_In_Manual_Mode_When_EmployeeNumber_Supplied()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User9.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
+        var companyId = await CreateCompanyAsync(client);
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+        await SetEmployeeNumberModeAsync(client, companyId, "Manual");
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Alice", "Smith", $"alice.smith.{Guid.NewGuid():N}@example.com",
+                employeeNumber: "EMP-100"));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_Employees_Generates_EmployeeNumber_In_Automatic_Mode_When_Omitted()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User10.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
+        var companyId = await CreateCompanyAsync(client);
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+        await SetEmployeeNumberModeAsync(client, companyId, "Automatic", prefix: "EMP-", nextEmployeeNumber: 125, minimumLength: 5);
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
+        {
+            companyId,
+            departmentId = refData.DepartmentId,
+            locationId = refData.LocationId,
+            positionProfileId = refData.PositionProfileId,
+            employmentTypeId = refData.EmploymentTypeId,
+            firstName = "Alice",
+            lastName = "Smith",
+            workEmail = $"alice.{Guid.NewGuid():N}@example.com",
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-05-20",
+            nationality = "British",
+            gender = "Female"
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<EmployeePayload>();
+        Assert.NotNull(payload);
+
+        // The response contract doesn't currently surface EmployeeNumber, so assert against the
+        // company settings' advanced counter — proof a number was actually claimed.
+        var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/settings");
+        settingsResponse.EnsureSuccessStatusCode();
+        var settings = await settingsResponse.Content.ReadFromJsonAsync<SettingsPayload>();
+        Assert.NotNull(settings);
+        Assert.Equal(126, settings!.NextEmployeeNumber);
+    }
+
+    [Fact]
+    public async Task Post_Employees_Advances_NextEmployeeNumber_On_Each_Automatic_Creation()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User11.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
+        var companyId = await CreateCompanyAsync(client);
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+        await SetEmployeeNumberModeAsync(client, companyId, "Automatic", prefix: "EMP-", nextEmployeeNumber: 1, minimumLength: 3);
+
+        for (var i = 0; i < 3; i++)
+        {
+            var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
+            {
+                companyId,
+                departmentId = refData.DepartmentId,
+                locationId = refData.LocationId,
+                positionProfileId = refData.PositionProfileId,
+                employmentTypeId = refData.EmploymentTypeId,
+                firstName = "Alice",
+                lastName = "Smith",
+                workEmail = $"alice.{Guid.NewGuid():N}@example.com",
+                startDate = "2026-07-01",
+                dateOfBirth = "1990-05-20",
+                nationality = "British",
+                gender = "Female"
+            });
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        }
+
+        var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/settings");
+        settingsResponse.EnsureSuccessStatusCode();
+        var settings = await settingsResponse.Content.ReadFromJsonAsync<SettingsPayload>();
+        Assert.NotNull(settings);
+        Assert.Equal(4, settings!.NextEmployeeNumber);
+    }
+
+    [Fact]
+    public async Task Post_Employees_Concurrent_Automatic_Creation_Produces_Distinct_EmployeeNumbers()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User12.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
+        var companyId = await CreateCompanyAsync(client);
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+        await SetEmployeeNumberModeAsync(client, companyId, "Automatic", prefix: "EMP-", nextEmployeeNumber: 1, minimumLength: 3);
+
+        const int concurrentCreations = 10;
+
+        var tasks = Enumerable.Range(0, concurrentCreations).Select(_ =>
+        {
+            // A fresh HttpClient per concurrent request, sharing the same auth/tenant headers,
+            // avoids any accidental serialization introduced by reusing one HttpClient instance.
+            var concurrentClient = _factory.CreateClient();
+            concurrentClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User12.ToString());
+            concurrentClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+            return concurrentClient.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
+            {
+                companyId,
+                departmentId = refData.DepartmentId,
+                locationId = refData.LocationId,
+                positionProfileId = refData.PositionProfileId,
+                employmentTypeId = refData.EmploymentTypeId,
+                firstName = "Alice",
+                lastName = "Smith",
+                workEmail = $"alice.{Guid.NewGuid():N}@example.com",
+                startDate = "2026-07-01",
+                dateOfBirth = "1990-05-20",
+                nationality = "British",
+                gender = "Female"
+            });
+        }).ToArray();
+
+        var responses = await Task.WhenAll(tasks);
+
+        Assert.All(responses, r => Assert.Equal(HttpStatusCode.Created, r.StatusCode));
+
+        var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/settings");
+        settingsResponse.EnsureSuccessStatusCode();
+        var settings = await settingsResponse.Content.ReadFromJsonAsync<SettingsPayload>();
+        Assert.NotNull(settings);
+        Assert.Equal(1 + concurrentCreations, settings!.NextEmployeeNumber);
+    }
+
+    [Fact]
+    public async Task Post_Employees_Two_Automatic_Companies_Each_Advance_Independently()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
+        var companyA = await CreateCompanyAsync(client);
+        var companyB = await CreateCompanyAsync(client);
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyA.ToString());
+        var refDataA = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyA);
+        await SetEmployeeNumberModeAsync(client, companyA, "Automatic", prefix: "A-", nextEmployeeNumber: 1, minimumLength: 3);
+
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyB.ToString());
+        var refDataB = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyB);
+        await SetEmployeeNumberModeAsync(client, companyB, "Automatic", prefix: "B-", nextEmployeeNumber: 1, minimumLength: 3);
+
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyA.ToString());
+        var responseA1 = await client.PostAsJsonAsync($"/api/companies/{companyA}/employees", new
+        {
+            companyId = companyA,
+            departmentId = refDataA.DepartmentId,
+            locationId = refDataA.LocationId,
+            positionProfileId = refDataA.PositionProfileId,
+            employmentTypeId = refDataA.EmploymentTypeId,
+            firstName = "Alice",
+            lastName = "Smith",
+            workEmail = $"alice.{Guid.NewGuid():N}@example.com",
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-05-20",
+            nationality = "British",
+            gender = "Female"
+        });
+        Assert.Equal(HttpStatusCode.Created, responseA1.StatusCode);
+
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyB.ToString());
+        var responseB1 = await client.PostAsJsonAsync($"/api/companies/{companyB}/employees", new
+        {
+            companyId = companyB,
+            departmentId = refDataB.DepartmentId,
+            locationId = refDataB.LocationId,
+            positionProfileId = refDataB.PositionProfileId,
+            employmentTypeId = refDataB.EmploymentTypeId,
+            firstName = "Bob",
+            lastName = "Jones",
+            workEmail = $"bob.{Guid.NewGuid():N}@example.com",
+            startDate = "2026-07-01",
+            dateOfBirth = "1990-05-20",
+            nationality = "British",
+            gender = "Male"
+        });
+        Assert.Equal(HttpStatusCode.Created, responseB1.StatusCode);
+
+        var settingsAResponse = await client.GetAsync($"/api/companies/{companyB}/settings");
+        // Still scoped to companyB via the tenant header set above.
+        settingsAResponse.EnsureSuccessStatusCode();
+        var settingsB = await settingsAResponse.Content.ReadFromJsonAsync<SettingsPayload>();
+        Assert.NotNull(settingsB);
+        Assert.Equal(2, settingsB!.NextEmployeeNumber);
+
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyA.ToString());
+        var settingsAOnlyResponse = await client.GetAsync($"/api/companies/{companyA}/settings");
+        settingsAOnlyResponse.EnsureSuccessStatusCode();
+        var settingsA = await settingsAOnlyResponse.Content.ReadFromJsonAsync<SettingsPayload>();
+        Assert.NotNull(settingsA);
+        Assert.Equal(2, settingsA!.NextEmployeeNumber);
+    }
+
+    [Fact]
+    public async Task Post_Employees_Returns_Conflict_For_Case_Insensitive_Duplicate_EmployeeNumber_In_Same_Company()
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+
+        var first = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com",
+                employeeNumber: "EMP-001"));
+        first.EnsureSuccessStatusCode();
+
+        var second = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Bob", "Jones", $"bob.{Guid.NewGuid():N}@example.com",
+                employeeNumber: "emp-001"));
+
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_Employees_Allows_Same_EmployeeNumber_In_Different_Companies()
+    {
+        using var client = _factory.CreateClient();
+        var companyA = Guid.NewGuid();
+        var companyB = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
+
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyA.ToString());
+        var refDataA = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyA);
+        var responseA = await client.PostAsJsonAsync(
+            $"/api/companies/{companyA}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyA, refDataA, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com",
+                employeeNumber: "EMP-777"));
+        Assert.Equal(HttpStatusCode.Created, responseA.StatusCode);
+
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyB.ToString());
+        var refDataB = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyB);
+        var responseB = await client.PostAsJsonAsync(
+            $"/api/companies/{companyB}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyB, refDataB, "Bob", "Jones", $"bob.{Guid.NewGuid():N}@example.com",
+                employeeNumber: "EMP-777"));
+        Assert.Equal(HttpStatusCode.Created, responseB.StatusCode);
+    }
+
     private sealed record DepartmentPayload(Guid Id);
     private sealed record PositionProfilePayload(Guid Id);
+    private sealed record SettingsPayload(int NextEmployeeNumber);
 
     private sealed record EmployeePayload(
         Guid Id,

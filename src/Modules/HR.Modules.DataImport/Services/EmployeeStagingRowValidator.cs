@@ -29,10 +29,11 @@ internal sealed record RowValidationResult(
 /// </summary>
 internal sealed class EmployeeStagingRowValidator(
     IEmployeeImportLookupReader lookupReader,
-    IImportLookupResolver lookupResolver)
+    IImportLookupResolver lookupResolver,
+    ICompanyEmployeeNumberSettingsReader employeeNumberSettingsReader)
 {
     private static readonly string[] RequiredFields =
-        ["FirstName", "LastName", "WorkEmail", "StartDate", "DateOfBirth", "Nationality", "Gender", "EmployeeNumber"];
+        ["FirstName", "LastName", "WorkEmail", "StartDate", "DateOfBirth", "Nationality", "Gender"];
 
     // Lookup-by-name fields that resolve to a mandatory Employee foreign key (Department,
     // Location, EmploymentType, PositionProfile). These are validated for presence here in
@@ -75,7 +76,23 @@ internal sealed class EmployeeStagingRowValidator(
         var hasLeaveColumns = LeaveFields.Any(mappedFields.Contains);
         var hasWorkingPatternColumns = WorkingPatternFields.Any(mappedFields.Contains);
 
-        AddDuplicateErrors(rows, "EmployeeNumber", "employee number", errorsByRow);
+        // Employee-number requiredness and duplicate-checking both depend on the company's
+        // EmployeeNumberMode (Manual vs Automatic), read once up front for the whole batch.
+        //
+        // Automatic-mode rule (deliberate design decision for this feature, not an oversight):
+        // a SUPPLIED employee number in the import file is REJECTED with a row-level validation
+        // error rather than silently honoured or silently overwritten. Honouring an arbitrary
+        // supplied number in automatic mode risks colliding with, or creating gaps in, the
+        // atomic counter sequence (IEmployeeNumberGenerator); silently overwriting user-supplied
+        // data is worse UX than a clear upfront error. Numbers are only ever generated for
+        // automatic-mode rows once ALL rows in the batch have passed validation (at the later
+        // ConfirmImportSession/commit step, never here at staging time) — this guarantees a
+        // failed import never consumes/wastes employee numbers.
+        var employeeNumberMode = await employeeNumberSettingsReader.GetModeAsync(companyId, cancellationToken);
+
+        if (employeeNumberMode == EmployeeNumberMode.Manual)
+            AddDuplicateErrors(rows, "EmployeeNumber", "employee number", errorsByRow);
+
         AddDuplicateErrors(rows, "WorkEmail", "work email", errorsByRow);
 
         foreach (var row in rows)
@@ -84,8 +101,13 @@ internal sealed class EmployeeStagingRowValidator(
             var rowWarnings = warningsByRow[row.RowNumber];
 
             ValidateRequiredFields(row, rowErrors);
+            ValidateEmployeeNumberField(row, employeeNumberMode, rowErrors);
             ValidateDateFields(row, rowErrors);
-            await ValidateDuplicateAgainstExistingEmployeesAsync(companyId, row, rowErrors, cancellationToken);
+
+            if (employeeNumberMode == EmployeeNumberMode.Manual)
+                await ValidateDuplicateAgainstExistingEmployeesAsync(companyId, row, rowErrors, cancellationToken);
+            else
+                await ValidateWorkEmailAgainstExistingEmployeesAsync(companyId, row, rowErrors, cancellationToken);
             await ValidateManagerReferenceAsync(companyId, row, rows, rowErrors, cancellationToken);
 
             if (hasCompensationColumns)
@@ -213,6 +235,48 @@ internal sealed class EmployeeStagingRowValidator(
         }
     }
 
+    // EmployeeNumberPattern lives on HR.Modules.Employees' CreateEmployeeValidator, which is
+    // `internal` and therefore not visible from this module. Rather than reaching across a
+    // module boundary or duplicating the literal, the pattern text is duplicated here with an
+    // explicit comment pointing at the canonical definition, since no shared cross-module
+    // validation-constants location currently exists in this codebase and introducing one for a
+    // single regex is not justified.
+    // Canonical definition: HR.Modules.Employees.Features.CreateEmployee.CreateEmployeeValidator.EmployeeNumberPattern
+    private const string EmployeeNumberPattern = @"^[A-Za-z0-9 \-_./]+$";
+    private static readonly Regex EmployeeNumberFormatRegex = new(EmployeeNumberPattern, RegexOptions.Compiled);
+
+    private static void ValidateEmployeeNumberField(
+        ParsedImportRow row, EmployeeNumberMode mode, List<string> rowErrors)
+    {
+        var employeeNumber = GetField(row, "EmployeeNumber");
+
+        if (mode == EmployeeNumberMode.Automatic)
+        {
+            if (!string.IsNullOrWhiteSpace(employeeNumber))
+            {
+                rowErrors.Add(
+                    "Employee number is auto-generated for this company and must be left blank.");
+            }
+
+            return;
+        }
+
+        // Manual mode: required. Enforced explicitly here (rather than via the static
+        // RequiredFields array) because requiredness depends on the company's EmployeeNumberMode,
+        // which is only known once this method has already read it.
+        if (string.IsNullOrWhiteSpace(employeeNumber))
+        {
+            rowErrors.Add("'EmployeeNumber' is required.");
+            return;
+        }
+
+        if (employeeNumber.Length > 50 || !EmployeeNumberFormatRegex.IsMatch(employeeNumber.Trim()))
+        {
+            rowErrors.Add(
+                "Employee number may only contain letters, numbers, spaces, and the separators - _ . / (max 50 characters).");
+        }
+    }
+
     private async Task ValidateDuplicateAgainstExistingEmployeesAsync(
         Guid companyId,
         ParsedImportRow row,
@@ -226,6 +290,15 @@ internal sealed class EmployeeStagingRowValidator(
             rowErrors.Add($"Employee number '{employeeNumber}' already exists in this company.");
         }
 
+        await ValidateWorkEmailAgainstExistingEmployeesAsync(companyId, row, rowErrors, cancellationToken);
+    }
+
+    private async Task ValidateWorkEmailAgainstExistingEmployeesAsync(
+        Guid companyId,
+        ParsedImportRow row,
+        List<string> rowErrors,
+        CancellationToken cancellationToken)
+    {
         var workEmail = GetField(row, "WorkEmail");
         if (!string.IsNullOrWhiteSpace(workEmail) &&
             await lookupReader.WorkEmailExistsAsync(companyId, workEmail, cancellationToken))

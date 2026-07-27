@@ -19,6 +19,10 @@ public class ConfirmImportSessionEndpointTests : IClassFixture<ApiWebApplication
         {
             await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.Employee);
+            // CompanyAdministrator is additionally required by the Automatic-mode scenarios added
+            // below, which call PUT .../settings (company:manage) to switch the company into
+            // Automatic employee-numbering mode before uploading/confirming an import.
+            await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.CompanyAdministrator);
         }).GetAwaiter().GetResult();
     }
 
@@ -48,8 +52,20 @@ public class ConfirmImportSessionEndpointTests : IClassFixture<ApiWebApplication
         employeesResponse.EnsureSuccessStatusCode();
         var employees = await employeesResponse.Content.ReadFromJsonAsync<ListEmployeesPayload>();
         Assert.NotNull(employees);
-        Assert.Contains(employees!.Items, e => e.WorkEmail == "john.doe@example.com");
+        var john = Assert.Single(employees!.Items, e => e.WorkEmail == "john.doe@example.com");
         Assert.Contains(employees.Items, e => e.WorkEmail == "jane.doe@example.com");
+
+        // Imported employees go through the same EmployeeCreatedIntegrationEvent (IsImported:
+        // true) as directly-created ones — ConfirmImportSessionHandler publishes it once per
+        // successfully-imported row (see EmployeeImportWriter's own doc comment) — so an "Employee
+        // joined" timeline entry must exist here too, with the import-specific summary text.
+        var timelineResponse = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{john.Id}/timeline");
+        timelineResponse.EnsureSuccessStatusCode();
+        var timeline = await timelineResponse.Content.ReadFromJsonAsync<TimelinePayload>();
+        Assert.NotNull(timeline);
+        var joinedEntry = Assert.Single(timeline!.Items, i => i.EventType == "EmployeeJoined");
+        Assert.Contains("imported", joinedEntry.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -145,6 +161,135 @@ public class ConfirmImportSessionEndpointTests : IClassFixture<ApiWebApplication
         Assert.Equal(HttpStatusCode.Conflict, secondConfirm.StatusCode);
     }
 
+    [Fact]
+    public async Task Automatic_Mode_Row_With_Supplied_EmployeeNumber_Fails_Validation_Alone_While_Other_Rows_Succeed()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
+        // UpdateCompanySettings (used by SetEmployeeNumberModeAsync below) requires a real
+        // companies.companies row — unlike upload/validate/confirm, which never check the Company
+        // table directly and so can use an arbitrary companyId elsewhere in this file.
+        var companyId = await CreateCompanyAsync(client);
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        await EnsureDefaultLeavePolicyAsync(client, companyId);
+        await SetEmployeeNumberModeAsync(client, companyId, "Automatic", prefix: "EMP-", nextEmployeeNumber: 1, minimumLength: 3);
+
+        // Row 2 (John) leaves Employee Number blank, as required in Automatic mode. Row 3 (Jane)
+        // incorrectly supplies one — per EmployeeStagingRowValidator, this is a row-level failure
+        // for Jane's row alone (staging IsValid is per-row, not whole-batch atomic): the ticket's
+        // "reject the whole batch, generate zero numbers" concern about a bad row poisoning an
+        // otherwise-valid import doesn't apply here, because Jane's invalid row simply never
+        // reaches the confirm/generation step at all — John's still-valid row proceeds normally
+        // and gets a real generated number.
+        const string csv =
+            "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n" +
+            "Jane,Doe,jane.doe@example.com,2026-01-02,EMP-999,1991-02-02,British,Female,Sales,London,Permanent,Software Developer\n";
+
+        var sessionId = await UploadAsync(client, companyId, csv);
+        var validateResponse = await client.PostAsync(
+            $"/api/companies/{companyId}/data-import/sessions/{sessionId}/validate", EmptyJson());
+        validateResponse.EnsureSuccessStatusCode();
+        var validatePayload = await validateResponse.Content.ReadFromJsonAsync<ValidatePayload>();
+        Assert.NotNull(validatePayload);
+        Assert.Equal(1, validatePayload!.SuccessfulRows);
+        Assert.Equal(1, validatePayload.FailedRows);
+
+        var response = await client.PostAsync(ConfirmUrl(companyId, sessionId), EmptyJson());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ConfirmPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal(1, payload!.CreatedCount);
+        Assert.Equal(1, payload.FailedCount);
+
+        var createdRow = Assert.Single(payload.CreatedRows);
+        Assert.Equal(2, createdRow.RowNumber);
+        Assert.Equal("EMP-001", createdRow.EmployeeNumber);
+
+        var employeesResponse = await client.GetAsync($"/api/companies/{companyId}/employees?pageSize=50");
+        employeesResponse.EnsureSuccessStatusCode();
+        var employees = await employeesResponse.Content.ReadFromJsonAsync<ListEmployeesPayload>();
+        Assert.NotNull(employees);
+        Assert.Contains(employees!.Items, e => e.WorkEmail == "john.doe@example.com");
+        Assert.DoesNotContain(employees.Items, e => e.WorkEmail == "jane.doe@example.com");
+    }
+
+    [Fact]
+    public async Task Automatic_Mode_Confirm_Assigns_Generated_Numbers_To_All_Valid_Rows_In_RowOrder()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
+        var companyId = await CreateCompanyAsync(client);
+        client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        await EnsureDefaultLeavePolicyAsync(client, companyId);
+        await SetEmployeeNumberModeAsync(client, companyId, "Automatic", prefix: "EMP-", nextEmployeeNumber: 1, minimumLength: 3);
+
+        const string csv =
+            "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
+            "John,Doe,john.doe@example.com,2026-01-01,,1990-01-01,British,Male,Sales,London,Permanent,Software Developer\n" +
+            "Jane,Doe,jane.doe@example.com,2026-01-02,,1991-02-02,British,Female,Sales,London,Permanent,Software Developer\n";
+
+        var sessionId = await UploadAsync(client, companyId, csv);
+        var validateResponse = await client.PostAsync(
+            $"/api/companies/{companyId}/data-import/sessions/{sessionId}/validate", EmptyJson());
+        validateResponse.EnsureSuccessStatusCode();
+
+        var response = await client.PostAsync(ConfirmUrl(companyId, sessionId), EmptyJson());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ConfirmPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal(2, payload!.CreatedCount);
+        Assert.Equal(0, payload.FailedCount);
+        Assert.Equal(2, payload.CreatedRows.Count);
+        Assert.Equal(2, payload.CreatedRows[0].RowNumber);
+        Assert.Equal("EMP-001", payload.CreatedRows[0].EmployeeNumber);
+        Assert.Equal(3, payload.CreatedRows[1].RowNumber);
+        Assert.Equal("EMP-002", payload.CreatedRows[1].EmployeeNumber);
+    }
+
+    private static async Task<Guid> CreateCompanyAsync(HttpClient client)
+    {
+        var response = await client.PostAsJsonAsync("/api/companies", new
+        {
+            name = $"Import EmployeeNumber Test Co {Guid.NewGuid():N}",
+            addresses = new[]
+            {
+                new { type = "RegisteredOffice", line1 = "10 High Street", city = "London", countryCode = "GB" }
+            }
+        });
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<IdPayload>();
+        return payload!.Id;
+    }
+
+    private static async Task SetEmployeeNumberModeAsync(
+        HttpClient client, Guid companyId, string mode, string? prefix = null, int nextEmployeeNumber = 1, int minimumLength = 1)
+    {
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/settings", new
+        {
+            timeZone = "UTC",
+            locale = "en-GB",
+            workingDays = 31,
+            hoursPerDay = 7.5,
+            leaveYearStartMonth = 1,
+            defaultHolidayAllowance = 25,
+            probationMonths = 6,
+            employeeNumberMode = mode,
+            employeeNumberPrefix = prefix,
+            nextEmployeeNumber,
+            employeeNumberMinimumLength = minimumLength
+        });
+        response.EnsureSuccessStatusCode();
+    }
+
     private HttpClient AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
@@ -207,10 +352,23 @@ public class ConfirmImportSessionEndpointTests : IClassFixture<ApiWebApplication
         Guid Id, Guid CompanyId, string EntityType, string FileName, string Status,
         int TotalRows, DateTimeOffset CreatedAt);
 
-    private sealed record ConfirmPayload(Guid ImportSessionId, string Status, int CreatedCount, int FailedCount);
+    private sealed record IdPayload(Guid Id);
+
+    private sealed record ConfirmedRowPayload(int RowNumber, Guid EmployeeId, string EmployeeNumber);
+
+    private sealed record ConfirmPayload(
+        Guid ImportSessionId, string Status, int CreatedCount, int FailedCount,
+        List<ConfirmedRowPayload> CreatedRows);
+
+    private sealed record ValidatePayload(
+        Guid Id, string Status, int TotalRows, int SuccessfulRows, int FailedRows);
 
     private sealed record EmployeeListItemPayload(Guid Id, string WorkEmail);
 
     private sealed record ListEmployeesPayload(
         List<EmployeeListItemPayload> Items, int TotalCount, int PageNumber, int PageSize, int TotalPages);
+
+    private sealed record TimelineItemPayload(string EventType, string Summary);
+
+    private sealed record TimelinePayload(List<TimelineItemPayload> Items, int TotalCount);
 }

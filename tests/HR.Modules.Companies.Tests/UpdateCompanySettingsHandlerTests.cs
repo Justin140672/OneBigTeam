@@ -438,6 +438,103 @@ public class UpdateCompanySettingsHandlerTests
 		Assert.False(auditEvent.CurrentSettings.AutoDisableAccessOnLeavingDate);
 	}
 
+	[Fact]
+	public async Task HandleAsync_Persists_EmployeeNumberSettings_And_Returns_Them_In_Response()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 7, 26, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var handler = new UpdateCompanySettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 7, 26, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher());
+
+		var result = await handler.HandleAsync(
+			new UpdateCompanySettingsRequest
+			{
+				Id = company.Id,
+				TimeZone = "UTC",
+				Locale = "en-GB",
+				WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+				              WorkingDays.Thursday | WorkingDays.Friday,
+				HoursPerDay = 7.5m,
+				LeaveYearStartMonth = 1,
+				DefaultHolidayAllowance = 25,
+				ProbationMonths = 6,
+				EmployeeNumberMode = EmployeeNumberMode.Automatic,
+				EmployeeNumberPrefix = "EMP-",
+				NextEmployeeNumber = 125,
+				EmployeeNumberMinimumLength = 5,
+			},
+			CancellationToken.None);
+
+		Assert.True(result.IsSuccess);
+		Assert.Equal(EmployeeNumberMode.Automatic, result.Value!.EmployeeNumberMode);
+		Assert.Equal("EMP-", result.Value.EmployeeNumberPrefix);
+		Assert.Equal(125, result.Value.NextEmployeeNumber);
+		Assert.Equal(5, result.Value.EmployeeNumberMinimumLength);
+
+		var savedSettings = await context.CompanySettings.SingleAsync();
+		Assert.Equal(EmployeeNumberMode.Automatic, savedSettings.EmployeeNumberMode);
+		Assert.Equal("EMP-", savedSettings.EmployeeNumberPrefix);
+		Assert.Equal(125, savedSettings.NextEmployeeNumber);
+		Assert.Equal(5, savedSettings.EmployeeNumberMinimumLength);
+	}
+
+	[Fact]
+	public async Task HandleAsync_Includes_EmployeeNumberSettings_In_AuditEvent_BeforeAndAfter_Snapshots()
+	{
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 7, 26, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
+
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		var auditPublisher = new CapturingAuditEventPublisher();
+		var updateTime = new DateTime(2026, 7, 26, 11, 0, 0, DateTimeKind.Utc);
+		var handler = new UpdateCompanySettingsHandler(context, new FakeClock(updateTime), auditPublisher);
+
+		await handler.HandleAsync(
+			new UpdateCompanySettingsRequest
+			{
+				Id = company.Id,
+				TimeZone = "UTC",
+				Locale = "en-GB",
+				WorkingDays = WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+				              WorkingDays.Thursday | WorkingDays.Friday,
+				HoursPerDay = 7.5m,
+				LeaveYearStartMonth = 1,
+				DefaultHolidayAllowance = 25,
+				ProbationMonths = 6,
+				EmployeeNumberMode = EmployeeNumberMode.Automatic,
+				EmployeeNumberPrefix = "EMP-",
+				NextEmployeeNumber = 200,
+				EmployeeNumberMinimumLength = 6,
+			},
+			CancellationToken.None);
+
+		var auditEvt = Assert.Single(auditPublisher.Published);
+		var auditEvent = Assert.IsType<CompanySettingsUpdatedAuditEvent>(auditEvt);
+
+		Assert.NotNull(auditEvent.PreviousSettings);
+		Assert.Equal(EmployeeNumberMode.Manual, auditEvent.PreviousSettings!.EmployeeNumberMode);
+		Assert.Null(auditEvent.PreviousSettings.EmployeeNumberPrefix);
+		Assert.Equal(1, auditEvent.PreviousSettings.NextEmployeeNumber);
+		Assert.Equal(1, auditEvent.PreviousSettings.EmployeeNumberMinimumLength);
+
+		Assert.Equal(EmployeeNumberMode.Automatic, auditEvent.CurrentSettings.EmployeeNumberMode);
+		Assert.Equal("EMP-", auditEvent.CurrentSettings.EmployeeNumberPrefix);
+		Assert.Equal(200, auditEvent.CurrentSettings.NextEmployeeNumber);
+		Assert.Equal(6, auditEvent.CurrentSettings.EmployeeNumberMinimumLength);
+	}
+
 	private static CompaniesDbContext BuildContext()
 	{
 		var options = new DbContextOptionsBuilder<CompaniesDbContext>()

@@ -36,7 +36,8 @@ public class ValidateImportSessionHandlerTests
             new EmployeeImportFileParser(),
             new EmployeeStagingRowValidator(
                 lookupReader ?? new FakeEmployeeImportLookupReader(),
-                lookupResolver ?? new FakeImportLookupResolver()),
+                lookupResolver ?? new FakeImportLookupResolver(),
+                new FakeCompanyEmployeeNumberSettingsReader()),
             new FakeClock(FixedUtcNow));
 
     // Pre-seeds a lookup resolver with the Department/EmploymentType/Location/PositionProfile

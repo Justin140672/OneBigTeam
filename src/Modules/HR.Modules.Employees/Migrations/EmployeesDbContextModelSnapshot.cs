@@ -409,6 +409,10 @@ namespace HR.Modules.Employees.Migrations
 
                     b.HasIndex("PositionProfileId");
 
+                    b.HasIndex("CompanyId", "EmployeeNumber")
+                        .IsUnique()
+                        .HasFilter("employee_number <> ''");
+
                     b.HasIndex("CompanyId", "Status");
 
                     b.HasIndex("CompanyId", "WorkEmail")
@@ -653,6 +657,10 @@ namespace HR.Modules.Employees.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("BackfilledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("backfilled_at");
 
                     b.Property<int>("Category")
                         .HasColumnType("integer")

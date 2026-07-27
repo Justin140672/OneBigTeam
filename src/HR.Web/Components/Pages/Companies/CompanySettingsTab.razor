@@ -1,4 +1,5 @@
 @inject CompanyService CompanyService
+@inject AppSession Session
 @inherits EditSectionBase<CompanySettingsEditModel>
 @using HR.Infrastructure.Abstractions
 @using HR.SharedKernel
@@ -159,10 +160,88 @@ else
                                     Checked="@Model.AutoDisableAccessOnLeavingDate"
                                     CheckedChanged="@((bool v) => Model.AutoDisableAccessOnLeavingDate = v)" />
                     </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Employee Numbering</label>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Numbering Mode</label>
+                        <SfDropDownList TValue="EmployeeNumberMode" TItem="EmployeeNumberModeOption"
+                                        @bind-Value="Model.EmployeeNumberMode"
+                                        DataSource="@EmployeeNumberModeOptions">
+                            <DropDownListFieldSettings Value="Value" Text="Label" />
+                        </SfDropDownList>
+                    </div>
+                    @if (Model.EmployeeNumberMode == EmployeeNumberMode.Automatic)
+                    {
+                        <div class="col-md-4">
+                            <HrTextBox @bind-Value="Model.EmployeeNumberPrefix" Placeholder="e.g. EMP-" />
+                            <div class="form-text">
+                                Changing the prefix only affects employee numbers assigned in the future —
+                                existing employees' numbers are never changed retroactively.
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <SfNumericTextBox TValue="int" @bind-Value="Model.NextEmployeeNumber"
+                                              Placeholder="Next Number"
+                                              FloatLabelType="FloatLabelType.Auto"
+                                              ShowSpinButton="false"
+                                              Min="1" />
+                            <ValidationMessage For="@(() => Model.NextEmployeeNumber)" />
+                        </div>
+                        <div class="col-md-4">
+                            <SfNumericTextBox TValue="int" @bind-Value="Model.EmployeeNumberMinimumLength"
+                                              Placeholder="Minimum Numeric Length"
+                                              FloatLabelType="FloatLabelType.Auto"
+                                              ShowSpinButton="false"
+                                              Min="1" Max="10" />
+                            <ValidationMessage For="@(() => Model.EmployeeNumberMinimumLength)" />
+                        </div>
+                        <div class="col-12">
+                            <p class="text-muted mb-0">Preview: <strong>@PreviewEmployeeNumber</strong></p>
+                        </div>
+                        @if (Session.CanManageEmployees)
+                        {
+                            <div class="col-12">
+                                <SfButton OnClick="OpenBackfillDialog">Backfill Employee Numbers…</SfButton>
+                                <div class="form-text">
+                                    Assigns employee numbers to existing employees who don't have one yet, in start-date order.
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="col-12">
+                                <p class="text-muted mb-0">
+                                    Backfilling employee numbers requires HR Administrator permissions.
+                                </p>
+                            </div>
+                        }
+                    }
+                    @if (Session.CanManageEmployees)
+                    {
+                        <div class="col-12">
+                            <hr />
+                            <h6>Employee Timeline</h6>
+                            <SfButton OnClick="OpenTimelineBackfillDialog">Backfill Employee Timeline…</SfButton>
+                            <div class="form-text">
+                                Generates historical timeline entries from existing employee data. Safe to re-run.
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
     </EditForm>
+
+    <BackfillEmployeeNumbersDialog CompanyId="CompanyId"
+                                    IsOpen="_backfillDialogOpen"
+                                    OnClosed="@(() => _backfillDialogOpen = false)"
+                                    OnCommitted="HandleBackfillCommittedAsync" />
+
+    <BackfillEmployeeTimelineDialog CompanyId="CompanyId"
+                                     IsOpen="_timelineBackfillDialogOpen"
+                                     OnClosed="@(() => _timelineBackfillDialogOpen = false)"
+                                     OnCommitted="HandleTimelineBackfillCommittedAsync" />
 }
 
 @code {
@@ -195,6 +274,31 @@ else
 
     private string _selectedNoticePeriodPreset = CustomPresetValue;
 
+    private static readonly List<EmployeeNumberModeOption> EmployeeNumberModeOptions =
+    [
+        new(EmployeeNumberMode.Manual, "Manual"),
+        new(EmployeeNumberMode.Automatic, "Automatic"),
+    ];
+
+    private string PreviewEmployeeNumber =>
+        $"{Model.EmployeeNumberPrefix}{Model.NextEmployeeNumber.ToString().PadLeft(Model.EmployeeNumberMinimumLength, '0')}";
+
+    private bool _backfillDialogOpen;
+
+    private void OpenBackfillDialog() => _backfillDialogOpen = true;
+
+    private async Task HandleBackfillCommittedAsync()
+    {
+        // Refresh settings so the "Next Number" preview reflects the numbers just assigned.
+        await LoadAsync();
+    }
+
+    private bool _timelineBackfillDialogOpen;
+
+    private void OpenTimelineBackfillDialog() => _timelineBackfillDialogOpen = true;
+
+    private Task HandleTimelineBackfillCommittedAsync() => Task.CompletedTask;
+
     protected override async Task LoadAsync()
     {
         var settings = await CompanyService.GetCompanySettingsAsync(CompanyId);
@@ -220,6 +324,10 @@ else
             Model.NoticePeriodUnit = settings.NoticePeriodUnit;
             Model.NoticePeriodLength = settings.NoticePeriodLength;
             Model.AutoDisableAccessOnLeavingDate = settings.AutoDisableAccessOnLeavingDate;
+            Model.EmployeeNumberMode = settings.EmployeeNumberMode;
+            Model.EmployeeNumberPrefix = settings.EmployeeNumberPrefix;
+            Model.NextEmployeeNumber = settings.NextEmployeeNumber;
+            Model.EmployeeNumberMinimumLength = settings.EmployeeNumberMinimumLength;
 
             var matchedPreset = NoticePeriodPresets.FirstOrDefault(p =>
                 p.Unit == settings.NoticePeriodUnit && p.Length == settings.NoticePeriodLength);
@@ -245,7 +353,11 @@ else
             Model.AcknowledgementReminderIntervalDays,
             Model.NoticePeriodUnit,
             Model.NoticePeriodLength,
-            Model.AutoDisableAccessOnLeavingDate);
+            Model.AutoDisableAccessOnLeavingDate,
+            Model.EmployeeNumberMode,
+            string.IsNullOrWhiteSpace(Model.EmployeeNumberPrefix) ? null : Model.EmployeeNumberPrefix.Trim(),
+            Model.NextEmployeeNumber,
+            Model.EmployeeNumberMinimumLength);
 
         var result = await CompanyService.UpdateCompanySettingsAsync(CompanyId, request);
         return result is not null ? null : "Failed to save company settings.";
@@ -273,4 +385,6 @@ else
     private sealed record NoticePeriodPresetItem(string Value, string Label, NoticePeriodUnit? Unit, int? Length);
 
     private sealed record NoticePeriodUnitOption(NoticePeriodUnit Value, string Label);
+
+    private sealed record EmployeeNumberModeOption(EmployeeNumberMode Value, string Label);
 }

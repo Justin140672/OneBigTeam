@@ -131,4 +131,83 @@ public class UpdateCompanySettingsValidatorTests
 		Assert.False(result.IsValid);
 		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateCompanySettingsRequest.NoticePeriodLength));
 	}
+
+	[Fact]
+	public void Validate_Passes_For_Valid_NextEmployeeNumber()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { NextEmployeeNumber = 1 });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Fails_When_NextEmployeeNumber_Is_Zero()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { NextEmployeeNumber = 0 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateCompanySettingsRequest.NextEmployeeNumber));
+	}
+
+	[Fact]
+	public void Validate_Fails_When_NextEmployeeNumber_Is_Negative()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { NextEmployeeNumber = -1 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateCompanySettingsRequest.NextEmployeeNumber));
+	}
+
+	[Theory]
+	[InlineData(1)]
+	[InlineData(10)]
+	public void Validate_Passes_For_EmployeeNumberMinimumLength_At_Boundaries(int minimumLength)
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { EmployeeNumberMinimumLength = minimumLength });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Fails_When_EmployeeNumberMinimumLength_Is_Zero()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { EmployeeNumberMinimumLength = 0 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateCompanySettingsRequest.EmployeeNumberMinimumLength));
+	}
+
+	[Fact]
+	public void Validate_Fails_When_EmployeeNumberMinimumLength_Exceeds_Ten()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { EmployeeNumberMinimumLength = 11 });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateCompanySettingsRequest.EmployeeNumberMinimumLength));
+	}
+
+	[Fact]
+	public void Validate_Passes_When_EmployeeNumberPrefix_Is_Null()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { EmployeeNumberPrefix = null });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Passes_When_EmployeeNumberPrefix_At_MaximumLength()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { EmployeeNumberPrefix = new string('A', 20) });
+		Assert.True(result.IsValid);
+	}
+
+	[Fact]
+	public void Validate_Fails_When_EmployeeNumberPrefix_Exceeds_MaximumLength()
+	{
+		var validator = new UpdateCompanySettingsValidator();
+		var result = validator.Validate(ValidRequest() with { EmployeeNumberPrefix = new string('A', 21) });
+		Assert.False(result.IsValid);
+		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateCompanySettingsRequest.EmployeeNumberPrefix));
+	}
 }

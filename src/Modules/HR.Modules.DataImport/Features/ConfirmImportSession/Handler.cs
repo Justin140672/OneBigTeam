@@ -69,6 +69,7 @@ internal sealed class ConfirmImportSessionHandler(
         var createdCount = 0;
         var failedCount = alreadyInvalidRowCount;
         var createdByRow = new Dictionary<int, (Guid EmployeeId, string? ManagerReference)>();
+        var createdRowResults = new List<ConfirmImportSessionRowResult>();
 
         foreach (var row in stagingRows)
         {
@@ -93,7 +94,7 @@ internal sealed class ConfirmImportSessionHandler(
                         row.LocationId!.Value,
                         row.EmploymentTypeId!.Value,
                         row.PositionProfileId!.Value,
-                        row.EmployeeNumber!,
+                        row.EmployeeNumber,
                         session.Id,
                         actorUserId),
                     cancellationToken);
@@ -156,6 +157,8 @@ internal sealed class ConfirmImportSessionHandler(
                 }
 
                 createdByRow[row.RowNumber] = (createResult.EmployeeId, row.ManagerReference);
+                createdRowResults.Add(new ConfirmImportSessionRowResult(
+                    row.RowNumber, createResult.EmployeeId, createResult.EmployeeNumber));
                 createdCount++;
             }
             catch (Exception ex)
@@ -221,7 +224,8 @@ internal sealed class ConfirmImportSessionHandler(
         await db.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new ConfirmImportSessionResponse(
-            session.Id, session.Status.ToString(), createdCount, failedCount));
+            session.Id, session.Status.ToString(), createdCount, failedCount,
+            createdRowResults.OrderBy(r => r.RowNumber).ToList()));
     }
 
     private static Dictionary<string, string?> ParseRawData(string rawData)

@@ -1,10 +1,13 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Employees.Services;
 
-internal sealed class EmployeeTimelineWriter(EmployeesDbContext dbContext) : IEmployeeTimelineWriter
+internal sealed class EmployeeTimelineWriter(
+    EmployeesDbContext dbContext,
+    ILogger<EmployeeTimelineWriter> logger) : IEmployeeTimelineWriter
 {
     // Query-then-insert, race-safe against the DB's two partial unique indexes (see
     // EmployeeTimelineEntryConfiguration) as a backstop — if a concurrent writer beats us to it,
@@ -37,12 +40,22 @@ internal sealed class EmployeeTimelineWriter(EmployeesDbContext dbContext) : IEm
             await dbContext.SaveChangesAsync(cancellationToken);
             return true;
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex)
         {
             // Backstop for the race where a concurrent writer inserted a matching entry between
             // our existence check and this SaveChangesAsync — the DB's partial unique indexes
             // reject the duplicate, and we treat that the same as "not added" rather than
-            // propagating the failure.
+            // propagating the failure. No business data (e.g. salary) is logged — only
+            // identifiers, matching the logging standards for this codebase.
+            logger.LogWarning(
+                ex,
+                "Failed to write employee timeline entry (race backstop hit) CompanyId={CompanyId} " +
+                "EmployeeId={EmployeeId} EventType={EventType} SourceRecordId={SourceRecordId}",
+                entry.CompanyId,
+                entry.EmployeeId,
+                entry.EventType,
+                entry.SourceRecordId);
+
             dbContext.Entry(entry).State = EntityState.Detached;
             return false;
         }

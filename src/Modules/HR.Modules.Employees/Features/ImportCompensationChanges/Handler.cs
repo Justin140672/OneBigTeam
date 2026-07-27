@@ -47,9 +47,15 @@ internal sealed class ImportCompensationChangesHandler(
             return ImportCompensationChangesOutcome.ValidationFailed(
                 [new CompensationImportRowError(0, "The file contains no data rows.")]);
 
+        // Employee.EmployeeNumber is always normalized to uppercase at write time (mirrors the
+        // WorkEmail convention), so the searched values must be uppercased too before the
+        // database comparison below — a raw .Contains() translates to a case-sensitive SQL IN,
+        // and would silently match nothing for a row whose EmployeeNumber was typed in any other
+        // case even though employeesByNumber's own lookup is case-insensitive.
         var employeeNumbers = parsedRows
             .Select(r => r.EmployeeNumber)
             .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Select(n => n.Trim().ToUpperInvariant())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 

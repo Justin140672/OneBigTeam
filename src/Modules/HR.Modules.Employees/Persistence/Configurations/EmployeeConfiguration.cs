@@ -191,5 +191,20 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.HasIndex(e => e.PositionProfileId);
         builder.HasIndex(e => e.ManagerId);
         builder.HasIndex(e => new { e.CompanyId, e.Status });
+
+        // EmployeeNumber is normalized to uppercase before storage (see Employee.NormalizeEmployeeNumber),
+        // so a plain unique index on the stored value enforces case-insensitive uniqueness per
+        // company without needing a computed/expression index — same pattern as the
+        // (CompanyId, WorkEmail) unique index above, which relies on WorkEmail being lowercased
+        // before storage.
+        //
+        // Filtered to exclude the empty-string sentinel ("no employee number assigned yet", used
+        // by legacy/pre-Automatic-mode records and the BackfillEmployeeNumbers feature) so that
+        // MULTIPLE employees in the same company can simultaneously have a blank EmployeeNumber
+        // pending backfill, while every real (non-blank) employee number still remains unique per
+        // company.
+        builder.HasIndex(e => new { e.CompanyId, e.EmployeeNumber })
+            .IsUnique()
+            .HasFilter("employee_number <> ''");
     }
 }

@@ -2,6 +2,7 @@ using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Employees.Tests;
 
@@ -40,7 +41,7 @@ public class EmployeeTimelineWriterTests
     public async Task TryAddAsync_Returns_True_On_First_Insert()
     {
         await using var context = BuildContext();
-        var writer = new EmployeeTimelineWriter(context);
+        var writer = new EmployeeTimelineWriter(context, NullLogger<EmployeeTimelineWriter>.Instance);
         var entry = CreateEntry(Guid.NewGuid(), Guid.NewGuid(), sourceRecordId: Guid.NewGuid());
 
         var result = await writer.TryAddAsync(entry, CancellationToken.None);
@@ -57,7 +58,7 @@ public class EmployeeTimelineWriterTests
         var employeeId = Guid.NewGuid();
         var sourceRecordId = Guid.NewGuid();
 
-        var writer = new EmployeeTimelineWriter(context);
+        var writer = new EmployeeTimelineWriter(context, NullLogger<EmployeeTimelineWriter>.Instance);
         var first = CreateEntry(companyId, employeeId, sourceRecordId: sourceRecordId);
         var firstResult = await writer.TryAddAsync(first, CancellationToken.None);
         Assert.True(firstResult);
@@ -78,7 +79,7 @@ public class EmployeeTimelineWriterTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        var writer = new EmployeeTimelineWriter(context);
+        var writer = new EmployeeTimelineWriter(context, NullLogger<EmployeeTimelineWriter>.Instance);
         var first = CreateEntry(companyId, employeeId, sourceRecordId: Guid.NewGuid());
         await writer.TryAddAsync(first, CancellationToken.None);
 
@@ -97,7 +98,7 @@ public class EmployeeTimelineWriterTests
         var employeeId = Guid.NewGuid();
         var eventDate = new DateOnly(2026, 7, 20);
 
-        var writer = new EmployeeTimelineWriter(context);
+        var writer = new EmployeeTimelineWriter(context, NullLogger<EmployeeTimelineWriter>.Instance);
         var first = CreateEntry(
             companyId, employeeId, eventDate, EmployeeTimelineEventType.ManagerChanged, sourceRecordId: null);
         var firstResult = await writer.TryAddAsync(first, CancellationToken.None);
@@ -123,7 +124,7 @@ public class EmployeeTimelineWriterTests
         var employeeId = Guid.NewGuid();
         var eventDate = new DateOnly(2026, 7, 20);
 
-        var writer = new EmployeeTimelineWriter(context);
+        var writer = new EmployeeTimelineWriter(context, NullLogger<EmployeeTimelineWriter>.Instance);
         var withNullSourceRecordId = CreateEntry(
             companyId, employeeId, eventDate, EmployeeTimelineEventType.ManagerChanged, sourceRecordId: null);
         await writer.TryAddAsync(withNullSourceRecordId, CancellationToken.None);
@@ -143,7 +144,7 @@ public class EmployeeTimelineWriterTests
         var employeeId = Guid.NewGuid();
         var sourceRecordId = Guid.NewGuid();
 
-        var writer = new EmployeeTimelineWriter(context);
+        var writer = new EmployeeTimelineWriter(context, NullLogger<EmployeeTimelineWriter>.Instance);
         var forCompanyA = CreateEntry(Guid.NewGuid(), employeeId, sourceRecordId: sourceRecordId);
         var forCompanyB = CreateEntry(Guid.NewGuid(), employeeId, sourceRecordId: sourceRecordId);
 

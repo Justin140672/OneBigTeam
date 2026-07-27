@@ -20,7 +20,11 @@ internal sealed record CompanySettingsAuditSnapshot(
     int AcknowledgementReminderIntervalDays,
     NoticePeriodUnit NoticePeriodUnit,
     int NoticePeriodLength,
-    bool AutoDisableAccessOnLeavingDate);
+    bool AutoDisableAccessOnLeavingDate,
+    EmployeeNumberMode EmployeeNumberMode,
+    string? EmployeeNumberPrefix,
+    int NextEmployeeNumber,
+    int EmployeeNumberMinimumLength);
 
 internal sealed record CompanySettingsUpdatedAuditEvent(
     Guid CompanyId,
