@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/HR.Api/HR.Api.csproj" />
     <Project Path="src/HR.AppHost/HR.AppHost.csproj" />
+    <Project Path="src/HR.Marketing/HR.Marketing.csproj" />
     <Project Path="src/HR.ServiceDefaults/HR.ServiceDefaults.csproj" />
     <Project Path="src/HR.Web/HR.Web.csproj" />
   </Folder>

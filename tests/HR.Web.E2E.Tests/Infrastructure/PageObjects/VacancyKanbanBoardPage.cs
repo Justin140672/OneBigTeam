@@ -42,8 +42,12 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
 
     // ── Search box (ticket #69) ──────────────────────────────────────────────────
 
+    // Tolerant of either DOM shape Syncfusion's SfTextBox might render the data-testid onto: the
+    // attribute could land directly on the <input> itself, or on a wrapper (e.g. ".e-input-group")
+    // containing a nested <input> — this was never confirmed against a live board before this file
+    // was written, so match both rather than assuming one.
     public Task FillSearchAsync(string text) =>
-        Board.Locator("[data-testid='kanban-search-box'] input").FillAsync(text);
+        Board.Locator("input[data-testid='kanban-search-box'], [data-testid='kanban-search-box'] input").First.FillAsync(text);
 
     public async Task<int> CountVisibleCardsAsync() =>
         await Board.Locator(".kanban-applicant-card").CountAsync();

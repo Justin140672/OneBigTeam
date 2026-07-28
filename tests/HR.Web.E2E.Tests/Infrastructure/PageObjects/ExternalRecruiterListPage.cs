@@ -63,7 +63,10 @@ public sealed class ExternalRecruiterListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
         await Row(agencyNameFragment).ClickAsync();
-        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Activate" });
+        // Exact = true: Playwright's accessible-name matching is substring-based by default, and
+        // "Activate" is a substring of "Deactivate" — without this the locator resolves to both
+        // toolbar buttons (strict-mode violation) whenever a Deactivate button is also present.
+        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Activate", Exact = true });
         await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await btn.ClickAsync();
         await page.WaitForFunctionAsync(

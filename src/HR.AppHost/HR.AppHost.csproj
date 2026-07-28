@@ -7,6 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="..\HR.Api\HR.Api.csproj" />
     <ProjectReference Include="..\HR.Web\HR.Web.csproj" />
+    <ProjectReference Include="..\HR.Marketing\HR.Marketing.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

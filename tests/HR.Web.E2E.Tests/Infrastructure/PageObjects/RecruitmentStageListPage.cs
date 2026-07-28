@@ -123,7 +123,10 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
         await Row(nameFragment).ClickAsync();
-        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Activate" });
+        // Exact = true: "Activate" is a substring of "Deactivate", so without this the locator
+        // resolves to both toolbar buttons (strict-mode violation) when a Deactivate button is
+        // also present — same bug found in ExternalRecruiterListPage.cs.
+        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Activate", Exact = true });
         await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await btn.ClickAsync();
         await page.WaitForFunctionAsync(

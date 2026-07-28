@@ -1,6 +1,7 @@
 using HR.Marketing.Components;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults();
 
 // Add services to the container.
 builder.Services.AddRazorComponents();
@@ -17,5 +18,6 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>();
+app.MapDefaultEndpoints();
 
 app.Run();

@@ -1,0 +1,38 @@
+@inject NavigationManager Navigation
+
+<header class="site-header">
+  <a class="brand" href="/" aria-label="One Big Team home">
+    <img class="brand-logo" src="/assets/one-big-team-logo.png" alt="One Big Team">
+  </a>
+
+  <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+    <span class="sr-only">Open navigation</span>
+    <span aria-hidden="true"></span>
+    <span aria-hidden="true"></span>
+    <span aria-hidden="true"></span>
+  </button>
+
+  <nav id="site-navigation" class="site-nav" aria-label="Primary navigation">
+    <a href="/" aria-current="@(CurrentPage == "home" ? "page" : null)">Home</a>
+    <a href="/features" aria-current="@(CurrentPage == "features" ? "page" : null)">Features</a>
+    <a href="/pricing" aria-current="@(CurrentPage == "pricing" ? "page" : null)">Pricing</a>
+    <a href="/#about">About</a>
+    <a href="/contact" aria-current="@(CurrentPage == "contact" ? "page" : null)">Contact</a>
+  </nav>
+
+  <div class="header-actions">
+    <a class="login-link" href="#login">Log in</a>
+    <a class="button button-primary" href="@TrialHref">Start free trial</a>
+  </div>
+</header>
+
+@code {
+    /// <summary>Set by each page to highlight the matching nav link via aria-current="page".</summary>
+    [Parameter] public string? CurrentPage { get; set; }
+
+    /// <summary>
+    /// The Home/Features pages link "Start free trial" to the Contact page's form; the Contact
+    /// page itself links straight to its own in-page anchor (mirrors the original static site).
+    /// </summary>
+    private string TrialHref => CurrentPage == "contact" ? "#contact-form" : "/contact#contact-form";
+}

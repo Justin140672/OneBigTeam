@@ -1,0 +1,135 @@
+@page "/contact"
+
+<PageTitle>Contact | One Big Team</PageTitle>
+<HeadContent>
+    <meta name="description" content="Contact One Big Team for simple HR software built for small and medium-sized businesses.">
+</HeadContent>
+
+<SiteHeader CurrentPage="contact" />
+
+<main>
+  <section class="contact-hero section-band">
+    <div class="section-inner two-column">
+      <div class="hero-copy">
+        <p class="eyebrow">Contact</p>
+        <h1>Talk to One Big Team about your HR setup.</h1>
+      </div>
+      <div class="copy-block">
+        <p class="hero-text">
+          One Big Team is for small and medium-sized businesses looking to manage
+          HR, leave, sickness, documents and recruitment in one place. Tell us
+          about your organisation and we will help you understand the best next step.
+        </p>
+        <div class="hero-actions">
+          <a class="button button-primary button-large" href="#contact-form">Send a message</a>
+          <a class="button button-secondary button-large" href="#contact-form">Contact us</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-muted">
+    <div class="section-inner info-panel">
+      <div>
+        <p class="eyebrow">How we can help</p>
+        <h2>Start a conversation about replacing scattered HR admin.</h2>
+        <p>
+          Tell us how your team currently manages employee records, leave,
+          sickness, documents and recruitment. We can help you understand whether
+          One Big Team is the right fit for the way your business is growing.
+        </p>
+      </div>
+      <div class="info-points">
+        <div>
+          <strong>Built around SMB needs</strong>
+          <p>Designed for growing businesses that need structure without heavyweight HR systems.</p>
+        </div>
+        <div>
+          <strong>Focused on everyday admin</strong>
+          <p>Bring repeat people processes out of spreadsheets, inboxes and disconnected tools.</p>
+        </div>
+        <div>
+          <strong>No billing on this page</strong>
+          <p>This form captures interest only. Customer onboarding and billing happen inside the SaaS app.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-inner contact-grid">
+      <div>
+        <p class="eyebrow">Send a message</p>
+        <h2>Tell us what you would like to solve.</h2>
+        <p class="estimator-intro">
+          Use the form to ask a question or share a little context
+          about your team. Required fields are marked so you can send the essentials quickly.
+        </p>
+        <p class="pricing-note">
+          This placeholder form validates your details on the page but does not send
+          a real email yet.
+        </p>
+      </div>
+
+      <form id="contact-form" class="contact-form" novalidate data-contact-form>
+        <div class="form-field">
+          <label for="contact-name">Name</label>
+          <input id="contact-name" name="name" type="text" autocomplete="name" required>
+          <p class="field-error" data-error-for="contact-name">Enter your name.</p>
+        </div>
+
+        <div class="form-field">
+          <label for="work-email">Work email</label>
+          <input id="work-email" name="email" type="email" autocomplete="email" required>
+          <p class="field-error" data-error-for="work-email">Enter a valid work email.</p>
+        </div>
+
+        <div class="form-field">
+          <label for="company-name">Company name</label>
+          <input id="company-name" name="company" type="text" autocomplete="organization" required>
+          <p class="field-error" data-error-for="company-name">Enter your company name.</p>
+        </div>
+
+        <div class="form-field">
+          <label for="employee-count-contact">Approximate employee count</label>
+          <input
+            id="employee-count-contact"
+            name="employee-count"
+            type="number"
+            min="1"
+            step="1"
+            inputmode="numeric"
+            required
+          >
+          <p class="field-error" data-error-for="employee-count-contact">Enter an employee count of 1 or more.</p>
+        </div>
+
+        <div class="form-field form-field-full">
+          <label for="contact-message">Message</label>
+          <textarea id="contact-message" name="message" rows="6" required></textarea>
+          <p class="field-error" data-error-for="contact-message">Enter a short message.</p>
+        </div>
+
+        <div class="form-submit-row">
+          <button class="button button-primary button-large" type="submit">Send message</button>
+          <p class="small-note">No email will be sent until a real email service is connected.</p>
+        </div>
+
+        <div class="form-status" role="status" aria-live="polite" data-form-status hidden></div>
+      </form>
+    </div>
+  </section>
+
+  <section class="section final-cta">
+    <div class="section-inner cta-panel">
+      <p class="eyebrow">Ready when you are</p>
+      <h2>Bring your HR, leave, sickness, documents and recruitment into one place.</h2>
+      <div class="hero-actions">
+        <a class="button button-primary button-large" href="#contact-form">Start free trial</a>
+        <a class="button button-secondary button-large" href="#contact-form">Contact us</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<SiteFooter />

@@ -1,0 +1,179 @@
+@page "/pricing"
+
+<PageTitle>Pricing | One Big Team</PageTitle>
+<HeadContent>
+    <meta name="description" content="Estimate One Big Team monthly pricing based on your active employee count. Final pricing is confirmed after organisation import.">
+</HeadContent>
+
+<SiteHeader CurrentPage="pricing" />
+
+<main>
+  <section class="pricing-hero section-band">
+    <div class="section-inner pricing-hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">Pricing</p>
+        <h1>Clear HR pricing for growing teams.</h1>
+        <p class="hero-text">
+          One Big Team pricing is based on the number of active employees in
+          your organisation. Use the estimator to get a guide monthly price
+          before your team is imported.
+        </p>
+        <div class="hero-actions" id="trial">
+          <a class="button button-primary button-large" href="/contact#contact-form">Start free trial</a>
+          <a class="button button-secondary button-large" href="/contact#contact-form">Contact us</a>
+        </div>
+      </div>
+
+      <aside class="price-summary" aria-label="Pricing summary">
+        <p class="summary-label">Estimated monthly price</p>
+        <strong><span data-estimated-price>&pound;0</span></strong>
+        <p>
+          Based on <span data-estimated-employees>25</span> active employees at
+          <span data-price-per-employee></span> per active employee per month.
+        </p>
+      </aside>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-inner estimator-grid">
+      <div>
+        <p class="eyebrow">Estimator</p>
+        <h2>Estimate your monthly One Big Team price.</h2>
+        <p class="estimator-intro">
+          Enter the number of active employees you expect to manage in One Big Team.
+          The estimate updates instantly and is for guidance only.
+        </p>
+        <p class="pricing-note">Your final monthly price is confirmed after your organisation import, based on your active employee count.</p>
+      </div>
+
+      <form class="estimator-card" data-pricing-estimator>
+        <label for="employee-count">Active employees</label>
+        <div class="employee-input-row">
+          <input
+            id="employee-count"
+            name="employee-count"
+            type="number"
+            min="1"
+            step="1"
+            inputmode="numeric"
+            value="25"
+            aria-describedby="employee-count-help"
+          >
+          <span>employees</span>
+        </div>
+        <p id="employee-count-help">
+          Count employees who are active in your organisation and managed in the platform.
+        </p>
+
+        <div class="estimate-result" aria-live="polite">
+          <span>Estimated monthly price</span>
+          <strong data-estimated-price>&pound;0</strong>
+        </div>
+
+        <div class="rate-row">
+          <span>Rate</span>
+          <strong><span data-price-per-employee></span> per active employee/month</strong>
+        </div>
+
+        <p class="small-note">
+          Billing and payment details are handled inside the One Big Team SaaS app,
+          not on this public marketing website.
+        </p>
+      </form>
+    </div>
+  </section>
+
+  <section class="section section-muted">
+    <div class="section-inner">
+      <div class="section-heading">
+        <p class="eyebrow">What is included</p>
+        <h2>One platform for core people operations.</h2>
+      </div>
+
+      <div class="benefit-grid">
+        <div>
+          <strong>HR records and documents</strong>
+          <p>Manage employee information, company documents and shared HR resources.</p>
+        </div>
+        <div>
+          <strong>Absence and workflows</strong>
+          <p>Track leave, sickness, reminders and repeat HR processes in one place.</p>
+        </div>
+        <div>
+          <strong>Recruitment and reporting</strong>
+          <p>Support hiring activity and understand workforce trends as your team grows.</p>
+        </div>
+      </div>
+
+      <div class="payroll-callout">
+        <strong>Payroll is not included.</strong>
+        <p>
+          One Big Team helps with HR and workforce management. Payroll processing,
+          payslip generation and salary payments are not included in the product.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section faq-section">
+    <div class="section-inner faq-grid">
+      <div>
+        <p class="eyebrow">FAQ</p>
+        <h2>Pricing questions, answered simply.</h2>
+      </div>
+
+      <div class="faq-list">
+        <details>
+          <summary>When do I add payment details?</summary>
+          <p>
+            Payment details are added inside the SaaS app when you are ready to
+            activate billing. The public pricing page only provides an estimate.
+          </p>
+        </details>
+        <details>
+          <summary>What counts as an active employee?</summary>
+          <p>
+            An active employee is a current team member imported into your organisation
+            and managed in One Big Team. Former, archived or inactive records do not
+            normally count toward the active employee total.
+          </p>
+        </details>
+        <details>
+          <summary>Can my price change if my employee count changes?</summary>
+          <p>
+            Yes. Because pricing is based on active employee count, your monthly price
+            can change as employees are added, removed, archived or reactivated.
+          </p>
+        </details>
+        <details>
+          <summary>Is payroll included?</summary>
+          <p>
+            No. One Big Team does not include payroll. It supports HR records, leave,
+            sickness, recruitment, documents, workflows, reminders and reporting.
+          </p>
+        </details>
+        <details>
+          <summary>Can I cancel?</summary>
+          <p>
+            Yes. You can cancel your One Big Team subscription according to the terms
+            agreed when billing is activated inside the SaaS app.
+          </p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section id="contact" class="section final-cta">
+    <div class="section-inner cta-panel">
+      <p class="eyebrow">Ready to see your price in context?</p>
+      <h2>Start with your team size, then confirm after organisation import.</h2>
+      <div class="hero-actions">
+        <a class="button button-primary button-large" href="/contact#contact-form">Start free trial</a>
+        <a class="button button-secondary button-large" href="/contact#contact-form">Contact us</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<SiteFooter />

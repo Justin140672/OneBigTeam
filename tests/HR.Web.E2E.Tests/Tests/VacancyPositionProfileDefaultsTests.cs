@@ -152,6 +152,7 @@ public sealed class VacancyPositionProfileDefaultsTests(AppFixture fixture) : E2
         await login.SwitchAccountAsync(MarcusEmail);
 
         await vacancyDetail.GoToNewAsync(AcmeId);
+        await vacancyDetail.OpenPositionProfileDropdownAsync();
         var options = await vacancyDetail.GetPositionProfileDropdownOptionsAsync();
 
         Assert.Contains(activeProfileTitle, options);

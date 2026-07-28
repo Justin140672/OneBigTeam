@@ -189,23 +189,38 @@ public sealed class VacancyManagementTests(AppFixture fixture) : E2ETestBase(fix
     }
 
     /// <summary>
-    /// Position Profile is fixed at creation time — PositionProfileId is not editable via
-    /// UpdateVacancy, so VacancyDetail.razor renders that dropdown with Enabled="@IsNew". Once a
-    /// vacancy exists, the dropdown must still show which profile it's linked to, just disabled,
-    /// while the rest of the Overview form (Advert Title, Advert Description, Location, Hiring
-    /// Manager) stays fully editable.
+    /// Position Profile is only locked once UpdateVacancyHandler.CanChangePositionProfile's
+    /// baseline check fails — Status is no longer Draft, or the vacancy has at least one
+    /// application (confirmed against production behavior: a freshly-created Draft vacancy with
+    /// zero applications is deliberately still editable, so this test must first give the vacancy
+    /// an application before the dropdown will actually render disabled). Once locked, the
+    /// dropdown must still show which profile it's linked to, just disabled, while the rest of the
+    /// Overview form (Advert Title, Advert Description, Location, Hiring Manager) stays fully
+    /// editable.
     /// </summary>
     [Fact]
     public async Task EditVacancy_PositionProfileIsDisabled_OtherFieldsRemainEditable()
     {
-        var vacancyTitle = $"E2E Edit {Guid.NewGuid().ToString("N")[..8]}";
+        var unique          = Guid.NewGuid().ToString("N")[..8];
+        var vacancyTitle    = $"E2E Edit {unique}";
+        var candidateLast   = $"LockCand{unique}";
+        var candidateEmail  = $"e2e.lockcand{unique}@example.com";
 
         var login         = new LoginPage(_page, _fixture.WebBaseUrl);
         var vacancyList   = new VacancyListPage(_page, _fixture.WebBaseUrl);
         var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
+        var candidateList = new CandidateListPage(_page, _fixture.WebBaseUrl);
+        var candidateEdit = new CandidateEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
+
+        await candidateList.GoToAsync(AcmeId);
+        await candidateList.ClickNewCandidateAsync();
+        await candidateEdit.FillFirstNameAsync("E2E");
+        await candidateEdit.FillLastNameAsync(candidateLast);
+        await candidateEdit.FillEmailAsync(candidateEmail);
+        await candidateEdit.SaveNewCandidateAsync();
 
         // Create a vacancy with a known Position Profile so its value can be asserted after reopening.
         await vacancyList.GoToAsync(AcmeId);
@@ -215,12 +230,20 @@ public sealed class VacancyManagementTests(AppFixture fixture) : E2ETestBase(fix
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 
+        // Give the vacancy an application — CanChangePositionProfile requires both Draft status
+        // AND zero applications, so a bare Draft vacancy alone is not enough to lock this field.
+        await vacancyList.ClickVacancyAsync(vacancyTitle);
+        await vacancyDetail.OpenApplicationsTabAsync();
+        await vacancyDetail.ClickAddCandidateAsync();
+        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateEmail);
+        await vacancyDetail.SubmitAddApplicationAsync();
+
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickVacancyAsync(vacancyTitle);
 
         // Position Profile still shows the value it was created with, but can no longer be changed.
         Assert.True(await vacancyDetail.IsPositionProfileDisabledAsync(),
-            "Expected the Position Profile dropdown to be disabled once a vacancy has been created");
+            "Expected the Position Profile dropdown to be disabled once the vacancy has an application");
         Assert.Equal("Senior Software Engineer", await vacancyDetail.GetSelectedPositionProfileTextAsync());
 
         // The vacancy's own fields card was renamed from "Vacancy Details" to "Recruitment Advert

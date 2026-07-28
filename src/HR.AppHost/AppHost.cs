@@ -29,4 +29,9 @@ web
 	.WithReference(api)
 	.WaitFor(api);
 
+// Public marketing site — static content only, no database/API dependency.
+var marketing = isE2ETesting
+	? builder.AddProject<Projects.HR_Marketing>("marketing", launchProfileName: "http")
+	: builder.AddProject<Projects.HR_Marketing>("marketing");
+
 builder.Build().Run();
