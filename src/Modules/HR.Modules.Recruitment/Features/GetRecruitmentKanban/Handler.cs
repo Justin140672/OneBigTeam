@@ -46,6 +46,19 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
 
         var vacancyTitle = vacancy.AdvertTitle ?? positionProfile?.Title ?? "(untitled)";
 
+        // Ticket #81: AssignedRecruiterId now references ExternalRecruiter (an external agency), not
+        // an Employee — resolved here (same module/schema, direct EF Core access) rather than by the
+        // UI looking it up against the employee list, which is what happened before this change.
+        string? assignedRecruiterAgencyName = null;
+        if (vacancy.AssignedRecruiterId is { } assignedRecruiterId)
+        {
+            assignedRecruiterAgencyName = await db.ExternalRecruiters
+                .AsNoTracking()
+                .Where(r => r.Id == assignedRecruiterId)
+                .Select(r => r.AgencyName)
+                .SingleOrDefaultAsync(cancellationToken);
+        }
+
         var applicants = await (
             from a in db.Applications.AsNoTracking()
             join c in db.Candidates.AsNoTracking() on a.CandidateId equals c.Id
@@ -81,6 +94,7 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
                         a.Status,
                         a.AppliedAt,
                         vacancy.AssignedRecruiterId,
+                        assignedRecruiterAgencyName,
                         vacancyTitle))
                     .ToList();
 

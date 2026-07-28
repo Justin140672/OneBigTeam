@@ -23,5 +23,11 @@ internal sealed record KanbanApplicantSummary(
     string? CandidatePhotoUrl,
     ApplicationStatus Stage,
     DateTimeOffset AppliedAt,
+    // Ticket #81: references ExternalRecruiter (an external agency) rather than an Employee — see
+    // Vacancy.AssignedRecruiterId's remarks for the scope-correction history.
     Guid? AssignedRecruiterId,
+    // Resolved agency display name for AssignedRecruiterId, so the Kanban card doesn't need to look
+    // this up against the employee list anymore (it never was an employee) — null when unassigned or
+    // (rare) the recruiter row can no longer be found.
+    string? AssignedRecruiterAgencyName,
     string VacancyTitle);

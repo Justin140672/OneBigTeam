@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.ListEmployees;
 using HR.Modules.Employees.Persistence;
@@ -15,7 +16,7 @@ public class ListEmployeesHandlerTests
     public async Task HandleAsync_Returns_Empty_When_No_Employees()
     {
         await using var context = BuildContext();
-        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), new FakeEmployeeUserAccountStatusReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = Guid.NewGuid() },
@@ -40,7 +41,7 @@ public class ListEmployeesHandlerTests
             Employee.Create(Guid.NewGuid(), Guid.NewGuid(), "Carol", "Other", "carol@other.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), new FakeEmployeeUserAccountStatusReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId },
@@ -65,7 +66,7 @@ public class ListEmployeesHandlerTests
             Employee.Create(Guid.NewGuid(), companyId, "Carol", "Jones", "carol@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), new FakeEmployeeUserAccountStatusReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId },
@@ -90,7 +91,7 @@ public class ListEmployeesHandlerTests
             Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), new FakeEmployeeUserAccountStatusReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId, Search = "ali" },
@@ -113,7 +114,7 @@ public class ListEmployeesHandlerTests
             Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), new FakeEmployeeUserAccountStatusReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId, Search = "David Park" },
@@ -136,7 +137,7 @@ public class ListEmployeesHandlerTests
             Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@globex.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), new FakeEmployeeUserAccountStatusReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId, Search = "acme" },
@@ -159,7 +160,7 @@ public class ListEmployeesHandlerTests
             Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0099", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), new FakeEmployeeUserAccountStatusReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId, Search = "0042" },
@@ -184,7 +185,7 @@ public class ListEmployeesHandlerTests
         context.Employees.AddRange(emp1, emp2);
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), new FakeEmployeeUserAccountStatusReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId, DepartmentId = departmentId },
@@ -219,7 +220,7 @@ public class ListEmployeesHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), new FakeEmployeeUserAccountStatusReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId, Search = "alice" },
@@ -247,7 +248,7 @@ public class ListEmployeesHandlerTests
         context.Employees.AddRange(active, draft);
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), new FakeEmployeeUserAccountStatusReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId, Status = EmploymentStatus.Active },
@@ -273,7 +274,7 @@ public class ListEmployeesHandlerTests
         var photoReader = new FakeProfilePhotoReader();
         photoReader.PhotoUrls[withPhoto.Id] = "https://example.com/alice.jpg";
 
-        var handler = new ListEmployeesHandler(context, photoReader);
+        var handler = new ListEmployeesHandler(context, photoReader, new FakeEmployeeUserAccountStatusReader());
 
         var result = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId },
@@ -301,7 +302,7 @@ public class ListEmployeesHandlerTests
         }
         await context.SaveChangesAsync();
 
-        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader());
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), new FakeEmployeeUserAccountStatusReader());
 
         var page1 = await handler.HandleAsync(
             new ListEmployeesRequest { CompanyId = companyId, PageNumber = 1, PageSize = 2 },
@@ -319,6 +320,103 @@ public class ListEmployeesHandlerTests
         // No overlap between pages
         var page1Ids = page1.Value.Items.Select(i => i.Id).ToHashSet();
         Assert.DoesNotContain(page2.Value.Items, i => page1Ids.Contains(i.Id));
+    }
+
+    [Theory]
+    [InlineData(EmployeeUserAccountStatus.Active, "Active")]
+    [InlineData(EmployeeUserAccountStatus.PendingInvitation, "PendingInvitation")]
+    [InlineData(EmployeeUserAccountStatus.Disabled, "Disabled")]
+    public async Task HandleAsync_Maps_UserAccountStatus_When_Present_In_Reader(
+        EmployeeUserAccountStatus status, string expected)
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var statusReader = new FakeEmployeeUserAccountStatusReader();
+        statusReader.Statuses[employee.Id] = new EmployeeUserAccountSummary(employee.Id, status, null);
+
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), statusReader);
+
+        var result = await handler.HandleAsync(
+            new ListEmployeesRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = result.Value!.Items.Single();
+        Assert.Equal(expected, item.UserAccountStatus);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Maps_UserAccountStatus_To_NoUser_When_Absent_From_Reader()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        // No entry seeded in FakeEmployeeUserAccountStatusReader for this employee.
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), new FakeEmployeeUserAccountStatusReader());
+
+        var result = await handler.HandleAsync(
+            new ListEmployeesRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = result.Value!.Items.Single();
+        Assert.Equal("NoUser", item.UserAccountStatus);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Calls_GetStatusesAsync_With_CompanyId_And_CurrentPage_EmployeeIds()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employees = Enumerable.Range(0, 5)
+            .Select(i => Employee.Create(Guid.NewGuid(), companyId, "Employee", $"Z{i:00}", $"emp{i}@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now))
+            .ToList();
+        context.Employees.AddRange(employees);
+        await context.SaveChangesAsync();
+
+        var statusReader = new SpyEmployeeUserAccountStatusReader();
+        var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), statusReader);
+
+        var result = await handler.HandleAsync(
+            new ListEmployeesRequest { CompanyId = companyId, PageNumber = 1, PageSize = 2 },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(companyId, statusReader.LastCompanyId);
+        Assert.NotNull(statusReader.LastEmployeeIds);
+        Assert.Equal(2, statusReader.LastEmployeeIds!.Count);
+        var pageIds = result.Value!.Items.Select(i => i.Id).ToHashSet();
+        Assert.Equal(pageIds, statusReader.LastEmployeeIds.ToHashSet());
+    }
+
+    private sealed class SpyEmployeeUserAccountStatusReader : HR.Infrastructure.Abstractions.IEmployeeUserAccountStatusReader
+    {
+        public Guid? LastCompanyId { get; private set; }
+        public IReadOnlyList<Guid>? LastEmployeeIds { get; private set; }
+
+        public Task<IReadOnlyDictionary<Guid, HR.Infrastructure.Abstractions.EmployeeUserAccountSummary>> GetStatusesAsync(
+            Guid companyId,
+            IEnumerable<Guid> employeeIds,
+            CancellationToken cancellationToken)
+        {
+            LastCompanyId = companyId;
+            LastEmployeeIds = employeeIds.ToList();
+            return Task.FromResult<IReadOnlyDictionary<Guid, HR.Infrastructure.Abstractions.EmployeeUserAccountSummary>>(
+                new Dictionary<Guid, HR.Infrastructure.Abstractions.EmployeeUserAccountSummary>());
+        }
     }
 
     private static EmployeesDbContext BuildContext()

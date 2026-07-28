@@ -1,6 +1,5 @@
 @using Syncfusion.Blazor.Inputs
 @inject RecruitmentKanbanService KanbanService
-@inject EmployeeService EmployeeService
 @inject CandidateService CandidateService
 @inject NavigationManager Navigation
 
@@ -41,7 +40,7 @@
                     @{
                         var applicant = (KanbanApplicantModel)context;
                     }
-                    <KanbanApplicantCard Applicant="applicant" RecruiterName="@RecruiterName(applicant.AssignedRecruiterId)" OnOpen="OpenApplicant" />
+                    <KanbanApplicantCard Applicant="applicant" RecruiterName="@RecruiterName(applicant)" OnOpen="OpenApplicant" />
                 </Template>
             </KanbanCardSettings>
             <KanbanColumns>
@@ -70,7 +69,6 @@
     private string? _error;
     private string? _vacancyTitle;
     private List<KanbanApplicantModel> _cards = [];
-    private Dictionary<Guid, string> _recruiterNames = [];
     private Dictionary<Guid, string> _candidateEmails = [];
 
     protected override async Task OnParametersSetAsync()
@@ -95,14 +93,13 @@
         _error = null;
 
         var kanbanTask = KanbanService.GetKanbanAsync(CompanyId, VacancyId);
-        var employeesTask = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 200);
         // Bulk-loaded once so the search box can match candidate email — the Kanban response itself
         // only carries name/stage/dates (see GetRecruitmentKanbanResponse), no email or employee
         // number field. See report: this is a known contract gap for ticket #69's email/employee
         // number search scope.
         var candidatesTask = CandidateService.ListCandidatesAsync(CompanyId, pageSize: 200);
 
-        await Task.WhenAll(kanbanTask, employeesTask, candidatesTask);
+        await Task.WhenAll(kanbanTask, candidatesTask);
 
         var kanban = await kanbanTask;
         if (kanban is null)
@@ -115,9 +112,6 @@
 
         _vacancyTitle = kanban.VacancyTitle;
         _cards = kanban.Columns.SelectMany(c => c.Applicants).ToList();
-
-        var employees = (await employeesTask)?.Items ?? [];
-        _recruiterNames = employees.ToDictionary(e => e.Id, e => e.FullName);
 
         var candidates = (await candidatesTask)?.Items ?? [];
         _candidateEmails = candidates.ToDictionary(c => c.Id, c => c.Email);
@@ -140,10 +134,8 @@
         }
     }
 
-    private string RecruiterName(Guid? recruiterId) =>
-        recruiterId is not null && _recruiterNames.TryGetValue(recruiterId.Value, out var name)
-            ? name
-            : "Unassigned";
+    private static string RecruiterName(KanbanApplicantModel applicant) =>
+        applicant.AssignedRecruiterAgencyName ?? "Unassigned";
 
     private async Task OnSearchChanged(Syncfusion.Blazor.Inputs.ChangedEventArgs args)
     {

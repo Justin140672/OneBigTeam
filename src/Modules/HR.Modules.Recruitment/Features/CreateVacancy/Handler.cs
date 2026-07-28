@@ -2,6 +2,7 @@ using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.CreateVacancy;
 
@@ -23,6 +24,26 @@ internal sealed class CreateVacancyHandler(
         if (!positionProfileExists)
             return Result.Failure<CreateVacancyResponse>(
                 Error.NotFound($"Position profile '{request.PositionProfileId}' was not found."));
+
+        // Ticket #81: AssignedRecruiterId is an optional FK to ExternalRecruiter (the external agency),
+        // not an Employee — existence/company-ownership/active checks happen here via direct EF Core
+        // access, since ExternalRecruiter lives in this same module/schema.
+        if (request.AssignedRecruiterId is { } requestedRecruiterId)
+        {
+            var recruiter = await db.ExternalRecruiters
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    r => r.Id == requestedRecruiterId && r.CompanyId == request.CompanyId,
+                    cancellationToken);
+
+            if (recruiter is null)
+                return Result.Failure<CreateVacancyResponse>(
+                    Error.NotFound($"External recruiter '{requestedRecruiterId}' was not found."));
+
+            if (!recruiter.IsActive)
+                return Result.Failure<CreateVacancyResponse>(
+                    Error.Validation($"External recruiter '{recruiter.AgencyName}' is inactive and cannot be assigned to a vacancy."));
+        }
 
         // Department is no longer stored on Vacancy at all — it is always derived from the linked
         // Position Profile at the read layer (see GetVacancyHandler/ListVacanciesHandler), so there is

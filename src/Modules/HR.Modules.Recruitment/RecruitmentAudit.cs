@@ -6,7 +6,11 @@ internal sealed record VacancyAuditSnapshot(
     string? AdvertTitle,
     string? AdvertDescription,
     Guid HiringManagerId,
-    Domain.VacancyStatus Status);
+    Domain.VacancyStatus Status,
+    // Ticket #81: the assigned external recruitment agency (ExternalRecruiter.Id), folded into the
+    // existing vacancy.updated audit event rather than a bespoke event — this is now a plain optional
+    // field on Vacancy, not a separate assignment entity with its own audit trail.
+    Guid? AssignedRecruiterId);
 
 // EffectiveTitle is resolved by the handler (vacancy.AdvertTitle ?? linked Position Profile's title)
 // purely for a readable audit Summary line — it is not part of the Before/After snapshot itself,
@@ -151,6 +155,98 @@ internal sealed record ApplicationStageChangedAuditEvent(
     string? IAuditEvent.Summary => $"Application moved from '{PreviousStage}' to '{NewStage}'";
     object? IAuditEvent.Before => new { Stage = PreviousStage };
     object? IAuditEvent.After => new { Stage = NewStage };
+    object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
+}
+
+internal sealed record ExternalRecruiterCreatedAuditEvent(
+    Guid CompanyId,
+    Guid ExternalRecruiterId,
+    string AgencyName,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "external_recruiter.created";
+    string IAuditEvent.EntityType => "ExternalRecruiter";
+    Guid IAuditEvent.EntityId => ExternalRecruiterId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"External recruiter '{AgencyName}' created";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { AgencyName };
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record ExternalRecruiterAuditSnapshot(
+    string AgencyName,
+    string? ContactName,
+    string? ContactEmail,
+    string? ContactTelephone,
+    string? Website,
+    string? Notes);
+
+internal sealed record ExternalRecruiterUpdatedAuditEvent(
+    Guid CompanyId,
+    Guid ExternalRecruiterId,
+    ExternalRecruiterAuditSnapshot Before,
+    ExternalRecruiterAuditSnapshot After,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "external_recruiter.updated";
+    string IAuditEvent.EntityType => "ExternalRecruiter";
+    Guid IAuditEvent.EntityId => ExternalRecruiterId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"External recruiter '{After.AgencyName}' updated";
+    object? IAuditEvent.Before => Before;
+    object? IAuditEvent.After => After;
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record ExternalRecruiterActiveStatusChangedAuditEvent(
+    Guid CompanyId,
+    Guid ExternalRecruiterId,
+    string AgencyName,
+    bool PreviousIsActive,
+    bool NewIsActive,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "external_recruiter.active_status_changed";
+    string IAuditEvent.EntityType => "ExternalRecruiter";
+    Guid IAuditEvent.EntityId => ExternalRecruiterId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => NewIsActive
+        ? $"External recruiter '{AgencyName}' reactivated"
+        : $"External recruiter '{AgencyName}' deactivated";
+    object? IAuditEvent.Before => new { IsActive = PreviousIsActive };
+    object? IAuditEvent.After => new { IsActive = NewIsActive };
+    object? IAuditEvent.Metadata => null;
+}
+
+// Ticket #78: published whenever an application's source/recruiter attribution is set (at creation
+// today; also intended for any future "edit source" endpoint). SourceExternalRecruiterId references
+// the ExternalRecruiter row directly and is preserved verbatim in the audit trail even if that
+// recruiter's vacancy assignment is later removed.
+internal sealed record ApplicationSourceSetAuditEvent(
+    Guid CompanyId,
+    Guid ApplicationId,
+    Guid VacancyId,
+    Guid CandidateId,
+    Domain.ApplicationSource Source,
+    Guid? SourceExternalRecruiterId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "application.source_set";
+    string IAuditEvent.EntityType => "Application";
+    Guid IAuditEvent.EntityId => ApplicationId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"Application source set to '{Source}'";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { Source, SourceExternalRecruiterId };
     object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
 }
 

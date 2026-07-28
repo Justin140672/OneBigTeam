@@ -16,13 +16,28 @@ internal sealed class Application
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    // Ticket #78: how this candidate/application originated. Nullable for backward compatibility —
+    // existing applications created before this concept existed have Source == null. Set together
+    // with SourceExternalRecruiterId as a validated pair (see CreateApplicationValidator): the
+    // recruiter id is required if and only if Source == ExternalRecruiter.
+    public ApplicationSource? Source { get; private set; }
+
+    // Deliberately references the ExternalRecruiter row directly (never the VacancyRecruiterAssignment
+    // row). This is the crux of ticket #78: once set, the source attribution must remain fixed in
+    // history even if the recruiter's assignment to this vacancy is later removed/deactivated
+    // (VacancyRecruiterAssignment rows can be deactivated; ExternalRecruiter rows are never deleted,
+    // only deactivated) — so this FK must survive assignment removal.
+    public Guid? SourceExternalRecruiterId { get; private set; }
+
     public static Application Create(
         Guid id,
         Guid companyId,
         Guid vacancyId,
         Guid candidateId,
         string? notes,
-        DateTimeOffset now) => new()
+        DateTimeOffset now,
+        ApplicationSource? source = null,
+        Guid? sourceExternalRecruiterId = null) => new()
     {
         Id          = id,
         CompanyId   = companyId,
@@ -33,7 +48,23 @@ internal sealed class Application
         AppliedAt   = now,
         CreatedAt   = now,
         UpdatedAt   = now,
+        Source      = source,
+        SourceExternalRecruiterId = source == ApplicationSource.ExternalRecruiter ? sourceExternalRecruiterId : null,
     };
+
+    /// <summary>
+    /// Sets (or changes) the recorded source of this application. Kept as a distinct method from
+    /// Create so that source can also be attached/corrected after creation via a dedicated endpoint.
+    /// Callers (validator/handler) must enforce that sourceExternalRecruiterId is supplied if and only
+    /// if source == ExternalRecruiter — this method trusts that pairing has already been validated and
+    /// simply guards against storing an orphaned recruiter id for a non-ExternalRecruiter source.
+    /// </summary>
+    public void SetSource(ApplicationSource? source, Guid? sourceExternalRecruiterId, DateTimeOffset now)
+    {
+        Source = source;
+        SourceExternalRecruiterId = source == ApplicationSource.ExternalRecruiter ? sourceExternalRecruiterId : null;
+        UpdatedAt = now;
+    }
 
     public void MoveToScreening(DateTimeOffset now)
     {

@@ -451,11 +451,55 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public Task SelectCandidateInAddDialogAsync(string nameOrEmailFragment) =>
         DropDownSelector.SelectAsync(page, page.Locator(".add-application-dialog"), nameOrEmailFragment);
 
+    /// <summary>
+    /// Selects a value from the "Source (optional)" dropdown in the (currently open) Add Candidate
+    /// dialog (VacancyApplicationsTab.razor's _sourceOptions — "Unspecified", "Direct", "Referral",
+    /// "External Recruiter", "Job Board", "Careers Site"). This is the dialog's second combobox
+    /// (index 1) — the Candidate picker is the first (index 0).
+    /// </summary>
+    public Task SelectAddApplicationSourceAsync(string sourceLabel) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".add-application-dialog"), sourceLabel, index: 1);
+
+    /// <summary>
+    /// Selects a value from the "Recruiter" dropdown that only renders in the Add Candidate dialog
+    /// once Source="ExternalRecruiter" is picked. This is the dialog's third combobox (index 2).
+    /// </summary>
+    public Task SelectAddApplicationRecruiterAsync(string agencyNameFragment) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".add-application-dialog"), agencyNameFragment, index: 2);
+
+    /// <summary>
+    /// The non-blocking "This recruiter isn't currently assigned to this vacancy." warning
+    /// (data-testid="recruiter-not-assigned-warning") shown under the Recruiter dropdown when the
+    /// chosen recruiter isn't among this vacancy's currently-assigned active recruiters.
+    /// </summary>
+    public Task<bool> IsRecruiterNotAssignedWarningVisibleAsync() =>
+        page.Locator("[data-testid='recruiter-not-assigned-warning']").IsVisibleAsync();
+
     public async Task SubmitAddApplicationAsync()
     {
         await page.Locator(".add-application-dialog .e-footer-content button:has-text('Add')").ClickAsync();
         await page.Locator("[role='dialog'].add-application-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// Clicks the Add Candidate dialog's "Add" button without waiting for the dialog to close — for
+    /// tests expecting client-side validation (e.g. "Please select a recruiter…") to keep it open.
+    /// </summary>
+    public Task ClickAddApplicationSubmitButtonAsync() =>
+        page.Locator(".add-application-dialog .e-footer-content button:has-text('Add')").ClickAsync();
+
+    /// <summary>
+    /// Reads the Applications grid's "Source" column text for the row matching
+    /// <paramref name="candidateNameFragment"/> — populated lazily per-application (see
+    /// VacancyApplicationsTab.razor's _sourceDetails/LoadAsync), so this may briefly show "—" while
+    /// that N+1 detail fetch is still in flight; callers should generally reload/re-check after the
+    /// add dialog has closed and LoadAsync has re-run.
+    /// </summary>
+    public async Task<string?> GetApplicationSourceColumnTextAsync(string candidateNameFragment)
+    {
+        var cell = ApplicationRow(candidateNameFragment).First.Locator(".e-rowcell").Last;
+        return (await cell.TextContentAsync())?.Trim();
     }
 
     // ── Applications tab: per-row actions ────────────────────────────────────────
@@ -643,6 +687,47 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task<bool> HasDialogErrorAsync(string dialogCssClass) =>
         await page.Locator($".{dialogCssClass} .alert-danger").IsVisibleAsync();
 
+    // ── Overview tab: Recruitment Agency dropdown (ticket #81/#94) ───────────────
+    // Optional SfDropDownList bound to Model.AssignedRecruiterId (FK to ExternalRecruiter, not the
+    // removed VacancyRecruiterAssignment/Recruiters-tab feature above). DataSource is active-only
+    // (VacancyDetail.razor's OnLoadedAsync calls ListExternalRecruitersAsync(isActive: true)), with
+    // a prepended "Not assigned" sentinel item (Guid.Empty) rather than ShowClearButton, per this
+    // codebase's convention for optional dropdowns. Scoped to ".col-md-4" like Hiring Manager above,
+    // since both fields share that column width in the "Recruitment Advert Details" card.
+    private ILocator RecruitmentAgencyField =>
+        page.Locator(".col-md-4").Filter(new() { HasText = "Recruitment Agency" }).First;
+
+    public Task SelectRecruitmentAgencyAsync(string agencyNameFragment) =>
+        DropDownSelector.SelectAsync(page, RecruitmentAgencyField, agencyNameFragment);
+
+    /// <summary>Reads the current value of the Recruitment Agency dropdown's visible text.</summary>
+    public async Task<string?> GetSelectedRecruitmentAgencyTextAsync()
+    {
+        var input = RecruitmentAgencyField.Locator(".e-input-group input").First;
+        return await input.InputValueAsync();
+    }
+
+    /// <summary>
+    /// Opens the Recruitment Agency dropdown's popup without selecting anything, so its visible
+    /// option list can be inspected — e.g. to assert an inactive agency is excluded (the
+    /// DataSource is active-recruiters-only).
+    /// </summary>
+    public async Task OpenRecruitmentAgencyDropdownAsync()
+    {
+        await RecruitmentAgencyField.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+    }
+
+    /// <summary>Reads the visible option names from the (currently open) Recruitment Agency dropdown popup.</summary>
+    public async Task<IReadOnlyList<string>> GetRecruitmentAgencyDropdownOptionsAsync()
+    {
+        var items = await page.Locator(".e-popup.e-ddl:visible .e-list-item:not(.e-hide)").AllAsync();
+        var names = new List<string>();
+        foreach (var item in items)
+            names.Add((await item.TextContentAsync())?.Trim() ?? "");
+        return names;
+    }
+
     public async Task<string?> GetActionSuccessMessageAsync()
     {
         var alert = page.Locator("[data-testid='vacancy-applications-tab'] .alert-success").First;
@@ -676,4 +761,5 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.Locator("[role='dialog'].record-outcome-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
+
 }

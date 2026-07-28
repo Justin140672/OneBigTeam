@@ -3,6 +3,7 @@
 @inherits SearchPageBase<EmployeeListItemModel>
 @using HR.SharedKernel
 @using HR.Web.Services
+@using HR.Web.Components.Pages.Users
 @inject EmployeeService EmployeeService
 @inject UserService UserService
 @inject AppSession Session
@@ -88,6 +89,21 @@
                         }
                     </Template>
                 </GridColumn>
+                <GridColumn Field="@nameof(EmployeeListItemModel.UserAccountStatus)" HeaderText="User Account" Width="180">
+                    <Template>
+                        @{
+                            var row = (context as EmployeeListItemModel)!;
+                            var (icon, cssClass, label) = UserAccountStatusDisplay(row.UserAccountStatus);
+                            <span class="@cssClass">
+                                <i class="@icon me-1"></i>@label
+                            </span>
+                            @if (row.UserAccountStatus == "NoUser")
+                            {
+                                <a href="javascript:void(0)" class="ms-2" @onclick="@(() => OnInviteUserClicked(row))">Invite User</a>
+                            }
+                        }
+                    </Template>
+                </GridColumn>
             </GridColumns>
         </HrGrid>
 
@@ -101,6 +117,14 @@
                                       IsOpen="_showImportDialog"
                                       OnClosed="HandleImportDialogClosed"
                                       OnImported="HandleImportDialogImported" />
+
+        <InviteUserDialog CompanyId="CompanyId"
+                          IsOpen="_showInviteUserDialog"
+                          PreselectedEmployeeId="_inviteEmployeeId"
+                          PreselectedEmployeeName="_inviteEmployeeName"
+                          PreselectedEmployeeEmail="_inviteEmployeeEmail"
+                          OnCancelled="HandleInviteUserDialogCancelled"
+                          OnCompleted="HandleInviteUserDialogCompleted" />
     }
 </div>
 
@@ -111,6 +135,11 @@
     private List<EmployeeListItemModel> _bulkUpdateEmployees = [];
     private string? _actionError;
     private string? _actionSuccess;
+
+    private bool _showInviteUserDialog;
+    private Guid? _inviteEmployeeId;
+    private string? _inviteEmployeeName;
+    private string? _inviteEmployeeEmail;
 
     protected override async Task OnBeforeLoadAsync()
     {
@@ -263,4 +292,44 @@
         "FormerEmployee" => "bg-secondary",
         _                => "bg-light text-dark"
     };
+
+    // (icon css class, text css class, label) — mirrors StatusBadgeClass above but for the
+    // "User Account" column, which renders an icon + text instead of a badge.
+    private static (string Icon, string CssClass, string Label) UserAccountStatusDisplay(string status) => status switch
+    {
+        "Active"             => ("fa-solid fa-circle-check", "text-success", "Active"),
+        "Disabled"           => ("fa-solid fa-ban", "text-danger", "Disabled"),
+        "PendingInvitation"  => ("fa-solid fa-clock", "text-warning", "Pending Invitation"),
+        "InvitationExpired"  => ("fa-solid fa-clock", "text-warning", "Invitation Expired"),
+        "NoUser"             => ("fa-solid fa-circle-minus", "text-secondary", "No User"),
+        _                    => ("fa-solid fa-circle-question", "text-muted", status)
+    };
+
+    private void OnInviteUserClicked(EmployeeListItemModel row)
+    {
+        _actionError = null;
+        _actionSuccess = null;
+        _inviteEmployeeId = row.Id;
+        _inviteEmployeeName = row.FullName;
+        _inviteEmployeeEmail = row.WorkEmail;
+        _showInviteUserDialog = true;
+    }
+
+    private void HandleInviteUserDialogCancelled()
+    {
+        _showInviteUserDialog = false;
+        _inviteEmployeeId = null;
+        _inviteEmployeeName = null;
+        _inviteEmployeeEmail = null;
+    }
+
+    private async Task HandleInviteUserDialogCompleted(InviteEmployeeUserResponse result)
+    {
+        _showInviteUserDialog = false;
+        _inviteEmployeeId = null;
+        _inviteEmployeeName = null;
+        _inviteEmployeeEmail = null;
+        _actionSuccess = "Invitation sent.";
+        await LoadAsync();
+    }
 }

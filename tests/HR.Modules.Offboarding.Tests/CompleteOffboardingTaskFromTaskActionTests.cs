@@ -84,7 +84,8 @@ public class CompleteOffboardingTaskFromTaskActionTests
             new FakeEmployeeNameReader(names),
             notifications,
             taskCreator,
-            auditPublisher);
+            auditPublisher,
+            new HR.Modules.Offboarding.Tests.Infrastructure.FakeIntegrationEventPublisher());
         return (action, notifications, taskCreator, auditPublisher);
     }
 

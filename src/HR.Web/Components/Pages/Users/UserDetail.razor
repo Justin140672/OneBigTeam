@@ -1,0 +1,315 @@
+@page "/companies/{CompanyId:guid}/user-administration/{EmployeeId:guid}"
+@rendermode InteractiveServer
+@inject UserAdministrationService UserAdministrationService
+@inject AppSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>@(_user?.Name ?? "User")</PageTitle>
+
+<div class="container py-4">
+    <SfBreadcrumb Class="mb-3">
+        <BreadcrumbItems>
+            <BreadcrumbItem Text="User Administration" Url="@($"/companies/{CompanyId}/user-administration")" />
+            <BreadcrumbItem Text="@(_user?.Name ?? "User")" />
+        </BreadcrumbItems>
+    </SfBreadcrumb>
+
+    @if (IsLoading)
+    {
+        <HrLoadingIndicator />
+    }
+    else if (_notFound)
+    {
+        <div class="alert alert-warning">No user administration record was found for this employee.</div>
+    }
+    else if (_user is not null)
+    {
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <h1 class="mb-0 fs-4">@_user.Name</h1>
+            <span class="badge @AccountStatusBadgeClass(_user.AccountStatus)">@_user.AccountStatus</span>
+            @if (!string.IsNullOrEmpty(_user.InvitationStatus))
+            {
+                <span class="badge @InvitationStatusBadgeClass(_user.InvitationStatus)">@_user.InvitationStatus</span>
+            }
+        </div>
+        <p class="text-muted mb-4">View this user's access details and manage their account.</p>
+
+        @if (!string.IsNullOrEmpty(_globalError))
+        {
+            <div class="alert alert-danger">@_globalError</div>
+        }
+        @if (!string.IsNullOrEmpty(_globalSuccess))
+        {
+            <div class="alert alert-success alert-dismissible">
+                @_globalSuccess
+                <button type="button" class="btn-close" @onclick="@(() => _globalSuccess = null)"></button>
+            </div>
+        }
+
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Account Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4 text-muted fw-normal">Email</dt>
+                            <dd class="col-sm-8">@_user.Email</dd>
+                            <dt class="col-sm-4 text-muted fw-normal">Roles</dt>
+                            <dd class="col-sm-8">
+                                @if (_user.RoleNames.Count == 0)
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                                else
+                                {
+                                    @foreach (var roleName in _user.RoleNames)
+                                    {
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis me-1">@roleName</span>
+                                    }
+                                }
+                            </dd>
+                            <dt class="col-sm-4 text-muted fw-normal">Last Login</dt>
+                            <dd class="col-sm-8">@(_user.LastLoginAt is { } lastLogin ? lastLogin.ToString("dd MMM yyyy HH:mm") : "Never")</dd>
+                            @if (_user.InviteExpiresAt is not null)
+                            {
+                                <dt class="col-sm-4 text-muted fw-normal">Invite Expires</dt>
+                                <dd class="col-sm-8">@_user.InviteExpiresAt.Value.ToString("dd MMM yyyy")</dd>
+                            }
+                            @if (_user.CreatedByName is not null)
+                            {
+                                <dt class="col-sm-4 text-muted fw-normal">Created By</dt>
+                                <dd class="col-sm-8">@_user.CreatedByName</dd>
+                            }
+                            <dt class="col-sm-4 text-muted fw-normal">Created</dt>
+                            <dd class="col-sm-8">@_user.CreatedAt.ToString("dd MMM yyyy")</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                @if (_canManage)
+                {
+                    <div class="d-flex gap-2 mb-4">
+                        @if (_user.InvitationStatus is "Pending" or "Expired")
+                        {
+                            <SfButton Disabled="@_actionInProgress" OnClick="ResendInviteAsync">Resend Invitation</SfButton>
+                            <SfButton Disabled="@_actionInProgress" OnClick="CancelInviteAsync">Cancel Invitation</SfButton>
+                        }
+                        else if (_user.AccountStatus == "Active")
+                        {
+                            <SfButton Disabled="@_actionInProgress" OnClick="DisableAccountAsync">Disable Account</SfButton>
+                            <SfButton Disabled="@_actionInProgress" OnClick="OpenManageRolesDialog">Manage Roles</SfButton>
+                        }
+                        else if (_user.AccountStatus == "Disabled")
+                        {
+                            <SfButton Disabled="@_actionInProgress" OnClick="EnableAccountAsync">Enable Account</SfButton>
+                            <SfButton Disabled="@_actionInProgress" OnClick="OpenManageRolesDialog">Manage Roles</SfButton>
+                        }
+                    </div>
+                }
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Audit History</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (_auditHistory.Count == 0)
+                        {
+                            <p class="text-muted mb-0">No audit history recorded for this user.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0">
+                                @foreach (var entry in _auditHistory)
+                                {
+                                    <li class="mb-3">
+                                        <div class="d-flex justify-content-between">
+                                            <span class="fw-semibold">@entry.EventType</span>
+                                            <span class="text-muted small">@entry.OccurredAt.ToString("dd MMM yyyy HH:mm")</span>
+                                        </div>
+                                        <div>@entry.Summary</div>
+                                        @if (!string.IsNullOrEmpty(entry.PerformedBy))
+                                        {
+                                            <div class="text-muted small">By @entry.PerformedBy</div>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </div>
+
+                <SfButton OnClick="BackToList">Close</SfButton>
+            </div>
+        </div>
+
+        @if (_user.UserId is not null)
+        {
+            <ManageUserRolesDialog CompanyId="CompanyId"
+                                   UserId="_user.UserId.Value"
+                                   CurrentRoleIds="_user.RoleIds"
+                                   IsOpen="_showManageRolesDialog"
+                                   OnCancelled="CloseManageRolesDialog"
+                                   OnCompleted="OnRolesUpdated" />
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid EmployeeId { get; set; }
+
+    private bool IsLoading = true;
+    private bool _notFound;
+    private GetUserDetailResponse? _user;
+    private List<UserAuditHistoryItemModel> _auditHistory = [];
+    private string? _globalError;
+    private string? _globalSuccess;
+    private bool _actionInProgress;
+    private bool _showManageRolesDialog;
+
+    private bool _canManage => Session.IsHrAdministrator || Session.CanManageCompany;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!(Session.IsHrAdministrator || Session.CanManageCompany))
+        {
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        IsLoading = true;
+        _notFound = false;
+        _globalError = null;
+
+        _user = await UserAdministrationService.GetUserAsync(CompanyId, EmployeeId);
+
+        if (_user is null)
+        {
+            _notFound = true;
+            IsLoading = false;
+            return;
+        }
+
+        var history = await UserAdministrationService.GetAuditHistoryAsync(CompanyId, EmployeeId);
+        _auditHistory = history?.Items ?? [];
+
+        IsLoading = false;
+    }
+
+    private void BackToList() => Navigation.NavigateTo($"/companies/{CompanyId}/user-administration");
+
+    private async Task ResendInviteAsync()
+    {
+        if (_user?.InviteId is null) return;
+        _actionInProgress = true;
+        _globalError = null;
+
+        var (success, error) = await UserAdministrationService.ResendInviteAsync(CompanyId, _user.InviteId.Value);
+
+        _actionInProgress = false;
+
+        if (!success)
+            _globalError = error;
+        else
+        {
+            _globalSuccess = "Invitation resent.";
+            await LoadAsync();
+        }
+    }
+
+    private async Task CancelInviteAsync()
+    {
+        if (_user?.InviteId is null) return;
+        _actionInProgress = true;
+        _globalError = null;
+
+        var (success, error) = await UserAdministrationService.CancelInviteAsync(CompanyId, _user.InviteId.Value);
+
+        _actionInProgress = false;
+
+        if (!success)
+            _globalError = error;
+        else
+        {
+            _globalSuccess = "Invitation cancelled.";
+            await LoadAsync();
+        }
+    }
+
+    private async Task DisableAccountAsync()
+    {
+        if (_user?.UserId is null) return;
+        _actionInProgress = true;
+        _globalError = null;
+
+        var (success, error) = await UserAdministrationService.DisableUserAsync(CompanyId, _user.UserId.Value);
+
+        _actionInProgress = false;
+
+        if (!success)
+            _globalError = error;
+        else
+        {
+            _globalSuccess = "Account disabled.";
+            await LoadAsync();
+        }
+    }
+
+    private async Task EnableAccountAsync()
+    {
+        if (_user?.UserId is null) return;
+        _actionInProgress = true;
+        _globalError = null;
+
+        var (success, error) = await UserAdministrationService.EnableUserAsync(CompanyId, _user.UserId.Value);
+
+        _actionInProgress = false;
+
+        if (!success)
+            _globalError = error;
+        else
+        {
+            _globalSuccess = "Account enabled.";
+            await LoadAsync();
+        }
+    }
+
+    private void OpenManageRolesDialog()
+    {
+        _globalError = null;
+        _showManageRolesDialog = true;
+    }
+
+    private void CloseManageRolesDialog() => _showManageRolesDialog = false;
+
+    private async Task OnRolesUpdated()
+    {
+        _showManageRolesDialog = false;
+        _globalSuccess = "Roles updated.";
+        await LoadAsync();
+    }
+
+    private static string AccountStatusBadgeClass(string status) => status switch
+    {
+        "Active"    => "bg-success",
+        "Disabled"  => "bg-danger",
+        "NoAccount" => "bg-secondary",
+        _           => "bg-light text-dark"
+    };
+
+    private static string InvitationStatusBadgeClass(string status) => status switch
+    {
+        "Pending"   => "bg-warning text-dark",
+        "Expired"   => "bg-danger",
+        "Claimed"   => "bg-success",
+        "Cancelled" => "bg-secondary",
+        _           => "bg-light text-dark"
+    };
+}

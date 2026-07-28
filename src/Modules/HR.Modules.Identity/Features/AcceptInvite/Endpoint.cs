@@ -56,11 +56,20 @@ internal sealed class Endpoint(
             db.Users.Add(user);
         }
 
-        // Assign the base Employee role
-        var roleExists = await db.UserRoles.AnyAsync(
-            ur => ur.UserId == invite.EmployeeId && ur.RoleId == SystemRoles.Employee, ct);
-        if (!roleExists)
-            db.UserRoles.Add(UserRole.Create(invite.EmployeeId, SystemRoles.Employee, now));
+        // Assign the roles selected when the invite was sent (Features/InviteEmployeeUser),
+        // falling back to the base Employee role for invites created before role selection
+        // existed (e.g. via the older SendInvite endpoint).
+        var roleIds = invite.PendingRoleIds.Count > 0
+            ? invite.PendingRoleIds
+            : [SystemRoles.Employee];
+
+        foreach (var roleId in roleIds)
+        {
+            var roleExists = await db.UserRoles.AnyAsync(
+                ur => ur.UserId == invite.EmployeeId && ur.RoleId == roleId, ct);
+            if (!roleExists)
+                db.UserRoles.Add(UserRole.Create(invite.EmployeeId, roleId, now));
+        }
 
         invite.Claim(now);
         await db.SaveChangesAsync(ct);

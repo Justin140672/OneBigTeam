@@ -15,6 +15,12 @@ internal sealed record GetApplicationResponse(
     DateTimeOffset AppliedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
+    ApplicationSource? Source,
+    Guid? SourceExternalRecruiterId,
+    // Denormalised for display convenience so the UI doesn't need a second round trip; null when
+    // Source != ExternalRecruiter or the recruiter row could not be resolved (should not normally
+    // happen since ExternalRecruiter rows are never deleted, only deactivated).
+    string? SourceExternalRecruiterAgencyName,
     // Ticket #66: stage-change history surfaced directly on the applicant record, ordered oldest
     // first. Distinct from the cross-cutting IAuditEvent log (see RecruitmentAudit's
     // ApplicationStageChangedAuditEvent) — this is domain-specific data, not a general audit trail.

@@ -59,9 +59,13 @@ public class UpdateVacancyHandlerTests
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Old Title", null, Guid.NewGuid(), Now);
         db.Vacancies.Add(vacancy);
-        await db.SaveChangesAsync();
 
-        var recruiterId = Guid.NewGuid();
+        // Ticket #81: AssignedRecruiterId now references ExternalRecruiter (in this same module/schema)
+        // rather than an unvalidated Employee id, so the handler validates existence/company-ownership —
+        // a real, active ExternalRecruiter row must exist for this to succeed.
+        var recruiter = ExternalRecruiter.Create(Guid.NewGuid(), companyId, "Acme Recruiting", null, null, null, null, null, Now);
+        db.ExternalRecruiters.Add(recruiter);
+        await db.SaveChangesAsync();
 
         var result = await handler(db, new FakeAuditPublisher()).HandleAsync(
             new UpdateVacancyRequest
@@ -70,16 +74,119 @@ public class UpdateVacancyHandlerTests
                 VacancyId           = vacancy.Id,
                 AdvertTitle         = "New Title",
                 HiringManagerId     = Guid.NewGuid(),
-                AssignedRecruiterId = recruiterId,
+                AssignedRecruiterId = recruiter.Id,
             },
             Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(recruiterId, result.Value!.AssignedRecruiterId);
+        Assert.Equal(recruiter.Id, result.Value!.AssignedRecruiterId);
 
         var saved = await db.Vacancies.SingleAsync();
-        Assert.Equal(recruiterId, saved.AssignedRecruiterId);
+        Assert.Equal(recruiter.Id, saved.AssignedRecruiterId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_AssignedRecruiter_Is_Inactive()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Old Title", null, Guid.NewGuid(), Now);
+        db.Vacancies.Add(vacancy);
+
+        var recruiter = ExternalRecruiter.Create(Guid.NewGuid(), companyId, "Acme Recruiting", null, null, null, null, null, Now);
+        recruiter.SetActiveStatus(false, Now);
+        db.ExternalRecruiters.Add(recruiter);
+        await db.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, auditPublisher).HandleAsync(
+            new UpdateVacancyRequest
+            {
+                CompanyId           = companyId,
+                VacancyId           = vacancy.Id,
+                AdvertTitle         = "New Title",
+                HiringManagerId     = vacancy.HiringManagerId,
+                AssignedRecruiterId = recruiter.Id,
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("inactive", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(auditPublisher.Published);
+
+        var saved = await db.Vacancies.SingleAsync();
+        Assert.Null(saved.AssignedRecruiterId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_AssignedRecruiter_Belongs_To_Different_Company()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Old Title", null, Guid.NewGuid(), Now);
+        db.Vacancies.Add(vacancy);
+
+        var recruiter = ExternalRecruiter.Create(Guid.NewGuid(), otherCompanyId, "Acme Recruiting", null, null, null, null, null, Now);
+        db.ExternalRecruiters.Add(recruiter);
+        await db.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, auditPublisher).HandleAsync(
+            new UpdateVacancyRequest
+            {
+                CompanyId           = companyId,
+                VacancyId           = vacancy.Id,
+                AdvertTitle         = "New Title",
+                HiringManagerId     = vacancy.HiringManagerId,
+                AssignedRecruiterId = recruiter.Id,
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+        Assert.Empty(auditPublisher.Published);
+
+        var saved = await db.Vacancies.SingleAsync();
+        Assert.Null(saved.AssignedRecruiterId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Clears_AssignedRecruiterId_To_Null_Succeeds_Since_It_Is_Optional()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var recruiter = ExternalRecruiter.Create(Guid.NewGuid(), companyId, "Acme Recruiting", null, null, null, null, null, Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Old Title", null, Guid.NewGuid(), Now, recruiter.Id);
+        db.ExternalRecruiters.Add(recruiter);
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, auditPublisher).HandleAsync(
+            new UpdateVacancyRequest
+            {
+                CompanyId           = companyId,
+                VacancyId           = vacancy.Id,
+                AdvertTitle         = "Old Title",
+                HiringManagerId     = vacancy.HiringManagerId,
+                AssignedRecruiterId = null,
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.AssignedRecruiterId);
+
+        var saved = await db.Vacancies.SingleAsync();
+        Assert.Null(saved.AssignedRecruiterId);
     }
 
     [Fact]

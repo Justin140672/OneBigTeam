@@ -60,6 +60,15 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("rejection_reason");
 
+                    b.Property<string>("Source")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("source");
+
+                    b.Property<Guid?>("SourceExternalRecruiterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_external_recruiter_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -79,6 +88,8 @@ namespace HR.Modules.Recruitment.Migrations
                     b.HasIndex("CandidateId");
 
                     b.HasIndex("CompanyId");
+
+                    b.HasIndex("SourceExternalRecruiterId");
 
                     b.HasIndex("VacancyId");
 
@@ -254,6 +265,66 @@ namespace HR.Modules.Recruitment.Migrations
                     b.ToTable("candidate_documents", "recruitment");
                 });
 
+            modelBuilder.Entity("HR.Modules.Recruitment.Domain.ExternalRecruiter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AgencyName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("agency_name");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("ContactEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("contact_email");
+
+                    b.Property<string>("ContactName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("contact_name");
+
+                    b.Property<string>("ContactTelephone")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("contact_telephone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Website")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("website");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.ToTable("external_recruiters", "recruitment");
+                });
+
             modelBuilder.Entity("HR.Modules.Recruitment.Domain.Interview", b =>
                 {
                     b.Property<Guid>("Id")
@@ -369,6 +440,8 @@ namespace HR.Modules.Recruitment.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AssignedRecruiterId");
+
                     b.HasIndex("CompanyId");
 
                     b.HasIndex("PositionProfileId");
@@ -418,6 +491,14 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasForeignKey("ApplicationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("HR.Modules.Recruitment.Domain.Vacancy", b =>
+                {
+                    b.HasOne("HR.Modules.Recruitment.Domain.ExternalRecruiter", null)
+                        .WithMany()
+                        .HasForeignKey("AssignedRecruiterId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 #pragma warning restore 612, 618
         }

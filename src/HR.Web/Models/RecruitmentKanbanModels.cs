@@ -25,7 +25,12 @@ public sealed record KanbanApplicantModel(
     string? CandidatePhotoUrl,
     string Stage,
     DateTimeOffset AppliedAt,
+    // Ticket #81: references ExternalRecruiter (an external agency), not an Employee — see the
+    // backend Response's remarks for the scope-correction history.
     Guid? AssignedRecruiterId,
+    // Resolved agency display name — server-resolved now, so this component no longer needs to look
+    // it up against the employee list.
+    string? AssignedRecruiterAgencyName,
     string VacancyTitle)
 {
     public string CandidateFullName => $"{CandidateFirstName} {CandidateLastName}";

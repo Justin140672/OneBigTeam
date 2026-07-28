@@ -6,12 +6,15 @@ using HR.Modules.Recruitment.Features.AssignVacancyPositionProfile;
 using HR.Modules.Recruitment.Features.CloseVacancy;
 using HR.Modules.Recruitment.Features.CreateApplication;
 using HR.Modules.Recruitment.Features.CreateCandidate;
+using HR.Modules.Recruitment.Features.CreateExternalRecruiter;
 using HR.Modules.Recruitment.Features.CreateVacancy;
 using HR.Modules.Recruitment.Features.DeleteCandidateDocument;
 using HR.Modules.Recruitment.Features.DownloadCandidateDocument;
 using HR.Modules.Recruitment.Features.GetApplication;
 using HR.Modules.Recruitment.Features.GetApplicationsByStatus;
 using HR.Modules.Recruitment.Features.GetCandidate;
+using HR.Modules.Recruitment.Features.GetExternalRecruiter;
+using HR.Modules.Recruitment.Features.GetExternalRecruiterActivitySummary;
 using HR.Modules.Recruitment.Features.GetInterviewsTodayCount;
 using HR.Modules.Recruitment.Features.GetPipelineSummary;
 using HR.Modules.Recruitment.Features.GetRecruitmentKanban;
@@ -23,6 +26,7 @@ using HR.Modules.Recruitment.Features.HireCandidate;
 using HR.Modules.Recruitment.Features.ListApplicationsForVacancy;
 using HR.Modules.Recruitment.Features.ListCandidateDocuments;
 using HR.Modules.Recruitment.Features.ListCandidates;
+using HR.Modules.Recruitment.Features.ListExternalRecruiters;
 using HR.Modules.Recruitment.Features.ListInterviewsForVacancy;
 using HR.Modules.Recruitment.Features.ListVacancies;
 using HR.Modules.Recruitment.Features.MoveApplicationStage;
@@ -30,7 +34,9 @@ using HR.Modules.Recruitment.Features.OfferCandidate;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 using HR.Modules.Recruitment.Features.RejectCandidate;
 using HR.Modules.Recruitment.Features.ScheduleInterview;
+using HR.Modules.Recruitment.Features.SetExternalRecruiterActiveStatus;
 using HR.Modules.Recruitment.Features.UpdateCandidate;
+using HR.Modules.Recruitment.Features.UpdateExternalRecruiter;
 using HR.Modules.Recruitment.Features.UpdateInterview;
 using HR.Modules.Recruitment.Features.UpdateVacancy;
 using HR.Modules.Recruitment.Features.UploadCandidateDocument;
@@ -172,6 +178,24 @@ public static class RecruitmentModule
 
         services.AddScoped<InterviewReminderJob>();
         services.AddScoped<OutstandingInterviewFeedbackReminderJob>();
+
+        services.AddScoped<CreateExternalRecruiterHandler>();
+        services.AddScoped<IValidator<CreateExternalRecruiterRequest>, CreateExternalRecruiterValidator>();
+
+        services.AddScoped<ListExternalRecruitersHandler>();
+        services.AddScoped<IValidator<ListExternalRecruitersRequest>, ListExternalRecruitersValidator>();
+
+        services.AddScoped<GetExternalRecruiterHandler>();
+        services.AddScoped<IValidator<GetExternalRecruiterRequest>, GetExternalRecruiterValidator>();
+
+        services.AddScoped<UpdateExternalRecruiterHandler>();
+        services.AddScoped<IValidator<UpdateExternalRecruiterRequest>, UpdateExternalRecruiterValidator>();
+
+        services.AddScoped<SetExternalRecruiterActiveStatusHandler>();
+        services.AddScoped<IValidator<SetExternalRecruiterActiveStatusRequest>, SetExternalRecruiterActiveStatusValidator>();
+
+        services.AddScoped<GetExternalRecruiterActivitySummaryHandler>();
+        services.AddScoped<IValidator<GetExternalRecruiterActivitySummaryRequest>, GetExternalRecruiterActivitySummaryValidator>();
     }
 
     public static WebApplication UseRecruitmentRecurringJobs(this WebApplication app)

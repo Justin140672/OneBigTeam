@@ -7,6 +7,7 @@
 @inject EmployeeService EmployeeService
 @inject PositionProfileService PositionProfileService
 @inject LocationService LocationService
+@inject ExternalRecruiterService ExternalRecruiterService
 @inject AppSession Session
 
 @inherits EditPageBase<VacancyEditModel, Guid>
@@ -154,6 +155,7 @@
     private List<EmployeeListItemModel> _employees = [];
     private List<LocationListItemModel> _locations = [];
     private List<PositionProfileListItemModel> _positionProfiles = [];
+    private List<ExternalRecruiterListItemModel> _externalRecruiters = [];
     private GetPositionProfileResponse? _selectedProfileDefaults;
     private bool _closing;
     private string? _closeError;
@@ -191,6 +193,16 @@
         var profileResult = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
         _positionProfiles = profileResult?.Items.ToList() ?? [];
 
+        // Only active recruitment agencies are selectable, per ticket #81 (same rule as the removed
+        // VacancyRecruiterAssignment feature previously enforced). "Not assigned" is prepended below,
+        // per this codebase's convention of an explicit sentinel list item over Syncfusion's
+        // ShowClearButton for optional dropdowns.
+        var recruitersResult = await ExternalRecruiterService.ListExternalRecruitersAsync(CompanyId, isActive: true, pageSize: 200);
+        _externalRecruiters = (recruitersResult?.Items.ToList() ?? [])
+            .OrderBy(r => r.AgencyName)
+            .Prepend(new ExternalRecruiterListItemModel(Guid.Empty, "Not assigned", null, null, null, true, 0, DateTimeOffset.MinValue))
+            .ToList();
+
         if (!IsNew)
         {
             _vacancy = await VacancyService.GetVacancyAsync(CompanyId, Id!.Value);
@@ -213,6 +225,21 @@
                         profile.Id, departmentName, profile.Title, profile.Description,
                         profile.IsActive, profile.SalaryMin, profile.SalaryMax, profile.SalaryType,
                         profile.NoticePeriodUnitOverride, profile.NoticePeriodLengthOverride));
+                }
+            }
+
+            // Same rationale as the Position Profile merge above: _externalRecruiters is active-only,
+            // so if this vacancy's currently-assigned agency has since gone inactive it won't be in
+            // that list, and the dropdown (disabled in view mode, enabled in edit mode) would render
+            // blank instead of the correct agency name without merging it in explicitly.
+            if (_vacancy?.AssignedRecruiterId is { } assignedRecruiterId && _externalRecruiters.All(r => r.Id != assignedRecruiterId))
+            {
+                var recruiter = await ExternalRecruiterService.GetExternalRecruiterAsync(CompanyId, assignedRecruiterId);
+                if (recruiter is not null)
+                {
+                    _externalRecruiters.Add(new ExternalRecruiterListItemModel(
+                        recruiter.Id, recruiter.AgencyName, recruiter.ContactName, recruiter.ContactEmail,
+                        recruiter.ContactTelephone, recruiter.IsActive, 0, recruiter.CreatedAt));
                 }
             }
         }
@@ -447,6 +474,18 @@
                                 </DropDownListTemplates>
                             </SfDropDownList>
                             <ValidationMessage For="@(() => Model.HiringManagerId)" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Recruitment Agency (optional)</label>
+                            <SfDropDownList TValue="Guid"
+                                            TItem="ExternalRecruiterListItemModel"
+                                            DataSource="@_externalRecruiters"
+                                            @bind-Value="Model.AssignedRecruiterId"
+                                            Placeholder="Not assigned"
+                                            AllowFiltering="true"
+                                            Enabled="@(!IsViewMode)">
+                                <DropDownListFieldSettings Value="Id" Text="AgencyName" />
+                            </SfDropDownList>
                         </div>
                         <div class="col-12">
                             <label class="form-label">Advert Description (optional)</label>

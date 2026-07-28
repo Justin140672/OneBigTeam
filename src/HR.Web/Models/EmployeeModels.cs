@@ -30,7 +30,8 @@ public record EmployeeListItemModel(
     DateOnly StartDate,
     string Status,
     DateTimeOffset CreatedAt,
-    string? ProfilePhotoUrl)
+    string? ProfilePhotoUrl,
+    string UserAccountStatus)
 {
     public string FullName => $"{FirstName} {LastName}";
 }

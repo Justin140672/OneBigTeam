@@ -12,4 +12,6 @@ internal sealed record CreateApplicationResponse(
     string? Notes,
     DateTimeOffset AppliedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    ApplicationSource? Source,
+    Guid? SourceExternalRecruiterId);

@@ -137,6 +137,14 @@ public sealed class VacancyEditModel
     [Required(ErrorMessage = "Hiring manager is required.")]
     public Guid? HiringManagerId { get; set; }
 
+    // Optional external recruitment agency (ExternalRecruiter) assigned to run this vacancy — see
+    // Vacancy.AssignedRecruiterId's remarks for the ticket #81 scope-correction history (previously an
+    // Employee reference, and previously tracked via a separate many-to-many VacancyRecruiterAssignment
+    // table/tab, both now removed in favour of this single optional field). Bound as Guid.Empty (never
+    // null) to work with the "None"/"Not assigned" dropdown option convention used elsewhere in this
+    // codebase, then translated to a nullable Guid when building the API request.
+    public Guid AssignedRecruiterId { get; set; }
+
     // Authorised correction escape hatch — only meaningful when PositionProfileId is being changed on
     // a vacancy that's no longer eligible for the normal Draft+no-applications path. See
     // VacancyDetail.razor.

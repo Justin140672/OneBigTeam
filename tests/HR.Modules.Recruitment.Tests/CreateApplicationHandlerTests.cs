@@ -92,8 +92,121 @@ public class CreateApplicationHandlerTests
         Assert.Equal("conflict", result.Error.Code);
     }
 
+    [Fact]
+    public async Task HandleAsync_Succeeds_With_Source_Direct_And_No_Recruiter_Id()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new CreateApplicationRequest
+            {
+                CompanyId = companyId,
+                VacancyId = vacancy.Id,
+                CandidateId = candidate.Id,
+                Source = ApplicationSource.Direct,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ApplicationSource.Direct, result.Value!.Source);
+        Assert.Null(result.Value.SourceExternalRecruiterId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Succeeds_With_Source_ExternalRecruiter_And_Valid_Recruiter_Id()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var recruiter = ExternalRecruiter.Create(Guid.NewGuid(), companyId, "Acme Recruiting", null, null, null, null, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.ExternalRecruiters.Add(recruiter);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new CreateApplicationRequest
+            {
+                CompanyId = companyId,
+                VacancyId = vacancy.Id,
+                CandidateId = candidate.Id,
+                Source = ApplicationSource.ExternalRecruiter,
+                SourceExternalRecruiterId = recruiter.Id,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ApplicationSource.ExternalRecruiter, result.Value!.Source);
+        Assert.Equal(recruiter.Id, result.Value.SourceExternalRecruiterId);
+
+        var saved = await db.Applications.SingleAsync();
+        Assert.Equal(recruiter.Id, saved.SourceExternalRecruiterId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_Source_ExternalRecruiter_But_Recruiter_Id_Does_Not_Exist()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new CreateApplicationRequest
+            {
+                CompanyId = companyId,
+                VacancyId = vacancy.Id,
+                CandidateId = candidate.Id,
+                Source = ApplicationSource.ExternalRecruiter,
+                SourceExternalRecruiterId = Guid.NewGuid(),
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_Recruiter_Belongs_To_Different_Company()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var recruiter = ExternalRecruiter.Create(Guid.NewGuid(), otherCompanyId, "Acme Recruiting", null, null, null, null, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.ExternalRecruiters.Add(recruiter);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new CreateApplicationRequest
+            {
+                CompanyId = companyId,
+                VacancyId = vacancy.Id,
+                CandidateId = candidate.Id,
+                Source = ApplicationSource.ExternalRecruiter,
+                SourceExternalRecruiterId = recruiter.Id,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+    }
+
     private static CreateApplicationHandler handler(RecruitmentDbContext db) =>
-        new(db, new FakeClock(FixedUtcNow));
+        new(db, new FakeClock(FixedUtcNow), new Infrastructure.FakeAuditPublisher());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

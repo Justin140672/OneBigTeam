@@ -11,6 +11,7 @@ internal sealed class ApplicationUser
     public string FirstName { get; private set; } = string.Empty;
     public string LastName { get; private set; } = string.Empty;
     public bool IsActive { get; private set; }
+    public DateTimeOffset? LastLoginAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -54,5 +55,16 @@ internal sealed class ApplicationUser
     {
         IsActive = false;
         UpdatedAt = now;
+    }
+
+    public void Reactivate(DateTimeOffset now)
+    {
+        IsActive = true;
+        UpdatedAt = now;
+    }
+
+    public void RecordLogin(DateTimeOffset now)
+    {
+        LastLoginAt = now;
     }
 }

@@ -51,10 +51,17 @@ internal sealed class VacancyConfiguration : IEntityTypeConfiguration<Vacancy>
             .HasColumnName("hiring_manager_id")
             .IsRequired();
 
-        // Nullable: recruiter may not yet be assigned. Not cross-module validated (no FK / no
-        // Employees-existence check) — see Vacancy.AssignedRecruiterId's remarks.
+        // Nullable: an external recruitment agency may not yet be assigned. FK to ExternalRecruiter —
+        // both entities live in this same module/schema, so unlike PositionProfileId this can (and
+        // does) have a real database constraint. See Vacancy.AssignedRecruiterId's remarks for the
+        // ticket #81 scope-correction history (previously an unconstrained Employee reference).
         builder.Property(v => v.AssignedRecruiterId)
             .HasColumnName("assigned_recruiter_id");
+
+        builder.HasOne<ExternalRecruiter>()
+            .WithMany()
+            .HasForeignKey(v => v.AssignedRecruiterId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.Property(v => v.OpenedAt)
             .HasColumnName("opened_at");
@@ -72,6 +79,7 @@ internal sealed class VacancyConfiguration : IEntityTypeConfiguration<Vacancy>
 
         builder.HasIndex(v => v.CompanyId);
         builder.HasIndex(v => v.PositionProfileId);
+        builder.HasIndex(v => v.AssignedRecruiterId);
         builder.HasIndex(v => new { v.CompanyId, v.Status });
     }
 }

@@ -189,4 +189,222 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         await page.WaitForTimeoutAsync(400);
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
+
+    // ── User Account column (tickets #90/#91 — "User Account" status + Quick Invite) ──────────
+
+    /// <summary>
+    /// Returns the row matching <paramref name="nameFragment"/> in the last name/first name cells
+    /// — used as the anchor for all of the User-Account-column helpers below.
+    /// </summary>
+    private ILocator Row(string nameFragment) =>
+        page.Locator(".e-grid .e-row").Filter(new() { HasText = nameFragment }).First;
+
+    /// <summary>
+    /// Returns the trimmed rendered text (icon label, e.g. "Active"/"Pending Invitation"/"No
+    /// User") of the "User Account" column's cell for the row matching <paramref name="nameFragment"/>.
+    /// The column is the last one in EmployeeList.razor's GridColumns, so its cell is the last
+    /// ".e-rowcell" in the row.
+    /// </summary>
+    public async Task<string?> GetUserAccountStatusTextAsync(string nameFragment)
+    {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        var cell = Row(nameFragment).Locator(".e-rowcell").Last;
+        return (await cell.InnerTextAsync())?.Trim();
+    }
+
+    /// <summary>
+    /// Returns the CSS class of the &lt;i&gt; icon rendered in the "User Account" cell for the row
+    /// matching <paramref name="nameFragment"/> (e.g. "fa-solid fa-circle-check me-1" for Active) —
+    /// see EmployeeList.UserAccountStatusDisplay for the icon/status mapping this proves.
+    /// </summary>
+    public async Task<string?> GetUserAccountStatusIconClassAsync(string nameFragment)
+    {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        var icon = Row(nameFragment).Locator(".e-rowcell").Last.Locator("i").First;
+        return await icon.GetAttributeAsync("class");
+    }
+
+    /// <summary>
+    /// Returns true if the row-level "Invite User" link (rendered only when
+    /// UserAccountStatus == "NoUser" — see EmployeeList.razor's User Account GridColumn Template)
+    /// is visible for the row matching <paramref name="nameFragment"/>.
+    /// </summary>
+    public async Task<bool> HasInviteUserLinkAsync(string nameFragment)
+    {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        return await Row(nameFragment).GetByRole(AriaRole.Link, new() { Name = "Invite User" }).IsVisibleAsync();
+    }
+
+    /// <summary>
+    /// Clicks the row-level "Invite User" link for the row matching <paramref name="nameFragment"/>
+    /// (only present on "No User" rows) and waits for the resulting InviteUserDialog to open.
+    /// Because EmployeeList.OnInviteUserClicked pre-populates PreselectedEmployeeId/Name/Email, the
+    /// dialog opens straight on step 2 ("Email & Roles") rather than the employee-picker step.
+    /// </summary>
+    public async Task ClickInviteUserLinkAsync(string nameFragment)
+    {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await Row(nameFragment).GetByRole(AriaRole.Link, new() { Name = "Invite User" }).ClickAsync();
+        await InviteUserDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// The InviteUserDialog opened via <see cref="ClickInviteUserLinkAsync"/> — same component as
+    /// UserAdministrationListPage's invite wizard (shares the "Invite Employee User" dialog title),
+    /// just parameterised with PreselectedEmployeeId/Name/Email so it skips straight to step 2.
+    /// </summary>
+    public ILocator InviteUserDialog =>
+        page.GetByRole(AriaRole.Dialog, new() { Name = "Invite Employee User" });
+
+    /// <summary>
+    /// Returns true if the (open) InviteUserDialog is still showing the step-1 employee-picker
+    /// combobox — expected to be false for the pre-selected Quick Invite flow, which jumps
+    /// straight to step 2 and never renders the picker at all.
+    /// </summary>
+    public async Task<bool> InviteDialogHasEmployeePickerAsync() =>
+        await InviteUserDialog.Locator("span[role='combobox']").CountAsync() > 0;
+
+    /// <summary>Returns the current value of the (pre-filled) Email field on the dialog's step 2.</summary>
+    public async Task<string?> GetInviteDialogEmailValueAsync() =>
+        await InviteUserDialog.Locator("input[placeholder='work@company.com']").InputValueAsync();
+
+    /// <summary>
+    /// Completes the pre-selected Quick Invite flow from step 2 (Email & Roles) onward: selects
+    /// the given role(s) via the SfMultiSelect checkbox popup, advances to step 3 (Confirm), and
+    /// submits. Mirrors the step 2/3 portion of UserAdministrationListPage.InviteEmployeeAsync
+    /// (same InviteUserDialog component, same Syncfusion widgets/interaction patterns), but skips
+    /// step 1 entirely since the employee is already pre-selected. Waits for the dialog to close.
+    /// </summary>
+    public async Task CompleteQuickInviteAsync(IReadOnlyList<string> roleNames)
+    {
+        await InviteUserDialog.Locator("input[placeholder='Select one or more roles']").ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup:visible", new() { Timeout = 10_000 });
+        foreach (var roleName in roleNames)
+        {
+            await page.Locator(".e-popup .e-list-item")
+                .Filter(new() { HasText = roleName })
+                .First
+                .ClickAsync();
+        }
+        // Checkbox-mode multiselect popup stays open — click a neutral area of the dialog (the
+        // nav-pills step header) to close it via its outside-click handler before reaching Next.
+        await InviteUserDialog.Locator("ul.nav-pills").ClickAsync();
+
+        await InviteUserDialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
+
+        // Step 3: Confirm.
+        await InviteUserDialog.GetByRole(AriaRole.Button, new() { Name = "Send Invite" }).ClickAsync();
+
+        await InviteUserDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
+    }
+
+    /// <summary>
+    /// Returns the trimmed "Employee" summary value shown on the dialog's step 3 (Confirm) screen —
+    /// used to assert the pre-selected employee's name is what's actually being invited, not a
+    /// picker-driven selection. Call after advancing to step 3 but before
+    /// <see cref="CompleteQuickInviteAsync"/> submits.
+    /// </summary>
+    public async Task<string?> GetInviteDialogConfirmEmployeeNameAsync()
+    {
+        var dd = InviteUserDialog.Locator("dl.row dd").First;
+        return (await dd.TextContentAsync())?.Trim();
+    }
+
+    // ── Sorting ────────────────────────────────────────────────────────────────
+
+    private ILocator UserAccountHeaderCell =>
+        page.Locator(".e-headercell").Filter(new() { HasText = "User Account" });
+
+    /// <summary>
+    /// Clicks the "User Account" column header (standard EJ2 single-column sort click target —
+    /// same pattern as SharedDocumentSortByReviewDateTests' ClickReviewDateHeaderAsync) and
+    /// best-effort waits for the sort-indicator class. Row-order assertions in tests are the
+    /// actual source of truth regardless of whether this wait's indicator-class assumption holds.
+    /// </summary>
+    public async Task ClickUserAccountHeaderAsync(string expectedDirectionClass)
+    {
+        await UserAccountHeaderCell.Locator(".e-headercelldiv").First.ClickAsync();
+        try
+        {
+            await page.WaitForSelectorAsync(
+                $".e-headercell.{expectedDirectionClass}:has-text('User Account')",
+                new() { Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+            await page.WaitForTimeoutAsync(500);
+        }
+    }
+
+    /// <summary>
+    /// Reads every visible ".e-row"'s "User Account" cell text (last ".e-rowcell") in DOM order —
+    /// used to prove the column is genuinely sortable (values move from ascending to descending
+    /// order relative to each other) without needing to know exactly which employees/statuses are
+    /// on the shared, long-lived E2E database at any given time.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetVisibleUserAccountStatusesInOrderAsync()
+    {
+        var rows = page.Locator(".e-grid .e-row");
+        var count = await rows.CountAsync();
+        var result = new List<string>();
+        for (var i = 0; i < count; i++)
+            result.Add((await rows.Nth(i).Locator(".e-rowcell").Last.InnerTextAsync()).Trim());
+        return result;
+    }
+
+    // ── Column (Excel-style) filter ───────────────────────────────────────────
+    //
+    // The global "Search by name, email or employee number" textbox is server-side and only
+    // matches FirstName/LastName/WorkEmail/EmployeeNumber (see ListEmployeesHandler) — it does not
+    // and cannot filter on User Account status. The mechanism every grid column (including this
+    // one) actually participates in is HrGrid's own per-column Excel-style filter
+    // (AllowFiltering="true" + GridFilterSettings { Type = FilterType.Excel } — see HrGrid.cs),
+    // triggered via the small filter icon Syncfusion renders in each header cell.
+
+    /// <summary>Opens the "User Account" column's Excel-style filter popup.</summary>
+    public async Task OpenUserAccountColumnFilterAsync()
+    {
+        await UserAccountHeaderCell.Locator(".e-filtermenudiv").ClickAsync();
+        await page.WaitForSelectorAsync(".e-excelfilter:visible, .e-flmenu:visible", new() { Timeout = 10_000 });
+    }
+
+    /// <summary>
+    /// Ticks the checkbox for <paramref name="valueLabel"/> (e.g. "No User") in the (already open)
+    /// Excel filter popup and applies it via the popup's own "OK" button, then waits for the grid
+    /// to settle on the filtered result.
+    /// </summary>
+    public async Task ApplyUserAccountColumnFilterAsync(string valueLabel)
+    {
+        var searchInput = page.Locator(".e-excelfilter:visible .e-searchinput input");
+        if (await searchInput.CountAsync() > 0)
+            await searchInput.FillAsync(valueLabel);
+
+        await page.Locator(".e-excelfilter:visible .e-ftrchk")
+            .Filter(new() { HasText = valueLabel })
+            .First
+            .ClickAsync();
+
+        await page.Locator(".e-excelfilter:visible button")
+            .Filter(new() { HasText = "OK" })
+            .First
+            .ClickAsync();
+
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+    }
+
+    /// <summary>Clears any active filter on the "User Account" column via the header's clear-filter icon.</summary>
+    public async Task ClearUserAccountColumnFilterAsync()
+    {
+        await OpenUserAccountColumnFilterAsync();
+        var clearAll = page.Locator(".e-excelfilter:visible .e-ftrchk")
+            .Filter(new() { HasText = "Select All" })
+            .First;
+        if (await clearAll.CountAsync() > 0)
+            await clearAll.ClickAsync();
+        await page.Locator(".e-excelfilter:visible button")
+            .Filter(new() { HasText = "OK" })
+            .First
+            .ClickAsync();
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+    }
 }

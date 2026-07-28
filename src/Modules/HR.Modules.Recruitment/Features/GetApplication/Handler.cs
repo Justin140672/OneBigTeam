@@ -30,12 +30,24 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
                 a.AppliedAt,
                 a.CreatedAt,
                 a.UpdatedAt,
+                a.Source,
+                a.SourceExternalRecruiterId,
             })
             .SingleOrDefaultAsync(cancellationToken);
 
         if (row is null)
             return Result.Failure<GetApplicationResponse>(
                 Error.NotFound($"Application '{request.ApplicationId}' was not found."));
+
+        string? sourceRecruiterAgencyName = null;
+        if (row.SourceExternalRecruiterId is not null)
+        {
+            sourceRecruiterAgencyName = await db.ExternalRecruiters
+                .AsNoTracking()
+                .Where(r => r.Id == row.SourceExternalRecruiterId && r.CompanyId == request.CompanyId)
+                .Select(r => r.AgencyName)
+                .SingleOrDefaultAsync(cancellationToken);
+        }
 
         var stageHistory = await db.ApplicationStageHistoryEntries
             .AsNoTracking()
@@ -63,6 +75,9 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
             row.AppliedAt,
             row.CreatedAt,
             row.UpdatedAt,
+            row.Source,
+            row.SourceExternalRecruiterId,
+            sourceRecruiterAgencyName,
             stageHistory));
     }
 }

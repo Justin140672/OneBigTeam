@@ -26,4 +26,5 @@ internal sealed record EmployeeListItem(
     DateOnly StartDate,
     EmploymentStatus Status,
     DateTimeOffset CreatedAt,
-    string? ProfilePhotoUrl);
+    string? ProfilePhotoUrl,
+    string UserAccountStatus);

@@ -1,0 +1,242 @@
+@page "/companies/{CompanyId:guid}/external-recruiters/new"
+@page "/companies/{CompanyId:guid}/external-recruiters/{Id:guid}"
+@page "/companies/{CompanyId:guid}/external-recruiters/{Id:guid}/view"
+@rendermode InteractiveServer
+@inject ExternalRecruiterService ExternalRecruiterService
+@inject AppSession Session
+@inherits EditPageBase<ExternalRecruiterEditModel, Guid>
+
+<PageTitle>@PageTitle</PageTitle>
+
+<div class="container py-4">
+    <SfBreadcrumb Class="mb-3">
+        <BreadcrumbItems>
+            <BreadcrumbItem Text="External Recruiters" Url="@($"/companies/{CompanyId}/external-recruiters")" />
+            <BreadcrumbItem Text="@PageTitle" />
+        </BreadcrumbItems>
+    </SfBreadcrumb>
+
+    @if (IsLoading)
+    {
+        <HrLoadingIndicator />
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <h1 class="mb-0 fs-4">@PageTitle</h1>
+            @if (!IsNew)
+            {
+                <ActiveStatusBadge IsActive="_recruiter?.IsActive ?? true" />
+            }
+        </div>
+        <p class="text-muted mb-4">Record the recruitment agency's contact details.</p>
+
+        @if (!string.IsNullOrEmpty(GlobalError))
+        {
+            <div class="alert alert-danger">@GlobalError</div>
+        }
+
+        @if (_duplicateWarning is not null)
+        {
+            <div class="alert alert-warning" data-testid="agency-name-duplicate-warning">
+                <i class="fa-solid fa-triangle-exclamation me-1"></i>@_duplicateWarning
+            </div>
+        }
+
+        <EditForm EditContext="EditContext">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Agency Details</h5>
+                        </div>
+                        <div class="card-body @(IsViewMode ? "view-mode" : "")">
+                            <div class="row g-3">
+                                <div class="col-md-8">
+                                    <label class="form-label">Agency Name <span class="text-danger">*</span></label>
+                                    <HrTextBox @bind-Value="Model.AgencyName" Placeholder="e.g. Acme Recruiting"
+                                               Blur="@(() => OnAgencyNameBlurAsync())" />
+                                    <ValidationMessage For="@(() => Model.AgencyName)" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Contact Name</label>
+                                    <HrTextBox @bind-Value="Model.ContactName" Placeholder="Primary contact" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Contact Email</label>
+                                    <HrTextBox @bind-Value="Model.ContactEmail" Placeholder="contact@agency.com" />
+                                    <ValidationMessage For="@(() => Model.ContactEmail)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Contact Telephone</label>
+                                    <HrTextBox @bind-Value="Model.ContactTelephone" Placeholder="e.g. 07700 900000" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Website</label>
+                                    <HrTextBox @bind-Value="Model.Website" Placeholder="https://…" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Notes</label>
+                                    <SfTextBox @bind-Value="Model.Notes" Multiline="true" Rows="3" Readonly="@IsViewMode" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-3">
+                        @if (!IsViewMode)
+                        {
+                            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                                @if (Saving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                Save
+                            </SfButton>
+                        }
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+
+        @if (!IsNew)
+        {
+            <div class="card mt-4" data-testid="recruiter-activity-summary">
+                <div class="card-header">
+                    <h5 class="mb-0">Activity Summary</h5>
+                </div>
+                <div class="card-body">
+                    @if (_summaryLoading)
+                    {
+                        <HrLoadingIndicator Label="Loading activity…" />
+                    }
+                    else if (_summary is null)
+                    {
+                        <p class="text-muted mb-0">No activity data available.</p>
+                    }
+                    else
+                    {
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3">
+                                <div class="text-muted small">Candidates Introduced</div>
+                                <div class="fs-4 fw-semibold">@_summary.CandidatesIntroducedCount</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-muted small">Candidates Hired</div>
+                                <div class="fs-4 fw-semibold">@_summary.CandidatesHiredCount</div>
+                            </div>
+                        </div>
+
+                        <h6>Current Vacancies</h6>
+                        @if (_summary.CurrentVacancies.Count == 0)
+                        {
+                            <p class="text-muted">None.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-3">
+                                @foreach (var v in _summary.CurrentVacancies)
+                                {
+                                    <li>
+                                        <a href="/companies/@CompanyId/vacancies/@v.VacancyId/view">@(v.AdvertTitle ?? "(untitled vacancy)")</a>
+                                        <span class="text-muted ms-1">— @v.Status@(v.DateInstructed is { } opened ? $", opened {opened:d}" : "")</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+
+                        <h6>Previous Vacancies</h6>
+                        @if (_summary.PreviousVacancies.Count == 0)
+                        {
+                            <p class="text-muted mb-0">None.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0">
+                                @foreach (var v in _summary.PreviousVacancies)
+                                {
+                                    <li>
+                                        <a href="/companies/@CompanyId/vacancies/@v.VacancyId/view">@(v.AdvertTitle ?? "(untitled vacancy)")</a>
+                                        <span class="text-muted ms-1">— @v.Status@(v.DateInstructed is { } opened ? $", opened {opened:d}" : "")</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    }
+                </div>
+            </div>
+        }
+    }
+
+    <NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" />
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid? Id { get; set; }
+
+    private GetExternalRecruiterResponse? _recruiter;
+    private GetExternalRecruiterActivitySummaryResponse? _summary;
+    private bool _summaryLoading;
+    private string? _duplicateWarning;
+
+    private string PageTitle => IsNew ? "Add External Recruiter"
+        : Model.AgencyName.Trim().Length > 0 ? Model.AgencyName
+        : IsViewMode ? "View External Recruiter" : "Edit External Recruiter";
+
+    protected override IEditService<ExternalRecruiterEditModel, Guid> Service => ExternalRecruiterService;
+    protected override Guid GetCompanyId() => CompanyId;
+    protected override Guid? GetId() => Id;
+
+    protected override async Task OnLoadedAsync()
+    {
+        if (!Session.IsRecruiter)
+        {
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            return;
+        }
+
+        if (!IsNew)
+        {
+            _recruiter = await ExternalRecruiterService.GetExternalRecruiterAsync(CompanyId, Id!.Value);
+
+            _summaryLoading = true;
+            _summary = await ExternalRecruiterService.GetActivitySummaryAsync(CompanyId, Id!.Value);
+            _summaryLoading = false;
+        }
+    }
+
+    protected override string? ListUrl => $"/companies/{CompanyId}/external-recruiters";
+
+    // Soft, non-blocking warning (not a validation error) — surfaced on blur rather than debounced
+    // on every keystroke to keep this simple, per the ticket's "keep it simple" guidance.
+    private async Task OnAgencyNameBlurAsync()
+    {
+        _duplicateWarning = null;
+
+        var name = Model.AgencyName?.Trim();
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        var result = await ExternalRecruiterService.ListExternalRecruitersAsync(CompanyId, search: name, isActive: true, pageSize: 10);
+        var match = result?.Items.FirstOrDefault(r =>
+            r.Id != (Id ?? Guid.Empty) &&
+            string.Equals(r.AgencyName?.Trim(), name, StringComparison.OrdinalIgnoreCase));
+
+        if (match is not null)
+        {
+            _duplicateWarning = $"An active recruiter named \"{match.AgencyName}\" already exists — please check this isn't a duplicate.";
+        }
+        else if (result?.Items.Count > 0)
+        {
+            // A similarly-named (but not exact) active agency exists — still worth a soft nudge.
+            _duplicateWarning = $"A similarly named active recruiter already exists (\"{result.Items[0].AgencyName}\") — please check this isn't a duplicate.";
+        }
+    }
+}

@@ -114,6 +114,7 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
             AdvertDescription = response.AdvertDescription,
             PositionProfileId = response.PositionProfileId,
             HiringManagerId = response.HiringManagerId,
+            AssignedRecruiterId = response.AssignedRecruiterId ?? Guid.Empty,
         };
     }
 
@@ -123,7 +124,8 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
             companyId, model.PositionProfileId!.Value,
             string.IsNullOrWhiteSpace(model.AdvertTitle) ? null : model.AdvertTitle.Trim(),
             string.IsNullOrWhiteSpace(model.AdvertDescription) ? null : model.AdvertDescription.Trim(),
-            model.HiringManagerId!.Value);
+            model.HiringManagerId!.Value,
+            model.AssignedRecruiterId == Guid.Empty ? null : model.AssignedRecruiterId);
 
         var (created, error) = await CreateVacancyAsync(companyId, request);
         return (created is null ? null : model, error);
@@ -137,6 +139,7 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
             string.IsNullOrWhiteSpace(model.AdvertTitle) ? null : model.AdvertTitle.Trim(),
             string.IsNullOrWhiteSpace(model.AdvertDescription) ? null : model.AdvertDescription.Trim(),
             model.HiringManagerId!.Value,
+            AssignedRecruiterId: model.AssignedRecruiterId == Guid.Empty ? null : model.AssignedRecruiterId,
             IsAuthorisedCorrection: model.IsAuthorisedCorrection,
             CorrectionReason: string.IsNullOrWhiteSpace(model.CorrectionReason) ? null : model.CorrectionReason.Trim());
 

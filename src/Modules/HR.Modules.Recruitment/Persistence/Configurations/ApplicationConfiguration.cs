@@ -59,6 +59,14 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
             .HasColumnName("updated_at")
             .IsRequired();
 
+        builder.Property(a => a.Source)
+            .HasColumnName("source")
+            .HasConversion<string>()
+            .HasMaxLength(30);
+
+        builder.Property(a => a.SourceExternalRecruiterId)
+            .HasColumnName("source_external_recruiter_id");
+
         builder.HasOne<Vacancy>()
             .WithMany()
             .HasForeignKey(a => a.VacancyId)
@@ -73,5 +81,6 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
         builder.HasIndex(a => a.VacancyId);
         builder.HasIndex(a => a.CandidateId);
         builder.HasIndex(a => new { a.VacancyId, a.CandidateId }).IsUnique();
+        builder.HasIndex(a => a.SourceExternalRecruiterId);
     }
 }

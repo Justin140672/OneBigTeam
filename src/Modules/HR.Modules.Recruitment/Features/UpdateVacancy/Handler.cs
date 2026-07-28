@@ -77,11 +77,34 @@ internal sealed class UpdateVacancyHandler(
             vacancy.ChangePositionProfile(requestedPositionProfileId, now);
         }
 
+        // Ticket #81: AssignedRecruiterId is now an optional FK to ExternalRecruiter (the external
+        // agency), not an Employee — existence/company-ownership/active checks happen here via direct
+        // EF Core access, since ExternalRecruiter lives in this same module/schema (unlike
+        // PositionProfileId, which requires the cross-module IPositionProfileReader contract).
+        if (request.AssignedRecruiterId is { } requestedRecruiterId
+            && requestedRecruiterId != vacancy.AssignedRecruiterId)
+        {
+            var recruiter = await db.ExternalRecruiters
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    r => r.Id == requestedRecruiterId && r.CompanyId == request.CompanyId,
+                    cancellationToken);
+
+            if (recruiter is null)
+                return Result.Failure<UpdateVacancyResponse>(
+                    Error.NotFound($"External recruiter '{requestedRecruiterId}' was not found."));
+
+            if (!recruiter.IsActive)
+                return Result.Failure<UpdateVacancyResponse>(
+                    Error.Validation($"External recruiter '{recruiter.AgencyName}' is inactive and cannot be assigned to a vacancy."));
+        }
+
         var before = new VacancyAuditSnapshot(
             vacancy.AdvertTitle,
             vacancy.AdvertDescription,
             vacancy.HiringManagerId,
-            vacancy.Status);
+            vacancy.Status,
+            vacancy.AssignedRecruiterId);
 
         vacancy.UpdateDetails(
             request.AdvertTitle,
@@ -96,7 +119,8 @@ internal sealed class UpdateVacancyHandler(
             vacancy.AdvertTitle,
             vacancy.AdvertDescription,
             vacancy.HiringManagerId,
-            vacancy.Status);
+            vacancy.Status,
+            vacancy.AssignedRecruiterId);
 
         // Cross-module read purely for a readable audit Summary line — see VacancyUpdatedAuditEvent's
         // remarks. Deliberately resolved after the vacancy's own state has already been persisted, so

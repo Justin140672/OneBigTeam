@@ -42,6 +42,8 @@ internal sealed class GetEmployeeAuditHistoryHandler(
         ["DocumentRequest"] = "Documents",
         ["AssetAssignment"] = "Assets",
         ["Candidate"] = "Recruitment",
+        ["ApplicationUser"] = "Identity",
+        ["UserInvite"] = "Identity",
     };
 
     public async Task<Result<GetEmployeeAuditHistoryResponse>> HandleAsync(

@@ -125,6 +125,54 @@ public class GetApplicationHandlerTests
         Assert.Equal("Passed CV screen.", result.Value.StageHistory[0].Notes);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Source_And_Recruiter_AgencyName_When_Source_Is_ExternalRecruiter()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var recruiter = ExternalRecruiter.Create(Guid.NewGuid(), companyId, "Acme Recruiting", null, null, null, null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now, ApplicationSource.ExternalRecruiter, recruiter.Id);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.ExternalRecruiters.Add(recruiter);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await new GetApplicationHandler(db).HandleAsync(
+            new GetApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ApplicationSource.ExternalRecruiter, result.Value!.Source);
+        Assert.Equal(recruiter.Id, result.Value.SourceExternalRecruiterId);
+        Assert.Equal("Acme Recruiting", result.Value.SourceExternalRecruiterAgencyName);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Null_Source_Fields_When_Source_Was_Never_Set()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await new GetApplicationHandler(db).HandleAsync(
+            new GetApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value!.Source);
+        Assert.Null(result.Value.SourceExternalRecruiterId);
+        Assert.Null(result.Value.SourceExternalRecruiterAgencyName);
+    }
+
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))

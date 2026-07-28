@@ -1,0 +1,94 @@
+@inject UserAdministrationService UserAdministrationService
+
+<SfDialog Visible="IsOpen" IsModal="true" Width="480px" ShowCloseIcon="false">
+    <DialogTemplates>
+        <Header>Manage Roles</Header>
+        <Content>
+            <div class="mb-3">
+                <label class="form-label">Roles <span class="text-danger">*</span></label>
+                <SfMultiSelect TValue="List<Guid>"
+                               TItem="RoleOption"
+                               DataSource="@_roleOptions"
+                               @bind-Value="_selectedRoleIds"
+                               Placeholder="Select one or more roles"
+                               Mode="VisualMode.CheckBox"
+                               AllowFiltering="true">
+                    <MultiSelectFieldSettings Value="Id" Text="Name" />
+                </SfMultiSelect>
+                <p class="text-muted small mt-2 mb-0">A user must always retain at least one role.</p>
+            </div>
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="alert alert-danger py-2">@_error</div>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAsync">
+                @if (_saving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Save
+            </SfButton>
+            <SfButton Disabled="@_saving" OnClick="CancelAsync">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid UserId { get; set; }
+    [Parameter] public List<Guid> CurrentRoleIds { get; set; } = [];
+    [Parameter] public EventCallback OnCancelled { get; set; }
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private bool _wasOpen;
+    private bool _saving;
+    private string? _error;
+    private List<Guid> _selectedRoleIds = [];
+
+    private readonly List<RoleOption> _roleOptions = SystemRoleOptions.All.ToList();
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && !_wasOpen)
+        {
+            _selectedRoleIds = CurrentRoleIds.ToList();
+            _error = null;
+            _saving = false;
+        }
+
+        _wasOpen = IsOpen;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_selectedRoleIds.Count == 0)
+        {
+            _error = "A user must always retain at least one role.";
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+
+        var (success, error) = await UserAdministrationService.UpdateUserRolesAsync(CompanyId, UserId, _selectedRoleIds);
+
+        _saving = false;
+
+        if (!success)
+        {
+            _error = error ?? "Failed to update this user's roles.";
+            return;
+        }
+
+        await OnCompleted.InvokeAsync();
+    }
+
+    private async Task CancelAsync()
+    {
+        await OnCancelled.InvokeAsync();
+    }
+}

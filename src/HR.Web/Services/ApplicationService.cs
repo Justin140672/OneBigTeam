@@ -38,16 +38,30 @@ public sealed class ApplicationService(IHttpClientFactory httpClientFactory)
     }
 
     public async Task<(CreateApplicationResponse? Result, string? Error)> CreateApplicationAsync(
-        Guid companyId, Guid vacancyId, Guid candidateId, string? notes)
+        Guid companyId, Guid vacancyId, Guid candidateId, string? notes,
+        string? source = null, Guid? sourceExternalRecruiterId = null)
     {
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/vacancies/{vacancyId}/applications",
-            new CreateApplicationRequest(companyId, vacancyId, candidateId, notes));
+            new CreateApplicationRequest(companyId, vacancyId, candidateId, notes, source, sourceExternalRecruiterId));
 
         if (response.IsSuccessStatusCode)
             return (await response.Content.ReadFromJsonAsync<CreateApplicationResponse>(), null);
 
         return (null, await ReadErrorAsync(response, "Failed to create application."));
+    }
+
+    public async Task<GetApplicationResponse?> GetApplicationAsync(Guid companyId, Guid vacancyId, Guid applicationId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetApplicationResponse>(
+                $"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
     }
 
     public async Task<(ApplicationActionResponse? Result, string? Error)> WithdrawApplicationAsync(Guid companyId, Guid vacancyId, Guid applicationId)

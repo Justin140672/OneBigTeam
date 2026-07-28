@@ -4,6 +4,7 @@
 @inject EmployeeService EmployeeService
 @inject VacancyService VacancyService
 @inject EmploymentTypeService EmploymentTypeService
+@inject ExternalRecruiterService ExternalRecruiterService
 @inject IJSRuntime JS
 
 <div data-testid="vacancy-applications-tab">
@@ -59,6 +60,26 @@
                     </Template>
                 </GridColumn>
                 <GridColumn Field="@nameof(ApplicationListItemModel.AppliedAt)" HeaderText="Applied" Width="130" Format="d" />
+                <GridColumn HeaderText="Source" Width="220">
+                    <Template>
+                        @{
+                            var row = (ApplicationListItemModel)context;
+                            _sourceDetails.TryGetValue(row.Id, out var detail);
+                        }
+                        @if (detail?.Source is null or "Unspecified")
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                        else if (detail.Source == "ExternalRecruiter")
+                        {
+                            <span>Source: External Recruiter@(detail.SourceExternalRecruiterAgencyName is null ? "" : $" ({detail.SourceExternalRecruiterAgencyName})")</span>
+                        }
+                        else
+                        {
+                            <span>Source: @SourceLabel(detail.Source)</span>
+                        }
+                    </Template>
+                </GridColumn>
                 <GridColumn HeaderText="Actions" Width="260">
                     <Template>
                         @{
@@ -109,6 +130,44 @@
                     </DropDownListTemplates>
                 </SfDropDownList>
             </div>
+            <div class="mb-3">
+                <label class="form-label">Source (optional)</label>
+                <SfDropDownList TValue="string" TItem="SourceOption" DataSource="@_sourceOptions"
+                                @bind-Value="_selectedSource" Placeholder="Select a source"
+                                ValueChange="OnSourceChanged">
+                    <DropDownListFieldSettings Value="Value" Text="Label" />
+                </SfDropDownList>
+            </div>
+            @if (_selectedSource == "ExternalRecruiter")
+            {
+                <div class="mb-3">
+                    <label class="form-label">Recruiter</label>
+                    <SfDropDownList TValue="Guid?" TItem="ExternalRecruiterListItemModel"
+                                    DataSource="@_activeRecruitersForSource" @bind-Value="_selectedSourceRecruiterId"
+                                    Placeholder="Select a recruiter" AllowFiltering="true"
+                                    ValueChange="OnSourceRecruiterChanged">
+                        <DropDownListFieldSettings Value="Id" Text="AgencyName" />
+                        <DropDownListTemplates TItem="ExternalRecruiterListItemModel">
+                            <ItemTemplate>
+                                @{ var r = (ExternalRecruiterListItemModel)context; }
+                                <span>
+                                    @r.AgencyName
+                                    @if (_vacancyAssignedRecruiterId == r.Id)
+                                    {
+                                        <span class="text-muted ms-1">(assigned to this vacancy)</span>
+                                    }
+                                </span>
+                            </ItemTemplate>
+                        </DropDownListTemplates>
+                    </SfDropDownList>
+                    @if (_recruiterNotAssignedWarning)
+                    {
+                        <div class="form-text text-warning" data-testid="recruiter-not-assigned-warning">
+                            <i class="fa-solid fa-triangle-exclamation me-1"></i>This recruiter isn't currently assigned to this vacancy.
+                        </div>
+                    }
+                </div>
+            }
             <div class="mb-3">
                 <label class="form-label">Notes (optional)</label>
                 <SfTextBox @bind-Value="_addNotes" Multiline="true" Rows="2" />
@@ -281,6 +340,33 @@
     private Guid? _selectedCandidateId;
     private string? _addNotes;
 
+    // Ticket #78 — application source. Options mirror Domain.ApplicationSource with display-friendly
+    // labels; "Unspecified" is treated the same as "not selected" (Source sent as null either way).
+    private sealed record SourceOption(string Value, string Label);
+    private static readonly List<SourceOption> _sourceOptions =
+    [
+        new("Unspecified", "Unspecified"),
+        new("Direct", "Direct"),
+        new("Referral", "Referral"),
+        new("ExternalRecruiter", "External Recruiter"),
+        new("JobBoard", "Job Board"),
+        new("CareersSite", "Careers Site"),
+    ];
+    private string _selectedSource = "Unspecified";
+    private List<ExternalRecruiterListItemModel> _activeRecruitersForSource = [];
+    // Ticket #81: the removed VacancyRecruiterAssignment table (many-to-many with history) is
+    // replaced by this single optional field mirroring Vacancy.AssignedRecruiterId.
+    private Guid? _vacancyAssignedRecruiterId;
+    private Guid? _selectedSourceRecruiterId;
+    private bool _recruiterNotAssignedWarning;
+
+    // Per-application Source detail, looked up lazily since ListApplicationsForVacancy's own
+    // response doesn't include Source (only GetApplication does) — see LoadAsync.
+    private readonly Dictionary<Guid, GetApplicationResponse> _sourceDetails = [];
+
+    private static string SourceLabel(string? source) =>
+        _sourceOptions.FirstOrDefault(o => o.Value == source)?.Label ?? source ?? "Unspecified";
+
     private bool _showScheduleDialog;
     private List<EmployeeListItemModel> _employees = [];
     private ApplicationListItemModel? _activeApplication;
@@ -324,6 +410,18 @@
         _loading = true;
         var result = await ApplicationService.ListApplicationsForVacancyAsync(CompanyId, VacancyId);
         _applications = result?.Items ?? [];
+
+        // Source isn't in ListApplicationsForVacancy's response — fetch each application's detail
+        // in parallel to populate the "Source" column. Application lists per vacancy are small, so
+        // an N+1 here is an acceptable trade-off against extending the list endpoint's contract.
+        _sourceDetails.Clear();
+        var detailTasks = _applications.Select(a => ApplicationService.GetApplicationAsync(CompanyId, VacancyId, a.Id)).ToList();
+        var details = await Task.WhenAll(detailTasks);
+        foreach (var detail in details)
+        {
+            if (detail is not null) _sourceDetails[detail.Id] = detail;
+        }
+
         _loading = false;
     }
 
@@ -341,13 +439,47 @@
         _dialogError = null;
         _selectedCandidateId = null;
         _addNotes = null;
+        _selectedSource = "Unspecified";
+        _selectedSourceRecruiterId = null;
+        _recruiterNotAssignedWarning = false;
+
         // ListCandidatesValidator caps PageSize at 100 (InclusiveBetween(1, 100)) — requesting
         // more than that fails FluentValidation validation, and CandidateService.ListCandidatesAsync
         // swallows that failure (catch (HttpRequestException) { return null; }), so this silently
         // returned zero candidates on every single open regardless of how many actually exist.
         var result = await CandidateService.ListCandidatesAsync(CompanyId, pageSize: 100);
         _candidates = result?.Items ?? [];
+
+        // Only active recruiters are selectable, per ticket #78. This vacancy's currently-assigned
+        // agency (Vacancy.AssignedRecruiterId, ticket #81 — replaces the removed
+        // VacancyRecruiterAssignment table) is cross-referenced (not filtered to) so the full active
+        // list stays selectable — see the ItemTemplate's "(assigned to this vacancy)" hint above.
+        var activeRecruitersTask = ExternalRecruiterService.ListExternalRecruitersAsync(CompanyId, isActive: true, pageSize: 200);
+        var vacancyTask = VacancyService.GetVacancyAsync(CompanyId, VacancyId);
+        await Task.WhenAll(activeRecruitersTask, vacancyTask);
+
+        _activeRecruitersForSource = (await activeRecruitersTask)?.Items.ToList() ?? [];
+        _vacancyAssignedRecruiterId = (await vacancyTask)?.AssignedRecruiterId;
+
         _showAddDialog = true;
+    }
+
+    private void OnSourceChanged(ChangeEventArgs<string, SourceOption> args)
+    {
+        _selectedSource = args.Value;
+        if (_selectedSource != "ExternalRecruiter")
+        {
+            _selectedSourceRecruiterId = null;
+            _recruiterNotAssignedWarning = false;
+        }
+    }
+
+    // Warns (does not block) when the chosen recruiter isn't this vacancy's currently-assigned agency
+    // (Vacancy.AssignedRecruiterId) — per the ticket, this is advisory only.
+    private void OnSourceRecruiterChanged(ChangeEventArgs<Guid?, ExternalRecruiterListItemModel> args)
+    {
+        _selectedSourceRecruiterId = args.Value;
+        _recruiterNotAssignedWarning = args.Value is Guid id && id != _vacancyAssignedRecruiterId;
     }
 
     // Candidates are searched server-side as the user types rather than filtered against the
@@ -369,7 +501,16 @@
             return;
         }
 
-        var (created, error) = await ApplicationService.CreateApplicationAsync(CompanyId, VacancyId, _selectedCandidateId.Value, _addNotes);
+        if (_selectedSource == "ExternalRecruiter" && _selectedSourceRecruiterId is null)
+        {
+            _dialogError = "Please select a recruiter, or choose a different source.";
+            return;
+        }
+
+        var (created, error) = await ApplicationService.CreateApplicationAsync(
+            CompanyId, VacancyId, _selectedCandidateId.Value, _addNotes,
+            source: _selectedSource == "Unspecified" ? null : _selectedSource,
+            sourceExternalRecruiterId: _selectedSource == "ExternalRecruiter" ? _selectedSourceRecruiterId : null);
         if (created is null)
         {
             _dialogError = error;

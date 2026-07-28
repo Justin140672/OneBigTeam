@@ -101,6 +101,10 @@ else
                                 }
                                 <MenuItem Text="Company" IconCss="fa-solid fa-building" Url="@_menuItems["Company"]" />
                             }
+                            @if (Session.IsHrAdministrator || Session.CanManageCompany)
+                            {
+                                <MenuItem Text="User Administration" IconCss="fa-solid fa-user-shield" Url="@_menuItems["UserAdministration"]" />
+                            }
                         </MenuItems>
                     </SfMenu>
 
@@ -295,6 +299,7 @@ else
         ["SicknessCategories"] = "/",
         ["OrganisationChart"] = "/",
         ["Company"] = "/",
+        ["UserAdministration"] = "/",
     };
 
     protected override async Task OnInitializedAsync()
@@ -323,6 +328,7 @@ else
         _menuItems["SicknessCategories"] = $"/companies/{companyId}/sickness-categories";
         _menuItems["OrganisationChart"] = $"/companies/{companyId}/organisation-chart";
         _menuItems["Company"] = $"/companies/{companyId}/edit";
+        _menuItems["UserAdministration"] = $"/companies/{companyId}/user-administration";
 
         await LoadUnreadCountAsync();
 

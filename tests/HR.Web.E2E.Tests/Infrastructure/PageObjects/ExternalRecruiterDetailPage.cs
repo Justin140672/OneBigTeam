@@ -1,0 +1,106 @@
+using Microsoft.Playwright;
+
+namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
+
+/// <summary>
+/// Page object for the External Recruiter create/edit/view page
+/// (/companies/{companyId}/external-recruiters/new|{id}|{id}/view, ExternalRecruiterDetail.razor),
+/// including its soft duplicate-agency-name warning banner and read-only Activity Summary card.
+/// </summary>
+public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
+{
+    public async Task GoToNewAsync(Guid companyId)
+    {
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/external-recruiters/new");
+        await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
+    }
+
+    public async Task GoToAsync(Guid companyId, Guid recruiterId)
+    {
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/external-recruiters/{recruiterId}");
+        await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
+    }
+
+    public Task FillAgencyNameAsync(string value) =>
+        page.GetByPlaceholder("e.g. Acme Recruiting").FillAsync(value);
+
+    public Task FillContactNameAsync(string value) =>
+        page.GetByPlaceholder("Primary contact").FillAsync(value);
+
+    public Task FillContactEmailAsync(string value) =>
+        page.GetByPlaceholder("contact@agency.com").FillAsync(value);
+
+    public Task FillContactTelephoneAsync(string value) =>
+        page.GetByPlaceholder("e.g. 07700 900000").FillAsync(value);
+
+    public Task<string> GetAgencyNameAsync() =>
+        page.GetByPlaceholder("e.g. Acme Recruiting").InputValueAsync();
+
+    /// <summary>
+    /// Blurs the Agency Name field (tabbing to the next field) — required to trigger the
+    /// non-blocking duplicate-agency-name check (ExternalRecruiterDetail.razor's OnAgencyNameBlurAsync).
+    /// </summary>
+    public async Task BlurAgencyNameAsync()
+    {
+        await page.GetByPlaceholder("e.g. Acme Recruiting").FocusAsync();
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    private ILocator DuplicateWarning => page.Locator("[data-testid='agency-name-duplicate-warning']");
+
+    public Task<bool> IsDuplicateWarningVisibleAsync() => DuplicateWarning.IsVisibleAsync();
+
+    public async Task<string?> GetDuplicateWarningTextAsync() =>
+        await DuplicateWarning.IsVisibleAsync() ? (await DuplicateWarning.TextContentAsync())?.Trim() : null;
+
+    public async Task SaveAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await page.WaitForURLAsync("**/external-recruiters", new() { Timeout = 15_000 });
+        await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
+    }
+
+    public async Task<bool> HasErrorAsync() =>
+        await page.Locator(".alert-danger, .validation-message").First.IsVisibleAsync();
+
+    // ── Activity Summary (existing recruiter only) ───────────────────────────────
+
+    private ILocator ActivitySummaryCard => page.Locator("[data-testid='recruiter-activity-summary']");
+
+    public Task<bool> IsActivitySummaryVisibleAsync() => ActivitySummaryCard.IsVisibleAsync();
+
+    public async Task<string?> GetCandidatesIntroducedCountAsync()
+    {
+        var value = ActivitySummaryCard.Locator(".text-muted.small", new() { HasText = "Candidates Introduced" })
+            .Locator("xpath=following-sibling::div[1]");
+        return await value.IsVisibleAsync() ? (await value.TextContentAsync())?.Trim() : null;
+    }
+
+    public async Task<string?> GetCandidatesHiredCountAsync()
+    {
+        var value = ActivitySummaryCard.Locator(".text-muted.small", new() { HasText = "Candidates Hired" })
+            .Locator("xpath=following-sibling::div[1]");
+        return await value.IsVisibleAsync() ? (await value.TextContentAsync())?.Trim() : null;
+    }
+
+    public Task<bool> HasCurrentVacancyAsync(string vacancyTitleFragment) =>
+        ActivitySummaryCard.GetByText("Current Vacancies")
+            .Locator("xpath=following-sibling::ul[1]")
+            .GetByText(vacancyTitleFragment, new() { Exact = false })
+            .IsVisibleAsync();
+
+    public Task<bool> HasPreviousVacancyAsync(string vacancyTitleFragment) =>
+        ActivitySummaryCard.GetByText("Previous Vacancies")
+            .Locator("xpath=following-sibling::ul[1]")
+            .GetByText(vacancyTitleFragment, new() { Exact = false })
+            .IsVisibleAsync();
+
+    // ── Unsaved changes dialog (EditPageBase, shared convention) ─────────────────
+
+    private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
+
+    public Task ClickCloseAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+
+    public Task<bool> IsUnsavedChangesDialogVisibleAsync() => UnsavedChangesDialog.IsVisibleAsync();
+}

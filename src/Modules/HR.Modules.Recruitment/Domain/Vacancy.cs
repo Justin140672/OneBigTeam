@@ -33,13 +33,15 @@ internal sealed class Vacancy
     public VacancyStatus Status { get; private set; }
     public Guid HiringManagerId { get; private set; }
 
-    // Recruiter assigned to run this vacancy through the recruitment pipeline. Nullable and set
-    // separately from HiringManagerId — per explicit product direction, the recruiter is assigned
-    // per-Vacancy (not per-Application, and not reusing HiringManagerId, which represents the hiring
-    // decision-maker rather than the person actively working the pipeline). May be null until HR
-    // assigns a recruiter. "Recruitment users" elsewhere in this module means whoever holds the
-    // recruitment:view/recruitment:manage policies — there is no separate "Recruiter" role/table to
-    // validate this value against, so (unlike PositionProfileId) it is not cross-module validated.
+    // The external recruitment agency (ExternalRecruiter) assigned to run this vacancy, if any.
+    // Nullable — a vacancy may have no agency assigned. Per explicit product-direction scope
+    // correction (ticket #81), this used to be a Guid? FK to an internal Employee (mirroring
+    // HiringManagerId); it has been repointed to reference ExternalRecruiter instead, replacing the
+    // separate VacancyRecruiterAssignment many-to-many/history table with a single optional
+    // "assigned agency" field, consistent with the simpler model the product decided to keep. Existence
+    // and same-company validation happen in the CreateVacancy/UpdateVacancy handlers against
+    // ExternalRecruiter (same module/schema, so unlike PositionProfileId this is a direct EF Core
+    // check, not a cross-module reader).
     public Guid? AssignedRecruiterId { get; private set; }
 
     public DateOnly? OpenedAt { get; private set; }

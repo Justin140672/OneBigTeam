@@ -149,6 +149,66 @@ public class ListEmployeesEndpointTests : IClassFixture<ApiWebApplicationFactory
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Get_Employees_Reports_Active_UserAccountStatus_For_Employee_With_Active_User()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
+        await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, $"active.{Guid.NewGuid():N}@test.com", isActive: true);
+
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ListEmpUser1.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/employees");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
+        Assert.NotNull(payload);
+        var item = payload!.Items.Single(i => i.Id == employeeId);
+        Assert.Equal("Active", item.UserAccountStatus);
+    }
+
+    [Fact]
+    public async Task Get_Employees_Reports_PendingInvitation_UserAccountStatus_For_Employee_With_Pending_Invite()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
+        await IdentityUserAdminTestHelpers.SeedInviteAsync(
+            _factory, companyId, employeeId, $"pending.{Guid.NewGuid():N}@test.com", claimed: false, cancelled: false);
+
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ListEmpUser2.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/employees");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
+        Assert.NotNull(payload);
+        var item = payload!.Items.Single(i => i.Id == employeeId);
+        Assert.Equal("PendingInvitation", item.UserAccountStatus);
+    }
+
+    [Fact]
+    public async Task Get_Employees_Reports_NoUser_UserAccountStatus_For_Employee_Without_Account_Or_Invite()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
+
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ListEmpUser3.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/employees");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
+        Assert.NotNull(payload);
+        var item = payload!.Items.Single(i => i.Id == employeeId);
+        Assert.Equal("NoUser", item.UserAccountStatus);
+    }
+
     private static async Task<(Guid DepartmentId, Guid LocationId, Guid PositionProfileId, Guid EmploymentTypeId)> CreateReferenceDataAsync(
         HttpClient client, Guid companyId)
     {
@@ -235,5 +295,6 @@ public class ListEmployeesEndpointTests : IClassFixture<ApiWebApplicationFactory
         string FirstName,
         string LastName,
         string WorkEmail,
-        string Status);
+        string Status,
+        string UserAccountStatus);
 }

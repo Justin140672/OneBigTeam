@@ -3,6 +3,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
+using HR.Modules.Recruitment.Domain;
+using HR.Modules.Recruitment.Persistence;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
@@ -272,13 +275,115 @@ public class CreateVacancyEndpointTests : IClassFixture<ApiWebApplicationFactory
         Assert.Equal(advertDescription, getPayload.AdvertDescription);
     }
 
+    private async Task<Guid> SeedExternalRecruiterAsync(Guid companyId, bool isActive = true)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+        var recruiter = ExternalRecruiter.Create(
+            Guid.NewGuid(), companyId, "Acme Recruiting", null, null, null, null, null, DateTimeOffset.UtcNow);
+        if (!isActive)
+            recruiter.SetActiveStatus(false, DateTimeOffset.UtcNow);
+        db.ExternalRecruiters.Add(recruiter);
+        await db.SaveChangesAsync();
+        return recruiter.Id;
+    }
+
+    [Fact]
+    public async Task Post_Vacancies_Creates_Vacancy_With_Active_AssignedRecruiter()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
+        var recruiterId = await SeedExternalRecruiterAsync(companyId);
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
+        {
+            companyId,
+            positionProfileId = referenceData.PositionProfileId,
+            advertTitle = "Senior Software Engineer",
+            hiringManagerId = Guid.NewGuid(),
+            assignedRecruiterId = recruiterId
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<VacancyPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal(recruiterId, payload!.AssignedRecruiterId);
+    }
+
+    [Fact]
+    public async Task Post_Vacancies_Returns_Validation_Error_When_AssignedRecruiter_Is_Inactive()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
+        var recruiterId = await SeedExternalRecruiterAsync(companyId, isActive: false);
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
+        {
+            companyId,
+            positionProfileId = referenceData.PositionProfileId,
+            advertTitle = "Senior Software Engineer",
+            hiringManagerId = Guid.NewGuid(),
+            assignedRecruiterId = recruiterId
+        });
+
+        // Note: this is a handler-level Result.Failure(Error.Validation(...)), not a FastEndpoints
+        // validator failure, so it maps to 400 (BadRequest) — same as other handler-level validation
+        // errors in this codebase (e.g. the PositionProfile change-control checks below).
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_Vacancies_Returns_NotFound_When_AssignedRecruiter_Belongs_To_Different_Company()
+    {
+        var companyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
+        var recruiterId = await SeedExternalRecruiterAsync(otherCompanyId);
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
+        {
+            companyId,
+            positionProfileId = referenceData.PositionProfileId,
+            advertTitle = "Senior Software Engineer",
+            hiringManagerId = Guid.NewGuid(),
+            assignedRecruiterId = recruiterId
+        });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_Vacancies_Succeeds_Without_AssignedRecruiterId_Since_It_Is_Optional()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = AuthenticatedClient(companyId);
+        var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
+        {
+            companyId,
+            positionProfileId = referenceData.PositionProfileId,
+            advertTitle = "Senior Software Engineer",
+            hiringManagerId = Guid.NewGuid()
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<VacancyPayload>();
+        Assert.NotNull(payload);
+        Assert.Null(payload!.AssignedRecruiterId);
+    }
+
     private sealed record VacancyPayload(
         Guid Id,
         Guid CompanyId,
         Guid PositionProfileId,
         string? AdvertTitle,
         string? AdvertDescription,
-        string? EffectiveTitle);
+        string? EffectiveTitle,
+        Guid? AssignedRecruiterId);
 
     private sealed record PositionProfileTitlePayload(string Title);
 }

@@ -425,8 +425,18 @@ app.MapGet("/health/startup-migrations", () =>
 if (app.Environment.IsDevelopment())
 {
 	app.MapGet("/api/dev/personas", (DevPersonaStore store) => DevPersonaStore.Personas).AllowAnonymous();
-	app.MapPost("/api/dev/persona/{userId}", (string userId, DevPersonaStore store) =>
+	app.MapPost("/api/dev/persona/{userId}", async (string userId, DevPersonaStore store, IServiceProvider services) =>
 	{
+		// The dev persona switcher is the only real "sign-in" path in this codebase today (see
+		// HR.Modules.Identity.IdentityModule.TryDevSignInAsync remarks) — this is where the
+		// IsActive gate (ticket #88) and LastLoginAt recording (ticket #89) are wired in.
+		if (!Guid.TryParse(userId, out var userGuid))
+			return Results.NoContent();
+
+		var isAllowed = await services.TryDevSignInAsync(userGuid);
+		if (!isAllowed)
+			return Results.StatusCode(StatusCodes.Status403Forbidden);
+
 		store.Switch(userId);
 		return Results.NoContent();
 	}).AllowAnonymous();

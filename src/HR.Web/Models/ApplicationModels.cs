@@ -28,7 +28,11 @@ public record GetApplicationResponse(
     string? Notes,
     DateTimeOffset AppliedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    // Ticket #78 — both null for applications recorded before this concept existed.
+    string? Source,
+    Guid? SourceExternalRecruiterId,
+    string? SourceExternalRecruiterAgencyName);
 
 // ── CREATE ────────────────────────────────────────────────────────────────────
 
@@ -36,7 +40,11 @@ public record CreateApplicationRequest(
     Guid CompanyId,
     Guid VacancyId,
     Guid CandidateId,
-    string? Notes);
+    string? Notes,
+    // Ticket #78. Both optional; SourceExternalRecruiterId is required if and only if
+    // Source == "ExternalRecruiter" (enforced server-side by CreateApplicationValidator).
+    string? Source = null,
+    Guid? SourceExternalRecruiterId = null);
 
 public record CreateApplicationResponse(
     Guid Id,

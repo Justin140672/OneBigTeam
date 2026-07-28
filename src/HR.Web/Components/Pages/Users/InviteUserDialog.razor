@@ -1,0 +1,276 @@
+@inject UserAdministrationService UserAdministrationService
+@inject HR.Web.Services.EmployeeService EmployeeService
+
+<SfDialog Visible="IsOpen" IsModal="true" Width="560px" ShowCloseIcon="false">
+    <DialogTemplates>
+        <Header>Invite Employee User</Header>
+        <Content>
+            <ul class="nav nav-pills mb-3">
+                @foreach (var step in _steps)
+                {
+                    <li class="nav-item">
+                        <span class="nav-link @(step.Number == _step ? "active" : (step.Number < _step ? "text-success" : "text-muted"))">
+                            @step.Number. @step.Label
+                        </span>
+                    </li>
+                }
+            </ul>
+
+            @if (_loading)
+            {
+                <HrLoadingIndicator Label="Loading employees…" />
+            }
+            else
+            {
+                @if (_step == 1)
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Employee <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="Guid?"
+                                        TItem="InviteEmployeeOption"
+                                        DataSource="@_employeeOptions"
+                                        @bind-Value="_selectedEmployeeId"
+                                        Placeholder="Select an employee"
+                                        AllowFiltering="true"
+                                        ValueChange="OnEmployeeChanged">
+                            <DropDownListFieldSettings Value="EmployeeId" Text="Name" />
+                        </SfDropDownList>
+                        @if (_employeeOptions.Count == 0)
+                        {
+                            <p class="text-muted small mt-2 mb-0">Every employee already has an account or a pending invitation.</p>
+                        }
+                    </div>
+                }
+                else if (_step == 2)
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Email <span class="text-danger">*</span></label>
+                        <HrTextBox @bind-Value="_email" Placeholder="work@company.com" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Roles <span class="text-danger">*</span></label>
+                        <SfMultiSelect TValue="List<Guid>"
+                                       TItem="RoleOption"
+                                       DataSource="@_roleOptions"
+                                       @bind-Value="_selectedRoleIds"
+                                       Placeholder="Select one or more roles"
+                                       Mode="VisualMode.CheckBox"
+                                       AllowFiltering="true">
+                            <MultiSelectFieldSettings Value="Id" Text="Name" />
+                        </SfMultiSelect>
+                    </div>
+                }
+                else if (_step == 3)
+                {
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4 text-muted fw-normal">Employee</dt>
+                        <dd class="col-sm-8">@_selectedEmployeeName</dd>
+                        <dt class="col-sm-4 text-muted fw-normal">Email</dt>
+                        <dd class="col-sm-8">@_email</dd>
+                        <dt class="col-sm-4 text-muted fw-normal">Roles</dt>
+                        <dd class="col-sm-8">@string.Join(", ", _selectedRoleIds.Select(SystemRoleOptions.NameFor))</dd>
+                    </dl>
+                }
+
+                @if (!string.IsNullOrEmpty(_stepError))
+                {
+                    <div class="alert alert-danger py-2">@_stepError</div>
+                }
+                @if (!string.IsNullOrEmpty(_globalError))
+                {
+                    <div class="alert alert-danger py-2">@_globalError</div>
+                }
+            }
+        </Content>
+        <FooterTemplate>
+            @if (_step > (PreselectedEmployeeId is not null ? 2 : 1))
+            {
+                <SfButton Disabled="@_submitting" OnClick="GoBack">Back</SfButton>
+            }
+            @if (_step < 3)
+            {
+                <SfButton IsPrimary="true" Disabled="@(_submitting || _loading)" OnClick="GoNext">Next</SfButton>
+            }
+            else
+            {
+                <SfButton IsPrimary="true" Disabled="@_submitting" OnClick="ConfirmAsync">
+                    @if (_submitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Send Invite
+                </SfButton>
+            }
+            <SfButton Disabled="@_submitting" OnClick="CancelAsync">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+    [Parameter] public EventCallback<InviteEmployeeUserResponse> OnCompleted { get; set; }
+    [Parameter] public Guid? PreselectedEmployeeId { get; set; }
+    [Parameter] public string? PreselectedEmployeeName { get; set; }
+    [Parameter] public string? PreselectedEmployeeEmail { get; set; }
+
+    private bool _wasOpen;
+    private bool _loading;
+    private int _step = 1;
+    private bool _submitting;
+    private string? _stepError;
+    private string? _globalError;
+
+    private List<InviteEmployeeOption> _employeeOptions = [];
+    private Guid? _selectedEmployeeId;
+    private string _selectedEmployeeName = string.Empty;
+    private string _email = string.Empty;
+    private List<Guid> _selectedRoleIds = [];
+
+    private readonly List<RoleOption> _roleOptions = SystemRoleOptions.All.ToList();
+
+    private static readonly (int Number, string Label)[] _steps =
+    [
+        (1, "Employee"),
+        (2, "Email & Roles"),
+        (3, "Confirm"),
+    ];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && !_wasOpen)
+            await ResetStateAsync();
+
+        _wasOpen = IsOpen;
+    }
+
+    private async Task ResetStateAsync()
+    {
+        _step = 1;
+        _submitting = false;
+        _stepError = null;
+        _globalError = null;
+        _selectedEmployeeId = null;
+        _selectedEmployeeName = string.Empty;
+        _email = string.Empty;
+        _selectedRoleIds = [];
+
+        if (PreselectedEmployeeId is not null)
+        {
+            // Pre-selected-employee flow (e.g. from the Employee List's row-level "Invite User"
+            // action): the employee/name/email are already known from the calling page, so skip
+            // the employee lookup entirely and jump straight to step 2 (Email & Roles).
+            _employeeOptions = [];
+            _selectedEmployeeId = PreselectedEmployeeId;
+            _selectedEmployeeName = PreselectedEmployeeName ?? string.Empty;
+            _email = PreselectedEmployeeEmail ?? string.Empty;
+            _step = 2;
+            _loading = false;
+            return;
+        }
+
+        _loading = true;
+
+        // ListUsers only returns employees who have at least one UserInvite record, so it can't
+        // answer "which employees have never been invited at all" — the full employee roster
+        // has to come from the Employees module, cross-referenced against Identity's per-employee
+        // account status to exclude anyone who already has (or is claiming) an account.
+        var employeesResult = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 500);
+        var usersResult = await UserAdministrationService.ListUsersAsync(CompanyId, pageSize: 500);
+
+        var linkedEmployeeIds = (usersResult?.Items ?? [])
+            .Where(u => u.AccountStatus is "Active" or "Disabled" || u.InvitationStatus is "Pending" or "Claimed")
+            .Select(u => u.EmployeeId)
+            .ToHashSet();
+
+        _employeeOptions = (employeesResult?.Items ?? [])
+            .Where(e => !linkedEmployeeIds.Contains(e.Id))
+            .Select(e => new InviteEmployeeOption(e.Id, e.FullName, e.WorkEmail))
+            .OrderBy(e => e.Name)
+            .ToList();
+
+        // The invite endpoint itself still guards against a race with a 409 Conflict — this is
+        // just the happy-path filter.
+        _loading = false;
+    }
+
+    private void OnEmployeeChanged(ChangeEventArgs<Guid?, InviteEmployeeOption> args)
+    {
+        _selectedEmployeeId = args.Value;
+        var option = _employeeOptions.FirstOrDefault(e => e.EmployeeId == args.Value);
+        _selectedEmployeeName = option?.Name ?? string.Empty;
+        _email = option?.Email ?? string.Empty;
+    }
+
+    private void GoNext()
+    {
+        _stepError = null;
+
+        switch (_step)
+        {
+            case 1:
+                if (_selectedEmployeeId is null)
+                {
+                    _stepError = "Please select an employee.";
+                    return;
+                }
+                break;
+
+            case 2:
+                if (string.IsNullOrWhiteSpace(_email))
+                {
+                    _stepError = "Please enter an email address.";
+                    return;
+                }
+                if (_selectedRoleIds.Count == 0)
+                {
+                    _stepError = "Please select at least one role.";
+                    return;
+                }
+                break;
+        }
+
+        _step++;
+    }
+
+    private void GoBack()
+    {
+        _stepError = null;
+        var minStep = PreselectedEmployeeId is not null ? 2 : 1;
+        if (_step > minStep)
+            _step--;
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (_selectedEmployeeId is null || string.IsNullOrWhiteSpace(_email) || _selectedRoleIds.Count == 0)
+        {
+            _globalError = "Please complete all steps before sending the invite.";
+            return;
+        }
+
+        _submitting = true;
+        _globalError = null;
+
+        var (result, error) = await UserAdministrationService.InviteEmployeeUserAsync(
+            CompanyId, _selectedEmployeeId.Value, _email.Trim(), _selectedRoleIds);
+
+        _submitting = false;
+
+        if (result is null)
+        {
+            _globalError = error ?? "Failed to invite this employee.";
+            return;
+        }
+
+        await OnCompleted.InvokeAsync(result);
+    }
+
+    private async Task CancelAsync()
+    {
+        await OnCancelled.InvokeAsync();
+    }
+
+    private sealed record InviteEmployeeOption(Guid EmployeeId, string Name, string Email);
+}

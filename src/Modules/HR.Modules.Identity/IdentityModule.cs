@@ -1,6 +1,18 @@
+using FluentValidation;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Identity.Authorization;
 using HR.Modules.Identity.Domain;
+using HR.Modules.Identity.Features.CancelInvite;
+using HR.Modules.Identity.Features.DisableUser;
+using HR.Modules.Identity.Features.EnableUser;
+using HR.Modules.Identity.Features.GetUserAuditHistory;
+using HR.Modules.Identity.Features.GetUserDetails;
+using HR.Modules.Identity.Features.InviteEmployeeUser;
+using HR.Modules.Identity.Features.ListUsers;
+using HR.Modules.Identity.Features.ResendInvite;
+using HR.Modules.Identity.Features.UpdateUserRoles;
 using HR.Modules.Identity.Persistence;
+using HR.Modules.Identity.Services;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -25,7 +37,58 @@ public static class IdentityModule
         services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, RoleAuthorizationHandler>();
         services.AddSingleton<IClock, SystemClock>();
 
+        services.AddScoped<IEmployeeUserAccountStatusReader, EmployeeUserAccountStatusReader>();
+
+        services.AddScoped<ListUsersHandler>();
+        services.AddScoped<IValidator<ListUsersRequest>, ListUsersValidator>();
+        services.AddScoped<GetUserDetailsHandler>();
+        services.AddScoped<IValidator<GetUserDetailsRequest>, GetUserDetailsValidator>();
+        services.AddScoped<GetUserAuditHistoryHandler>();
+        services.AddScoped<IValidator<GetUserAuditHistoryRequest>, GetUserAuditHistoryValidator>();
+        services.AddScoped<InviteEmployeeUserHandler>();
+        services.AddScoped<IValidator<InviteEmployeeUserRequest>, InviteEmployeeUserValidator>();
+        services.AddScoped<UpdateUserRolesHandler>();
+        services.AddScoped<IValidator<UpdateUserRolesRequest>, UpdateUserRolesValidator>();
+        services.AddScoped<ResendInviteHandler>();
+        services.AddScoped<IValidator<ResendInviteRequest>, ResendInviteValidator>();
+        services.AddScoped<CancelInviteHandler>();
+        services.AddScoped<IValidator<CancelInviteRequest>, CancelInviteValidator>();
+        services.AddScoped<DisableUserHandler>();
+        services.AddScoped<IValidator<DisableUserRequest>, DisableUserValidator>();
+        services.AddScoped<EnableUserHandler>();
+        services.AddScoped<IValidator<EnableUserRequest>, EnableUserValidator>();
+
+        services.AddScoped<
+            IIntegrationEventHandler<OffboardingPlanCompletedIntegrationEvent>,
+            Features.OnOffboardingPlanCompleted.Handler>();
+
         return services;
+    }
+
+    /// <summary>
+    /// Called from HR.Api's dev persona-switch endpoint (the only real "sign-in" path that exists
+    /// today — see the class remarks on Authentication.DevAuthHandler). Rejects switching to a
+    /// disabled user's persona and records LastLoginAt on success. This will need to be revisited
+    /// once real Supabase-backed authentication replaces the dev persona switcher.
+    /// Returns false if the persona's linked user account is disabled (sign-in must be rejected);
+    /// true otherwise (allowed — including when no ApplicationUser row exists at all).
+    /// </summary>
+    public static async Task<bool> TryDevSignInAsync(this IServiceProvider services, Guid userId)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        var clock = scope.ServiceProvider.GetRequiredService<IClock>();
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user is null)
+            return true; // no ApplicationUser row (e.g. persona seeded only in dev store) — allow, nothing to gate.
+
+        if (!user.IsActive)
+            return false;
+
+        user.RecordLogin(clock.UtcNow);
+        await db.SaveChangesAsync();
+        return true;
     }
 
     public static IApplicationBuilder UseIdentityModule(this IApplicationBuilder app)
@@ -56,6 +119,18 @@ public static class IdentityModule
         // HR Administrator is a distinct role scoped to employee/leave/sickness data and
         // must not be able to change company-level configuration.
         builder.AddPolicy("company:manage", RolePolicy(
+            SystemRoles.CompanyAdministrator));
+
+        // User Administration domain policies (ticket #92) — viewing/inviting/managing roles and
+        // disabling/enabling accounts, plus resending/cancelling invitations, are HR/Company Admin
+        // territory, matching employee:manage/company:manage's precedent of restricting
+        // security-sensitive actions to administrative roles.
+        builder.AddPolicy("users:view", RolePolicy(
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
+        builder.AddPolicy("users:manage", RolePolicy(
+            SystemRoles.HrAdministrator,
             SystemRoles.CompanyAdministrator));
 
         // Leave domain composite policies — match spec section 14.

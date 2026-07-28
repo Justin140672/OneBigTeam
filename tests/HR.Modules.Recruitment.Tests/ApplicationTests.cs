@@ -152,6 +152,80 @@ public class ApplicationTests
             () => application.MoveToStage(ApplicationStatus.Screening, Now.AddDays(1)));
     }
 
+    [Fact]
+    public void Create_With_Source_ExternalRecruiter_Sets_SourceExternalRecruiterId()
+    {
+        var recruiterId = Guid.NewGuid();
+
+        var application = Application.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, Now,
+            ApplicationSource.ExternalRecruiter, recruiterId);
+
+        Assert.Equal(ApplicationSource.ExternalRecruiter, application.Source);
+        Assert.Equal(recruiterId, application.SourceExternalRecruiterId);
+    }
+
+    [Fact]
+    public void Create_Forces_SourceExternalRecruiterId_Null_When_Source_Is_Not_ExternalRecruiter()
+    {
+        var suppliedRecruiterId = Guid.NewGuid();
+
+        var application = Application.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, Now,
+            ApplicationSource.Direct, suppliedRecruiterId);
+
+        Assert.Equal(ApplicationSource.Direct, application.Source);
+        Assert.Null(application.SourceExternalRecruiterId);
+    }
+
+    [Fact]
+    public void Create_Without_Source_Leaves_Source_And_RecruiterId_Null()
+    {
+        var application = CreateApplication();
+
+        Assert.Null(application.Source);
+        Assert.Null(application.SourceExternalRecruiterId);
+    }
+
+    [Fact]
+    public void SetSource_ExternalRecruiter_Sets_SourceExternalRecruiterId_And_UpdatedAt()
+    {
+        var application = CreateApplication();
+        var recruiterId = Guid.NewGuid();
+        var later = Now.AddDays(1);
+
+        application.SetSource(ApplicationSource.ExternalRecruiter, recruiterId, later);
+
+        Assert.Equal(ApplicationSource.ExternalRecruiter, application.Source);
+        Assert.Equal(recruiterId, application.SourceExternalRecruiterId);
+        Assert.Equal(later, application.UpdatedAt);
+    }
+
+    [Fact]
+    public void SetSource_Forces_SourceExternalRecruiterId_Null_When_Source_Not_ExternalRecruiter_Even_If_Id_Supplied()
+    {
+        var application = CreateApplication();
+        application.SetSource(ApplicationSource.ExternalRecruiter, Guid.NewGuid(), Now);
+        var suppliedRecruiterId = Guid.NewGuid();
+
+        application.SetSource(ApplicationSource.Direct, suppliedRecruiterId, Now.AddDays(1));
+
+        Assert.Equal(ApplicationSource.Direct, application.Source);
+        Assert.Null(application.SourceExternalRecruiterId);
+    }
+
+    [Fact]
+    public void SetSource_Null_Clears_Source_And_RecruiterId()
+    {
+        var application = CreateApplication();
+        application.SetSource(ApplicationSource.ExternalRecruiter, Guid.NewGuid(), Now);
+
+        application.SetSource(null, null, Now.AddDays(1));
+
+        Assert.Null(application.Source);
+        Assert.Null(application.SourceExternalRecruiterId);
+    }
+
     private static void MoveApplicationToStatus(Application application, ApplicationStatus target)
     {
         if (target == ApplicationStatus.Applied)

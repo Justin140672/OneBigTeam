@@ -2,6 +2,8 @@ namespace HR.Modules.Identity.Domain;
 
 internal sealed class UserInvite
 {
+    private readonly List<Guid> _pendingRoleIds = [];
+
     private UserInvite() { }
 
     public Guid Id { get; private set; }
@@ -14,18 +16,26 @@ internal sealed class UserInvite
     public string Token { get; private set; } = string.Empty;
     public DateTimeOffset ExpiresAt { get; private set; }
     public DateTimeOffset? ClaimedAt { get; private set; }
+    public DateTimeOffset? CancelledAt { get; private set; }
+    public Guid? CreatedByUserId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
+
+    /// <summary>Roles to assign once this invite is accepted. Empty means "fall back to the base Employee role".</summary>
+    public IReadOnlyList<Guid> PendingRoleIds => _pendingRoleIds;
 
     public bool IsExpired => DateTimeOffset.UtcNow > ExpiresAt;
     public bool IsClaimed => ClaimedAt.HasValue;
+    public bool IsCancelled => CancelledAt.HasValue;
 
     public static UserInvite Create(
         Guid employeeId,
         Guid companyId,
         string email,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        IEnumerable<Guid>? roleIds = null,
+        Guid? createdByUserId = null)
     {
-        return new UserInvite
+        var invite = new UserInvite
         {
             Id = Guid.NewGuid(),
             EmployeeId = employeeId,
@@ -34,12 +44,30 @@ internal sealed class UserInvite
             Token = GenerateToken(),
             ExpiresAt = now.AddDays(7),
             CreatedAt = now,
+            CreatedByUserId = createdByUserId,
         };
+
+        if (roleIds is not null)
+            invite._pendingRoleIds.AddRange(roleIds.Distinct());
+
+        return invite;
     }
 
     public void Claim(DateTimeOffset now)
     {
         ClaimedAt = now;
+    }
+
+    public void Cancel(DateTimeOffset now)
+    {
+        CancelledAt = now;
+    }
+
+    /// <summary>Regenerates the token and expiry so the invite can be shared again.</summary>
+    public void Resend(DateTimeOffset now)
+    {
+        Token = GenerateToken();
+        ExpiresAt = now.AddDays(7);
     }
 
     private static string GenerateToken()

@@ -9,11 +9,16 @@ internal sealed class ListEmployeesHandler
 {
     private readonly EmployeesDbContext _dbContext;
     private readonly IProfilePhotoReader _profilePhotoReader;
+    private readonly IEmployeeUserAccountStatusReader _userAccountStatusReader;
 
-    public ListEmployeesHandler(EmployeesDbContext dbContext, IProfilePhotoReader profilePhotoReader)
+    public ListEmployeesHandler(
+        EmployeesDbContext dbContext,
+        IProfilePhotoReader profilePhotoReader,
+        IEmployeeUserAccountStatusReader userAccountStatusReader)
     {
         _dbContext = dbContext;
         _profilePhotoReader = profilePhotoReader;
+        _userAccountStatusReader = userAccountStatusReader;
     }
 
     public async Task<Result<ListEmployeesResponse>> HandleAsync(
@@ -106,6 +111,11 @@ internal sealed class ListEmployeesHandler
         var photoUrls = await _profilePhotoReader.GetCurrentPhotoUrlsAsync(
             request.CompanyId, employeeIds, cancellationToken);
 
+        // Employees not present in the returned dictionary are treated as NoUser (see
+        // IEmployeeUserAccountStatusReader contract) — no ApplicationUser and no active invite exist.
+        var accountStatuses = await _userAccountStatusReader.GetStatusesAsync(
+            request.CompanyId, employeeIds, cancellationToken);
+
         var items = employees
             .Select(e => new EmployeeListItem(
                 e.Id,
@@ -124,7 +134,10 @@ internal sealed class ListEmployeesHandler
                 e.StartDate,
                 e.Status,
                 e.CreatedAt,
-                photoUrls.TryGetValue(e.Id, out var photoUrl) ? photoUrl : null))
+                photoUrls.TryGetValue(e.Id, out var photoUrl) ? photoUrl : null,
+                accountStatuses.TryGetValue(e.Id, out var accountSummary)
+                    ? accountSummary.Status.ToString()
+                    : EmployeeUserAccountStatus.NoUser.ToString()))
             .ToList();
 
         var totalPages = request.PageSize == 0 ? 0 : (int)Math.Ceiling((double)totalCount / request.PageSize);
