@@ -33,6 +33,11 @@ using HR.Modules.Recruitment.Features.MoveApplicationStage;
 using HR.Modules.Recruitment.Features.OfferCandidate;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 using HR.Modules.Recruitment.Features.RejectCandidate;
+using HR.Modules.Recruitment.Features.ListRecruitmentStages;
+using HR.Modules.Recruitment.Features.CreateRecruitmentStage;
+using HR.Modules.Recruitment.Features.UpdateRecruitmentStage;
+using HR.Modules.Recruitment.Features.ReorderRecruitmentStages;
+using HR.Modules.Recruitment.Features.SetRecruitmentStageActiveStatus;
 using HR.Modules.Recruitment.Features.ScheduleInterview;
 using HR.Modules.Recruitment.Features.SetExternalRecruiterActiveStatus;
 using HR.Modules.Recruitment.Features.UpdateCandidate;
@@ -79,6 +84,7 @@ public static class RecruitmentModule
     private static void AddFeatureServices(IServiceCollection services)
     {
         services.AddScoped<RecruitmentStageChangeRecorder>();
+        services.AddScoped<RecruitmentStageSeeder>();
 
         services.AddScoped<CreateVacancyHandler>();
         services.AddScoped<IValidator<CreateVacancyRequest>, CreateVacancyValidator>();
@@ -196,6 +202,21 @@ public static class RecruitmentModule
 
         services.AddScoped<GetExternalRecruiterActivitySummaryHandler>();
         services.AddScoped<IValidator<GetExternalRecruiterActivitySummaryRequest>, GetExternalRecruiterActivitySummaryValidator>();
+
+        // Ticket #97: RecruitmentStage settings CRUD.
+        services.AddScoped<ListRecruitmentStagesHandler>();
+
+        services.AddScoped<CreateRecruitmentStageHandler>();
+        services.AddScoped<IValidator<CreateRecruitmentStageRequest>, CreateRecruitmentStageValidator>();
+
+        services.AddScoped<UpdateRecruitmentStageHandler>();
+        services.AddScoped<IValidator<UpdateRecruitmentStageRequest>, UpdateRecruitmentStageValidator>();
+
+        services.AddScoped<ReorderRecruitmentStagesHandler>();
+        services.AddScoped<IValidator<ReorderRecruitmentStagesRequest>, ReorderRecruitmentStagesValidator>();
+
+        services.AddScoped<SetRecruitmentStageActiveStatusHandler>();
+        services.AddScoped<IValidator<SetRecruitmentStageActiveStatusRequest>, SetRecruitmentStageActiveStatusValidator>();
     }
 
     public static WebApplication UseRecruitmentRecurringJobs(this WebApplication app)
@@ -223,10 +244,25 @@ public static class RecruitmentModule
     public static async Task SeedRecruitmentAsync(this IServiceProvider services)
     {
         using var scope = services.CreateScope();
-        var db  = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
-        var now = DateTimeOffset.UtcNow;
+        var db      = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+        var seeder  = scope.ServiceProvider.GetRequiredService<RecruitmentStageSeeder>();
+        var now     = DateTimeOffset.UtcNow;
+
+        // Ticket #98: demo companies get the same default stage set every real company gets on
+        // first use (see RecruitmentStageSeeder) — idempotent, so re-running seeding is safe.
+        var acmeCompanyId    = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var betaCorpCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        await seeder.EnsureDefaultStagesSeededAsync(acmeCompanyId, now, CancellationToken.None);
+        await seeder.EnsureDefaultStagesSeededAsync(betaCorpCompanyId, now, CancellationToken.None);
+
+        async Task<Dictionary<string, Guid>> GetStageIdsByNameAsync(Guid companyId) =>
+            await db.RecruitmentStages
+                .AsNoTracking()
+                .Where(s => s.CompanyId == companyId)
+                .ToDictionaryAsync(s => s.Name, s => s.Id);
 
         // ── Acme Corporation ─────────────────────────────────────────────────
+        var acmeStages      = await GetStageIdsByNameAsync(acmeCompanyId);
         var acmeId          = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var acmeJamesId     = Guid.Parse("30000000-0000-0000-0000-000000000002"); // James Okafor
         var acmeLauraId     = Guid.Parse("30000000-0000-0000-0000-000000000005"); // Laura Bennett
@@ -283,32 +319,29 @@ public static class RecruitmentModule
 
         if (!await db.Applications.AnyAsync(a => a.CompanyId == acmeId))
         {
-            var emmaApplication = Application.Create(Guid.Parse("e2000000-0000-0000-0000-000000000001"), acmeId, acmeSeniorEngVacancyId, acmeEmmaId, null, now);
-            emmaApplication.MoveToScreening(now);
-            emmaApplication.ScheduleInterview(now);
+            var emmaApplication = Application.Create(Guid.Parse("e2000000-0000-0000-0000-000000000001"), acmeId, acmeSeniorEngVacancyId, acmeEmmaId, acmeStages["CV Review"], null, now);
+            emmaApplication.MoveToStage(acmeStages["Interview"], now);
 
-            var liamApplication = Application.Create(Guid.Parse("e2000000-0000-0000-0000-000000000002"), acmeId, acmeSeniorEngVacancyId, acmeLiamId, null, now);
-            liamApplication.MoveToScreening(now);
-            liamApplication.ScheduleInterview(now);
-            liamApplication.RecordInterviewOutcome(InterviewOutcome.Passed, now);
+            var liamApplication = Application.Create(Guid.Parse("e2000000-0000-0000-0000-000000000002"), acmeId, acmeSeniorEngVacancyId, acmeLiamId, acmeStages["CV Review"], null, now);
+            liamApplication.MoveToStage(acmeStages["Interview"], now);
+            liamApplication.SetInterviewOutcome(InterviewOutcome.Passed, now);
 
-            var noahApplication = Application.Create(Guid.Parse("e2000000-0000-0000-0000-000000000003"), acmeId, acmeSeniorEngVacancyId, acmeNoahId, "Not enough backend experience for this role.", now);
-            noahApplication.MoveToScreening(now);
-            noahApplication.Reject(now);
+            var noahApplication = Application.Create(Guid.Parse("e2000000-0000-0000-0000-000000000003"), acmeId, acmeSeniorEngVacancyId, acmeNoahId, acmeStages["CV Review"], "Not enough backend experience for this role.", now);
+            noahApplication.RecordRejection(acmeStages["Rejected"], "Not enough backend experience for this role.", now);
 
-            var oliviaApplication = Application.Create(Guid.Parse("e2000000-0000-0000-0000-000000000004"), acmeId, acmeDesignerVacancyId, acmeOliviaId, null, now);
-            oliviaApplication.MoveToScreening(now);
-            oliviaApplication.ScheduleInterview(now);
-            oliviaApplication.RecordInterviewOutcome(InterviewOutcome.Passed, now);
-            oliviaApplication.Offer(now);
-            oliviaApplication.Hire(now);
+            var oliviaApplication = Application.Create(Guid.Parse("e2000000-0000-0000-0000-000000000004"), acmeId, acmeDesignerVacancyId, acmeOliviaId, acmeStages["CV Review"], null, now);
+            oliviaApplication.MoveToStage(acmeStages["Interview"], now);
+            oliviaApplication.SetInterviewOutcome(InterviewOutcome.Passed, now);
+            oliviaApplication.MoveToStage(acmeStages["Offer"], now);
+            oliviaApplication.RecordHire(acmeStages["Hired"], now);
 
             db.Applications.AddRange(emmaApplication, liamApplication, noahApplication, oliviaApplication);
             await db.SaveChangesAsync();
         }
 
         // ── Beta Corp ─────────────────────────────────────────────────────────
-        var betaCorpId    = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        var betaStages    = await GetStageIdsByNameAsync(betaCorpCompanyId);
+        var betaCorpId    = betaCorpCompanyId;
         var betaAliceId   = Guid.Parse("30000000-0000-0000-0000-000000000011"); // Alice Morgan
 
         var betaBackendVacancyId = Guid.Parse("e0000000-0000-0000-0000-000000000011");
@@ -341,10 +374,9 @@ public static class RecruitmentModule
 
         if (!await db.Applications.AnyAsync(a => a.CompanyId == betaCorpId))
         {
-            var sophieApplication = Application.Create(Guid.Parse("e2000000-0000-0000-0000-000000000011"), betaCorpId, betaBackendVacancyId, betaSophieId, null, now);
+            var sophieApplication = Application.Create(Guid.Parse("e2000000-0000-0000-0000-000000000011"), betaCorpId, betaBackendVacancyId, betaSophieId, betaStages["Application Received"], null, now);
 
-            var ethanApplication = Application.Create(Guid.Parse("e2000000-0000-0000-0000-000000000012"), betaCorpId, betaBackendVacancyId, betaEthanId, null, now);
-            ethanApplication.MoveToScreening(now);
+            var ethanApplication = Application.Create(Guid.Parse("e2000000-0000-0000-0000-000000000012"), betaCorpId, betaBackendVacancyId, betaEthanId, betaStages["CV Review"], null, now);
 
             db.Applications.AddRange(sophieApplication, ethanApplication);
             await db.SaveChangesAsync();

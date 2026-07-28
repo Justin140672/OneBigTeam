@@ -157,5 +157,6 @@ public sealed class VacancyEditModel
 public sealed record GetPipelineSummaryResponse(IReadOnlyList<PipelineSummaryItem> Items);
 
 public sealed record PipelineSummaryItem(
+    Guid StageId,
     string Status,
     int ApplicationCount);

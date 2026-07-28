@@ -24,23 +24,45 @@ internal sealed class RejectCandidateHandler(RecruitmentDbContext db, IClock clo
             return Result.Failure<RejectCandidateResponse>(
                 Error.NotFound($"Application '{request.ApplicationId}' was not found."));
 
-        if (application.Status is ApplicationStatus.Hired or ApplicationStatus.Rejected or ApplicationStatus.Withdrawn)
+        if (application.WithdrawnAt is not null)
             return Result.Failure<RejectCandidateResponse>(
-                Error.Validation($"Cannot reject an application with status '{application.Status}'."));
+                Error.Validation("Cannot reject an application that has been withdrawn."));
+
+        var currentStage = await db.RecruitmentStages
+            .AsNoTracking()
+            .SingleOrDefaultAsync(s => s.Id == application.CurrentStageId && s.CompanyId == request.CompanyId, cancellationToken);
+
+        if (currentStage is null)
+            return Result.Failure<RejectCandidateResponse>(
+                Error.NotFound($"Recruitment stage '{application.CurrentStageId}' was not found."));
+
+        if (currentStage.IsTerminal)
+            return Result.Failure<RejectCandidateResponse>(
+                Error.Validation($"Cannot reject an application already on the terminal stage '{currentStage.Name}'."));
+
+        var rejectedStage = await db.RecruitmentStages
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                s => s.CompanyId == request.CompanyId && s.IsActive && s.TerminalOutcome == RecruitmentStageTerminalOutcome.Rejected,
+                cancellationToken);
+
+        if (rejectedStage is null)
+            return Result.Failure<RejectCandidateResponse>(
+                Error.Validation("This company has no active 'Rejected' terminal recruitment stage configured."));
 
         var now = clock.UtcNowOffset();
-        var previousStatus = application.Status;
+        var previousStageId = application.CurrentStageId;
 
-        application.Reject(now, request.RejectionReason);
-        recorder.AddHistoryEntry(application, previousStatus, performedBy, now, request.RejectionReason);
+        application.RecordRejection(rejectedStage.Id, request.RejectionReason, now);
+        recorder.AddHistoryEntry(application, previousStageId, performedBy, now, request.RejectionReason);
         await db.SaveChangesAsync(cancellationToken);
-        await recorder.PublishStageChangedEventsAsync(application, previousStatus, performedBy, now, cancellationToken);
+        await recorder.PublishStageChangedEventsAsync(application, previousStageId, performedBy, now, cancellationToken);
 
         return Result.Success(new RejectCandidateResponse(
             application.Id,
             application.VacancyId,
             application.CandidateId,
-            application.Status,
+            application.CurrentStageId,
             application.InterviewOutcome,
             application.Notes,
             application.RejectionReason,

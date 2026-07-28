@@ -44,26 +44,13 @@
     </div>
 
     <ApplicationsByStatusDialog CompanyId="Session.CompanyId"
-                                 Status="_selectedStatus"
+                                 StageId="_selectedStageId"
+                                 StageName="_selectedStageName"
                                  IsOpen="_dialogOpen"
                                  OnClosed="@(() => _dialogOpen = false)" />
 }
 
 @code {
-    // Natural funnel order — Rejected/Withdrawn are excluded by the backend.
-    private static readonly string[] StageOrder =
-        ["Applied", "Screening", "InterviewScheduled", "Interviewed", "Offered", "Hired"];
-
-    private static readonly Dictionary<string, string> StageLabels = new()
-    {
-        ["Applied"] = "Applied",
-        ["Screening"] = "Screening",
-        ["InterviewScheduled"] = "Interview Scheduled",
-        ["Interviewed"] = "Interviewed",
-        ["Offered"] = "Offered",
-        ["Hired"] = "Hired",
-    };
-
     private static readonly string[] Palette =
     [
         "#0f766e", "#0d9488", "#eab308", "#f97316", "#6366f1", "#16a34a"
@@ -71,7 +58,8 @@
 
     private bool _loading = true;
     private List<FunnelStage> _data = [];
-    private string? _selectedStatus;
+    private Guid? _selectedStageId;
+    private string? _selectedStageName;
     private bool _dialogOpen;
 
     protected override async Task OnInitializedAsync()
@@ -82,15 +70,15 @@
             return;
         }
 
+        // GetPipelineSummary already returns the company's active, non-terminal stages in
+        // DisplayOrder (Rejected/Hired etc. excluded server-side) — no client-side reordering needed.
         var result = await VacancyService.GetPipelineSummaryAsync(Session.CompanyId);
-        var byStatus = (result?.Items ?? []).ToDictionary(i => i.Status, i => i.ApplicationCount);
 
-        _data = StageOrder
-            .Where(byStatus.ContainsKey)
-            .Select((status, index) => new FunnelStage(
-                status,
-                StageLabels.GetValueOrDefault(status, status),
-                byStatus[status],
+        _data = (result?.Items ?? [])
+            .Select((item, index) => new FunnelStage(
+                item.StageId,
+                item.Status,
+                item.ApplicationCount,
                 Palette[index % Palette.Length]))
             .ToList();
 
@@ -101,9 +89,12 @@
     {
         if (args.PointIndex < 0 || args.PointIndex >= _data.Count) return;
 
-        _selectedStatus = _data[args.PointIndex].Status;
+        _selectedStageId = _data[args.PointIndex].StageId;
+        _selectedStageName = _data[args.PointIndex].Label;
         _dialogOpen = true;
     }
 
-    private sealed record FunnelStage(string Status, string Label, int Value, string Fill);
+    // "Status" here holds the stage's display name (GetPipelineSummary's PipelineSummaryItem.Status
+    // field name is retained as-is from the backend, but functionally it is the stage's Name).
+    private sealed record FunnelStage(Guid StageId, string Label, int Value, string Fill);
 }

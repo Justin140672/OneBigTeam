@@ -6,9 +6,10 @@ internal sealed record WithdrawApplicationResponse(
     Guid Id,
     Guid VacancyId,
     Guid CandidateId,
-    ApplicationStatus Status,
+    Guid CurrentStageId,
     InterviewOutcome? InterviewOutcome,
     string? Notes,
+    DateTimeOffset? WithdrawnAt,
     DateTimeOffset AppliedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

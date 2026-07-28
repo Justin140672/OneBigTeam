@@ -2,7 +2,6 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.ScheduleInterview;
 using HR.Modules.Recruitment.Persistence;
-using HR.Modules.Recruitment.Services;
 using HR.Modules.Recruitment.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,13 +13,14 @@ public class ScheduleInterviewHandlerTests
     private static readonly DateTimeOffset Now = new(2026, 7, 6, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task HandleAsync_Creates_Interview_And_Moves_Application_To_InterviewScheduled()
+    public async Task HandleAsync_Creates_Interview_And_Defaults_InterviewOutcome_To_Pending_Without_Changing_Stage()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -49,19 +49,20 @@ public class ScheduleInterviewHandlerTests
         Assert.Equal(InterviewOutcome.Pending, result.Value.Outcome);
 
         var savedApplication = await db.Applications.SingleAsync();
-        Assert.Equal(ApplicationStatus.InterviewScheduled, savedApplication.Status);
+        Assert.Equal(stages.Interview.Id, savedApplication.CurrentStageId);
+        Assert.Equal(InterviewOutcome.Pending, savedApplication.InterviewOutcome);
     }
 
     [Fact]
-    public async Task HandleAsync_Allows_Additional_Round_When_Already_InterviewScheduled()
+    public async Task HandleAsync_Allows_Additional_Round_When_Already_Pending()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
-        application.MoveToScreening(Now);
-        application.ScheduleInterview(Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        application.SetInterviewOutcome(InterviewOutcome.Pending, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -86,23 +87,20 @@ public class ScheduleInterviewHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Publishes_StageChanged_Events_When_First_Interview_Moves_Application_To_InterviewScheduled()
+    public async Task HandleAsync_Does_Not_Publish_StageHistory_Since_Scheduling_Never_Changes_Stage()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
         await db.SaveChangesAsync();
 
-        var eventPublisher = new FakeIntegrationEventPublisher();
-        var auditPublisher = new FakeAuditPublisher();
-        var performedBy = Guid.NewGuid();
-
-        var result = await handler(db, eventPublisher: eventPublisher, auditPublisher: auditPublisher).HandleAsync(
+        var result = await handler(db).HandleAsync(
             new ScheduleInterviewRequest
             {
                 CompanyId             = companyId,
@@ -111,54 +109,10 @@ public class ScheduleInterviewHandlerTests
                 InterviewerEmployeeId = Guid.NewGuid(),
                 ScheduledAt           = Now.AddDays(3),
             },
-            performedBy,
-            CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-
-        var stageChanged = Assert.IsType<HR.SharedKernel.ApplicantStageChangedIntegrationEvent>(Assert.Single(eventPublisher.PublishedEvents));
-        Assert.Equal(ApplicationStatus.Applied.ToString(), stageChanged.PreviousStage);
-        Assert.Equal(ApplicationStatus.InterviewScheduled.ToString(), stageChanged.NewStage);
-        Assert.Equal(performedBy, stageChanged.ChangedBy);
-
-        var stageChangedAudit = Assert.IsType<ApplicationStageChangedAuditEvent>(Assert.Single(auditPublisher.Published));
-        Assert.Equal(ApplicationStatus.Applied, stageChangedAudit.PreviousStage);
-        Assert.Equal(ApplicationStatus.InterviewScheduled, stageChangedAudit.NewStage);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Does_Not_Publish_StageChanged_Events_When_Additional_Round_Booked_On_Already_InterviewScheduled_Application()
-    {
-        await using var db = BuildContext();
-        var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
-        application.MoveToScreening(Now);
-        application.ScheduleInterview(Now);
-        db.Vacancies.Add(vacancy);
-        db.Candidates.Add(candidate);
-        db.Applications.Add(application);
-        await db.SaveChangesAsync();
-
-        var eventPublisher = new FakeIntegrationEventPublisher();
-        var auditPublisher = new FakeAuditPublisher();
-
-        var result = await handler(db, eventPublisher: eventPublisher, auditPublisher: auditPublisher).HandleAsync(
-            new ScheduleInterviewRequest
-            {
-                CompanyId             = companyId,
-                VacancyId             = vacancy.Id,
-                ApplicationId         = application.Id,
-                InterviewerEmployeeId = Guid.NewGuid(),
-                ScheduledAt           = Now.AddDays(5),
-            },
             Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Empty(eventPublisher.PublishedEvents);
-        Assert.Empty(auditPublisher.Published);
         Assert.Empty(await db.ApplicationStageHistoryEntries.ToListAsync());
     }
 
@@ -184,18 +138,45 @@ public class ScheduleInterviewHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_Validation_Error_When_Application_Already_Hired()
+    public async Task HandleAsync_Returns_Validation_Error_When_Application_Already_On_Terminal_Stage()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", "olivia.grant@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
-        application.MoveToScreening(Now);
-        application.ScheduleInterview(Now);
-        application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
-        application.Offer(Now);
-        application.Hire(Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Hired.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new ScheduleInterviewRequest
+            {
+                CompanyId             = companyId,
+                VacancyId             = vacancy.Id,
+                ApplicationId         = application.Id,
+                InterviewerEmployeeId = Guid.NewGuid(),
+                ScheduledAt           = Now.AddDays(3),
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_Application_Withdrawn()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", "olivia.grant@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        application.Withdraw(Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -224,8 +205,9 @@ public class ScheduleInterviewHandlerTests
         var taskCreator = new FakeTaskCreator();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -294,8 +276,9 @@ public class ScheduleInterviewHandlerTests
         var notificationWriter = new FakeNotificationWriter();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -356,8 +339,9 @@ public class ScheduleInterviewHandlerTests
         var companyId = Guid.NewGuid();
         var positionProfileId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, null, null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -394,14 +378,14 @@ public class ScheduleInterviewHandlerTests
         var taskCreator = new FakeTaskCreator();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), null, null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
         await db.SaveChangesAsync();
 
-        // No summaries dictionary supplied — simulates the linked profile no longer being resolvable.
         var result = await handler(db, taskCreator).HandleAsync(
             new ScheduleInterviewRequest
             {
@@ -423,10 +407,8 @@ public class ScheduleInterviewHandlerTests
         RecruitmentDbContext db,
         FakeTaskCreator? taskCreator = null,
         FakeNotificationWriter? notificationWriter = null,
-        IPositionProfileReader? positionProfileReader = null,
-        FakeIntegrationEventPublisher? eventPublisher = null,
-        FakeAuditPublisher? auditPublisher = null) =>
-        new(db, taskCreator ?? new FakeTaskCreator(), notificationWriter ?? new FakeNotificationWriter(), new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader(), new RecruitmentStageChangeRecorder(db, eventPublisher ?? new FakeIntegrationEventPublisher(), auditPublisher ?? new FakeAuditPublisher()));
+        IPositionProfileReader? positionProfileReader = null) =>
+        new(db, taskCreator ?? new FakeTaskCreator(), notificationWriter ?? new FakeNotificationWriter(), new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

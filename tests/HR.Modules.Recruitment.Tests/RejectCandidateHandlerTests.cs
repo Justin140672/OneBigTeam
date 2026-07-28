@@ -18,8 +18,9 @@ public class RejectCandidateHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Noah", "Patel", "noah.patel@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -37,7 +38,7 @@ public class RejectCandidateHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(ApplicationStatus.Rejected, result.Value!.Status);
+        Assert.Equal(stages.Rejected.Id, result.Value!.CurrentStageId);
         Assert.Equal("Not enough backend experience.", result.Value.RejectionReason);
     }
 
@@ -47,8 +48,9 @@ public class RejectCandidateHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Ethan", "Wright", "ethan.wright@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -69,8 +71,9 @@ public class RejectCandidateHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Noah", "Patel", "noah.patel@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -88,33 +91,29 @@ public class RejectCandidateHandlerTests
         Assert.True(result.IsSuccess);
 
         var stageChanged = Assert.IsType<HR.SharedKernel.ApplicantStageChangedIntegrationEvent>(Assert.Single(eventPublisher.PublishedEvents));
-        Assert.Equal(ApplicationStatus.Applied.ToString(), stageChanged.PreviousStage);
-        Assert.Equal(ApplicationStatus.Rejected.ToString(), stageChanged.NewStage);
+        Assert.Equal("Application Received", stageChanged.PreviousStage);
+        Assert.Equal("Rejected", stageChanged.NewStage);
         Assert.Equal(performedBy, stageChanged.ChangedBy);
 
         var stageChangedAudit = Assert.IsType<ApplicationStageChangedAuditEvent>(Assert.Single(auditPublisher.Published));
-        Assert.Equal(ApplicationStatus.Applied, stageChangedAudit.PreviousStage);
-        Assert.Equal(ApplicationStatus.Rejected, stageChangedAudit.NewStage);
+        Assert.Equal(stages.ApplicationReceived.Id, stageChangedAudit.PreviousStageId);
+        Assert.Equal(stages.Rejected.Id, stageChangedAudit.NewStageId);
         Assert.Equal(performedBy, stageChangedAudit.ChangedBy);
 
         var historyEntry = await db.ApplicationStageHistoryEntries.SingleAsync();
-        Assert.Equal(ApplicationStatus.Applied, historyEntry.PreviousStage);
-        Assert.Equal(ApplicationStatus.Rejected, historyEntry.NewStage);
+        Assert.Equal(stages.ApplicationReceived.Id, historyEntry.PreviousStageId);
+        Assert.Equal(stages.Rejected.Id, historyEntry.NewStageId);
     }
 
     [Fact]
-    public async Task HandleAsync_Does_Not_Publish_Events_When_Already_Hired()
+    public async Task HandleAsync_Does_Not_Publish_Events_When_Already_On_Terminal_Stage()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", "olivia.grant@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
-        application.MoveToScreening(Now);
-        application.ScheduleInterview(Now);
-        application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
-        application.Offer(Now);
-        application.Hire(Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Hired.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -148,18 +147,38 @@ public class RejectCandidateHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_Validation_Error_When_Already_Hired()
+    public async Task HandleAsync_Returns_Validation_Error_When_Already_On_Terminal_Stage()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", "olivia.grant@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
-        application.MoveToScreening(Now);
-        application.ScheduleInterview(Now);
-        application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
-        application.Offer(Now);
-        application.Hire(Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Hired.Id, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new RejectCandidateRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_Error_When_No_Active_Rejected_Stage_Configured()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        stages.Rejected.SetActiveStatus(false, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", "olivia.grant@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);

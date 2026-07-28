@@ -1,5 +1,6 @@
 @using Syncfusion.Blazor.Inputs
 @inject RecruitmentKanbanService KanbanService
+@inject RecruitmentStageService RecruitmentStageService
 @inject CandidateService CandidateService
 @inject NavigationManager Navigation
 
@@ -32,7 +33,7 @@
     {
         <SfKanban TValue="KanbanApplicantModel"
                   DataSource="@FilteredCards"
-                  KeyField="Stage"
+                  KeyField="StageKey"
                   Height="640px"
                   CssClass="vacancy-kanban-board__kanban">
             <KanbanCardSettings>
@@ -40,13 +41,16 @@
                     @{
                         var applicant = (KanbanApplicantModel)context;
                     }
-                    <KanbanApplicantCard Applicant="applicant" RecruiterName="@RecruiterName(applicant)" OnOpen="OpenApplicant" />
+                    <KanbanApplicantCard Applicant="applicant"
+                                         RecruiterName="@RecruiterName(applicant)"
+                                         TerminalOutcome="@StageOutcome(applicant.StageId)"
+                                         OnOpen="OpenApplicant" />
                 </Template>
             </KanbanCardSettings>
             <KanbanColumns>
-                @foreach (var stage in ApplicationStatusTransitionRules.ColumnOrder)
+                @foreach (var column in _columns)
                 {
-                    <KanbanColumn HeaderText="@stage" KeyField="@(new List<string> { stage })" ShowItemCount="true" />
+                    <KanbanColumn HeaderText="@column.StageName" KeyField="@(new List<string> { column.StageId.ToString() })" ShowItemCount="true" />
                 }
             </KanbanColumns>
             <KanbanEvents TValue="KanbanApplicantModel" DragStop="OnDragStopAsync" CardClick="OnCardClickAsync" />
@@ -69,7 +73,14 @@
     private string? _error;
     private string? _vacancyTitle;
     private List<KanbanApplicantModel> _cards = [];
+    private List<KanbanColumnModel> _columns = [];
     private Dictionary<Guid, string> _candidateEmails = [];
+
+    // StageId -> TerminalOutcome lookup for Hired=success/Rejected=danger card accent styling — the
+    // Kanban response's KanbanColumn.IsTerminal alone can't distinguish Hired from Rejected, so this
+    // is built once per board load from the ticket #100 stages list endpoint instead (better UX than
+    // falling back to a generic "terminal" accent for both outcomes).
+    private Dictionary<Guid, RecruitmentStageTerminalOutcome> _stageOutcomes = [];
 
     protected override async Task OnParametersSetAsync()
     {
@@ -98,26 +109,38 @@
         // number field. See report: this is a known contract gap for ticket #69's email/employee
         // number search scope.
         var candidatesTask = CandidateService.ListCandidatesAsync(CompanyId, pageSize: 200);
+        // Only needed for the StageId -> TerminalOutcome lookup used by card styling — reused rather
+        // than re-fetched from scratch every board load isn't worth the added caching complexity
+        // here since a Kanban board load is already a multi-request operation.
+        var stagesTask = RecruitmentStageService.ListStagesAsync(CompanyId);
 
-        await Task.WhenAll(kanbanTask, candidatesTask);
+        await Task.WhenAll(kanbanTask, candidatesTask, stagesTask);
 
         var kanban = await kanbanTask;
         if (kanban is null)
         {
             _error = "Failed to load the recruitment Kanban board.";
             _cards = [];
+            _columns = [];
             if (showSpinner) _loading = false;
             return;
         }
 
         _vacancyTitle = kanban.VacancyTitle;
+        _columns = kanban.Columns.ToList();
         _cards = kanban.Columns.SelectMany(c => c.Applicants).ToList();
 
         var candidates = (await candidatesTask)?.Items ?? [];
         _candidateEmails = candidates.ToDictionary(c => c.Id, c => c.Email);
 
+        var stages = (await stagesTask)?.Items ?? [];
+        _stageOutcomes = stages.ToDictionary(s => s.Id, s => s.TerminalOutcome);
+
         if (showSpinner) _loading = false;
     }
+
+    private RecruitmentStageTerminalOutcome StageOutcome(Guid stageId) =>
+        _stageOutcomes.GetValueOrDefault(stageId, RecruitmentStageTerminalOutcome.None);
 
     private IEnumerable<KanbanApplicantModel> FilteredCards
     {
@@ -153,35 +176,27 @@
         args.Data is null ? Task.CompletedTask : OpenApplicant(args.Data);
 
     // Judgement call: DragStop (not DragStart/Dragging) is the hook — by the time it fires, Syncfusion
-    // has already updated args.Data's KeyField (Stage) to the target column's key, and
+    // has already updated args.Data's KeyField (StageKey) to the target column's key, and
     // args.PreviousCardData holds the pre-drag record, so both the "from" and "to" stage are available
-    // without any extra bookkeeping. Client-side transition validity is checked first (mirrors
-    // ApplicationStatusTransitions) so an obviously-invalid drop never reaches the server. Regardless
-    // of outcome (invalid drop, 422 from the server, or success) the board is always re-fetched from
-    // the server afterwards — this is the "revert" mechanism: the card visually snaps back to its true
-    // server-side column because the DataSource is fully replaced, rather than relying on
-    // args.Cancel's own (unconfirmed for this Blazor wrapper) undo behaviour. args.Cancel is still set
-    // for invalid/failed moves as a defensive best-effort in case the engine also does its own revert.
+    // without any extra bookkeeping. Ticket #99/#101 deleted the whole client-side transition graph
+    // (ApplicationStatusTransitionRules) since the server now validates transitions dynamically
+    // per-company (arbitrary stage configuration, no fixed pipeline) — there is no equivalent
+    // client-side rule left to pre-check, so every drop is now sent straight to the server and its
+    // 422 response (if any) is surfaced via _error. Regardless of outcome (422 from the server, or
+    // success) the board is always re-fetched from the server afterwards — this is the "revert"
+    // mechanism: the card visually snaps back to its true server-side column because the DataSource
+    // is fully replaced, rather than relying on args.Cancel's own (unconfirmed for this Blazor
+    // wrapper) undo behaviour. args.Cancel is still set on failure as a defensive best-effort in case
+    // the engine also does its own revert.
     private async Task OnDragStopAsync(Syncfusion.Blazor.Kanban.DragEventArgs<KanbanApplicantModel> args)
     {
         var moved = args.Data?.FirstOrDefault();
         var previous = args.PreviousCardData?.FirstOrDefault();
 
-        if (moved is null || previous is null || moved.Stage == previous.Stage)
+        if (moved is null || previous is null || moved.StageId == previous.StageId)
             return;
 
-        var fromStage = previous.Stage;
-        var toStage = moved.Stage;
-
-        if (!ApplicationStatusTransitionRules.CanTransitionTo(fromStage, toStage))
-        {
-            args.Cancel = true;
-            _error = $"Cannot move an applicant from {fromStage} to {toStage}.";
-            await LoadAsync(showSpinner: false);
-            return;
-        }
-
-        var (result, error) = await KanbanService.MoveApplicationStageAsync(CompanyId, VacancyId, moved.ApplicationId, toStage);
+        var (result, error) = await KanbanService.MoveApplicationStageAsync(CompanyId, VacancyId, moved.ApplicationId, moved.StageId);
 
         if (result is null)
         {

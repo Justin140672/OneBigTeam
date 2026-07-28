@@ -7,7 +7,7 @@ internal sealed record CreateApplicationResponse(
     Guid CompanyId,
     Guid VacancyId,
     Guid CandidateId,
-    ApplicationStatus Status,
+    Guid CurrentStageId,
     InterviewOutcome? InterviewOutcome,
     string? Notes,
     DateTimeOffset AppliedAt,

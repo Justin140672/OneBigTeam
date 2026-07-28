@@ -431,7 +431,7 @@ public class UpdateVacancyHandlerTests
         var newPositionProfileId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, oldPositionProfileId, "Title", null, Guid.NewGuid(), Now);
         db.Vacancies.Add(vacancy);
-        db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, Guid.NewGuid(), null, Now));
+        db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now));
         await db.SaveChangesAsync();
 
         var auditPublisher = new FakeAuditPublisher();
@@ -608,7 +608,7 @@ public class UpdateVacancyHandlerTests
         var newPositionProfileId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, oldPositionProfileId, "Title", null, Guid.NewGuid(), Now);
         db.Vacancies.Add(vacancy);
-        db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, Guid.NewGuid(), null, Now));
+        db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now));
         await db.SaveChangesAsync();
 
         var auditPublisher = new FakeAuditPublisher();

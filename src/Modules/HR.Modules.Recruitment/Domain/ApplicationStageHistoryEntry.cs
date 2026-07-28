@@ -6,6 +6,10 @@ namespace HR.Modules.Recruitment.Domain;
 /// IAuditEvent mechanism (see RecruitmentAudit.ApplicationStageChangedAuditEvent) — this is
 /// domain-specific data surfaced directly on the applicant record (GetApplication.StageHistory),
 /// not a general "who changed what" audit log entry.
+/// Ticket #99: PreviousStage/NewStage are now RecruitmentStage ids (Guid) rather than
+/// ApplicationStatus enum values. A nullable PreviousStageId represents "no prior stage" (does not
+/// currently occur — every Application always starts on a stage — but kept nullable for parity with
+/// other optional fields on this record and to tolerate any future stage-less transitional state).
 /// </summary>
 internal sealed class ApplicationStageHistoryEntry
 {
@@ -14,8 +18,8 @@ internal sealed class ApplicationStageHistoryEntry
     public Guid Id { get; private set; }
     public Guid CompanyId { get; private set; }
     public Guid ApplicationId { get; private set; }
-    public ApplicationStatus PreviousStage { get; private set; }
-    public ApplicationStatus NewStage { get; private set; }
+    public Guid? PreviousStageId { get; private set; }
+    public Guid NewStageId { get; private set; }
 
     // Nullable: some stage changes happen without an authenticated actor in scope (none currently,
     // but kept nullable for consistency with other audit-adjacent records in this module, e.g.
@@ -28,8 +32,8 @@ internal sealed class ApplicationStageHistoryEntry
         Guid id,
         Guid companyId,
         Guid applicationId,
-        ApplicationStatus previousStage,
-        ApplicationStatus newStage,
+        Guid? previousStageId,
+        Guid newStageId,
         Guid? changedByUserId,
         string? notes,
         DateTimeOffset changedAt) => new()
@@ -37,8 +41,8 @@ internal sealed class ApplicationStageHistoryEntry
         Id              = id,
         CompanyId       = companyId,
         ApplicationId   = applicationId,
-        PreviousStage   = previousStage,
-        NewStage        = newStage,
+        PreviousStageId = previousStageId,
+        NewStageId      = newStageId,
         ChangedByUserId = changedByUserId,
         Notes           = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
         ChangedAt       = changedAt,

@@ -1,12 +1,10 @@
-using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
-using HR.Modules.Recruitment.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.WithdrawApplication;
 
-internal sealed class WithdrawApplicationHandler(RecruitmentDbContext db, IClock clock, RecruitmentStageChangeRecorder recorder)
+internal sealed class WithdrawApplicationHandler(RecruitmentDbContext db, IClock clock, IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<WithdrawApplicationResponse>> HandleAsync(
         WithdrawApplicationRequest request,
@@ -24,25 +22,48 @@ internal sealed class WithdrawApplicationHandler(RecruitmentDbContext db, IClock
             return Result.Failure<WithdrawApplicationResponse>(
                 Error.NotFound($"Application '{request.ApplicationId}' was not found."));
 
-        if (application.Status is ApplicationStatus.Hired or ApplicationStatus.Rejected or ApplicationStatus.Withdrawn)
+        if (application.WithdrawnAt is not null)
             return Result.Failure<WithdrawApplicationResponse>(
-                Error.Validation($"Cannot withdraw an application with status '{application.Status}'."));
+                Error.Validation("This application has already been withdrawn."));
+
+        var currentStage = await db.RecruitmentStages
+            .AsNoTracking()
+            .SingleOrDefaultAsync(s => s.Id == application.CurrentStageId && s.CompanyId == request.CompanyId, cancellationToken);
+
+        if (currentStage is { IsTerminal: true })
+            return Result.Failure<WithdrawApplicationResponse>(
+                Error.Validation($"Cannot withdraw an application already on the terminal stage '{currentStage.Name}'."));
 
         var now = clock.UtcNowOffset();
-        var previousStatus = application.Status;
 
+        // Ticket #99 judgement call: withdrawal is candidate-initiated and orthogonal to the pipeline
+        // — there is no "Withdrawn" RecruitmentStage. CurrentStageId is left unchanged (the stage the
+        // application was at when withdrawn is preserved for historical accuracy); WithdrawnAt is set
+        // instead so Kanban/reporting can treat this application as inactive. No stage-history entry
+        // or ApplicantStageChangedIntegrationEvent is recorded here, since CurrentStageId does not
+        // change — only the audit trail (below) records that the withdrawal happened.
         application.Withdraw(now);
-        recorder.AddHistoryEntry(application, previousStatus, performedBy, now);
         await db.SaveChangesAsync(cancellationToken);
-        await recorder.PublishStageChangedEventsAsync(application, previousStatus, performedBy, now, cancellationToken);
+
+        await auditPublisher.PublishAsync(
+            new ApplicationWithdrawnAuditEvent(
+                application.CompanyId,
+                application.Id,
+                application.VacancyId,
+                application.CandidateId,
+                application.CurrentStageId,
+                performedBy,
+                now),
+            cancellationToken);
 
         return Result.Success(new WithdrawApplicationResponse(
             application.Id,
             application.VacancyId,
             application.CandidateId,
-            application.Status,
+            application.CurrentStageId,
             application.InterviewOutcome,
             application.Notes,
+            application.WithdrawnAt,
             application.AppliedAt,
             application.CreatedAt,
             application.UpdatedAt));

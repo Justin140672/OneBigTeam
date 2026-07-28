@@ -6,17 +6,24 @@
             <div class="kanban-applicant-card__name">@Applicant.CandidateFullName</div>
             <div class="kanban-applicant-card__vacancy text-muted">@Applicant.VacancyTitle</div>
         </div>
-        <StatusBadge Variant="@StatusVariant(Applicant.Stage)">@Applicant.Stage</StatusBadge>
+        <StatusBadge Variant="@StatusVariant">@Applicant.StageName</StatusBadge>
     </div>
     <div class="kanban-applicant-card__meta">
         <span><i class="fa-regular fa-calendar me-1"></i>Applied @Applicant.AppliedAt.ToString("d MMM yyyy")</span>
         <span><i class="fa-regular fa-user me-1"></i>@RecruiterName</span>
+        @if (Applicant.IsWithdrawn)
+        {
+            <span class="kanban-applicant-card__withdrawn"><i class="fa-solid fa-circle-minus me-1"></i>Withdrawn</span>
+        }
     </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public KanbanApplicantModel Applicant { get; set; } = default!;
     [Parameter] public string RecruiterName { get; set; } = "Unassigned";
+    // StageId -> TerminalOutcome lookup result for this applicant's current stage, resolved by the
+    // parent board (see VacancyKanbanBoard's _stageOutcomes) — None for non-terminal stages.
+    [Parameter] public RecruitmentStageTerminalOutcome TerminalOutcome { get; set; } = RecruitmentStageTerminalOutcome.None;
     [Parameter] public EventCallback<KanbanApplicantModel> OnOpen { get; set; }
 
     private string Initials =>
@@ -24,21 +31,25 @@
             .ToUpperInvariant();
 
     // Withdrawn/Rejected/Hired get a visually distinct accent — see StatusBadge for the badge itself,
-    // this is the card container accent (muted/danger/success border).
-    private string StageCssClass => Applicant.Stage switch
-    {
-        "Withdrawn" => "kanban-applicant-card--muted",
-        "Rejected" => "kanban-applicant-card--danger",
-        "Hired" => "kanban-applicant-card--success",
-        _ => string.Empty,
-    };
+    // this is the card container accent (muted/danger/success border). IsWithdrawn takes priority
+    // over the stage's terminal outcome since a withdrawn application can sit under any stage
+    // (see Applicant.IsWithdrawn's remarks) and that fact is more relevant to a recruiter scanning
+    // the board than which stage it happened to be on when withdrawn.
+    private string StageCssClass =>
+        Applicant.IsWithdrawn ? "kanban-applicant-card--muted"
+        : TerminalOutcome switch
+        {
+            RecruitmentStageTerminalOutcome.Hired => "kanban-applicant-card--success",
+            RecruitmentStageTerminalOutcome.Rejected => "kanban-applicant-card--danger",
+            _ => string.Empty,
+        };
 
-    private static StatusBadgeVariant StatusVariant(string status) => status switch
-    {
-        "Hired" => StatusBadgeVariant.Success,
-        "Offered" => StatusBadgeVariant.Primary,
-        "Interviewed" or "InterviewScheduled" => StatusBadgeVariant.Info,
-        "Rejected" or "Withdrawn" => StatusBadgeVariant.Danger,
-        _ => StatusBadgeVariant.Secondary,
-    };
+    private StatusBadgeVariant StatusVariant =>
+        Applicant.IsWithdrawn ? StatusBadgeVariant.Secondary
+        : TerminalOutcome switch
+        {
+            RecruitmentStageTerminalOutcome.Hired => StatusBadgeVariant.Success,
+            RecruitmentStageTerminalOutcome.Rejected => StatusBadgeVariant.Danger,
+            _ => StatusBadgeVariant.Info,
+        };
 }

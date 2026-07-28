@@ -62,6 +62,7 @@ builder.Services.AddScoped<ApplicationService>();
 builder.Services.AddScoped<InterviewService>();
 builder.Services.AddScoped<RecruitmentKanbanService>();
 builder.Services.AddScoped<ExternalRecruiterService>();
+builder.Services.AddScoped<RecruitmentStageService>();
 builder.Services.AddScoped<UserAdministrationService>();
 builder.Services.AddScoped<DataImportService>();
 builder.Services.AddScoped<AppSession>();

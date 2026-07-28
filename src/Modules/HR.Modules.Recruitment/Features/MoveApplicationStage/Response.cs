@@ -6,7 +6,7 @@ internal sealed record MoveApplicationStageResponse(
     Guid Id,
     Guid VacancyId,
     Guid CandidateId,
-    ApplicationStatus Status,
+    Guid CurrentStageId,
     InterviewOutcome? InterviewOutcome,
     string? Notes,
     DateTimeOffset AppliedAt,

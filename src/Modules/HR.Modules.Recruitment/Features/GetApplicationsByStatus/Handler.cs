@@ -15,7 +15,7 @@ internal sealed class GetApplicationsByStatusHandler(
                 from a in dbContext.Applications.AsNoTracking()
                 join c in dbContext.Candidates.AsNoTracking() on a.CandidateId equals c.Id
                 join v in dbContext.Vacancies.AsNoTracking() on a.VacancyId equals v.Id
-                where a.CompanyId == request.CompanyId && a.Status == request.Status
+                where a.CompanyId == request.CompanyId && a.CurrentStageId == request.StageId
                 orderby a.AppliedAt descending
                 select new
                 {

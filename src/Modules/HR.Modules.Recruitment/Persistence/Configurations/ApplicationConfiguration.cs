@@ -28,11 +28,12 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
             .HasColumnName("candidate_id")
             .IsRequired();
 
-        builder.Property(a => a.Status)
-            .HasColumnName("status")
-            .HasConversion<string>()
-            .HasMaxLength(30)
+        builder.Property(a => a.CurrentStageId)
+            .HasColumnName("current_stage_id")
             .IsRequired();
+
+        builder.Property(a => a.WithdrawnAt)
+            .HasColumnName("withdrawn_at");
 
         builder.Property(a => a.InterviewOutcome)
             .HasColumnName("interview_outcome")
@@ -77,10 +78,16 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
             .HasForeignKey(a => a.CandidateId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne<RecruitmentStage>()
+            .WithMany()
+            .HasForeignKey(a => a.CurrentStageId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(a => a.CompanyId);
         builder.HasIndex(a => a.VacancyId);
         builder.HasIndex(a => a.CandidateId);
         builder.HasIndex(a => new { a.VacancyId, a.CandidateId }).IsUnique();
         builder.HasIndex(a => a.SourceExternalRecruiterId);
+        builder.HasIndex(a => a.CurrentStageId);
     }
 }

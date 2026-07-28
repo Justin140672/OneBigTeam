@@ -23,9 +23,9 @@ public sealed class RecruitmentKanbanService(IHttpClientFactory httpClientFactor
     }
 
     public async Task<(MoveApplicationStageResponse? Result, string? Error)> MoveApplicationStageAsync(
-        Guid companyId, Guid vacancyId, Guid applicationId, string newStatus, string? notes = null)
+        Guid companyId, Guid vacancyId, Guid applicationId, Guid newStageId, string? notes = null)
     {
-        var request = new MoveApplicationStageRequest(companyId, vacancyId, applicationId, newStatus, notes);
+        var request = new MoveApplicationStageRequest(companyId, vacancyId, applicationId, newStageId, notes);
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/move-stage",
             request, HrApiJsonOptions.Default);

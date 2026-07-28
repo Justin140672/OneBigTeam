@@ -1,5 +1,4 @@
 using FluentValidation;
-using HR.Modules.Recruitment.Domain;
 
 namespace HR.Modules.Recruitment.Features.MoveApplicationStage;
 
@@ -16,8 +15,8 @@ internal sealed class MoveApplicationStageValidator : AbstractValidator<MoveAppl
         RuleFor(r => r.ApplicationId)
             .NotEmpty();
 
-        RuleFor(r => r.NewStatus)
-            .IsInEnum();
+        RuleFor(r => r.NewStageId)
+            .NotEmpty();
 
         RuleFor(r => r.Notes)
             .MaximumLength(2000)

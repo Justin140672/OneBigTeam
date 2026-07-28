@@ -13,6 +13,7 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
         var row = await (
             from a in db.Applications.AsNoTracking()
             join c in db.Candidates.AsNoTracking() on a.CandidateId equals c.Id
+            join s in db.RecruitmentStages.AsNoTracking() on a.CurrentStageId equals s.Id
             where a.Id        == request.ApplicationId
                && a.CompanyId == request.CompanyId
                && a.VacancyId == request.VacancyId
@@ -24,9 +25,11 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
                 c.FirstName,
                 c.LastName,
                 c.Email,
-                a.Status,
+                a.CurrentStageId,
+                CurrentStageName = s.Name,
                 a.InterviewOutcome,
                 a.Notes,
+                a.WithdrawnAt,
                 a.AppliedAt,
                 a.CreatedAt,
                 a.UpdatedAt,
@@ -55,8 +58,8 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
             .OrderBy(e => e.ChangedAt)
             .Select(e => new ApplicationStageHistoryItem(
                 e.Id,
-                e.PreviousStage,
-                e.NewStage,
+                e.PreviousStageId,
+                e.NewStageId,
                 e.ChangedByUserId,
                 e.Notes,
                 e.ChangedAt))
@@ -69,9 +72,11 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
             row.FirstName,
             row.LastName,
             row.Email,
-            row.Status,
+            row.CurrentStageId,
+            row.CurrentStageName,
             row.InterviewOutcome,
             row.Notes,
+            row.WithdrawnAt,
             row.AppliedAt,
             row.CreatedAt,
             row.UpdatedAt,

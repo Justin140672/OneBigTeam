@@ -293,12 +293,12 @@ public class GetVacancyHandlerTests
 
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
         db.Vacancies.Add(vacancy);
-        db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, Guid.NewGuid(), null, Now));
-        db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, Guid.NewGuid(), null, Now));
+        db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now));
+        db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now));
         // An application linked to a different vacancy should not be counted.
         var otherVacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Other Role", null, Guid.NewGuid(), Now);
         db.Vacancies.Add(otherVacancy);
-        db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, otherVacancy.Id, Guid.NewGuid(), null, Now));
+        db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, otherVacancy.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now));
         await db.SaveChangesAsync();
 
         var result = await new GetVacancyHandler(db, new FakePositionProfileReader()).HandleAsync(
@@ -336,7 +336,7 @@ public class GetVacancyHandlerTests
 
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
         db.Vacancies.Add(vacancy);
-        db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, Guid.NewGuid(), null, Now));
+        db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now));
         await db.SaveChangesAsync();
 
         var result = await new GetVacancyHandler(db, new FakePositionProfileReader()).HandleAsync(

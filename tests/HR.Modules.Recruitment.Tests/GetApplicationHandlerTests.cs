@@ -1,6 +1,7 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.GetApplication;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Tests;
@@ -16,7 +17,8 @@ public class GetApplicationHandlerTests
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -31,6 +33,9 @@ public class GetApplicationHandlerTests
         Assert.Equal("Emma", result.Value.CandidateFirstName);
         Assert.Equal("Clarke", result.Value.CandidateLastName);
         Assert.Equal("emma.clarke@example.com", result.Value.CandidateEmail);
+        Assert.Equal(stages.ApplicationReceived.Id, result.Value.CurrentStageId);
+        Assert.Equal("Application Received", result.Value.CurrentStageName);
+        Assert.Null(result.Value.WithdrawnAt);
     }
 
     [Fact]
@@ -54,7 +59,8 @@ public class GetApplicationHandlerTests
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var otherVacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
         db.Vacancies.AddRange(vacancy, otherVacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -75,7 +81,8 @@ public class GetApplicationHandlerTests
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -96,17 +103,18 @@ public class GetApplicationHandlerTests
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.CvReview.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
 
         var changedBy = Guid.NewGuid();
-        var laterEntry = ApplicationStageHistoryEntry.Create(
-            Guid.NewGuid(), companyId, application.Id, ApplicationStatus.Screening, ApplicationStatus.InterviewScheduled,
+        var laterEntry = HR.Modules.Recruitment.Domain.ApplicationStageHistoryEntry.Create(
+            Guid.NewGuid(), companyId, application.Id, stages.CvReview.Id, stages.Interview.Id,
             changedBy, "Scheduled first round.", Now.AddDays(2));
-        var earlierEntry = ApplicationStageHistoryEntry.Create(
-            Guid.NewGuid(), companyId, application.Id, ApplicationStatus.Applied, ApplicationStatus.Screening,
+        var earlierEntry = HR.Modules.Recruitment.Domain.ApplicationStageHistoryEntry.Create(
+            Guid.NewGuid(), companyId, application.Id, stages.ApplicationReceived.Id, stages.CvReview.Id,
             changedBy, "Passed CV screen.", Now.AddDays(1));
         db.ApplicationStageHistoryEntries.AddRange(laterEntry, earlierEntry);
         await db.SaveChangesAsync();
@@ -119,8 +127,8 @@ public class GetApplicationHandlerTests
         Assert.Equal(
             [earlierEntry.Id, laterEntry.Id],
             result.Value!.StageHistory.Select(h => h.Id));
-        Assert.Equal(ApplicationStatus.Applied, result.Value.StageHistory[0].PreviousStage);
-        Assert.Equal(ApplicationStatus.Screening, result.Value.StageHistory[0].NewStage);
+        Assert.Equal(stages.ApplicationReceived.Id, result.Value.StageHistory[0].PreviousStageId);
+        Assert.Equal(stages.CvReview.Id, result.Value.StageHistory[0].NewStageId);
         Assert.Equal(changedBy, result.Value.StageHistory[0].ChangedByUserId);
         Assert.Equal("Passed CV screen.", result.Value.StageHistory[0].Notes);
     }
@@ -133,7 +141,8 @@ public class GetApplicationHandlerTests
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         var recruiter = ExternalRecruiter.Create(Guid.NewGuid(), companyId, "Acme Recruiting", null, null, null, null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now, ApplicationSource.ExternalRecruiter, recruiter.Id);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now, ApplicationSource.ExternalRecruiter, recruiter.Id);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.ExternalRecruiters.Add(recruiter);
@@ -157,7 +166,8 @@ public class GetApplicationHandlerTests
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -171,6 +181,30 @@ public class GetApplicationHandlerTests
         Assert.Null(result.Value!.Source);
         Assert.Null(result.Value.SourceExternalRecruiterId);
         Assert.Null(result.Value.SourceExternalRecruiterAgencyName);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_WithdrawnAt_When_Application_Has_Been_Withdrawn()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
+        application.Withdraw(Now.AddDays(1));
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await new GetApplicationHandler(db).HandleAsync(
+            new GetApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(Now.AddDays(1), result.Value!.WithdrawnAt);
+        Assert.Equal(stages.ApplicationReceived.Id, result.Value.CurrentStageId);
     }
 
     private static RecruitmentDbContext BuildContext() =>

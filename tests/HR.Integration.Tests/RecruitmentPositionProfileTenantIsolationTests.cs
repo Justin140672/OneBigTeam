@@ -4,6 +4,7 @@ using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
@@ -78,12 +79,11 @@ public class RecruitmentPositionProfileTenantIsolationTests : IClassFixture<ApiW
                 Guid.NewGuid(), companyA, referenceDataA.PositionProfileId, "Company A Role", null, Guid.NewGuid(), Now);
             var candidateA = Candidate.Create(
                 Guid.NewGuid(), companyA, "Ada", "Lovelace", $"ada.{Guid.NewGuid():N}@example.com", null, null, Now);
-            var applicationA = Application.Create(Guid.NewGuid(), companyA, vacancyA.Id, candidateA.Id, null, Now);
-            applicationA.MoveToScreening(Now);
-            applicationA.ScheduleInterview(Now);
-            applicationA.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
-            applicationA.Offer(Now);
+            var stages = RecruitmentStageSeeder.BuildDefaultStages(companyA, Now);
+            var offerStageId = stages.Single(s => s.Name == "Offer").Id;
+            var applicationA = Application.Create(Guid.NewGuid(), companyA, vacancyA.Id, candidateA.Id, offerStageId, null, Now);
 
+            recruitmentDb.RecruitmentStages.AddRange(stages);
             recruitmentDb.Vacancies.Add(vacancyA);
             recruitmentDb.Candidates.Add(candidateA);
             recruitmentDb.Applications.Add(applicationA);

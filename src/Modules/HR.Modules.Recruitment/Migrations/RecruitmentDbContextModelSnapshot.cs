@@ -45,6 +45,10 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid>("CurrentStageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_stage_id");
+
                     b.Property<string>("InterviewOutcome")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
@@ -69,12 +73,6 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("source_external_recruiter_id");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("status");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -83,11 +81,17 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("vacancy_id");
 
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("withdrawn_at");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CandidateId");
 
                     b.HasIndex("CompanyId");
+
+                    b.HasIndex("CurrentStageId");
 
                     b.HasIndex("SourceExternalRecruiterId");
 
@@ -121,22 +125,18 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");
 
-                    b.Property<string>("NewStage")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("new_stage");
+                    b.Property<Guid>("NewStageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("new_stage_id");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("notes");
 
-                    b.Property<string>("PreviousStage")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("previous_stage");
+                    b.Property<Guid?>("PreviousStageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("previous_stage_id");
 
                     b.HasKey("Id");
 
@@ -384,6 +384,61 @@ namespace HR.Modules.Recruitment.Migrations
                     b.ToTable("interviews", "recruitment");
                 });
 
+            modelBuilder.Entity("HR.Modules.Recruitment.Domain.RecruitmentStage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("display_order");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsTerminal")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_terminal");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("TerminalOutcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("terminal_outcome");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("CompanyId", "DisplayOrder")
+                        .IsUnique();
+
+                    b.HasIndex("CompanyId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("recruitment_stages", "recruitment");
+                });
+
             modelBuilder.Entity("HR.Modules.Recruitment.Domain.Vacancy", b =>
                 {
                     b.Property<Guid>("Id")
@@ -456,6 +511,12 @@ namespace HR.Modules.Recruitment.Migrations
                     b.HasOne("HR.Modules.Recruitment.Domain.Candidate", null)
                         .WithMany()
                         .HasForeignKey("CandidateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HR.Modules.Recruitment.Domain.RecruitmentStage", null)
+                        .WithMany()
+                        .HasForeignKey("CurrentStageId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 

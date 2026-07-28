@@ -1,0 +1,188 @@
+@page "/companies/{CompanyId:guid}/recruitment-stages"
+@rendermode InteractiveServer
+@inherits SearchPageBase<RecruitmentStageListItem>
+@inject RecruitmentStageService RecruitmentStageService
+@inject AppSession Session
+
+<PageTitle>Recruitment Stages</PageTitle>
+
+<div class="container-fluid py-4">
+    <a href="/dashboard/recruitment" class="text-decoration-none text-muted small">← Recruitment Dashboard</a>
+    <h1 class="mb-1">Recruitment Stages</h1>
+    <p class="text-muted mb-3">Configure the pipeline stages applicants move through, and mark which stages represent a Hired or Rejected outcome.</p>
+
+    @if (IsLoading)
+    {
+        <HrLoadingIndicator Label="Loading recruitment stages…" />
+    }
+    else if (Error is not null)
+    {
+        <div class="alert alert-danger">@Error</div>
+    }
+    else
+    {
+        @if (ActionError is not null)
+        {
+            <div class="alert alert-danger alert-dismissible">
+                @ActionError
+                <button type="button" class="btn-close" @onclick="ClearActionError"></button>
+            </div>
+        }
+
+        <HrGrid @ref="Grid"
+                TValue="RecruitmentStageListItem"
+                DataSource="@Items"
+                Toolbar="@GridToolbar"
+                AllowPaging="true"
+                AllowSorting="true">
+            <GridEvents TValue="RecruitmentStageListItem" OnToolbarClick="OnToolbarClick"
+                        RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
+            <GridPageSettings PageSize="20" />
+            <GridColumns>
+                <GridColumn Field="@nameof(RecruitmentStageListItem.DisplayOrder)" HeaderText="Order" Width="90" />
+                <GridColumn Field="@nameof(RecruitmentStageListItem.Name)" HeaderText="Name" Width="220">
+                    <Template>
+                        @{
+                            var row = (context as RecruitmentStageListItem)!;
+                            <a href="/companies/@CompanyId/recruitment-stages/@row.Id">@row.Name</a>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(RecruitmentStageListItem.IsActive)" HeaderText="Status" Width="110">
+                    <Template>
+                        @{
+                            var row = (context as RecruitmentStageListItem)!;
+                            <ActiveStatusBadge IsActive="row.IsActive" />
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn HeaderText="Terminal Outcome" Width="150">
+                    <Template>
+                        @{
+                            var row = (context as RecruitmentStageListItem)!;
+                        }
+                        <StatusBadge Variant="@TerminalOutcomeVariant(row.TerminalOutcome)">@row.TerminalOutcome</StatusBadge>
+                    </Template>
+                </GridColumn>
+                <GridColumn HeaderText="Reorder" Width="140">
+                    <Template>
+                        @{
+                            var row = (context as RecruitmentStageListItem)!;
+                        }
+                        <button type="button" class="btn btn-sm btn-outline-secondary me-1"
+                                disabled="@(row.DisplayOrder <= 1)"
+                                @onclick="() => MoveUpAsync(row)" title="Move up">
+                            <i class="fa-solid fa-arrow-up"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                disabled="@(row.DisplayOrder >= Items.Count)"
+                                @onclick="() => MoveDownAsync(row)" title="Move down">
+                            <i class="fa-solid fa-arrow-down"></i>
+                        </button>
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </HrGrid>
+
+        <p class="text-muted small mt-2">@Items.Count stage(s)</p>
+    }
+</div>
+
+@code {
+    protected override bool SupportsActiveFilter => true;
+
+    protected override Task OnBeforeLoadAsync()
+    {
+        if (!Session.CanManageEmployees && !Session.IsRecruiter)
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+        return Task.CompletedTask;
+    }
+
+    protected override void ConfigureToolbar()
+    {
+        AddToolbarAction(
+            id:      "hr-activate",
+            text:    "Activate",
+            icon:    "fa-solid fa-circle-check",
+            onClick: async item =>
+            {
+                if (item.IsActive) return;
+                await SetActiveStatus(item, true);
+            },
+            tooltip: "Activate selected stage");
+
+        AddToolbarAction(
+            id:      "hr-deactivate",
+            text:    "Deactivate",
+            icon:    "fa-solid fa-circle-xmark",
+            onClick: async item =>
+            {
+                if (!item.IsActive) return;
+                await SetActiveStatus(item, false);
+            },
+            tooltip: "Deactivate selected stage");
+    }
+
+    protected override async Task<IReadOnlyList<RecruitmentStageListItem>?> FetchItemsAsync(string? search)
+    {
+        var result = await RecruitmentStageService.ListStagesAsync(CompanyId);
+        var items = result?.Items;
+        if (items is null) return null;
+
+        var ordered = items.OrderBy(i => i.DisplayOrder).ToList();
+        return ShowInactive ? ordered : ordered.Where(i => i.IsActive).ToList();
+    }
+
+    protected override string LoadErrorMessage => "Failed to load recruitment stages.";
+
+    protected override string? GetAddUrl()  => $"/companies/{CompanyId}/recruitment-stages/new";
+    protected override string? GetEditUrl(RecruitmentStageListItem item) => $"/companies/{CompanyId}/recruitment-stages/{item.Id}";
+    protected override string? GetViewUrl(RecruitmentStageListItem item) => $"/companies/{CompanyId}/recruitment-stages/{item.Id}/view";
+
+    private static StatusBadgeVariant TerminalOutcomeVariant(RecruitmentStageTerminalOutcome outcome) => outcome switch
+    {
+        RecruitmentStageTerminalOutcome.Hired => StatusBadgeVariant.Success,
+        RecruitmentStageTerminalOutcome.Rejected => StatusBadgeVariant.Danger,
+        _ => StatusBadgeVariant.Secondary,
+    };
+
+    private async Task SetActiveStatus(RecruitmentStageListItem item, bool isActive)
+    {
+        ClearActionError();
+        var (result, error) = await RecruitmentStageService.SetActiveStatusAsync(CompanyId, item.Id, isActive);
+        if (result is null)
+            SetActionError(error);
+        else
+            await LoadAsync();
+    }
+
+    // Move-up/down is the reorder mechanism (no drag-drop precedent found in this codebase's grid
+    // usage) — recompute the full ordered id list (including inactive stages, since the reorder
+    // endpoint reassigns DisplayOrder 1..N by list position for every stage) and send it whole.
+    private async Task MoveUpAsync(RecruitmentStageListItem item) => await MoveAsync(item, -1);
+
+    private async Task MoveDownAsync(RecruitmentStageListItem item) => await MoveAsync(item, 1);
+
+    private async Task MoveAsync(RecruitmentStageListItem item, int delta)
+    {
+        ClearActionError();
+
+        // Reorder must operate on the full set (active + inactive) in true DisplayOrder, regardless
+        // of the current "show inactive" filter applied to Items.
+        var all = await RecruitmentStageService.ListStagesAsync(CompanyId);
+        if (all?.Items is null) return;
+
+        var ordered = all.Items.OrderBy(i => i.DisplayOrder).Select(i => i.Id).ToList();
+        var index = ordered.IndexOf(item.Id);
+        var newIndex = index + delta;
+        if (index < 0 || newIndex < 0 || newIndex >= ordered.Count) return;
+
+        (ordered[index], ordered[newIndex]) = (ordered[newIndex], ordered[index]);
+
+        var (result, error) = await RecruitmentStageService.ReorderAsync(CompanyId, ordered);
+        if (result is null)
+            SetActionError(error);
+        else
+            await LoadAsync();
+    }
+}

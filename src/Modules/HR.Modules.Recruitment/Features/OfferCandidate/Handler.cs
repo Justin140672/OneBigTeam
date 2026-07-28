@@ -29,9 +29,34 @@ internal sealed class OfferCandidateHandler(
             return Result.Failure<OfferCandidateResponse>(
                 Error.NotFound($"Application '{request.ApplicationId}' was not found."));
 
-        if (application.Status != ApplicationStatus.Interviewed)
+        if (application.WithdrawnAt is not null)
             return Result.Failure<OfferCandidateResponse>(
-                Error.Validation($"Cannot make an offer for an application with status '{application.Status}'."));
+                Error.Validation("Cannot make an offer for an application that has been withdrawn."));
+
+        var currentStage = await db.RecruitmentStages
+            .AsNoTracking()
+            .SingleOrDefaultAsync(s => s.Id == application.CurrentStageId && s.CompanyId == request.CompanyId, cancellationToken);
+
+        if (currentStage is null)
+            return Result.Failure<OfferCandidateResponse>(
+                Error.NotFound($"Recruitment stage '{application.CurrentStageId}' was not found."));
+
+        // Ticket #99 judgement call: since stages are now data-driven, the equivalent of the old
+        // "must be Interviewed" rule is "must not already be on a terminal stage" — a company may
+        // have zero, one, or several interview-shaped stages ahead of Offer.
+        if (currentStage.IsTerminal)
+            return Result.Failure<OfferCandidateResponse>(
+                Error.Validation($"Cannot make an offer for an application already on the terminal stage '{currentStage.Name}'."));
+
+        var offerStage = await db.RecruitmentStages
+            .AsNoTracking()
+            .Where(s => s.CompanyId == request.CompanyId && s.IsActive)
+            .OrderByDescending(s => s.DisplayOrder)
+            .FirstOrDefaultAsync(s => !s.IsTerminal, cancellationToken);
+
+        if (offerStage is null)
+            return Result.Failure<OfferCandidateResponse>(
+                Error.Validation("This company has no active non-terminal recruitment stage to move this application to."));
 
         var vacancy = await db.Vacancies
             .AsNoTracking()
@@ -44,12 +69,12 @@ internal sealed class OfferCandidateHandler(
                 Error.NotFound($"Vacancy '{request.VacancyId}' was not found."));
 
         var now = clock.UtcNowOffset();
-        var previousStatus = application.Status;
+        var previousStageId = application.CurrentStageId;
 
-        application.Offer(now);
-        recorder.AddHistoryEntry(application, previousStatus, performedBy, now);
+        application.MoveToStage(offerStage.Id, now);
+        recorder.AddHistoryEntry(application, previousStageId, performedBy, now);
         await db.SaveChangesAsync(cancellationToken);
-        await recorder.PublishStageChangedEventsAsync(application, previousStatus, performedBy, now, cancellationToken);
+        await recorder.PublishStageChangedEventsAsync(application, previousStageId, performedBy, now, cancellationToken);
 
         // Cross-module read: informational-only employment defaults from the linked Position Profile
         // (owned by HR.Modules.Employees), resolved via the narrow IPositionProfileReader contract. See
@@ -61,7 +86,7 @@ internal sealed class OfferCandidateHandler(
             application.Id,
             application.VacancyId,
             application.CandidateId,
-            application.Status,
+            application.CurrentStageId,
             application.InterviewOutcome,
             application.Notes,
             application.AppliedAt,

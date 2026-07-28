@@ -28,6 +28,9 @@
             <SfButton CssClass="recruitment-dashboard-action-btn" OnClick="NavigateToExternalRecruiters" data-testid="recruitment-dashboard-recruiters-btn">
                 <i class="fa-solid fa-people-arrows me-2"></i>Recruiters
             </SfButton>
+            <SfButton CssClass="recruitment-dashboard-action-btn" OnClick="NavigateToRecruitmentSettings" data-testid="recruitment-dashboard-settings-btn">
+                <i class="fa-solid fa-gear me-2"></i>Recruitment Settings
+            </SfButton>
         </div>
 
         <div class="dashboard-overview-row">
@@ -138,6 +141,9 @@
 
     private void NavigateToExternalRecruiters() =>
         Navigation.NavigateTo($"/companies/{Session.CompanyId}/external-recruiters");
+
+    private void NavigateToRecruitmentSettings() =>
+        Navigation.NavigateTo($"/companies/{Session.CompanyId}/recruitment-stages");
 
     private static string Greeting()
     {

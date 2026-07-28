@@ -17,6 +17,7 @@ internal class RecruitmentDbContext : DbContext
     public DbSet<CandidateDocument> CandidateDocuments => Set<CandidateDocument>();
     public DbSet<ApplicationStageHistoryEntry> ApplicationStageHistoryEntries => Set<ApplicationStageHistoryEntry>();
     public DbSet<ExternalRecruiter> ExternalRecruiters => Set<ExternalRecruiter>();
+    public DbSet<RecruitmentStage> RecruitmentStages => Set<RecruitmentStage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

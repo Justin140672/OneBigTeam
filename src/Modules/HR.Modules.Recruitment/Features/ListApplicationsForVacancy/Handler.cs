@@ -17,8 +17,8 @@ internal sealed class ListApplicationsForVacancyHandler(RecruitmentDbContext db)
                && a.VacancyId == request.VacancyId
             select new { a, c };
 
-        if (request.Status.HasValue)
-            query = query.Where(x => x.a.Status == request.Status.Value);
+        if (request.StageId.HasValue)
+            query = query.Where(x => x.a.CurrentStageId == request.StageId.Value);
 
         var items = await query
             .OrderByDescending(x => x.a.AppliedAt)
@@ -28,8 +28,9 @@ internal sealed class ListApplicationsForVacancyHandler(RecruitmentDbContext db)
                 x.c.FirstName,
                 x.c.LastName,
                 x.c.Email,
-                x.a.Status,
+                x.a.CurrentStageId,
                 x.a.InterviewOutcome,
+                x.a.WithdrawnAt != null,
                 x.a.AppliedAt))
             .ToListAsync(cancellationToken);
 

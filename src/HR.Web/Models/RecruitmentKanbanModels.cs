@@ -1,9 +1,10 @@
 namespace HR.Web.Models;
 
 // ── GET KANBAN ────────────────────────────────────────────────────────────────
-// Mirrors HR.Modules.Recruitment.Features.GetRecruitmentKanban.Response — one column per
-// ApplicationStatus (pipeline order), all eight always present including trailing
-// Rejected/Withdrawn columns, even when empty.
+// Mirrors HR.Modules.Recruitment.Features.GetRecruitmentKanban.Response (post ticket #99) — columns
+// are now the company's own active RecruitmentStage rows, in DisplayOrder, not a fixed 8-status
+// enum. There is no more dedicated "Withdrawn" column: a withdrawn application stays under its real
+// current stage and is flagged via IsWithdrawn instead (see KanbanApplicantModel).
 
 public sealed record GetRecruitmentKanbanResponse(
     Guid VacancyId,
@@ -11,7 +12,9 @@ public sealed record GetRecruitmentKanbanResponse(
     IReadOnlyList<KanbanColumnModel> Columns);
 
 public sealed record KanbanColumnModel(
-    string Stage,
+    Guid StageId,
+    string StageName,
+    bool IsTerminal,
     int Count,
     IReadOnlyList<KanbanApplicantModel> Applicants);
 
@@ -23,7 +26,12 @@ public sealed record KanbanApplicantModel(
     // Always null today — Candidate has no photo field yet (see backend Handler comment). Card
     // template must render a placeholder avatar and not break on null.
     string? CandidatePhotoUrl,
-    string Stage,
+    Guid StageId,
+    string StageName,
+    // Ticket #99: a withdrawn application remains under its current stage rather than moving to a
+    // dedicated column — this flag is orthogonal to StageId/StageName and drives a muted/greyed-out
+    // card treatment regardless of which stage it's shown under.
+    bool IsWithdrawn,
     DateTimeOffset AppliedAt,
     // Ticket #81: references ExternalRecruiter (an external agency), not an Employee — see the
     // backend Response's remarks for the scope-correction history.
@@ -34,22 +42,28 @@ public sealed record KanbanApplicantModel(
     string VacancyTitle)
 {
     public string CandidateFullName => $"{CandidateFirstName} {CandidateLastName}";
+
+    // SfKanban's KeyField needs a string — StageId (Guid) is the real identity, this is purely a
+    // rendering/wiring convenience for the Kanban column KeyField match.
+    public string StageKey => StageId.ToString();
 }
 
 // ── MOVE STAGE ────────────────────────────────────────────────────────────────
+// Mirrors HR.Modules.Recruitment.Features.MoveApplicationStage (post ticket #99) — the target is
+// now a RecruitmentStage id, not a fixed ApplicationStatus string.
 
 public sealed record MoveApplicationStageRequest(
     Guid CompanyId,
     Guid VacancyId,
     Guid ApplicationId,
-    string NewStatus,
+    Guid NewStageId,
     string? Notes = null);
 
 public sealed record MoveApplicationStageResponse(
     Guid Id,
     Guid VacancyId,
     Guid CandidateId,
-    string Status,
+    Guid CurrentStageId,
     string? InterviewOutcome,
     string? Notes,
     DateTimeOffset AppliedAt,

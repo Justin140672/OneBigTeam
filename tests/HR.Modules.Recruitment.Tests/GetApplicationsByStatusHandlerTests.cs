@@ -11,24 +11,25 @@ public class GetApplicationsByStatusHandlerTests
     private static readonly DateTimeOffset Now = new(2026, 7, 6, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task HandleAsync_Returns_Applications_For_Given_Status_With_Candidate_And_Vacancy_Details()
+    public async Task HandleAsync_Returns_Applications_For_Given_Stage_With_Candidate_And_Vacancy_Details()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var applied = GetPipelineSummaryHandlerTests.CreateApplicationWithStatus(companyId, vacancy.Id, candidate.Id, ApplicationStatus.Applied);
-        var screening = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
-        screening.MoveToScreening(Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var applied = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
+        var otherCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var cvReview = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, otherCandidate.Id, stages.CvReview.Id, null, Now);
 
         db.Vacancies.Add(vacancy);
-        db.Candidates.Add(candidate);
-        db.Applications.AddRange(applied, screening);
+        db.Candidates.AddRange(candidate, otherCandidate);
+        db.Applications.AddRange(applied, cvReview);
         await db.SaveChangesAsync();
 
         var handler = new GetApplicationsByStatusHandler(db, new FakePositionProfileReader());
         var result = await handler.HandleAsync(
-            new GetApplicationsByStatusRequest(companyId, ApplicationStatus.Applied),
+            new GetApplicationsByStatusRequest(companyId, stages.ApplicationReceived.Id),
             CancellationToken.None);
 
         var item = Assert.Single(result.Items);
@@ -48,9 +49,10 @@ public class GetApplicationsByStatusHandlerTests
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
         var candidateA = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         var candidateB = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
 
-        var earlier = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidateA.Id, null, Now.AddDays(-2));
-        var later = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidateB.Id, null, Now);
+        var earlier = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidateA.Id, stages.ApplicationReceived.Id, null, Now.AddDays(-2));
+        var later = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidateB.Id, stages.ApplicationReceived.Id, null, Now);
 
         db.Vacancies.Add(vacancy);
         db.Candidates.AddRange(candidateA, candidateB);
@@ -59,7 +61,7 @@ public class GetApplicationsByStatusHandlerTests
 
         var handler = new GetApplicationsByStatusHandler(db, new FakePositionProfileReader());
         var result = await handler.HandleAsync(
-            new GetApplicationsByStatusRequest(companyId, ApplicationStatus.Applied),
+            new GetApplicationsByStatusRequest(companyId, stages.ApplicationReceived.Id),
             CancellationToken.None);
 
         Assert.Equal(2, result.Items.Count);
@@ -68,22 +70,23 @@ public class GetApplicationsByStatusHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Excludes_Applications_With_A_Different_Status()
+    public async Task HandleAsync_Excludes_Applications_On_A_Different_Stage()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var screening = GetPipelineSummaryHandlerTests.CreateApplicationWithStatus(companyId, vacancy.Id, candidate.Id, ApplicationStatus.Screening);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var cvReview = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.CvReview.Id, null, Now);
 
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
-        db.Applications.Add(screening);
+        db.Applications.Add(cvReview);
         await db.SaveChangesAsync();
 
         var handler = new GetApplicationsByStatusHandler(db, new FakePositionProfileReader());
         var result = await handler.HandleAsync(
-            new GetApplicationsByStatusRequest(companyId, ApplicationStatus.Applied),
+            new GetApplicationsByStatusRequest(companyId, stages.ApplicationReceived.Id),
             CancellationToken.None);
 
         Assert.Empty(result.Items);
@@ -98,11 +101,13 @@ public class GetApplicationsByStatusHandlerTests
 
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
 
         var otherVacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
         var otherCandidate = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
-        var otherApplication = Application.Create(Guid.NewGuid(), otherCompanyId, otherVacancy.Id, otherCandidate.Id, null, Now);
+        var otherStages = RecruitmentStageTestData.AddDefaultStages(db, otherCompanyId, Now);
+        var otherApplication = Application.Create(Guid.NewGuid(), otherCompanyId, otherVacancy.Id, otherCandidate.Id, otherStages.ApplicationReceived.Id, null, Now);
 
         db.Vacancies.AddRange(vacancy, otherVacancy);
         db.Candidates.AddRange(candidate, otherCandidate);
@@ -111,7 +116,7 @@ public class GetApplicationsByStatusHandlerTests
 
         var handler = new GetApplicationsByStatusHandler(db, new FakePositionProfileReader());
         var result = await handler.HandleAsync(
-            new GetApplicationsByStatusRequest(companyId, ApplicationStatus.Applied),
+            new GetApplicationsByStatusRequest(companyId, stages.ApplicationReceived.Id),
             CancellationToken.None);
 
         var item = Assert.Single(result.Items);
@@ -119,13 +124,13 @@ public class GetApplicationsByStatusHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_Empty_When_No_Applications_Match_Status()
+    public async Task HandleAsync_Returns_Empty_When_No_Applications_Match_Stage()
     {
         await using var db = BuildContext();
         var handler = new GetApplicationsByStatusHandler(db, new FakePositionProfileReader());
 
         var result = await handler.HandleAsync(
-            new GetApplicationsByStatusRequest(Guid.NewGuid(), ApplicationStatus.Hired),
+            new GetApplicationsByStatusRequest(Guid.NewGuid(), Guid.NewGuid()),
             CancellationToken.None);
 
         Assert.Empty(result.Items);

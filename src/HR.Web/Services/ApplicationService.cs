@@ -7,12 +7,12 @@ public sealed class ApplicationService(IHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
-    public async Task<ListApplicationsForVacancyResponse?> ListApplicationsForVacancyAsync(Guid companyId, Guid vacancyId, string? status = null)
+    public async Task<ListApplicationsForVacancyResponse?> ListApplicationsForVacancyAsync(Guid companyId, Guid vacancyId, Guid? stageId = null)
     {
         try
         {
             var url = $"api/companies/{companyId}/vacancies/{vacancyId}/applications";
-            if (!string.IsNullOrWhiteSpace(status)) url += $"?status={status}";
+            if (stageId is not null) url += $"?stageId={stageId}";
 
             return await Http.GetFromJsonAsync<ListApplicationsForVacancyResponse>(url, HrApiJsonOptions.Default);
         }
@@ -23,12 +23,12 @@ public sealed class ApplicationService(IHttpClientFactory httpClientFactory)
     }
 
     public async Task<GetApplicationsByStatusResponse?> GetApplicationsByStatusAsync(
-        Guid companyId, string status, CancellationToken cancellationToken = default)
+        Guid companyId, Guid stageId, CancellationToken cancellationToken = default)
     {
         try
         {
             return await Http.GetFromJsonAsync<GetApplicationsByStatusResponse>(
-                $"api/companies/{companyId}/recruitment/applications?status={status}",
+                $"api/companies/{companyId}/recruitment/applications?stageId={stageId}",
                 HrApiJsonOptions.Default, cancellationToken);
         }
         catch
@@ -64,12 +64,12 @@ public sealed class ApplicationService(IHttpClientFactory httpClientFactory)
         }
     }
 
-    public async Task<(ApplicationActionResponse? Result, string? Error)> WithdrawApplicationAsync(Guid companyId, Guid vacancyId, Guid applicationId)
+    public async Task<(WithdrawApplicationResponse? Result, string? Error)> WithdrawApplicationAsync(Guid companyId, Guid vacancyId, Guid applicationId)
     {
         var response = await Http.DeleteAsync($"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}");
 
         if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<ApplicationActionResponse>(), null);
+            return (await response.Content.ReadFromJsonAsync<WithdrawApplicationResponse>(HrApiJsonOptions.Default), null);
 
         return (null, await ReadErrorAsync(response, "Failed to withdraw application."));
     }
@@ -88,7 +88,7 @@ public sealed class ApplicationService(IHttpClientFactory httpClientFactory)
         return (null, await ReadErrorAsync(response, "Failed to make offer."));
     }
 
-    public async Task<(ApplicationActionResponse? Result, string? Error)> RejectCandidateAsync(
+    public async Task<(RejectCandidateResponse? Result, string? Error)> RejectCandidateAsync(
         Guid companyId, Guid vacancyId, Guid applicationId, string? rejectionReason)
     {
         var response = await Http.PostAsJsonAsync(
@@ -96,7 +96,7 @@ public sealed class ApplicationService(IHttpClientFactory httpClientFactory)
             new RejectCandidateRequest(companyId, vacancyId, applicationId, rejectionReason));
 
         if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<ApplicationActionResponse>(), null);
+            return (await response.Content.ReadFromJsonAsync<RejectCandidateResponse>(HrApiJsonOptions.Default), null);
 
         return (null, await ReadErrorAsync(response, "Failed to reject candidate."));
     }

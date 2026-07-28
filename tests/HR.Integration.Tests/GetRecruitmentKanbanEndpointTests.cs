@@ -4,6 +4,7 @@ using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
@@ -67,7 +68,7 @@ public class GetRecruitmentKanbanEndpointTests : IClassFixture<ApiWebApplication
     }
 
     [Fact]
-    public async Task Get_Kanban_Returns_Ok_With_Eight_Columns_And_Grouped_Applicants_For_View_User()
+    public async Task Get_Kanban_Returns_Ok_With_A_Column_Per_Active_Stage_And_Grouped_Applicants_For_View_User()
     {
         var companyId = Guid.NewGuid();
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
@@ -76,8 +77,11 @@ public class GetRecruitmentKanbanEndpointTests : IClassFixture<ApiWebApplication
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+            var stages = RecruitmentStageSeeder.BuildDefaultStages(companyId, Now);
+            var applicationReceivedStageId = stages.Single(s => s.Name == "Application Received").Id;
             var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, Now);
-            var application = Application.Create(Guid.NewGuid(), companyId, vacancyId, candidate.Id, null, Now);
+            var application = Application.Create(Guid.NewGuid(), companyId, vacancyId, candidate.Id, applicationReceivedStageId, null, Now);
+            db.RecruitmentStages.AddRange(stages);
             db.Candidates.Add(candidate);
             db.Applications.Add(application);
             await db.SaveChangesAsync();
@@ -91,13 +95,13 @@ public class GetRecruitmentKanbanEndpointTests : IClassFixture<ApiWebApplication
         var payload = await response.Content.ReadFromJsonAsync<KanbanPayload>();
         Assert.NotNull(payload);
         Assert.Equal(vacancyId, payload!.VacancyId);
-        Assert.Equal(8, payload.Columns.Count);
+        Assert.Equal(6, payload.Columns.Count);
 
-        var appliedColumn = payload.Columns.Single(c => c.Stage == "Applied");
+        var appliedColumn = payload.Columns.Single(c => c.StageName == "Application Received");
         Assert.Equal(1, appliedColumn.Count);
         Assert.Single(appliedColumn.Applicants);
 
-        var otherColumns = payload.Columns.Where(c => c.Stage != "Applied");
+        var otherColumns = payload.Columns.Where(c => c.StageName != "Application Received");
         Assert.All(otherColumns, c =>
         {
             Assert.Equal(0, c.Count);
@@ -120,6 +124,6 @@ public class GetRecruitmentKanbanEndpointTests : IClassFixture<ApiWebApplication
     }
 
     private sealed record KanbanPayload(Guid VacancyId, string VacancyTitle, List<KanbanColumnPayload> Columns);
-    private sealed record KanbanColumnPayload(string Stage, int Count, List<KanbanApplicantPayload> Applicants);
+    private sealed record KanbanColumnPayload(Guid StageId, string StageName, bool IsTerminal, int Count, List<KanbanApplicantPayload> Applicants);
     private sealed record KanbanApplicantPayload(Guid ApplicationId, Guid CandidateId, string CandidateFirstName, string CandidateLastName);
 }

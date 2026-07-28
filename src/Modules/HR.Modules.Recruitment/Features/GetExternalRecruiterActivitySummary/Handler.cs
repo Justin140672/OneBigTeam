@@ -48,24 +48,20 @@ internal sealed class GetExternalRecruiterActivitySummaryHandler(RecruitmentDbCo
             .Select(v => new VacancyActivityItem(v.Id, v.AdvertTitle, v.Status, v.OpenedAt))
             .ToListAsync(cancellationToken);
 
-        // TODO(#78-dependency): The counts below assume Application.SourceExternalRecruiterId
-        // (nullable Guid?) exists on the Application entity. That column is being added by a separate
-        // workstream that also touches the existing Application table/migrations — out of scope here.
-        // This handler will not compile until that column lands. Per instructions, Application.cs is
-        // deliberately NOT modified by this change; querying db.Set<Application>() directly (no
-        // navigation property added to Application) so this slice stays isolated to the new
-        // ExternalRecruiter/VacancyRecruiterAssignment feature until the dependency lands.
         var candidatesIntroducedCount = await db.Set<Application>()
             .AsNoTracking()
             .CountAsync(a => a.CompanyId == request.CompanyId && a.SourceExternalRecruiterId == request.ExternalRecruiterId, cancellationToken);
 
-        var candidatesHiredCount = await db.Set<Application>()
-            .AsNoTracking()
-            .CountAsync(
-                a => a.CompanyId == request.CompanyId
-                    && a.SourceExternalRecruiterId == request.ExternalRecruiterId
-                    && a.Status == ApplicationStatus.Hired,
-                cancellationToken);
+        // Ticket #99: "hired" now means the application's current stage has TerminalOutcome == Hired,
+        // rather than Status == ApplicationStatus.Hired.
+        var candidatesHiredCount = await (
+            from a in db.Set<Application>().AsNoTracking()
+            join s in db.RecruitmentStages.AsNoTracking() on a.CurrentStageId equals s.Id
+            where a.CompanyId == request.CompanyId
+                && a.SourceExternalRecruiterId == request.ExternalRecruiterId
+                && s.TerminalOutcome == RecruitmentStageTerminalOutcome.Hired
+            select a.Id)
+            .CountAsync(cancellationToken);
 
         return Result.Success(new GetExternalRecruiterActivitySummaryResponse(
             recruiter.Id,

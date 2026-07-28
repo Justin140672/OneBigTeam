@@ -1,6 +1,7 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.GetExternalRecruiterActivitySummary;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Tests;
@@ -99,18 +100,14 @@ public class GetExternalRecruiterActivitySummaryHandlerTests
         var recruiter = ExternalRecruiter.Create(Guid.NewGuid(), companyId, "Acme Recruiting", null, null, null, null, null, Now);
         var otherRecruiter = ExternalRecruiter.Create(Guid.NewGuid(), companyId, "Beta Talent", null, null, null, null, null, Now);
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate1 = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma@example.com", null, null, Now);
         var candidate2 = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam@example.com", null, null, Now);
         var candidate3 = Candidate.Create(Guid.NewGuid(), companyId, "Nina", "Patel", "nina@example.com", null, null, Now);
 
-        var introducedApplication = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate1.Id, null, Now, ApplicationSource.ExternalRecruiter, recruiter.Id);
-        var hiredApplication = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate2.Id, null, Now, ApplicationSource.ExternalRecruiter, recruiter.Id);
-        hiredApplication.MoveToScreening(Now);
-        hiredApplication.ScheduleInterview(Now);
-        hiredApplication.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
-        hiredApplication.Offer(Now);
-        hiredApplication.Hire(Now);
-        var otherRecruiterApplication = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate3.Id, null, Now, ApplicationSource.ExternalRecruiter, otherRecruiter.Id);
+        var introducedApplication = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate1.Id, stages.ApplicationReceived.Id, null, Now, ApplicationSource.ExternalRecruiter, recruiter.Id);
+        var hiredApplication = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate2.Id, stages.Hired.Id, null, Now, ApplicationSource.ExternalRecruiter, recruiter.Id);
+        var otherRecruiterApplication = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate3.Id, stages.ApplicationReceived.Id, null, Now, ApplicationSource.ExternalRecruiter, otherRecruiter.Id);
 
         db.ExternalRecruiters.AddRange(recruiter, otherRecruiter);
         db.Vacancies.Add(vacancy);

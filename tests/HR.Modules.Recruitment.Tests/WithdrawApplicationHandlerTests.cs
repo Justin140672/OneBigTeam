@@ -1,7 +1,6 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.WithdrawApplication;
 using HR.Modules.Recruitment.Persistence;
-using HR.Modules.Recruitment.Services;
 using HR.Modules.Recruitment.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,13 +12,14 @@ public class WithdrawApplicationHandlerTests
     private static readonly DateTimeOffset Now = new(2026, 7, 6, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task HandleAsync_Withdraws_Application_In_Applied_Status()
+    public async Task HandleAsync_Withdraws_Application_Preserving_CurrentStageId()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.CvReview.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -31,72 +31,63 @@ public class WithdrawApplicationHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(ApplicationStatus.Withdrawn, result.Value!.Status);
+        Assert.NotNull(result.Value!.WithdrawnAt);
+        Assert.Equal(stages.CvReview.Id, result.Value.CurrentStageId);
     }
 
     [Fact]
-    public async Task HandleAsync_Publishes_StageChanged_IntegrationEvent_And_AuditEvent_On_Success()
+    public async Task HandleAsync_Publishes_ApplicationWithdrawnAuditEvent_On_Success()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
         await db.SaveChangesAsync();
 
-        var eventPublisher = new FakeIntegrationEventPublisher();
         var auditPublisher = new FakeAuditPublisher();
         var performedBy = Guid.NewGuid();
 
-        var result = await handler(db, eventPublisher, auditPublisher).HandleAsync(
+        var result = await handler(db, auditPublisher).HandleAsync(
             new WithdrawApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
             performedBy,
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
 
-        var stageChanged = Assert.IsType<HR.SharedKernel.ApplicantStageChangedIntegrationEvent>(Assert.Single(eventPublisher.PublishedEvents));
-        Assert.Equal(ApplicationStatus.Applied.ToString(), stageChanged.PreviousStage);
-        Assert.Equal(ApplicationStatus.Withdrawn.ToString(), stageChanged.NewStage);
-        Assert.Equal(performedBy, stageChanged.ChangedBy);
-
-        var stageChangedAudit = Assert.IsType<ApplicationStageChangedAuditEvent>(Assert.Single(auditPublisher.Published));
-        Assert.Equal(ApplicationStatus.Applied, stageChangedAudit.PreviousStage);
-        Assert.Equal(ApplicationStatus.Withdrawn, stageChangedAudit.NewStage);
+        var auditEvent = Assert.IsType<ApplicationWithdrawnAuditEvent>(Assert.Single(auditPublisher.Published));
+        Assert.Equal(companyId, auditEvent.CompanyId);
+        Assert.Equal(application.Id, auditEvent.ApplicationId);
+        Assert.Equal(vacancy.Id, auditEvent.VacancyId);
+        Assert.Equal(candidate.Id, auditEvent.CandidateId);
+        Assert.Equal(stages.ApplicationReceived.Id, auditEvent.StageIdAtWithdrawal);
+        Assert.Equal(performedBy, auditEvent.ChangedBy);
     }
 
     [Fact]
-    public async Task HandleAsync_Does_Not_Publish_Events_When_Already_Hired()
+    public async Task HandleAsync_Does_Not_Change_StageHistory_No_Stage_Change_Occurs()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", "olivia.grant@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
-        application.MoveToScreening(Now);
-        application.ScheduleInterview(Now);
-        application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
-        application.Offer(Now);
-        application.Hire(Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
         await db.SaveChangesAsync();
 
-        var eventPublisher = new FakeIntegrationEventPublisher();
-        var auditPublisher = new FakeAuditPublisher();
-
-        var result = await handler(db, eventPublisher, auditPublisher).HandleAsync(
+        await handler(db).HandleAsync(
             new WithdrawApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
             Guid.NewGuid(),
             CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Empty(eventPublisher.PublishedEvents);
-        Assert.Empty(auditPublisher.Published);
+        Assert.Empty(await db.ApplicationStageHistoryEntries.ToListAsync());
     }
 
     [Fact]
@@ -114,18 +105,14 @@ public class WithdrawApplicationHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_Validation_Error_When_Already_Hired()
+    public async Task HandleAsync_Returns_Validation_Error_When_Already_On_Terminal_Stage()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", "olivia.grant@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
-        application.MoveToScreening(Now);
-        application.ScheduleInterview(Now);
-        application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
-        application.Offer(Now);
-        application.Hire(Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Hired.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -146,8 +133,9 @@ public class WithdrawApplicationHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "HR Business Partner", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Noah", "Patel", "noah.patel@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
         application.Withdraw(Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -165,9 +153,8 @@ public class WithdrawApplicationHandlerTests
 
     private static WithdrawApplicationHandler handler(
         RecruitmentDbContext db,
-        FakeIntegrationEventPublisher? eventPublisher = null,
         FakeAuditPublisher? auditPublisher = null) =>
-        new(db, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(db, eventPublisher ?? new FakeIntegrationEventPublisher(), auditPublisher ?? new FakeAuditPublisher()));
+        new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

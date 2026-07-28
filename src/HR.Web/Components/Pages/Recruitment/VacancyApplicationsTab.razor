@@ -5,6 +5,7 @@
 @inject VacancyService VacancyService
 @inject EmploymentTypeService EmploymentTypeService
 @inject ExternalRecruiterService ExternalRecruiterService
+@inject RecruitmentStageService RecruitmentStageService
 @inject IJSRuntime JS
 
 <div data-testid="vacancy-applications-tab">
@@ -51,12 +52,16 @@
                     </Template>
                 </GridColumn>
                 <GridColumn Field="@nameof(ApplicationListItemModel.CandidateEmail)" HeaderText="Email" Width="200" />
-                <GridColumn Field="@nameof(ApplicationListItemModel.Status)" HeaderText="Status" Width="140">
+                <GridColumn HeaderText="Status" Width="140">
                     <Template>
                         @{
                             var row = (ApplicationListItemModel)context;
                         }
-                        <StatusBadge Variant="@StatusVariant(row.Status)">@row.Status</StatusBadge>
+                        <StatusBadge Variant="@StatusVariant(row)">@StageName(row.CurrentStageId)</StatusBadge>
+                        @if (row.IsWithdrawn)
+                        {
+                            <span class="text-muted ms-1">(Withdrawn)</span>
+                        }
                     </Template>
                 </GridColumn>
                 <GridColumn Field="@nameof(ApplicationListItemModel.AppliedAt)" HeaderText="Applied" Width="130" Format="d" />
@@ -86,20 +91,11 @@
                             var row = (ApplicationListItemModel)context;
                         }
                         <div class="d-flex gap-1 flex-wrap">
-                            @if (row.Status is "Applied" or "Screening")
+                            @if (IsActive(row))
                             {
                                 <SfButton CssClass="e-small" OnClick="() => OpenScheduleDialog(row)">Schedule Interview</SfButton>
-                            }
-                            @if (row.Status is "Interviewed")
-                            {
                                 <SfButton CssClass="e-small" IsPrimary="true" OnClick="() => OfferAsync(row)">Offer</SfButton>
-                            }
-                            @if (row.Status is "Offered")
-                            {
                                 <SfButton CssClass="e-small" IsPrimary="true" OnClick="() => OpenHireDialog(row)">Hire</SfButton>
-                            }
-                            @if (row.Status is "Applied" or "Screening" or "InterviewScheduled" or "Interviewed" or "Offered")
-                            {
                                 <SfButton CssClass="e-small" OnClick="() => OpenRejectDialog(row)">Reject</SfButton>
                                 <SfButton CssClass="e-small" OnClick="() => WithdrawAsync(row)">Withdraw</SfButton>
                             }
@@ -330,6 +326,9 @@
 
     private bool _loading = true;
     private List<ApplicationListItemModel> _applications = [];
+    // Ticket #99: the company's own configured pipeline, used to resolve CurrentStageId -> display
+    // name/IsTerminal/TerminalOutcome for the Status column and to drive action-button visibility.
+    private List<RecruitmentStageListItem> _stages = [];
     private string? _actionError;
     private string? _actionSuccess;
     private string? _dialogError;
@@ -408,6 +407,13 @@
     private async Task LoadAsync()
     {
         _loading = true;
+
+        if (_stages.Count == 0)
+        {
+            var stagesResult = await RecruitmentStageService.ListStagesAsync(CompanyId);
+            _stages = stagesResult?.Items.ToList() ?? [];
+        }
+
         var result = await ApplicationService.ListApplicationsForVacancyAsync(CompanyId, VacancyId);
         _applications = result?.Items ?? [];
 
@@ -425,14 +431,35 @@
         _loading = false;
     }
 
-    private static StatusBadgeVariant StatusVariant(string status) => status switch
+    private string StageName(Guid stageId) =>
+        _stages.FirstOrDefault(s => s.Id == stageId)?.Name ?? "Unknown";
+
+    private RecruitmentStageListItem? Stage(Guid stageId) =>
+        _stages.FirstOrDefault(s => s.Id == stageId);
+
+    private StatusBadgeVariant StatusVariant(ApplicationListItemModel row)
     {
-        "Hired" => StatusBadgeVariant.Success,
-        "Offered" => StatusBadgeVariant.Primary,
-        "Interviewed" or "InterviewScheduled" => StatusBadgeVariant.Info,
-        "Rejected" or "Withdrawn" => StatusBadgeVariant.Danger,
-        _ => StatusBadgeVariant.Secondary,
-    };
+        if (row.IsWithdrawn) return StatusBadgeVariant.Secondary;
+
+        var stage = Stage(row.CurrentStageId);
+        return stage?.TerminalOutcome switch
+        {
+            RecruitmentStageTerminalOutcome.Hired => StatusBadgeVariant.Success,
+            RecruitmentStageTerminalOutcome.Rejected => StatusBadgeVariant.Danger,
+            _ => StatusBadgeVariant.Info,
+        };
+    }
+
+    // Ticket #99 judgement call: since the pipeline is now fully data-driven (companies can freely
+    // insert/reorder/rename stages), there is no reliable data-driven signal for "eligible for
+    // Schedule Interview / Offer / Reject / Withdraw" beyond what the backend handlers themselves
+    // enforce — OfferCandidateHandler/HireCandidateHandler/RejectCandidateHandler/WithdrawApplication
+    // all only require the application to be non-withdrawn and not already on a terminal stage (see
+    // each handler's remarks). So all these actions are surfaced together for any active
+    // (non-withdrawn, non-terminal-stage) application; the backend remains the source of truth and
+    // will reject anything that's actually invalid for the current stage.
+    private bool IsActive(ApplicationListItemModel row) =>
+        !row.IsWithdrawn && Stage(row.CurrentStageId) is { IsTerminal: false };
 
     private async Task OpenAddDialog()
     {

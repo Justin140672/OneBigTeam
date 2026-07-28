@@ -6,7 +6,7 @@ internal sealed record RejectCandidateResponse(
     Guid Id,
     Guid VacancyId,
     Guid CandidateId,
-    ApplicationStatus Status,
+    Guid CurrentStageId,
     InterviewOutcome? InterviewOutcome,
     string? Notes,
     string? RejectionReason,

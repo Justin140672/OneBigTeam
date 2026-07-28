@@ -1,11 +1,16 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.CreateApplication;
 
-internal sealed class CreateApplicationHandler(RecruitmentDbContext db, IClock clock, IAuditEventPublisher auditPublisher)
+internal sealed class CreateApplicationHandler(
+    RecruitmentDbContext db,
+    IClock clock,
+    IAuditEventPublisher auditPublisher,
+    RecruitmentStageSeeder stageSeeder)
 {
     public async Task<Result<CreateApplicationResponse>> HandleAsync(
         CreateApplicationRequest request,
@@ -48,11 +53,28 @@ internal sealed class CreateApplicationHandler(RecruitmentDbContext db, IClock c
 
         var now = clock.UtcNowOffset();
 
+        // Defensive: normally already seeded by CreateVacancyHandler (a Vacancy must exist before an
+        // Application can be created against it — see the check above), but this guards against any
+        // other path that creates vacancies without going through that handler (e.g. direct seed data).
+        await stageSeeder.EnsureDefaultStagesSeededAsync(request.CompanyId, now, cancellationToken);
+
+        var initialStageId = await db.RecruitmentStages
+            .AsNoTracking()
+            .Where(s => s.CompanyId == request.CompanyId && s.IsActive && !s.IsTerminal)
+            .OrderBy(s => s.DisplayOrder)
+            .Select(s => s.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (initialStageId == Guid.Empty)
+            return Result.Failure<CreateApplicationResponse>(
+                Error.Validation("This company has no active, non-terminal recruitment stage to place a new application on."));
+
         var application = Application.Create(
             Guid.NewGuid(),
             request.CompanyId,
             request.VacancyId,
             request.CandidateId,
+            initialStageId,
             request.Notes,
             now,
             request.Source,
@@ -80,7 +102,7 @@ internal sealed class CreateApplicationHandler(RecruitmentDbContext db, IClock c
             application.CompanyId,
             application.VacancyId,
             application.CandidateId,
-            application.Status,
+            application.CurrentStageId,
             application.InterviewOutcome,
             application.Notes,
             application.AppliedAt,

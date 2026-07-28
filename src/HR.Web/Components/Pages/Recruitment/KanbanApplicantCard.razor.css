@@ -50,3 +50,8 @@
     font-size: 0.75rem;
     color: var(--bs-secondary-color, #6c757d);
 }
+
+.kanban-applicant-card__withdrawn {
+    font-weight: 600;
+    color: var(--bs-secondary-color, #6c757d);
+}

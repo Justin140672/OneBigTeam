@@ -42,9 +42,34 @@ internal sealed class HireCandidateHandler(
             return Result.Failure<HireCandidateResponse>(
                 Error.NotFound($"Application '{request.ApplicationId}' was not found."));
 
-        if (application.Status != ApplicationStatus.Offered)
+        if (application.WithdrawnAt is not null)
             return Result.Failure<HireCandidateResponse>(
-                Error.Validation($"Cannot hire an application with status '{application.Status}'."));
+                Error.Validation("Cannot hire an application that has been withdrawn."));
+
+        var currentStage = await db.RecruitmentStages
+            .AsNoTracking()
+            .SingleOrDefaultAsync(s => s.Id == application.CurrentStageId && s.CompanyId == request.CompanyId, cancellationToken);
+
+        if (currentStage is null)
+            return Result.Failure<HireCandidateResponse>(
+                Error.NotFound($"Recruitment stage '{application.CurrentStageId}' was not found."));
+
+        // Ticket #99: since the pipeline is now fully data-driven, "eligible to be hired from" is
+        // simply "not already on a terminal stage" — the old fixed rule (must be Interviewed) no
+        // longer applies once companies can freely insert/reorder stages ahead of Offer.
+        if (currentStage.IsTerminal)
+            return Result.Failure<HireCandidateResponse>(
+                Error.Validation($"Cannot hire an application already on the terminal stage '{currentStage.Name}'."));
+
+        var hiredStage = await db.RecruitmentStages
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                s => s.CompanyId == request.CompanyId && s.IsActive && s.TerminalOutcome == RecruitmentStageTerminalOutcome.Hired,
+                cancellationToken);
+
+        if (hiredStage is null)
+            return Result.Failure<HireCandidateResponse>(
+                Error.Validation("This company has no active 'Hired' terminal recruitment stage configured."));
 
         var candidate = await db.Candidates
             .SingleOrDefaultAsync(c => c.Id == application.CandidateId && c.CompanyId == request.CompanyId, cancellationToken);
@@ -103,11 +128,11 @@ internal sealed class HireCandidateHandler(
             return Result.Failure<HireCandidateResponse>(provisioningResult.Error);
 
         var now = clock.UtcNowOffset();
-        var previousStatus = application.Status;
+        var previousStageId = application.CurrentStageId;
 
-        application.Hire(now);
+        application.RecordHire(hiredStage.Id, now);
         candidate.LinkToEmployee(provisioningResult.Value!, now);
-        recorder.AddHistoryEntry(application, previousStatus, performedBy, now);
+        recorder.AddHistoryEntry(application, previousStageId, performedBy, now);
         await db.SaveChangesAsync(cancellationToken);
 
         await eventPublisher.PublishAsync(new CandidateHiredIntegrationEvent(
@@ -118,7 +143,7 @@ internal sealed class HireCandidateHandler(
             application.VacancyId,
             now), cancellationToken);
 
-        await recorder.PublishStageChangedEventsAsync(application, previousStatus, performedBy, now, cancellationToken);
+        await recorder.PublishStageChangedEventsAsync(application, previousStageId, performedBy, now, cancellationToken);
 
         await auditPublisher.PublishAsync(
             new CandidateHiredAuditEvent(
@@ -135,7 +160,7 @@ internal sealed class HireCandidateHandler(
             application.VacancyId,
             application.CandidateId,
             provisioningResult.Value!,
-            application.Status,
+            application.CurrentStageId,
             application.InterviewOutcome,
             application.Notes,
             application.AppliedAt,

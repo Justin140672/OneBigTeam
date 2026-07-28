@@ -20,8 +20,7 @@ namespace HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 internal sealed class InterviewOutcomeRecorder(
     RecruitmentDbContext db,
     IClock clock,
-    IAuditEventPublisher auditPublisher,
-    RecruitmentStageChangeRecorder stageChangeRecorder)
+    IAuditEventPublisher auditPublisher)
 {
     public async Task<Result<RecordInterviewOutcomeResponse>> RecordAsync(
         RecordInterviewOutcomeRequest request,
@@ -55,11 +54,15 @@ internal sealed class InterviewOutcomeRecorder(
                 Error.Validation($"Cannot record an outcome for an interview with outcome '{interview.Outcome}'."));
 
         var now = clock.UtcNowOffset();
-        var previousStatus = application.Status;
 
+        // Ticket #99 judgement call: recording an interview outcome is metadata only (mirrored onto
+        // Application.InterviewOutcome for cheap list/kanban display) — it never itself moves
+        // CurrentStageId, since "Interview" is just one configurable stage among however many the
+        // company defines. No stage-history entry or ApplicantStageChangedIntegrationEvent is
+        // published here, since the stage does not change; advancing the pipeline (e.g. to an
+        // "Offer" stage) remains a separate, explicit action via MoveApplicationStage/OfferCandidate.
         interview.RecordOutcome(request.Outcome, request.Notes, now);
-        application.RecordInterviewOutcome(request.Outcome, now);
-        stageChangeRecorder.AddHistoryEntry(application, previousStatus, recordedBy, now);
+        application.SetInterviewOutcome(request.Outcome, now);
         await db.SaveChangesAsync(cancellationToken);
 
         await auditPublisher.PublishAsync(
@@ -74,8 +77,6 @@ internal sealed class InterviewOutcomeRecorder(
                 recordedBy,
                 now),
             cancellationToken);
-
-        await stageChangeRecorder.PublishStageChangedEventsAsync(application, previousStatus, recordedBy, now, cancellationToken);
 
         return Result.Success(new RecordInterviewOutcomeResponse(
             interview.Id,

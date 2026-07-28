@@ -4,6 +4,7 @@ using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
@@ -49,9 +50,11 @@ public class GetApplicationSourceEndpointTests : IClassFixture<ApiWebApplication
             var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
             var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, Now);
             var recruiter = ExternalRecruiter.Create(Guid.NewGuid(), companyId, "Acme Recruiting", null, null, null, null, null, Now);
-            var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now, ApplicationSource.ExternalRecruiter, recruiter.Id);
+            var stages = RecruitmentStageSeeder.BuildDefaultStages(companyId, Now);
+            var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages[0].Id, null, Now, ApplicationSource.ExternalRecruiter, recruiter.Id);
             db.Vacancies.Add(vacancy);
             db.Candidates.Add(candidate);
+            db.RecruitmentStages.AddRange(stages);
             db.ExternalRecruiters.Add(recruiter);
             db.Applications.Add(application);
             await db.SaveChangesAsync();
@@ -81,9 +84,11 @@ public class GetApplicationSourceEndpointTests : IClassFixture<ApiWebApplication
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
             var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
             var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", $"liam.{Guid.NewGuid():N}@example.com", null, null, Now);
-            var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+            var stages = RecruitmentStageSeeder.BuildDefaultStages(companyId, Now);
+            var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages[0].Id, null, Now);
             db.Vacancies.Add(vacancy);
             db.Candidates.Add(candidate);
+            db.RecruitmentStages.AddRange(stages);
             db.Applications.Add(application);
             await db.SaveChangesAsync();
             vacancyId = vacancy.Id;

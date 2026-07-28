@@ -1,4 +1,3 @@
-using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
@@ -8,25 +7,15 @@ namespace HR.Modules.Recruitment.Features.GetRecruitmentKanban;
 
 /// <summary>
 /// Ticket #63: Kanban read model for a single vacancy's applicant pipeline, grouped by stage in
-/// pipeline order. Judgement call: Rejected/Withdrawn are included as trailing terminal columns
-/// (rather than excluded entirely) so recruiters can still see/find applicants who left the active
-/// pipeline without a separate query — all eight ApplicationStatus values always appear as columns,
-/// even when empty, so the board layout is stable across vacancies.
+/// pipeline order. Ticket #99: columns are now the company's own active RecruitmentStage rows (in
+/// DisplayOrder) instead of the fixed eight ApplicationStatus values — the board layout is stable
+/// across vacancies within the same company, but differs between companies with different stage
+/// configurations. Withdrawn applications are not given a separate column (no "Withdrawn" stage
+/// exists — see Application.WithdrawnAt's remarks) — they remain visible under whatever stage they
+/// were on when withdrawn, flagged via KanbanApplicantSummary.IsWithdrawn so the UI can grey them out.
 /// </summary>
 internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPositionProfileReader positionProfileReader)
 {
-    private static readonly ApplicationStatus[] ColumnOrder =
-    [
-        ApplicationStatus.Applied,
-        ApplicationStatus.Screening,
-        ApplicationStatus.InterviewScheduled,
-        ApplicationStatus.Interviewed,
-        ApplicationStatus.Offered,
-        ApplicationStatus.Hired,
-        ApplicationStatus.Rejected,
-        ApplicationStatus.Withdrawn,
-    ];
-
     public async Task<Result<GetRecruitmentKanbanResponse>> HandleAsync(
         GetRecruitmentKanbanRequest request,
         CancellationToken cancellationToken)
@@ -59,6 +48,12 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
                 .SingleOrDefaultAsync(cancellationToken);
         }
 
+        var stages = await db.RecruitmentStages
+            .AsNoTracking()
+            .Where(s => s.CompanyId == request.CompanyId && s.IsActive)
+            .OrderBy(s => s.DisplayOrder)
+            .ToListAsync(cancellationToken);
+
         var applicants = await (
             from a in db.Applications.AsNoTracking()
             join c in db.Candidates.AsNoTracking() on a.CandidateId equals c.Id
@@ -70,19 +65,20 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
                 a.CandidateId,
                 c.FirstName,
                 c.LastName,
-                a.Status,
+                a.CurrentStageId,
+                a.WithdrawnAt,
                 a.AppliedAt,
             })
             .ToListAsync(cancellationToken);
 
         var groupedByStage = applicants
-            .GroupBy(a => a.Status)
+            .GroupBy(a => a.CurrentStageId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        var columns = ColumnOrder
+        var columns = stages
             .Select(stage =>
             {
-                var items = groupedByStage.TryGetValue(stage, out var group) ? group : [];
+                var items = groupedByStage.TryGetValue(stage.Id, out var group) ? group : [];
 
                 var summaries = items
                     .Select(a => new KanbanApplicantSummary(
@@ -91,14 +87,16 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
                         a.FirstName,
                         a.LastName,
                         null,
-                        a.Status,
+                        stage.Id,
+                        stage.Name,
+                        a.WithdrawnAt is not null,
                         a.AppliedAt,
                         vacancy.AssignedRecruiterId,
                         assignedRecruiterAgencyName,
                         vacancyTitle))
                     .ToList();
 
-                return new KanbanColumn(stage, summaries.Count, summaries);
+                return new KanbanColumn(stage.Id, stage.Name, stage.IsTerminal, summaries.Count, summaries);
             })
             .ToList();
 

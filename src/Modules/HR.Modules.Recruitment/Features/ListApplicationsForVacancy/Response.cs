@@ -10,6 +10,7 @@ internal sealed record ApplicationListItem(
     string CandidateFirstName,
     string CandidateLastName,
     string CandidateEmail,
-    ApplicationStatus Status,
+    Guid CurrentStageId,
     InterviewOutcome? InterviewOutcome,
+    bool IsWithdrawn,
     DateTimeOffset AppliedAt);

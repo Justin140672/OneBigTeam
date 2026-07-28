@@ -266,7 +266,9 @@ public class UpdateVacancyEndpointTests : IClassFixture<ApiWebApplicationFactory
         var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Jane", "Doe", $"jane.doe.{Guid.NewGuid():N}@example.com", null, null, Now);
         db.Candidates.Add(candidate);
-        db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancyId, candidate.Id, null, Now));
+        var stages = HR.Modules.Recruitment.Services.RecruitmentStageSeeder.BuildDefaultStages(companyId, Now);
+        db.RecruitmentStages.AddRange(stages);
+        db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancyId, candidate.Id, stages[0].Id, null, Now));
         await db.SaveChangesAsync();
     }
 

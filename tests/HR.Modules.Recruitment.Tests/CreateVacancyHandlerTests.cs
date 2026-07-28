@@ -301,8 +301,39 @@ public class CreateVacancyHandlerTests
         Assert.NotEqual(Guid.Empty, nonNullablePositionProfileId);
     }
 
+    [Fact]
+    public async Task HandleAsync_Seeds_Default_RecruitmentStages_For_The_Companys_First_Vacancy()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var result = await handler(db, new FakePositionProfileReader()).HandleAsync(
+            new CreateVacancyRequest { CompanyId = companyId, PositionProfileId = Guid.NewGuid(), HiringManagerId = Guid.NewGuid() },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(6, await db.RecruitmentStages.CountAsync(s => s.CompanyId == companyId));
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Duplicate_Stages_When_Company_Already_Has_A_Vacancy()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var reader = new FakePositionProfileReader();
+
+        await handler(db, reader).HandleAsync(
+            new CreateVacancyRequest { CompanyId = companyId, PositionProfileId = Guid.NewGuid(), HiringManagerId = Guid.NewGuid() },
+            CancellationToken.None);
+        await handler(db, reader).HandleAsync(
+            new CreateVacancyRequest { CompanyId = companyId, PositionProfileId = Guid.NewGuid(), HiringManagerId = Guid.NewGuid() },
+            CancellationToken.None);
+
+        Assert.Equal(6, await db.RecruitmentStages.CountAsync(s => s.CompanyId == companyId));
+    }
+
     private static CreateVacancyHandler handler(RecruitmentDbContext db, HR.Infrastructure.Abstractions.IPositionProfileReader? positionProfileReader = null) =>
-        new(db, new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader());
+        new(db, new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader(), new HR.Modules.Recruitment.Services.RecruitmentStageSeeder(db));
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

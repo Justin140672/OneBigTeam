@@ -1,4 +1,5 @@
 @inject ApplicationService ApplicationService
+@inject RecruitmentStageService RecruitmentStageService
 @inject NavigationManager Navigation
 @inject AppSession Session
 
@@ -87,16 +88,38 @@
             return;
         }
 
-        var offersTask = ApplicationService.GetApplicationsByStatusAsync(Session.CompanyId, "Offered");
-        var hiresTask = ApplicationService.GetApplicationsByStatusAsync(Session.CompanyId, "Hired");
+        var stagesResult = await RecruitmentStageService.ListStagesAsync(Session.CompanyId);
+        var stages = stagesResult?.Items ?? [];
 
-        await Task.WhenAll(offersTask, hiresTask);
+        // "Hired" has a reliable data-driven signal — the stage(s) whose TerminalOutcome == Hired
+        // (there is normally exactly one, enforced by HireCandidateHandler's "no active 'Hired'
+        // terminal recruitment stage configured" check).
+        //
+        // "Offer" is likewise data-driven, mirroring the exact same definition OfferCandidateHandler
+        // uses server-side: the last active non-terminal stage, ordered by DisplayOrder. This avoids
+        // matching on a hardcoded stage name (which broke as soon as a company renamed/removed the
+        // default "Offer" stage) — instead it always agrees with whichever stage OfferCandidate
+        // actually moves applications into.
+        var hiredStageIds = stages.Where(s => s.TerminalOutcome == RecruitmentStageTerminalOutcome.Hired).Select(s => s.Id).ToList();
+        var offerStageId = stages
+            .Where(s => s.IsActive && !s.IsTerminal)
+            .OrderByDescending(s => s.DisplayOrder)
+            .FirstOrDefault()?.Id;
 
-        _offers = (await offersTask)?.Items ?? [];
+        var offersTask = offerStageId is { } offerId
+            ? ApplicationService.GetApplicationsByStatusAsync(Session.CompanyId, offerId)
+            : Task.FromResult<GetApplicationsByStatusResponse?>(null);
+
+        var hireTasks = hiredStageIds.Select(id => ApplicationService.GetApplicationsByStatusAsync(Session.CompanyId, id)).ToList();
+
+        var offersResult = await offersTask;
+        var hireResults = await Task.WhenAll(hireTasks);
+
+        _offers = offersResult?.Items ?? [];
         // "Recent hires" stands in for "upcoming start dates" — Recruitment doesn't own an
         // Employee start date once hired, so the most recent hire transitions are the closest
         // proxy available without crossing into the Employees module's data.
-        _recentHires = (await hiresTask)?.Items ?? [];
+        _recentHires = hireResults.Where(r => r is not null).SelectMany(r => r!.Items).ToList();
         _loading = false;
     }
 }

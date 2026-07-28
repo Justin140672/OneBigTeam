@@ -1,4 +1,3 @@
-using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.MoveApplicationStage;
 
 namespace HR.Modules.Recruitment.Tests;
@@ -15,7 +14,7 @@ public class MoveApplicationStageValidatorTests
             CompanyId     = Guid.NewGuid(),
             VacancyId     = Guid.NewGuid(),
             ApplicationId = Guid.NewGuid(),
-            NewStatus     = ApplicationStatus.Screening,
+            NewStageId    = Guid.NewGuid(),
         });
 
         Assert.True(result.IsValid);
@@ -29,7 +28,7 @@ public class MoveApplicationStageValidatorTests
             CompanyId     = Guid.Empty,
             VacancyId     = Guid.NewGuid(),
             ApplicationId = Guid.NewGuid(),
-            NewStatus     = ApplicationStatus.Screening,
+            NewStageId    = Guid.NewGuid(),
         });
 
         Assert.False(result.IsValid);
@@ -44,7 +43,7 @@ public class MoveApplicationStageValidatorTests
             CompanyId     = Guid.NewGuid(),
             VacancyId     = Guid.Empty,
             ApplicationId = Guid.NewGuid(),
-            NewStatus     = ApplicationStatus.Screening,
+            NewStageId    = Guid.NewGuid(),
         });
 
         Assert.False(result.IsValid);
@@ -59,7 +58,7 @@ public class MoveApplicationStageValidatorTests
             CompanyId     = Guid.NewGuid(),
             VacancyId     = Guid.NewGuid(),
             ApplicationId = Guid.Empty,
-            NewStatus     = ApplicationStatus.Screening,
+            NewStageId    = Guid.NewGuid(),
         });
 
         Assert.False(result.IsValid);
@@ -67,18 +66,18 @@ public class MoveApplicationStageValidatorTests
     }
 
     [Fact]
-    public void Validate_Fails_When_NewStatus_Is_Not_A_Defined_Enum_Value()
+    public void Validate_Fails_When_NewStageId_Is_Empty()
     {
         var result = _validator.Validate(new MoveApplicationStageRequest
         {
             CompanyId     = Guid.NewGuid(),
             VacancyId     = Guid.NewGuid(),
             ApplicationId = Guid.NewGuid(),
-            NewStatus     = (ApplicationStatus)999,
+            NewStageId    = Guid.Empty,
         });
 
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(MoveApplicationStageRequest.NewStatus));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(MoveApplicationStageRequest.NewStageId));
     }
 
     [Fact]
@@ -89,7 +88,7 @@ public class MoveApplicationStageValidatorTests
             CompanyId     = Guid.NewGuid(),
             VacancyId     = Guid.NewGuid(),
             ApplicationId = Guid.NewGuid(),
-            NewStatus     = ApplicationStatus.Screening,
+            NewStageId    = Guid.NewGuid(),
             Notes         = new string('A', 2001),
         });
 
@@ -107,7 +106,7 @@ public class MoveApplicationStageValidatorTests
             CompanyId     = Guid.NewGuid(),
             VacancyId     = Guid.NewGuid(),
             ApplicationId = Guid.NewGuid(),
-            NewStatus     = ApplicationStatus.Screening,
+            NewStageId    = Guid.NewGuid(),
             Notes         = notes,
         });
 

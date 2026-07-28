@@ -1,5 +1,6 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +10,8 @@ namespace HR.Modules.Recruitment.Features.CreateVacancy;
 internal sealed class CreateVacancyHandler(
     RecruitmentDbContext db,
     IClock clock,
-    IPositionProfileReader positionProfileReader)
+    IPositionProfileReader positionProfileReader,
+    RecruitmentStageSeeder stageSeeder)
 {
     public async Task<Result<CreateVacancyResponse>> HandleAsync(
         CreateVacancyRequest request,
@@ -49,6 +51,11 @@ internal sealed class CreateVacancyHandler(
         // Position Profile at the read layer (see GetVacancyHandler/ListVacanciesHandler), so there is
         // nothing to resolve or persist here at create time.
         var now = clock.UtcNowOffset();
+
+        // Ticket #98: creating a company's first Vacancy is the chosen "recruitment enabled" moment
+        // (see RecruitmentStageSeeder's remarks) — idempotent, so this is a no-op for every vacancy
+        // after the first.
+        await stageSeeder.EnsureDefaultStagesSeededAsync(request.CompanyId, now, cancellationToken);
 
         var vacancy = Vacancy.Create(
             Guid.NewGuid(),

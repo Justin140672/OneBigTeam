@@ -136,13 +136,18 @@ internal sealed record InterviewOutcomeRecordedAuditEvent(
 // applicant record via GetApplication.StageHistory): this is the cross-cutting "who changed
 // business data" audit log entry, published for every successful stage change (named transition
 // methods and the generic MoveToStage path alike) via RecruitmentStageChangeRecorder.
+// Ticket #99: PreviousStageId/NewStageId are RecruitmentStage ids (Guid) rather than
+// ApplicationStatus enum values; PreviousStageName/NewStageName are resolved by
+// RecruitmentStageChangeRecorder for a readable Summary/audit payload.
 internal sealed record ApplicationStageChangedAuditEvent(
     Guid CompanyId,
     Guid ApplicationId,
     Guid VacancyId,
     Guid CandidateId,
-    Domain.ApplicationStatus PreviousStage,
-    Domain.ApplicationStatus NewStage,
+    Guid PreviousStageId,
+    string PreviousStageName,
+    Guid NewStageId,
+    string NewStageName,
     Guid ChangedBy,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
@@ -152,9 +157,9 @@ internal sealed record ApplicationStageChangedAuditEvent(
     Guid? IAuditEvent.ActorUserId => ChangedBy;
     Guid? IAuditEvent.ActorEmployeeId => null;
     Guid? IAuditEvent.CorrelationId => null;
-    string? IAuditEvent.Summary => $"Application moved from '{PreviousStage}' to '{NewStage}'";
-    object? IAuditEvent.Before => new { Stage = PreviousStage };
-    object? IAuditEvent.After => new { Stage = NewStage };
+    string? IAuditEvent.Summary => $"Application moved from '{PreviousStageName}' to '{NewStageName}'";
+    object? IAuditEvent.Before => new { StageId = PreviousStageId, Stage = PreviousStageName };
+    object? IAuditEvent.After => new { StageId = NewStageId, Stage = NewStageName };
     object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
 }
 
@@ -268,5 +273,114 @@ internal sealed record CandidateHiredAuditEvent(
     string? IAuditEvent.Summary => "Candidate hired and provisioned as employee";
     object? IAuditEvent.Before => null;
     object? IAuditEvent.After => new { ApplicationId, VacancyId, EmployeeId };
+    object? IAuditEvent.Metadata => null;
+}
+
+// Ticket #99: published whenever a candidate withdraws an application. Deliberately not folded into
+// ApplicationStageChangedAuditEvent, since withdrawal never changes CurrentStageId (see
+// Application.WithdrawnAt's remarks) — this is a distinct, additive fact about the application.
+internal sealed record ApplicationWithdrawnAuditEvent(
+    Guid CompanyId,
+    Guid ApplicationId,
+    Guid VacancyId,
+    Guid CandidateId,
+    Guid StageIdAtWithdrawal,
+    Guid ChangedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "application.withdrawn";
+    string IAuditEvent.EntityType => "Application";
+    Guid IAuditEvent.EntityId => ApplicationId;
+    Guid? IAuditEvent.ActorUserId => ChangedBy;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Application withdrawn by candidate";
+    object? IAuditEvent.Before => new { WithdrawnAt = (DateTimeOffset?)null };
+    object? IAuditEvent.After => new { WithdrawnAt = OccurredAt, StageIdAtWithdrawal };
+    object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
+}
+
+// Ticket #97: audit events for the new per-company RecruitmentStage settings CRUD.
+internal sealed record RecruitmentStageCreatedAuditEvent(
+    Guid CompanyId,
+    Guid RecruitmentStageId,
+    string Name,
+    int DisplayOrder,
+    bool IsTerminal,
+    Domain.RecruitmentStageTerminalOutcome TerminalOutcome,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "recruitment_stage.created";
+    string IAuditEvent.EntityType => "RecruitmentStage";
+    Guid IAuditEvent.EntityId => RecruitmentStageId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"Recruitment stage '{Name}' created";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { Name, DisplayOrder, IsTerminal, TerminalOutcome };
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record RecruitmentStageAuditSnapshot(
+    string Name,
+    bool IsTerminal,
+    Domain.RecruitmentStageTerminalOutcome TerminalOutcome);
+
+internal sealed record RecruitmentStageUpdatedAuditEvent(
+    Guid CompanyId,
+    Guid RecruitmentStageId,
+    RecruitmentStageAuditSnapshot Before,
+    RecruitmentStageAuditSnapshot After,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "recruitment_stage.updated";
+    string IAuditEvent.EntityType => "RecruitmentStage";
+    Guid IAuditEvent.EntityId => RecruitmentStageId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"Recruitment stage '{After.Name}' updated";
+    object? IAuditEvent.Before => Before;
+    object? IAuditEvent.After => After;
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record RecruitmentStagesReorderedAuditEvent(
+    Guid CompanyId,
+    IReadOnlyList<Guid> OrderedStageIds,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "recruitment_stage.reordered";
+    string IAuditEvent.EntityType => "RecruitmentStage";
+    Guid IAuditEvent.EntityId => CompanyId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Recruitment stages reordered";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { OrderedStageIds };
+    object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record RecruitmentStageActiveStatusChangedAuditEvent(
+    Guid CompanyId,
+    Guid RecruitmentStageId,
+    string Name,
+    bool PreviousIsActive,
+    bool NewIsActive,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "recruitment_stage.active_status_changed";
+    string IAuditEvent.EntityType => "RecruitmentStage";
+    Guid IAuditEvent.EntityId => RecruitmentStageId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => NewIsActive
+        ? $"Recruitment stage '{Name}' reactivated"
+        : $"Recruitment stage '{Name}' deactivated";
+    object? IAuditEvent.Before => new { IsActive = PreviousIsActive };
+    object? IAuditEvent.After => new { IsActive = NewIsActive };
     object? IAuditEvent.Metadata => null;
 }

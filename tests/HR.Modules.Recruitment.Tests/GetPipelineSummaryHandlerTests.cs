@@ -1,6 +1,7 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.GetPipelineSummary;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Tests;
@@ -10,65 +11,94 @@ public class GetPipelineSummaryHandlerTests
     private static readonly DateTimeOffset Now = new(2026, 7, 6, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task HandleAsync_Returns_All_Funnel_Stages_Zero_Filled_When_No_Applications()
+    public async Task HandleAsync_Returns_No_Stages_When_Company_Has_No_RecruitmentStages()
     {
         await using var db = BuildContext();
         var handler = new GetPipelineSummaryHandler(db);
 
         var result = await handler.HandleAsync(new GetPipelineSummaryRequest(Guid.NewGuid()), CancellationToken.None);
 
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Active_NonTerminal_Stages_Zero_Filled_When_No_Applications()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        await db.SaveChangesAsync();
+
+        var handler = new GetPipelineSummaryHandler(db);
+        var result = await handler.HandleAsync(new GetPipelineSummaryRequest(companyId), CancellationToken.None);
+
         Assert.Equal(
-            ["Applied", "Screening", "InterviewScheduled", "Interviewed", "Offered", "Hired"],
+            ["Application Received", "CV Review", "Interview", "Offer"],
             result.Items.Select(i => i.Status).ToArray());
         Assert.All(result.Items, i => Assert.Equal(0, i.ApplicationCount));
     }
 
     [Fact]
-    public async Task HandleAsync_Groups_By_Status_And_Zero_Fills_Stages_With_No_Applications()
+    public async Task HandleAsync_Groups_By_Stage_And_Zero_Fills_Stages_With_No_Applications()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var (vacancy, candidatePool) = SeedVacancyAndCandidates(db, companyId, 5);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var (vacancy, candidatePool) = SeedVacancyAndCandidates(db, companyId, 3);
 
         db.Applications.AddRange(
-            CreateApplicationWithStatus(companyId, vacancy.Id, candidatePool[0].Id, ApplicationStatus.Applied),
-            CreateApplicationWithStatus(companyId, vacancy.Id, candidatePool[1].Id, ApplicationStatus.Applied),
-            CreateApplicationWithStatus(companyId, vacancy.Id, candidatePool[2].Id, ApplicationStatus.Screening),
-            CreateApplicationWithStatus(companyId, vacancy.Id, candidatePool[3].Id, ApplicationStatus.Interviewed),
-            CreateApplicationWithStatus(companyId, vacancy.Id, candidatePool[4].Id, ApplicationStatus.Hired));
+            Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidatePool[0].Id, stages.ApplicationReceived.Id, null, Now),
+            Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidatePool[1].Id, stages.ApplicationReceived.Id, null, Now),
+            Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidatePool[2].Id, stages.CvReview.Id, null, Now));
         await db.SaveChangesAsync();
 
         var handler = new GetPipelineSummaryHandler(db);
         var result = await handler.HandleAsync(new GetPipelineSummaryRequest(companyId), CancellationToken.None);
 
         var byStatus = result.Items.ToDictionary(i => i.Status, i => i.ApplicationCount);
-        Assert.Equal(2, byStatus["Applied"]);
-        Assert.Equal(1, byStatus["Screening"]);
-        Assert.Equal(0, byStatus["InterviewScheduled"]);
-        Assert.Equal(1, byStatus["Interviewed"]);
-        Assert.Equal(0, byStatus["Offered"]);
-        Assert.Equal(1, byStatus["Hired"]);
+        Assert.Equal(2, byStatus["Application Received"]);
+        Assert.Equal(1, byStatus["CV Review"]);
+        Assert.Equal(0, byStatus["Interview"]);
+        Assert.Equal(0, byStatus["Offer"]);
     }
 
     [Fact]
-    public async Task HandleAsync_Excludes_Rejected_And_Withdrawn_Applications()
+    public async Task HandleAsync_Excludes_Terminal_Stages_And_Withdrawn_Applications()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var (vacancy, candidatePool) = SeedVacancyAndCandidates(db, companyId, 3);
 
-        db.Applications.AddRange(
-            CreateApplicationWithStatus(companyId, vacancy.Id, candidatePool[0].Id, ApplicationStatus.Applied),
-            CreateApplicationWithStatus(companyId, vacancy.Id, candidatePool[1].Id, ApplicationStatus.Rejected),
-            CreateApplicationWithStatus(companyId, vacancy.Id, candidatePool[2].Id, ApplicationStatus.Withdrawn));
+        var applied = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidatePool[0].Id, stages.ApplicationReceived.Id, null, Now);
+        var hired = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidatePool[1].Id, stages.Hired.Id, null, Now);
+        var withdrawn = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidatePool[2].Id, stages.ApplicationReceived.Id, null, Now);
+        withdrawn.Withdraw(Now);
+
+        db.Applications.AddRange(applied, hired, withdrawn);
         await db.SaveChangesAsync();
 
         var handler = new GetPipelineSummaryHandler(db);
         var result = await handler.HandleAsync(new GetPipelineSummaryRequest(companyId), CancellationToken.None);
 
-        Assert.Equal(6, result.Items.Count);
-        Assert.DoesNotContain(result.Items, i => i.Status is "Rejected" or "Withdrawn");
+        Assert.Equal(4, result.Items.Count);
+        Assert.DoesNotContain(result.Items, i => i.Status is "Hired" or "Rejected");
         Assert.Equal(1, result.Items.Sum(i => i.ApplicationCount));
+    }
+
+    [Fact]
+    public async Task HandleAsync_Excludes_Inactive_Stages()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        stages.Offer.SetActiveStatus(false, Now);
+        await db.SaveChangesAsync();
+
+        var handler = new GetPipelineSummaryHandler(db);
+        var result = await handler.HandleAsync(new GetPipelineSummaryRequest(companyId), CancellationToken.None);
+
+        Assert.DoesNotContain(result.Items, i => i.Status == "Offer");
     }
 
     [Fact]
@@ -77,19 +107,20 @@ public class GetPipelineSummaryHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var otherStages = RecruitmentStageTestData.AddDefaultStages(db, otherCompanyId, Now);
         var (vacancy, candidatePool) = SeedVacancyAndCandidates(db, companyId, 1);
         var (otherVacancy, otherCandidatePool) = SeedVacancyAndCandidates(db, otherCompanyId, 1);
 
         db.Applications.AddRange(
-            CreateApplicationWithStatus(companyId, vacancy.Id, candidatePool[0].Id, ApplicationStatus.Applied),
-            CreateApplicationWithStatus(otherCompanyId, otherVacancy.Id, otherCandidatePool[0].Id, ApplicationStatus.Applied),
-            CreateApplicationWithStatus(otherCompanyId, otherVacancy.Id, otherCandidatePool[0].Id, ApplicationStatus.Applied));
+            Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidatePool[0].Id, stages.ApplicationReceived.Id, null, Now),
+            Application.Create(Guid.NewGuid(), otherCompanyId, otherVacancy.Id, otherCandidatePool[0].Id, otherStages.ApplicationReceived.Id, null, Now));
         await db.SaveChangesAsync();
 
         var handler = new GetPipelineSummaryHandler(db);
         var result = await handler.HandleAsync(new GetPipelineSummaryRequest(companyId), CancellationToken.None);
 
-        var applied = Assert.Single(result.Items, i => i.Status == "Applied");
+        var applied = Assert.Single(result.Items, i => i.Status == "Application Received");
         Assert.Equal(1, applied.ApplicationCount);
     }
 
@@ -109,53 +140,6 @@ public class GetPipelineSummaryHandlerTests
         db.Candidates.AddRange(candidates);
 
         return (vacancy, candidates);
-    }
-
-    internal static Application CreateApplicationWithStatus(
-        Guid companyId, Guid vacancyId, Guid candidateId, ApplicationStatus status, DateTimeOffset? appliedAt = null)
-    {
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancyId, candidateId, null, appliedAt ?? Now);
-
-        switch (status)
-        {
-            case ApplicationStatus.Applied:
-                break;
-            case ApplicationStatus.Screening:
-                application.MoveToScreening(Now);
-                break;
-            case ApplicationStatus.InterviewScheduled:
-                application.MoveToScreening(Now);
-                application.ScheduleInterview(Now);
-                break;
-            case ApplicationStatus.Interviewed:
-                application.MoveToScreening(Now);
-                application.ScheduleInterview(Now);
-                application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
-                break;
-            case ApplicationStatus.Offered:
-                application.MoveToScreening(Now);
-                application.ScheduleInterview(Now);
-                application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
-                application.Offer(Now);
-                break;
-            case ApplicationStatus.Hired:
-                application.MoveToScreening(Now);
-                application.ScheduleInterview(Now);
-                application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
-                application.Offer(Now);
-                application.Hire(Now);
-                break;
-            case ApplicationStatus.Rejected:
-                application.Reject(Now);
-                break;
-            case ApplicationStatus.Withdrawn:
-                application.Withdraw(Now);
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(status), status, null);
-        }
-
-        return application;
     }
 
     private static RecruitmentDbContext BuildContext() =>

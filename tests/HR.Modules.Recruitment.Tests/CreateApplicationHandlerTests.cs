@@ -1,6 +1,7 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.CreateApplication;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Modules.Recruitment.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,7 +13,32 @@ public class CreateApplicationHandlerTests
     private static readonly DateTimeOffset Now = new(2026, 7, 6, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task HandleAsync_Creates_Application_In_Applied_Status()
+    public async Task HandleAsync_Creates_Application_On_First_Active_NonTerminal_Stage()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new CreateApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, CandidateId = candidate.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(stages.ApplicationReceived.Id, result.Value!.CurrentStageId);
+        Assert.Equal(vacancy.Id, result.Value.VacancyId);
+        Assert.Equal(candidate.Id, result.Value.CandidateId);
+
+        var saved = await db.Applications.SingleAsync();
+        Assert.Equal(result.Value.Id, saved.Id);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Seeds_Default_Stages_When_Company_Has_None_Yet()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
@@ -27,12 +53,7 @@ public class CreateApplicationHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(ApplicationStatus.Applied, result.Value!.Status);
-        Assert.Equal(vacancy.Id, result.Value.VacancyId);
-        Assert.Equal(candidate.Id, result.Value.CandidateId);
-
-        var saved = await db.Applications.SingleAsync();
-        Assert.Equal(result.Value.Id, saved.Id);
+        Assert.Equal(6, await db.RecruitmentStages.CountAsync(s => s.CompanyId == companyId));
     }
 
     [Fact]
@@ -206,7 +227,7 @@ public class CreateApplicationHandlerTests
     }
 
     private static CreateApplicationHandler handler(RecruitmentDbContext db) =>
-        new(db, new FakeClock(FixedUtcNow), new Infrastructure.FakeAuditPublisher());
+        new(db, new FakeClock(FixedUtcNow), new Infrastructure.FakeAuditPublisher(), new RecruitmentStageSeeder(db));
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

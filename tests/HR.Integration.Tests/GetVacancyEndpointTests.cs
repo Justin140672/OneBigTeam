@@ -211,7 +211,9 @@ public class GetVacancyEndpointTests : IClassFixture<ApiWebApplicationFactory>
             recruitmentDb.Vacancies.Add(vacancy);
             var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Jane", "Doe", $"jane.doe.{Guid.NewGuid():N}@example.com", null, null, Now);
             recruitmentDb.Candidates.Add(candidate);
-            recruitmentDb.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now));
+            var stages = HR.Modules.Recruitment.Services.RecruitmentStageSeeder.BuildDefaultStages(companyId, Now);
+            recruitmentDb.RecruitmentStages.AddRange(stages);
+            recruitmentDb.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages[0].Id, null, Now));
             await recruitmentDb.SaveChangesAsync();
             vacancyId = vacancy.Id;
         }

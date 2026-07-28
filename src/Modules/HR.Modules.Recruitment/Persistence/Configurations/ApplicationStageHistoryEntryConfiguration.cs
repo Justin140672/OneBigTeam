@@ -24,16 +24,11 @@ internal sealed class ApplicationStageHistoryEntryConfiguration : IEntityTypeCon
             .HasColumnName("application_id")
             .IsRequired();
 
-        builder.Property(e => e.PreviousStage)
-            .HasColumnName("previous_stage")
-            .HasConversion<string>()
-            .HasMaxLength(30)
-            .IsRequired();
+        builder.Property(e => e.PreviousStageId)
+            .HasColumnName("previous_stage_id");
 
-        builder.Property(e => e.NewStage)
-            .HasColumnName("new_stage")
-            .HasConversion<string>()
-            .HasMaxLength(30)
+        builder.Property(e => e.NewStageId)
+            .HasColumnName("new_stage_id")
             .IsRequired();
 
         builder.Property(e => e.ChangedByUserId)

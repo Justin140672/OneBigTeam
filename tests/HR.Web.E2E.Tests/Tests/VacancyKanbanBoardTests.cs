@@ -6,8 +6,24 @@ namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
 /// Covers the Recruitment Kanban board (VacancyKanbanBoard.razor / KanbanApplicantCard.razor,
-/// tickets #69-#73) — the board's own page object (VacancyKanbanBoardPage) already existed from
-/// that work, but no test class actually exercised it (task #80).
+/// tickets #69-#73, reworked to dynamic per-company stages by tickets #97-#101).
+///
+/// The board now renders one column per RecruitmentStage the applying company has configured, in
+/// DisplayOrder, rather than a fixed 8-status enum layout — so this class asserts against the actual
+/// seeded stage set for Acme (RecruitmentStageSeeder.BuildDefaultStages: "Application Received",
+/// "CV Review", "Interview", "Offer", "Hired", "Rejected", at DisplayOrder 1-6, "Hired"/"Rejected"
+/// being the only terminal stages) instead of a hardcoded enum column list/count. The seeder only
+/// runs the first time recruitment data exists for a company (on first Vacancy creation), which is
+/// guaranteed here since ArrangeAppliedApplicationAsync always creates a fresh vacancy first.
+///
+/// Also: the old client-side transition graph (ApplicationStatusTransitionRules) that used to
+/// pre-block "invalid" drags before ever calling the server was deleted as part of #99/#101 — stage
+/// order is now arbitrary per company and the server (MoveApplicationStageHandler) only rejects a
+/// move when the application is currently on a terminal stage, or the target stage is inactive/not
+/// found. The invalid-move test below exercises the "target stage is inactive" case (the only one
+/// reachable purely through the UI, since reaching a terminal stage via the board removes the
+/// "move off it" case from being a normal drag scenario without leaving Applied) and asserts a real
+/// request round-trip (error banner from server error text) rather than an instant client no-op.
 ///
 /// Uses the seeded Acme company (00000000-0000-0000-0000-000000000001) and Marcus Diallo
 /// (Recruiter role) throughout, the same persona used by ApplicationToEmployeeFlowTests and
@@ -22,35 +38,37 @@ public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fi
 
     private const string MarcusEmail = "marcus.diallo@acme.example";
 
-    // Pipeline order mirrors ApplicationStatusTransitionRules.ColumnOrder (HR.Web.Services) /
-    // GetRecruitmentKanban's ColumnOrder (HR.Modules.Recruitment) — all eight statuses are always
-    // rendered as columns, whether or not they currently hold any applicants.
-    private static readonly string[] AllStages =
+    // RecruitmentStageSeeder.BuildDefaultStages — the default stage set every company gets the first
+    // time recruitment data exists for it. A freshly created Application always starts on the first
+    // of these (DisplayOrder 1, "Application Received").
+    private const string InitialStage      = "Application Received";
+    private const string NonTerminalStage2 = "CV Review";
+    private const string TerminalHired     = "Hired";
+    private static readonly string[] AllSeededStages =
     [
-        "Applied", "Screening", "InterviewScheduled", "Interviewed",
-        "Offered", "Hired", "Rejected", "Withdrawn",
+        "Application Received", "CV Review", "Interview", "Offer", "Hired", "Rejected",
     ];
 
     [Fact]
-    public async Task Board_RendersOneColumnPerStage_InPipelineOrder_IncludingEmptyColumns()
+    public async Task Board_RendersOneColumnPerConfiguredStage_InDisplayOrder_IncludingEmptyColumns()
     {
         var (candidateLast, kanban) = await ArrangeAppliedApplicationAsync();
 
-        foreach (var stage in AllStages)
+        foreach (var stage in AllSeededStages)
         {
             Assert.True(await kanban.HasColumnHeaderAsync(stage),
                 $"Expected a Kanban column header for stage '{stage}' to render, including stages with no current applicants");
         }
 
-        // The freshly created application sits in "Applied" — its column should show a count of
-        // at least 1 (other tests/data may also be Applied on other vacancies' boards, but this
-        // board is scoped to a single vacancy, so ours is the only contributor here).
-        Assert.True(await kanban.GetColumnCountAsync("Applied") >= 1,
-            $"Expected the 'Applied' column count to include the new application for {candidateLast}");
+        // The freshly created application sits in the seeded initial stage — its column should show
+        // a count of at least 1 (other tests/data may also share this stage on other vacancies'
+        // boards, but this board is scoped to a single vacancy, so ours is the only contributor here).
+        Assert.True(await kanban.GetColumnCountAsync(InitialStage) >= 1,
+            $"Expected the '{InitialStage}' column count to include the new application for {candidateLast}");
 
         // A stage nothing has reached yet on this vacancy's board (e.g. "Hired") should still
         // render its header with a count of 0, not be hidden entirely.
-        Assert.Equal(0, await kanban.GetColumnCountAsync("Hired"));
+        Assert.Equal(0, await kanban.GetColumnCountAsync(TerminalHired));
     }
 
     [Fact]
@@ -92,40 +110,57 @@ public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fi
     }
 
     [Fact]
-    public async Task DragCard_ToValidColumn_MovesTheApplicationAndPersistsAcrossReload()
+    public async Task DragCard_ToAnotherActiveNonTerminalStage_MovesTheApplicationAndPersistsAcrossReload()
     {
         var (candidateLast, kanban) = await ArrangeAppliedApplicationAsync();
 
-        // Applied -> Screening is an allowed transition (ApplicationStatusTransitionRules).
-        await kanban.DragCardToColumnAsync(candidateLast, "Screening");
+        // Ticket #99 removed the compiled linear transition graph — a company's stages can be
+        // reordered/inserted freely, so any active, non-terminal target stage is now a valid move.
+        await kanban.DragCardToColumnAsync(candidateLast, NonTerminalStage2);
 
-        Assert.Equal("Screening", await kanban.GetCardStatusBadgeTextAsync(candidateLast));
+        Assert.Equal(NonTerminalStage2, await kanban.GetCardStatusBadgeTextAsync(candidateLast));
 
         // Reload the board from scratch (fresh navigation, not just re-reading the DOM) — the move
         // must have actually been persisted server-side (MoveApplicationStageAsync), not merely
         // reflected client-side by the drag itself.
         await kanban.WaitForLoadedAsync();
-        Assert.Equal("Screening", await kanban.GetCardStatusBadgeTextAsync(candidateLast));
+        Assert.Equal(NonTerminalStage2, await kanban.GetCardStatusBadgeTextAsync(candidateLast));
     }
 
     [Fact]
-    public async Task DragCard_ToInvalidColumn_IsRejected_CardStaysPut_AndShowsError()
+    public async Task DragCard_ToInactiveStage_IsRejectedByServer_CardStaysPut_AndShowsError()
     {
         var (candidateLast, kanban) = await ArrangeAppliedApplicationAsync();
 
-        // Applied -> Interviewed skips Screening/InterviewScheduled and is not in the allowed
-        // transition graph — VacancyKanbanBoard.OnDragStopAsync rejects this client-side before
-        // ever calling the server, sets an error banner, and re-fetches to snap the card back.
-        await kanban.DragCardToColumnAsync(candidateLast, "Interviewed");
+        // Deactivate the "Interview" stage via the Recruitment Stages settings page first — with the
+        // client-side transition graph gone, this is the only "invalid move" a plain drag on the
+        // board can still reach; MoveApplicationStageHandler rejects a move whose target stage is
+        // inactive. Requires a real request round-trip (no client-side pre-check exists anymore).
+        var stageList = new RecruitmentStageListPage(_page, _fixture.WebBaseUrl);
+        await stageList.GoToAsync(AcmeId);
+        if (await stageList.IsActiveAsync("Interview"))
+            await stageList.DeactivateAsync("Interview");
 
-        Assert.True(await kanban.IsErrorVisibleAsync(),
-            "Expected an error banner after attempting an invalid drag-and-drop move");
-        var errorText = await kanban.GetErrorTextAsync();
-        Assert.Contains("Applied", errorText ?? "");
-        Assert.Contains("Interviewed", errorText ?? "");
+        try
+        {
+            await kanban.DragCardToColumnAsync(candidateLast, "Interview");
 
-        // The card must still be in its original column, not the rejected target.
-        Assert.Equal("Applied", await kanban.GetCardStatusBadgeTextAsync(candidateLast));
+            Assert.True(await kanban.IsErrorVisibleAsync(),
+                "Expected an error banner after attempting to move an applicant to an inactive stage");
+            var errorText = await kanban.GetErrorTextAsync();
+            Assert.Contains("Interview", errorText ?? "");
+
+            // The card must still be in its original column, not the rejected target.
+            Assert.Equal(InitialStage, await kanban.GetCardStatusBadgeTextAsync(candidateLast));
+        }
+        finally
+        {
+            // Restore shared seeded state for other tests/classes sharing this database.
+            await stageList.GoToAsync(AcmeId);
+            await stageList.ShowInactiveAsync();
+            if (!await stageList.IsActiveAsync("Interview"))
+                await stageList.ActivateAsync("Interview");
+        }
     }
 
     [Fact]
@@ -163,9 +198,9 @@ public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fi
     }
 
     /// <summary>
-    /// Creates a fresh candidate and vacancy, adds the candidate's application (leaving it in the
-    /// initial "Applied" stage), then opens the vacancy's Kanban tab. Returns the candidate's
-    /// (unique) last name and the ready-to-use board page object.
+    /// Creates a fresh candidate and vacancy, adds the candidate's application (leaving it on the
+    /// seeded initial stage), then opens the vacancy's Kanban tab. Returns the candidate's (unique)
+    /// last name and the ready-to-use board page object.
     /// </summary>
     private string? _vacancyTitle;
 
@@ -208,7 +243,7 @@ public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fi
         await vacancyDetail.SelectCandidateInAddDialogAsync(candidateEmail);
         await vacancyDetail.SubmitAddApplicationAsync();
 
-        Assert.Equal("Applied", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
+        Assert.Equal(InitialStage, await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
         await vacancyDetail.OpenKanbanTabAsync();
 

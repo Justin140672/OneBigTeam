@@ -3,7 +3,7 @@
 <SfDialog Visible="Visible" IsModal="true" Width="720px" ShowCloseIcon="true" CssClass="applications-by-status-dialog">
     <DialogEvents Closed="HandleDialogClosed" />
     <DialogTemplates>
-        <Header>@(string.IsNullOrEmpty(Status) ? "Applications" : $"Applications — {Status}")</Header>
+        <Header>@(string.IsNullOrEmpty(StageName) ? "Applications" : $"Applications — {StageName}")</Header>
         <Content>
             @if (_loading)
             {
@@ -46,24 +46,25 @@
 
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
-    [Parameter] public string? Status { get; set; }
+    [Parameter] public Guid? StageId { get; set; }
+    [Parameter] public string? StageName { get; set; }
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback OnClosed { get; set; }
 
     private bool Visible;
     private bool _loading;
     private List<ApplicationByStatusItem> _items = [];
-    private string? _loadedStatus;
+    private Guid? _loadedStageId;
 
     protected override async Task OnParametersSetAsync()
     {
         Visible = IsOpen;
 
-        if (IsOpen && !string.IsNullOrEmpty(Status) && Status != _loadedStatus)
+        if (IsOpen && StageId is { } stageId && StageId != _loadedStageId)
         {
-            _loadedStatus = Status;
+            _loadedStageId = stageId;
             _loading = true;
-            var result = await ApplicationService.GetApplicationsByStatusAsync(CompanyId, Status);
+            var result = await ApplicationService.GetApplicationsByStatusAsync(CompanyId, stageId);
             _items = result?.Items.ToList() ?? [];
             _loading = false;
         }

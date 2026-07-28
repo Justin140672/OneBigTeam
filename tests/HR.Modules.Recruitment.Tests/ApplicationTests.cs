@@ -6,150 +6,96 @@ public class ApplicationTests
 {
     private static readonly DateTimeOffset Now = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
-    private static Application CreateApplication() =>
-        Application.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, Now);
+    private static Application CreateApplication(Guid? initialStageId = null) =>
+        Application.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), initialStageId ?? Guid.NewGuid(), null, Now);
 
     [Fact]
-    public void Create_Sets_Status_To_Applied()
+    public void Create_Sets_CurrentStageId_To_InitialStageId()
     {
-        var application = CreateApplication();
+        var stageId = Guid.NewGuid();
+        var application = CreateApplication(stageId);
 
-        Assert.Equal(ApplicationStatus.Applied, application.Status);
+        Assert.Equal(stageId, application.CurrentStageId);
         Assert.Null(application.InterviewOutcome);
+        Assert.Null(application.WithdrawnAt);
     }
 
     [Fact]
-    public void Full_Happy_Path_Reaches_Hired_With_Passed_Outcome()
+    public void SetInterviewOutcome_Sets_Outcome_And_UpdatedAt_Without_Changing_Stage()
     {
-        var application = CreateApplication();
-
-        application.MoveToScreening(Now);
-        application.ScheduleInterview(Now);
-        application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
-        application.Offer(Now);
-        application.Hire(Now);
-
-        Assert.Equal(ApplicationStatus.Hired, application.Status);
-        Assert.Equal(InterviewOutcome.Passed, application.InterviewOutcome);
-    }
-
-    [Fact]
-    public void ScheduleInterview_Sets_Outcome_To_Pending()
-    {
-        var application = CreateApplication();
-
-        application.ScheduleInterview(Now);
-
-        Assert.Equal(ApplicationStatus.InterviewScheduled, application.Status);
-        Assert.Equal(InterviewOutcome.Pending, application.InterviewOutcome);
-    }
-
-    [Fact]
-    public void RecordInterviewOutcome_Before_Scheduled_Throws()
-    {
-        var application = CreateApplication();
-
-        Assert.Throws<InvalidOperationException>(() => application.RecordInterviewOutcome(InterviewOutcome.Passed, Now));
-    }
-
-    [Fact]
-    public void Offer_Before_Interviewed_Throws()
-    {
-        var application = CreateApplication();
-
-        Assert.Throws<InvalidOperationException>(() => application.Offer(Now));
-    }
-
-    [Fact]
-    public void Reject_From_Applied_Sets_Status_To_Rejected()
-    {
-        var application = CreateApplication();
-
-        application.Reject(Now);
-
-        Assert.Equal(ApplicationStatus.Rejected, application.Status);
-    }
-
-    [Fact]
-    public void Reject_After_Hired_Throws()
-    {
-        var application = CreateApplication();
-        application.MoveToScreening(Now);
-        application.ScheduleInterview(Now);
-        application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
-        application.Offer(Now);
-        application.Hire(Now);
-
-        Assert.Throws<InvalidOperationException>(() => application.Reject(Now));
-    }
-
-    [Fact]
-    public void Withdraw_From_Applied_Sets_Status_To_Withdrawn()
-    {
-        var application = CreateApplication();
-
-        application.Withdraw(Now);
-
-        Assert.Equal(ApplicationStatus.Withdrawn, application.Status);
-    }
-
-    [Theory]
-    [InlineData(ApplicationStatus.Applied, ApplicationStatus.Screening)]
-    [InlineData(ApplicationStatus.Applied, ApplicationStatus.InterviewScheduled)]
-    [InlineData(ApplicationStatus.Applied, ApplicationStatus.Rejected)]
-    [InlineData(ApplicationStatus.Applied, ApplicationStatus.Withdrawn)]
-    [InlineData(ApplicationStatus.Screening, ApplicationStatus.InterviewScheduled)]
-    [InlineData(ApplicationStatus.InterviewScheduled, ApplicationStatus.Interviewed)]
-    [InlineData(ApplicationStatus.Interviewed, ApplicationStatus.Offered)]
-    [InlineData(ApplicationStatus.Offered, ApplicationStatus.Hired)]
-    internal void MoveToStage_Valid_Transition_Updates_Status_And_UpdatedAt(ApplicationStatus from, ApplicationStatus to)
-    {
-        var application = CreateApplication();
-        MoveApplicationToStatus(application, from);
+        var stageId = Guid.NewGuid();
+        var application = CreateApplication(stageId);
         var later = Now.AddDays(1);
 
-        application.MoveToStage(to, later);
+        application.SetInterviewOutcome(InterviewOutcome.Pending, later);
 
-        Assert.Equal(to, application.Status);
+        Assert.Equal(InterviewOutcome.Pending, application.InterviewOutcome);
+        Assert.Equal(stageId, application.CurrentStageId);
         Assert.Equal(later, application.UpdatedAt);
     }
 
     [Fact]
-    public void MoveToStage_Invalid_Transition_Throws_With_Message_Naming_Both_Stages()
+    public void MoveToStage_Updates_CurrentStageId_And_UpdatedAt()
     {
         var application = CreateApplication();
-        application.MoveToScreening(Now);
-        application.ScheduleInterview(Now);
-        application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
+        var newStageId = Guid.NewGuid();
+        var later = Now.AddDays(1);
 
-        var ex = Assert.Throws<InvalidOperationException>(
-            () => application.MoveToStage(ApplicationStatus.Applied, Now.AddDays(1)));
+        application.MoveToStage(newStageId, later);
 
-        Assert.Contains("Interviewed", ex.Message);
-        Assert.Contains("Applied", ex.Message);
+        Assert.Equal(newStageId, application.CurrentStageId);
+        Assert.Equal(later, application.UpdatedAt);
     }
 
     [Fact]
-    public void MoveToStage_Invalid_Transition_Does_Not_Change_Status_Or_UpdatedAt()
+    public void RecordRejection_Sets_Stage_And_RejectionReason()
     {
         var application = CreateApplication();
-        var originalUpdatedAt = application.UpdatedAt;
+        var rejectedStageId = Guid.NewGuid();
+        var later = Now.AddDays(1);
 
-        Assert.Throws<InvalidOperationException>(
-            () => application.MoveToStage(ApplicationStatus.Hired, Now.AddDays(1)));
+        application.RecordRejection(rejectedStageId, "Not enough experience.", later);
 
-        Assert.Equal(ApplicationStatus.Applied, application.Status);
-        Assert.Equal(originalUpdatedAt, application.UpdatedAt);
+        Assert.Equal(rejectedStageId, application.CurrentStageId);
+        Assert.Equal("Not enough experience.", application.RejectionReason);
+        Assert.Equal(later, application.UpdatedAt);
     }
 
     [Fact]
-    public void MoveToStage_From_Terminal_Stage_Throws()
+    public void RecordRejection_Trims_Whitespace_Only_Reason_To_Null()
     {
         var application = CreateApplication();
-        application.Reject(Now);
 
-        Assert.Throws<InvalidOperationException>(
-            () => application.MoveToStage(ApplicationStatus.Screening, Now.AddDays(1)));
+        application.RecordRejection(Guid.NewGuid(), "   ", Now.AddDays(1));
+
+        Assert.Null(application.RejectionReason);
+    }
+
+    [Fact]
+    public void RecordHire_Sets_Stage_And_UpdatedAt()
+    {
+        var application = CreateApplication();
+        var hiredStageId = Guid.NewGuid();
+        var later = Now.AddDays(1);
+
+        application.RecordHire(hiredStageId, later);
+
+        Assert.Equal(hiredStageId, application.CurrentStageId);
+        Assert.Equal(later, application.UpdatedAt);
+    }
+
+    [Fact]
+    public void Withdraw_Sets_WithdrawnAt_But_Does_Not_Change_CurrentStageId()
+    {
+        var stageId = Guid.NewGuid();
+        var application = CreateApplication(stageId);
+        var later = Now.AddDays(1);
+
+        application.Withdraw(later);
+
+        Assert.Equal(later, application.WithdrawnAt);
+        Assert.Equal(stageId, application.CurrentStageId);
+        Assert.Equal(later, application.UpdatedAt);
     }
 
     [Fact]
@@ -158,7 +104,7 @@ public class ApplicationTests
         var recruiterId = Guid.NewGuid();
 
         var application = Application.Create(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, Now,
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, Now,
             ApplicationSource.ExternalRecruiter, recruiterId);
 
         Assert.Equal(ApplicationSource.ExternalRecruiter, application.Source);
@@ -171,7 +117,7 @@ public class ApplicationTests
         var suppliedRecruiterId = Guid.NewGuid();
 
         var application = Application.Create(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, Now,
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, Now,
             ApplicationSource.Direct, suppliedRecruiterId);
 
         Assert.Equal(ApplicationSource.Direct, application.Source);
@@ -224,29 +170,5 @@ public class ApplicationTests
 
         Assert.Null(application.Source);
         Assert.Null(application.SourceExternalRecruiterId);
-    }
-
-    private static void MoveApplicationToStatus(Application application, ApplicationStatus target)
-    {
-        if (target == ApplicationStatus.Applied)
-            return;
-
-        application.MoveToScreening(Now);
-        if (target == ApplicationStatus.Screening)
-            return;
-
-        application.ScheduleInterview(Now);
-        if (target == ApplicationStatus.InterviewScheduled)
-            return;
-
-        application.RecordInterviewOutcome(InterviewOutcome.Passed, Now);
-        if (target == ApplicationStatus.Interviewed)
-            return;
-
-        application.Offer(Now);
-        if (target == ApplicationStatus.Offered)
-            return;
-
-        application.Hire(Now);
     }
 }

@@ -2,7 +2,6 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 using HR.Modules.Recruitment.Persistence;
-using HR.Modules.Recruitment.Services;
 using HR.Modules.Recruitment.Tests.Infrastructure;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -15,14 +14,15 @@ public class RecordInterviewOutcomeHandlerTests
     private static readonly DateTimeOffset Now = new(2026, 7, 6, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task HandleAsync_Records_Outcome_And_Notes()
+    public async Task HandleAsync_Records_Outcome_And_Notes_And_Mirrors_Onto_Application_Without_Changing_Stage()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
-        application.ScheduleInterview(Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        application.SetInterviewOutcome(InterviewOutcome.Pending, Now);
         var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(2), 30, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -50,20 +50,16 @@ public class RecordInterviewOutcomeHandlerTests
         Assert.Equal(InterviewOutcome.Passed, result.Value!.Outcome);
         Assert.Equal("Strong technical skills.", result.Value.Notes);
 
-        // Recording the interview outcome also moves the Application itself from
-        // InterviewScheduled to Interviewed (Application.RecordInterviewOutcome) — previously
-        // this call was missing entirely, leaving the application stuck on InterviewScheduled
-        // forever with no way to reach Offer/Hire.
+        // Recording an outcome is metadata-only (ticket #99) — it never moves the application off
+        // its current stage; advancing the pipeline remains a separate, explicit action.
         var savedApplication = await db.Applications.SingleAsync();
-        Assert.Equal(ApplicationStatus.Interviewed, savedApplication.Status);
+        Assert.Equal(stages.Interview.Id, savedApplication.CurrentStageId);
         Assert.Equal(InterviewOutcome.Passed, savedApplication.InterviewOutcome);
 
-        // Two audit events are published: InterviewOutcomeRecordedAuditEvent (this handler's own)
-        // and ApplicationStageChangedAuditEvent (RecruitmentStageChangeRecorder, ticket #67), since
-        // recording an outcome also transitions the application to Interviewed.
-        Assert.Equal(2, auditPublisher.Published.Count);
-        var auditEvent = Assert.IsType<InterviewOutcomeRecordedAuditEvent>(
-            auditPublisher.Published.Single(e => e is InterviewOutcomeRecordedAuditEvent));
+        // Exactly one audit event is published now: InterviewOutcomeRecordedAuditEvent. Unlike before
+        // ticket #99, recording an outcome no longer transitions the stage, so no
+        // ApplicationStageChangedAuditEvent accompanies it.
+        var auditEvent = Assert.IsType<InterviewOutcomeRecordedAuditEvent>(Assert.Single(auditPublisher.Published));
         Assert.Equal("interview.outcome_recorded", ((IAuditEvent)auditEvent).EventType);
         Assert.Equal("Interview", ((IAuditEvent)auditEvent).EntityType);
         Assert.Equal(interview.Id, ((IAuditEvent)auditEvent).EntityId);
@@ -104,8 +100,9 @@ public class RecordInterviewOutcomeHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -135,8 +132,9 @@ public class RecordInterviewOutcomeHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", "olivia.grant@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
         var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(2), 30, null, Now);
         interview.RecordOutcome(InterviewOutcome.Failed, null, Now);
         db.Vacancies.Add(vacancy);
@@ -170,9 +168,10 @@ public class RecordInterviewOutcomeHandlerTests
         var taskCompleter = new FakeTaskCompleter();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
-        application.ScheduleInterview(Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        application.SetInterviewOutcome(InterviewOutcome.Pending, Now);
         var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(2), 30, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -209,8 +208,9 @@ public class RecordInterviewOutcomeHandlerTests
         var taskCompleter = new FakeTaskCompleter();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -236,7 +236,7 @@ public class RecordInterviewOutcomeHandlerTests
         FakeTaskCompleter? taskCompleter = null,
         FakeAuditPublisher? auditPublisher = null) =>
         new(
-            new InterviewOutcomeRecorder(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher(), new RecruitmentStageChangeRecorder(db, new FakeIntegrationEventPublisher(), auditPublisher ?? new FakeAuditPublisher())),
+            new InterviewOutcomeRecorder(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher()),
             taskCompleter ?? new FakeTaskCompleter());
 
     private static RecruitmentDbContext BuildContext() =>

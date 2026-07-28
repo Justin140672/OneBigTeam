@@ -4,6 +4,8 @@ using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
@@ -68,7 +70,7 @@ public class GetPipelineSummaryEndpointTests : IClassFixture<ApiWebApplicationFa
     }
 
     [Fact]
-    public async Task Get_PipelineSummary_Returns_All_Six_Stages_Zero_Filled_When_No_Applications()
+    public async Task Get_PipelineSummary_Returns_No_Items_When_Company_Has_No_RecruitmentStages()
     {
         var companyId = Guid.NewGuid();
         using var client = ClientAs(RecruiterUser, companyId);
@@ -78,14 +80,11 @@ public class GetPipelineSummaryEndpointTests : IClassFixture<ApiWebApplicationFa
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<SummaryPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(
-            ["Applied", "Screening", "InterviewScheduled", "Interviewed", "Offered", "Hired"],
-            payload!.Items.Select(i => i.Status).ToArray());
-        Assert.All(payload.Items, i => Assert.Equal(0, i.ApplicationCount));
+        Assert.Empty(payload!.Items);
     }
 
     [Fact]
-    public async Task Get_PipelineSummary_Groups_By_Status_And_Excludes_Rejected_And_Withdrawn()
+    public async Task Get_PipelineSummary_Returns_Default_Stages_Zero_Filled_And_Excludes_Terminal_Stages_And_Withdrawn()
     {
         var companyId = Guid.NewGuid();
         using var client = ClientAs(RecruiterUser, companyId);
@@ -93,24 +92,25 @@ public class GetPipelineSummaryEndpointTests : IClassFixture<ApiWebApplicationFa
         await SeedAsync(scope =>
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+            var seeded = RecruitmentStageSeeder.BuildDefaultStages(companyId, Now);
+            db.RecruitmentStages.AddRange(seeded);
+
             var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Software Engineer", null, Guid.NewGuid(), Now);
             db.Vacancies.Add(vacancy);
 
-            for (var i = 0; i < 4; i++)
-            {
-                var candidate = Candidate.Create(
-                    Guid.NewGuid(), companyId, "First", $"Last{i}", $"c{i}.{Guid.NewGuid():N}@example.com", null, null, Now);
-                db.Candidates.Add(candidate);
+            var applicationReceivedStageId = seeded.Single(s => s.Name == "Application Received").Id;
+            var hiredStageId = seeded.Single(s => s.Name == "Hired").Id;
 
-                var status = i switch
-                {
-                    0 => ApplicationStatus.Applied,
-                    1 => ApplicationStatus.Applied,
-                    2 => ApplicationStatus.Rejected,
-                    _ => ApplicationStatus.Withdrawn,
-                };
-                db.Applications.Add(CreateApplicationWithStatus(companyId, vacancy.Id, candidate.Id, status));
-            }
+            var candidate1 = Candidate.Create(Guid.NewGuid(), companyId, "First", "Last1", $"c1.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var candidate2 = Candidate.Create(Guid.NewGuid(), companyId, "First", "Last2", $"c2.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var candidate3 = Candidate.Create(Guid.NewGuid(), companyId, "First", "Last3", $"c3.{Guid.NewGuid():N}@example.com", null, null, Now);
+            db.Candidates.AddRange(candidate1, candidate2, candidate3);
+
+            var applied = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate1.Id, applicationReceivedStageId, null, Now);
+            var withdrawn = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate2.Id, applicationReceivedStageId, null, Now);
+            withdrawn.Withdraw(Now);
+            var hired = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate3.Id, hiredStageId, null, Now);
+            db.Applications.AddRange(applied, withdrawn, hired);
         });
 
         var response = await client.GetAsync($"/api/companies/{companyId}/recruitment/pipeline-summary");
@@ -118,12 +118,14 @@ public class GetPipelineSummaryEndpointTests : IClassFixture<ApiWebApplicationFa
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<SummaryPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(6, payload!.Items.Count);
-        Assert.DoesNotContain(payload.Items, i => i.Status is "Rejected" or "Withdrawn");
+        Assert.Equal(
+            ["Application Received", "CV Review", "Interview", "Offer"],
+            payload!.Items.Select(i => i.Status).ToArray());
+        Assert.DoesNotContain(payload.Items, i => i.Status is "Hired" or "Rejected");
 
-        var applied = Assert.Single(payload.Items, i => i.Status == "Applied");
-        Assert.Equal(2, applied.ApplicationCount);
-        Assert.Equal(2, payload.Items.Sum(i => i.ApplicationCount));
+        var appliedItem = Assert.Single(payload.Items, i => i.Status == "Application Received");
+        Assert.Equal(1, appliedItem.ApplicationCount);
+        Assert.Equal(1, payload.Items.Sum(i => i.ApplicationCount));
     }
 
     [Fact]
@@ -136,11 +138,15 @@ public class GetPipelineSummaryEndpointTests : IClassFixture<ApiWebApplicationFa
         await SeedAsync(scope =>
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+            var seeded = RecruitmentStageSeeder.BuildDefaultStages(otherCompanyId, Now);
+            db.RecruitmentStages.AddRange(seeded);
+            var applicationReceivedStageId = seeded.Single(s => s.Name == "Application Received").Id;
+
             var otherVacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
             var otherCandidate = Candidate.Create(Guid.NewGuid(), otherCompanyId, "First", "Last", $"c.{Guid.NewGuid():N}@example.com", null, null, Now);
             db.Vacancies.Add(otherVacancy);
             db.Candidates.Add(otherCandidate);
-            db.Applications.Add(CreateApplicationWithStatus(otherCompanyId, otherVacancy.Id, otherCandidate.Id, ApplicationStatus.Applied));
+            db.Applications.Add(Application.Create(Guid.NewGuid(), otherCompanyId, otherVacancy.Id, otherCandidate.Id, applicationReceivedStageId, null, Now));
         });
 
         var response = await client.GetAsync($"/api/companies/{companyId}/recruitment/pipeline-summary");
@@ -148,26 +154,7 @@ public class GetPipelineSummaryEndpointTests : IClassFixture<ApiWebApplicationFa
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<SummaryPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(0, payload!.Items.Sum(i => i.ApplicationCount));
-    }
-
-    private static Application CreateApplicationWithStatus(Guid companyId, Guid vacancyId, Guid candidateId, ApplicationStatus status)
-    {
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancyId, candidateId, null, Now);
-
-        switch (status)
-        {
-            case ApplicationStatus.Applied:
-                break;
-            case ApplicationStatus.Rejected:
-                application.Reject(Now);
-                break;
-            case ApplicationStatus.Withdrawn:
-                application.Withdraw(Now);
-                break;
-        }
-
-        return application;
+        Assert.Empty(payload!.Items);
     }
 
     private async Task SeedAsync(Action<IServiceScope> seed)

@@ -10,8 +10,9 @@ public record ApplicationListItemModel(
     string CandidateFirstName,
     string CandidateLastName,
     string CandidateEmail,
-    string Status,
+    Guid CurrentStageId,
     string? InterviewOutcome,
+    bool IsWithdrawn,
     DateTimeOffset AppliedAt);
 
 // ── GET ───────────────────────────────────────────────────────────────────────
@@ -23,16 +24,29 @@ public record GetApplicationResponse(
     string CandidateFirstName,
     string CandidateLastName,
     string CandidateEmail,
-    string Status,
+    Guid CurrentStageId,
+    string CurrentStageName,
     string? InterviewOutcome,
     string? Notes,
+    // Ticket #99: candidate-initiated withdrawal, orthogonal to CurrentStageId.
+    DateTimeOffset? WithdrawnAt,
     DateTimeOffset AppliedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     // Ticket #78 — both null for applications recorded before this concept existed.
     string? Source,
     Guid? SourceExternalRecruiterId,
-    string? SourceExternalRecruiterAgencyName);
+    string? SourceExternalRecruiterAgencyName,
+    // Ticket #66: stage-change history, ordered oldest first.
+    IReadOnlyList<ApplicationStageHistoryItemModel>? StageHistory = null);
+
+public record ApplicationStageHistoryItemModel(
+    Guid Id,
+    Guid? PreviousStageId,
+    Guid NewStageId,
+    Guid? ChangedByUserId,
+    string? Notes,
+    DateTimeOffset ChangedAt);
 
 // ── CREATE ────────────────────────────────────────────────────────────────────
 
@@ -51,27 +65,46 @@ public record CreateApplicationResponse(
     Guid CompanyId,
     Guid VacancyId,
     Guid CandidateId,
-    string Status,
+    Guid CurrentStageId,
     string? InterviewOutcome,
     string? Notes,
     DateTimeOffset AppliedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? Source = null,
+    Guid? SourceExternalRecruiterId = null);
 
 // ── STATUS TRANSITIONS ────────────────────────────────────────────────────────
 
-public record ApplicationActionResponse(
+// Dedicated response for the Withdraw action — WithdrawApplicationResponse (HR.Modules.Recruitment)
+// carries WithdrawnAt but no RejectionReason.
+public record WithdrawApplicationResponse(
     Guid Id,
     Guid VacancyId,
     Guid CandidateId,
-    string Status,
+    Guid CurrentStageId,
     string? InterviewOutcome,
     string? Notes,
+    DateTimeOffset? WithdrawnAt,
     DateTimeOffset AppliedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
 public record RejectCandidateRequest(Guid CompanyId, Guid VacancyId, Guid ApplicationId, string? RejectionReason);
+
+// Dedicated response for the Reject action — RejectCandidateResponse (HR.Modules.Recruitment)
+// carries RejectionReason but no WithdrawnAt.
+public record RejectCandidateResponse(
+    Guid Id,
+    Guid VacancyId,
+    Guid CandidateId,
+    Guid CurrentStageId,
+    string? InterviewOutcome,
+    string? Notes,
+    string? RejectionReason,
+    DateTimeOffset AppliedAt,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
 
 // Dedicated response for the Offer action (rather than the generic ApplicationActionResponse) so the
 // linked Position Profile's read-only employment defaults are available to the UI while HR decides to
@@ -80,7 +113,7 @@ public record OfferCandidateResponse(
     Guid Id,
     Guid VacancyId,
     Guid CandidateId,
-    string Status,
+    Guid CurrentStageId,
     string? InterviewOutcome,
     string? Notes,
     DateTimeOffset AppliedAt,
@@ -118,7 +151,7 @@ public record HireCandidateResponse(
     Guid VacancyId,
     Guid CandidateId,
     Guid EmployeeId,
-    string Status,
+    Guid CurrentStageId,
     string? InterviewOutcome,
     string? Notes,
     DateTimeOffset AppliedAt,

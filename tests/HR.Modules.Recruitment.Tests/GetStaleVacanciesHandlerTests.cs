@@ -19,7 +19,7 @@ public class GetStaleVacanciesHandlerTests
         var vacancy = OpenVacancy(companyId, Now.AddDays(-30));
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         // Application activity 5 days ago — well within the default 14-day window.
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now.AddDays(-5));
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-5));
 
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -40,7 +40,7 @@ public class GetStaleVacanciesHandlerTests
         var vacancy = OpenVacancy(companyId, Now.AddDays(-60));
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
         var lastActivity = Now.AddDays(-20);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, lastActivity);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, lastActivity);
 
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -83,7 +83,7 @@ public class GetStaleVacanciesHandlerTests
         // Never opened — stays in Draft status.
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Software Engineer", null, Guid.NewGuid(), Now.AddDays(-60));
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Noah", "Patel", "noah.patel@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now.AddDays(-40));
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-40));
 
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -104,7 +104,7 @@ public class GetStaleVacanciesHandlerTests
         var vacancy = OpenVacancy(companyId, Now.AddDays(-60));
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Ava", "Bell", "ava.bell@example.com", null, null, Now);
         // 20 days since activity — stale under the default 14-day threshold.
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now.AddDays(-20));
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-20));
 
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -127,7 +127,7 @@ public class GetStaleVacanciesHandlerTests
         var vacancy = OpenVacancy(companyId, Now.AddDays(-60));
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Sophie", "Wright", "sophie.wright@example.com", null, null, Now);
         // 20 days since activity — stale under the default 14 days, but not under a 30-day threshold.
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now.AddDays(-20));
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-20));
 
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);

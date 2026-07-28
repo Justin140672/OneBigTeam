@@ -4,6 +4,7 @@ using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -34,18 +35,25 @@ public class MoveApplicationStageEndpointTests : IClassFixture<ApiWebApplication
         return client;
     }
 
-    private async Task<(Guid VacancyId, Guid ApplicationId)> SeedApplicationAsync(Guid companyId, Guid positionProfileId)
+    private async Task<(Guid VacancyId, Guid ApplicationId, Guid ApplicationReceivedStageId, Guid CvReviewStageId, Guid HiredStageId)>
+        SeedApplicationAsync(Guid companyId, Guid positionProfileId)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+        var stages = RecruitmentStageSeeder.BuildDefaultStages(companyId, Now);
+        db.RecruitmentStages.AddRange(stages);
+        var applicationReceivedStageId = stages.Single(s => s.Name == "Application Received").Id;
+        var cvReviewStageId = stages.Single(s => s.Name == "CV Review").Id;
+        var hiredStageId = stages.Single(s => s.Name == "Hired").Id;
+
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Backend Engineer", null, Guid.NewGuid(), Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, applicationReceivedStageId, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
         await db.SaveChangesAsync();
-        return (vacancy.Id, application.Id);
+        return (vacancy.Id, application.Id, applicationReceivedStageId, cvReviewStageId, hiredStageId);
     }
 
     [Fact]
@@ -55,7 +63,7 @@ public class MoveApplicationStageEndpointTests : IClassFixture<ApiWebApplication
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{Guid.NewGuid()}/vacancies/{Guid.NewGuid()}/applications/{Guid.NewGuid()}/move-stage",
-            new { newStatus = "Screening" });
+            new { newStageId = Guid.NewGuid() });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -65,35 +73,35 @@ public class MoveApplicationStageEndpointTests : IClassFixture<ApiWebApplication
     {
         var companyId = Guid.NewGuid();
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
-        var (vacancyId, applicationId) = await SeedApplicationAsync(companyId, referenceData.PositionProfileId);
+        var (vacancyId, applicationId, _, cvReviewStageId, _) = await SeedApplicationAsync(companyId, referenceData.PositionProfileId);
 
         // Plain Employee holds recruitment:view but not recruitment:manage (ticket #68).
         using var client = AuthenticatedClient(PlainEmployeeUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/move-stage",
-            new { companyId, vacancyId, applicationId, newStatus = "Screening" });
+            new { companyId, vacancyId, applicationId, newStageId = cvReviewStageId });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
-    public async Task Post_MoveStage_Returns_Ok_For_Valid_Transition_By_RecruitmentManage_User()
+    public async Task Post_MoveStage_Returns_Ok_For_Valid_Move_By_RecruitmentManage_User()
     {
         var companyId = Guid.NewGuid();
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
-        var (vacancyId, applicationId) = await SeedApplicationAsync(companyId, referenceData.PositionProfileId);
+        var (vacancyId, applicationId, _, cvReviewStageId, _) = await SeedApplicationAsync(companyId, referenceData.PositionProfileId);
 
         using var client = AuthenticatedClient(RecruiterUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/move-stage",
-            new { companyId, vacancyId, applicationId, newStatus = "Screening" });
+            new { companyId, vacancyId, applicationId, newStageId = cvReviewStageId });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<MoveStagePayload>();
         Assert.NotNull(payload);
-        Assert.Equal("Screening", payload!.Status);
+        Assert.Equal(cvReviewStageId, payload!.CurrentStageId);
     }
 
     [Fact]
@@ -101,13 +109,13 @@ public class MoveApplicationStageEndpointTests : IClassFixture<ApiWebApplication
     {
         var companyId = Guid.NewGuid();
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
-        var (vacancyId, _) = await SeedApplicationAsync(companyId, referenceData.PositionProfileId);
+        var (vacancyId, _, _, cvReviewStageId, _) = await SeedApplicationAsync(companyId, referenceData.PositionProfileId);
 
         using var client = AuthenticatedClient(RecruiterUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{Guid.NewGuid()}/move-stage",
-            new { companyId, vacancyId, applicationId = Guid.NewGuid(), newStatus = "Screening" });
+            new { companyId, vacancyId, applicationId = Guid.NewGuid(), newStageId = cvReviewStageId });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -118,41 +126,45 @@ public class MoveApplicationStageEndpointTests : IClassFixture<ApiWebApplication
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
         var referenceDataA = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyA);
-        var (vacancyId, applicationId) = await SeedApplicationAsync(companyA, referenceDataA.PositionProfileId);
+        var (vacancyId, applicationId, _, cvReviewStageId, _) = await SeedApplicationAsync(companyA, referenceDataA.PositionProfileId);
 
         using var clientB = AuthenticatedClient(RecruiterUser, companyB);
 
         var response = await clientB.PostAsJsonAsync(
             $"/api/companies/{companyB}/vacancies/{vacancyId}/applications/{applicationId}/move-stage",
-            new { companyId = companyB, vacancyId, applicationId, newStatus = "Screening" });
+            new { companyId = companyB, vacancyId, applicationId, newStageId = cvReviewStageId });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
-    public async Task Post_MoveStage_Returns_BadRequest_For_Invalid_Transition()
+    public async Task Post_MoveStage_Returns_BadRequest_When_Application_Already_On_Terminal_Stage()
     {
-        // MoveApplicationStageHandler catches Application.MoveToStage's InvalidOperationException
-        // and converts it to a validation-error Result, which the Endpoint maps to 400 BadRequest
-        // (not the FastEndpoints validator's usual 422) — see MoveApplicationStage/Endpoint.cs.
         var companyId = Guid.NewGuid();
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
-        var (vacancyId, applicationId) = await SeedApplicationAsync(companyId, referenceData.PositionProfileId);
+        var (vacancyId, applicationId, _, cvReviewStageId, hiredStageId) = await SeedApplicationAsync(companyId, referenceData.PositionProfileId);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+            var application = await db.Applications.SingleAsync(a => a.Id == applicationId);
+            application.MoveToStage(hiredStageId, Now);
+            await db.SaveChangesAsync();
+        }
 
         using var client = AuthenticatedClient(RecruiterUser, companyId);
 
-        // Applied -> Hired is not an allowed transition (skips every intermediate stage).
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/move-stage",
-            new { companyId, vacancyId, applicationId, newStatus = "Hired" });
+            new { companyId, vacancyId, applicationId, newStageId = cvReviewStageId });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
-        var application = await db.Applications.SingleAsync(a => a.Id == applicationId);
-        Assert.Equal(ApplicationStatus.Applied, application.Status);
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+        var savedApplication = await verifyDb.Applications.SingleAsync(a => a.Id == applicationId);
+        Assert.Equal(hiredStageId, savedApplication.CurrentStageId);
     }
 
-    private sealed record MoveStagePayload(Guid Id, Guid VacancyId, Guid CandidateId, string Status);
+    private sealed record MoveStagePayload(Guid Id, Guid VacancyId, Guid CandidateId, Guid CurrentStageId);
 }

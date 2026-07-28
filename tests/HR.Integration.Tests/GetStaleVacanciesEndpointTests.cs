@@ -127,9 +127,11 @@ public class GetStaleVacanciesEndpointTests : IClassFixture<ApiWebApplicationFac
             var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), openedAt);
             vacancy.Open(openedAt, DateOnly.FromDateTime(openedAt.Date));
             var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var stages = HR.Modules.Recruitment.Services.RecruitmentStageSeeder.BuildDefaultStages(companyId, Now);
             // Recent activity (2 days ago) — well within the default 14-day window.
-            var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now.AddDays(-2));
+            var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages[0].Id, null, Now.AddDays(-2));
 
+            db.RecruitmentStages.AddRange(stages);
             db.Vacancies.Add(vacancy);
             db.Candidates.Add(candidate);
             db.Applications.Add(application);

@@ -13,14 +13,15 @@ public class InterviewFeedbackServiceTests
     private static readonly DateTimeOffset Now = new(2026, 7, 6, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task RecordFeedbackAsync_Records_Outcome_On_Interview()
+    public async Task RecordFeedbackAsync_Records_Outcome_On_Interview_And_Mirrors_Onto_Application_Without_Changing_Stage()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
-        application.ScheduleInterview(Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        application.SetInterviewOutcome(InterviewOutcome.Pending, Now);
         var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(2), 30, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -40,7 +41,8 @@ public class InterviewFeedbackServiceTests
         Assert.Equal("Strong technical skills.", saved.Notes);
 
         var savedApplication = await db.Applications.SingleAsync();
-        Assert.Equal(ApplicationStatus.Interviewed, savedApplication.Status);
+        Assert.Equal(InterviewOutcome.Passed, savedApplication.InterviewOutcome);
+        Assert.Equal(stages.Interview.Id, savedApplication.CurrentStageId);
     }
 
     [Fact]
@@ -49,8 +51,9 @@ public class InterviewFeedbackServiceTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
-        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
         var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(2), 30, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -78,7 +81,7 @@ public class InterviewFeedbackServiceTests
     }
 
     private static InterviewFeedbackService service(RecruitmentDbContext db) =>
-        new(db, new InterviewOutcomeRecorder(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new RecruitmentStageChangeRecorder(db, new FakeIntegrationEventPublisher(), new FakeAuditPublisher())));
+        new(db, new InterviewOutcomeRecorder(db, new FakeClock(FixedUtcNow), new FakeAuditPublisher()));
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

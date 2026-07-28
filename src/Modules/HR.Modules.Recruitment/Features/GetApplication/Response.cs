@@ -9,9 +9,13 @@ internal sealed record GetApplicationResponse(
     string CandidateFirstName,
     string CandidateLastName,
     string CandidateEmail,
-    ApplicationStatus Status,
+    Guid CurrentStageId,
+    string CurrentStageName,
     InterviewOutcome? InterviewOutcome,
     string? Notes,
+    // Ticket #99: candidate-initiated withdrawal, orthogonal to CurrentStageId — see
+    // Application.WithdrawnAt's remarks.
+    DateTimeOffset? WithdrawnAt,
     DateTimeOffset AppliedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
@@ -28,8 +32,8 @@ internal sealed record GetApplicationResponse(
 
 internal sealed record ApplicationStageHistoryItem(
     Guid Id,
-    ApplicationStatus PreviousStage,
-    ApplicationStatus NewStage,
+    Guid? PreviousStageId,
+    Guid NewStageId,
     Guid? ChangedByUserId,
     string? Notes,
     DateTimeOffset ChangedAt);

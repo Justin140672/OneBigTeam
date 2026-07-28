@@ -1,26 +1,15 @@
 using FluentValidation;
-using HR.Modules.Recruitment.Domain;
 
 namespace HR.Modules.Recruitment.Features.GetApplicationsByStatus;
 
+// Ticket #99: the funnel stage set is now per-company/data-driven (RecruitmentStage rows), so this
+// no longer restricts to a compiled list of "active pipeline" enum values — the handler itself scopes
+// the query to the requested company, and a non-existent/foreign stage id simply yields zero rows.
 internal sealed class GetApplicationsByStatusValidator : AbstractValidator<GetApplicationsByStatusRequest>
 {
-    private static readonly ApplicationStatus[] FunnelStages =
-    [
-        ApplicationStatus.Applied,
-        ApplicationStatus.Screening,
-        ApplicationStatus.InterviewScheduled,
-        ApplicationStatus.Interviewed,
-        ApplicationStatus.Offered,
-        ApplicationStatus.Hired,
-    ];
-
     public GetApplicationsByStatusValidator()
     {
         RuleFor(r => r.CompanyId).NotEmpty();
-
-        RuleFor(r => r.Status)
-            .Must(status => FunnelStages.Contains(status))
-            .WithMessage("Status must be one of the active pipeline stages (Applied, Screening, InterviewScheduled, Interviewed, Offered, Hired).");
+        RuleFor(r => r.StageId).NotEmpty();
     }
 }

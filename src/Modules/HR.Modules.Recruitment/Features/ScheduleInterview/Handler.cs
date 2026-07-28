@@ -12,8 +12,7 @@ internal sealed class ScheduleInterviewHandler(
     ITaskCreator taskCreator,
     INotificationWriter notificationWriter,
     IClock clock,
-    IPositionProfileReader positionProfileReader,
-    RecruitmentStageChangeRecorder recorder)
+    IPositionProfileReader positionProfileReader)
 {
     public async Task<Result<ScheduleInterviewResponse>> HandleAsync(
         ScheduleInterviewRequest request,
@@ -31,27 +30,30 @@ internal sealed class ScheduleInterviewHandler(
             return Result.Failure<ScheduleInterviewResponse>(
                 Error.NotFound($"Application '{request.ApplicationId}' was not found."));
 
+        if (application.WithdrawnAt is not null)
+            return Result.Failure<ScheduleInterviewResponse>(
+                Error.Validation("Cannot schedule an interview for an application that has been withdrawn."));
+
+        var currentStage = await db.RecruitmentStages
+            .AsNoTracking()
+            .SingleOrDefaultAsync(s => s.Id == application.CurrentStageId && s.CompanyId == request.CompanyId, cancellationToken);
+
+        if (currentStage is { IsTerminal: true })
+            return Result.Failure<ScheduleInterviewResponse>(
+                Error.Validation($"Cannot schedule an interview for an application already on the terminal stage '{currentStage.Name}'."));
+
         var now = clock.UtcNowOffset();
-        var previousStatus = application.Status;
-        var stageChanged = false;
 
-        switch (application.Status)
-        {
-            case ApplicationStatus.Applied or ApplicationStatus.Screening:
-                application.ScheduleInterview(now);
-                stageChanged = true;
-                break;
-            case ApplicationStatus.InterviewScheduled:
-                // Additional interview round for an application already in progress — no stage
-                // change, so no stage-history entry/integration event/audit event is recorded here.
-                break;
-            default:
-                return Result.Failure<ScheduleInterviewResponse>(
-                    Error.Validation($"Cannot schedule an interview for an application with status '{application.Status}'."));
-        }
-
-        if (stageChanged)
-            recorder.AddHistoryEntry(application, previousStatus, scheduledBy, now);
+        // Ticket #99 judgement call: interview sub-states (Screening/InterviewScheduled/Interviewed)
+        // no longer exist as separate pipeline stages — "Interview" is just one configurable stage
+        // among however many a company defines, and a company may have zero, one, or several
+        // interview-shaped stages. Scheduling an interview is therefore pure metadata (an Interview
+        // row plus Application.InterviewOutcome defaulting to Pending) and never itself moves
+        // CurrentStageId — moving stage remains an explicit, separate action via
+        // MoveApplicationStage/OfferCandidate/etc. No stage-history entry/integration/audit event is
+        // recorded here, since the stage does not change.
+        if (application.InterviewOutcome is null)
+            application.SetInterviewOutcome(Domain.InterviewOutcome.Pending, now);
 
         var interview = Interview.Create(
             Guid.NewGuid(),
@@ -65,9 +67,6 @@ internal sealed class ScheduleInterviewHandler(
 
         db.Interviews.Add(interview);
         await db.SaveChangesAsync(cancellationToken);
-
-        if (stageChanged)
-            await recorder.PublishStageChangedEventsAsync(application, previousStatus, scheduledBy, now, cancellationToken);
 
         var candidateName = await db.Candidates
             .Where(c => c.Id == application.CandidateId)
