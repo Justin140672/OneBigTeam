@@ -40,8 +40,9 @@
                     </div>
                     <div class="col-12">
                         <label class="form-label">Note <span class="text-danger">*</span></label>
-                        <textarea class="form-control" rows="4" maxlength="4000" data-testid="supersede-note-text"
-                                  @bind="Model.NoteText" placeholder="Enter replacement note details…"></textarea>
+                        <HrTextBox @bind-Value="Model.NoteText" Multiline="true" Rows="4" Maxlength="4000"
+                                   Placeholder="Enter replacement note details…"
+                                   HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "supersede-note-text" })" />
                         <ValidationMessage For="@(() => Model.NoteText)" />
                     </div>
                     <div class="col-12">

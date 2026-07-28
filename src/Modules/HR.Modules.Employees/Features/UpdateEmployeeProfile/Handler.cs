@@ -150,7 +150,7 @@ internal sealed class UpdateEmployeeProfileHandler
             employee.HasSystemAccess);
 
         await _auditEventPublisher.PublishAsync(
-            new EmployeeProfileUpdatedAuditEvent(employee.CompanyId, employee.Id, actorEmployeeId, now, before, after),
+            new EmployeeProfileUpdatedAuditEvent(employee.CompanyId, employee.Id, actorEmployeeId, now, before, after, request.CorrelationId),
             cancellationToken);
 
         // Timeline granularity: publish a specific event only for the field that actually

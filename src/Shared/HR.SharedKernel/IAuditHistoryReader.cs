@@ -33,4 +33,10 @@ public sealed record AuditHistoryEntry(
     string? BeforeJson,
     string? AfterJson,
     Guid? EmployeeId = null,
-    Guid EntityId = default);
+    Guid EntityId = default,
+    // Used to merge multiple audit rows produced by the same user action into a single
+    // AuditHistoryItem (e.g. EmployeeEdit.razor's combined Profile + Employment tab save) — see
+    // GetEmployeeAuditHistoryHandler. Null (the default) means the entry is never merged with
+    // anything else, which is the correct behaviour for every existing audit event that doesn't
+    // set a CorrelationId.
+    Guid? CorrelationId = null);

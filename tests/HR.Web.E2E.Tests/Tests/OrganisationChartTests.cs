@@ -150,6 +150,50 @@ public sealed class OrganisationChartTests(AppFixture fixture) : E2ETestBase(fix
     }
 
     [Fact]
+    public async Task OrganisationChart_HasPrintAndExportButtons()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/organisation-chart");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        await _page.Locator(".org-chart-zoom-toolbar").WaitForAsync(new() { Timeout = 15_000 });
+
+        Assert.True(await _page.GetByTitle("Print").IsVisibleAsync(),
+            "Expected a Print button on the organisation chart toolbar");
+        Assert.True(await _page.GetByTitle("Export as image").IsVisibleAsync(),
+            "Expected an Export button on the organisation chart toolbar");
+    }
+
+    [Fact]
+    public async Task OrganisationChart_DepartmentFilter_HasAllDepartmentsOption_AndNoEmploymentStatusFilter()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/organisation-chart");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        var departmentGroup = _page.Locator(".col-md-3").Filter(new() { HasText = "Department" });
+        await departmentGroup.Locator("span[role='combobox']").First.ClickAsync();
+        await _page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+
+        var allDepartmentsItem = _page.Locator(".e-popup.e-ddl .e-list-item").Filter(new() { HasText = "All Departments" });
+        Assert.True(await allDepartmentsItem.First.IsVisibleAsync(),
+            "Expected an explicit 'All Departments' item in the Department filter's dropdown list");
+
+        await _page.Keyboard.PressAsync("Escape");
+
+        Assert.False(await _page.GetByText("Employment Status").IsVisibleAsync(),
+            "Expected the Employment Status filter to have been removed — the chart always shows Active employees only");
+    }
+
+    [Fact]
     public async Task PlainEmployee_IsRedirectedAway_FromOrganisationChartPage()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);

@@ -78,15 +78,16 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
     private ILocator InviteDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Invite Employee User" });
 
     /// <summary>
-    /// Runs the full 3-step invite wizard: selects the employee by name (Step 1), fills the
-    /// email and selects the given role(s) (Step 2), then confirms (Step 3). The employee
-    /// combobox is a Syncfusion SfDropDownList (single-select popup, click item to choose and
-    /// auto-close); the roles field is an SfMultiSelect in checkbox mode (popup stays open after
-    /// each click, so it's closed explicitly before advancing) — same interaction patterns as
-    /// SharedDocumentAudienceTests / CompanyDocumentsTabTests use for the equivalent Syncfusion
-    /// widgets elsewhere in this suite.
+    /// Runs the full 3-step invite wizard: selects the employee by name (Step 1) — this
+    /// auto-derives the email from the employee's own work email, which is shown read-only and
+    /// can no longer be edited here — then selects the given role(s) (Step 2), then confirms
+    /// (Step 3). The employee combobox is a Syncfusion SfDropDownList (single-select popup, click
+    /// item to choose and auto-close); the roles field is an SfMultiSelect in checkbox mode
+    /// (popup stays open after each click, so it's closed explicitly before advancing) — same
+    /// interaction patterns as SharedDocumentAudienceTests / CompanyDocumentsTabTests use for the
+    /// equivalent Syncfusion widgets elsewhere in this suite.
     /// </summary>
-    public async Task InviteEmployeeAsync(string employeeName, IReadOnlyList<string> roleNames, string? emailOverride = null)
+    public async Task InviteEmployeeAsync(string employeeName, IReadOnlyList<string> roleNames)
     {
         // Step 1: Employee picker (Syncfusion SfDropDownList, AllowFiltering="true").
         await InviteDialog.Locator("span[role='combobox']").First.ClickAsync();
@@ -103,12 +104,7 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
 
         await InviteDialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
 
-        // Step 2: Email + Roles.
-        if (!string.IsNullOrEmpty(emailOverride))
-        {
-            await InviteDialog.Locator("input[placeholder='work@company.com']").FillAsync(emailOverride);
-        }
-
+        // Step 2: Roles (email is derived from the employee record and shown read-only).
         await InviteDialog.Locator("input[placeholder='Select one or more roles']").ClickAsync();
         await page.WaitForSelectorAsync(".e-popup:visible", new() { Timeout = 10_000 });
         foreach (var roleName in roleNames)

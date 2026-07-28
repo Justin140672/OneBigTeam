@@ -264,9 +264,13 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     public async Task<bool> InviteDialogHasEmployeePickerAsync() =>
         await InviteUserDialog.Locator("span[role='combobox']").CountAsync() > 0;
 
-    /// <summary>Returns the current value of the (pre-filled) Email field on the dialog's step 2.</summary>
+    /// <summary>
+    /// Returns the read-only email text shown on the dialog's step 2 (InviteUserDialog no longer
+    /// lets an admin type/edit the email — it's derived from the employee's own work email and
+    /// rendered as plain text, or a "no work email on file" warning if the employee has none).
+    /// </summary>
     public async Task<string?> GetInviteDialogEmailValueAsync() =>
-        await InviteUserDialog.Locator("input[placeholder='work@company.com']").InputValueAsync();
+        (await InviteUserDialog.Locator("p.form-control-plaintext").TextContentAsync())?.Trim();
 
     /// <summary>
     /// Completes the pre-selected Quick Invite flow from step 2 (Email & Roles) onward: selects

@@ -64,8 +64,7 @@
                     </div>
                     <div class="col-12">
                         <label class="form-label">Notes</label>
-                        <textarea class="form-control" rows="3" maxlength="4000"
-                                  @bind="Model.Notes" placeholder="Optional notes…"></textarea>
+                        <HrTextBox @bind-Value="Model.Notes" Multiline="true" Rows="3" Maxlength="4000" Placeholder="Optional notes…" />
                     </div>
                 </div>
             </EditForm>

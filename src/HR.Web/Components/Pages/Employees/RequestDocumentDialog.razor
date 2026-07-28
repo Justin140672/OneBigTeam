@@ -45,8 +45,7 @@
                     </div>
                     <div class="col-12">
                         <label class="form-label">Notes</label>
-                        <textarea class="form-control" rows="3" maxlength="1000"
-                                  @bind="Model.Notes" placeholder="Optional notes for the employee…"></textarea>
+                        <HrTextBox @bind-Value="Model.Notes" Multiline="true" Rows="3" Maxlength="1000" Placeholder="Optional notes for the employee…" />
                     </div>
                 </div>
             </EditForm>
@@ -56,6 +55,11 @@
         </FooterTemplate>
     </DialogTemplates>
 </SfDialog>
+
+<UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                      OnSaveAndClose="ConfirmSaveInsteadOfCancelAsync"
+                      OnDiscard="ConfirmDiscardAsync"
+                      OnCancel="CancelUnsavedChangesDialog" />
 
 @code {
     [Parameter, EditorRequired] public Guid CompanyId  { get; set; }

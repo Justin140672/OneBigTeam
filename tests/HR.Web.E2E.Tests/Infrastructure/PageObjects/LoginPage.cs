@@ -1,3 +1,4 @@
+using HR.Web.E2E.Tests.Infrastructure;
 using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
@@ -23,32 +24,17 @@ public sealed class LoginPage(IPage page, string baseUrl)
 
     public async Task SwitchAccountAsync(string email, string password = "password")
     {
-        // In dev mode, persona switcher is a dropdown in the topbar.
-        var devSelect = page.Locator("select.dev-persona-select");
-        if (await devSelect.IsVisibleAsync())
-        {
-            // Find the option whose label contains the email, then fall back to full login.
-            var options = await devSelect.Locator("option").AllAsync();
-            foreach (var opt in options)
-            {
-                var val = await opt.GetAttributeAsync("value");
-                if (string.IsNullOrEmpty(val)) continue;
-                // We identify the persona by matching email to the login page instead.
-            }
-            // Fall through to cookie-based login when we don't have a userId mapping.
-        }
-
-        // Fallback: navigate to /login and re-authenticate.
+        // In dev mode, persona switcher is an SfDropDownList in the topbar — we don't have a
+        // userId mapping from an email here, so this always falls back to cookie-based login.
         await page.GotoAsync($"{baseUrl}/login");
         await page.WaitForURLAsync($"{baseUrl}/login");
         await LoginAsync(email, password);
     }
 
-    public async Task SwitchPersonaAsync(string userId)
+    public async Task SwitchPersonaAsync(string personaNameFragment)
     {
-        // Dev-mode topbar persona switcher.
-        var devSelect = page.Locator("select.dev-persona-select");
-        await devSelect.SelectOptionAsync(new SelectOptionValue { Value = userId });
+        // Dev-mode topbar persona switcher — Syncfusion SfDropDownList, see DropDownSelector.
+        await DropDownSelector.SelectAsync(page, page.Locator(".dev-persona-switcher"), personaNameFragment);
         // Selecting triggers a full navigation, wait for the shell to reload.
         await page.WaitForSelectorAsync(".app-shell", new() { Timeout = 30_000 });
     }

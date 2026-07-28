@@ -15,6 +15,8 @@ using HR.Modules.Recruitment.Features.GetApplicationsByStatus;
 using HR.Modules.Recruitment.Features.GetCandidate;
 using HR.Modules.Recruitment.Features.GetExternalRecruiter;
 using HR.Modules.Recruitment.Features.GetExternalRecruiterActivitySummary;
+using HR.Modules.Recruitment.Features.GetExternalRecruiterUsage;
+using HR.Modules.Recruitment.Features.GetRecruitmentStageUsage;
 using HR.Modules.Recruitment.Features.GetInterviewsTodayCount;
 using HR.Modules.Recruitment.Features.GetPipelineSummary;
 using HR.Modules.Recruitment.Features.GetRecruitmentKanban;
@@ -200,6 +202,8 @@ public static class RecruitmentModule
         services.AddScoped<SetExternalRecruiterActiveStatusHandler>();
         services.AddScoped<IValidator<SetExternalRecruiterActiveStatusRequest>, SetExternalRecruiterActiveStatusValidator>();
 
+        services.AddScoped<GetExternalRecruiterUsageHandler>();
+
         services.AddScoped<GetExternalRecruiterActivitySummaryHandler>();
         services.AddScoped<IValidator<GetExternalRecruiterActivitySummaryRequest>, GetExternalRecruiterActivitySummaryValidator>();
 
@@ -217,6 +221,8 @@ public static class RecruitmentModule
 
         services.AddScoped<SetRecruitmentStageActiveStatusHandler>();
         services.AddScoped<IValidator<SetRecruitmentStageActiveStatusRequest>, SetRecruitmentStageActiveStatusValidator>();
+
+        services.AddScoped<GetRecruitmentStageUsageHandler>();
     }
 
     public static WebApplication UseRecruitmentRecurringJobs(this WebApplication app)

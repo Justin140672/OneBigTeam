@@ -389,12 +389,15 @@ public class GetEmployeeAuditHistoryHandlerTests
         context.Departments.Add(department);
         await context.SaveChangesAsync();
 
-        // "ManagerId" is not one of the three resolved field names, even though its value is a
-        // Department id and happens to be GUID-shaped — it must render as the raw guid string.
+        // "SomeOtherFieldId" is not one of the four resolved field names (DepartmentId/
+        // PositionProfileId/LocationId/ManagerId), even though its value is a Department id and
+        // happens to be GUID-shaped — it must render as the raw guid string. (ManagerId itself
+        // used to be the example here, but it is now a resolved field name — see
+        // HandleAsync_Resolves_ManagerId_To_Manager_Full_Name below.)
         var reader = new FakeAuditHistoryReader([
             new AuditHistoryEntry(
                 Now, "employee.profile.updated", "Employee", null, null, "Employee profile updated",
-                null, $$"""{"ManagerId":"{{department.Id}}"}""")
+                null, $$"""{"SomeOtherFieldId":"{{department.Id}}"}""")
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
@@ -403,7 +406,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
         var change = Assert.Single(item.Changes);
-        Assert.Equal("Manager Id", change.Field);
+        Assert.Equal("Some Other Field Id", change.Field);
         Assert.Equal(department.Id.ToString(), change.After);
     }
 
@@ -503,6 +506,140 @@ public class GetEmployeeAuditHistoryHandlerTests
         var item = Assert.Single(result.Value!.Items);
         var change = Assert.Single(item.Changes);
         Assert.Equal("—", change.After);
+    }
+
+    // ── ManagerId resolution (Task C) ────────────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_Resolves_ManagerId_To_Manager_Full_Name()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var manager = Employee.Create(Guid.NewGuid(), companyId, "Grace", "Hopper", "grace@example.com", new DateOnly(2020, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0100", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
+        context.Employees.Add(manager);
+        await context.SaveChangesAsync();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.employment-details.updated", "Employee", null, null, "Employment details updated",
+                null, $$"""{"ManagerId":"{{manager.Id}}"}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        var change = Assert.Single(item.Changes);
+        Assert.Equal("Manager Id", change.Field);
+        Assert.Equal("Grace Hopper", change.After);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Renders_Null_ManagerId_As_EmDash()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var manager = Employee.Create(Guid.NewGuid(), companyId, "Grace", "Hopper", "grace@example.com", new DateOnly(2020, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0100", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
+        context.Employees.Add(manager);
+        await context.SaveChangesAsync();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.employment-details.updated", "Employee", null, null, "Employment details updated",
+                $$"""{"ManagerId":"{{manager.Id}}"}""", """{"ManagerId":null}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        var change = Assert.Single(item.Changes);
+        Assert.Equal("Manager Id", change.Field);
+        Assert.Equal("Grace Hopper", change.Before);
+        Assert.Equal("—", change.After);
+    }
+
+    // ── CorrelationId merging (Task D) ───────────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_Merges_Entries_Sharing_A_CorrelationId_Into_One_Item_With_Combined_Changes()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var correlationId = Guid.NewGuid();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.profile.updated", "Employee", null, null, "Employee profile updated",
+                null, """{"FirstName":"Bob"}""", CorrelationId: correlationId),
+            new AuditHistoryEntry(
+                Now.AddSeconds(1), "employee.employment-details.updated", "Employee", null, null, "Employment details updated",
+                null, """{"EmployeeNumber":"EMP-9999"}""", CorrelationId: correlationId),
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal("Employee profile and employment details updated", item.Action);
+        Assert.Equal(2, item.Changes.Count);
+        Assert.Contains(item.Changes, c => c.Field == "First Name");
+        Assert.Contains(item.Changes, c => c.Field == "Employee Number");
+        Assert.Equal(Now, item.OccurredAt); // earliest entry in the group
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Merge_Entry_Whose_CorrelationId_Is_Not_Shared_By_Any_Other_Entry()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var unsharedCorrelationId = Guid.NewGuid();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.employment-details.updated", "Employee", null, null, "Employment details updated",
+                null, """{"Notes":"solo save"}""", CorrelationId: unsharedCorrelationId),
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value!.Items);
+        Assert.Equal("Employment details updated", item.Action);
+        Assert.Single(item.Changes);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Never_Merges_Entries_With_Null_CorrelationId()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.profile.updated", "Employee", null, null, "Employee profile updated",
+                null, """{"FirstName":"Bob"}"""),
+            new AuditHistoryEntry(
+                Now.AddSeconds(1), "employee.employment-details.updated", "Employee", null, null, "Employment details updated",
+                null, """{"EmployeeNumber":"EMP-9999"}"""),
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value!.Items.Count);
     }
 
     private static EmployeesDbContext BuildContext()

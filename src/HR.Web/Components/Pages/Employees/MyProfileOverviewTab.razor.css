@@ -147,6 +147,16 @@
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 
+.stat-card--clickable {
+    cursor: pointer;
+    transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.stat-card--clickable:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+}
+
 .stat-icon {
     display: flex;
     align-items: center;

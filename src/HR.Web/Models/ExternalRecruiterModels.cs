@@ -119,6 +119,14 @@ public record VacancyActivityItemModel(
     string Status,
     DateOnly? DateInstructed);
 
+// ── USAGE CHECK (deactivation warning) ───────────────────────────────────────
+
+public sealed record GetExternalRecruiterUsageResponse(
+    Guid ExternalRecruiterId,
+    bool InUse,
+    int ActiveVacancyCount,
+    IReadOnlyList<string> VacancyLabels);
+
 // ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
 public sealed class ExternalRecruiterEditModel

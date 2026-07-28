@@ -44,8 +44,17 @@
                 else if (_step == 2)
                 {
                     <div class="mb-3">
-                        <label class="form-label">Email <span class="text-danger">*</span></label>
-                        <HrTextBox @bind-Value="_email" Placeholder="work@company.com" />
+                        <label class="form-label">Email</label>
+                        @if (string.IsNullOrWhiteSpace(_email))
+                        {
+                            <p class="text-danger small mb-0">
+                                This employee has no work email on file. Add one on their profile before inviting them.
+                            </p>
+                        }
+                        else
+                        {
+                            <p class="form-control-plaintext mb-0">@_email</p>
+                        }
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Roles <span class="text-danger">*</span></label>
@@ -53,11 +62,13 @@
                                        TItem="RoleOption"
                                        DataSource="@_roleOptions"
                                        @bind-Value="_selectedRoleIds"
+                                       @bind-Value:after="EnsureEmployeeRoleSelected"
                                        Placeholder="Select one or more roles"
                                        Mode="VisualMode.CheckBox"
                                        AllowFiltering="true">
                             <MultiSelectFieldSettings Value="Id" Text="Name" />
                         </SfMultiSelect>
+                        <p class="text-muted small mt-2 mb-0">Employee is required for every user and can't be removed.</p>
                     </div>
                 }
                 else if (_step == 3)
@@ -154,7 +165,7 @@
         _selectedEmployeeId = null;
         _selectedEmployeeName = string.Empty;
         _email = string.Empty;
-        _selectedRoleIds = [];
+        _selectedRoleIds = [SystemRoleOptions.EmployeeRoleId];
 
         if (PreselectedEmployeeId is not null)
         {
@@ -195,6 +206,12 @@
         _loading = false;
     }
 
+    private void EnsureEmployeeRoleSelected()
+    {
+        if (!_selectedRoleIds.Contains(SystemRoleOptions.EmployeeRoleId))
+            _selectedRoleIds.Add(SystemRoleOptions.EmployeeRoleId);
+    }
+
     private void OnEmployeeChanged(ChangeEventArgs<Guid?, InviteEmployeeOption> args)
     {
         _selectedEmployeeId = args.Value;
@@ -220,7 +237,7 @@
             case 2:
                 if (string.IsNullOrWhiteSpace(_email))
                 {
-                    _stepError = "Please enter an email address.";
+                    _stepError = "This employee has no work email on file. Add one on their profile before inviting them.";
                     return;
                 }
                 if (_selectedRoleIds.Count == 0)

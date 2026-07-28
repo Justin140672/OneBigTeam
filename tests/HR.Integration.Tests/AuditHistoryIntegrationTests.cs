@@ -246,6 +246,58 @@ public class AuditHistoryIntegrationTests : IClassFixture<ApiWebApplicationFacto
     }
 
     [Fact]
+    public async Task UpdateEmployeeProfile_And_UpdateEmploymentDetails_With_Same_CorrelationId_Merge_Into_One_AuditHistory_Entry()
+    {
+        // Ticket: EmployeeEdit.razor's combined Save action generates one CorrelationId and passes
+        // it into both UpdateEmployeeProfile and UpdateEmploymentDetails so their two audit rows
+        // read back as a single merged entry rather than two separate ones.
+        var companyId = Guid.NewGuid();
+        using var hrAdminClient = AuthenticatedClient(companyId);
+
+        var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
+        var correlationId = Guid.NewGuid();
+
+        var profileResp = await hrAdminClient.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/profile",
+            new
+            {
+                companyId,
+                id = employeeId,
+                firstName = "Audrey",
+                lastName = "Tester",
+                workEmail = $"audit.tester.{Guid.NewGuid():N}@example.com",
+                startDate = "2026-01-01",
+                gender = "Female",
+                hasSystemAccess = true,
+                correlationId
+            });
+        profileResp.EnsureSuccessStatusCode();
+
+        var employmentResp = await hrAdminClient.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/employment",
+            new
+            {
+                companyId,
+                id = employeeId,
+                status = "Active",
+                startDate = "2026-01-01",
+                employeeNumber = "EMP-CORR-9999",
+                correlationId
+            });
+        employmentResp.EnsureSuccessStatusCode();
+
+        var historyResp = await hrAdminClient.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/audit-history");
+        historyResp.EnsureSuccessStatusCode();
+
+        var history = await historyResp.Content.ReadFromJsonAsync<AuditHistoryPayload>();
+        Assert.NotNull(history);
+
+        var entry = Assert.Single(history!.Items, i => i.Action == "Employee profile and employment details updated");
+        Assert.Contains(entry.Changes, c => c.Field == "First Name" && c.After == "Audrey");
+        Assert.Contains(entry.Changes, c => c.Field == "Employee Number" && c.After == "EMP-CORR-9999");
+    }
+
+    [Fact]
     public async Task UpdateCompanySettings_Persists_Audit_Record()
     {
         // No API surface exposes company-level audit events (GetEmployeeAuditHistory is scoped to

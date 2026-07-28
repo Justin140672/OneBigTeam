@@ -611,6 +611,74 @@ public class UpdateEmploymentDetailsHandlerTests
         Assert.Equal("EMP-8888", after.EmployeeNumber);
     }
 
+    // ── ManagerId audit tracking (Task C) ────────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_Publishes_EmploymentDetailsUpdatedAuditEvent_With_Before_And_After_ManagerId()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var oldManager = CreateEmployee(companyId, now);
+        var newManager = CreateEmployee(companyId, now);
+        var employee = CreateEmployee(companyId, now);
+        employee.Assign(employee.DepartmentId, employee.PositionProfileId, employee.LocationId, oldManager.Id, now);
+        context.Employees.AddRange(oldManager, newManager, employee);
+        await context.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow), auditPublisher: auditPublisher);
+
+        var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
+        {
+            CompanyId = companyId,
+            Id = employee.Id,
+            Status = EmploymentStatus.Active,
+            StartDate = StartDate,
+            ManagerId = newManager.Id
+        }, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var auditEvent = Assert.Single(auditPublisher.Published);
+
+        var before = Assert.IsType<EmploymentDetailsSnapshot>(auditEvent.Before);
+        var after = Assert.IsType<EmploymentDetailsSnapshot>(auditEvent.After);
+        Assert.Equal(oldManager.Id, before.ManagerId);
+        Assert.Equal(newManager.Id, after.ManagerId);
+    }
+
+    // ── CorrelationId propagation (Task D) ───────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_Passes_Request_CorrelationId_Onto_Published_AuditEvent()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+        var handler = BuildHandler(context, new FakeClock(FixedUtcNow), auditPublisher: auditPublisher);
+        var correlationId = Guid.NewGuid();
+
+        var result = await handler.HandleAsync(new UpdateEmploymentDetailsRequest
+        {
+            CompanyId = companyId,
+            Id = employee.Id,
+            Status = EmploymentStatus.Active,
+            StartDate = StartDate,
+            CorrelationId = correlationId
+        }, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var auditEvent = Assert.Single(auditPublisher.Published);
+        Assert.Equal(correlationId, auditEvent.CorrelationId);
+    }
+
     private static Employee CreateEmployee(Guid companyId, DateTimeOffset now)
         => Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
 

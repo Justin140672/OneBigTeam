@@ -33,6 +33,51 @@
     transform: translateY(-1px);
 }
 
+.team-card-status {
+    align-self: flex-end;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 1px 7px;
+    border-radius: var(--hr-radius-sm);
+}
+
+.team-card-status--at-work {
+    background: #dcfce7;
+    color: var(--hr-color-success);
+}
+
+.team-card-status--sick {
+    background: #fee2e2;
+    color: var(--hr-color-danger);
+}
+
+.team-card-status--on-leave {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+html[data-theme="dark"] .team-card-status--at-work {
+    background: rgba(22, 163, 74, 0.18);
+    color: #4ade80;
+}
+
+html[data-theme="dark"] .team-card-status--sick {
+    background: rgba(220, 38, 38, 0.18);
+    color: var(--hr-color-danger);
+}
+
+html[data-theme="dark"] .team-card-status--on-leave {
+    background: rgba(202, 138, 4, 0.18);
+    color: #fbbf24;
+}
+
+.team-card-notify-btn {
+    margin-top: 8px;
+    width: 100%;
+}
+
 .team-card-name {
     margin-top: 6px;
     font-size: 0.82rem;

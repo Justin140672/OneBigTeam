@@ -108,6 +108,31 @@ public sealed class EmployeeDocumentsTabTests(AppFixture fixture) : E2ETestBase(
     }
 
     [Fact]
+    public async Task Request_Document_Dialog_Cancel_Works_After_Selecting_A_Document_Type()
+    {
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await empAdmin.GoToAsync(AcmeId, TomId);
+        await empAdmin.OpenDocumentsTabAsync();
+
+        // Selecting a document type marks the dialog's form "dirty", which used to make the
+        // Cancel button silently do nothing (see EmployeeAdminPage method doc for why). Uses
+        // "Right To Work" rather than "Driving Licence" (used by the request-creation test above)
+        // to avoid a false pass/fail if these tests run against the same shared Tom Williams row.
+        await empAdmin.OpenRequestDocumentDialogSelectTypeThenCancelAsync("Right To Work");
+
+        Assert.False(await _page.Locator(".request-document-dialog").IsVisibleAsync(),
+            "Expected the Request Document dialog to actually close after Cancel + Discard Changes");
+
+        // No request should have been created for the cancelled attempt.
+        Assert.False(await empAdmin.HasDocumentRequestAsync("Right To Work"),
+            "Expected cancelling the dialog to not create a 'Right To Work' document request");
+    }
+
+    [Fact]
     public async Task Working_Pattern_Override_Can_Be_Set_Via_Admin_Profile()
     {
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);

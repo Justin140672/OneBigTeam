@@ -296,9 +296,9 @@
         }
     }
 
-    private void OnAuthorisedCorrectionToggled(Microsoft.AspNetCore.Components.ChangeEventArgs args)
+    private void OnAuthorisedCorrectionToggled(bool value)
     {
-        Model.IsAuthorisedCorrection = args.Value is bool value && value;
+        Model.IsAuthorisedCorrection = value;
         if (!Model.IsAuthorisedCorrection)
         {
             Model.CorrectionReason = null;
@@ -368,14 +368,10 @@
                     {
                         <div class="row g-3 mt-1" data-testid="position-profile-correction-section">
                             <div class="col-12">
-                                <div class="form-check">
-                                    <input type="checkbox" class="form-check-input" id="isAuthorisedCorrection"
-                                           checked="@Model.IsAuthorisedCorrection"
-                                           @onchange="OnAuthorisedCorrectionToggled" />
-                                    <label class="form-check-label" for="isAuthorisedCorrection">
-                                        This is an authorised correction
-                                    </label>
-                                </div>
+                                <SfCheckBox TChecked="bool" ID="isAuthorisedCorrection"
+                                            Label="This is an authorised correction"
+                                            Checked="Model.IsAuthorisedCorrection"
+                                            CheckedChanged="OnAuthorisedCorrectionToggled" />
                             </div>
                             @if (Model.IsAuthorisedCorrection)
                             {

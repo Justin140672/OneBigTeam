@@ -121,6 +121,29 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
         return values;
     }
 
+    /// <summary>
+    /// Returns the status badge text (".team-card-status") for the team-member card whose name
+    /// contains <paramref name="nameFragment"/> — "At Work", "Sick", or "On Leave"
+    /// (MyTeamWidget.razor's StatusLabel).
+    /// </summary>
+    public async Task<string> GetTeamMemberStatusAsync(string nameFragment)
+    {
+        var card = MyTeamWidget.Locator(".team-card").Filter(new() { HasText = nameFragment }).First;
+        return (await card.Locator(".team-card-status").TextContentAsync())?.Trim() ?? "";
+    }
+
+    /// <summary>
+    /// Clicks "Notify Sickness" on the team-member card whose name contains
+    /// <paramref name="nameFragment"/>, opening RecordSicknessDialog for that employee
+    /// (MyTeamWidget.razor's OpenNotifySickness).
+    /// </summary>
+    public async Task ClickNotifySicknessForTeamMemberAsync(string nameFragment)
+    {
+        var card = MyTeamWidget.Locator(".team-card").Filter(new() { HasText = nameFragment }).First;
+        await card.GetByRole(AriaRole.Button, new() { Name = "Notify Sickness" }).ClickAsync();
+        await page.WaitForSelectorAsync("[role='dialog'].record-sickness-dialog", new() { Timeout = 10_000 });
+    }
+
     // ── Upcoming Probation Reviews Widget ─────────────────────────────────────
 
     private ILocator UpcomingProbationWidget =>

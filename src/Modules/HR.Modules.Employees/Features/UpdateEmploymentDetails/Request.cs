@@ -24,4 +24,8 @@ internal sealed record UpdateEmploymentDetailsRequest
     public WorkingDays? WorkingDaysOverride { get; init; }
     public decimal? HoursPerDayOverride { get; init; }
     public string? Notes { get; init; }
+
+    // Same CorrelationId mechanism as UpdateEmployeeProfileRequest — optional, defaults to null so
+    // EmployeeEmploymentTab.SaveAsync's standalone callers are unaffected.
+    public Guid? CorrelationId { get; init; }
 }

@@ -95,6 +95,7 @@ internal sealed class ListUsersHandler(
                 roleNames,
                 accountStatus,
                 invitationStatus,
+                invite?.Id,
                 user?.LastLoginAt,
                 invite?.CreatedAt ?? user!.CreatedAt));
         }

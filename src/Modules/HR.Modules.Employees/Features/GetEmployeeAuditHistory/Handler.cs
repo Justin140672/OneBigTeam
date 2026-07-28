@@ -17,6 +17,12 @@ internal sealed class GetEmployeeAuditHistoryHandler(
     private const string PositionProfileIdField = "PositionProfileId";
     private const string LocationIdField = "LocationId";
 
+    // ManagerId is resolved to "{FirstName} {LastName}" the same way Department/PositionProfile/
+    // Location Guids are, via a batched lookup against Employees below — a raw Guid is never
+    // useful to a reader of audit history. Null is a valid value ("No Manager") and is already
+    // rendered as "—" by FormatValue's existing null handling, so no special casing is needed there.
+    private const string ManagerIdField = "ManagerId";
+
     // Compensation's Reason snapshot field carries a PascalCase enum value (e.g. "AnnualReview")
     // rather than a human-readable one — reuse the same Humanize() already applied to field names
     // below rather than hardcoding a separate value-to-label table.
@@ -72,6 +78,7 @@ internal sealed class GetEmployeeAuditHistoryHandler(
         var departmentIds = CollectReferencedIds(parsed, DepartmentIdField);
         var positionProfileIds = CollectReferencedIds(parsed, PositionProfileIdField);
         var locationIds = CollectReferencedIds(parsed, LocationIdField);
+        var managerIds = CollectReferencedIds(parsed, ManagerIdField);
 
         var departmentNames = departmentIds.Count == 0
             ? new Dictionary<Guid, string>()
@@ -94,16 +101,81 @@ internal sealed class GetEmployeeAuditHistoryHandler(
                 .Where(l => l.CompanyId == companyId && locationIds.Contains(l.Id))
                 .ToDictionaryAsync(l => l.Id, l => l.Name, cancellationToken);
 
-        var items = parsed
-            .Select(p => new AuditHistoryItem(
-                p.Entry.OccurredAt,
-                string.IsNullOrEmpty(p.Entry.Summary) ? p.Entry.EventType : p.Entry.Summary,
-                ModuleMap.TryGetValue(p.Entry.EntityType, out var module) ? module : p.Entry.EntityType,
-                ResolveUser(p.Entry.ActorEmployeeId, names),
-                BuildChanges(p.Before, p.After, departmentNames, positionProfileNames, locationNames)))
+        var managerNames = managerIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await dbContext.Employees
+                .AsNoTracking()
+                .Where(e => e.CompanyId == companyId && managerIds.Contains(e.Id))
+                .ToDictionaryAsync(e => e.Id, e => $"{e.FirstName} {e.LastName}", cancellationToken);
+
+        var candidates = parsed
+            .Select(p => (
+                Entry: p.Entry,
+                Item: new AuditHistoryItem(
+                    p.Entry.OccurredAt,
+                    string.IsNullOrEmpty(p.Entry.Summary) ? p.Entry.EventType : p.Entry.Summary,
+                    ModuleMap.TryGetValue(p.Entry.EntityType, out var module) ? module : p.Entry.EntityType,
+                    ResolveUser(p.Entry.ActorEmployeeId, names),
+                    BuildChanges(p.Before, p.After, departmentNames, positionProfileNames, locationNames, managerNames))))
             .ToList();
 
+        var items = MergeCorrelatedItems(candidates);
+
         return Result.Success(new GetEmployeeAuditHistoryResponse(items));
+    }
+
+    // Ticket: "merge Employee + Employment tab audit entries when saved together". Entries sharing
+    // a non-null CorrelationId (set by EmployeeEdit.razor's combined Save action — see
+    // UpdateEmployeeProfileRequest/UpdateEmploymentDetailsRequest.CorrelationId) are combined into
+    // one AuditHistoryItem so the reader sees a single "Employee profile and employment details
+    // updated" entry rather than two separate rows for what was really one save. Entries with a
+    // null CorrelationId, or a CorrelationId not shared by any other entry, pass through unchanged.
+    private static List<AuditHistoryItem> MergeCorrelatedItems(
+        IReadOnlyList<(AuditHistoryEntry Entry, AuditHistoryItem Item)> candidates)
+    {
+        var correlationGroupSizes = candidates
+            .Where(c => c.Entry.CorrelationId.HasValue)
+            .GroupBy(c => c.Entry.CorrelationId!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var result = new List<AuditHistoryItem>();
+        var mergedCorrelationIds = new HashSet<Guid>();
+
+        foreach (var candidate in candidates)
+        {
+            var correlationId = candidate.Entry.CorrelationId;
+
+            if (!correlationId.HasValue || correlationGroupSizes[correlationId.Value] <= 1)
+            {
+                result.Add(candidate.Item);
+                continue;
+            }
+
+            if (!mergedCorrelationIds.Add(correlationId.Value))
+                continue; // Already merged and added when we encountered the first member of this group.
+
+            var group = candidates.Where(c => c.Entry.CorrelationId == correlationId.Value).ToList();
+
+            var mergedChanges = group
+                .SelectMany(c => c.Item.Changes)
+                .ToList();
+
+            var eventTypes = group.Select(c => c.Entry.EventType).Distinct().ToList();
+            var summary = eventTypes.Count > 1
+                ? "Employee profile and employment details updated"
+                : group[0].Item.Action;
+
+            var earliest = group.OrderBy(c => c.Entry.OccurredAt).First();
+
+            result.Add(new AuditHistoryItem(
+                earliest.Entry.OccurredAt,
+                summary,
+                earliest.Item.Module,
+                earliest.Item.User,
+                mergedChanges));
+        }
+
+        return result.OrderByDescending(i => i.OccurredAt).ToList();
     }
 
     private static string ResolveUser(Guid? actorEmployeeId, IReadOnlyDictionary<Guid, string> names)
@@ -137,15 +209,16 @@ internal sealed class GetEmployeeAuditHistoryHandler(
         Dictionary<string, JsonElement> after,
         IReadOnlyDictionary<Guid, string> departmentNames,
         IReadOnlyDictionary<Guid, string> positionProfileNames,
-        IReadOnlyDictionary<Guid, string> locationNames)
+        IReadOnlyDictionary<Guid, string> locationNames,
+        IReadOnlyDictionary<Guid, string> managerNames)
     {
         var keys = before.Keys.Concat(after.Keys).Distinct(StringComparer.Ordinal).OrderBy(k => k, StringComparer.Ordinal);
 
         return keys
             .Select(key => new AuditFieldChangeItem(
                 Humanize(key),
-                before.TryGetValue(key, out var b) ? FormatValue(key, b, departmentNames, positionProfileNames, locationNames) : "—",
-                after.TryGetValue(key, out var a) ? FormatValue(key, a, departmentNames, positionProfileNames, locationNames) : "—"))
+                before.TryGetValue(key, out var b) ? FormatValue(key, b, departmentNames, positionProfileNames, locationNames, managerNames) : "—",
+                after.TryGetValue(key, out var a) ? FormatValue(key, a, departmentNames, positionProfileNames, locationNames, managerNames) : "—"))
             .ToList();
     }
 
@@ -159,7 +232,8 @@ internal sealed class GetEmployeeAuditHistoryHandler(
         JsonElement element,
         IReadOnlyDictionary<Guid, string> departmentNames,
         IReadOnlyDictionary<Guid, string> positionProfileNames,
-        IReadOnlyDictionary<Guid, string> locationNames)
+        IReadOnlyDictionary<Guid, string> locationNames,
+        IReadOnlyDictionary<Guid, string> managerNames)
     {
         if (element.ValueKind == JsonValueKind.Null)
             return "—";
@@ -171,6 +245,7 @@ internal sealed class GetEmployeeAuditHistoryHandler(
                 DepartmentIdField => departmentNames,
                 PositionProfileIdField => positionProfileNames,
                 LocationIdField => locationNames,
+                ManagerIdField => managerNames,
                 _ => null,
             };
 

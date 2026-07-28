@@ -180,7 +180,8 @@ internal sealed class UpdateEmploymentDetailsHandler
             employee.ContinuousServiceDate,
             employee.ProbationEndDate,
             employee.LeavingDate,
-            employee.Notes);
+            employee.Notes,
+            employee.ManagerId);
 
         employee.UpdateEmploymentDetails(
             request.EmployeeNumber ?? employee.EmployeeNumber,
@@ -215,11 +216,12 @@ internal sealed class UpdateEmploymentDetailsHandler
             employee.ContinuousServiceDate,
             employee.ProbationEndDate,
             employee.LeavingDate,
-            employee.Notes);
+            employee.Notes,
+            employee.ManagerId);
 
         await _auditEventPublisher.PublishAsync(
             new EmploymentDetailsUpdatedAuditEvent(
-                employee.CompanyId, employee.Id, actorEmployeeId, now, employmentDetailsBefore, employmentDetailsAfter),
+                employee.CompanyId, employee.Id, actorEmployeeId, now, employmentDetailsBefore, employmentDetailsAfter, request.CorrelationId),
             cancellationToken);
 
         if (previousPositionProfileId != employee.PositionProfileId)

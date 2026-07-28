@@ -8,9 +8,14 @@ public record RoleOption(Guid Id, string Name);
 
 public static class SystemRoleOptions
 {
+    // Every user always has this role — it's never optional, so callers that let an admin
+    // pick roles (InviteUserDialog, ManageUserRolesDialog) pin it into the selection and
+    // block its removal rather than letting it be unchecked like the others.
+    public static readonly Guid EmployeeRoleId = new("00000000-0000-0000-0000-000000000001");
+
     public static readonly IReadOnlyList<RoleOption> All =
     [
-        new(new Guid("00000000-0000-0000-0000-000000000001"), "Employee"),
+        new(EmployeeRoleId, "Employee"),
         new(new Guid("00000000-0000-0000-0000-000000000002"), "Manager"),
         new(new Guid("00000000-0000-0000-0000-000000000003"), "Recruiter"),
         new(new Guid("00000000-0000-0000-0000-000000000004"), "HR Administrator"),
@@ -37,6 +42,7 @@ public record UserListItemModel(
     List<string> RoleNames,
     string AccountStatus,
     string? InvitationStatus,
+    Guid? InviteId,
     DateTimeOffset? LastLoginAt,
     DateTimeOffset CreatedAt);
 

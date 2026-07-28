@@ -15,10 +15,10 @@
                 <label class="form-label fw-medium">
                     Reason <span class="text-muted fw-normal">(required for rejection)</span>
                 </label>
-                <textarea class="form-control"
-                          rows="3"
-                          @bind="_reason"
-                          placeholder="Enter a reason for your decision…" />
+                <HrTextBox @bind-Value="_reason"
+                           Multiline="true"
+                           Rows="3"
+                           Placeholder="Enter a reason for your decision…" />
             </div>
             @if (_error is not null)
             {

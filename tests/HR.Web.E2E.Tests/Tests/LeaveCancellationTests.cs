@@ -49,21 +49,23 @@ public sealed class LeaveCancellationTests(AppFixture fixture) : E2ETestBase(fix
         Assert.Equal("Pending", await profile.GetLeaveRequestStatusAsync(reason));
 
         // ── Step 4: Cancel the leave request ─────────────────────────────────
-        // Find the row and click its cancel/delete action button.
+        // Find the row and click its "Cancel" action button.
         var row = _page.Locator("table tbody tr")
             .Filter(new() { HasText = reason })
             .First;
 
-        // The row has an action button (trash icon or "Cancel" link).
         var cancelBtn = row.Locator("button, a")
             .Filter(new() { HasText = "Cancel" })
             .First;
         await cancelBtn.ClickAsync();
 
-        // ── Step 5: Confirm the cancellation in the modal/dialog if one appears
-        var confirmBtn = _page.GetByRole(AriaRole.Button, new() { Name = "Confirm" });
-        if (await confirmBtn.IsVisibleAsync())
-            await confirmBtn.ClickAsync();
+        // ── Step 5: Confirm the cancellation — clicking "Cancel" doesn't cancel
+        // immediately, it swaps in an inline "Cancel this request? [Yes] [No]" prompt
+        // (MyProfileLeaveTab.razor) that must be explicitly confirmed via "Yes".
+        Assert.True(await row.GetByText("Cancel this request?").IsVisibleAsync(),
+            "Expected an inline confirmation prompt after clicking 'Cancel'");
+
+        await row.GetByRole(AriaRole.Button, new() { Name = "Yes" }).ClickAsync();
 
         // ── Step 6: Row stays in the table but status changes to "Cancelled" ──
         // The API keeps cancelled requests visible; only the Cancel button disappears.

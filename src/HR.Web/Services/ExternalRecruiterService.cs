@@ -90,6 +90,19 @@ public sealed class ExternalRecruiterService(IHttpClientFactory httpClientFactor
         }
     }
 
+    public async Task<GetExternalRecruiterUsageResponse?> GetUsageAsync(Guid companyId, Guid id)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetExternalRecruiterUsageResponse>(
+                $"api/companies/{companyId}/external-recruiters/{id}/usage", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
     // ── IEditService<ExternalRecruiterEditModel, Guid> ───────────────────────
 
     async Task<ExternalRecruiterEditModel?> IEditService<ExternalRecruiterEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)

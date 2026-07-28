@@ -95,6 +95,33 @@ public sealed class CompanyAdministratorAccessTests(AppFixture fixture) : E2ETes
     }
 
     [Fact]
+    public async Task CompanyAdministrator_IsAlsoAnEmployee_AndCanReachMyProfile()
+    {
+        // Priya Shah is a Company Administrator, but she's also a real employee (Chief Financial
+        // Officer, Finance dept) — EmployeesModule seeds her with the same id as her
+        // ApplicationUser so Session.EmployeeId resolves and the top-bar avatar link
+        // (MainLayout.razor's ".top-bar-user", gated on Session.EmployeeId.HasValue) appears for
+        // her just like it does for any other employee.
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(CompanyAdminEmail);
+
+        await _page.WaitForURLAsync(new Regex($"/companies/{AcmeId}/edit"), new() { Timeout = 15_000 });
+
+        var avatarLink = _page.Locator("a.top-bar-user");
+        Assert.True(await avatarLink.IsVisibleAsync(),
+            "Expected the top-bar avatar link to My Profile to be visible for Priya (Company Administrator, but also an employee)");
+
+        await avatarLink.ClickAsync();
+        await profile.WaitForLoadAsync();
+
+        Assert.Contains($"/employees/", _page.Url);
+        Assert.Contains("/profile", _page.Url);
+    }
+
+    [Fact]
     public async Task HrAdministrator_StillSeesFullSidebar_AndDashboard()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);

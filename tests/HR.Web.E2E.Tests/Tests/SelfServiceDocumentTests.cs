@@ -47,9 +47,13 @@ public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(f
     }
 
     [Fact]
-    public async Task SelfServiceDocumentsTab_HasNoUploadButtonsAnywhere()
+    public async Task SelfServiceDocumentsTab_HasNoGeneralUploadButton_OnlyPerRequestUploadButtons()
     {
-        // Documents are uploaded via tasks only — no Upload button should appear anywhere on this tab.
+        // The admin-only bulk "Upload" button (Documents card header) never renders for
+        // EmployeeSelfUpload — that part is unchanged. But each "Requested" row in the Document
+        // Requests grid now gets its own contextual "Upload" button (EmployeeDocumentsTab.razor),
+        // so the button isn't entirely absent anymore — Tom has exactly one open request
+        // (Passport), so exactly one "Upload" button should be visible.
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
 
@@ -64,7 +68,7 @@ public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(f
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
 
         var uploadBtns = _page.GetByRole(AriaRole.Button, new() { Name = "Upload" });
-        Assert.Equal(0, await uploadBtns.CountAsync());
+        Assert.Equal(1, await uploadBtns.CountAsync());
     }
 
     [Fact]
@@ -117,6 +121,45 @@ public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(f
     }
 
     [Fact]
+    public async Task SelfServiceDocumentsTab_UploadRequestedDocument_CompletesTheRequest()
+    {
+        // Tom's seeded Passport request is "Requested" — uploading against it via the grid row's
+        // new "Upload" button (EmployeeDocumentsTab.razor, EmployeeSelfUpload branch) should mark
+        // it Uploaded and remove the row's "Upload" action.
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await profile.GoToAsync(AcmeId, TomId);
+        await profile.OpenDocumentsTabAsync();
+
+        await _page.WaitForFunctionAsync(
+            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+
+        Assert.True(await profile.HasUploadButtonForDocumentRequestAsync("Passport"),
+            "Expected an 'Upload' button on Tom's outstanding Passport request row");
+
+        var tempFile = Path.Combine(Path.GetTempPath(), $"passport-{Guid.NewGuid():N}.pdf");
+        try
+        {
+            await File.WriteAllBytesAsync(tempFile, BuildTestPdf());
+            await profile.UploadRequestedDocumentAsync("Passport", tempFile);
+
+            // The grid reloads after a successful upload — the request should no longer show an
+            // "Upload" action (its status has moved on from "Requested").
+            Assert.False(await profile.HasUploadButtonForDocumentRequestAsync("Passport"),
+                "Expected the Passport request's 'Upload' button to disappear once the document has been uploaded");
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
     public async Task SelfServiceDocumentsTab_DownloadButton_IsVisibleAndClickable()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
@@ -155,5 +198,13 @@ public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(f
         var openedUrl = await _page.EvaluateAsync<string>("window.__lastOpenedUrl");
         Assert.False(string.IsNullOrEmpty(openedUrl),
             "Expected window.open to be called with a download URL after clicking Download");
+    }
+
+    private static byte[] BuildTestPdf()
+    {
+        var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };
+        var bytes = new byte[magic.Length + 500];
+        magic.CopyTo(bytes, 0);
+        return bytes;
     }
 }

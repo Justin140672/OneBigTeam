@@ -1,6 +1,12 @@
 @inject EmployeeService EmployeeService
 @inject AppSession Session
 
+<RecordSicknessDialog CompanyId="Session.CompanyId"
+                      EmployeeId="@(_sicknessTargetEmployeeId ?? Guid.Empty)"
+                      IsOpen="_recordSicknessOpen"
+                      OnSaved="OnSicknessRecordedAsync"
+                      OnCancelled="@(() => _recordSicknessOpen = false)" />
+
 @if (Session.IsManager)
 {
     @if (_loading)
@@ -47,6 +53,7 @@
                         {
                             var m = member;
                             <div @key="m.EmployeeId" class="team-card">
+                                <span class="team-card-status team-card-status--@StatusCss(m.Status)">@StatusLabel(m.Status)</span>
                                 <ProfilePhotoAvatar PhotoUrl="@m.ProfilePhotoUrl" Initials="@Initials(m.FullName)" SizePx="48" />
                                 <span class="team-card-name" title="@m.FullName">@m.FullName</span>
                                 <span class="team-card-title" title="@(m.JobTitle ?? "—")">@(m.JobTitle ?? "—")</span>
@@ -63,6 +70,7 @@
                                         <span class="team-card-contact-text">@m.WorkEmail</span>
                                     </a>
                                 </div>
+                                <SfButton CssClass="e-small e-outline team-card-notify-btn" OnClick="@(() => OpenNotifySickness(m.EmployeeId))">Notify Sickness</SfButton>
                             </div>
                         }
                     </div>
@@ -76,6 +84,8 @@
     private bool _loading = true;
     private bool _includeIndirect;
     private List<TeamMemberItem> _items = [];
+    private bool _recordSicknessOpen;
+    private Guid? _sicknessTargetEmployeeId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -106,6 +116,33 @@
         await LoadTeamAsync();
         _loading = false;
     }
+
+    private void OpenNotifySickness(Guid employeeId)
+    {
+        _sicknessTargetEmployeeId = employeeId;
+        _recordSicknessOpen = true;
+    }
+
+    private async Task OnSicknessRecordedAsync()
+    {
+        _recordSicknessOpen = false;
+        _sicknessTargetEmployeeId = null;
+        await LoadTeamAsync();
+    }
+
+    private static string StatusCss(string status) => status switch
+    {
+        "Sick"    => "sick",
+        "OnLeave" => "on-leave",
+        _         => "at-work",
+    };
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "Sick"    => "Sick",
+        "OnLeave" => "On Leave",
+        _         => "At Work",
+    };
 
     private static string Initials(string fullName)
     {

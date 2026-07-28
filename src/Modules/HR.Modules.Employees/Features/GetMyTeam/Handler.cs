@@ -5,7 +5,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Features.GetMyTeam;
 
-internal sealed class GetMyTeamHandler(EmployeesDbContext dbContext, IProfilePhotoReader profilePhotoReader)
+internal sealed class GetMyTeamHandler(
+    EmployeesDbContext dbContext,
+    IProfilePhotoReader profilePhotoReader,
+    IEmployeeSicknessStatusReader sicknessStatusReader,
+    IEmployeeLeaveStatusReader leaveStatusReader)
 {
     public async Task<GetMyTeamResponse> HandleAsync(
         Guid companyId, Guid managerId, bool includeIndirect, CancellationToken cancellationToken)
@@ -63,6 +67,8 @@ internal sealed class GetMyTeamHandler(EmployeesDbContext dbContext, IProfilePho
 
         var teamIds = team.Select(e => e.Id).ToList();
         var photoUrls = await profilePhotoReader.GetCurrentPhotoUrlsAsync(companyId, teamIds, cancellationToken);
+        var sickIds = await sicknessStatusReader.GetSickEmployeeIdsAsync(companyId, teamIds, cancellationToken);
+        var onLeaveIds = await leaveStatusReader.GetOnLeaveTodayEmployeeIdsAsync(companyId, teamIds, cancellationToken);
 
         var items = team
             .OrderBy(e => e.LastName)
@@ -73,7 +79,8 @@ internal sealed class GetMyTeamHandler(EmployeesDbContext dbContext, IProfilePho
                 positionProfileTitles.TryGetValue(e.PositionProfileId, out var title) ? title : null,
                 e.PhoneNumber,
                 e.WorkEmail,
-                photoUrls.TryGetValue(e.Id, out var photoUrl) ? photoUrl : null))
+                photoUrls.TryGetValue(e.Id, out var photoUrl) ? photoUrl : null,
+                sickIds.Contains(e.Id) ? "Sick" : onLeaveIds.Contains(e.Id) ? "OnLeave" : "AtWork"))
             .ToList();
 
         return new GetMyTeamResponse(items);

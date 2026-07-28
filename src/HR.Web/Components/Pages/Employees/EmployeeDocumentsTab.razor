@@ -38,7 +38,14 @@
                                 @r.CreatedAt.LocalDateTime.ToString("d MMM yyyy")
                             </td>
                             <td class="align-middle text-end">
-                                @if (r.Status == "Requested" && !EmployeeSelfUpload)
+                                @if (r.Status == "Requested" && EmployeeSelfUpload)
+                                {
+                                    <SfButton CssClass="e-primary e-small"
+                                              OnClick="() => OpenUploadRequested(r)">
+                                        <i class="fa-solid fa-upload me-1"></i> Upload
+                                    </SfButton>
+                                }
+                                else if (r.Status == "Requested" && !EmployeeSelfUpload)
                                 {
                                     @if (_cancelTargetId == r.Id)
                                     {
@@ -81,6 +88,15 @@
                            IsOpen="_requestOpen"
                            OnSaved="OnDocumentRequested"
                            OnCancelled="@(() => _requestOpen = false)" />
+}
+else
+{
+    <UploadRequestedDocumentDialog @ref="_uploadRequestedDialog"
+                                   CompanyId="CompanyId"
+                                   EmployeeId="EmployeeId"
+                                   IsOpen="_uploadRequestedOpen"
+                                   OnUploaded="OnRequestedDocumentUploaded"
+                                   OnCancelled="@(() => _uploadRequestedOpen = false)" />
 }
 
 @if (_loading)
@@ -188,6 +204,25 @@ else
 
     private Guid? _deleteTargetId;
     private Guid? _cancelTargetId;
+
+    private UploadRequestedDocumentDialog? _uploadRequestedDialog;
+    private bool _uploadRequestedOpen;
+
+    private void OpenUploadRequested(DocumentRequestListItem request)
+    {
+        // _uploadRequestedOpen also has to flip true here (not just the dialog's own
+        // internal Open()) — the dialog's OnParametersSet force-closes itself whenever this
+        // parent re-renders with IsOpen still false, which would otherwise immediately
+        // undo the Open() call on the very next unrelated render.
+        _uploadRequestedOpen = true;
+        _uploadRequestedDialog?.Open(request);
+    }
+
+    private async Task OnRequestedDocumentUploaded()
+    {
+        _uploadRequestedOpen = false;
+        await LoadAsync();
+    }
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 

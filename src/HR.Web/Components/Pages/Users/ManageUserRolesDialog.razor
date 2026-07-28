@@ -10,12 +10,13 @@
                                TItem="RoleOption"
                                DataSource="@_roleOptions"
                                @bind-Value="_selectedRoleIds"
+                               @bind-Value:after="EnsureEmployeeRoleSelected"
                                Placeholder="Select one or more roles"
                                Mode="VisualMode.CheckBox"
                                AllowFiltering="true">
                     <MultiSelectFieldSettings Value="Id" Text="Name" />
                 </SfMultiSelect>
-                <p class="text-muted small mt-2 mb-0">A user must always retain at least one role.</p>
+                <p class="text-muted small mt-2 mb-0">Employee is required for every user and can't be removed.</p>
             </div>
 
             @if (!string.IsNullOrEmpty(_error))
@@ -56,11 +57,18 @@
         if (IsOpen && !_wasOpen)
         {
             _selectedRoleIds = CurrentRoleIds.ToList();
+            EnsureEmployeeRoleSelected();
             _error = null;
             _saving = false;
         }
 
         _wasOpen = IsOpen;
+    }
+
+    private void EnsureEmployeeRoleSelected()
+    {
+        if (!_selectedRoleIds.Contains(SystemRoleOptions.EmployeeRoleId))
+            _selectedRoleIds.Add(SystemRoleOptions.EmployeeRoleId);
     }
 
     private async Task SaveAsync()

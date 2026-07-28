@@ -73,6 +73,12 @@ public sealed record SetRecruitmentStageActiveStatusResponse(
     bool IsActive,
     DateTimeOffset UpdatedAt);
 
+public sealed record GetRecruitmentStageUsageResponse(
+    Guid RecruitmentStageId,
+    bool InUse,
+    int ActiveVacancyCount,
+    IReadOnlyList<string> VacancyLabels);
+
 public sealed class RecruitmentStageEditModel
 {
     [Required(ErrorMessage = "Name is required.")]

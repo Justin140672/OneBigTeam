@@ -85,6 +85,13 @@
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
+.org-chart-toolbar-divider {
+    width: 1px;
+    align-self: stretch;
+    margin: 2px 2px;
+    background: #D5D5D5;
+}
+
 .org-chart-zoom-level {
     min-width: 42px;
     text-align: center;

@@ -203,7 +203,11 @@ public record UpdateEmployeeProfileRequest(
     string? Country,
     bool HasSystemAccess,
     WorkingDays? WorkingDaysOverride,
-    decimal? HoursPerDayOverride);
+    decimal? HoursPerDayOverride,
+    // Optional — see UpdateEmploymentDetailsRequest.CorrelationId's remarks. Lets
+    // EmployeeEdit.razor's combined Save merge this profile update with the Employment tab's
+    // update into a single audit history entry.
+    Guid? CorrelationId = null);
 
 public record UpdateEmployeeProfileResponse(
     Guid Id,
@@ -338,7 +342,14 @@ public record UpdateEmploymentDetailsRequest(
     decimal? HoursPerDayOverride,
     string? Notes,
     NoticePeriodUnit? NoticePeriodUnitOverride = null,
-    int? NoticePeriodLengthOverride = null);
+    int? NoticePeriodLengthOverride = null,
+    // Ticket: "merge Employee + Employment tab audit entries when saved together". Optional —
+    // when EmployeeEdit.razor's SaveCoreAsync saves both tabs in one click, it generates one Guid
+    // and passes it into both this request and UpdateEmployeeProfileRequest, so
+    // GetEmployeeAuditHistoryHandler can merge the two resulting audit rows into a single entry.
+    // Left null (the default) by EmployeeEmploymentTab.SaveAsync's other callers, if any, so their
+    // audit entries remain separate exactly as before.
+    Guid? CorrelationId = null);
 
 // ── LEAVING PROCESS ────────────────────────────────────────────────────────────
 
@@ -455,5 +466,6 @@ public sealed record TeamMemberItem(
     string? JobTitle,
     string? PhoneNumber,
     string WorkEmail,
-    string? ProfilePhotoUrl);
+    string? ProfilePhotoUrl,
+    string Status);
 

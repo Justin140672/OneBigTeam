@@ -132,15 +132,12 @@
                                     <tr>
                                         <td>@field.StandardHeaderName</td>
                                         <td>
-                                            <select class="form-select form-select-sm mapping-select"
-                                                    value="@_mappingSelections.GetValueOrDefault(field.TargetField)"
-                                                    @onchange="@(e => OnMappingChanged(field.TargetField, e))">
-                                                <option value="">Not mapped</option>
-                                                @foreach (var header in _columns.DetectedHeaders)
-                                                {
-                                                    <option value="@header">@header</option>
-                                                }
-                                            </select>
+                                            <SfDropDownList TValue="string?" TItem="string"
+                                                            CssClass="mapping-select"
+                                                            DataSource="@_columns.DetectedHeaders"
+                                                            Value="@_mappingSelections.GetValueOrDefault(field.TargetField)"
+                                                            Placeholder="Not mapped"
+                                                            ValueChanged="@(header => OnMappingChanged(field.TargetField, header))" />
                                         </td>
                                     </tr>
                                 }
@@ -440,10 +437,9 @@
         }
     }
 
-    private void OnMappingChanged(string targetField, Microsoft.AspNetCore.Components.ChangeEventArgs e)
+    private void OnMappingChanged(string targetField, string? header)
     {
-        var value = e.Value?.ToString();
-        _mappingSelections[targetField] = string.IsNullOrWhiteSpace(value) ? null : value;
+        _mappingSelections[targetField] = string.IsNullOrWhiteSpace(header) ? null : header;
     }
 
     private async Task ContinueToValidateAsync()

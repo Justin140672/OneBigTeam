@@ -1,18 +1,34 @@
+/* Bootstrap's .alert-secondary supplies its own light-gray background, and used to be paired
+   with --hr-gray-400/300 text/icon colors picked for contrast against a *white* card background
+   — nearly invisible against alert-secondary's own gray. Pin the background/border explicitly so
+   the text/icon colors here are contrast-checked against a background we actually control. */
 .hr-empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
     padding: 2.5rem 1rem;
-    color: var(--hr-gray-400);
+    background: var(--hr-gray-50);
+    border-color: var(--hr-gray-200);
+    color: var(--hr-gray-500);
     text-align: center;
 }
 
 .hr-empty-state-icon {
     font-size: 1.5rem;
-    color: var(--hr-gray-300);
+    color: var(--hr-gray-400);
 }
 
 .hr-empty-state-message {
     font-size: 0.9rem;
+}
+
+html[data-theme="dark"] .hr-empty-state {
+    background: var(--hr-gray-800);
+    border-color: var(--hr-gray-700);
+    color: var(--hr-gray-400);
+}
+
+html[data-theme="dark"] .hr-empty-state-icon {
+    color: var(--hr-gray-500);
 }

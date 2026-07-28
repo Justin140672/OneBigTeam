@@ -43,7 +43,7 @@
 
 .ec-field-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: 1rem;
     margin-bottom: 0.75rem;
 }
@@ -187,10 +187,6 @@
 }
 
 @media (max-width: 576px) {
-    .ec-field-row {
-        grid-template-columns: 1fr;
-    }
-
     .ec-contact-card {
         flex-direction: column;
     }

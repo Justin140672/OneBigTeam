@@ -81,6 +81,14 @@ public sealed class OverviewTab(IPage page)
     }
 
     /// <summary>
+    /// Clicks the stats-row card whose label (".stat-label") matches <paramref name="label"/>
+    /// exactly (e.g. "Open Tasks") — each card now navigates to its relevant My Profile tab
+    /// (MyProfileOverviewTab.razor's OnNavigateToTasks/OnNavigateToLeave/OnNavigateToSickness).
+    /// </summary>
+    public Task ClickStatCardAsync(string label) =>
+        page.Locator(".stat-card").Filter(new() { HasText = label }).First.ClickAsync();
+
+    /// <summary>
     /// Returns true if the "Onboarding Progress" card is rendered — only present when the
     /// current employee has an in-progress onboarding plan (Session.EmployeeId's
     /// MyOnboardingStatusModel.HasPlan is true). See MyProfileOverviewTab.razor.

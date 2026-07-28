@@ -8,11 +8,10 @@
         @foreach (var option in _options)
         {
             var opt = option;
-            <button type="button"
-                    class="dashboard-switcher-item @(IsCurrent(opt.Key) ? "dashboard-switcher-item--active" : "")"
-                    @onclick="() => SwitchToAsync(opt.Key, opt.Url)">
+            <SfButton CssClass="@("dashboard-switcher-item " + (IsCurrent(opt.Key) ? "dashboard-switcher-item--active" : ""))"
+                      OnClick="() => SwitchToAsync(opt.Key, opt.Url)">
                 @opt.Label
-            </button>
+            </SfButton>
         }
     </div>
 }

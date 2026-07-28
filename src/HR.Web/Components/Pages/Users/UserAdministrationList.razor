@@ -112,6 +112,22 @@
                         </Template>
                     </GridColumn>
                     <GridColumn Field="@nameof(UserListItemModel.CreatedAt)" HeaderText="Created" Width="130" Format="d" />
+                    <GridColumn HeaderText="Actions" Width="220" AllowSorting="false" AllowFiltering="false">
+                        <Template>
+                            @{
+                                var row = (context as UserListItemModel)!;
+                            }
+                            @if (row.InvitationStatus is "Pending" or "Expired" && row.InviteId is not null)
+                            {
+                                <SfButton CssClass="e-small" Disabled="@(_actionInProgressInviteId == row.InviteId)" OnClick="@(() => ResendInviteAsync(row))">Resend</SfButton>
+                                <SfButton CssClass="e-small" Disabled="@(_actionInProgressInviteId == row.InviteId)" OnClick="@(() => CancelInviteAsync(row))">Cancel</SfButton>
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </Template>
+                    </GridColumn>
                 </GridColumns>
             </HrGrid>
 
@@ -127,6 +143,7 @@
 
 @code {
     private bool _showInviteDialog;
+    private Guid? _actionInProgressInviteId;
 
     protected override Task OnBeforeLoadAsync()
     {
@@ -156,6 +173,42 @@
         _showInviteDialog = false;
         Navigation.NavigateTo($"/companies/{CompanyId}/user-administration/{result.EmployeeId}", forceLoad: true);
         await Task.CompletedTask;
+    }
+
+    private async Task ResendInviteAsync(UserListItemModel row)
+    {
+        if (row.InviteId is not { } inviteId) return;
+
+        ClearActionError();
+        _actionInProgressInviteId = inviteId;
+        var (success, error) = await UserAdministrationService.ResendInviteAsync(CompanyId, inviteId);
+        _actionInProgressInviteId = null;
+
+        if (!success)
+        {
+            SetActionError(error ?? "Failed to resend the invitation.");
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task CancelInviteAsync(UserListItemModel row)
+    {
+        if (row.InviteId is not { } inviteId) return;
+
+        ClearActionError();
+        _actionInProgressInviteId = inviteId;
+        var (success, error) = await UserAdministrationService.CancelInviteAsync(CompanyId, inviteId);
+        _actionInProgressInviteId = null;
+
+        if (!success)
+        {
+            SetActionError(error ?? "Failed to cancel the invitation.");
+            return;
+        }
+
+        await LoadAsync();
     }
 
     private static string AccountStatusBadgeClass(string status) => status switch

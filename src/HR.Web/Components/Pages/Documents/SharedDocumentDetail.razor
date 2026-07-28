@@ -345,8 +345,8 @@
                 versions, and completed acknowledgements are retained. This cannot be undone from here.
             </p>
             <div class="mb-2">
-                <label class="form-label" for="archive-reason">Reason <span class="text-danger">*</span></label>
-                <textarea id="archive-reason" class="form-control" rows="3" maxlength="500" @bind="_archiveReason"></textarea>
+                <label class="form-label">Reason <span class="text-danger">*</span></label>
+                <HrTextBox @bind-Value="_archiveReason" Multiline="true" Rows="3" Maxlength="500" />
             </div>
             @if (!string.IsNullOrEmpty(_archiveError))
             {

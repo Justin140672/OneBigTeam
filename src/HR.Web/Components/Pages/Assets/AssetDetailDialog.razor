@@ -38,6 +38,8 @@
                     </div>
                 </div>
 
+                @if (!SelfServiceView)
+                {
                 <div class="card mb-3">
                     <div class="card-header"><h6 class="mb-0">Specifications</h6></div>
                     <div class="card-body">
@@ -134,6 +136,7 @@
                         }
                     </div>
                 </div>
+                }
 
                 @if (!string.IsNullOrEmpty(_actionSuccess))
                 {
@@ -218,6 +221,10 @@
     [Parameter] public Guid? AssetId { get; set; }
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback OnClosed { get; set; }
+    // Hides Specifications/Purchase Information/Assignments — an employee viewing their own
+    // assigned assets from My Profile only needs to know what they have, not its admin-facing
+    // procurement/assignment history.
+    [Parameter] public bool SelfServiceView { get; set; }
 
     private bool Visible;
     private bool _loading;
@@ -264,7 +271,8 @@
             _asset = await AssetService.GetAssetAsync(CompanyId, AssetId.Value);
             _loading = false;
 
-            await LoadAssignmentsAsync();
+            if (!SelfServiceView)
+                await LoadAssignmentsAsync();
         }
     }
 

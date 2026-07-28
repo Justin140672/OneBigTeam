@@ -23,6 +23,7 @@ internal sealed record UserAdministrationListItem(
     IReadOnlyList<string> RoleNames,
     string AccountStatus,
     string InvitationStatus,
+    Guid? InviteId,
     DateTimeOffset? LastLoginAt,
     DateTimeOffset CreatedAt);
 

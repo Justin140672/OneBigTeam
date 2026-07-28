@@ -452,8 +452,18 @@ public static class EmployeesModule
             var locTypeOfficeId = Guid.Parse("60000000-0000-0000-0000-000000000001");
             var locLondonId     = Guid.Parse("70000000-0000-0000-0000-000000000001");
 
-            db.LocationTypes.Add(LocationType.Create(locTypeOfficeId, acmeId, "Office", null, now));
-            db.Locations.Add(Location.Create(locLondonId, acmeId, locTypeOfficeId, "London Office", null, now));
+            // A second Location Type ("Remote") with its own Location ("Home") — so location
+            // data isn't exclusively office-based, e.g. for filters/forms that need more than one
+            // Location Type to demonstrate against.
+            var locTypeRemoteId = Guid.Parse("60000000-0000-0000-0000-000000000002");
+            var locHomeId       = Guid.Parse("70000000-0000-0000-0000-000000000002");
+
+            db.LocationTypes.AddRange(
+                LocationType.Create(locTypeOfficeId, acmeId, "Office", null, now),
+                LocationType.Create(locTypeRemoteId, acmeId, "Remote", null, now));
+            db.Locations.AddRange(
+                Location.Create(locLondonId, acmeId, locTypeOfficeId, "London Office", null, now),
+                Location.Create(locHomeId,   acmeId, locTypeRemoteId, "Home", null, now));
 
             // Shared with HR.Modules.Leave's seed data (LeaveModule.SeedLeaveAsync) — Employees cannot
             // reference Leave's DbContext/entities directly (no cross-module DB references), so both
@@ -469,6 +479,9 @@ public static class EmployeesModule
             var posFinanceMgrId = Guid.Parse("20000000-0000-0000-0000-000000000006");
             var posSalesMgrId   = Guid.Parse("20000000-0000-0000-0000-000000000007");
             var posAeId         = Guid.Parse("20000000-0000-0000-0000-000000000008");
+            // Priya Shah (see below) is a Company Administrator, not a line role in the org chart —
+            // she still needs a real position/department pair like any other employee.
+            var posCfoId        = Guid.Parse("20000000-0000-0000-0000-000000000009");
 
             db.PositionProfiles.AddRange(
                 PositionProfile.Create(posCtoId,        acmeId, deptEngId,     locLondonId, "Chief Technology Officer", null, null, null, null, null, null, null, acmeLeavePolicyId, now),
@@ -478,7 +491,8 @@ public static class EmployeesModule
                 PositionProfile.Create(posHrAdvisorId,  acmeId, deptHrId,      locLondonId, "HR Advisor",               null, null, null, null, null, null, null, acmeLeavePolicyId, now),
                 PositionProfile.Create(posFinanceMgrId, acmeId, deptFinanceId, locLondonId, "Finance Manager",          null, null, null, null, null, null, null, acmeLeavePolicyId, now),
                 PositionProfile.Create(posSalesMgrId,   acmeId, deptSalesId,   locLondonId, "Sales Manager",            null, null, null, null, null, null, null, acmeLeavePolicyId, now),
-                PositionProfile.Create(posAeId,         acmeId, deptSalesId,   locLondonId, "Account Executive",        null, null, null, null, null, null, null, acmeLeavePolicyId, now));
+                PositionProfile.Create(posAeId,         acmeId, deptSalesId,   locLondonId, "Account Executive",        null, null, null, null, null, null, null, acmeLeavePolicyId, now),
+                PositionProfile.Create(posCfoId,        acmeId, deptFinanceId, locLondonId, "Chief Financial Officer",  null, null, null, null, null, null, null, acmeLeavePolicyId, now));
 
             var empCtoId      = Guid.Parse("30000000-0000-0000-0000-000000000001");
             var empSenDev1Id  = Guid.Parse("30000000-0000-0000-0000-000000000002");
@@ -490,6 +504,11 @@ public static class EmployeesModule
             var empSalesMgrId = Guid.Parse("30000000-0000-0000-0000-000000000008");
             var empAe1Id      = Guid.Parse("30000000-0000-0000-0000-000000000009");
             var empAe2Id      = Guid.Parse("30000000-0000-0000-0000-000000000010");
+            // Must equal the ApplicationUser id IdentityModule seeds for Priya Shah (Company
+            // Administrator) — GetMyEmployeeHandler resolves "my employee record" by matching the
+            // signed-in user's id directly against Employee.Id, so without a real Employee row at
+            // this exact id she'd have no employee record at all despite holding the Employee role.
+            var empCfoId      = Guid.Parse("30000000-0000-0000-0000-000000000013");
 
             Employee MakeAcme(Guid id, string first, string last, string email, DateOnly start,
                               Guid deptId, Guid posId, Guid? managerId,
@@ -521,7 +540,8 @@ public static class EmployeesModule
                 MakeAcme(empFinMgrId,   "Sophie", "Laurent",  "sophie.laurent@acme.example", new DateOnly(2020, 4, 14), deptFinanceId, posFinanceMgrId, null,         new DateOnly(1985, 6, 30),  "French",    "Female", "sophie.laurent@gmail.com",   "07700 900007", "61 Gloucester Road",   null,       "London",      "Greater London",     "SW7 4PE",   "ACME-007", etPermId),
                 MakeAcme(empSalesMgrId, "David",  "Park",     "david.park@acme.example",     new DateOnly(2018, 8, 22), deptSalesId,   posSalesMgrId,   null,         new DateOnly(1975, 12, 8),  "Korean",    "Male",   "david.park@outlook.com",     "07700 900008", "44 Harborne Park Road",null,       "Birmingham",  "West Midlands",      "B17 0DH",   "ACME-008", etPermId),
                 MakeAcme(empAe1Id,      "Emma",   "Jones",    "emma.jones@acme.example",     new DateOnly(2023, 5, 2),  deptSalesId,   posAeId,         empSalesMgrId, new DateOnly(1998, 8, 17), "British",   "Female", "emma.jones@gmail.com",       "07700 900009", "11 Cowley Road",       "Flat 1",   "Oxford",      "Oxfordshire",        "OX4 1HZ",   "ACME-009", etPermId),
-                MakeAcme(empAe2Id,      "Carlos", "Rivera",   "carlos.rivera@acme.example",  new DateOnly(2024, 1, 8),  deptSalesId,   posAeId,         empSalesMgrId, new DateOnly(2000, 1, 25), "Spanish",   "Male",   "carlos.rivera@gmail.com",    "07700 900010", "5 Western Road",       null,       "Brighton",    "East Sussex",        "BN1 2DA",   "ACME-010", etContractId));
+                MakeAcme(empAe2Id,      "Carlos", "Rivera",   "carlos.rivera@acme.example",  new DateOnly(2024, 1, 8),  deptSalesId,   posAeId,         empSalesMgrId, new DateOnly(2000, 1, 25), "Spanish",   "Male",   "carlos.rivera@gmail.com",    "07700 900010", "5 Western Road",       null,       "Brighton",    "East Sussex",        "BN1 2DA",   "ACME-010", etContractId),
+                MakeAcme(empCfoId,      "Priya",  "Shah",     "priya.shah@acme.example",     new DateOnly(2019, 3, 1),  deptFinanceId, posCfoId,        null,          new DateOnly(1980, 4, 9),  "British",   "Female", "priya.shah@gmail.com",       "07700 900011", "22 Chiswick High Road", null,     "London",      "Greater London",     "W4 2DT",    "ACME-011", etPermId));
 
             await db.SaveChangesAsync();
 
@@ -537,6 +557,58 @@ public static class EmployeesModule
                 "Promoted to CTO", CompensationChangeReason.Promotion, empHrMgrId, now);
 
             db.Compensations.AddRange(ctoStartingSalary, ctoCurrentSalary);
+
+            // Every employee needs at least one starting Compensation record and one "Employee
+            // joined" Timeline entry — CreateEmployeeHandler/EmployeeCreatedHandler produce both
+            // automatically for employees created through the app, but these employees are
+            // inserted directly via db.Employees.AddRange above and bypass that handler entirely,
+            // so both need to be seeded explicitly here. Sarah Chen (CTO) already has her own
+            // compensation history above and is included below only for her timeline entry.
+            var newHireCompensation = new (Guid EmployeeId, DateOnly StartDate, decimal Salary)[]
+            {
+                (empSenDev1Id,  new DateOnly(2021, 3, 15),  85000m),
+                (empSenDev2Id,  new DateOnly(2021, 9, 1),   82000m),
+                (empDev1Id,     new DateOnly(2023, 2, 20),  55000m),
+                (empHrMgrId,    new DateOnly(2019, 6, 3),   70000m),
+                (empHrAdvId,    new DateOnly(2022, 11, 7),  45000m),
+                (empFinMgrId,   new DateOnly(2020, 4, 14),  75000m),
+                (empSalesMgrId, new DateOnly(2018, 8, 22),  72000m),
+                (empAe1Id,      new DateOnly(2023, 5, 2),   40000m),
+                (empAe2Id,      new DateOnly(2024, 1, 8),   38000m),
+                (empCfoId,      new DateOnly(2019, 3, 1),   135000m),
+            };
+
+            foreach (var (employeeId, startDate, salary) in newHireCompensation)
+            {
+                db.Compensations.Add(Compensation.Create(
+                    Guid.NewGuid(), acmeId, employeeId, startDate, SalaryType.Annual, salary, "GBP", 37.5m, 1m,
+                    "Starting salary", CompensationChangeReason.NewHire, empHrMgrId, now));
+            }
+
+            var allAcmeEmployeeStartDates = new (Guid EmployeeId, DateOnly StartDate)[]
+            {
+                (empCtoId,      new DateOnly(2020, 1, 6)),
+                (empSenDev1Id,  new DateOnly(2021, 3, 15)),
+                (empSenDev2Id,  new DateOnly(2021, 9, 1)),
+                (empDev1Id,     new DateOnly(2023, 2, 20)),
+                (empHrMgrId,    new DateOnly(2019, 6, 3)),
+                (empHrAdvId,    new DateOnly(2022, 11, 7)),
+                (empFinMgrId,   new DateOnly(2020, 4, 14)),
+                (empSalesMgrId, new DateOnly(2018, 8, 22)),
+                (empAe1Id,      new DateOnly(2023, 5, 2)),
+                (empAe2Id,      new DateOnly(2024, 1, 8)),
+                (empCfoId,      new DateOnly(2019, 3, 1)),
+            };
+
+            foreach (var (employeeId, startDate) in allAcmeEmployeeStartDates)
+            {
+                db.EmployeeTimelineEntries.Add(EmployeeTimelineEntry.Create(
+                    Guid.NewGuid(), acmeId, employeeId, startDate,
+                    EmployeeTimelineEventType.EmployeeJoined, EmployeeTimelineCategory.Employment,
+                    "Employee joined", "Employee joined the company.",
+                    performedByUserId: null, "Employees", sourceRecordId: null,
+                    EmployeeTimelineVisibility.AuthorisedInternal, now));
+            }
 
             await db.SaveChangesAsync();
         }
@@ -591,6 +663,34 @@ public static class EmployeesModule
             db.Employees.AddRange(
                 MakeBeta(betaEmpMgrId, "Alice", "Morgan", "alice.morgan@betacorp.example", new DateOnly(2022, 3, 1), betaPosEngMgrId, null,         new DateOnly(1987, 5, 20),  "British", "Female", "alice.morgan@gmail.com", "07700 900021", "33 Headingley Lane", null,     "Leeds", "West Yorkshire", "LS6 1BL", "BETA-001", betaEtPermId),
                 MakeBeta(betaEmpDevId, "Bob",   "Taylor", "bob.taylor@betacorp.example",   new DateOnly(2023, 9, 4), betaPosDevId,    betaEmpMgrId, new DateOnly(1993, 10, 11), "British", "Male",   "bob.taylor@hotmail.com", "07700 900022", "7 Kirkstall Road",   "Flat 2", "Leeds", "West Yorkshire", "LS3 1LH", "BETA-002", betaEtPermId));
+
+            await db.SaveChangesAsync();
+
+            // Same rationale as the Acme block above — every employee needs a starting
+            // Compensation record and an "Employee joined" Timeline entry, and seeded employees
+            // bypass CreateEmployeeHandler entirely.
+            var betaNewHireCompensation = new (Guid EmployeeId, DateOnly StartDate, decimal Salary)[]
+            {
+                (betaEmpMgrId, new DateOnly(2022, 3, 1),  78000m),
+                (betaEmpDevId, new DateOnly(2023, 9, 4),  52000m),
+            };
+
+            foreach (var (employeeId, startDate, salary) in betaNewHireCompensation)
+            {
+                db.Compensations.Add(Compensation.Create(
+                    Guid.NewGuid(), betaCorpId, employeeId, startDate, SalaryType.Annual, salary, "GBP", 37.5m, 1m,
+                    "Starting salary", CompensationChangeReason.NewHire, betaEmpMgrId, now));
+            }
+
+            foreach (var (employeeId, startDate) in betaNewHireCompensation.Select(c => (c.EmployeeId, c.StartDate)))
+            {
+                db.EmployeeTimelineEntries.Add(EmployeeTimelineEntry.Create(
+                    Guid.NewGuid(), betaCorpId, employeeId, startDate,
+                    EmployeeTimelineEventType.EmployeeJoined, EmployeeTimelineCategory.Employment,
+                    "Employee joined", "Employee joined the company.",
+                    performedByUserId: null, "Employees", sourceRecordId: null,
+                    EmployeeTimelineVisibility.AuthorisedInternal, now));
+            }
 
             await db.SaveChangesAsync();
         }

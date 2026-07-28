@@ -111,23 +111,35 @@ else
                                 </span>
                             </Template>
                         </GridColumn>
-                        <GridColumn Width="110" AllowSorting="false" AllowFiltering="false">
+                        <GridColumn Width="220" AllowSorting="false" AllowFiltering="false">
                             <Template>
                                 @{ var r = (context as LeaveRequestListItem)!; }
                                 @if (r.Status == "Pending")
                                 {
-                                    <SfButton CssClass="e-outline e-danger e-small"
-                                              Disabled="@(_cancelling == r.Id)"
-                                              OnClick="@(() => CancelRequestAsync(r.Id))">
-                                        @if (_cancelling == r.Id)
-                                        {
-                                            <span class="spinner-border spinner-border-sm"></span>
-                                        }
-                                        else
-                                        {
-                                            <span>Cancel</span>
-                                        }
-                                    </SfButton>
+                                    @if (_cancelTargetId == r.Id)
+                                    {
+                                        <span class="me-2 text-muted small">Cancel this request?</span>
+                                        <SfButton CssClass="e-danger e-small me-1"
+                                                  Disabled="@(_cancelling == r.Id)"
+                                                  OnClick="@(() => CancelRequestAsync(r.Id))">
+                                            @if (_cancelling == r.Id)
+                                            {
+                                                <span class="spinner-border spinner-border-sm"></span>
+                                            }
+                                            else
+                                            {
+                                                <span>Yes</span>
+                                            }
+                                        </SfButton>
+                                        <SfButton CssClass="e-small" OnClick="ClearCancelTarget">No</SfButton>
+                                    }
+                                    else
+                                    {
+                                        <SfButton CssClass="e-outline e-danger e-small"
+                                                  OnClick="@(() => _cancelTargetId = r.Id)">
+                                            Cancel
+                                        </SfButton>
+                                    }
                                 }
                             </Template>
                         </GridColumn>
@@ -156,6 +168,7 @@ else
     private bool _loading = true;
     private bool _showRequestForm;
     private Guid? _cancelling;
+    private Guid? _cancelTargetId;
 
     private IReadOnlyList<LeaveBalanceItemModel> _allBalances = [];
     private LeaveBalanceItemModel? _annualLeave;
@@ -218,8 +231,11 @@ else
         _cancelling = leaveRequestId;
         await LeaveService.CancelLeaveRequestAsync(CompanyId, EmployeeId, leaveRequestId);
         _cancelling = null;
+        _cancelTargetId = null;
         await RefreshLeaveAsync();
     }
+
+    private void ClearCancelTarget() => _cancelTargetId = null;
 
     private static string StatusBadge(string status) => status switch
     {

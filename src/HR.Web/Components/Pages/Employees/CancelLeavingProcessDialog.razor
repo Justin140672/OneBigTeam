@@ -18,8 +18,7 @@
             }
             <div class="mb-3">
                 <label class="form-label">Cancellation Reason <span class="text-danger">*</span></label>
-                <textarea class="form-control" rows="3" maxlength="1000"
-                          @bind="_cancellationReason" placeholder="Why is the leaving process being cancelled?"></textarea>
+                <HrTextBox @bind-Value="_cancellationReason" Multiline="true" Rows="3" Maxlength="1000" Placeholder="Why is the leaving process being cancelled?" />
             </div>
 
             @if (!string.IsNullOrEmpty(_globalError))

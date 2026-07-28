@@ -117,14 +117,13 @@ else
                     </div>
                 }
                 <div>
-                    <label for="pd-notes" class="pd-label">Your request</label>
-                    <textarea id="pd-notes"
-                              class="form-control @(_notesError is not null ? "is-invalid" : "")"
-                              rows="5"
-                              maxlength="2000"
-                              placeholder="e.g. Please update my preferred name to &quot;Alex&quot; and my nationality to British."
-                              @bind="_notes"
-                              @bind:event="oninput"></textarea>
+                    <label class="pd-label">Your request</label>
+                    <HrTextBox CssClass="@(_notesError is not null ? "is-invalid" : "")"
+                               Multiline="true"
+                               Rows="5"
+                               Maxlength="2000"
+                               Placeholder="e.g. Please update my preferred name to &quot;Alex&quot; and my nationality to British."
+                               @bind-Value="_notes" />
                     @if (_notesError is not null)
                     {
                         <div class="invalid-feedback">@_notesError</div>

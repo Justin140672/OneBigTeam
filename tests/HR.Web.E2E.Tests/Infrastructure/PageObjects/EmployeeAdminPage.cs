@@ -123,6 +123,32 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("[data-testid='admin-document-requests-section']", new() { Timeout = 10_000 });
     }
 
+    /// <summary>
+    /// Opens the Request Document dialog, selects a document type (without submitting), then
+    /// clicks Cancel and confirms "Discard Changes" on the resulting unsaved-changes prompt.
+    /// Waits for both dialogs to close. RequestDocumentDialog.razor inherits EditDialogBase,
+    /// whose Cancel button routes through an "unsaved changes?" confirmation once any field has
+    /// been touched — without UnsavedChangesDialog actually wired up in the markup, that
+    /// confirmation had nothing to render and Cancel silently did nothing.
+    /// </summary>
+    public async Task OpenRequestDocumentDialogSelectTypeThenCancelAsync(string documentTypeName)
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Request Document" }).ClickAsync();
+        await page.WaitForSelectorAsync(".request-document-dialog", new() { Timeout = 10_000 });
+
+        await DropDownSelector.SelectAsync(page, page.Locator(".request-document-dialog"), documentTypeName);
+
+        await page.Locator(".request-document-dialog").GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
+
+        var unsavedDialog = page.GetByRole(AriaRole.Dialog, new() { Name = "Unsaved Changes" });
+        await unsavedDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await unsavedDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
+
+        await page.WaitForFunctionAsync(
+            "!document.querySelector('.request-document-dialog') || !document.querySelector('.request-document-dialog').offsetParent",
+            null, new PageWaitForFunctionOptions { Timeout = 10_000 });
+    }
+
     // ── Assets tab ────────────────────────────────────────────────────────────
 
     public async Task OpenAssetsTabAsync()

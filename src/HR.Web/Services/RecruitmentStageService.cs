@@ -71,6 +71,19 @@ public sealed class RecruitmentStageService(IHttpClientFactory httpClientFactory
         return (null, await ReadErrorAsync(response, "Failed to update active status."));
     }
 
+    public async Task<GetRecruitmentStageUsageResponse?> GetUsageAsync(Guid companyId, Guid recruitmentStageId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetRecruitmentStageUsageResponse>(
+                $"api/companies/{companyId}/recruitment-stages/{recruitmentStageId}/usage", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
     // ── IEditService<RecruitmentStageEditModel, Guid> ────────────────────────
     // No dedicated backend GetById endpoint — the list already returns full item detail.
 

@@ -29,8 +29,9 @@
                     </div>
                     <div class="col-12">
                         <label class="form-label">Note <span class="text-danger">*</span></label>
-                        <textarea class="form-control" rows="4" maxlength="4000" data-testid="add-note-text"
-                                  @bind="Model.NoteText" placeholder="Enter note details…"></textarea>
+                        <HrTextBox @bind-Value="Model.NoteText" Multiline="true" Rows="4" Maxlength="4000"
+                                   Placeholder="Enter note details…"
+                                   HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "add-note-text" })" />
                         <ValidationMessage For="@(() => Model.NoteText)" />
                     </div>
                     <div class="col-12">

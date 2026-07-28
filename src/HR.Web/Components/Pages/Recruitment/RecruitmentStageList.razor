@@ -88,7 +88,43 @@
     }
 </div>
 
+<SfDialog Visible="_deactivateConfirmOpen" IsModal="true" Width="420px" ShowCloseIcon="false">
+    <DialogTemplates>
+        <Header>Deactivate Stage</Header>
+        <Content>
+            @if (_deactivateTarget is not null)
+            {
+                <p>
+                    "@_deactivateTarget.Name" is currently the stage of
+                    @_deactivateUsage?.ActiveVacancyCount active vacanc@(_deactivateUsage?.ActiveVacancyCount == 1 ? "y" : "ies")@(":")
+                </p>
+                @if (_deactivateUsage?.VacancyLabels.Count > 0)
+                {
+                    <ul>
+                        @foreach (var label in _deactivateUsage.VacancyLabels)
+                        {
+                            <li>@label</li>
+                        }
+                    </ul>
+                }
+                <p class="mb-0">
+                    You can still deactivate it — applications already on this stage will not be affected —
+                    but it will no longer be selectable for new moves. Continue?
+                </p>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton CssClass="e-danger" Disabled="_deactivating" OnClick="ConfirmDeactivateAsync">Deactivate</SfButton>
+            <SfButton Disabled="_deactivating" OnClick="@(() => _deactivateConfirmOpen = false)">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
 @code {
+    private bool _deactivateConfirmOpen;
+    private bool _deactivating;
+    private RecruitmentStageListItem? _deactivateTarget;
+    private GetRecruitmentStageUsageResponse? _deactivateUsage;
     protected override bool SupportsActiveFilter => true;
 
     protected override Task OnBeforeLoadAsync()
@@ -155,6 +191,40 @@
     private async Task SetActiveStatus(RecruitmentStageListItem item, bool isActive)
     {
         ClearActionError();
+
+        // Deactivating never breaks anything (the stage row is preserved, just hidden from new
+        // selection — see SetRecruitmentStageActiveStatusHandler), but if any active vacancy's
+        // applications currently sit on this stage, warn the user first rather than deactivating
+        // silently. Activating never needs this check.
+        if (!isActive)
+        {
+            var usage = await RecruitmentStageService.GetUsageAsync(CompanyId, item.Id);
+            if (usage is { InUse: true })
+            {
+                _deactivateTarget = item;
+                _deactivateUsage = usage;
+                _deactivateConfirmOpen = true;
+                return;
+            }
+        }
+
+        await ApplyActiveStatusAsync(item, isActive);
+    }
+
+    private async Task ConfirmDeactivateAsync()
+    {
+        if (_deactivateTarget is null) return;
+
+        _deactivating = true;
+        await ApplyActiveStatusAsync(_deactivateTarget, false);
+        _deactivating = false;
+        _deactivateConfirmOpen = false;
+        _deactivateTarget = null;
+        _deactivateUsage = null;
+    }
+
+    private async Task ApplyActiveStatusAsync(RecruitmentStageListItem item, bool isActive)
+    {
         var (result, error) = await RecruitmentStageService.SetActiveStatusAsync(CompanyId, item.Id, isActive);
         if (result is null)
             SetActionError(error);

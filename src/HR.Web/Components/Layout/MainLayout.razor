@@ -201,15 +201,13 @@ else
                     @if (Env.IsDevelopment())
                     {
                         <div class="dev-persona-switcher">
-                            <select class="form-select form-select-sm dev-persona-select"
-                                    @onchange="OnPersonaSwitchAsync"
-                                    title="Switch dev persona">
-                                <option value="">Switch user…</option>
-                                @foreach (var p in _personas)
-                                {
-                                    <option value="@p.UserId">@p.Name (@p.JobTitle)</option>
-                                }
-                            </select>
+                            <SfDropDownList TValue="string?" TItem="PersonaOption"
+                                            CssClass="dev-persona-select"
+                                            DataSource="@_personaOptions"
+                                            Placeholder="Switch user…"
+                                            ValueChanged="OnPersonaSwitchAsync">
+                                <DropDownListFieldSettings Value="UserId" Text="DisplayName" />
+                            </SfDropDownList>
                         </div>
                     }
                 </div>
@@ -278,6 +276,9 @@ else
     private bool _taskDialogOpen;
 
     private IReadOnlyList<DevPersonaDto> _personas = [];
+    private List<PersonaOption> _personaOptions = [];
+
+    private sealed record PersonaOption(string UserId, string DisplayName);
 
     private readonly Dictionary<string, string> _menuItems = new()
     {
@@ -334,7 +335,10 @@ else
         await LoadUnreadCountAsync();
 
         if (Env.IsDevelopment())
+        {
             _personas = await DevAuth.GetPersonasAsync();
+            _personaOptions = _personas.Select(p => new PersonaOption(p.UserId, $"{p.Name} ({p.JobTitle})")).ToList();
+        }
     }
 
     private async Task LoadUnreadCountAsync()
@@ -405,9 +409,8 @@ else
 
     private void ToggleSidebar() => SidebarOpen = !SidebarOpen;
 
-    private async Task OnPersonaSwitchAsync(Microsoft.AspNetCore.Components.ChangeEventArgs e)
+    private async Task OnPersonaSwitchAsync(string? userId)
     {
-        var userId = e.Value?.ToString();
         if (string.IsNullOrEmpty(userId)) return;
         var ok = await DevAuth.SwitchAsync(userId);
         if (ok) NavigationManager.NavigateTo("/", forceLoad: true);

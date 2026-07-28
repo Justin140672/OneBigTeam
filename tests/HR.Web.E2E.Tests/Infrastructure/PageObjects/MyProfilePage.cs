@@ -97,6 +97,40 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".card", new() { Timeout = 15_000 });
     }
 
+    /// <summary>
+    /// Returns true if the given document type's row in the (self-service) Document Requests
+    /// grid has an "Upload" button — only present while that request's Status is "Requested"
+    /// (EmployeeDocumentsTab.razor, EmployeeSelfUpload branch).
+    /// </summary>
+    public Task<bool> HasUploadButtonForDocumentRequestAsync(string documentTypeName) =>
+        DocumentRequestRow(documentTypeName).GetByRole(AriaRole.Button, new() { Name = "Upload" }).IsVisibleAsync();
+
+    /// <summary>
+    /// Clicks the "Upload" button on the given document type's row in the self-service Document
+    /// Requests grid, fills in the file (the dialog pre-fills Title from the request's document
+    /// type), and submits — completing UploadRequestedDocumentDialog.razor's flow. Waits for the
+    /// dialog to close, which only happens on a successful upload.
+    /// </summary>
+    public async Task UploadRequestedDocumentAsync(string documentTypeName, string filePath)
+    {
+        await DocumentRequestRow(documentTypeName)
+            .GetByRole(AriaRole.Button, new() { Name = "Upload" })
+            .ClickAsync();
+
+        var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = $"Upload {documentTypeName}" });
+        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
+        await dialog.Locator("input[type='file']").SetInputFilesAsync(filePath);
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
+
+        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
+
+    private ILocator DocumentRequestRow(string documentTypeName) =>
+        page.Locator("[data-testid='admin-document-requests-section'] tbody tr")
+            .Filter(new() { HasText = documentTypeName })
+            .First;
+
     // ── Company Documents tab (MyProfileCompanyDocumentsTab — published shared company
     // documents visible to the employee; distinct from the personal "Documents" tab above) ──
 

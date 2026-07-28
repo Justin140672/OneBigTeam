@@ -315,7 +315,8 @@ internal sealed record EmployeeProfileUpdatedAuditEvent(
     Guid ActorEmployeeId,
     DateTimeOffset OccurredAt,
     EmployeeProfileSnapshot Before,
-    EmployeeProfileSnapshot After) : IAuditEvent
+    EmployeeProfileSnapshot After,
+    Guid? CorrelationId = null) : IAuditEvent
 {
     string IAuditEvent.EventType => "employee.profile.updated";
     string IAuditEvent.EntityType => "Employee";
@@ -323,7 +324,7 @@ internal sealed record EmployeeProfileUpdatedAuditEvent(
     Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
-    Guid? IAuditEvent.CorrelationId => null;
+    Guid? IAuditEvent.CorrelationId => CorrelationId;
     string? IAuditEvent.Summary => "Employee profile updated";
     object? IAuditEvent.Before => Before;
     object? IAuditEvent.After => After;
@@ -337,7 +338,8 @@ internal sealed record EmploymentDetailsSnapshot(
     DateOnly? ContinuousServiceDate,
     DateOnly? ProbationEndDate,
     DateOnly? LeavingDate,
-    string? Notes);
+    string? Notes,
+    Guid? ManagerId);
 
 // Employee number changes made through the Employment tab are administrative corrections (per
 // the Employee Number ticket) and must be visible in Employee Audit History like any other
@@ -350,7 +352,8 @@ internal sealed record EmploymentDetailsUpdatedAuditEvent(
     Guid ActorEmployeeId,
     DateTimeOffset OccurredAt,
     EmploymentDetailsSnapshot Before,
-    EmploymentDetailsSnapshot After) : IAuditEvent
+    EmploymentDetailsSnapshot After,
+    Guid? CorrelationId = null) : IAuditEvent
 {
     string IAuditEvent.EventType => "employee.employment-details.updated";
     string IAuditEvent.EntityType => "Employee";
@@ -358,7 +361,7 @@ internal sealed record EmploymentDetailsUpdatedAuditEvent(
     Guid? IAuditEvent.EmployeeId => EmployeeId;
     Guid? IAuditEvent.ActorUserId => null;
     Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
-    Guid? IAuditEvent.CorrelationId => null;
+    Guid? IAuditEvent.CorrelationId => CorrelationId;
     string? IAuditEvent.Summary => Before.EmployeeNumber != After.EmployeeNumber
         ? "Employee number corrected"
         : "Employment details updated";

@@ -31,10 +31,10 @@
                     Notes
                     <span class="text-muted fw-normal"> (optional)</span>
                 </label>
-                <textarea class="form-control"
-                          rows="3"
-                          @bind="_notes"
-                          placeholder="Enter your review notes…" />
+                <HrTextBox @bind-Value="_notes"
+                           Multiline="true"
+                           Rows="3"
+                           Placeholder="Enter your review notes…" />
             </div>
             @if (_error is not null)
             {

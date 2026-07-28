@@ -36,7 +36,8 @@ public sealed record UpcomingProbationReviewItem(
     Guid ProbationRecordId,
     Guid EmployeeId,
     string ReviewType,
-    DateOnly DueDate);
+    DateOnly DueDate,
+    Guid? TaskId = null);
 
 public sealed record UpcomingProbationReviewsResponse(IReadOnlyList<UpcomingProbationReviewItem> Items);
 

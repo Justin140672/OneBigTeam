@@ -253,6 +253,32 @@ public sealed class ProfileOverviewTabTests(AppFixture fixture) : E2ETestBase(fi
             "Expected no Onboarding Progress card for Tom, who has no onboarding plan");
     }
 
+    [Theory]
+    [InlineData("Open Tasks", "Tasks")]
+    [InlineData("Leave Remaining", "Leave")]
+    [InlineData("Pending Requests", "Leave")]
+    [InlineData("Sickness Absence", "Sickness")]
+    public async Task OverviewTab_ClickingStatCard_NavigatesToRelevantTab(string statLabel, string expectedTabName)
+    {
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile  = new MyProfilePage(_page, _fixture.WebBaseUrl);
+        var overview = new OverviewTab(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await profile.GoToAsync(AcmeId, TomId);
+
+        if (!await overview.IsVisibleAsync())
+            await profile.OpenOverviewTabAsync();
+
+        await overview.WaitForLoadAsync();
+
+        await overview.ClickStatCardAsync(statLabel);
+
+        Assert.Equal(expectedTabName, await profile.GetActiveTabNameAsync());
+    }
+
     [Fact]
     public async Task OverviewTab_NotifySicknessButton_OpensSicknessDialog()
     {

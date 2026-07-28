@@ -195,6 +195,42 @@ public sealed class ManagerDashboardTests(AppFixture fixture) : E2ETestBase(fixt
     }
 
     [Fact]
+    public async Task MyTeamWidget_ShowsAtWorkStatusBadge_ForDirectReportWithNoActiveSicknessOrLeave()
+    {
+        // Tom Williams has no active sickness record and no leave request covering today (see
+        // seed data referenced elsewhere in this file), so his status badge should read "At Work".
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(JamesEmail);
+        await dashboard.GoToAsync();
+
+        await dashboard.GetMyTeamMemberNamesAsync();
+
+        Assert.Equal("At Work", await dashboard.GetTeamMemberStatusAsync("Tom Williams"));
+    }
+
+    [Fact]
+    public async Task MyTeamWidget_NotifySicknessButton_OpensRecordSicknessDialogForThatEmployee()
+    {
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(JamesEmail);
+        await dashboard.GoToAsync();
+
+        await dashboard.GetMyTeamMemberNamesAsync();
+        await dashboard.ClickNotifySicknessForTeamMemberAsync("Tom Williams");
+
+        // RecordSicknessDialog renders with SelfService not set (manager-on-behalf-of flow), so
+        // its header reads "Record Sickness" even though the card's own button says "Notify
+        // Sickness" — see MyTeamWidget.razor / RecordSicknessDialog.razor.
+        Assert.Contains("Record Sickness", await _page.ContentAsync());
+    }
+
+    [Fact]
     public async Task UpcomingProbationReviewsWidget_IsVisible_ForManager()
     {
         // Full regression coverage (including the click-through navigation) for this widget

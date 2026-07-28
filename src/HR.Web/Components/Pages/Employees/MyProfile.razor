@@ -21,7 +21,9 @@
                         <MyProfileOverviewTab CompanyId="CompanyId"
                                              EmployeeId="EmployeeId"
                                              OnNavigateToDocuments="() => _activeTabIndex = 6"
-                                             OnNavigateToTasks="() => _activeTabIndex = 8" />
+                                             OnNavigateToTasks="() => _activeTabIndex = 8"
+                                             OnNavigateToLeave="() => _activeTabIndex = 4"
+                                             OnNavigateToSickness="() => _activeTabIndex = 5" />
                     </div>
                 </ContentTemplate>
             </TabItem>
@@ -80,18 +82,11 @@
                 </ContentTemplate>
             </TabItem>
             <TabItem>
-                <ChildContent><TabHeader Text="Acknowledgement History" /></ChildContent>
-                <ContentTemplate>
-                    <div class="mt-4"><MyProfileAcknowledgementHistoryTab CompanyId="CompanyId" EmployeeId="EmployeeId" /></div>
-                </ContentTemplate>
-            </TabItem>
-            <TabItem>
                 <ChildContent><TabHeader Text="Timeline" /></ChildContent>
                 <ContentTemplate>
                     <div class="mt-4">
                         <EmployeeTimelineTab CompanyId="CompanyId" EmployeeId="EmployeeId"
-                                              OnNavigateToDocuments="@(() => _activeTabIndex = 6)"
-                                              OnNavigateToAcknowledgements="@(() => _activeTabIndex = 10)" />
+                                              OnNavigateToDocuments="@(() => _activeTabIndex = 6)" />
                     </div>
                 </ContentTemplate>
             </TabItem>
@@ -127,7 +122,7 @@
                 "companyDocuments" => 7,
                 "tasks"            => 8,
                 "assets"           => 9,
-                "timeline"         => 11,
+                "timeline"         => 10,
                 _                  => 0
             };
         }

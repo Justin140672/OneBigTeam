@@ -64,9 +64,8 @@
                         var r = item;
                         var (dueLabel, dueCss) = DueBadge(r.DueDate);
                         var name = EmployeeName(r.EmployeeId);
-                        var url  = $"/companies/{Session.CompanyId}/employees/{r.EmployeeId}?tab=probation";
                         <div @key="r.ReviewId" class="task-widget-item"
-                             @onclick="() => Navigation.NavigateTo(url)">
+                             @onclick="() => OnReviewClicked(r)">
                             <span class="priority-pip priority-pip--@DuePip(r.DueDate)"></span>
                             <div class="task-widget-content">
                                 <span class="task-widget-title">@name</span>
@@ -82,6 +81,8 @@
 }
 
 @code {
+    [Parameter] public EventCallback<Guid> OnOpenTask { get; set; }
+
     private bool _loading = true;
     private IReadOnlyList<UpcomingProbationReviewItem> _items = [];
     private IReadOnlyDictionary<Guid, string> _employeeNames = new Dictionary<Guid, string>();
@@ -110,6 +111,20 @@
         _overdue  = _items.Count(r => r.DueDate < _today);
         _dueSoon  = _items.Count(r => r.DueDate >= _today && r.DueDate <= _today.AddDays(7));
         _loading  = false;
+    }
+
+    // Opens the review task dialog when one exists (the normal case — GenerateDueProbationReviewsJob
+    // always creates one per review), falling back to the employee's Probation tab for the rare
+    // review that predates task creation and has no open task to show.
+    private async Task OnReviewClicked(UpcomingProbationReviewItem item)
+    {
+        if (item.TaskId is { } taskId && OnOpenTask.HasDelegate)
+        {
+            await OnOpenTask.InvokeAsync(taskId);
+            return;
+        }
+
+        Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/{item.EmployeeId}?tab=probation");
     }
 
     private string EmployeeName(Guid employeeId) =>

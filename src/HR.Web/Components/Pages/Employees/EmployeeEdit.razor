@@ -1141,6 +1141,13 @@
             var workingDaysOverride = _employee?.WorkingDaysOverride;
             var hoursPerDayOverride = _employee?.HoursPerDayOverride;
 
+            // Ticket: "merge Employee + Employment tab audit entries when saved together". This
+            // page's single Save button calls both UpdateEmployeeProfileAsync and (below)
+            // _employmentTab.SaveAsync() as one user action, so both requests share the same
+            // freshly generated CorrelationId — letting GetEmployeeAuditHistoryHandler combine
+            // the two resulting audit rows into a single history entry.
+            var correlationId = Guid.NewGuid();
+
             var request = new UpdateEmployeeProfileRequest(
                 CompanyId,
                 Id!.Value,
@@ -1167,7 +1174,8 @@
                 string.IsNullOrWhiteSpace(Model.Country)        ? null : Model.Country.Trim(),
                 Model.HasSystemAccess,
                 workingDaysOverride,
-                hoursPerDayOverride);
+                hoursPerDayOverride,
+                CorrelationId: correlationId);
 
             var (success, conflictMessage) = await EmployeeService.UpdateEmployeeProfileAsync(CompanyId, Id!.Value, request);
 
@@ -1175,9 +1183,11 @@
                 return conflictMessage;
 
             // Save Employment tab's data (including any working pattern override change) second,
-            // so it has the final say over the shared working-pattern fields.
+            // so it has the final say over the shared working-pattern fields. Pass the same
+            // correlationId through so its audit event merges with the profile update above.
             if (_employmentTab is not null)
             {
+                _employmentTab.CorrelationId = correlationId;
                 var employmentError = await _employmentTab.SaveAsync();
                 if (employmentError is not null)
                     return employmentError;

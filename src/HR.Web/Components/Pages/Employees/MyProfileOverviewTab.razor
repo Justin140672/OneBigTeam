@@ -137,7 +137,7 @@ else
 
             <!-- Quick Statistics -->
             <div class="stats-row">
-                <div class="stat-card">
+                <div class="stat-card stat-card--clickable" @onclick="@(() => OnNavigateToTasks.InvokeAsync())">
                     <div class="stat-icon stat-icon--tasks">
                         <i class="fa-solid fa-list-check"></i>
                     </div>
@@ -147,7 +147,7 @@ else
                     </div>
                 </div>
 
-                <div class="stat-card">
+                <div class="stat-card stat-card--clickable" @onclick="@(() => OnNavigateToLeave.InvokeAsync())">
                     <div class="stat-icon stat-icon--leave">
                         <i class="fa-solid fa-umbrella-beach"></i>
                     </div>
@@ -157,7 +157,7 @@ else
                     </div>
                 </div>
 
-                <div class="stat-card">
+                <div class="stat-card stat-card--clickable" @onclick="@(() => OnNavigateToLeave.InvokeAsync())">
                     <div class="stat-icon stat-icon--pending @(_pendingLeaveCount > 0 ? "stat-icon--pending-active" : "")">
                         <i class="fa-solid fa-clock"></i>
                     </div>
@@ -167,7 +167,7 @@ else
                     </div>
                 </div>
 
-                <div class="stat-card">
+                <div class="stat-card stat-card--clickable" @onclick="@(() => OnNavigateToSickness.InvokeAsync())">
                     <div class="stat-icon stat-icon--sickness">
                         <i class="fa-solid fa-house-medical"></i>
                     </div>
@@ -297,6 +297,8 @@ else
 
     [Parameter] public EventCallback OnNavigateToDocuments { get; set; }
     [Parameter] public EventCallback OnNavigateToTasks { get; set; }
+    [Parameter] public EventCallback OnNavigateToLeave { get; set; }
+    [Parameter] public EventCallback OnNavigateToSickness { get; set; }
 
     private bool _loading = true;
     private bool _showRequestLeaveForm;

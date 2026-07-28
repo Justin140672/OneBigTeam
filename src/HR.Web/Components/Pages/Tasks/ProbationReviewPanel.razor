@@ -36,12 +36,12 @@
                 {
                     <div class="mb-3">
                         <label class="form-label fw-medium">Outcome <span class="text-danger">*</span></label>
-                        <select class="form-select" @bind="_outcome">
-                            <option value="">Select outcome…</option>
-                            <option value="Pass">Pass</option>
-                            <option value="Fail">Fail</option>
-                            <option value="Extend">Extend probation</option>
-                        </select>
+                        <SfDropDownList TValue="string?" TItem="OutcomeOption"
+                                        DataSource="@OutcomeOptions"
+                                        @bind-Value="_outcome"
+                                        Placeholder="Select outcome…">
+                            <DropDownListFieldSettings Value="Value" Text="Label" />
+                        </SfDropDownList>
                     </div>
                     @if (_outcome == "Extend")
                     {
@@ -64,10 +64,10 @@
                         <span class="text-muted fw-normal"> (optional)</span>
                     }
                 </label>
-                <textarea class="form-control"
-                          rows="3"
-                          @bind="_notes"
-                          placeholder="@NotesPlaceholder(_outcome)" />
+                <HrTextBox @bind-Value="_notes"
+                           Multiline="true"
+                           Rows="3"
+                           Placeholder="@NotesPlaceholder(_outcome)" />
             </div>
             @if (_error is not null)
             {
@@ -99,6 +99,15 @@
     private bool _submitting;
     private bool _justCompleted;
     private string? _successOutcome;
+
+    private static readonly OutcomeOption[] OutcomeOptions =
+    [
+        new("Pass", "Pass"),
+        new("Fail", "Fail"),
+        new("Extend", "Extend probation")
+    ];
+
+    private sealed record OutcomeOption(string Value, string Label);
 
     protected override async Task OnParametersSetAsync()
     {

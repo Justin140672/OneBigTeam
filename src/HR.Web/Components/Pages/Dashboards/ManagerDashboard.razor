@@ -22,10 +22,15 @@
         <DashboardSwitcher />
 
         <section class="dashboard-section">
-            <h2 class="dashboard-section-title">Tasks &amp; Leave</h2>
-            <div class="dashboard-detail-grid">
+            <h2 class="dashboard-section-title">Tasks &amp; Team Wellbeing</h2>
+            <div class="dashboard-grid-3col">
                 <TeamTasksWidget />
                 <LeaveRequestsWidget OnOpenTask="OpenTask" />
+                <UpcomingProbationReviewsWidget OnOpenTask="OpenTask" />
+                <TeamOnboardingWidget />
+                <TeamSicknessTodayWidget />
+                <OverdueReturnToWorkReviewsWidget />
+                <MissingFitNotesWidget />
             </div>
         </section>
 
@@ -33,17 +38,6 @@
             <h2 class="dashboard-section-title">My Team</h2>
             <div class="dashboard-detail-grid">
                 <MyTeamWidget />
-            </div>
-        </section>
-
-        <section class="dashboard-section">
-            <h2 class="dashboard-section-title">Team Wellbeing &amp; Onboarding</h2>
-            <div class="dashboard-detail-grid">
-                <UpcomingProbationReviewsWidget />
-                <TeamOnboardingWidget />
-                <TeamSicknessTodayWidget />
-                <OverdueReturnToWorkReviewsWidget />
-                <MissingFitNotesWidget />
             </div>
         </section>
     </div>

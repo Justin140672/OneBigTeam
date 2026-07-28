@@ -48,7 +48,7 @@
             </div>
             <div class="col-12">
                 <label class="form-label">Notes</label>
-                <textarea class="form-control" rows="2" maxlength="4000" @bind="_notes" placeholder="Optional notes…"></textarea>
+                <HrTextBox @bind-Value="_notes" Multiline="true" Rows="2" Maxlength="4000" Placeholder="Optional notes…" />
             </div>
         </div>
         <div class="d-flex gap-2 mt-3">

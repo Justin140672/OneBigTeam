@@ -85,7 +85,43 @@
     }
 </div>
 
+<SfDialog Visible="_deactivateConfirmOpen" IsModal="true" Width="420px" ShowCloseIcon="false">
+    <DialogTemplates>
+        <Header>Deactivate Recruiter</Header>
+        <Content>
+            @if (_deactivateTarget is not null)
+            {
+                <p>
+                    "@_deactivateTarget.AgencyName" is currently assigned to
+                    @_deactivateUsage?.ActiveVacancyCount active vacanc@(_deactivateUsage?.ActiveVacancyCount == 1 ? "y" : "ies")@(":")
+                </p>
+                @if (_deactivateUsage?.VacancyLabels.Count > 0)
+                {
+                    <ul>
+                        @foreach (var label in _deactivateUsage.VacancyLabels)
+                        {
+                            <li>@label</li>
+                        }
+                    </ul>
+                }
+                <p class="mb-0">
+                    You can still deactivate this recruiter — existing vacancy assignments are not removed —
+                    but they will no longer be selectable for new assignments. Continue?
+                </p>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton CssClass="e-danger" Disabled="_deactivating" OnClick="ConfirmDeactivateAsync">Deactivate</SfButton>
+            <SfButton Disabled="_deactivating" OnClick="@(() => _deactivateConfirmOpen = false)">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
 @code {
+    private bool _deactivateConfirmOpen;
+    private bool _deactivating;
+    private ExternalRecruiterListItemModel? _deactivateTarget;
+    private GetExternalRecruiterUsageResponse? _deactivateUsage;
     protected override bool SupportsActiveFilter => true;
 
     protected override Task OnBeforeLoadAsync()
@@ -139,6 +175,40 @@
     private async Task SetActiveStatus(ExternalRecruiterListItemModel item, bool isActive)
     {
         ClearActionError();
+
+        // Deactivation never breaks anything (the row is preserved, only flagged inactive — see
+        // SetExternalRecruiterActiveStatusHandler), but if the recruiter is still assigned to any
+        // active vacancy, warn the user first rather than deactivating silently. Activating never
+        // needs this check.
+        if (!isActive)
+        {
+            var usage = await ExternalRecruiterService.GetUsageAsync(CompanyId, item.Id);
+            if (usage is { InUse: true })
+            {
+                _deactivateTarget = item;
+                _deactivateUsage = usage;
+                _deactivateConfirmOpen = true;
+                return;
+            }
+        }
+
+        await ApplyActiveStatusAsync(item, isActive);
+    }
+
+    private async Task ConfirmDeactivateAsync()
+    {
+        if (_deactivateTarget is null) return;
+
+        _deactivating = true;
+        await ApplyActiveStatusAsync(_deactivateTarget, false);
+        _deactivating = false;
+        _deactivateConfirmOpen = false;
+        _deactivateTarget = null;
+        _deactivateUsage = null;
+    }
+
+    private async Task ApplyActiveStatusAsync(ExternalRecruiterListItemModel item, bool isActive)
+    {
         var (result, error) = await ExternalRecruiterService.SetActiveStatusAsync(CompanyId, item.Id, isActive);
         if (result is null)
             SetActionError(error);

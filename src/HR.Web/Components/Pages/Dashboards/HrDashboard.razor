@@ -26,17 +26,11 @@
         </div>
 
         <section class="dashboard-section">
-            <h2 class="dashboard-section-title">Tasks &amp; Leave</h2>
-            <div class="dashboard-detail-grid">
+            <h2 class="dashboard-section-title">Tasks, Leave &amp; Compliance</h2>
+            <div class="dashboard-grid-3col">
                 <HrInboxWidget />
                 <LeaveRequestsWidget OnOpenTask="OpenTask" />
-            </div>
-        </section>
-
-        <section class="dashboard-section">
-            <h2 class="dashboard-section-title">People &amp; Compliance</h2>
-            <div class="dashboard-detail-grid">
-                <UpcomingProbationReviewsWidget />
+                <UpcomingProbationReviewsWidget OnOpenTask="OpenTask" />
                 <CurrentSicknessAbsenceWidget />
                 <OverdueReturnToWorkReviewsWidget />
                 <MissingFitNotesWidget />
