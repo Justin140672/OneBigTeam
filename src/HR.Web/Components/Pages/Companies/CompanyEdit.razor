@@ -25,9 +25,9 @@
             <ActiveStatusBadge IsActive="_company.IsActive" />
             @if (Session.IsHrAdministrator || Session.CanManageCompany)
             {
-                <a class="btn btn-outline-secondary btn-sm ms-auto" href="@($"/companies/{Id}/user-administration")">
+                <SfButton CssClass="e-small ms-auto" OnClick="@(() => Navigation.NavigateTo($"/companies/{Id}/user-administration"))">
                     <i class="fa-solid fa-user-shield me-1"></i>User Administration
-                </a>
+                </SfButton>
             }
         </div>
         <p class="text-muted mb-4">Manage this company's profile, addresses, and settings.</p>

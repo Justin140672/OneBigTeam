@@ -43,6 +43,19 @@ internal sealed class WithdrawApplicationHandler(RecruitmentDbContext db, IClock
         // or ApplicantStageChangedIntegrationEvent is recorded here, since CurrentStageId does not
         // change — only the audit trail (below) records that the withdrawal happened.
         application.Withdraw(now);
+
+        // Any interview still awaiting an outcome shouldn't keep showing as scheduled/pending once
+        // the candidate has withdrawn — cancel it via the entity's own Cancel() so its invariants
+        // (only a Pending interview can be cancelled) are enforced the same way as a direct cancel
+        // would be. Already-resolved interviews (Passed/Failed/NoShow/Cancelled) are untouched.
+        var pendingInterviews = await db.Interviews
+            .Where(i => i.ApplicationId == application.Id && i.CompanyId == request.CompanyId
+                && i.Outcome == HR.Modules.Recruitment.Domain.InterviewOutcome.Pending)
+            .ToListAsync(cancellationToken);
+
+        foreach (var interview in pendingInterviews)
+            interview.Cancel(now);
+
         await db.SaveChangesAsync(cancellationToken);
 
         await auditPublisher.PublishAsync(

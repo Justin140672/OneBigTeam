@@ -108,10 +108,14 @@
                         <div class="d-flex gap-1 flex-wrap">
                             @if (IsActive(row))
                             {
-                                <SfButton CssClass="e-small" OnClick="() => OpenScheduleDialog(row)">Schedule Interview</SfButton>
-                                <SfButton CssClass="e-small" IsPrimary="true" OnClick="() => OfferAsync(row)">Offer</SfButton>
-                                <SfButton CssClass="e-small" IsPrimary="true" OnClick="() => OpenHireDialog(row)">Hire</SfButton>
-                                <SfButton CssClass="e-small" OnClick="() => OpenRejectDialog(row)">Reject</SfButton>
+                                var pendingInterview = HasPendingInterview(row);
+                                var pendingTitle = pendingInterview
+                                    ? "An interview is scheduled — record its outcome before moving this application further."
+                                    : null;
+                                <SfButton CssClass="e-small" Disabled="@pendingInterview" title="@pendingTitle" OnClick="() => OpenScheduleDialog(row)">Schedule Interview</SfButton>
+                                <SfButton CssClass="e-small" IsPrimary="true" Disabled="@pendingInterview" title="@pendingTitle" OnClick="() => OfferAsync(row)">Offer</SfButton>
+                                <SfButton CssClass="e-small" IsPrimary="true" Disabled="@pendingInterview" title="@pendingTitle" OnClick="() => OpenHireDialog(row)">Hire</SfButton>
+                                <SfButton CssClass="e-small" Disabled="@pendingInterview" title="@pendingTitle" OnClick="() => OpenRejectDialog(row)">Reject</SfButton>
                                 <SfButton CssClass="e-small" OnClick="() => WithdrawAsync(row)">Withdraw</SfButton>
                             }
                         </div>
@@ -483,6 +487,15 @@
     // will reject anything that's actually invalid for the current stage.
     private bool IsActive(ApplicationListItemModel row) =>
         !row.IsWithdrawn && Stage(row.CurrentStageId) is { IsTerminal: false };
+
+    // "Pending" means an interview has been scheduled but no outcome has been recorded yet
+    // (RecordInterviewOutcome hasn't been called) — Schedule Interview/Offer/Hire/Reject are
+    // disabled until that outcome is recorded, so a recruiter can't accidentally schedule a second
+    // interview or move an applicant on/off the pipeline while one is still awaiting a result.
+    // Withdraw is deliberately left enabled — a candidate can withdraw at any point regardless of
+    // where their interview stands.
+    private static bool HasPendingInterview(ApplicationListItemModel row) =>
+        row.InterviewOutcome == "Pending";
 
     private async Task OpenAddDialog()
     {

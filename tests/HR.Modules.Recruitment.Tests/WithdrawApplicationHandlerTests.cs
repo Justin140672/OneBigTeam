@@ -151,6 +151,65 @@ public class WithdrawApplicationHandlerTests
         Assert.Equal("validation", result.Error.Code);
     }
 
+    [Fact]
+    public async Task HandleAsync_Cancels_Any_Pending_Interview_For_The_Application()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        application.SetInterviewOutcome(InterviewOutcome.Pending, Now);
+        var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(1), 30, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        db.Interviews.Add(interview);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new WithdrawApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(InterviewOutcome.Cancelled, result.Value!.InterviewOutcome);
+
+        var reloadedInterview = await db.Interviews.SingleAsync(i => i.Id == interview.Id);
+        Assert.Equal(InterviewOutcome.Cancelled, reloadedInterview.Outcome);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Leaves_An_Already_Resolved_Interview_Outcome_Untouched()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        application.SetInterviewOutcome(InterviewOutcome.Passed, Now);
+        var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(-1), 30, null, Now);
+        interview.RecordOutcome(InterviewOutcome.Passed, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        db.Interviews.Add(interview);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new WithdrawApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(InterviewOutcome.Passed, result.Value!.InterviewOutcome);
+
+        var reloadedInterview = await db.Interviews.SingleAsync(i => i.Id == interview.Id);
+        Assert.Equal(InterviewOutcome.Passed, reloadedInterview.Outcome);
+    }
+
     private static WithdrawApplicationHandler handler(
         RecruitmentDbContext db,
         FakeAuditPublisher? auditPublisher = null) =>

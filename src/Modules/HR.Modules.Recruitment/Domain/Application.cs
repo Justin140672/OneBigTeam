@@ -128,6 +128,14 @@ internal sealed class Application
     /// </summary>
     public void Withdraw(DateTimeOffset now)
     {
+        // A scheduled-but-not-yet-resolved interview shouldn't linger as "Pending" once the
+        // candidate has withdrawn — mirror the same Cancelled outcome onto this display field that
+        // WithdrawApplicationHandler applies to the real Interview row(s) via Interview.Cancel().
+        // Any already-resolved outcome (Passed/Failed/NoShow) is left untouched — that's a genuine
+        // historical fact, not something withdrawal should overwrite.
+        if (InterviewOutcome == Domain.InterviewOutcome.Pending)
+            InterviewOutcome = Domain.InterviewOutcome.Cancelled;
+
         WithdrawnAt = now;
         UpdatedAt   = now;
     }
