@@ -14,7 +14,7 @@ internal sealed class Endpoint(GetImportSessionColumnsHandler handler, IAuthoriz
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/data-import/sessions/{importSessionId:guid}/columns");
-        Policies("role:employee");
+        Policies("employee:manage");
     }
 
     public override async Task HandleAsync(

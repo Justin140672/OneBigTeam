@@ -11,7 +11,7 @@
                 <i class="fa-solid fa-circle-check text-success fs-5"></i>
                 <span class="fw-medium">Review completed.</span>
             </div>
-            <button class="btn btn-outline-secondary btn-sm" @onclick="DismissAsync">Done</button>
+            <SfButton CssClass="e-outline e-small" OnClick="DismissAsync">Done</SfButton>
         }
         else
         {
@@ -40,15 +40,15 @@
             {
                 <div class="alert alert-danger mb-3">@_error</div>
             }
-            <button class="btn btn-success"
-                    @onclick="CompleteReviewAsync"
-                    disabled="@_submitting">
+            <SfButton CssClass="e-success"
+                    OnClick="CompleteReviewAsync"
+                    Disabled="@_submitting">
                 @if (_submitting)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                 }
                 <i class="fa-solid fa-check me-1"></i>Complete Review
-            </button>
+            </SfButton>
         }
     </div>
 </div>

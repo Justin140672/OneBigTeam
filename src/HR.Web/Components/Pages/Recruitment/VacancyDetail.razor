@@ -126,14 +126,17 @@
                     </ContentTemplate>
                 </TabItem>
 
-                <TabItem>
-                    <ChildContent><TabHeader Text="Kanban" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4">
-                            <VacancyKanbanBoard CompanyId="CompanyId" VacancyId="Id!.Value" @bind-SearchText="_kanbanSearchText" />
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
+                @if (Session.IsRecruiter)
+                {
+                    <TabItem>
+                        <ChildContent><TabHeader Text="Kanban" /></ChildContent>
+                        <ContentTemplate>
+                            <div class="mt-4">
+                                <VacancyKanbanBoard CompanyId="CompanyId" VacancyId="Id!.Value" @bind-SearchText="_kanbanSearchText" />
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+                }
             </TabItems>
         </SfTab>
     }

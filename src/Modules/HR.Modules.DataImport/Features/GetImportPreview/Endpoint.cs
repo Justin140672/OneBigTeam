@@ -13,7 +13,7 @@ internal sealed class Endpoint(GetImportPreviewHandler handler, IAuthorizationSe
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/data-import/sessions/{importSessionId:guid}/preview");
-        Policies("role:employee");
+        Policies("employee:manage");
     }
 
     public override async Task HandleAsync(

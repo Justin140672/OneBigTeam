@@ -42,9 +42,9 @@ else
             <span class="ec-card-title">Emergency Contacts</span>
             @if (!_showAddForm && _editingId is null)
             {
-                <button class="btn btn-sm btn-outline-primary ms-auto" @onclick="StartAdd">
+                <SfButton CssClass="e-outline e-small ms-auto" OnClick="StartAdd">
                     <i class="fa-solid fa-plus me-1"></i>Add Contact
-                </button>
+                </SfButton>
             }
         </div>
 
@@ -54,7 +54,7 @@ else
                 <div class="ec-empty">
                     <i class="fa-solid fa-address-book ec-empty-icon"></i>
                     <p class="ec-empty-text">No emergency contacts added yet.</p>
-                    <button class="btn btn-outline-primary btn-sm" @onclick="StartAdd">Add your first contact</button>
+                    <SfButton CssClass="e-outline e-small" OnClick="StartAdd">Add your first contact</SfButton>
                 </div>
             }
 
@@ -116,12 +116,12 @@ else
                             </div>
                         </div>
                         <div class="ec-contact-actions">
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="@(() => StartEdit(c))" title="Edit">
+                            <SfButton CssClass="e-outline e-small" OnClick="@(() => StartEdit(c))" title="Edit">
                                 <i class="fa-solid fa-pen"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger" @onclick="@(() => RemoveAsync(c.Id))" title="Remove">
+                            </SfButton>
+                            <SfButton CssClass="e-outline e-danger e-small" OnClick="@(() => RemoveAsync(c.Id))" title="Remove">
                                 <i class="fa-solid fa-trash"></i>
-                            </button>
+                            </SfButton>
                         </div>
                     </div>
                 }

@@ -51,13 +51,13 @@
                 <div class="alert alert-danger">@_error</div>
             }
 
-            <button class="btn btn-primary" data-testid="acknowledge-btn" @onclick="AcknowledgeAsync" disabled="@_submitting">
+            <SfButton IsPrimary="true" data-testid="acknowledge-btn" OnClick="AcknowledgeAsync" Disabled="@_submitting">
                 @if (_submitting)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                 }
                 <i class="fa-solid fa-circle-check me-1"></i>I Acknowledge Receipt
-            </button>
+            </SfButton>
         }
     </div>
 </div>

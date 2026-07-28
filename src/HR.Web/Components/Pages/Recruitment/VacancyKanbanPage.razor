@@ -1,5 +1,7 @@
 @page "/companies/{CompanyId:guid}/vacancies/{VacancyId:guid}/kanban"
 @rendermode InteractiveServer
+@inject AppSession Session
+@inject NavigationManager Navigation
 
 <PageTitle>Recruitment Kanban</PageTitle>
 
@@ -15,4 +17,12 @@
     [Parameter] public Guid VacancyId { get; set; }
 
     private string _searchText = string.Empty;
+
+    // Recruiter-only, matching the backend's GetRecruitmentKanban policy (recruitment:manage) —
+    // the Kanban board is an operational recruiting tool, not general vacancy visibility.
+    protected override void OnInitialized()
+    {
+        if (!Session.IsRecruiter)
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+    }
 }

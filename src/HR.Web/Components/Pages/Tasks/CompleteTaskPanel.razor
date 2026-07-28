@@ -5,13 +5,13 @@
 {
     <div class="alert alert-danger mb-3">@_error</div>
 }
-<button class="btn btn-success" data-testid="complete-task-btn" @onclick="CompleteAsync" disabled="@_submitting">
+<SfButton CssClass="e-success" data-testid="complete-task-btn" OnClick="CompleteAsync" Disabled="@_submitting">
     @if (_submitting)
     {
         <span class="spinner-border spinner-border-sm me-1" role="status"></span>
     }
     <i class="fa-solid fa-check me-1"></i>Mark as Complete
-</button>
+</SfButton>
 
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }

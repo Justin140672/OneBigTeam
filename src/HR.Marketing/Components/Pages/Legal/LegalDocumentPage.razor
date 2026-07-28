@@ -1,0 +1,38 @@
+@using HR.Marketing.Services
+
+<PageTitle>@Document.Title | One Big Team</PageTitle>
+
+<SiteHeader />
+
+<main>
+  <section class="section-band legal-hero">
+    <div class="section-inner">
+      <p class="eyebrow">Legal</p>
+      <h1>@Document.Title</h1>
+      @if (!string.IsNullOrWhiteSpace(Document.LastUpdated))
+      {
+        <p class="legal-updated">Last updated @Document.LastUpdated</p>
+      }
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-inner legal-content">
+      @((MarkupString)Document.Html)
+    </div>
+  </section>
+</main>
+
+<SiteFooter />
+
+@code {
+    /// <summary>Documents/{slug}.md filename (without extension) to load and render.</summary>
+    [Parameter, EditorRequired] public string DocumentSlug { get; set; } = string.Empty;
+
+    private MarkdownDocument Document { get; set; } = null!;
+
+    protected override void OnInitialized()
+    {
+        Document = MarkdownDocumentLoader.Load(DocumentSlug);
+    }
+}

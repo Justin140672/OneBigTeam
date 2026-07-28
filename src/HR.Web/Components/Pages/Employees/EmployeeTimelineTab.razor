@@ -41,9 +41,9 @@ else
                             @{ var targetTab = MapToTabKey(item.EventType); }
                             @if (targetTab is not null && HasCallbackFor(targetTab))
                             {
-                                <button type="button" class="btn btn-link btn-sm p-0" @onclick="@(() => NavigateToSourceAsync(targetTab))">
+                                <SfButton CssClass="e-flat e-small p-0" OnClick="@(() => NavigateToSourceAsync(targetTab))">
                                     View details
-                                </button>
+                                </SfButton>
                             }
                         </div>
                     </div>

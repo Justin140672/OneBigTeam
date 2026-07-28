@@ -93,12 +93,6 @@ else
                             }
                             @if (Session.CanManageCompany)
                             {
-                                @if (!Session.CanManageEmployees)
-                                {
-                                    <!-- Only shown here for a Company-Admin-only user: CanManageEmployees users already
-                                         have "Import History" nested under People above, so this avoids a duplicate entry. -->
-                                    <MenuItem Text="Import History" IconCss="fa-solid fa-clock-rotate-left" Url="@_menuItems["ImportHistory"]" />
-                                }
                                 <MenuItem Text="Company" IconCss="fa-solid fa-building" Url="@_menuItems["Company"]" />
                             }
                             @if (Session.IsHrAdministrator || Session.CanManageCompany)
@@ -233,9 +227,9 @@ else
                                 <div>
                                     <h5 class="mb-1">Something went wrong</h5>
                                     <p class="mb-2">An unexpected error occurred. You can try refreshing the page or navigating away.</p>
-                                    <a href="." class="btn btn-sm btn-outline-danger me-2">Refresh</a>
+                                    <SfButton CssClass="e-small me-2" OnClick="@(() => NavigationManager.NavigateTo(".", forceLoad: true))">Refresh</SfButton>
                                     @ex
-                                    <button class="btn btn-sm btn-outline-secondary" @onclick="ClearError">Try again</button>
+                                    <SfButton CssClass="e-small" OnClick="ClearError">Try again</SfButton>
                                 </div>
                             </div>
                         </div>
@@ -266,8 +260,15 @@ else
     // get no sidebar at all, same as pre-dashboards behavior for Employees. Individual menu
     // sections inside the sidebar are independently role-gated so combined roles (e.g. an
     // HR Administrator who is also a Manager or Recruiter) merge without duplicates.
+    //
+    // A Company Administrator with no other role also gets no sidebar — their whole job is
+    // company profile/settings plus User Administration, both reachable directly from the
+    // Company Settings page (their landing screen, see AppSession.LandingUrl), so a full nav
+    // menu is unnecessary surface area. CanManageCompany is deliberately excluded here; if they
+    // also hold a role that grants CanManageEmployees/IsHrAdministrator the sidebar still shows
+    // (with the Company/User Administration items already gated in below).
     private bool ShowSidebar =>
-        Session.CanManageEmployees || Session.CanManageCompany || Session.IsHrAdministrator;
+        Session.CanManageEmployees || Session.IsHrAdministrator;
 
     private int _unreadCount;
     private List<NotificationDto> _notifications = [];

@@ -68,7 +68,22 @@ public class GetRecruitmentKanbanEndpointTests : IClassFixture<ApiWebApplication
     }
 
     [Fact]
-    public async Task Get_Kanban_Returns_Ok_With_A_Column_Per_Active_Stage_And_Grouped_Applicants_For_View_User()
+    public async Task Get_Kanban_Returns_Forbidden_For_Plain_Employee()
+    {
+        // The Kanban board is Recruiter-only (recruitment:manage) — it's an operational recruiting
+        // tool, not general vacancy visibility, unlike recruitment:view elsewhere in this module.
+        var companyId = Guid.NewGuid();
+        var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
+        var vacancyId = await SeedVacancyAsync(companyId, referenceData.PositionProfileId);
+
+        using var client = AuthenticatedClient(PlainEmployeeUser, companyId);
+        var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/{vacancyId}/kanban");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_Kanban_Returns_Ok_With_A_Column_Per_Active_Stage_And_Grouped_Applicants_For_Recruiter()
     {
         var companyId = Guid.NewGuid();
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
@@ -87,8 +102,7 @@ public class GetRecruitmentKanbanEndpointTests : IClassFixture<ApiWebApplication
             await db.SaveChangesAsync();
         }
 
-        // Plain Employee has recruitment:view (broad internal job board visibility).
-        using var client = AuthenticatedClient(PlainEmployeeUser, companyId);
+        using var client = AuthenticatedClient(RecruiterUser, companyId);
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/{vacancyId}/kanban");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

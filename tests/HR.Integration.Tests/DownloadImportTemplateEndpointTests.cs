@@ -15,7 +15,7 @@ public class DownloadImportTemplateEndpointTests : IClassFixture<ApiWebApplicati
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.HrAdministrator);
-            await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.Employee);
+            await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.HrAdministrator);
         }).GetAwaiter().GetResult();
     }
 

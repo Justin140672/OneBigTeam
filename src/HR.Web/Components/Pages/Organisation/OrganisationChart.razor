@@ -85,16 +85,16 @@
         <div class="card">
             <div class="card-body p-0 org-chart-canvas">
                 <div class="org-chart-zoom-toolbar">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ZoomOut" title="Zoom out">
+                    <SfButton CssClass="e-outline e-small" OnClick="ZoomOut" title="Zoom out">
                         <i class="fa-solid fa-minus"></i>
-                    </button>
+                    </SfButton>
                     <span class="org-chart-zoom-level">@($"{_currentZoom * 100:0}%")</span>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ZoomIn" title="Zoom in">
+                    <SfButton CssClass="e-outline e-small" OnClick="ZoomIn" title="Zoom in">
                         <i class="fa-solid fa-plus"></i>
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="FitToScreen" title="Fit chart to screen">
+                    </SfButton>
+                    <SfButton CssClass="e-outline e-small" OnClick="FitToScreen" title="Fit chart to screen">
                         <i class="fa-solid fa-expand"></i>
-                    </button>
+                    </SfButton>
                 </div>
                 <SfDiagramComponent @ref="_diagram" Height="100%" Width="100%"
                                     NodeCreating="OnNodeCreating"

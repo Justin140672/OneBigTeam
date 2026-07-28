@@ -14,7 +14,7 @@ internal sealed class Endpoint(DownloadImportTemplateHandler handler, IAuthoriza
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/data-import/employees/template");
-        Policies("role:employee");
+        Policies("employee:manage");
     }
 
     public override async Task HandleAsync(

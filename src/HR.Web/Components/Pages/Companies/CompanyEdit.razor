@@ -23,6 +23,12 @@
         <div class="d-flex align-items-center gap-3 mb-1">
             <h1 class="mb-0">@_company.Name</h1>
             <ActiveStatusBadge IsActive="_company.IsActive" />
+            @if (Session.IsHrAdministrator || Session.CanManageCompany)
+            {
+                <a class="btn btn-outline-secondary btn-sm ms-auto" href="@($"/companies/{Id}/user-administration")">
+                    <i class="fa-solid fa-user-shield me-1"></i>User Administration
+                </a>
+            }
         </div>
         <p class="text-muted mb-4">Manage this company's profile, addresses, and settings.</p>
 

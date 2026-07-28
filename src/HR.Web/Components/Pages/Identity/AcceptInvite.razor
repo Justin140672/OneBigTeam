@@ -36,13 +36,13 @@
                 <ValidationMessage For="@(() => _model.Confirm)" />
             </div>
 
-            <button type="submit" class="btn btn-primary w-100" disabled="@_saving">
+            <SfButton CssClass="w-100" IsPrimary="true" Type="ButtonType.Submit" Disabled="@_saving">
                 @if (_saving)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                 }
                 Activate Account
-            </button>
+            </SfButton>
         </EditForm>
     }
 </div>

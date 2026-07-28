@@ -13,6 +13,7 @@ internal sealed class FakeEmployeeAudienceReader : IEmployeeAudienceReader
     public Dictionary<Guid, string> LocationNames { get; } = new();
     public Dictionary<Guid, string> PositionProfileNames { get; } = new();
     public List<Guid> EligibleEmployeeIds { get; set; } = [];
+    public List<Guid> AllEmployeeIds { get; set; } = [];
     public Dictionary<Guid, Guid> ManagerIds { get; } = new();
     public Dictionary<Guid, string> ManagerNames { get; } = new();
 
@@ -61,4 +62,7 @@ internal sealed class FakeEmployeeAudienceReader : IEmployeeAudienceReader
         IReadOnlyCollection<Guid> employeeIds,
         CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<Guid>>(EligibleEmployeeIds);
+
+    public Task<IReadOnlyList<Guid>> GetAllEmployeeIdsAsync(Guid companyId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Guid>>(AllEmployeeIds);
 }

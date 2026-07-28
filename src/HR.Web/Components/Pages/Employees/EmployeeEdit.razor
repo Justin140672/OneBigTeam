@@ -313,13 +313,13 @@
             }
             @if (!_showLeavingTab)
             {
-                <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" @onclick="OpenStartLeavingProcessDialog">
+                <SfButton CssClass="e-small ms-auto" OnClick="OpenStartLeavingProcessDialog">
                     <i class="fa-solid fa-right-from-bracket me-1"></i>Start Leaving Process
-                </button>
+                </SfButton>
             }
-            <a class="btn btn-outline-secondary btn-sm @(_showLeavingTab ? "ms-auto" : "")" href="/companies/@CompanyId/organisation-chart?employeeId=@Id">
+            <SfButton CssClass="@("e-small " + (_showLeavingTab ? "ms-auto" : string.Empty))" OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/organisation-chart?employeeId={Id}"))">
                 <i class="fa-solid fa-sitemap me-1"></i>View Org Chart
-            </a>
+            </SfButton>
         </div>
 
         @if (Session.CanManageEmployees && _employee is not null)
@@ -521,7 +521,7 @@
                                                         <div class="mb-1"><strong>Invite link generated</strong> — expires @_inviteExpiresAt.ToString("MMM d, yyyy")</div>
                                                         <div class="input-group">
                                                             <input class="form-control form-control-sm font-monospace" readonly value="@_inviteLink" />
-                                                            <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="CopyLink">Copy</button>
+                                                            <SfButton CssClass="e-small" OnClick="CopyLink">Copy</SfButton>
                                                         </div>
                                                         <small class="text-muted">Share this link with the employee to let them set their password.</small>
                                                     </div>

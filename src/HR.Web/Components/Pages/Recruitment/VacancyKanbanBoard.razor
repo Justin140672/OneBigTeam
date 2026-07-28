@@ -168,7 +168,14 @@
 
     private Task OpenApplicant(KanbanApplicantModel applicant)
     {
-        Navigation.NavigateTo($"/companies/{CompanyId}/candidates/{applicant.CandidateId}");
+        // Carry a returnUrl so CandidateDetail.razor's "Close" button comes back to wherever this
+        // board is actually embedded (the standalone Kanban route, the Vacancy Detail tab, or the
+        // Recruitment Dashboard's Board view) instead of always falling back to the plain Candidate
+        // List — previously the card click had no memory of where it was opened from.
+        var returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var candidateUrl = $"/companies/{CompanyId}/candidates/{applicant.CandidateId}" +
+            $"?returnUrl={Uri.EscapeDataString(returnUrl)}";
+        Navigation.NavigateTo(candidateUrl);
         return Task.CompletedTask;
     }
 

@@ -20,7 +20,7 @@ public sealed class RecruitmentStageManagementTests(AppFixture fixture) : E2ETes
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example";
+    private const string MarcusEmail = "marcus.diallo@acme.example";
 
     [Fact]
     public async Task CreateRecruitmentStage_AppearsInList()
@@ -32,7 +32,7 @@ public sealed class RecruitmentStageManagementTests(AppFixture fixture) : E2ETes
         var stageEdit = new RecruitmentStageEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await stageList.GoToAsync(AcmeId);
         await stageList.ClickNewAsync();
@@ -56,7 +56,7 @@ public sealed class RecruitmentStageManagementTests(AppFixture fixture) : E2ETes
         var stageEdit = new RecruitmentStageEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await stageList.GoToAsync(AcmeId);
         await stageList.ClickNewAsync();
@@ -95,7 +95,7 @@ public sealed class RecruitmentStageManagementTests(AppFixture fixture) : E2ETes
         var stageEdit = new RecruitmentStageEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         // A freshly created stage is appended to the end of the list (RecruitmentStageService's
         // IEditService.CreateAsync sets DisplayOrder = existingCount + 1), so it starts as the last
@@ -138,7 +138,7 @@ public sealed class RecruitmentStageManagementTests(AppFixture fixture) : E2ETes
         var stageEdit = new RecruitmentStageEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await stageList.GoToAsync(AcmeId);
         await stageList.ClickNewAsync();
@@ -168,7 +168,7 @@ public sealed class RecruitmentStageManagementTests(AppFixture fixture) : E2ETes
         var stageEdit = new RecruitmentStageEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await stageList.GoToAsync(AcmeId);
         await stageList.ClickNewAsync();
@@ -213,7 +213,7 @@ public sealed class RecruitmentStageManagementTests(AppFixture fixture) : E2ETes
         var stageList = new RecruitmentStageListPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await AssertOnlyActiveTerminalStageCannotBeDeactivatedAsync(stageList, "Hired");
     }
@@ -226,7 +226,7 @@ public sealed class RecruitmentStageManagementTests(AppFixture fixture) : E2ETes
         var stageList = new RecruitmentStageListPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await AssertOnlyActiveTerminalStageCannotBeDeactivatedAsync(stageList, "Rejected");
     }

@@ -69,16 +69,16 @@
                         @{
                             var row = (context as RecruitmentStageListItem)!;
                         }
-                        <button type="button" class="btn btn-sm btn-outline-secondary me-1"
-                                disabled="@(row.DisplayOrder <= 1)"
-                                @onclick="() => MoveUpAsync(row)" title="Move up">
+                        <SfButton CssClass="e-outline e-small me-1"
+                                Disabled="@(row.DisplayOrder <= 1)"
+                                OnClick="() => MoveUpAsync(row)" title="Move up">
                             <i class="fa-solid fa-arrow-up"></i>
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary"
-                                disabled="@(row.DisplayOrder >= Items.Count)"
-                                @onclick="() => MoveDownAsync(row)" title="Move down">
+                        </SfButton>
+                        <SfButton CssClass="e-outline e-small"
+                                Disabled="@(row.DisplayOrder >= Items.Count)"
+                                OnClick="() => MoveDownAsync(row)" title="Move down">
                             <i class="fa-solid fa-arrow-down"></i>
-                        </button>
+                        </SfButton>
                     </Template>
                 </GridColumn>
             </GridColumns>
@@ -93,7 +93,13 @@
 
     protected override Task OnBeforeLoadAsync()
     {
-        if (!Session.CanManageEmployees && !Session.IsRecruiter)
+        // Recruiter-only, matching the backend's recruitment:manage policy (CreateRecruitmentStage/
+        // UpdateRecruitmentStage/ReorderRecruitmentStages/SetRecruitmentStageActiveStatus) — an HR
+        // Administrator does not automatically get recruitment access, by deliberate design (see
+        // IdentityModule.cs's recruitment:manage policy comment). CanManageEmployees was too broad
+        // here and let HR Administrators reach this page directly even though the Recruitment
+        // Dashboard's own "Recruitment Settings" button is already Recruiter-only.
+        if (!Session.IsRecruiter)
             Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
         return Task.CompletedTask;
     }

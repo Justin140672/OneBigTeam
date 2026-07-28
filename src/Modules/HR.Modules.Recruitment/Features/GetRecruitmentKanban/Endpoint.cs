@@ -9,7 +9,11 @@ internal sealed class Endpoint(GetRecruitmentKanbanHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/vacancies/{vacancyId:guid}/kanban");
-        Policies("recruitment:view");
+        // Recruiter-only — the Kanban board is an operational recruiting tool, not general vacancy
+        // visibility (that's what recruitment:view covers elsewhere), and MoveApplicationStage
+        // already requires recruitment:manage, so a broader read policy here didn't match the
+        // write side anyway.
+        Policies("recruitment:manage");
     }
 
     public override async Task HandleAsync(

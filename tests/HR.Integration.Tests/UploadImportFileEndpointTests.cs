@@ -24,7 +24,7 @@ public class UploadImportFileEndpointTests : IClassFixture<ApiWebApplicationFact
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.HrAdministrator);
-            await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.Employee);
+            await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.HrAdministrator);
         }).GetAwaiter().GetResult();
     }
 

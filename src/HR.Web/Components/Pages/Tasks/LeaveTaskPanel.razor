@@ -18,24 +18,24 @@
             <div class="alert alert-danger mb-3">@_error</div>
         }
         <div class="d-flex gap-2">
-            <button class="btn btn-success"
-                    @onclick='() => SubmitAsync("Approve")'
-                    disabled="@_submitting">
+            <SfButton CssClass="e-success"
+                    OnClick='() => SubmitAsync("Approve")'
+                    Disabled="@_submitting">
                 @if (_submitting && _pending == "Approve")
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                 }
                 Approve
-            </button>
-            <button class="btn btn-outline-danger"
-                    @onclick='() => SubmitAsync("Reject")'
-                    disabled="@_submitting">
+            </SfButton>
+            <SfButton CssClass="e-outline e-danger"
+                    OnClick='() => SubmitAsync("Reject")'
+                    Disabled="@_submitting">
                 @if (_submitting && _pending == "Reject")
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                 }
                 Reject
-            </button>
+            </SfButton>
         </div>
     </div>
 </div>

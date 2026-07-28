@@ -39,13 +39,13 @@
         }
 
         <div class="mt-3">
-            <button class="btn btn-primary" @onclick="SubmitAsync" disabled="@_uploading">
+            <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="@_uploading">
                 @if (_uploading)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                 }
                 <i class="fa-solid fa-upload me-1"></i>Upload Document
-            </button>
+            </SfButton>
         </div>
     </div>
 </div>

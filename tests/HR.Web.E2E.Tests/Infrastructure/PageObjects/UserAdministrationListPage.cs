@@ -20,9 +20,23 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 20_000 });
     }
 
-    public async Task<bool> HasRowAsync(string nameOrEmailFragment)
+    // UserAdministrationList.razor (SearchPageBase<UserListItemModel>) fetches an unfiltered page
+    // capped at 200 rows sorted by CreatedAt — on this shared, long-lived E2E database that cap is
+    // easy to exceed, so a specific user (e.g. one just invited by another test) can silently fall
+    // outside it. The page's own search box round-trips to the server (SearchPageBase.OnSearchChanged,
+    // debounced ~300ms) and finds the user regardless of how many others sort before them — same
+    // pattern as EmployeeListPage.HasEmployeeAsync.
+    private async Task SearchAsync(string nameOrEmailFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await page.GetByPlaceholder("Search by name or email").FillAsync(nameOrEmailFragment);
+        await page.WaitForTimeoutAsync(400);
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+    }
+
+    public async Task<bool> HasRowAsync(string nameOrEmailFragment)
+    {
+        await SearchAsync(nameOrEmailFragment);
 
         return await page.Locator(".e-rowcell")
             .Filter(new() { HasText = nameOrEmailFragment })
@@ -32,7 +46,7 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
 
     public async Task<string?> GetInvitationStatusAsync(string nameOrEmailFragment)
     {
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await SearchAsync(nameOrEmailFragment);
 
         var row = page.Locator(".e-row")
             .Filter(new() { HasText = nameOrEmailFragment })
@@ -45,7 +59,7 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
 
     public async Task OpenUserDetailAsync(string nameOrEmailFragment)
     {
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await SearchAsync(nameOrEmailFragment);
 
         await page.Locator(".e-rowcell a")
             .Filter(new() { HasText = nameOrEmailFragment })

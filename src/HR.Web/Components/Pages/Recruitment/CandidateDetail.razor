@@ -104,6 +104,15 @@
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
+    // Set when this page is reached from the Recruitment Kanban board (see
+    // VacancyKanbanBoard.OpenApplicant) so "Close" returns there instead of always falling back to
+    // the plain Candidate List — the board can be embedded in three different places (standalone
+    // route, Vacancy Detail tab, or the Recruitment Dashboard's Board view), so this carries
+    // whichever one the user actually came from.
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    [Parameter]
+    public string? ReturnUrl { get; set; }
+
     private GetCandidateResponse? _candidate;
 
     private string PageTitle => IsNew ? "Add Candidate"
@@ -120,5 +129,7 @@
             _candidate = await CandidateService.GetCandidateAsync(CompanyId, Id!.Value);
     }
 
-    protected override string? ListUrl => $"/companies/{CompanyId}/candidates";
+    protected override string? ListUrl => !string.IsNullOrWhiteSpace(ReturnUrl)
+        ? ReturnUrl
+        : $"/companies/{CompanyId}/candidates";
 }

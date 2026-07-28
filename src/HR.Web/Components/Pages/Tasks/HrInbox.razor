@@ -64,19 +64,19 @@
                         </div>
                     </div>
                     <div class="inbox-card-actions">
-                        <button class="btn btn-sm btn-outline-secondary"
-                                @onclick="() => ViewTask(t)">
+                        <SfButton CssClass="e-outline e-small"
+                                OnClick="() => ViewTask(t)">
                             View
-                        </button>
-                        <button class="btn btn-sm btn-primary"
-                                disabled="@(_claiming is not null)"
-                                @onclick="() => ClaimAsync(t)">
+                        </SfButton>
+                        <SfButton CssClass="e-small" IsPrimary="true"
+                                Disabled="@(_claiming is not null)"
+                                OnClick="() => ClaimAsync(t)">
                             @if (_claiming == t.Id)
                             {
                                 <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                             }
                             Claim
-                        </button>
+                        </SfButton>
                     </div>
                 </div>
             }

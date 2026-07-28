@@ -64,6 +64,21 @@
                         }
                     </Template>
                 </GridColumn>
+                <GridColumn HeaderText="Interview Outcome" Width="150">
+                    <Template>
+                        @{
+                            var row = (ApplicationListItemModel)context;
+                        }
+                        @if (row.InterviewOutcome is not null)
+                        {
+                            <StatusBadge Variant="@InterviewOutcomeVariant(row.InterviewOutcome)">@row.InterviewOutcome</StatusBadge>
+                        }
+                        else
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                    </Template>
+                </GridColumn>
                 <GridColumn Field="@nameof(ApplicationListItemModel.AppliedAt)" HeaderText="Applied" Width="130" Format="d" />
                 <GridColumn HeaderText="Source" Width="220">
                     <Template>
@@ -436,6 +451,14 @@
 
     private RecruitmentStageListItem? Stage(Guid stageId) =>
         _stages.FirstOrDefault(s => s.Id == stageId);
+
+    private static StatusBadgeVariant InterviewOutcomeVariant(string outcome) => outcome switch
+    {
+        "Passed" => StatusBadgeVariant.Success,
+        "Failed" or "NoShow" => StatusBadgeVariant.Danger,
+        "Cancelled" => StatusBadgeVariant.Secondary,
+        _ => StatusBadgeVariant.Warning, // "Pending"
+    };
 
     private StatusBadgeVariant StatusVariant(ApplicationListItemModel row)
     {

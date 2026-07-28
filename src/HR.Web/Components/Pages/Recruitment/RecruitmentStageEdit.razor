@@ -3,6 +3,8 @@
 @page "/companies/{CompanyId:guid}/recruitment-stages/{Id:guid}/view"
 @rendermode InteractiveServer
 @inject RecruitmentStageService RecruitmentStageService
+@inject AppSession Session
+@inject NavigationManager Navigation
 @inherits EditPageBase<RecruitmentStageEditModel, Guid>
 
 <PageTitle>@PageTitle</PageTitle>
@@ -107,6 +109,16 @@
     protected override Guid? GetId() => Id;
 
     protected override string? ListUrl => $"/companies/{CompanyId}/recruitment-stages";
+
+    // Recruiter-only, matching RecruitmentStageList.razor's guard and the backend's
+    // recruitment:manage policy — this page previously had no client-side check at all, so anyone
+    // could reach it directly by URL even though the list page and dashboard button were gated.
+    protected override Task OnLoadedAsync()
+    {
+        if (!Session.IsRecruiter)
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+        return Task.CompletedTask;
+    }
 
     private sealed record Option(RecruitmentStageTerminalOutcome Value, string Label);
 }

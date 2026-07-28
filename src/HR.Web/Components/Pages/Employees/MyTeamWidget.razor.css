@@ -1,3 +1,11 @@
+/* Two-button scope toggle (Direct Reports / All Reports), laid out side by side now that it's
+   built from plain SfButton elements rather than a Bootstrap btn-group/btn-check pair. */
+.team-widget-scope {
+    display: flex;
+    gap: 6px;
+    padding: 0 16px 12px;
+}
+
 /* Responsive grid of per-member cards, replacing the single-column stacked-row layout
    task-widget-item/task-widget-content are shared with (HrInboxWidget, LeaveRequestsWidget, …) —
    these classes are scoped to this widget only, so they don't affect anything else. */

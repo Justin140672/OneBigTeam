@@ -14,7 +14,7 @@ internal sealed class Endpoint(GetImportSessionHandler handler, IAuthorizationSe
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/data-import/sessions/{importSessionId:guid}");
-        Policies("role:employee");
+        Policies("employee:manage");
     }
 
     public override async Task HandleAsync(

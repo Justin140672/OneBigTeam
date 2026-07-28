@@ -27,14 +27,9 @@
                 }
             </div>
 
-            <div class="team-widget-scope btn-group btn-group-sm" role="group" aria-label="Team scope">
-                <input type="radio" class="btn-check" name="team-scope" id="team-scope-direct"
-                       checked="@(!_includeIndirect)" @onchange="@(() => SetScopeAsync(false))" />
-                <label class="btn btn-outline-primary" for="team-scope-direct">Direct Reports</label>
-
-                <input type="radio" class="btn-check" name="team-scope" id="team-scope-all"
-                       checked="@_includeIndirect" @onchange="@(() => SetScopeAsync(true))" />
-                <label class="btn btn-outline-primary" for="team-scope-all">All Reports</label>
+            <div class="team-widget-scope" role="group" aria-label="Team scope">
+                <SfButton CssClass="e-small" IsPrimary="@(!_includeIndirect)" OnClick="@(() => SetScopeAsync(false))">Direct Reports</SfButton>
+                <SfButton CssClass="e-small" IsPrimary="@_includeIndirect" OnClick="@(() => SetScopeAsync(true))">All Reports</SfButton>
             </div>
 
             <div class="widget-body">

@@ -114,4 +114,11 @@ internal sealed class EmployeeAudienceReader(EmployeesDbContext dbContext) : IEm
 
         return await query.Select(e => e.Id).ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Guid>> GetAllEmployeeIdsAsync(Guid companyId, CancellationToken cancellationToken) =>
+        await dbContext.Employees
+            .AsNoTracking()
+            .Where(e => e.CompanyId == companyId)
+            .Select(e => e.Id)
+            .ToListAsync(cancellationToken);
 }

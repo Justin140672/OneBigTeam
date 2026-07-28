@@ -45,12 +45,16 @@ public sealed class UserDetailPage(IPage page, string baseUrl)
 
     private async Task ClickActionAsync(string buttonName)
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = buttonName }).ClickAsync();
-        // The action buttons re-render the whole action bar once the request completes and the
-        // page reloads its detail data — wait for the request-in-flight spinner (if any) to clear.
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        var button = page.GetByRole(AriaRole.Button, new() { Name = buttonName });
+        await button.ClickAsync();
+
+        // UserDetail.razor renders no spinner during _actionInProgress (Disabled="@_actionInProgress"
+        // is the only visual cue), so there is nothing to wait on there. Instead wait for the clicked
+        // button itself to disappear — every one of these four actions (Disable/Enable
+        // Account, Resend/Cancel Invitation) changes AccountStatus/InvitationStatus once the
+        // server round-trip and reload complete, which always swaps out or removes the action bar
+        // entirely, so the exact button just clicked reliably stops being visible.
+        await button.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
     public async Task<string?> GetSuccessMessageAsync()
@@ -85,10 +89,13 @@ public sealed class UserDetailPage(IPage page, string baseUrl)
                 .ClickAsync();
         }
 
-        // Checkbox-mode multiselect popups stay open to allow further selections, so click a
-        // neutral area of the dialog (its instructional paragraph) to close the popup via its
-        // outside-click handler before reaching for the footer Save button.
-        await ManageRolesDialog.Locator("p.text-muted.small").ClickAsync();
+        // Checkbox-mode multiselect popups stay open to allow further selections, and being an
+        // overlay it can sit visually on top of (and intercept clicks intended for) whatever sits
+        // beneath it, including the dialog's own footer Save button — clicking a "neutral" element
+        // underneath it is not reliable. Escape is the standard, unambiguous way to close a
+        // Syncfusion dropdown/multiselect popup without depending on its rendered size/position.
+        await page.Keyboard.PressAsync("Escape");
+        await page.WaitForSelectorAsync(".e-popup:visible", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
 
         await ManageRolesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await ManageRolesDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });

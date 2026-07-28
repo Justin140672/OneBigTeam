@@ -18,11 +18,14 @@ public class ConfirmImportSessionEndpointTests : IClassFixture<ApiWebApplication
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.HrAdministrator);
-            await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.Employee);
             // CompanyAdministrator is additionally required by the Automatic-mode scenarios added
             // below, which call PUT .../settings (company:manage) to switch the company into
             // Automatic employee-numbering mode before uploading/confirming an import.
             await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.CompanyAdministrator);
+            // Employee is additionally required by this file's own CreateCompanyAsync test helper
+            // (POST /api/companies, "role:employee" policy) — unrelated to DataImport's own
+            // employee:manage policy, just a pre-existing setup helper this persona also needs.
+            await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
 

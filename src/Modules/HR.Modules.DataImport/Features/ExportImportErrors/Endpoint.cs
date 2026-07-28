@@ -13,7 +13,7 @@ internal sealed class Endpoint(ExportImportErrorsHandler handler, IAuthorization
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/data-import/sessions/{importSessionId:guid}/errors/export");
-        Policies("role:employee");
+        Policies("employee:manage");
     }
 
     public override async Task HandleAsync(
