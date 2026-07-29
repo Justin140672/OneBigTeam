@@ -182,7 +182,7 @@ public class GetUpcomingProbationReviewsHandlerTests
     }
 
     private static GetUpcomingProbationReviewsHandler BuildHandler(ProbationDbContext context) =>
-        new(context, new FakeClock(FixedUtcNow));
+        new(context, new FakeOpenTaskBySourceEntityReader(), new FakeClock(FixedUtcNow));
 
     private static ProbationDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<ProbationDbContext>()

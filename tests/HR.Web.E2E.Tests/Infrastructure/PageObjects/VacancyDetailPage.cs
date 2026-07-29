@@ -534,6 +534,11 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.Locator("[role='dialog'].schedule-interview-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
+    /// <summary>
+    /// Selects an interviewer from the Schedule Interview dialog's Interviewer dropdown.
+    /// DropDownSelector itself confirms Blazor's ValueChanged round-trip actually committed the
+    /// selection before returning — see its own doc comment.
+    /// </summary>
     public Task SelectInterviewerAsync(string nameFragment) =>
         DropDownSelector.SelectAsync(page, page.Locator(".schedule-interview-dialog"), nameFragment);
 

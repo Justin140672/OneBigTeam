@@ -101,7 +101,9 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     }
 
     /// <summary>
-    /// Selects a manager from the Manager dropdown on the Employment tab.
+    /// Selects a manager from the Manager dropdown on the Employment tab. DropDownSelector itself
+    /// confirms Blazor's ValueChanged round-trip actually committed the selection before
+    /// returning — see its own doc comment.
     /// </summary>
     public async Task SelectManagerAsync(string managerNameFragment)
     {
@@ -109,14 +111,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             .Filter(new() { HasText = "Manager" })
             .First;
         await DropDownSelector.SelectAsync(page, managerGroup, managerNameFragment);
-
-        // Confirms Blazor's ValueChanged round-trip to the server actually committed
-        // Model.ManagerId, not just that the popup closed client-side — without this, a caller
-        // that immediately clicks Save can race the round-trip and save with the old (null)
-        // ManagerId. The selected text lives in the dropdown's own <input> VALUE, not as plain
-        // DOM text, so assert on InputValueAsync rather than text matching.
-        await Assertions.Expect(managerGroup.Locator(".e-input-group input").First)
-            .ToHaveValueAsync(managerNameFragment, new() { Timeout = 10_000 });
     }
 
     /// <summary>
@@ -132,11 +126,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             .Filter(new() { HasText = "Manager" })
             .First;
         await DropDownSelector.SelectAsync(page, managerGroup, "No Manager");
-
-        // Same "not just a client-side popup close" concern as SelectManagerAsync above — wait
-        // for the combobox's own input value too before returning.
-        await Assertions.Expect(managerGroup.Locator(".e-input-group input").First)
-            .ToHaveValueAsync("No Manager", new() { Timeout = 10_000 });
     }
 
     /// <summary>
@@ -879,6 +868,11 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
+    /// <summary>
+    /// Selects a category from the Add Note dialog's Category dropdown. DropDownSelector itself
+    /// confirms Blazor's ValueChanged round-trip actually committed the selection before
+    /// returning — see its own doc comment.
+    /// </summary>
     public Task SelectAddNoteCategoryAsync(string categoryLabel) =>
         DropDownSelector.SelectAsync(page, page.Locator(".add-employee-note-dialog"), categoryLabel);
 

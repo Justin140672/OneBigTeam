@@ -45,7 +45,7 @@ internal sealed class IdentityAuthorizationService(
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
 
         // 1. Roles inherited from active position assignments.
-         var positionRoleIds = await db.UserPositions
+        var positionRoleIds = await db.UserPositions
             .Where(up => up.UserId == userId &&
                          (up.ExpiresAt == null || up.ExpiresAt > now))
             .Join(db.PositionRoles,

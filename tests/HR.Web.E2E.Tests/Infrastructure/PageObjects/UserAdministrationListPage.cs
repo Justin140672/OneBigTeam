@@ -29,7 +29,12 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
     private async Task SearchAsync(string nameOrEmailFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
-        await page.GetByPlaceholder("Search by name or email").FillAsync(nameOrEmailFragment);
+        var searchInput = page.GetByPlaceholder("Search by name or email");
+        await searchInput.FillAsync(nameOrEmailFragment);
+        // HrTextBox (SfTextBox) only raises ValueChanged on blur/change, not on the "input" event
+        // Playwright's FillAsync dispatches — without an explicit Enter/blur here, the search
+        // round-trip never actually fires (same reasoning as EmployeeListPage.HasEmployeeAsync).
+        await searchInput.PressAsync("Enter");
         await page.WaitForTimeoutAsync(400);
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
@@ -90,17 +95,13 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
     public async Task InviteEmployeeAsync(string employeeName, IReadOnlyList<string> roleNames)
     {
         // Step 1: Employee picker (Syncfusion SfDropDownList, AllowFiltering="true").
-        await InviteDialog.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-
-        var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
-        if (await filterInput.CountAsync() > 0)
-            await filterInput.FillAsync(employeeName);
-
-        await page.Locator(".e-popup.e-ddl .e-list-item:not(.e-hide)")
-            .Filter(new() { HasText = employeeName })
-            .First
-            .ClickAsync();
+        // DropDownSelector itself confirms Blazor's ValueChanged round-trip (InviteUserDialog's
+        // own OnEmployeeChanged, which populates _email from the selected employee) actually
+        // committed before returning — see its own doc comment. Without that, clicking "Next"
+        // can race the round-trip: _selectedEmployeeId is already set (step 1's own check
+        // passes) but _email hasn't been populated yet, surfacing a bogus "no work email on
+        // file" error on step 2 for an employee who genuinely has one.
+        await DropDownSelector.SelectAsync(page, InviteDialog, employeeName);
 
         await InviteDialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
 
@@ -114,10 +115,14 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
                 .First
                 .ClickAsync();
         }
-        // Checkbox-mode multiselect popups stay open to allow further selections, so click a
-        // neutral area of the dialog (the nav-pills step header) to close the popup via its
-        // outside-click handler before reaching for the footer "Next" button.
-        await InviteDialog.Locator("ul.nav-pills").ClickAsync();
+        // Checkbox-mode multiselect popups stay open to allow further selections, and being an
+        // overlay it can sit visually on top of (and intercept clicks intended for) whatever sits
+        // beneath it, including the dialog's own "Next" button — clicking a "neutral" element
+        // underneath it is not reliable. Escape is the standard, unambiguous way to close a
+        // Syncfusion dropdown/multiselect popup without depending on its rendered size/position —
+        // same reasoning as UserDetailPage.ToggleRolesAndSaveAsync for the equivalent widget.
+        await page.Keyboard.PressAsync("Escape");
+        await page.WaitForSelectorAsync(".e-popup:visible", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
 
         await InviteDialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
 

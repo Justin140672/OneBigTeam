@@ -49,7 +49,13 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
-        await page.GetByPlaceholder("Search by name, email or employee number").FillAsync(nameFragment);
+        var searchInput = page.GetByPlaceholder("Search by name, email or employee number");
+        await searchInput.FillAsync(nameFragment);
+        // HrTextBox (SfTextBox) only raises ValueChanged on blur/change, not on the "input" event
+        // Playwright's FillAsync dispatches — without an explicit Enter/blur here,
+        // SearchPageBase.OnSearchChanged never actually fires and the grid silently keeps showing
+        // the unfiltered rows.
+        await searchInput.PressAsync("Enter");
         // OnSearchChanged debounces 300ms before reloading — wait past that, then for the grid to
         // settle on the filtered result (row or empty state) rather than the pre-search rows.
         await page.WaitForTimeoutAsync(400);
@@ -184,6 +190,11 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         var searchInput = page.GetByPlaceholder("Search by name, email or employee number");
         await searchInput.ClearAsync();
         await searchInput.FillAsync(query);
+        // HrTextBox (SfTextBox) only raises ValueChanged on blur/change, not on the "input" event
+        // Playwright's FillAsync dispatches — without an explicit Enter/blur here,
+        // SearchPageBase.OnSearchChanged never actually fires and the grid silently keeps showing
+        // the unfiltered rows (same reasoning as HasEmployeeAsync above).
+        await searchInput.PressAsync("Enter");
         // OnSearchChanged debounces 300ms before reloading — wait past that, then for the grid to
         // settle on the filtered result (row or empty state) rather than the pre-search rows.
         await page.WaitForTimeoutAsync(400);
@@ -203,11 +214,13 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     /// Returns the trimmed rendered text (icon label, e.g. "Active"/"Pending Invitation"/"No
     /// User") of the "User Account" column's cell for the row matching <paramref name="nameFragment"/>.
     /// The column is the last one in EmployeeList.razor's GridColumns, so its cell is the last
-    /// ".e-rowcell" in the row.
+    /// ".e-rowcell" in the row. Searches first via <see cref="SearchAsync"/> — same reasoning as
+    /// HasEmployeeAsync: the unfiltered page is capped at 100 rows, so a specific employee can
+    /// silently fall outside it on this shared, long-lived E2E database.
     /// </summary>
     public async Task<string?> GetUserAccountStatusTextAsync(string nameFragment)
     {
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await SearchAsync(nameFragment);
         var cell = Row(nameFragment).Locator(".e-rowcell").Last;
         return (await cell.InnerTextAsync())?.Trim();
     }
@@ -215,11 +228,12 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     /// <summary>
     /// Returns the CSS class of the &lt;i&gt; icon rendered in the "User Account" cell for the row
     /// matching <paramref name="nameFragment"/> (e.g. "fa-solid fa-circle-check me-1" for Active) —
-    /// see EmployeeList.UserAccountStatusDisplay for the icon/status mapping this proves.
+    /// see EmployeeList.UserAccountStatusDisplay for the icon/status mapping this proves. Searches
+    /// first via <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync.
     /// </summary>
     public async Task<string?> GetUserAccountStatusIconClassAsync(string nameFragment)
     {
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await SearchAsync(nameFragment);
         var icon = Row(nameFragment).Locator(".e-rowcell").Last.Locator("i").First;
         return await icon.GetAttributeAsync("class");
     }
@@ -227,11 +241,12 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     /// <summary>
     /// Returns true if the row-level "Invite User" link (rendered only when
     /// UserAccountStatus == "NoUser" — see EmployeeList.razor's User Account GridColumn Template)
-    /// is visible for the row matching <paramref name="nameFragment"/>.
+    /// is visible for the row matching <paramref name="nameFragment"/>. Searches first via
+    /// <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync.
     /// </summary>
     public async Task<bool> HasInviteUserLinkAsync(string nameFragment)
     {
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await SearchAsync(nameFragment);
         return await Row(nameFragment).GetByRole(AriaRole.Link, new() { Name = "Invite User" }).IsVisibleAsync();
     }
 
@@ -240,10 +255,11 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     /// (only present on "No User" rows) and waits for the resulting InviteUserDialog to open.
     /// Because EmployeeList.OnInviteUserClicked pre-populates PreselectedEmployeeId/Name/Email, the
     /// dialog opens straight on step 2 ("Email & Roles") rather than the employee-picker step.
+    /// Searches first via <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync.
     /// </summary>
     public async Task ClickInviteUserLinkAsync(string nameFragment)
     {
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await SearchAsync(nameFragment);
         await Row(nameFragment).GetByRole(AriaRole.Link, new() { Name = "Invite User" }).ClickAsync();
         await InviteUserDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
     }
@@ -290,9 +306,14 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
                 .First
                 .ClickAsync();
         }
-        // Checkbox-mode multiselect popup stays open — click a neutral area of the dialog (the
-        // nav-pills step header) to close it via its outside-click handler before reaching Next.
-        await InviteUserDialog.Locator("ul.nav-pills").ClickAsync();
+        // Checkbox-mode multiselect popups stay open to allow further selections, and being an
+        // overlay it can sit visually on top of (and intercept clicks intended for) whatever sits
+        // beneath it, including the dialog's own "Next" button — clicking a "neutral" element
+        // underneath it is not reliable. Escape is the standard, unambiguous way to close a
+        // Syncfusion dropdown/multiselect popup without depending on its rendered size/position —
+        // same reasoning as UserDetailPage.ToggleRolesAndSaveAsync for the equivalent widget.
+        await page.Keyboard.PressAsync("Escape");
+        await page.WaitForSelectorAsync(".e-popup:visible", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
 
         await InviteUserDialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
 
