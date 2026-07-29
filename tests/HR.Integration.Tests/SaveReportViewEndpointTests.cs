@@ -1,0 +1,120 @@
+using System.Net;
+using System.Net.Http.Json;
+using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Identity.Domain;
+
+namespace HR.Integration.Tests;
+
+public class SaveReportViewEndpointTests : IClassFixture<ApiWebApplicationFactory>
+{
+    private readonly ApiWebApplicationFactory _factory;
+
+    public SaveReportViewEndpointTests(ApiWebApplicationFactory factory)
+    {
+        _factory = factory;
+    }
+
+    private HttpClient ClientFor(Guid userId, Guid companyId)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        return client;
+    }
+
+    [Fact]
+    public async Task Post_SavedViews_Returns_Unauthorized_For_Anonymous_Request()
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{Guid.NewGuid()}/reporting/saved-views",
+            new { companyId = Guid.NewGuid(), reportId = "employee-directory", name = "My View", filterCriteriaJson = "{}" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_SavedViews_Creates_View()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientFor(userId, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "employee-directory", name = "My View", filterCriteriaJson = "{}", isDefault = false });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<SavedViewPayload>();
+        Assert.NotNull(payload);
+        Assert.NotEqual(Guid.Empty, payload!.Id);
+        Assert.Equal("employee-directory", payload.ReportId);
+        Assert.Equal("My View", payload.Name);
+        Assert.False(payload.IsDefault);
+    }
+
+    [Fact]
+    public async Task Post_SavedViews_Returns_UnprocessableEntity_When_Name_Is_Missing()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientFor(userId, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "employee-directory", name = string.Empty, filterCriteriaJson = "{}" });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_SavedViews_Returns_UnprocessableEntity_When_FilterCriteriaJson_Is_Missing()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientFor(userId, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "employee-directory", name = "My View", filterCriteriaJson = string.Empty });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_SavedViews_Setting_Default_Unsets_Previous_Default()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientFor(userId, companyId);
+
+        var first = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "employee-directory", name = "First", filterCriteriaJson = "{}", isDefault = true });
+        first.EnsureSuccessStatusCode();
+
+        var second = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "employee-directory", name = "Second", filterCriteriaJson = "{}", isDefault = true });
+        second.EnsureSuccessStatusCode();
+
+        var listResponse = await client.GetAsync($"/api/companies/{companyId}/reporting/saved-views/employee-directory");
+        var payload = await listResponse.Content.ReadFromJsonAsync<ViewsListPayload>();
+
+        Assert.NotNull(payload);
+        Assert.Equal(2, payload!.Views.Count);
+        var defaultViews = payload.Views.Where(v => v.IsDefault).ToList();
+        Assert.Single(defaultViews);
+        Assert.Equal("Second", defaultViews[0].Name);
+    }
+
+    private sealed record SavedViewPayload(Guid Id, string ReportId, string Name, string FilterCriteriaJson, bool IsDefault, DateTimeOffset CreatedAt);
+
+    private sealed record ViewsListPayload(List<SavedViewPayload> Views);
+}

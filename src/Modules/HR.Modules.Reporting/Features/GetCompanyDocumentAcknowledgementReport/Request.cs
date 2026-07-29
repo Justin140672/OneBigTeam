@@ -1,0 +1,3 @@
+namespace HR.Modules.Reporting.Features.GetCompanyDocumentAcknowledgementReport;
+
+internal sealed record GetCompanyDocumentAcknowledgementReportRequest(Guid CompanyId);

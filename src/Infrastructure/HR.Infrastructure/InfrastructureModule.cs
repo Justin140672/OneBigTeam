@@ -4,8 +4,10 @@ using HR.Infrastructure.Abstractions;
 using HR.Infrastructure.BackgroundJobs;
 using HR.Infrastructure.Email;
 using HR.Infrastructure.Persistence;
+using HR.Infrastructure.Reporting;
 using HR.Infrastructure.Storage;
 using HR.SharedKernel;
+using QuestPDF.Infrastructure;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -37,6 +39,9 @@ public static class InfrastructureModule
 
         services.AddHttpContextAccessor();
         AddProfilePhotoStorageService(services, configuration);
+
+        QuestPDF.Settings.License = LicenseType.Community;
+        services.AddScoped<IReportExporter, ReportExporter>();
 
         return services;
     }

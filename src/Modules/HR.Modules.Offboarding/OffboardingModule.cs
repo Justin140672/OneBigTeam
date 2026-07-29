@@ -27,10 +27,13 @@ public static class OffboardingModule
         services.AddScoped<GetOffboardingOverviewHandler>();
         services.AddScoped<GetOffboardingStatusHandler>();
         services.AddScoped<IOffboardingStatusReader, OffboardingStatusReader>();
+        services.AddScoped<IOffboardingDetailReader, OffboardingDetailReader>();
+        services.AddScoped<IOffboardingReportReader, OffboardingReportReader>();
         services.AddScoped<IOffboardingPlanCoordinator, OffboardingPlanCoordinator>();
         services.AddScoped<IOffboardingHistoryReplayer, OffboardingHistoryReplayer>();
         services.AddScoped<IValidator<StartOffboardingRequest>, StartOffboardingValidator>();
         services.AddScoped<OffboardingReminderJob>();
+        services.AddScoped<IWorkloadActionProvider, OutstandingOffboardingTasksWorkloadActionProvider>();
 
         return services;
     }

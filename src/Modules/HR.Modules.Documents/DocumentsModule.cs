@@ -232,6 +232,8 @@ public static class DocumentsModule
         services.AddScoped<IDocumentTypeReader, DocumentTypeReader>();
         services.AddScoped<IOutstandingDocumentRequestReader, OutstandingDocumentRequestReader>();
         services.AddScoped<IProfilePhotoReader, ProfilePhotoReader>();
+        services.AddScoped<IDocumentComplianceReportReader, DocumentComplianceReportReader>();
+        services.AddScoped<ICompanyDocumentAcknowledgementReportReader, CompanyDocumentAcknowledgementReportReader>();
 
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
 
@@ -242,6 +244,10 @@ public static class DocumentsModule
         services.AddScoped<DetectDocumentsDueForReviewJob>();
 
         services.AddScoped<ISharedCompanyDocumentAcknowledgementHistoryReplayer, SharedCompanyDocumentAcknowledgementHistoryReplayer>();
+
+        services.AddScoped<IWorkloadActionProvider, MissingRequiredEmployeeDocumentsWorkloadActionProvider>();
+        services.AddScoped<IWorkloadActionProvider, EmployeeDocumentsExpiringSoonWorkloadActionProvider>();
+        services.AddScoped<IWorkloadActionProvider, CompanyDocumentAcknowledgementsOutstandingWorkloadActionProvider>();
     }
 
     public static WebApplication UseDocumentsRecurringJobs(this WebApplication app)

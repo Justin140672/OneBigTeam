@@ -1,117 +1,194 @@
 @page "/pricing"
+@rendermode InteractiveServer
+@using HR.Marketing.Services
 
 <PageTitle>Pricing | One Big Team</PageTitle>
 <HeadContent>
-    <meta name="description" content="Estimate One Big Team monthly pricing based on your active employee count. Final pricing is confirmed after organisation import.">
+    <meta name="description" content="Simple, transparent One Big Team pricing based on active employees only. Every feature included, no contracts, no hidden costs.">
 </HeadContent>
 
 <SiteHeader CurrentPage="pricing" />
 
 <main>
   <section class="pricing-hero section-band">
-    <div class="section-inner pricing-hero-grid">
-      <div class="hero-copy">
-        <p class="eyebrow">Pricing</p>
-        <h1>Clear HR pricing for growing teams.</h1>
-        <p class="hero-text">
-          One Big Team pricing is based on the number of active employees in
-          your organisation. Use the estimator to get a guide monthly price
-          before your team is imported.
-        </p>
-        <div class="hero-actions" id="trial">
-          <a class="button button-primary button-large" href="/contact#contact-form">Start free trial</a>
-          <a class="button button-secondary button-large" href="/contact#contact-form">Contact us</a>
-        </div>
+    <div class="section-inner hero-copy">
+      <p class="eyebrow">Pricing</p>
+      <h1>Simple, transparent pricing.</h1>
+      <p class="hero-text">
+        Only pay for your active employees. Every feature included. No hidden costs.
+        No contracts. Cancel anytime.
+      </p>
+      <div class="hero-actions" id="trial">
+        <a class="button button-primary button-large" href="/contact#contact-form">Start free trial</a>
+        <a class="button button-secondary button-large" href="/contact#contact-form">Book a demo</a>
       </div>
-
-      <aside class="price-summary" aria-label="Pricing summary">
-        <p class="summary-label">Estimated monthly price</p>
-        <strong><span data-estimated-price>&pound;0</span></strong>
-        <p>
-          Based on <span data-estimated-employees>25</span> active employees at
-          <span data-price-per-employee></span> per active employee per month.
-        </p>
-      </aside>
     </div>
   </section>
 
   <section class="section">
-    <div class="section-inner estimator-grid">
-      <div>
-        <p class="eyebrow">Estimator</p>
-        <h2>Estimate your monthly One Big Team price.</h2>
-        <p class="estimator-intro">
-          Enter the number of active employees you expect to manage in One Big Team.
-          The estimate updates instantly and is for guidance only.
-        </p>
-        <p class="pricing-note">Your final monthly price is confirmed after your organisation import, based on your active employee count.</p>
+    <div class="section-inner pricing-card-grid">
+      <div class="pricing-card">
+        <p class="summary-label">Pricing</p>
+        <strong class="pricing-headline">&pound;2 per active employee</strong>
+
+        <ul class="tier-list">
+          <li>
+            <span>First 50 employees</span>
+            <strong>&pound;2.00 each</strong>
+          </li>
+          <li>
+            <span>Employees 51&ndash;150</span>
+            <strong>&pound;1.75 each</strong>
+          </li>
+          <li>
+            <span>Employees 151+</span>
+            <strong>&pound;1.50 each</strong>
+          </li>
+        </ul>
+
+        <div class="minimum-charge-row">
+          <span>Minimum monthly charge</span>
+          <strong>&pound;20/month</strong>
+        </div>
+
+        <p class="small-note">All prices exclude VAT where applicable.</p>
       </div>
 
-      <form class="estimator-card" data-pricing-estimator>
+      <div class="estimator-card">
+        <p class="eyebrow">Pricing calculator</p>
+        <h2>Estimate your monthly price.</h2>
         <label for="employee-count">Active employees</label>
         <div class="employee-input-row">
           <input
             id="employee-count"
-            name="employee-count"
             type="number"
-            min="1"
+            min="0"
             step="1"
             inputmode="numeric"
-            value="25"
+            value="@ActiveEmployees"
+            @oninput="OnEmployeeCountChanged"
             aria-describedby="employee-count-help"
           >
-          <span>employees</span>
+          <input
+            id="employee-slider"
+            type="range"
+            min="0"
+            max="300"
+            step="1"
+            value="@ActiveEmployees"
+            @oninput="OnEmployeeCountChanged"
+            aria-hidden="true"
+            tabindex="-1"
+          >
         </div>
         <p id="employee-count-help">
-          Count employees who are active in your organisation and managed in the platform.
+          Enter the number of active employees you expect to manage in One Big Team.
         </p>
 
-        <div class="estimate-result" aria-live="polite">
-          <span>Estimated monthly price</span>
-          <strong data-estimated-price>&pound;0</strong>
-        </div>
-
-        <div class="rate-row">
-          <span>Rate</span>
-          <strong><span data-price-per-employee></span> per active employee/month</strong>
+        <div class="estimate-result" aria-live="polite" role="status">
+          <div>
+            <span>Monthly</span>
+            <strong>@FormatCurrency(Result.Monthly)</strong>
+          </div>
+          <div>
+            <span>Annual</span>
+            <strong>@FormatCurrency(Result.Annual)</strong>
+          </div>
+          <div>
+            <span>Effective price</span>
+            <strong>@FormatCurrency(Result.EffectivePricePerEmployee) per employee</strong>
+          </div>
         </div>
 
         <p class="small-note">
-          Billing and payment details are handled inside the One Big Team SaaS app,
-          not on this public marketing website.
+          Estimate updates instantly as you type. Billing and payment details are
+          handled inside the One Big Team SaaS app.
         </p>
-      </form>
+      </div>
     </div>
   </section>
 
   <section class="section section-muted">
     <div class="section-inner">
       <div class="section-heading">
+        <p class="eyebrow">Pricing examples</p>
+        <h2>See how the price scales with your team.</h2>
+      </div>
+
+      <div class="pricing-examples-table">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Active employees</th>
+              <th scope="col">Monthly cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            @foreach (var example in Examples)
+            {
+              <tr>
+                <td>@example.Employees</td>
+                <td>@FormatCurrency(example.Monthly)@(example.Employees == 10 ? " (minimum charge)" : "")</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <div class="pricing-examples-cards">
+          @foreach (var example in Examples)
+          {
+            <div class="pricing-example-card">
+              <span>@example.Employees employees</span>
+              <strong>@FormatCurrency(example.Monthly)@(example.Employees == 10 ? " (minimum charge)" : "")</strong>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-inner">
+      <div class="section-heading">
         <p class="eyebrow">What is included</p>
-        <h2>One platform for core people operations.</h2>
+        <h2>Everything is included.</h2>
+      </div>
+
+      <div class="feature-grid included-feature-grid">
+        @foreach (var feature in IncludedFeatures)
+        {
+          <article class="feature-card">
+            <h3>@feature</h3>
+          </article>
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-muted">
+    <div class="section-inner">
+      <div class="section-heading">
+        <p class="eyebrow">Why our pricing is different</p>
+        <h2>Pricing that grows fairly with you.</h2>
       </div>
 
       <div class="benefit-grid">
         <div>
-          <strong>HR records and documents</strong>
-          <p>Manage employee information, company documents and shared HR resources.</p>
+          <strong>Fair pricing</strong>
+          <p>You only pay for active employees.</p>
         </div>
         <div>
-          <strong>Absence and workflows</strong>
-          <p>Track leave, sickness, reminders and repeat HR processes in one place.</p>
+          <strong>Rewarding growth</strong>
+          <p>The cost per employee decreases as your company grows.</p>
         </div>
         <div>
-          <strong>Recruitment and reporting</strong>
-          <p>Support hiring activity and understand workforce trends as your team grows.</p>
+          <strong>No feature limits</strong>
+          <p>Every customer receives every feature.</p>
         </div>
-      </div>
-
-      <div class="payroll-callout">
-        <strong>Payroll is not included.</strong>
-        <p>
-          One Big Team helps with HR and workforce management. Payroll processing,
-          payslip generation and salary payments are not included in the product.
-        </p>
+        <div>
+          <strong>Simple billing</strong>
+          <p>No contracts. No setup fees. No surprise charges.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -125,40 +202,32 @@
 
       <div class="faq-list">
         <details>
-          <summary>When do I add payment details?</summary>
-          <p>
-            Payment details are added inside the SaaS app when you are ready to
-            activate billing. The public pricing page only provides an estimate.
-          </p>
+          <summary>Who counts as an active employee?</summary>
+          <p>Employees whose employment has started and who have not left the company.</p>
         </details>
         <details>
-          <summary>What counts as an active employee?</summary>
-          <p>
-            An active employee is a current team member imported into your organisation
-            and managed in One Big Team. Former, archived or inactive records do not
-            normally count toward the active employee total.
-          </p>
+          <summary>Are future starters billed?</summary>
+          <p>No. Employees are billed from their employment start date.</p>
         </details>
         <details>
-          <summary>Can my price change if my employee count changes?</summary>
-          <p>
-            Yes. Because pricing is based on active employee count, your monthly price
-            can change as employees are added, removed, archived or reactivated.
-          </p>
+          <summary>Are former employees billed?</summary>
+          <p>No. Employees leaving your organisation stop being counted once they are no longer active.</p>
         </details>
         <details>
-          <summary>Is payroll included?</summary>
-          <p>
-            No. One Big Team does not include payroll. It supports HR records, leave,
-            sickness, recruitment, documents, workflows, reminders and reporting.
-          </p>
+          <summary>Are all features included?</summary>
+          <p>Yes. Every customer has access to every feature regardless of company size.</p>
         </details>
         <details>
-          <summary>Can I cancel?</summary>
-          <p>
-            Yes. You can cancel your One Big Team subscription according to the terms
-            agreed when billing is activated inside the SaaS app.
-          </p>
+          <summary>Is there a minimum contract?</summary>
+          <p>No. You can cancel at any time.</p>
+        </details>
+        <details>
+          <summary>Is there a free trial?</summary>
+          <p>Yes. Start your free trial without speaking to sales.</p>
+        </details>
+        <details>
+          <summary>Do I pay for inactive users?</summary>
+          <p>No. Billing is based on active employees, not user accounts.</p>
         </details>
       </div>
     </div>
@@ -167,13 +236,59 @@
   <section id="contact" class="section final-cta">
     <div class="section-inner cta-panel">
       <p class="eyebrow">Ready to see your price in context?</p>
-      <h2>Start with your team size, then confirm after organisation import.</h2>
+      <h2>Start your free trial today.</h2>
       <div class="hero-actions">
         <a class="button button-primary button-large" href="/contact#contact-form">Start free trial</a>
-        <a class="button button-secondary button-large" href="/contact#contact-form">Contact us</a>
+        <a class="button button-secondary button-large" href="/contact#contact-form">Book a demo</a>
       </div>
     </div>
   </section>
 </main>
 
 <SiteFooter />
+
+@code {
+    private int ActiveEmployees = 75;
+
+    private PricingResult Result => PricingCalculator.Calculate(ActiveEmployees);
+
+    private void OnEmployeeCountChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value) && value >= 0)
+        {
+            ActiveEmployees = value;
+        }
+    }
+
+    private static readonly (int Employees, decimal Monthly)[] Examples =
+    [
+        (10, PricingCalculator.Calculate(10).Monthly),
+        (20, PricingCalculator.Calculate(20).Monthly),
+        (30, PricingCalculator.Calculate(30).Monthly),
+        (50, PricingCalculator.Calculate(50).Monthly),
+        (75, PricingCalculator.Calculate(75).Monthly),
+        (100, PricingCalculator.Calculate(100).Monthly),
+        (150, PricingCalculator.Calculate(150).Monthly),
+        (200, PricingCalculator.Calculate(200).Monthly),
+        (250, PricingCalculator.Calculate(250).Monthly),
+    ];
+
+    private static readonly string[] IncludedFeatures =
+    [
+        "Employee Management",
+        "Leave Management",
+        "Recruitment",
+        "Onboarding",
+        "Offboarding",
+        "HR Documents",
+        "Company Documents",
+        "Tasks",
+        "Employee Assets",
+        "Reporting",
+        "Company Policies",
+        "Dashboards",
+        "Notifications",
+    ];
+
+    private static string FormatCurrency(decimal amount) => $"£{amount:0.00}";
+}

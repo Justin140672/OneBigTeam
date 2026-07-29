@@ -22,6 +22,7 @@
     <Project Path="src/Modules/HR.Modules.Offboarding/HR.Modules.Offboarding.csproj" />
     <Project Path="src/Modules/HR.Modules.Probation/HR.Modules.Probation.csproj" />
     <Project Path="src/Modules/HR.Modules.Recruitment/HR.Modules.Recruitment.csproj" />
+    <Project Path="src/Modules/HR.Modules.Reporting/HR.Modules.Reporting.csproj" />
     <Project Path="src/Modules/HR.Modules.Assets/HR.Modules.Assets.csproj" />
     <Project Path="src/Modules/HR.Modules.Sickness/HR.Modules.Sickness.csproj" />
     <Project Path="src/Modules/HR.Modules.Tasks/HR.Modules.Tasks.csproj" />
@@ -31,6 +32,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/HR.Architecture.Tests/HR.Architecture.Tests.csproj" />
+    <Project Path="tests/HR.Marketing.Tests/HR.Marketing.Tests.csproj" />
     <Project Path="tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj" />
      <Project Path="tests/HR.Modules.Companies.Tests/HR.Modules.Companies.Tests.csproj" />
       <Project Path="tests/HR.Integration.Tests/HR.Integration.Tests.csproj" />
@@ -45,6 +47,7 @@
     <Project Path="tests/HR.Modules.Probation.Tests/HR.Modules.Probation.Tests.csproj" />
     <Project Path="tests/HR.Modules.Recruitment.Tests/HR.Modules.Recruitment.Tests.csproj" />
     <Project Path="tests/HR.Modules.Assets.Tests/HR.Modules.Assets.Tests.csproj" />
+    <Project Path="tests/HR.Modules.Reporting.Tests/HR.Modules.Reporting.Tests.csproj" />
     <Project Path="tests/HR.Modules.Tasks.Tests/HR.Modules.Tasks.Tests.csproj" />
     <Project Path="tests/HR.Web.Tests/HR.Web.Tests.csproj" />
   </Folder>

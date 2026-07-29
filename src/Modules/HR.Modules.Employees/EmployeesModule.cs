@@ -362,6 +362,10 @@ public static class EmployeesModule
         services.AddScoped<IEmployeePromotionFinalizer, EmployeePromotionFinalizer>();
         services.AddScoped<IWorkingPatternProvider, WorkingPatternProvider>();
         services.AddScoped<IDirectReportsReader, DirectReportsReader>();
+        services.AddScoped<IEmployeeDirectoryReader, EmployeeDirectoryReader>();
+        services.AddScoped<IEmployeeDepartmentReader, EmployeeDepartmentReader>();
+        services.AddScoped<IEmployeeStarterReader, EmployeeStarterReader>();
+        services.AddScoped<IEmployeeLeaverReader, EmployeeLeaverReader>();
         services.AddScoped<IEmployeeNameReader, EmployeeNameReader>();
         services.AddScoped<IEmployeeAudienceReader, EmployeeAudienceReader>();
         services.AddScoped<IManagerReader, ManagerReader>();
@@ -374,6 +378,8 @@ public static class EmployeesModule
         services.AddScoped<IEmployeeImportLookupReader, EmployeeImportLookupReader>();
         services.AddScoped<IImportLookupResolver, ImportLookupResolver>();
         services.AddScoped<IEmployeeImportWriter, EmployeeImportWriter>();
+        services.AddScoped<IWorkloadActionProvider, UpcomingEmployeeStartDatesWorkloadActionProvider>();
+        services.AddScoped<IWorkloadActionProvider, UpcomingEmployeeLeavingDatesWorkloadActionProvider>();
     }
 
     public static async Task MigrateEmployeesAsync(this IServiceProvider services)

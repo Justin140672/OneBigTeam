@@ -36,7 +36,9 @@
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Leave\HR.Modules.Leave.csproj" />
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Probation\HR.Modules.Probation.csproj" />
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Notifications\HR.Modules.Notifications.csproj" />
+    <ProjectReference Include="..\..\src\Modules\HR.Modules.Onboarding\HR.Modules.Onboarding.csproj" />
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Recruitment\HR.Modules.Recruitment.csproj" />
+    <ProjectReference Include="..\..\src\Modules\HR.Modules.Reporting\HR.Modules.Reporting.csproj" />
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Tasks\HR.Modules.Tasks.csproj" />
   </ItemGroup>
 

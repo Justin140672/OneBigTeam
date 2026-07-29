@@ -1,0 +1,158 @@
+@page "/companies/{CompanyId:guid}/reporting/vacancy-performance"
+@rendermode InteractiveServer
+@using HR.Infrastructure.Abstractions
+@using HR.Web.Components.Controls
+@using HR.Web.Models
+@using HR.Web.Services
+@inject ReportingService ReportingService
+@inject IJSRuntime JS
+
+<PageTitle>Vacancy Performance Report</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+        <h1 class="mb-1">Vacancy Performance Report</h1>
+        <SfDropDownButton Content="Export" IconCss="fa-solid fa-download" CssClass="e-flat" Items="_exportItems" Disabled="_exporting">
+            <DropDownButtonEvents ItemSelected="HandleExportSelected" />
+        </SfDropDownButton>
+    </div>
+    <p class="text-muted mb-3">Per-vacancy days open, applicant count, interview count, offer count and hire date.</p>
+
+    @if (_exportError is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_exportError
+            <button type="button" class="btn-close" @onclick="@(() => _exportError = null)"></button>
+        </div>
+    }
+
+    <ReportFilterPanel CompanyId="CompanyId"
+                        ReportId="vacancy-performance-report"
+                        OnCriteriaChanged="OnFilterChangedAsync"
+                        ShowDepartmentFilter="false"
+                        ShowLocationFilter="false"
+                        ShowPositionProfileFilter="false"
+                        ShowManagerFilter="false"
+                        ShowEmploymentTypeFilter="false"
+                        ShowStatusFilter="false"
+                        DateRangeStartLabel="Start Date From"
+                        DateRangeEndLabel="Start Date To" />
+
+    @if (_isLoading)
+    {
+        <HrLoadingIndicator Label="Loading vacancy performance report…" />
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else
+    {
+        <HrGrid TValue="VacancyPerformanceReportRowModel"
+                DataSource="@_items"
+                AllowPaging="true"
+                AllowSorting="true">
+            <GridColumns>
+                <GridColumn Field="@nameof(VacancyPerformanceReportRowModel.VacancyTitle)" HeaderText="Vacancy" Width="200" />
+                <GridColumn Field="@nameof(VacancyPerformanceReportRowModel.DaysOpen)" HeaderText="Days Open" Width="120" />
+                <GridColumn Field="@nameof(VacancyPerformanceReportRowModel.ApplicantCount)" HeaderText="Applicants" Width="120" />
+                <GridColumn Field="@nameof(VacancyPerformanceReportRowModel.InterviewCount)" HeaderText="Interviews" Width="120" />
+                <GridColumn Field="@nameof(VacancyPerformanceReportRowModel.OfferCount)" HeaderText="Offers" Width="120" />
+                <GridColumn Field="@nameof(VacancyPerformanceReportRowModel.HireDate)" HeaderText="Hire Date" Width="140" Format="d" />
+            </GridColumns>
+        </HrGrid>
+
+        <div class="mt-3">@_items.Count vacancy(s)</div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private List<VacancyPerformanceReportRowModel> _items = [];
+
+    private bool _isLoading = true;
+    private string? _error;
+
+    private ReportFilterCriteriaModel _currentFilter = new();
+
+    private bool _exporting;
+    private string? _exportError;
+
+    private static readonly List<Syncfusion.Blazor.SplitButtons.DropDownMenuItem> _exportItems =
+    [
+        new() { Id = "csv", Text = "CSV", IconCss = "fa-solid fa-file-csv" },
+        new() { Id = "excel", Text = "Excel", IconCss = "fa-solid fa-file-excel" },
+        new() { Id = "pdf", Text = "PDF", IconCss = "fa-solid fa-file-pdf" },
+    ];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task OnFilterChangedAsync(ReportFilterCriteriaModel filter)
+    {
+        _currentFilter = filter;
+        await LoadAsync();
+    }
+
+    private VacancyPerformanceReportFilter BuildServiceFilter() => new(
+        StartDate: _currentFilter.DateRangeStart,
+        EndDate: _currentFilter.DateRangeEnd);
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _error = null;
+        StateHasChanged();
+
+        var response = await ReportingService.GetVacancyPerformanceReportAsync(CompanyId, BuildServiceFilter());
+        if (response is null)
+        {
+            _error = "Failed to load the vacancy performance report.";
+        }
+        else
+        {
+            _items = response.Items;
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task HandleExportSelected(Syncfusion.Blazor.SplitButtons.MenuEventArgs args)
+    {
+        if (args.Item?.Id is not { } id) return;
+
+        var format = id switch
+        {
+            "csv" => ReportExportFormat.Csv,
+            "excel" => ReportExportFormat.Excel,
+            "pdf" => ReportExportFormat.Pdf,
+            _ => ReportExportFormat.Csv,
+        };
+
+        _exporting = true;
+        _exportError = null;
+        StateHasChanged();
+
+        var (bytes, contentType, fileName, error) =
+            await ReportingService.ExportVacancyPerformanceReportAsync(CompanyId, BuildServiceFilter(), format);
+
+        if (bytes is null)
+        {
+            _exportError = error ?? "Failed to export the vacancy performance report.";
+        }
+        else
+        {
+            await JS.InvokeVoidAsync(
+                "downloadFileFromBase64",
+                fileName ?? $"vacancy-performance-report.{format.ToString().ToLowerInvariant()}",
+                contentType ?? "application/octet-stream",
+                Convert.ToBase64String(bytes));
+        }
+
+        _exporting = false;
+        StateHasChanged();
+    }
+}

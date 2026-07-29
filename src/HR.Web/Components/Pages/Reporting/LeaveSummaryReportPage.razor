@@ -1,0 +1,196 @@
+@page "/companies/{CompanyId:guid}/reporting/leave-summary"
+@rendermode InteractiveServer
+@using HR.Infrastructure.Abstractions
+@using HR.Web.Models
+@using HR.Web.Services
+@inject ReportingService ReportingService
+@inject DepartmentService DepartmentService
+@inject IJSRuntime JS
+
+<PageTitle>Leave Summary Report</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+        <h1 class="mb-1">Leave Summary</h1>
+        <SfDropDownButton Content="Export" IconCss="fa-solid fa-download" CssClass="e-flat" Items="_exportItems" Disabled="_exporting">
+            <DropDownButtonEvents ItemSelected="HandleExportSelected" />
+        </SfDropDownButton>
+    </div>
+    <p class="text-muted mb-3">Leave entitlement, booked, approved and remaining days, grouped by employee, department or leave type.</p>
+
+    @if (_exportError is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_exportError
+            <button type="button" class="btn-close" @onclick="@(() => _exportError = null)"></button>
+        </div>
+    }
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Policy Year</label>
+                    <SfNumericTextBox TValue="int" @bind-Value="_policyYear" Format="####" Min="2000" Max="2100" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Department</label>
+                    <SfDropDownList TValue="Guid?"
+                                    TItem="DepartmentListItemModel"
+                                    DataSource="@_departments"
+                                    @bind-Value="_departmentId"
+                                    Placeholder="All Departments"
+                                    AllowFiltering="true"
+                                    ShowClearButton="true">
+                        <DropDownListFieldSettings Value="Id" Text="Name" />
+                    </SfDropDownList>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Group By</label>
+                    <SfDropDownList TValue="LeaveSummaryGroupBy"
+                                    TItem="GroupByOption"
+                                    DataSource="@_groupByOptions"
+                                    @bind-Value="_groupBy">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                </div>
+            </div>
+            <div class="mt-3 d-flex gap-2">
+                <SfButton CssClass="e-primary e-small" OnClick="LoadAsync">Apply Filters</SfButton>
+            </div>
+        </div>
+    </div>
+
+    @if (_isLoading)
+    {
+        <HrLoadingIndicator Label="Loading leave summary…" />
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else
+    {
+        <HrGrid TValue="LeaveSummaryGroupRowModel"
+                DataSource="@_items"
+                AllowPaging="false"
+                AllowSorting="false">
+            <GridColumns>
+                <GridColumn Field="@nameof(LeaveSummaryGroupRowModel.GroupLabel)" HeaderText="@_groupByLabel" Width="180" />
+                <GridColumn Field="@nameof(LeaveSummaryGroupRowModel.EntitlementDays)" HeaderText="Entitlement Days" Width="150" />
+                <GridColumn Field="@nameof(LeaveSummaryGroupRowModel.BookedDays)" HeaderText="Booked Days" Width="130" />
+                <GridColumn Field="@nameof(LeaveSummaryGroupRowModel.ApprovedDays)" HeaderText="Approved Days" Width="140" />
+                <GridColumn Field="@nameof(LeaveSummaryGroupRowModel.RemainingDays)" HeaderText="Remaining Days" Width="140" />
+                <GridColumn Field="@nameof(LeaveSummaryGroupRowModel.PendingRequestCount)" HeaderText="Pending Requests" Width="140" />
+            </GridColumns>
+        </HrGrid>
+
+        <div class="mt-3">@_items.Count row(s)</div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private List<LeaveSummaryGroupRowModel> _items = [];
+    private List<DepartmentListItemModel> _departments = [];
+
+    private bool _isLoading = true;
+    private string? _error;
+
+    private int _policyYear = DateTime.UtcNow.Year;
+    private Guid? _departmentId;
+    private LeaveSummaryGroupBy _groupBy = LeaveSummaryGroupBy.Employee;
+
+    private bool _exporting;
+    private string? _exportError;
+
+    private string _groupByLabel => _groupBy switch
+    {
+        LeaveSummaryGroupBy.Department => "Department",
+        LeaveSummaryGroupBy.LeaveType => "Leave Type",
+        _ => "Employee",
+    };
+
+    private sealed record GroupByOption(LeaveSummaryGroupBy Value, string Label);
+
+    private static readonly GroupByOption[] _groupByOptions =
+    [
+        new(LeaveSummaryGroupBy.Employee, "Employee"),
+        new(LeaveSummaryGroupBy.Department, "Department"),
+        new(LeaveSummaryGroupBy.LeaveType, "Leave Type"),
+    ];
+
+    private static readonly List<Syncfusion.Blazor.SplitButtons.DropDownMenuItem> _exportItems =
+    [
+        new() { Id = "csv", Text = "CSV", IconCss = "fa-solid fa-file-csv" },
+        new() { Id = "excel", Text = "Excel", IconCss = "fa-solid fa-file-excel" },
+        new() { Id = "pdf", Text = "PDF", IconCss = "fa-solid fa-file-pdf" },
+    ];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _departments = (await DepartmentService.ListDepartmentsAsync(CompanyId))?.Items ?? [];
+        await LoadAsync();
+    }
+
+    private LeaveSummaryReportFilter BuildFilter() => new(
+        PolicyYear: _policyYear,
+        DepartmentId: _departmentId,
+        GroupBy: _groupBy);
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _error = null;
+        StateHasChanged();
+
+        var response = await ReportingService.GetLeaveSummaryReportAsync(CompanyId, BuildFilter());
+        if (response is null)
+        {
+            _error = "Failed to load the leave summary report.";
+        }
+        else
+        {
+            _items = response.Items;
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task HandleExportSelected(Syncfusion.Blazor.SplitButtons.MenuEventArgs args)
+    {
+        if (args.Item?.Id is not { } id) return;
+
+        var format = id switch
+        {
+            "csv" => ReportExportFormat.Csv,
+            "excel" => ReportExportFormat.Excel,
+            "pdf" => ReportExportFormat.Pdf,
+            _ => ReportExportFormat.Csv,
+        };
+
+        _exporting = true;
+        _exportError = null;
+        StateHasChanged();
+
+        var (bytes, contentType, fileName, error) =
+            await ReportingService.ExportLeaveSummaryReportAsync(CompanyId, BuildFilter(), format);
+
+        if (bytes is null)
+        {
+            _exportError = error ?? "Failed to export the leave summary report.";
+        }
+        else
+        {
+            await JS.InvokeVoidAsync(
+                "downloadFileFromBase64",
+                fileName ?? $"leave-summary.{format.ToString().ToLowerInvariant()}",
+                contentType ?? "application/octet-stream",
+                Convert.ToBase64String(bytes));
+        }
+
+        _exporting = false;
+        StateHasChanged();
+    }
+}

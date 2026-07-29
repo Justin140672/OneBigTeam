@@ -1,0 +1,658 @@
+@page "/companies/{CompanyId:guid}/reporting/workload-actions"
+@rendermode InteractiveServer
+@using System.Text.Json
+@using HR.Infrastructure.Abstractions
+@using HR.Web.Models
+@using HR.Web.Services
+@inject ReportingService ReportingService
+@inject EmployeeService EmployeeService
+@inject LocationService LocationService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Workload &amp; HR Actions Report</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+        <h1 class="mb-1">Workload &amp; HR Actions Report</h1>
+        <SfDropDownButton Content="Export" IconCss="fa-solid fa-download" CssClass="e-flat" Items="_exportItems" Disabled="_exporting">
+            <DropDownButtonEvents ItemSelected="HandleExportSelected" />
+        </SfDropDownButton>
+    </div>
+    <p class="text-muted mb-3">Outstanding HR actions across the company, grouped and filtered by type, department, due date, urgency and status.</p>
+
+    @if (_exportError is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_exportError
+            <button type="button" class="btn-close" @onclick="@(() => _exportError = null)"></button>
+        </div>
+    }
+
+    @if (_isLoading)
+    {
+        <HrLoadingIndicator Label="Loading workload actions report…" />
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else
+    {
+        <div class="row g-3 mb-3">
+            <div class="col-md-3">
+                <div class="card"><div class="card-body"><div class="text-muted small">Total Outstanding</div><div class="fs-4">@_summary.TotalOutstanding</div></div></div>
+            </div>
+            <div class="col-md-3">
+                <div class="card"><div class="card-body"><div class="text-muted small">Overdue</div><div class="fs-4">@_summary.Overdue</div></div></div>
+            </div>
+            <div class="col-md-3">
+                <div class="card"><div class="card-body"><div class="text-muted small">Due Today</div><div class="fs-4">@_summary.DueToday</div></div></div>
+            </div>
+            <div class="col-md-3">
+                <div class="card"><div class="card-body"><div class="text-muted small">Due This Week</div><div class="fs-4">@_summary.DueThisWeek</div></div></div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row g-3 align-items-end mb-2">
+                    <div class="col-md-4">
+                        <label class="form-label">Saved Views</label>
+                        <SfDropDownList TValue="Guid?"
+                                        TItem="SavedViewOption"
+                                        DataSource="@_savedViewOptions"
+                                        Value="@_selectedViewId"
+                                        ValueChanged="OnSavedViewSelectedAsync"
+                                        Placeholder="Select a saved view"
+                                        AllowFiltering="true"
+                                        ShowClearButton="true">
+                            <DropDownListFieldSettings Value="Id" Text="DisplayText" />
+                        </SfDropDownList>
+                    </div>
+                    @if (_selectedView is not null)
+                    {
+                        <div class="col-md-auto d-flex gap-2 pb-1">
+                            <SfButton CssClass="e-outline e-small" OnClick="StartRenameAsync">Rename</SfButton>
+                            <SfButton CssClass="e-outline e-small" Disabled="_selectedView.IsDefault" OnClick="SetDefaultAsync">Set Default</SfButton>
+                            <SfButton CssClass="e-outline e-small e-danger" OnClick="DeleteSelectedViewAsync">Delete</SfButton>
+                        </div>
+                    }
+                    <div class="col-md-auto pb-1">
+                        <SfButton CssClass="e-flat e-small" OnClick="@(() => _showSaveAs = !_showSaveAs)">Save current filters as view</SfButton>
+                    </div>
+                </div>
+                @if (_showSaveAs)
+                {
+                    <div class="row g-3 align-items-end mb-2">
+                        <div class="col-md-4">
+                            <HrTextBox @bind-Value="_newViewName" Placeholder="View name" />
+                        </div>
+                        <div class="col-md-auto pb-1 d-flex gap-2">
+                            <SfButton CssClass="e-primary e-small" Disabled="@(string.IsNullOrWhiteSpace(_newViewName))" OnClick="SaveCurrentAsViewAsync">Save</SfButton>
+                            <SfButton CssClass="e-outline e-small" OnClick="@(() => _showSaveAs = false)">Cancel</SfButton>
+                        </div>
+                    </div>
+                }
+                @if (_showRename)
+                {
+                    <div class="row g-3 align-items-end mb-2">
+                        <div class="col-md-4">
+                            <HrTextBox @bind-Value="_renameViewName" Placeholder="View name" />
+                        </div>
+                        <div class="col-md-auto pb-1 d-flex gap-2">
+                            <SfButton CssClass="e-primary e-small" Disabled="@(string.IsNullOrWhiteSpace(_renameViewName))" OnClick="ConfirmRenameAsync">Save Name</SfButton>
+                            <SfButton CssClass="e-outline e-small" OnClick="@(() => _showRename = false)">Cancel</SfButton>
+                        </div>
+                    </div>
+                }
+                @if (_savedViewError is not null)
+                {
+                    <div class="alert alert-danger alert-dismissible py-2">
+                        @_savedViewError
+                        <button type="button" class="btn-close" @onclick="@(() => _savedViewError = null)"></button>
+                    </div>
+                }
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Action Type</label>
+                        <SfDropDownList TValue="string?"
+                                        TItem="string"
+                                        DataSource="@_actionTypeOptions"
+                                        @bind-Value="_actionType"
+                                        Placeholder="All Action Types"
+                                        AllowFiltering="true"
+                                        ShowClearButton="true" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Department</label>
+                        <SfDropDownList TValue="string?"
+                                        TItem="string"
+                                        DataSource="@_departmentOptions"
+                                        @bind-Value="_department"
+                                        Placeholder="All Departments"
+                                        AllowFiltering="true"
+                                        ShowClearButton="true" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Urgency</label>
+                        <SfDropDownList TValue="string?"
+                                        TItem="UrgencyOption"
+                                        DataSource="@_urgencyOptions"
+                                        @bind-Value="_urgency"
+                                        Placeholder="All Urgencies"
+                                        ShowClearButton="true">
+                            <DropDownListFieldSettings Value="Value" Text="Label" />
+                        </SfDropDownList>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Status</label>
+                        <SfDropDownList TValue="string?"
+                                        TItem="string"
+                                        DataSource="@_statusOptions"
+                                        @bind-Value="_status"
+                                        Placeholder="All Statuses"
+                                        AllowFiltering="true"
+                                        ShowClearButton="true" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Employee</label>
+                        <SfDropDownList @ref="_employeeDropdown"
+                                        TValue="Guid?"
+                                        TItem="EmployeeOption"
+                                        DataSource="@_employeeOptions"
+                                        @bind-Value="_employeeId"
+                                        Placeholder="All Employees"
+                                        AllowFiltering="true"
+                                        ShowClearButton="true">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                            <DropDownListEvents TValue="Guid?" TItem="EmployeeOption" Filtering="OnEmployeeFilteringAsync" />
+                        </SfDropDownList>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Due Date From</label>
+                        <SfDatePicker TValue="DateOnly?" @bind-Value="_dueDateStart" Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Due Date To</label>
+                        <SfDatePicker TValue="DateOnly?" @bind-Value="_dueDateEnd" Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Manager</label>
+                        <SfDropDownList @ref="_managerDropdown"
+                                        TValue="Guid?"
+                                        TItem="EmployeeOption"
+                                        DataSource="@_managerOptions"
+                                        @bind-Value="_managerId"
+                                        Placeholder="All Managers"
+                                        AllowFiltering="true"
+                                        ShowClearButton="true">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                            <DropDownListEvents TValue="Guid?" TItem="EmployeeOption" Filtering="OnManagerFilteringAsync" />
+                        </SfDropDownList>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Location</label>
+                        <SfDropDownList TValue="Guid?"
+                                        TItem="LocationListItemModel"
+                                        DataSource="@_locationOptions"
+                                        @bind-Value="_locationId"
+                                        Placeholder="All Locations"
+                                        AllowFiltering="true"
+                                        ShowClearButton="true">
+                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                        </SfDropDownList>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Recruitment User</label>
+                        <SfTextBox @bind-Value="_recruitmentUser" Placeholder="All Recruiters" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Group By</label>
+                        <SfDropDownList TValue="WorkloadActionsGroupBy?"
+                                        TItem="GroupByOption"
+                                        DataSource="@_groupByOptions"
+                                        @bind-Value="_groupBy"
+                                        Placeholder="No Grouping"
+                                        ShowClearButton="true">
+                            <DropDownListFieldSettings Value="Value" Text="Label" />
+                        </SfDropDownList>
+                    </div>
+                </div>
+                <div class="mt-3 d-flex gap-2">
+                    <SfButton CssClass="e-primary e-small" OnClick="LoadAsync">Apply Filters</SfButton>
+                    <SfButton CssClass="e-outline e-small" OnClick="ClearFiltersAsync">Clear</SfButton>
+                </div>
+            </div>
+        </div>
+
+        @if (_totalItemCount == 0)
+        {
+            <div class="alert alert-info">No outstanding actions. Everything is up to date.</div>
+        }
+        else if (_groupBy is not null)
+        {
+            @foreach (var group in _groups)
+            {
+                <h5 class="mt-4">@group.Key <span class="text-muted small">(@group.Items.Count)</span></h5>
+                @RenderGrid(group.Items)
+            }
+        }
+        else
+        {
+            @RenderGrid(_items)
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private List<WorkloadActionRowModel> _items = [];
+    private List<WorkloadActionGroupModel> _groups = [];
+    private WorkloadActionSummaryModel _summary = new(0, 0, 0, 0);
+    private int _totalItemCount;
+
+    private bool _isLoading = true;
+    private string? _error;
+
+    private string? _actionType;
+    private string? _department;
+    private string? _urgency;
+    private string? _status;
+    private Guid? _employeeId;
+    private DateOnly? _dueDateStart;
+    private DateOnly? _dueDateEnd;
+    private WorkloadActionsGroupBy? _groupBy;
+    private Guid? _managerId;
+    private Guid? _locationId;
+    private string? _recruitmentUser;
+
+    private bool _exporting;
+    private string? _exportError;
+
+    private static readonly List<Syncfusion.Blazor.SplitButtons.DropDownMenuItem> _exportItems =
+    [
+        new() { Id = "csv", Text = "CSV", IconCss = "fa-solid fa-file-csv" },
+        new() { Id = "excel", Text = "Excel", IconCss = "fa-solid fa-file-excel" },
+        new() { Id = "pdf", Text = "PDF", IconCss = "fa-solid fa-file-pdf" },
+    ];
+
+    private List<string> _actionTypeOptions = [];
+    private List<string> _departmentOptions = [];
+    private List<string> _statusOptions = [];
+    private List<EmployeeOption> _employeeOptions = [];
+    private List<EmployeeOption> _managerOptions = [];
+    private List<LocationListItemModel> _locationOptions = [];
+    private Syncfusion.Blazor.DropDowns.SfDropDownList<Guid?, EmployeeOption> _employeeDropdown = default!;
+    private Syncfusion.Blazor.DropDowns.SfDropDownList<Guid?, EmployeeOption> _managerDropdown = default!;
+
+    private sealed record EmployeeOption(Guid Id, string Name);
+    private sealed record UrgencyOption(string Value, string Label);
+    private sealed record GroupByOption(WorkloadActionsGroupBy Value, string Label);
+    private sealed record SavedViewOption(Guid Id, string DisplayText, SavedReportViewModel View);
+
+    private const string ReportId = "workload-actions";
+
+    private sealed record SavedFilterState(
+        string? ActionType,
+        string? Department,
+        string? Urgency,
+        string? Status,
+        Guid? EmployeeId,
+        DateOnly? DueDateStart,
+        DateOnly? DueDateEnd,
+        WorkloadActionsGroupBy? GroupBy,
+        Guid? ManagerId,
+        Guid? LocationId,
+        string? RecruitmentUser);
+
+    private List<SavedReportViewModel> _savedViews = [];
+    private List<SavedViewOption> _savedViewOptions = [];
+    private Guid? _selectedViewId;
+    private SavedReportViewModel? _selectedView;
+    private string? _savedViewError;
+    private bool _showSaveAs;
+    private string _newViewName = string.Empty;
+    private bool _showRename;
+    private string _renameViewName = string.Empty;
+
+    private static readonly UrgencyOption[] _urgencyOptions =
+    [
+        new("Overdue", "Overdue"),
+        new("DueToday", "Due Today"),
+        new("DueThisWeek", "Due This Week"),
+        new("Upcoming", "Upcoming"),
+    ];
+
+    private static readonly GroupByOption[] _groupByOptions =
+    [
+        new(WorkloadActionsGroupBy.ActionType, "Action Type"),
+        new(WorkloadActionsGroupBy.AssignedUser, "Assigned User"),
+        new(WorkloadActionsGroupBy.Department, "Department"),
+        new(WorkloadActionsGroupBy.DueDate, "Due Date"),
+    ];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var employeesTask = EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 50);
+        var locationsTask = LocationService.ListLocationsAsync(CompanyId);
+        await LoadAsync();
+        var employeeItems = (await employeesTask)?.Items ?? [];
+        _employeeOptions = employeeItems
+            .Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(e => e.Name)
+            .ToList();
+        _managerOptions = _employeeOptions;
+        _locationOptions = ((await locationsTask)?.Items ?? [])
+            .OrderBy(l => l.Name)
+            .ToList();
+
+        await LoadSavedViewsAsync();
+    }
+
+    private async Task LoadSavedViewsAsync()
+    {
+        var response = await ReportingService.GetReportViewsAsync(CompanyId, ReportId);
+        _savedViews = response?.Views ?? [];
+        _savedViewOptions = _savedViews
+            .Select(v => new SavedViewOption(v.Id, v.IsDefault ? $"{v.Name} (Default)" : v.Name, v))
+            .OrderBy(o => o.View.Name)
+            .ToList();
+    }
+
+    private async Task OnSavedViewSelectedAsync(Guid? viewId)
+    {
+        _selectedViewId = viewId;
+        _showRename = false;
+        _selectedView = _savedViews.FirstOrDefault(v => v.Id == viewId);
+
+        if (_selectedView is null) return;
+
+        try
+        {
+            var state = JsonSerializer.Deserialize<SavedFilterState>(_selectedView.FilterCriteriaJson);
+            if (state is not null)
+            {
+                _actionType = state.ActionType;
+                _department = state.Department;
+                _urgency = state.Urgency;
+                _status = state.Status;
+                _employeeId = state.EmployeeId;
+                _dueDateStart = state.DueDateStart;
+                _dueDateEnd = state.DueDateEnd;
+                _groupBy = state.GroupBy;
+                _managerId = state.ManagerId;
+                _locationId = state.LocationId;
+                _recruitmentUser = state.RecruitmentUser;
+            }
+        }
+        catch (JsonException)
+        {
+            _savedViewError = "Failed to apply the saved view's filters.";
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private SavedFilterState BuildSavedFilterState() => new(
+        _actionType, _department, _urgency, _status, _employeeId,
+        _dueDateStart, _dueDateEnd, _groupBy, _managerId, _locationId, _recruitmentUser);
+
+    private async Task SaveCurrentAsViewAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newViewName)) return;
+
+        _savedViewError = null;
+        var json = JsonSerializer.Serialize(BuildSavedFilterState());
+        var request = new SaveReportViewRequest(ReportId, _newViewName.Trim(), json, null);
+        var result = await ReportingService.SaveReportViewAsync(CompanyId, request);
+
+        if (result is null)
+        {
+            _savedViewError = "Failed to save the current filters as a view.";
+            return;
+        }
+
+        _newViewName = string.Empty;
+        _showSaveAs = false;
+        await LoadSavedViewsAsync();
+        _selectedViewId = result.Id;
+        _selectedView = _savedViews.FirstOrDefault(v => v.Id == result.Id);
+    }
+
+    private void StartRenameAsync()
+    {
+        if (_selectedView is null) return;
+        _renameViewName = _selectedView.Name;
+        _showRename = true;
+    }
+
+    private async Task ConfirmRenameAsync()
+    {
+        if (_selectedView is null || string.IsNullOrWhiteSpace(_renameViewName)) return;
+
+        _savedViewError = null;
+        var result = await ReportingService.RenameReportViewAsync(CompanyId, _selectedView.Id, _renameViewName.Trim());
+
+        if (result is null)
+        {
+            _savedViewError = "Failed to rename the saved view.";
+            return;
+        }
+
+        _showRename = false;
+        await LoadSavedViewsAsync();
+        _selectedView = _savedViews.FirstOrDefault(v => v.Id == result.Id);
+    }
+
+    private async Task SetDefaultAsync()
+    {
+        if (_selectedView is null) return;
+
+        _savedViewError = null;
+        var success = await ReportingService.SetDefaultReportViewAsync(CompanyId, _selectedView.Id);
+
+        if (!success)
+        {
+            _savedViewError = "Failed to set the saved view as default.";
+            return;
+        }
+
+        await LoadSavedViewsAsync();
+        _selectedView = _savedViews.FirstOrDefault(v => v.Id == _selectedViewId);
+    }
+
+    private async Task DeleteSelectedViewAsync()
+    {
+        if (_selectedView is null) return;
+
+        _savedViewError = null;
+        var success = await ReportingService.DeleteReportViewAsync(CompanyId, _selectedView.Id);
+
+        if (!success)
+        {
+            _savedViewError = "Failed to delete the saved view.";
+            return;
+        }
+
+        _selectedViewId = null;
+        _selectedView = null;
+        _showRename = false;
+        await LoadSavedViewsAsync();
+    }
+
+    private async Task OnEmployeeFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        _employeeOptions = (result?.Items ?? [])
+            .Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(e => e.Name)
+            .ToList();
+        await _employeeDropdown.FilterAsync(_employeeOptions, new Syncfusion.Blazor.Data.Query());
+    }
+
+    private async Task OnManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var result = await EmployeeService.ListEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        _managerOptions = (result?.Items ?? [])
+            .Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(e => e.Name)
+            .ToList();
+        await _managerDropdown.FilterAsync(_managerOptions, new Syncfusion.Blazor.Data.Query());
+    }
+
+    private WorkloadActionsReportFilter BuildFilter() => new(
+        ActionType: _actionType,
+        Department: _department,
+        Urgency: _urgency,
+        Status: _status,
+        EmployeeId: _employeeId,
+        DueDateStart: _dueDateStart,
+        DueDateEnd: _dueDateEnd,
+        GroupBy: _groupBy,
+        ManagerId: _managerId,
+        LocationId: _locationId,
+        RecruitmentUser: _recruitmentUser);
+
+    private async Task ClearFiltersAsync()
+    {
+        _actionType = null;
+        _department = null;
+        _urgency = null;
+        _status = null;
+        _employeeId = null;
+        _dueDateStart = null;
+        _dueDateEnd = null;
+        _groupBy = null;
+        _managerId = null;
+        _locationId = null;
+        _recruitmentUser = null;
+        await LoadAsync();
+    }
+
+    private async Task HandleExportSelected(Syncfusion.Blazor.SplitButtons.MenuEventArgs args)
+    {
+        if (args.Item?.Id is not { } id) return;
+
+        var format = id switch
+        {
+            "csv" => ReportExportFormat.Csv,
+            "excel" => ReportExportFormat.Excel,
+            "pdf" => ReportExportFormat.Pdf,
+            _ => ReportExportFormat.Csv,
+        };
+
+        _exporting = true;
+        _exportError = null;
+        StateHasChanged();
+
+        var (bytes, contentType, fileName, error) =
+            await ReportingService.ExportWorkloadActionsReportAsync(CompanyId, BuildFilter(), format);
+
+        if (bytes is null)
+        {
+            _exportError = error ?? "Failed to export the workload & HR actions report.";
+        }
+        else
+        {
+            await JS.InvokeVoidAsync(
+                "downloadFileFromBase64",
+                fileName ?? $"workload-actions-report.{format.ToString().ToLowerInvariant()}",
+                contentType ?? "application/octet-stream",
+                Convert.ToBase64String(bytes));
+        }
+
+        _exporting = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _error = null;
+        StateHasChanged();
+
+        var response = await ReportingService.GetWorkloadActionsReportAsync(CompanyId, BuildFilter());
+        if (response is null)
+        {
+            _error = "Failed to load the workload & HR actions report.";
+        }
+        else
+        {
+            _items = response.Items;
+            _groups = response.Groups;
+            _summary = response.Summary;
+            _totalItemCount = _groupBy is not null
+                ? _groups.Sum(g => g.Items.Count)
+                : _items.Count;
+
+            // Populate filter dropdown options from the loaded data set when not yet populated,
+            // so Action Type / Department / Status filters offer real values without a dedicated
+            // lookup endpoint (none exists in the workload-actions backend contract).
+            var allRows = _groupBy is not null ? _groups.SelectMany(g => g.Items) : _items;
+            var rowList = allRows.ToList();
+            _actionTypeOptions = rowList.Select(r => r.ActionType).Distinct().OrderBy(x => x).ToList();
+            _departmentOptions = rowList.Select(r => r.Department).Where(d => !string.IsNullOrWhiteSpace(d)).Distinct().OrderBy(x => x).ToList()!;
+            _statusOptions = rowList.Select(r => r.Status).Distinct().OrderBy(x => x).ToList();
+        }
+
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private static string UrgencyBadgeClass(string urgency) => urgency switch
+    {
+        "Overdue" => "badge bg-danger",
+        "DueToday" => "badge bg-warning text-dark",
+        "DueThisWeek" => "badge bg-info text-dark",
+        _ => "badge bg-secondary",
+    };
+
+    private void GoToAction(WorkloadActionRowModel row)
+    {
+        if (!string.IsNullOrWhiteSpace(row.DeepLinkUrl))
+            Navigation.NavigateTo(row.DeepLinkUrl);
+    }
+
+    private RenderFragment RenderGrid(List<WorkloadActionRowModel> rows) => @<HrGrid TValue="WorkloadActionRowModel"
+            DataSource="@rows"
+            AllowPaging="true"
+            AllowSorting="true">
+        <GridColumns>
+            <GridColumn HeaderText="Employee" Width="180">
+                <Template>
+                    @{
+                        var item = (WorkloadActionRowModel)context;
+                    }
+                    <a href="javascript:void(0)" @onclick="@(() => GoToAction(item))">@item.EmployeeName</a>
+                </Template>
+            </GridColumn>
+            <GridColumn Field="@nameof(WorkloadActionRowModel.Department)" HeaderText="Department" Width="140" />
+            <GridColumn Field="@nameof(WorkloadActionRowModel.ActionType)" HeaderText="Action Type" Width="150" />
+            <GridColumn Field="@nameof(WorkloadActionRowModel.ActionCategory)" HeaderText="Category" Width="130" />
+            <GridColumn Field="@nameof(WorkloadActionRowModel.DueDate)" HeaderText="Due Date" Width="110" Format="d" />
+            <GridColumn Field="@nameof(WorkloadActionRowModel.AssignedTo)" HeaderText="Assigned To" Width="140" />
+            <GridColumn Field="@nameof(WorkloadActionRowModel.Status)" HeaderText="Status" Width="120" />
+            <GridColumn HeaderText="Urgency" Width="120">
+                <Template>
+                    @{
+                        var item = (WorkloadActionRowModel)context;
+                    }
+                    <span class="@UrgencyBadgeClass(item.Urgency)">@item.Urgency</span>
+                </Template>
+            </GridColumn>
+            <GridColumn HeaderText="Action" Width="90">
+                <Template>
+                    @{
+                        var item = (WorkloadActionRowModel)context;
+                    }
+                    <SfButton CssClass="e-outline e-small" OnClick="@(() => GoToAction(item))">Go</SfButton>
+                </Template>
+            </GridColumn>
+        </GridColumns>
+    </HrGrid>;
+}

@@ -1,0 +1,167 @@
+@page "/companies/{CompanyId:guid}/reporting"
+@rendermode InteractiveServer
+@using HR.Web.Models
+@using HR.Web.Services
+@inject ReportingService ReportingService
+@inject NavigationManager Navigation
+
+<PageTitle>Reporting</PageTitle>
+
+<div class="container-fluid py-4">
+    <h1 class="mb-1">Reporting</h1>
+    <p class="text-muted mb-3">Browse and run reports available to you.</p>
+
+    <div class="mb-3 col-md-4 px-0">
+        <HrTextBox Value="@_searchTerm" ValueChanged="@OnSearchChanged" Placeholder="Search reports by name or description" />
+    </div>
+
+    @if (_isLoading)
+    {
+        <HrLoadingIndicator Label="Loading reports…" />
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else if (_items.Count == 0)
+    {
+        <HrEmptyState Message="You don't currently have access to any reports." />
+    }
+    else
+    {
+        @foreach (var category in _filteredGroups)
+        {
+            <h5 class="mt-4 mb-2">@category.Category</h5>
+            <div class="row g-3">
+                @foreach (var item in category.Items)
+                {
+                    <div class="col-md-4">
+                        <div class="card h-100 report-catalog-card @(IsClickable(item) ? "report-catalog-card--clickable" : "")"
+                             @onclick="@(() => OnCardClicked(item))">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <h6 class="card-title mb-1">@item.DisplayName</h6>
+                                    <button type="button"
+                                            class="btn btn-link p-0 report-catalog-favourite @(IsFavourite(item.Id) ? "report-catalog-favourite--active" : "")"
+                                            title="@(IsFavourite(item.Id) ? "Remove from favourites" : "Add to favourites")"
+                                            @onclick="@(() => ToggleFavouriteAsync(item.Id))"
+                                            @onclick:stopPropagation="true">
+                                        <i class="@(IsFavourite(item.Id) ? "fa-solid" : "fa-regular") fa-star"></i>
+                                    </button>
+                                </div>
+                                <p class="card-text text-muted small mb-0">@item.Description</p>
+                                @if (!IsClickable(item))
+                                {
+                                    <span class="badge bg-secondary mt-2">Coming soon</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private List<ReportCatalogItemModel> _items = [];
+    private bool _isLoading = true;
+    private string? _error;
+    private string _searchTerm = string.Empty;
+    private HashSet<string> _favouriteIds = [];
+
+    // Reports with a real target page this pass. Every other catalog entry is rendered but not
+    // yet clickable — see epic note about phase-1 catalog scope.
+    private static readonly Dictionary<string, string> _reportRoutes = new()
+    {
+        ["employee-directory"] = "employee-directory",
+        ["employee-starters"] = "employee-starters",
+        ["employee-leavers"] = "employee-leavers",
+        ["leave-summary"] = "leave-summary",
+        ["leave-calendar"] = "leave-calendar",
+        ["sickness-report"] = "sickness",
+        ["recruitment-pipeline-report"] = "recruitment-pipeline",
+        ["vacancy-performance-report"] = "vacancy-performance",
+        ["probation-report"] = "probation",
+        ["onboarding-progress"] = "onboarding-progress",
+        ["offboarding-progress"] = "offboarding-progress",
+        ["document-compliance"] = "document-compliance",
+        ["document-acknowledgement"] = "document-acknowledgement",
+        ["asset-assignment"] = "asset-assignment",
+        ["workload-actions"] = "workload-actions",
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _error = null;
+
+        var response = await ReportingService.GetReportCatalogAsync(CompanyId);
+        if (response is null)
+        {
+            _error = "Failed to load the report catalog.";
+        }
+        else
+        {
+            _items = response.Items;
+        }
+
+        await LoadFavouritesAsync();
+
+        _isLoading = false;
+    }
+
+    private sealed record CategoryGroup(string Category, List<ReportCatalogItemModel> Items);
+
+    private List<CategoryGroup> _filteredGroups => _items
+        .Where(MatchesSearch)
+        .GroupBy(i => i.Category)
+        .Select(g => new CategoryGroup(
+            g.Key,
+            g.OrderByDescending(i => IsFavourite(i.Id)).ThenBy(i => i.DisplayName).ToList()))
+        .OrderBy(g => g.Category)
+        .ToList();
+
+    private bool MatchesSearch(ReportCatalogItemModel item)
+    {
+        if (string.IsNullOrWhiteSpace(_searchTerm)) return true;
+        return item.DisplayName.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase)
+            || item.Description.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void OnSearchChanged(string value) => _searchTerm = value;
+
+    private static bool IsClickable(ReportCatalogItemModel item) => _reportRoutes.ContainsKey(item.Id);
+
+    private void OnCardClicked(ReportCatalogItemModel item)
+    {
+        if (_reportRoutes.TryGetValue(item.Id, out var route))
+            Navigation.NavigateTo($"/companies/{CompanyId}/reporting/{route}");
+    }
+
+    private async Task LoadFavouritesAsync()
+    {
+        var response = await ReportingService.GetReportFavouritesAsync(CompanyId);
+        _favouriteIds = response is null ? [] : response.ReportIds.ToHashSet();
+    }
+
+    private bool IsFavourite(string reportId) => _favouriteIds.Contains(reportId);
+
+    private async Task ToggleFavouriteAsync(string reportId)
+    {
+        var isCurrentlyFavourite = _favouriteIds.Contains(reportId);
+
+        var success = isCurrentlyFavourite
+            ? await ReportingService.RemoveReportFavouriteAsync(CompanyId, reportId)
+            : await ReportingService.AddReportFavouriteAsync(CompanyId, reportId);
+
+        if (!success) return;
+
+        if (isCurrentlyFavourite)
+            _favouriteIds.Remove(reportId);
+        else
+            _favouriteIds.Add(reportId);
+    }
+}

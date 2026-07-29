@@ -1,0 +1,17 @@
+.report-catalog-card--clickable {
+    cursor: pointer;
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+.report-catalog-card--clickable:hover {
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+}
+
+.report-catalog-favourite {
+    color: var(--bs-secondary-color, #6c757d);
+    text-decoration: none;
+}
+
+.report-catalog-favourite--active {
+    color: #ffc107;
+}

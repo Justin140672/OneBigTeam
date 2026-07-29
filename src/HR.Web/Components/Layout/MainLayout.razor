@@ -91,6 +91,10 @@ else
                                     </MenuItems>
                                 </MenuItem>
                             }
+                            @if (Session.IsHrAdministrator || Session.IsRecruiter || Session.IsManager)
+                            {
+                                <MenuItem Text="Reporting" IconCss="fa-solid fa-chart-column" Url="@_menuItems["Reporting"]" />
+                            }
                             @if (Session.CanManageCompany)
                             {
                                 <MenuItem Text="Company" IconCss="fa-solid fa-building" Url="@_menuItems["Company"]" />
@@ -252,10 +256,7 @@ else
     private bool IsDark { get; set; }
 
     // Shown whenever the signed-in user has a role with actual menu content below — a plain
-    // Employee, a plain Manager (whose dashboard IS their home, with no separate admin
-    // sections), and a plain Recruiter (whose Recruitment Dashboard is their home, with
-    // Vacancies/Candidates reached via buttons on that dashboard instead of the sidebar) all
-    // get no sidebar at all, same as pre-dashboards behavior for Employees. Individual menu
+    // Employee gets no sidebar at all, same as pre-dashboards behavior. Individual menu
     // sections inside the sidebar are independently role-gated so combined roles (e.g. an
     // HR Administrator who is also a Manager or Recruiter) merge without duplicates.
     //
@@ -265,8 +266,17 @@ else
     // menu is unnecessary surface area. CanManageCompany is deliberately excluded here; if they
     // also hold a role that grants CanManageEmployees/IsHrAdministrator the sidebar still shows
     // (with the Company/User Administration items already gated in below).
+    //
+    // A plain Manager or a plain Recruiter previously got no sidebar either (their dashboard was
+    // considered "home", with sub-pages reached via buttons on that dashboard). That excluded
+    // them from ever reaching the sidebar-only Reporting nav item below, even though both roles
+    // are granted the "reporting:view" policy server-side (see IdentityModule.cs) and can see at
+    // least one reporting category. IsManager/IsRecruiter are included here so any
+    // reporting:view-entitled user can reach the sidebar; the Reporting menu item itself remains
+    // separately gated below, and no other existing sidebar section's visibility is changed by
+    // this addition since every section under it keeps its own independent role check.
     private bool ShowSidebar =>
-        Session.CanManageEmployees || Session.IsHrAdministrator;
+        Session.CanManageEmployees || Session.IsHrAdministrator || Session.IsManager || Session.IsRecruiter;
 
     private int _unreadCount;
     private List<NotificationDto> _notifications = [];
@@ -300,6 +310,7 @@ else
         ["ImportHistory"] = "/",
         ["SicknessCategories"] = "/",
         ["OrganisationChart"] = "/",
+        ["Reporting"] = "/",
         ["Company"] = "/",
         ["UserAdministration"] = "/",
     };
@@ -329,6 +340,7 @@ else
         _menuItems["ImportHistory"] = $"/companies/{companyId}/data-import/history";
         _menuItems["SicknessCategories"] = $"/companies/{companyId}/sickness-categories";
         _menuItems["OrganisationChart"] = $"/companies/{companyId}/organisation-chart";
+        _menuItems["Reporting"] = $"/companies/{companyId}/reporting";
         _menuItems["Company"] = $"/companies/{companyId}/edit";
         _menuItems["UserAdministration"] = $"/companies/{companyId}/user-administration";
 

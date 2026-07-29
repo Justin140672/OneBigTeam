@@ -32,9 +32,11 @@ public static class OnboardingModule
         services.AddScoped<GetOnboardingStatusHandler>();
         services.AddScoped<GetMyOnboardingStatusHandler>();
         services.AddScoped<IOnboardingStatusReader, OnboardingStatusReader>();
+        services.AddScoped<IOnboardingReportReader, OnboardingReportReader>();
         services.AddScoped<GetTeamOnboardingHandler>();
         services.AddScoped<OnboardingReminderJob>();
         services.AddScoped<IOnboardingHistoryReplayer, OnboardingHistoryReplayer>();
+        services.AddScoped<IWorkloadActionProvider, OutstandingOnboardingTasksWorkloadActionProvider>();
 
         return services;
     }

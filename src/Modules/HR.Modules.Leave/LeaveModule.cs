@@ -40,6 +40,8 @@ public static class LeaveModule
     {
         AddFeatureServices(services);
 
+        services.AddScoped<IWorkloadActionProvider, Services.LeavePendingApprovalsWorkloadActionProvider>();
+
         services.AddDbContext<LeaveDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "leave")));
@@ -94,6 +96,8 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         services.AddScoped<ILeavePolicyReader, LeavePolicyReader>();
         services.AddScoped<ILeaveImportWriter, LeaveImportWriter>();
         services.AddScoped<IEmployeeLeaveStatusReader, EmployeeLeaveStatusReader>();
+        services.AddScoped<ILeaveSummaryReader, LeaveSummaryReader>();
+        services.AddScoped<ILeaveCalendarReader, LeaveCalendarReader>();
     }
 
     public static async Task MigrateLeaveAsync(this IServiceProvider services)

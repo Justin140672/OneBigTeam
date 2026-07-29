@@ -62,6 +62,9 @@ public static class IdentityModule
             IIntegrationEventHandler<OffboardingPlanCompletedIntegrationEvent>,
             Features.OnOffboardingPlanCompleted.Handler>();
 
+        services.AddScoped<IWorkloadActionProvider, EmployeeAccountsAwaitingInvitationWorkloadActionProvider>();
+        services.AddScoped<IWorkloadActionProvider, EmployeeAccountsAwaitingDisablementWorkloadActionProvider>();
+
         return services;
     }
 
@@ -226,6 +229,58 @@ public static class IdentityModule
 
         builder.AddPolicy("shared-document:view-acknowledgement-status", RolePolicy(
             SystemRoles.HrAdministrator));
+
+        // Reporting domain policies (Reporting Dashboard epic, phase 1).
+        // "reporting:view" is the baseline gate for the reporting area — Manager, Recruiter,
+        // and HrAdministrator only; plain Employees have no reporting access. Category-scoped
+        // policies below are deliberately non-overlapping (same precedent as
+        // recruitment:manage/candidate:view above): a Recruiter without HrAdministrator sees
+        // only the recruitment category, and an HrAdministrator without Recruiter sees only
+        // the HR category. A user needs both roles to see both categories.
+        builder.AddPolicy("reporting:view", RolePolicy(
+            SystemRoles.Manager,
+            SystemRoles.Recruiter,
+            SystemRoles.HrAdministrator));
+
+        builder.AddPolicy("reporting:view-recruitment", RolePolicy(
+            SystemRoles.Recruiter));
+
+        builder.AddPolicy("reporting:view-hr", RolePolicy(
+            SystemRoles.HrAdministrator));
+
+        // Reporting Dashboard epic, phase 2 (OBT-704..707). Employee Starter Report is HR
+        // territory but is also explicitly relevant to Recruiters tracking their own placements
+        // (ticket OBT-704) — combined OR-of-roles policy, same RolePolicy mechanism used above,
+        // rather than requiring both reporting:view-hr AND reporting:view-recruitment (which would
+        // be an AND and wrongly exclude a Recruiter-only user).
+        builder.AddPolicy("reporting:view-employee-starter", RolePolicy(
+            SystemRoles.HrAdministrator,
+            SystemRoles.Recruiter));
+
+        // Leave Summary Report (OBT-706) is HR-visible company-wide, but the ticket doesn't
+        // restrict it to HR only — a Manager should be able to see their own team's leave summary.
+        // This policy grants baseline endpoint access to both roles; the handler is responsible for
+        // scoping a non-HR caller down to their direct reports via IDirectReportsReader so a
+        // Manager never sees company-wide data through this endpoint (row-level scoping, not just a
+        // relaxed policy — see GetLeaveSummaryReport/Handler.cs).
+        builder.AddPolicy("reporting:view-leave-summary", RolePolicy(
+            SystemRoles.HrAdministrator,
+            SystemRoles.Manager));
+
+        // Probation Report (OBT-711) — modelled exactly on reporting:view-leave-summary above: a
+        // Manager gets baseline endpoint access, but the handler hard-restricts a non-HR caller to
+        // their own direct reports via IDirectReportsReader (row-level scoping, never company-wide
+        // data — see GetProbationReport/Handler.cs).
+        builder.AddPolicy("reporting:view-probation", RolePolicy(
+            SystemRoles.HrAdministrator,
+            SystemRoles.Manager));
+
+        // Onboarding Progress Report (OBT-712) — same OR-of-roles shape as reporting:view-probation:
+        // a Manager gets baseline endpoint access, handler restricts non-HR callers to their own
+        // direct reports.
+        builder.AddPolicy("reporting:view-onboarding", RolePolicy(
+            SystemRoles.HrAdministrator,
+            SystemRoles.Manager));
 
         return builder;
     }

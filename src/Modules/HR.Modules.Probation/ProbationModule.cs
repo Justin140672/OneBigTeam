@@ -33,6 +33,9 @@ public static class ProbationModule
     {
         AddFeatureServices(services);
 
+        services.AddScoped<IWorkloadActionProvider, Services.ProbationReviewsDueWorkloadActionProvider>();
+        services.AddScoped<IWorkloadActionProvider, Services.OverdueProbationReviewsWorkloadActionProvider>();
+
         services.AddDbContext<ProbationDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "probation")));
@@ -63,6 +66,7 @@ public static class ProbationModule
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddScoped<GenerateDueProbationReviewsJob>();
         services.AddScoped<IProbationHistoryReplayer, ProbationHistoryReplayer>();
+        services.AddScoped<IProbationReportReader, ProbationReportReader>();
     }
 
     public static WebApplication UseProbationRecurringJobs(this WebApplication app)

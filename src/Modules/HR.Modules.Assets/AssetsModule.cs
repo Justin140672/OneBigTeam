@@ -70,7 +70,9 @@ public static class AssetsModule
         services.AddScoped<IAssetCategoryReader, AssetCategoryReader>();
         services.AddScoped<IOutstandingAssetAcknowledgementReader, OutstandingAssetAcknowledgementReader>();
         services.AddScoped<IAssignedAssetReader, AssignedAssetReader>();
+        services.AddScoped<IAssetAssignmentReportReader, AssetAssignmentReportReader>();
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
+        services.AddScoped<IWorkloadActionProvider, AssetsAwaitingReturnWorkloadActionProvider>();
     }
 
     public static WebApplication UseAssetsRecurringJobs(this WebApplication app)

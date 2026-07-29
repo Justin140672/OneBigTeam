@@ -53,6 +53,12 @@ public class ServiceContainerCompositionTests
         services.AddLogging();
         services.AddSingleton<IConfiguration>(configuration);
 
+        // HR.Api/Program.cs registers authorization via AddAuthorizationBuilder(); OBT-721's
+        // IWorkloadActionProvider implementations inject IAuthorizationService directly (each
+        // provider self-enforces its own row-level scoping), so the composed container needs this
+        // registered here too or container validation fails even though the real app starts fine.
+        services.AddAuthorizationCore();
+
         services.AddCompaniesModule(connectionString);
         services.AddDataImportModule(connectionString, configuration);
         services.AddDocumentsModule(connectionString, configuration);

@@ -1,0 +1,218 @@
+@page "/companies/{CompanyId:guid}/reporting/employee-directory"
+@rendermode InteractiveServer
+@using HR.Infrastructure.Abstractions
+@using HR.Web.Components.Controls
+@using HR.Web.Models
+@using HR.Web.Services
+@inject ReportingService ReportingService
+@inject IJSRuntime JS
+
+<PageTitle>Employee Directory Report</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+        <h1 class="mb-1">Employee Directory</h1>
+        <SfDropDownButton Content="Export" IconCss="fa-solid fa-download" CssClass="e-flat" Items="_exportItems" Disabled="_exporting">
+            <DropDownButtonEvents ItemSelected="HandleExportSelected" />
+        </SfDropDownButton>
+    </div>
+    <p class="text-muted mb-3">Full employee directory including department, position, manager, employment type, start date, status, work location and email.</p>
+
+    @if (_exportError is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_exportError
+            <button type="button" class="btn-close" @onclick="@(() => _exportError = null)"></button>
+        </div>
+    }
+
+    <ReportFilterPanel CompanyId="CompanyId" ReportId="employee-directory" OnFilterChanged="OnFilterChangedAsync" />
+
+    @if (_isLoading)
+    {
+        <HrLoadingIndicator Label="Loading employee directory…" />
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else
+    {
+        <HrGrid TValue="EmployeeDirectoryReportItemModel"
+                DataSource="@_items"
+                AllowPaging="false"
+                AllowSorting="false">
+            <GridColumns>
+                <GridColumn Field="@nameof(EmployeeDirectoryReportItemModel.EmployeeNumber)" HeaderText="Employee Number" Width="140" />
+                <GridColumn Field="@nameof(EmployeeDirectoryReportItemModel.Name)" HeaderText="Name" Width="180" />
+                <GridColumn Field="@nameof(EmployeeDirectoryReportItemModel.Department)" HeaderText="Department" Width="160" />
+                <GridColumn Field="@nameof(EmployeeDirectoryReportItemModel.Position)" HeaderText="Position" Width="160" />
+                <GridColumn Field="@nameof(EmployeeDirectoryReportItemModel.Manager)" HeaderText="Manager" Width="150" />
+                <GridColumn Field="@nameof(EmployeeDirectoryReportItemModel.EmploymentType)" HeaderText="Employment Type" Width="150" />
+                <GridColumn Field="@nameof(EmployeeDirectoryReportItemModel.StartDate)" HeaderText="Start Date" Width="120" Format="d" />
+                <GridColumn Field="@nameof(EmployeeDirectoryReportItemModel.Status)" HeaderText="Status" Width="120" />
+                <GridColumn Field="@nameof(EmployeeDirectoryReportItemModel.WorkLocation)" HeaderText="Work Location" Width="150" />
+                <GridColumn Field="@nameof(EmployeeDirectoryReportItemModel.Email)" HeaderText="Email" Width="220" />
+            </GridColumns>
+        </HrGrid>
+
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div>@_totalCount employee(s)</div>
+            <div class="d-flex align-items-center gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <label class="form-label mb-0">Sort by</label>
+                    <SfDropDownList TValue="string?" TItem="SortOption" DataSource="@_sortOptions"
+                                    Width="180px"
+                                    Value="@_sortBy" ValueChanged="OnSortChangedAsync">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
+                    <SfButton CssClass="e-outline e-small" OnClick="ToggleSortDirectionAsync">
+                        <i class="fa-solid @(_sortDescending ? "fa-arrow-down" : "fa-arrow-up")"></i>
+                    </SfButton>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <SfButton CssClass="e-outline e-small" Disabled="@(_page <= 1)" OnClick="@(() => GoToPageAsync(_page - 1))">Previous</SfButton>
+                    <span>Page @_page of @TotalPages</span>
+                    <SfButton CssClass="e-outline e-small" Disabled="@(_page >= TotalPages)" OnClick="@(() => GoToPageAsync(_page + 1))">Next</SfButton>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private List<EmployeeDirectoryReportItemModel> _items = [];
+    private int _totalCount;
+    private int _page = 1;
+    private const int PageSize = 20;
+    private string? _sortBy;
+    private bool _sortDescending;
+
+    private bool _isLoading = true;
+    private string? _error;
+
+    private EmployeeDirectoryReportFilter _currentFilter = new();
+
+    private bool _exporting;
+    private string? _exportError;
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(_totalCount / (double)PageSize));
+
+    private sealed record SortOption(string? Value, string Label);
+
+    private static readonly SortOption[] _sortOptions =
+    [
+        new(null, "Default"),
+        new("Name", "Name"),
+        new("Department", "Department"),
+        new("Position", "Position"),
+        new("StartDate", "Start Date"),
+        new("Status", "Status"),
+    ];
+
+    private static readonly List<Syncfusion.Blazor.SplitButtons.DropDownMenuItem> _exportItems =
+    [
+        new() { Id = "csv", Text = "CSV", IconCss = "fa-solid fa-file-csv" },
+        new() { Id = "excel", Text = "Excel", IconCss = "fa-solid fa-file-excel" },
+        new() { Id = "pdf", Text = "PDF", IconCss = "fa-solid fa-file-pdf" },
+    ];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task OnFilterChangedAsync(EmployeeDirectoryReportFilter filter)
+    {
+        _currentFilter = filter;
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task OnSortChangedAsync(string? value)
+    {
+        _sortBy = value;
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task ToggleSortDirectionAsync()
+    {
+        _sortDescending = !_sortDescending;
+        await LoadAsync();
+    }
+
+    private async Task GoToPageAsync(int page)
+    {
+        if (page < 1 || page > TotalPages) return;
+        _page = page;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _error = null;
+        StateHasChanged();
+
+        var filter = _currentFilter with
+        {
+            Page = _page,
+            PageSize = PageSize,
+            SortBy = _sortBy,
+            SortDescending = _sortDescending,
+        };
+
+        var response = await ReportingService.GetEmployeeDirectoryReportAsync(CompanyId, filter);
+        if (response is null)
+        {
+            _error = "Failed to load the employee directory report.";
+        }
+        else
+        {
+            _items = response.Items;
+            _totalCount = response.TotalCount;
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task HandleExportSelected(Syncfusion.Blazor.SplitButtons.MenuEventArgs args)
+    {
+        if (args.Item?.Id is not { } id) return;
+
+        var format = id switch
+        {
+            "csv" => ReportExportFormat.Csv,
+            "excel" => ReportExportFormat.Excel,
+            "pdf" => ReportExportFormat.Pdf,
+            _ => ReportExportFormat.Csv,
+        };
+
+        _exporting = true;
+        _exportError = null;
+        StateHasChanged();
+
+        var filter = _currentFilter with { SortBy = _sortBy, SortDescending = _sortDescending };
+        var (bytes, contentType, fileName, error) =
+            await ReportingService.ExportEmployeeDirectoryReportAsync(CompanyId, filter, format);
+
+        if (bytes is null)
+        {
+            _exportError = error ?? "Failed to export the employee directory report.";
+        }
+        else
+        {
+            await JS.InvokeVoidAsync(
+                "downloadFileFromBase64",
+                fileName ?? $"employee-directory.{format.ToString().ToLowerInvariant()}",
+                contentType ?? "application/octet-stream",
+                Convert.ToBase64String(bytes));
+        }
+
+        _exporting = false;
+        StateHasChanged();
+    }
+}

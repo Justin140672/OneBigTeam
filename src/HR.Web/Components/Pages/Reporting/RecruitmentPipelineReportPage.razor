@@ -1,0 +1,185 @@
+@page "/companies/{CompanyId:guid}/reporting/recruitment-pipeline"
+@rendermode InteractiveServer
+@using HR.Infrastructure.Abstractions
+@using HR.Web.Components.Controls
+@using HR.Web.Models
+@using HR.Web.Services
+@inject ReportingService ReportingService
+@inject IJSRuntime JS
+
+<PageTitle>Recruitment Pipeline Report</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+        <h1 class="mb-1">Recruitment Pipeline Report</h1>
+        <SfDropDownButton Content="Export" IconCss="fa-solid fa-download" CssClass="e-flat" Items="_exportItems" Disabled="_exporting">
+            <DropDownButtonEvents ItemSelected="HandleExportSelected" />
+        </SfDropDownButton>
+    </div>
+    <p class="text-muted mb-3">Vacancies, applicants, interviews, offers and hires grouped by recruiter or vacancy.</p>
+
+    @if (_exportError is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_exportError
+            <button type="button" class="btn-close" @onclick="@(() => _exportError = null)"></button>
+        </div>
+    }
+
+    <ReportFilterPanel CompanyId="CompanyId"
+                        ReportId="recruitment-pipeline-report"
+                        OnCriteriaChanged="OnFilterChangedAsync"
+                        ShowDepartmentFilter="false"
+                        ShowLocationFilter="false"
+                        ShowPositionProfileFilter="false"
+                        ShowManagerFilter="false"
+                        ShowEmploymentTypeFilter="false"
+                        ShowStatusFilter="false"
+                        DateRangeStartLabel="Start Date From"
+                        DateRangeEndLabel="Start Date To" />
+
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <label class="form-label mb-0">Group by</label>
+        <SfDropDownList TValue="RecruitmentPipelineGroupBy" TItem="GroupByOption" DataSource="@_groupByOptions"
+                        Width="180px"
+                        Value="@_groupBy" ValueChanged="OnGroupByChangedAsync">
+            <DropDownListFieldSettings Value="Value" Text="Label" />
+        </SfDropDownList>
+    </div>
+
+    @if (_isLoading)
+    {
+        <HrLoadingIndicator Label="Loading recruitment pipeline report…" />
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else
+    {
+        <HrGrid TValue="RecruitmentPipelineReportRowModel"
+                DataSource="@_items"
+                AllowPaging="true"
+                AllowSorting="true">
+            <GridColumns>
+                <GridColumn Field="@nameof(RecruitmentPipelineReportRowModel.GroupLabel)" HeaderText="@GroupLabelHeader" Width="180" />
+                <GridColumn Field="@nameof(RecruitmentPipelineReportRowModel.Vacancies)" HeaderText="Vacancies" Width="120" />
+                <GridColumn Field="@nameof(RecruitmentPipelineReportRowModel.Applicants)" HeaderText="Applicants" Width="120" />
+                <GridColumn Field="@nameof(RecruitmentPipelineReportRowModel.Interviews)" HeaderText="Interviews" Width="120" />
+                <GridColumn Field="@nameof(RecruitmentPipelineReportRowModel.Offers)" HeaderText="Offers" Width="120" />
+                <GridColumn Field="@nameof(RecruitmentPipelineReportRowModel.Hires)" HeaderText="Hires" Width="120" />
+            </GridColumns>
+        </HrGrid>
+
+        <div class="mt-3">@_items.Count row(s)</div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private List<RecruitmentPipelineReportRowModel> _items = [];
+
+    private bool _isLoading = true;
+    private string? _error;
+
+    private ReportFilterCriteriaModel _currentFilter = new();
+    private RecruitmentPipelineGroupBy _groupBy = RecruitmentPipelineGroupBy.Recruiter;
+
+    private bool _exporting;
+    private string? _exportError;
+
+    private string GroupLabelHeader => _groupBy == RecruitmentPipelineGroupBy.Vacancy ? "Vacancy" : "Recruiter";
+
+    private sealed record GroupByOption(RecruitmentPipelineGroupBy Value, string Label);
+
+    private static readonly GroupByOption[] _groupByOptions =
+    [
+        new(RecruitmentPipelineGroupBy.Recruiter, "Recruiter"),
+        new(RecruitmentPipelineGroupBy.Vacancy, "Vacancy"),
+    ];
+
+    private static readonly List<Syncfusion.Blazor.SplitButtons.DropDownMenuItem> _exportItems =
+    [
+        new() { Id = "csv", Text = "CSV", IconCss = "fa-solid fa-file-csv" },
+        new() { Id = "excel", Text = "Excel", IconCss = "fa-solid fa-file-excel" },
+        new() { Id = "pdf", Text = "PDF", IconCss = "fa-solid fa-file-pdf" },
+    ];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task OnFilterChangedAsync(ReportFilterCriteriaModel filter)
+    {
+        _currentFilter = filter;
+        await LoadAsync();
+    }
+
+    private async Task OnGroupByChangedAsync(RecruitmentPipelineGroupBy value)
+    {
+        _groupBy = value;
+        await LoadAsync();
+    }
+
+    private RecruitmentPipelineReportFilter BuildServiceFilter() => new(
+        StartDate: _currentFilter.DateRangeStart,
+        EndDate: _currentFilter.DateRangeEnd,
+        GroupBy: _groupBy);
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _error = null;
+        StateHasChanged();
+
+        var response = await ReportingService.GetRecruitmentPipelineReportAsync(CompanyId, BuildServiceFilter());
+        if (response is null)
+        {
+            _error = "Failed to load the recruitment pipeline report.";
+        }
+        else
+        {
+            _items = response.Items;
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task HandleExportSelected(Syncfusion.Blazor.SplitButtons.MenuEventArgs args)
+    {
+        if (args.Item?.Id is not { } id) return;
+
+        var format = id switch
+        {
+            "csv" => ReportExportFormat.Csv,
+            "excel" => ReportExportFormat.Excel,
+            "pdf" => ReportExportFormat.Pdf,
+            _ => ReportExportFormat.Csv,
+        };
+
+        _exporting = true;
+        _exportError = null;
+        StateHasChanged();
+
+        var (bytes, contentType, fileName, error) =
+            await ReportingService.ExportRecruitmentPipelineReportAsync(CompanyId, BuildServiceFilter(), format);
+
+        if (bytes is null)
+        {
+            _exportError = error ?? "Failed to export the recruitment pipeline report.";
+        }
+        else
+        {
+            await JS.InvokeVoidAsync(
+                "downloadFileFromBase64",
+                fileName ?? $"recruitment-pipeline-report.{format.ToString().ToLowerInvariant()}",
+                contentType ?? "application/octet-stream",
+                Convert.ToBase64String(bytes));
+        }
+
+        _exporting = false;
+        StateHasChanged();
+    }
+}

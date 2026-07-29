@@ -373,9 +373,7 @@ h3 {
 
 .employee-input-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .employee-input-row input {
@@ -403,12 +401,18 @@ h3 {
 
 .estimate-result {
   display: grid;
-  gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
   margin: 28px 0 18px;
   padding: 24px;
   border-radius: var(--radius);
   color: #fff;
   background: var(--navy);
+}
+
+.estimate-result > div {
+  display: grid;
+  gap: 6px;
 }
 
 .estimate-result span {
@@ -417,8 +421,118 @@ h3 {
 }
 
 .estimate-result strong {
-  font-size: clamp(2.3rem, 5vw, 4rem);
+  font-size: clamp(1.4rem, 3vw, 2.1rem);
   line-height: 1;
+}
+
+#employee-slider {
+  width: 100%;
+  accent-color: var(--teal);
+}
+
+.pricing-card-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
+  gap: clamp(32px, 6vw, 72px);
+  align-items: start;
+}
+
+.pricing-card {
+  padding: clamp(28px, 4vw, 40px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.pricing-headline {
+  display: block;
+  margin: 8px 0 24px;
+  color: var(--teal-dark);
+  font-size: clamp(2.2rem, 5vw, 3rem);
+  line-height: 1;
+}
+
+.tier-list {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 0 0 24px;
+  list-style: none;
+}
+
+.tier-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--soft);
+}
+
+.tier-list span {
+  color: var(--muted);
+}
+
+.minimum-charge-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 18px;
+}
+
+.minimum-charge-row span {
+  color: var(--muted);
+}
+
+.pricing-examples-table table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--card);
+}
+
+.pricing-examples-table th,
+.pricing-examples-table td {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.pricing-examples-table th {
+  background: var(--soft);
+  font-weight: 850;
+}
+
+.pricing-examples-table tr:last-child td {
+  border-bottom: none;
+}
+
+.pricing-examples-cards {
+  display: none;
+}
+
+.included-feature-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.included-feature-grid .feature-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  text-align: center;
+  font-weight: 850;
+}
+
+.included-feature-grid h3 {
+  margin: 0;
 }
 
 .rate-row {
@@ -1008,6 +1122,7 @@ h3 {
   .two-column,
   .pricing-panel,
   .estimator-grid,
+  .pricing-card-grid,
   .faq-grid,
   .feature-detail,
   .info-panel,
@@ -1018,7 +1133,8 @@ h3 {
 
   .feature-grid,
   .benefit-grid,
-  .feature-index {
+  .feature-index,
+  .included-feature-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1075,6 +1191,7 @@ h3 {
   .hero-grid,
   .pricing-hero-grid,
   .estimator-grid,
+  .pricing-card-grid,
   .faq-grid,
   .feature-detail,
   .info-panel,
@@ -1095,7 +1212,9 @@ h3 {
   .benefit-grid,
   .feature-index,
   .steps,
-  .footer-links {
+  .footer-links,
+  .included-feature-grid,
+  .estimate-result {
     grid-template-columns: 1fr;
   }
 
@@ -1103,6 +1222,29 @@ h3 {
   .rate-row {
     grid-template-columns: 1fr;
     display: grid;
+  }
+
+  .pricing-examples-table table {
+    display: none;
+  }
+
+  .pricing-examples-cards {
+    display: grid;
+    gap: 12px;
+  }
+
+  .pricing-example-card {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--card);
+  }
+
+  .pricing-example-card span {
+    color: var(--muted);
   }
 
   .steps li,

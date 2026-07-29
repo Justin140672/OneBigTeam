@@ -43,6 +43,8 @@ public static class TasksModule
         services.AddScoped<ITaskCompleter, TaskCompleter>();
         services.AddScoped<ITaskCanceller, TaskCanceller>();
         services.AddScoped<IOpenTaskBySourceEntityReader, OpenTaskBySourceEntityReader>();
+        services.AddScoped<IWorkloadActionProvider, EmployeeTasksOverdueWorkloadActionProvider>();
+        services.AddScoped<IWorkloadActionProvider, ManagerTasksOverdueWorkloadActionProvider>();
         services.AddScoped<TaskCompletionDispatcher>();
         services.AddScoped<ITaskCompletionAction, ProbationTaskCompletionAction>();
         services.AddScoped<ITaskCompletionAction, LeaveTaskCompletionAction>();

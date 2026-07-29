@@ -1,12 +1,6 @@
 const header = document.querySelector(".site-header");
 const menuToggle = document.querySelector(".menu-toggle");
 const navLinks = document.querySelectorAll(".site-nav a, .header-actions a");
-const PRICE_PER_EMPLOYEE = 4;
-const currencyFormatter = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-  maximumFractionDigits: 0,
-});
 
 menuToggle?.addEventListener("click", () => {
   const isOpen = header.classList.toggle("nav-open");
@@ -19,35 +13,6 @@ navLinks.forEach((link) => {
     menuToggle?.setAttribute("aria-expanded", "false");
   });
 });
-
-document.querySelectorAll("[data-price-per-employee]").forEach((element) => {
-  element.textContent = currencyFormatter.format(PRICE_PER_EMPLOYEE);
-});
-
-const employeeCountInput = document.querySelector("#employee-count");
-const estimatedPriceElements = document.querySelectorAll("[data-estimated-price]");
-const estimatedEmployeeElements = document.querySelectorAll("[data-estimated-employees]");
-
-function updateEstimate() {
-  if (!employeeCountInput) {
-    return;
-  }
-
-  const rawCount = Number.parseInt(employeeCountInput.value, 10);
-  const employeeCount = Number.isFinite(rawCount) && rawCount > 0 ? rawCount : 0;
-  const estimatedPrice = employeeCount * PRICE_PER_EMPLOYEE;
-
-  estimatedPriceElements.forEach((element) => {
-    element.textContent = currencyFormatter.format(estimatedPrice);
-  });
-
-  estimatedEmployeeElements.forEach((element) => {
-    element.textContent = String(employeeCount);
-  });
-}
-
-employeeCountInput?.addEventListener("input", updateEstimate);
-updateEstimate();
 
 const contactForm = document.querySelector("[data-contact-form]");
 const formStatus = document.querySelector("[data-form-status]");

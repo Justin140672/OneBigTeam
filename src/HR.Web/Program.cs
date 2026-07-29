@@ -65,6 +65,7 @@ builder.Services.AddScoped<ExternalRecruiterService>();
 builder.Services.AddScoped<RecruitmentStageService>();
 builder.Services.AddScoped<UserAdministrationService>();
 builder.Services.AddScoped<DataImportService>();
+builder.Services.AddScoped<ReportingService>();
 builder.Services.AddScoped<AppSession>();
 builder.Services.AddScoped<AuthenticationStateProvider, AppSessionAuthStateProvider>();
 builder.Services.AddAuthentication("NoOp")

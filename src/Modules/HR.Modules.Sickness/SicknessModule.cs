@@ -36,6 +36,8 @@ public static class SicknessModule
     {
         AddFeatureServices(services);
 
+        services.AddScoped<IWorkloadActionProvider, SicknessPendingActionsWorkloadActionProvider>();
+
         services.AddDbContext<SicknessDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "sickness")));
@@ -67,6 +69,7 @@ public static class SicknessModule
         services.AddScoped<ITaskCompletionAction, SicknessEvidenceUploadCompletionAction>();
         services.AddScoped<ITaskCompletionAction, CompleteReturnToWorkReviewFromTaskAction>();
         services.AddScoped<IEmployeeSicknessStatusReader, EmployeeSicknessStatusReader>();
+        services.AddScoped<ISicknessReportReader, SicknessReportReader>();
     }
 
     public static WebApplication UseSicknessRecurringJobs(this WebApplication app)

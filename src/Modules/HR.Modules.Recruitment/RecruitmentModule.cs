@@ -69,6 +69,7 @@ public static class RecruitmentModule
         AddFeatureServices(services);
         AddCandidateDocumentStorage(services, configuration);
         services.AddScoped<IInterviewFeedbackService, InterviewFeedbackService>();
+        services.AddScoped<IWorkloadActionProvider, VacanciesAwaitingActionWorkloadActionProvider>();
 
         services.AddDbContext<RecruitmentDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
@@ -223,6 +224,12 @@ public static class RecruitmentModule
         services.AddScoped<IValidator<SetRecruitmentStageActiveStatusRequest>, SetRecruitmentStageActiveStatusValidator>();
 
         services.AddScoped<GetRecruitmentStageUsageHandler>();
+
+        services.AddScoped<HR.Infrastructure.Abstractions.IEmployeeRecruiterReader, Services.EmployeeRecruiterReader>();
+
+        services.AddScoped<RecruitmentReportReader>();
+        services.AddScoped<IRecruitmentPipelineReader>(sp => sp.GetRequiredService<RecruitmentReportReader>());
+        services.AddScoped<IVacancyPerformanceReader>(sp => sp.GetRequiredService<RecruitmentReportReader>());
     }
 
     public static WebApplication UseRecruitmentRecurringJobs(this WebApplication app)
