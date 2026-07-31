@@ -37,7 +37,7 @@ public sealed class EmployeeUserAccountColumnTests(AppFixture fixture) : E2ETest
 
     private const string ActiveEmployeeName = "Laura Bennett";
     private const string DisableTargetEmployeeName = "Carlos Rivera";
-    private const string NoUserEmployeeName = "Sophie Laurent";
+    private const string NoUserEmployeeName = "Laurent";
 
     [Fact]
     public async Task UserAccountColumn_ShowsActiveIconAndLabel_ForEmployeeWithActiveAccount()

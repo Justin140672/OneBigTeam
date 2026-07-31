@@ -21,6 +21,7 @@ public sealed class ReportCatalogTests(AppFixture fixture) : E2ETestBase(fixture
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
+    private const string MarcusEmail = "marcus.diallo@acme.example"; // Recruiter
 
     [Fact]
     public async Task CatalogPage_Loads_WithEmployeeDirectoryCardVisible()
@@ -127,14 +128,18 @@ public sealed class ReportCatalogTests(AppFixture fixture) : E2ETestBase(fixture
         Assert.Contains(headers, h => h.Contains("Email"));
     }
 
+    // Recruitment-category entries ("Recruitment Pipeline Report", "Vacancy Performance Report")
+    // are deliberately excluded from this Theory: their catalog visibility is gated by the
+    // "reporting:view-recruitment" policy (Recruiter-only — see IdentityModule.AddPolicy), so an
+    // HR Administrator like Laura never sees those two cards. They're covered separately by
+    // NewRecruitmentReportCard_IsClickable_AndNavigatesToCorrectRoute below, logged in as a
+    // Recruiter instead.
     [Theory]
-    [InlineData("Employee Starters", "employee-starters")]
-    [InlineData("Employee Leavers", "employee-leavers")]
-    [InlineData("Leave Summary", "leave-summary")]
-    [InlineData("Leave Calendar", "leave-calendar")]
+    [InlineData("Employee Starter Report", "employee-starters")]
+    [InlineData("Employee Leaver Report", "employee-leavers")]
+    [InlineData("Leave Summary Report", "leave-summary")]
+    [InlineData("Leave Calendar Export", "leave-calendar")]
     [InlineData("Sickness Report", "sickness")]
-    [InlineData("Recruitment Pipeline Report", "recruitment-pipeline")]
-    [InlineData("Vacancy Performance Report", "vacancy-performance")]
     [InlineData("Probation Report", "probation")]
     [InlineData("Onboarding Progress Report", "onboarding-progress")]
     [InlineData("Offboarding Progress Report", "offboarding-progress")]
@@ -152,6 +157,29 @@ public sealed class ReportCatalogTests(AppFixture fixture) : E2ETestBase(fixture
 
         Assert.True(await catalog.HasCardAsync(cardTitleFragment),
             $"Expected the {cardTitleFragment} catalog card to be visible for an HR Administrator");
+        Assert.True(await catalog.IsCardClickableAsync(cardTitleFragment),
+            $"Expected the {cardTitleFragment} card to be clickable (no 'Coming soon' badge)");
+
+        await catalog.ClickCardAsync(cardTitleFragment);
+
+        await _page.WaitForURLAsync($"**/reporting/{routeSlug}", new() { Timeout = 15_000 });
+    }
+
+    [Theory]
+    [InlineData("Recruitment Pipeline Report", "recruitment-pipeline")]
+    [InlineData("Vacancy Performance Report", "vacancy-performance")]
+    public async Task NewRecruitmentReportCard_IsClickable_AndNavigatesToCorrectRoute(string cardTitleFragment, string routeSlug)
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var catalog = new ReportCatalogPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(MarcusEmail);
+
+        await catalog.GoToAsync(AcmeId);
+
+        Assert.True(await catalog.HasCardAsync(cardTitleFragment),
+            $"Expected the {cardTitleFragment} catalog card to be visible for a Recruiter");
         Assert.True(await catalog.IsCardClickableAsync(cardTitleFragment),
             $"Expected the {cardTitleFragment} card to be clickable (no 'Coming soon' badge)");
 
@@ -181,25 +209,25 @@ public sealed class ReportCatalogTests(AppFixture fixture) : E2ETestBase(fixture
 
         await catalog.GoToAsync(AcmeId);
 
-        Assert.False(await catalog.IsFavouritedAsync("Employee Starters"));
+        Assert.False(await catalog.IsFavouritedAsync("Employee Starter Report"));
 
-        await catalog.ClickFavouriteAsync("Employee Starters");
-        Assert.True(await catalog.IsFavouritedAsync("Employee Starters"));
+        await catalog.ClickFavouriteAsync("Employee Starter Report");
+        Assert.True(await catalog.IsFavouritedAsync("Employee Starter Report"));
 
         // Navigate away into the report page itself, then back to the catalog — proves the
         // favourite round-tripped through the server rather than only surviving in the same
         // component instance's in-memory state.
-        await catalog.ClickCardAsync("Employee Starters");
+        await catalog.ClickCardAsync("Employee Starter Report");
         await _page.WaitForURLAsync("**/reporting/employee-starters", new() { Timeout = 15_000 });
         Assert.False(await report.HasLoadErrorAsync());
 
         await catalog.GoToAsync(AcmeId);
 
-        Assert.True(await catalog.IsFavouritedAsync("Employee Starters"),
+        Assert.True(await catalog.IsFavouritedAsync("Employee Starter Report"),
             "Expected the favourite to survive navigating away to the report page and back");
 
         // Clean up so this test is repeatable against the shared, long-lived E2E dev database.
-        await catalog.ClickFavouriteAsync("Employee Starters");
-        Assert.False(await catalog.IsFavouritedAsync("Employee Starters"));
+        await catalog.ClickFavouriteAsync("Employee Starter Report");
+        Assert.False(await catalog.IsFavouritedAsync("Employee Starter Report"));
     }
 }

@@ -6,6 +6,11 @@ namespace HR.Modules.Sickness.Services;
 
 internal sealed class SicknessReportReader(SicknessDbContext dbContext) : ISicknessReportReader
 {
+    // Row cap (OBT-720 perf pass) — mirrors ExportEmployeeDirectoryReport's 50,000-row bound so
+    // this reader (used by both the on-screen report and its export) can't return an unbounded
+    // result set for a company with an unusually long sickness history.
+    private const int MaxRows = 50_000;
+
     public async Task<IReadOnlyList<SicknessReportRecordItem>> GetSicknessRecordsAsync(
         Guid companyId,
         DateOnly? startDate,
@@ -26,6 +31,8 @@ internal sealed class SicknessReportReader(SicknessDbContext dbContext) : ISickn
             query = query.Where(r => r.StartDate <= endDate);
 
         var records = await query
+            .OrderBy(r => r.Id)
+            .Take(MaxRows)
             .Select(r => new { r.EmployeeId, r.Id, r.StartDate, r.EndDate, r.TotalDays })
             .ToListAsync(cancellationToken);
 

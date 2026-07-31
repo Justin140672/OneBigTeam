@@ -14,7 +14,11 @@ public sealed class VacancyPerformanceReportTests(AppFixture fixture) : E2ETestB
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
+    // The endpoint behind this page is gated by the "reporting:view-recruitment" policy, which is
+    // Recruiter-only (see IdentityModule.AddPolicy("reporting:view-recruitment", ...)) — Laura
+    // Bennett (HR Administrator, no Recruiter role) would get 403 Forbidden here. Use the Recruiter
+    // persona, matching every other Recruitment-domain E2E test and RecruitmentPipelineReportTests.
+    private const string MarcusEmail = "marcus.diallo@acme.example"; // Recruiter
 
     [Fact]
     public async Task Page_Loads_WithExpectedColumns()
@@ -23,7 +27,7 @@ public sealed class VacancyPerformanceReportTests(AppFixture fixture) : E2ETestB
         var report = new VacancyPerformanceReportPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await report.GoToAsync(AcmeId);
 
@@ -45,7 +49,7 @@ public sealed class VacancyPerformanceReportTests(AppFixture fixture) : E2ETestB
         var report = new VacancyPerformanceReportPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await report.GoToAsync(AcmeId);
 
@@ -72,7 +76,7 @@ public sealed class VacancyPerformanceReportTests(AppFixture fixture) : E2ETestB
         var report = new VacancyPerformanceReportPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await report.GoToAsync(AcmeId);
 

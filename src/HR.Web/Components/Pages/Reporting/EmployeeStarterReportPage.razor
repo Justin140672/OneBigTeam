@@ -10,12 +10,7 @@
 <PageTitle>Employee Starter Report</PageTitle>
 
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-start mb-1">
-        <h1 class="mb-1">Employee Starters</h1>
-        <SfDropDownButton Content="Export" IconCss="fa-solid fa-download" CssClass="e-flat" Items="_exportItems" Disabled="_exporting">
-            <DropDownButtonEvents ItemSelected="HandleExportSelected" />
-        </SfDropDownButton>
-    </div>
+    <h1 class="mb-1">Employee Starters</h1>
     <p class="text-muted mb-3">Employees who started within the selected date range, including onboarding and probation status.</p>
 
     @if (_exportError is not null)
@@ -45,9 +40,13 @@
     else
     {
         <HrGrid TValue="EmployeeStarterReportItemModel"
+                Toolbar="@Toolbar"
                 DataSource="@_items"
-                AllowPaging="false"
-                AllowSorting="false">
+                TotalItemCount="@_totalCount"
+                AllowPaging="true"
+                AllowSorting="true">
+            <GridEvents TValue="EmployeeStarterReportItemModel" OnActionBegin="OnGridActionBeginAsync" />
+            <GridPageSettings PageSize="@PageSize" />
             <GridColumns>
                 <GridColumn Field="@nameof(EmployeeStarterReportItemModel.Name)" HeaderText="Name" Width="180" />
                 <GridColumn Field="@nameof(EmployeeStarterReportItemModel.StartDate)" HeaderText="Start Date" Width="120" Format="d" />
@@ -59,27 +58,7 @@
             </GridColumns>
         </HrGrid>
 
-        <div class="d-flex justify-content-between align-items-center mt-3">
-            <div>@_totalCount employee(s)</div>
-            <div class="d-flex align-items-center gap-3">
-                <div class="d-flex align-items-center gap-2">
-                    <label class="form-label mb-0">Sort by</label>
-                    <SfDropDownList TValue="string?" TItem="SortOption" DataSource="@_sortOptions"
-                                    Width="180px"
-                                    Value="@_sortBy" ValueChanged="OnSortChangedAsync">
-                        <DropDownListFieldSettings Value="Value" Text="Label" />
-                    </SfDropDownList>
-                    <SfButton CssClass="e-outline e-small" OnClick="ToggleSortDirectionAsync">
-                        <i class="fa-solid @(_sortDescending ? "fa-arrow-down" : "fa-arrow-up")"></i>
-                    </SfButton>
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                    <SfButton CssClass="e-outline e-small" Disabled="@(_page <= 1)" OnClick="@(() => GoToPageAsync(_page - 1))">Previous</SfButton>
-                    <span>Page @_page of @TotalPages</span>
-                    <SfButton CssClass="e-outline e-small" Disabled="@(_page >= TotalPages)" OnClick="@(() => GoToPageAsync(_page + 1))">Next</SfButton>
-                </div>
-            </div>
-        </div>
+        <div class="mt-3">@_totalCount employee(s)</div>
     }
 </div>
 
@@ -101,25 +80,6 @@
     private bool _exporting;
     private string? _exportError;
 
-    private int TotalPages => Math.Max(1, (int)Math.Ceiling(_totalCount / (double)PageSize));
-
-    private sealed record SortOption(string? Value, string Label);
-
-    private static readonly SortOption[] _sortOptions =
-    [
-        new(null, "Default"),
-        new("Name", "Name"),
-        new("StartDate", "Start Date"),
-        new("Department", "Department"),
-    ];
-
-    private static readonly List<Syncfusion.Blazor.SplitButtons.DropDownMenuItem> _exportItems =
-    [
-        new() { Id = "csv", Text = "CSV", IconCss = "fa-solid fa-file-csv" },
-        new() { Id = "excel", Text = "Excel", IconCss = "fa-solid fa-file-excel" },
-        new() { Id = "pdf", Text = "PDF", IconCss = "fa-solid fa-file-pdf" },
-    ];
-
     protected override async Task OnParametersSetAsync()
     {
         await LoadAsync();
@@ -132,23 +92,23 @@
         await LoadAsync();
     }
 
-    private async Task OnSortChangedAsync(string? value)
+    private async Task OnGridActionBeginAsync(Syncfusion.Blazor.Grids.ActionEventArgs<EmployeeStarterReportItemModel> args)
     {
-        _sortBy = value;
-        _page = 1;
-        await LoadAsync();
-    }
+        if (args.RequestType == Syncfusion.Blazor.Grids.Action.Paging)
+        {
+            _page = args.CurrentPage;
+        }
+        else if (args.RequestType == Syncfusion.Blazor.Grids.Action.Sorting)
+        {
+            _sortBy = args.ColumnName;
+            _sortDescending = args.ColumnName is not null && args.Direction == Syncfusion.Blazor.Grids.SortDirection.Descending;
+            _page = 1;
+        }
+        else
+        {
+            return;
+        }
 
-    private async Task ToggleSortDirectionAsync()
-    {
-        _sortDescending = !_sortDescending;
-        await LoadAsync();
-    }
-
-    private async Task GoToPageAsync(int page)
-    {
-        if (page < 1 || page > TotalPages) return;
-        _page = page;
         await LoadAsync();
     }
 
@@ -184,15 +144,21 @@
         _isLoading = false;
     }
 
-    private async Task HandleExportSelected(Syncfusion.Blazor.SplitButtons.MenuEventArgs args)
-    {
-        if (args.Item?.Id is not { } id) return;
+    private RenderFragment ExportMenuTemplate => @<ExportMenu OnItemSelected="HandleExportItemSelected" />;
 
+    private IEnumerable<object> Toolbar => new List<object>
+    {
+        "Print",
+        new Syncfusion.Blazor.Navigations.ItemModel { Id = "export", Type = Syncfusion.Blazor.Navigations.ItemType.Input, Template = ExportMenuTemplate, TooltipText = "Export" },
+    };
+
+    private async Task HandleExportItemSelected(string id)
+    {
         var format = id switch
         {
-            "csv" => ReportExportFormat.Csv,
-            "excel" => ReportExportFormat.Excel,
-            "pdf" => ReportExportFormat.Pdf,
+            "hr-csv" => ReportExportFormat.Csv,
+            "hr-excel" => ReportExportFormat.Excel,
+            "hr-pdf" => ReportExportFormat.Pdf,
             _ => ReportExportFormat.Csv,
         };
 

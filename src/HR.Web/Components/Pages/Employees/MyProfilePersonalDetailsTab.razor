@@ -123,6 +123,7 @@ else
                                Rows="5"
                                Maxlength="2000"
                                Placeholder="e.g. Please update my preferred name to &quot;Alex&quot; and my nationality to British."
+                               HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "pd-notes" })"
                                @bind-Value="_notes" />
                     @if (_notesError is not null)
                     {

@@ -221,8 +221,12 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     public async Task<string?> GetUserAccountStatusTextAsync(string nameFragment)
     {
         await SearchAsync(nameFragment);
-        var cell = Row(nameFragment).Locator(".e-rowcell").Last;
-        return (await cell.InnerTextAsync())?.Trim();
+        // The cell can also contain a trailing "Invite User" action link (rendered only for
+        // "NoUser" rows — see EmployeeList.razor's User Account GridColumn Template). Reading the
+        // whole cell's InnerText would concatenate that link's text onto the status label (e.g.
+        // "No UserInvite User"). Read only the status label <span> so callers get just the status.
+        var label = Row(nameFragment).Locator(".e-rowcell").Last.Locator("span.user-account-status-label").First;
+        return (await label.InnerTextAsync())?.Trim();
     }
 
     /// <summary>
@@ -246,7 +250,6 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<bool> HasInviteUserLinkAsync(string nameFragment)
     {
-        await SearchAsync(nameFragment);
         return await Row(nameFragment).GetByRole(AriaRole.Link, new() { Name = "Invite User" }).IsVisibleAsync();
     }
 
@@ -373,7 +376,14 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         var count = await rows.CountAsync();
         var result = new List<string>();
         for (var i = 0; i < count; i++)
-            result.Add((await rows.Nth(i).Locator(".e-rowcell").Last.InnerTextAsync()).Trim());
+        {
+            // Read only the status label <span> (see GetUserAccountStatusTextAsync above) —
+            // the cell's full InnerText would concatenate the "NoUser" row's trailing "Invite
+            // User" action-link text onto the label with no separator (e.g. "No UserInvite User"),
+            // breaking exact-match comparisons like the Excel-filter test's Assert.Equal.
+            var label = rows.Nth(i).Locator(".e-rowcell").Last.Locator("span.user-account-status-label").First;
+            result.Add((await label.InnerTextAsync()).Trim());
+        }
         return result;
     }
 

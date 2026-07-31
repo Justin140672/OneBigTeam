@@ -1,275 +1,286 @@
 @page "/pricing"
-@rendermode InteractiveServer
 @using HR.Marketing.Services
+@using Microsoft.Extensions.Options
+@inject IOptions<PricingOptions> PricingOptionsAccessor
+@inject IMarketingAnalytics Analytics
 
 <PageTitle>Pricing | One Big Team</PageTitle>
 <HeadContent>
-    <meta name="description" content="Simple, transparent One Big Team pricing based on active employees only. Every feature included, no contracts, no hidden costs.">
+    <meta name="description" content="Only pay for active employees. Every feature included.">
 </HeadContent>
 
 <SiteHeader CurrentPage="pricing" />
 
 <main>
-  <section class="pricing-hero section-band">
-    <div class="section-inner hero-copy">
-      <p class="eyebrow">Pricing</p>
-      <h1>Simple, transparent pricing.</h1>
-      <p class="hero-text">
-        Only pay for your active employees. Every feature included. No hidden costs.
-        No contracts. Cancel anytime.
-      </p>
-      <div class="hero-actions" id="trial">
-        <a class="button button-primary button-large" href="/contact#contact-form">Start free trial</a>
-        <a class="button button-secondary button-large" href="/contact#contact-form">Book a demo</a>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="section-inner pricing-card-grid">
-      <div class="pricing-card">
-        <p class="summary-label">Pricing</p>
-        <strong class="pricing-headline">&pound;2 per active employee</strong>
-
-        <ul class="tier-list">
-          <li>
-            <span>First 50 employees</span>
-            <strong>&pound;2.00 each</strong>
-          </li>
-          <li>
-            <span>Employees 51&ndash;150</span>
-            <strong>&pound;1.75 each</strong>
-          </li>
-          <li>
-            <span>Employees 151+</span>
-            <strong>&pound;1.50 each</strong>
-          </li>
-        </ul>
-
-        <div class="minimum-charge-row">
-          <span>Minimum monthly charge</span>
-          <strong>&pound;20/month</strong>
+    <section class="pricing-hero section-band">
+        <div class="section-inner hero-copy">
+            <p class="eyebrow">Pricing</p>
+            <h1>Simple, transparent pricing.</h1>
+            <p class="hero-text">
+                Only pay for active employees. Every feature included.
+                No setup fees • No contracts • Cancel anytime
+            </p>
         </div>
+    </section>
 
-        <p class="small-note">All prices exclude VAT where applicable.</p>
-      </div>
+    <section class="section pricing-section">
+        <div class="section-inner pricing-card-grid">
+            <div class="pricing-card">
+                <p class="summary-label">Pricing Tiers</p>
+                <div class="pricing-headline">From &pound;2</div>
+                <div class="pricing-headline">per employee</div>
 
-      <div class="estimator-card">
-        <p class="eyebrow">Pricing calculator</p>
-        <h2>Estimate your monthly price.</h2>
-        <label for="employee-count">Active employees</label>
-        <div class="employee-input-row">
-          <input
-            id="employee-count"
-            type="number"
-            min="0"
-            step="1"
-            inputmode="numeric"
-            value="@ActiveEmployees"
-            @oninput="OnEmployeeCountChanged"
-            aria-describedby="employee-count-help"
-          >
-          <input
-            id="employee-slider"
-            type="range"
-            min="0"
-            max="300"
-            step="1"
-            value="@ActiveEmployees"
-            @oninput="OnEmployeeCountChanged"
-            aria-hidden="true"
-            tabindex="-1"
-          >
-        </div>
-        <p id="employee-count-help">
-          Enter the number of active employees you expect to manage in One Big Team.
-        </p>
+                <ul class="tier-list">
+                    <li>
+                        <span>1-50 employees</span>
+                        <strong>&pound;2.00 each</strong>
+                    </li>
+                    <li>
+                        <span>51-150 employees</span>
+                        <strong>&pound;1.75 each</strong>
+                    </li>
+                    <li>
+                        <span>151+ employees</span>
+                        <strong>&pound;1.50 each</strong>
+                    </li>
+                </ul>
 
-        <div class="estimate-result" aria-live="polite" role="status">
-          <div>
-            <span>Monthly</span>
-            <strong>@FormatCurrency(Result.Monthly)</strong>
-          </div>
-          <div>
-            <span>Annual</span>
-            <strong>@FormatCurrency(Result.Annual)</strong>
-          </div>
-          <div>
-            <span>Effective price</span>
-            <strong>@FormatCurrency(Result.EffectivePricePerEmployee) per employee</strong>
-          </div>
-        </div>
+                <div class="minimum-charge-row">
+                    <span>Minimum monthly charge</span>
+                    <strong>&pound;20.00/month</strong>
+                </div>
 
-        <p class="small-note">
-          Estimate updates instantly as you type. Billing and payment details are
-          handled inside the One Big Team SaaS app.
-        </p>
-      </div>
-    </div>
-  </section>
-
-  <section class="section section-muted">
-    <div class="section-inner">
-      <div class="section-heading">
-        <p class="eyebrow">Pricing examples</p>
-        <h2>See how the price scales with your team.</h2>
-      </div>
-
-      <div class="pricing-examples-table">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Active employees</th>
-              <th scope="col">Monthly cost</th>
-            </tr>
-          </thead>
-          <tbody>
-            @foreach (var example in Examples)
-            {
-              <tr>
-                <td>@example.Employees</td>
-                <td>@FormatCurrency(example.Monthly)@(example.Employees == 10 ? " (minimum charge)" : "")</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-
-        <div class="pricing-examples-cards">
-          @foreach (var example in Examples)
-          {
-            <div class="pricing-example-card">
-              <span>@example.Employees employees</span>
-              <strong>@FormatCurrency(example.Monthly)@(example.Employees == 10 ? " (minimum charge)" : "")</strong>
+                <p>All prices exclude VAT where applicable.</p>
             </div>
-          }
+
+            <form class="estimator-card"
+                  method="get"
+                  data-pricing-estimator
+                  data-large-org-threshold="@PricingOptionsAccessor.Value.LargeOrganisationThreshold">
+                <p class="summary-label">Pricing calculator</p>
+                <span class="pricing-section">Monthly price</span>
+
+                <div>
+                    <div class="pricing-text" data-monthly-price><span>@FormatCurrency(Result.Monthly)/month</span></div>
+                </div>
+                <div data-effective-price>Equivalent to @FormatCurrency(Result.EffectivePricePerEmployee) per employee</div>
+
+                
+                <label for="employee-count">Active employees</label>
+                <div class="employee-input-row">
+                    <input id="employee-count"
+                           name="employees"
+                           type="number"
+                           min="0"
+                           step="1"
+                           inputmode="numeric"
+                           value="@DisplayEmployees"
+                           aria-describedby="@(ValidationMessage is null ? "employee-count-help" : "employee-count-help employee-count-error")"
+                           aria-invalid="@(ValidationMessage is not null)">
+                    <input id="employee-slider"
+                           type="range"
+                           min="0"
+                           max="1000"
+                           step="1"
+                           value="@DisplayEmployees"
+                           aria-hidden="true"
+                           tabindex="-1">
+                </div>
+                <p id="employee-count-help">
+                    Move the slider to estimate your monthly cost.
+                </p>
+                <p id="employee-count-error" class="field-error" role="alert" hidden="@(ValidationMessage is null)">@ValidationMessage</p>
+
+                <noscript>
+                    <button class="button button-secondary" type="submit">Recalculate</button>
+                </noscript>
+
+                @if (DisplayEmployees >= PricingOptionsAccessor.Value.LargeOrganisationThreshold)
+                {
+                    <div class="calculator-cta">
+                        <div class="hero-actions" data-cta-large hidden="@(!Cta.IsLargeOrganisation)">
+                            <a class="button button-primary button-large" href="/contact#contact-form" data-track-cta="contact-sales">Contact Sales</a>
+                        </div>
+                        <p class="cta-supporting-message" aria-live="polite" data-cta-message>@Cta.SupportingMessage</p>
+                    </div>
+
+                    <p class="small-note">
+                        Estimate updates instantly as you type. Billing and payment details are
+                        handled inside One Big Team.
+                    </p>
+                }
+            </form>
         </div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="section">
-    <div class="section-inner">
-      <div class="section-heading">
-        <p class="eyebrow">What is included</p>
-        <h2>Everything is included.</h2>
-      </div>
+    <section class="section section-muted">
+        <div class="section-inner">
+            <div class="section-heading">
+                <p class="eyebrow">Pricing examples</p>
+                <h2>See how the price scales with your team.</h2>
+            </div>
 
-      <div class="feature-grid included-feature-grid">
-        @foreach (var feature in IncludedFeatures)
-        {
-          <article class="feature-card">
-            <h3>@feature</h3>
-          </article>
-        }
-      </div>
-    </div>
-  </section>
+            <div class="pricing-examples-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">Active employees</th>
+                            <th scope="col">Monthly cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var example in Examples)
+                        {
+                            <tr>
+                                <td>@example.Employees</td>
+                                <td>@FormatCurrency(example.Monthly)@(example.Employees == 10 ? " (minimum charge)" : "")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
 
-  <section class="section section-muted">
-    <div class="section-inner">
-      <div class="section-heading">
-        <p class="eyebrow">Why our pricing is different</p>
-        <h2>Pricing that grows fairly with you.</h2>
-      </div>
-
-      <div class="benefit-grid">
-        <div>
-          <strong>Fair pricing</strong>
-          <p>You only pay for active employees.</p>
+                <div class="pricing-examples-cards">
+                    @foreach (var example in Examples)
+                    {
+                        <div class="pricing-example-card">
+                            <span>@example.Employees employees</span>
+                            <strong>@FormatCurrency(example.Monthly)@(example.Employees == 10 ? " (minimum charge)" : "")</strong>
+                        </div>
+                    }
+                </div>
+            </div>
         </div>
-        <div>
-          <strong>Rewarding growth</strong>
-          <p>The cost per employee decreases as your company grows.</p>
-        </div>
-        <div>
-          <strong>No feature limits</strong>
-          <p>Every customer receives every feature.</p>
-        </div>
-        <div>
-          <strong>Simple billing</strong>
-          <p>No contracts. No setup fees. No surprise charges.</p>
-        </div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="section faq-section">
-    <div class="section-inner faq-grid">
-      <div>
-        <p class="eyebrow">FAQ</p>
-        <h2>Pricing questions, answered simply.</h2>
-      </div>
+    <section class="section">
+        <div class="section-inner">
+            <div class="section-heading">
+                <p class="eyebrow">What is included</p>
+                <h2>Everything included.</h2>
+            </div>
 
-      <div class="faq-list">
-        <details>
-          <summary>Who counts as an active employee?</summary>
-          <p>Employees whose employment has started and who have not left the company.</p>
-        </details>
-        <details>
-          <summary>Are future starters billed?</summary>
-          <p>No. Employees are billed from their employment start date.</p>
-        </details>
-        <details>
-          <summary>Are former employees billed?</summary>
-          <p>No. Employees leaving your organisation stop being counted once they are no longer active.</p>
-        </details>
-        <details>
-          <summary>Are all features included?</summary>
-          <p>Yes. Every customer has access to every feature regardless of company size.</p>
-        </details>
-        <details>
-          <summary>Is there a minimum contract?</summary>
-          <p>No. You can cancel at any time.</p>
-        </details>
-        <details>
-          <summary>Is there a free trial?</summary>
-          <p>Yes. Start your free trial without speaking to sales.</p>
-        </details>
-        <details>
-          <summary>Do I pay for inactive users?</summary>
-          <p>No. Billing is based on active employees, not user accounts.</p>
-        </details>
-      </div>
-    </div>
-  </section>
+            <div class="feature-grid included-feature-grid">
+                @foreach (var feature in IncludedFeatures)
+                {
+                    <article class="feature-card">
+                        <h3>@feature</h3>
+                    </article>
+                }
+            </div>
+        </div>
+    </section>
 
-  <section id="contact" class="section final-cta">
-    <div class="section-inner cta-panel">
-      <p class="eyebrow">Ready to see your price in context?</p>
-      <h2>Start your free trial today.</h2>
-      <div class="hero-actions">
-        <a class="button button-primary button-large" href="/contact#contact-form">Start free trial</a>
-        <a class="button button-secondary button-large" href="/contact#contact-form">Book a demo</a>
-      </div>
-    </div>
-  </section>
+    <section class="section section-muted">
+        <div class="section-inner">
+            <div class="section-heading">
+                <p class="eyebrow">Why our pricing is different</p>
+                <h2>Pricing that grows with your business.</h2>
+            </div>
+
+            <div class="benefit-grid">
+                <div>
+                    <strong>Fair pricing</strong>
+                    <p>You only pay for active employees.</p>
+                </div>
+                <div>
+                    <strong>Rewarding growth</strong>
+                    <p>The cost per employee decreases as your company grows.</p>
+                </div>
+                <div>
+                    <strong>No feature limits</strong>
+                    <p>Every customer receives every feature.</p>
+                </div>
+                <div>
+                    <strong>Simple billing</strong>
+                    <p>No contracts. No setup fees. No surprise charges.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section faq-section">
+        <div class="section-inner faq-grid">
+            <div>
+                <p class="eyebrow">FAQ</p>
+                <h2>Pricing questions, answered simply.</h2>
+            </div>
+
+            <div class="faq-list">
+                <details>
+                    <summary>Who counts as an active employee?</summary>
+                    <p>Employees whose employment has started and who have not left the company.</p>
+                </details>
+                <details>
+                    <summary>Are future starters billed?</summary>
+                    <p>No. Employees are billed from their employment start date.</p>
+                </details>
+                <details>
+                    <summary>Are former employees billed?</summary>
+                    <p>No. Employees leaving your organisation stop being counted once they are no longer active.</p>
+                </details>
+                <details>
+                    <summary>Are all features included?</summary>
+                    <p>Yes. Every customer has access to every feature regardless of company size.</p>
+                </details>
+                <details>
+                    <summary>Is there a minimum contract?</summary>
+                    <p>No. You can cancel at any time.</p>
+                </details>
+                <details>
+                    <summary>Is there a free trial?</summary>
+                    <p>Yes. Start your free trial without speaking to sales.</p>
+                </details>
+                <details>
+                    <summary>Do I pay for inactive users?</summary>
+                    <p>No. Billing is based on active employees, not user accounts.</p>
+                </details>
+            </div>
+        </div>
+    </section>
+
+    <section id="contact" class="section final-cta">
+        <div class="section-inner cta-panel">
+            <p class="eyebrow">Ready to see your price in context?</p>
+            <h2>Start your free trial today.</h2>
+            <div class="hero-actions">
+                <a class="button button-primary button-large" href="/contact#contact-form">Start free trial</a>
+                <a class="button button-secondary button-large" href="/contact#contact-form">Book a demo</a>
+            </div>
+        </div>
+    </section>
 </main>
 
 <SiteFooter />
 
 @code {
-    private int ActiveEmployees = 75;
+    [SupplyParameterFromQuery(Name = "employees")]
+    public string? EmployeesQuery { get; set; }
 
-    private PricingResult Result => PricingCalculator.Calculate(ActiveEmployees);
+    private int DisplayEmployees;
+    private string? ValidationMessage;
 
-    private void OnEmployeeCountChanged(ChangeEventArgs e)
+    protected override void OnInitialized()
     {
-        if (int.TryParse(e.Value?.ToString(), out var value) && value >= 0)
-        {
-            ActiveEmployees = value;
-        }
+        var parsed = EmployeeCountInputParser.Parse(EmployeesQuery, fallback: 75);
+        DisplayEmployees = EmployeesQuery is null ? 75 : parsed.Value;
+        ValidationMessage = parsed.ValidationMessage;
+
+        Analytics.TrackPricingCalculatorViewed();
+        Analytics.TrackEmployeeCountChanged(DisplayEmployees, Result.Monthly, Cta.PrimaryLabel);
     }
+
+    private PricingResult Result => PricingCalculator.Calculate(DisplayEmployees);
+
+    private PricingCtaResult Cta => PricingCtaResolver.Resolve(DisplayEmployees, PricingOptionsAccessor.Value.LargeOrganisationThreshold);
 
     private static readonly (int Employees, decimal Monthly)[] Examples =
     [
         (10, PricingCalculator.Calculate(10).Monthly),
-        (20, PricingCalculator.Calculate(20).Monthly),
-        (30, PricingCalculator.Calculate(30).Monthly),
+        (25, PricingCalculator.Calculate(25).Monthly),
         (50, PricingCalculator.Calculate(50).Monthly),
         (75, PricingCalculator.Calculate(75).Monthly),
         (100, PricingCalculator.Calculate(100).Monthly),
         (150, PricingCalculator.Calculate(150).Monthly),
-        (200, PricingCalculator.Calculate(200).Monthly),
         (250, PricingCalculator.Calculate(250).Monthly),
     ];
 
@@ -278,16 +289,13 @@
         "Employee Management",
         "Leave Management",
         "Recruitment",
-        "Onboarding",
-        "Offboarding",
-        "HR Documents",
-        "Company Documents",
-        "Tasks",
+        "Onboarding/Offboarding",
+        "Documents",
         "Employee Assets",
         "Reporting",
-        "Company Policies",
-        "Dashboards",
-        "Notifications",
+        "HR Workflows",
+        "Unlimited Users",
+        "Free Upgrades"
     ];
 
     private static string FormatCurrency(decimal amount) => $"£{amount:0.00}";

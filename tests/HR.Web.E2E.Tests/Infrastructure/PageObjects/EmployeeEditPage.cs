@@ -538,7 +538,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         page.Locator("[data-testid='audit-history-grid'] .e-row").Filter(new() { HasText = actionFragment });
 
     public Task ClickViewAuditRowAsync(string actionFragment) =>
-        AuditHistoryRow(actionFragment).First.GetByTitle("View").ClickAsync();
+        AuditHistoryRow(actionFragment).First.GetByText("View").ClickAsync();
 
     public async Task<bool> HasAuditDetailDialogAsync() =>
         await page.Locator("[role='dialog'].audit-history-detail-dialog").IsVisibleAsync();

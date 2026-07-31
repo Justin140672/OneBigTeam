@@ -346,7 +346,8 @@
             </p>
             <div class="mb-2">
                 <label class="form-label">Reason <span class="text-danger">*</span></label>
-                <HrTextBox @bind-Value="_archiveReason" Multiline="true" Rows="3" Maxlength="500" />
+                <HrTextBox @bind-Value="_archiveReason" Multiline="true" Rows="3" Maxlength="500"
+                           HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "archive-reason" })" />
             </div>
             @if (!string.IsNullOrEmpty(_archiveError))
             {

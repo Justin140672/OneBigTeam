@@ -32,8 +32,9 @@
                 }
             </dl>
             <div class="mb-2">
-                <label class="form-label">Review Notes <span class="text-danger">*</span></label>
-                <HrTextBox @bind-Value="_reviewNotes" Multiline="true" Rows="4" Maxlength="2000" />
+                <label class="form-label" for="review-notes">Review Notes <span class="text-danger">*</span></label>
+                <HrTextBox @bind-Value="_reviewNotes" Multiline="true" Rows="4" Maxlength="2000"
+                           HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "review-notes" })" />
                 @if (!string.IsNullOrEmpty(_validationError))
                 {
                     <div class="text-danger small mt-1">@_validationError</div>

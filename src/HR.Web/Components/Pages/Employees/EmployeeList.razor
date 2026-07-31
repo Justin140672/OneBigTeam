@@ -94,12 +94,12 @@
                         @{
                             var row = (context as EmployeeListItemModel)!;
                             var (icon, cssClass, label) = UserAccountStatusDisplay(row.UserAccountStatus);
-                            <span class="@cssClass">
+                            <span class="user-account-status-label @cssClass">
                                 <i class="@icon me-1"></i>@label
                             </span>
                             @if (row.UserAccountStatus == "NoUser")
                             {
-                                <a href="javascript:void(0)" class="ms-2" @onclick="@(() => OnInviteUserClicked(row))">Invite User</a>
+                                <a href="javascript:void(0)" class="ms-2" @onclick="@(() => OnInviteUserClicked(row))">&nbsp;Invite User</a>
                             }
                         }
                     </Template>

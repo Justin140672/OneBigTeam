@@ -48,5 +48,21 @@ public static class DropDownSelector
 
         await Assertions.Expect(combobox.Locator("input").First)
             .ToHaveValueAsync(new Regex(Regex.Escape(text)), new() { Timeout = 10_000 });
+
+        // The assertion above only proves the client-side widget updated its own input text —
+        // Syncfusion Blazor Server components do that optimistically, in JS, on click, ahead of
+        // (and independent of) the SignalR round-trip that actually invokes the .NET
+        // ValueChange/ValueChanged handler and commits the bound value server-side. There is no
+        // generic, provably-server-committed DOM signal exposed by the component for this (no
+        // aria-busy toggle, no spinner tied to value-commit specifically — those only exist ad hoc
+        // on a handful of forms for unrelated async work). Waiting for the popup to fully detach
+        // (not just become hidden) plus a short fixed debounce is a pragmatic, non-deterministic
+        // mitigation for that race, matching the fixed-wait pattern already used elsewhere in this
+        // suite for the same class of Blazor Server timing issue (see e.g. EmployeeListPage,
+        // CompanyEditPage). It reduces — it does not guarantee — the race window; callers with a
+        // downstream element/condition that reliably only appears post-commit should still wait on
+        // that directly rather than relying solely on this.
+        await page.Locator(".e-popup.e-ddl").WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 5_000 });
+        await page.WaitForTimeoutAsync(250);
     }
 }

@@ -12,6 +12,9 @@ namespace HR.Modules.Probation.Services;
 /// </summary>
 internal sealed class ProbationReportReader(ProbationDbContext dbContext) : IProbationReportReader
 {
+    // Row cap (OBT-720 perf pass) — see SicknessReportReader.MaxRows for rationale.
+    private const int MaxRows = 50_000;
+
     public async Task<IReadOnlyList<ProbationReportItem>> GetProbationReportAsync(
         Guid companyId,
         IReadOnlyCollection<Guid>? employeeIds,
@@ -25,6 +28,8 @@ internal sealed class ProbationReportReader(ProbationDbContext dbContext) : IPro
             query = query.Where(r => employeeIds.Contains(r.EmployeeId));
 
         var records = await query
+            .OrderBy(r => r.Id)
+            .Take(MaxRows)
             .Select(r => new { r.Id, r.EmployeeId, r.Status, r.StartDate, r.ExpectedEndDate })
             .ToListAsync(cancellationToken);
 

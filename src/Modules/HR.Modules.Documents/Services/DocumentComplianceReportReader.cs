@@ -30,11 +30,16 @@ internal sealed class DocumentComplianceReportReader(
         // required-document set, which depends on their assigned position profile. Employees with
         // no position profile at all have no required-document set and are omitted from the
         // result entirely (simplest way to keep the comparison well-defined).
+        // Bulk call (OBT-720 perf pass) — replaces a former per-employee loop over
+        // IEmployeeAudienceReader.GetEmployeeAudienceAsync(companyId, employeeId, ...), which issued
+        // one query per employee in this report.
+        var audienceProfiles = await employeeAudienceReader.GetEmployeeAudienceProfilesAsync(
+            companyId, employeeIds, cancellationToken);
+
         var employeePositionProfiles = new Dictionary<Guid, Guid>();
         foreach (var employeeId in employeeIds)
         {
-            var profile = await employeeAudienceReader.GetEmployeeAudienceAsync(companyId, employeeId, cancellationToken);
-            if (profile?.PositionProfileId is { } ppId)
+            if (audienceProfiles.TryGetValue(employeeId, out var profile) && profile.PositionProfileId is { } ppId)
                 employeePositionProfiles[employeeId] = ppId;
         }
 

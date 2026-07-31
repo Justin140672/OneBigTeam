@@ -9,12 +9,7 @@
 <PageTitle>Document Acknowledgement Report</PageTitle>
 
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-start mb-1">
-        <h1 class="mb-1">Document Acknowledgement</h1>
-        <SfDropDownButton Content="Export" IconCss="fa-solid fa-download" CssClass="e-flat" Items="_exportItems" Disabled="_exporting">
-            <DropDownButtonEvents ItemSelected="HandleExportSelected" />
-        </SfDropDownButton>
-    </div>
+    <h1 class="mb-1">Document Acknowledgement</h1>
     <p class="text-muted mb-3">Company document acknowledgement status by employee.</p>
 
     @if (_exportError is not null)
@@ -48,6 +43,7 @@
         </div>
 
         <HrGrid TValue="CompanyDocumentAcknowledgementReportRowModel"
+                Toolbar="@Toolbar"
                 DataSource="@_items"
                 AllowPaging="true"
                 AllowSorting="true">
@@ -84,13 +80,6 @@
     private bool _exporting;
     private string? _exportError;
 
-    private static readonly List<Syncfusion.Blazor.SplitButtons.DropDownMenuItem> _exportItems =
-    [
-        new() { Id = "csv", Text = "CSV", IconCss = "fa-solid fa-file-csv" },
-        new() { Id = "excel", Text = "Excel", IconCss = "fa-solid fa-file-excel" },
-        new() { Id = "pdf", Text = "PDF", IconCss = "fa-solid fa-file-pdf" },
-    ];
-
     protected override async Task OnParametersSetAsync()
     {
         await LoadAsync();
@@ -118,15 +107,21 @@
         _isLoading = false;
     }
 
-    private async Task HandleExportSelected(Syncfusion.Blazor.SplitButtons.MenuEventArgs args)
-    {
-        if (args.Item?.Id is not { } id) return;
+    private RenderFragment ExportMenuTemplate => @<ExportMenu OnItemSelected="HandleExportItemSelected" />;
 
+    private IEnumerable<object> Toolbar => new List<object>
+    {
+        "Print",
+        new Syncfusion.Blazor.Navigations.ItemModel { Id = "export", Type = Syncfusion.Blazor.Navigations.ItemType.Input, Template = ExportMenuTemplate, TooltipText = "Export" },
+    };
+
+    private async Task HandleExportItemSelected(string id)
+    {
         var format = id switch
         {
-            "csv" => ReportExportFormat.Csv,
-            "excel" => ReportExportFormat.Excel,
-            "pdf" => ReportExportFormat.Pdf,
+            "hr-csv" => ReportExportFormat.Csv,
+            "hr-excel" => ReportExportFormat.Excel,
+            "hr-pdf" => ReportExportFormat.Pdf,
             _ => ReportExportFormat.Csv,
         };
 

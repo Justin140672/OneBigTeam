@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Modules.Reporting.Features.GetWorkloadActions;
 
@@ -15,7 +16,7 @@ namespace HR.Modules.Reporting.Features.GetWorkloadActions;
 /// gate, real filtering happens per-provider.
 /// </summary>
 internal sealed class GetWorkloadActionsHandler(
-    IEnumerable<IWorkloadActionProvider> providers,
+    IServiceScopeFactory scopeFactory,
     IEmployeeDirectoryReader employeeDirectoryReader,
     IEmployeeRecruiterReader employeeRecruiterReader,
     IClock clock)
@@ -27,12 +28,30 @@ internal sealed class GetWorkloadActionsHandler(
     {
         var today = DateOnly.FromDateTime(clock.UtcNow);
 
-        var allActions = new List<WorkloadAction>();
-        foreach (var provider in providers)
+        // Invoked in parallel (OBT-720 perf pass) since this is the highest fan-out endpoint (17
+        // providers today, one per outstanding-action category across modules) and each provider is
+        // independent with no shared mutable state. IMPORTANT: providers are NOT called directly off
+        // the handler's own DI scope — several modules register more than one IWorkloadActionProvider
+        // against the same module DbContext (e.g. Documents has 3, Identity has 2, Tasks has 2), and
+        // because DbContext is scoped-per-request all of those providers would share one DbContext
+        // instance within this handler's own scope. EF Core DbContext is not thread-safe, so running
+        // them concurrently against that shared instance would be a real bug, not a fix. Instead each
+        // parallel call gets its own freshly-created DI scope, guaranteeing each provider resolves a
+        // dedicated DbContext instance even when multiple providers share a DbContext type.
+        int providerCount;
+        using (var countingScope = scopeFactory.CreateScope())
         {
-            var actions = await provider.GetActionsAsync(request.CompanyId, caller, cancellationToken);
-            allActions.AddRange(actions);
+            providerCount = countingScope.ServiceProvider.GetServices<IWorkloadActionProvider>().Count();
         }
+
+        var resultsPerProvider = await Task.WhenAll(Enumerable.Range(0, providerCount).Select(async index =>
+        {
+            using var scope = scopeFactory.CreateScope();
+            var provider = scope.ServiceProvider.GetServices<IWorkloadActionProvider>().ElementAt(index);
+            return await provider.GetActionsAsync(request.CompanyId, caller, cancellationToken);
+        }));
+
+        var allActions = resultsPerProvider.SelectMany(actions => actions).ToList();
 
         var withUrgency = allActions
             .Select(a => a with { Urgency = WorkloadAction.ComputeUrgency(a.DueDate, today) })

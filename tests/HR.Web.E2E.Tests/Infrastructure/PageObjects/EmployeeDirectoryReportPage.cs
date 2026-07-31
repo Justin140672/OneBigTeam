@@ -1,3 +1,4 @@
+using HR.Web.E2E.Tests.Infrastructure;
 using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
@@ -76,46 +77,64 @@ public sealed class EmployeeDirectoryReportPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
-    // ── Sort ───────────────────────────────────────────────────────────────────
+    // ── Sort (native SfGrid click-to-sort column headers) ───────────────────────
 
-    public async Task SelectSortByAsync(string label)
+    private ILocator HeaderCell(string headerText) =>
+        page.Locator(".e-headercell").Filter(new() { HasText = headerText }).First;
+
+    /// <summary>
+    /// Clicks the grid's column header for <paramref name="headerText"/> to sort by it (Syncfusion's
+    /// native click-to-sort UI, replacing the removed "Sort by" dropdown). Clicking the same header
+    /// again toggles the sort direction, matching Syncfusion's default behavior.
+    /// </summary>
+    public async Task SortByColumnAsync(string headerText)
     {
-        var sortField = page.Locator("label.form-label").Filter(new() { HasText = "Sort by" }).Locator("xpath=..");
-        await DropDownSelector.SelectAsync(page, sortField, label);
+        await HeaderCell(headerText).ClickAsync();
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
-    public async Task ToggleSortDirectionAsync()
+    /// <summary>
+    /// Returns "ascending"/"descending" for the header matching <paramref name="headerText"/> based
+    /// on Syncfusion's <c>aria-sort</c> attribute (version-independent, unlike CSS class names), or
+    /// null if the column isn't currently sorted.
+    /// </summary>
+    public async Task<string?> GetSortDirectionAsync(string headerText) =>
+        await HeaderCell(headerText).GetAttributeAsync("aria-sort") switch
+        {
+            "ascending" => "ascending",
+            "descending" => "descending",
+            _ => null,
+        };
+
+    // ── Paging (native SfGrid pager) ─────────────────────────────────────────
+
+    private ILocator NextPageButton => page.Locator(".e-pagercontainer .e-nextpage");
+    private ILocator PreviousPageButton => page.Locator(".e-pagercontainer .e-prevpage");
+    private ILocator CurrentPageItem => page.Locator(".e-pagercontainer .e-numericitem.e-currentitem");
+
+    public async Task<bool> IsNextPageDisabledAsync() =>
+        await NextPageButton.GetAttributeAsync("aria-disabled") == "true";
+
+    public async Task<bool> IsPreviousPageDisabledAsync() =>
+        await PreviousPageButton.GetAttributeAsync("aria-disabled") == "true";
+
+    public async Task ClickNextPageAsync()
     {
-        await page.Locator("i.fa-arrow-down, i.fa-arrow-up").Locator("xpath=ancestor::button[1]").ClickAsync();
+        await NextPageButton.ClickAsync();
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
-    // ── Paging ─────────────────────────────────────────────────────────────────
-
-    private ILocator PreviousButton => page.GetByRole(AriaRole.Button, new() { Name = "Previous" });
-    private ILocator NextButton => page.GetByRole(AriaRole.Button, new() { Name = "Next" });
-
-    public Task<bool> IsPreviousDisabledAsync() => PreviousButton.IsDisabledAsync();
-    public Task<bool> IsNextDisabledAsync() => NextButton.IsDisabledAsync();
-
-    public async Task ClickNextAsync()
+    public async Task ClickPreviousPageAsync()
     {
-        await NextButton.ClickAsync();
+        await PreviousPageButton.ClickAsync();
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
-    public async Task ClickPreviousAsync()
+    /// <summary>The active page number, read from Syncfusion's highlighted pager item.</summary>
+    public async Task<int> GetCurrentPageNumberAsync()
     {
-        await PreviousButton.ClickAsync();
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
-    }
-
-    /// <summary>The "Page X of Y" pager status text.</summary>
-    public async Task<string?> GetPagerStatusTextAsync()
-    {
-        var status = page.Locator("span").Filter(new() { HasTextRegex = new System.Text.RegularExpressions.Regex("^Page \\d+ of \\d+$") }).First;
-        return (await status.TextContentAsync())?.Trim();
+        var text = (await CurrentPageItem.TextContentAsync())?.Trim() ?? "1";
+        return int.Parse(text);
     }
 
     // ── Export ─────────────────────────────────────────────────────────────────
@@ -140,4 +159,75 @@ public sealed class EmployeeDirectoryReportPage(IPage page, string baseUrl)
 
     /// <summary>True if the page rendered its own graceful error banner rather than crashing (e.g. on a 403 from the report data endpoint).</summary>
     public async Task<bool> HasLoadErrorAsync() => await page.Locator(".alert-danger").IsVisibleAsync();
+
+    // ── Saved Views (ReportFilterPanel) ─────────────────────────────────────────
+
+    private ILocator SavedViewsField =>
+        page.Locator(".card-body .col-md-4").Filter(new() { HasText = "Saved Views" }).First;
+
+    /// <summary>
+    /// Selects <paramref name="viewNameOrDisplayText"/> in the "Saved Views" dropdown via the
+    /// shared DropDownSelector — never hand-rolled. Selecting a view re-applies its saved filters
+    /// (OnSavedViewSelectedAsync in ReportFilterPanel.razor).
+    /// </summary>
+    public async Task SelectSavedViewAsync(string viewNameOrDisplayText)
+    {
+        await DropDownSelector.SelectAsync(page, SavedViewsField, viewNameOrDisplayText);
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+    }
+
+    /// <summary>
+    /// Opens the "Saved Views" dropdown popup and returns the visible option labels (e.g.
+    /// "My View" or "My View (Default)" for the default view), then closes the popup again
+    /// without selecting anything.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetSavedViewOptionTextsAsync()
+    {
+        var combobox = SavedViewsField.Locator("span[role='combobox']").First;
+        await combobox.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+
+        var items = await page.Locator(".e-popup.e-ddl .e-list-item").AllAsync();
+        var result = new List<string>();
+        foreach (var item in items)
+            result.Add((await item.TextContentAsync())?.Trim() ?? "");
+
+        await page.Keyboard.PressAsync("Escape");
+        return result;
+    }
+
+    /// <summary>Clicks "Save current filters as view", fills the "View name" textbox, then clicks "Save".</summary>
+    public async Task SaveCurrentFiltersAsNewViewAsync(string name)
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save current filters as view" }).ClickAsync();
+        await page.GetByPlaceholder("View name").FillAsync(name);
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+    }
+
+    /// <summary>Clicks "Rename" on the currently selected saved view, fills the new name, then clicks "Save Name".</summary>
+    public async Task RenameSelectedViewAsync(string newName)
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Rename", Exact = true }).ClickAsync();
+        await page.GetByPlaceholder("View name").FillAsync(newName);
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save Name" }).ClickAsync();
+    }
+
+    /// <summary>Clicks "Set Default" for the currently selected saved view.</summary>
+    public Task SetSelectedViewAsDefaultAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Set Default" }).ClickAsync();
+
+    /// <summary>Clicks "Delete" for the currently selected saved view.</summary>
+    public Task DeleteSelectedViewAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Delete", Exact = true }).ClickAsync();
+
+    /// <summary>
+    /// The saved-views error banner text (ReportFilterPanel.razor's own alert-danger, distinct
+    /// from the grid-load error banner reused by <see cref="HasLoadErrorAsync"/>), or null if not present.
+    /// </summary>
+    public async Task<string?> GetSavedViewErrorAsync()
+    {
+        var banner = page.Locator(".card-body .alert-danger");
+        return await banner.IsVisibleAsync() ? (await banner.TextContentAsync())?.Trim() : null;
+    }
 }

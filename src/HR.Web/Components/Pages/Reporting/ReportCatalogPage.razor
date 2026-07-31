@@ -4,6 +4,7 @@
 @using HR.Web.Services
 @inject ReportingService ReportingService
 @inject NavigationManager Navigation
+@inject AppSession Session
 
 <PageTitle>Reporting</PageTitle>
 
@@ -101,12 +102,17 @@
         var response = await ReportingService.GetReportCatalogAsync(CompanyId);
         if (response is null)
         {
-            _error = "Failed to load the report catalog.";
+            // The catalog endpoint requires baseline "reporting:view" access (Manager, Recruiter
+            // or HrAdministrator); a caller with none of those roles is denied outright (403) and
+            // GetReportCatalogAsync surfaces that as a null response. Rather than showing a raw
+            // error banner here, redirect to the caller's default location — mirroring the
+            // Session.MyProfileUrl redirect-on-unauthorized convention used by every other gated
+            // list page (see DepartmentList.razor, LocationList.razor, LeaveTypeList.razor, etc.).
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            return;
         }
-        else
-        {
-            _items = response.Items;
-        }
+
+        _items = response.Items;
 
         await LoadFavouritesAsync();
 

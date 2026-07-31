@@ -235,7 +235,13 @@ public sealed class VacancyManagementTests(AppFixture fixture) : E2ETestBase(fix
         await vacancyList.ClickVacancyAsync(vacancyTitle);
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
-        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateEmail);
+        // Search by last name (not email) here: the candidate dropdown's committed input is bound
+        // to FullName (DropDownListFieldSettings Text="FullName" in VacancyApplicationsTab.razor),
+        // so the shared DropDownSelector's post-selection value assertion needs the search text to
+        // also appear in that committed FullName value. The candidate service searches
+        // FirstName/LastName/Email server-side (ListCandidatesHandler), so searching by last name
+        // still uniquely matches this candidate.
+        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateLast);
         await vacancyDetail.SubmitAddApplicationAsync();
 
         await vacancyList.GoToAsync(AcmeId);

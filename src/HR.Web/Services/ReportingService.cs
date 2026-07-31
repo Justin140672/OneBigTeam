@@ -1,3 +1,4 @@
+using System.Net;
 using HR.Infrastructure.Abstractions;
 using HR.Web.Models;
 using System.Web;
@@ -373,18 +374,23 @@ public class ReportingService(IHttpClientFactory httpClientFactory)
 
     // ── Recruitment Pipeline report ──────────────────────────────────────────
 
-    public async Task<GetRecruitmentPipelineReportResponse?> GetRecruitmentPipelineReportAsync(
+    public async Task<(GetRecruitmentPipelineReportResponse? Response, string? Error)> GetRecruitmentPipelineReportAsync(
         Guid companyId, RecruitmentPipelineReportFilter filter, CancellationToken cancellationToken = default)
     {
         try
         {
             var query = BuildQuery(filter);
-            return await Http.GetFromJsonAsync<GetRecruitmentPipelineReportResponse>(
+            var response = await Http.GetFromJsonAsync<GetRecruitmentPipelineReportResponse>(
                 $"api/companies/{companyId}/reporting/recruitment-pipeline?{query}", HrApiJsonOptions.Default, cancellationToken);
+            return (response, null);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Forbidden)
+        {
+            return (null, "You do not have permission to view this report.");
         }
         catch (HttpRequestException)
         {
-            return null;
+            return (null, "Failed to load the recruitment pipeline report.");
         }
     }
 

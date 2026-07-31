@@ -127,6 +127,7 @@ public sealed class VacancyPositionProfileCorrectionTests(AppFixture fixture) : 
         var candidateFirst = "E2E";
         var candidateLast = $"CorrCand{unique}";
         var candidateEmail = $"e2e.corrcand{unique}@example.com";
+        var candidateName =$"{candidateFirst} {candidateLast}";
         var vacancyTitle = $"E2E Correction {unique}";
 
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
@@ -155,7 +156,7 @@ public sealed class VacancyPositionProfileCorrectionTests(AppFixture fixture) : 
         await vacancyList.ClickVacancyAsync(vacancyTitle);
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
-        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateEmail);
+        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateName);
         await vacancyDetail.SubmitAddApplicationAsync();
 
         // Back to the Overview tab, where the Position Profile card / correction section live.

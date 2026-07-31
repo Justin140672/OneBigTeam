@@ -192,6 +192,18 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
                 break;
 
             default:
+                // Skip items whose toolbar slot has been overridden with a Template (Type ==
+                // ItemType.Input) — e.g. EmployeeList's EmployeeToolbar swaps the plain
+                // "hr-bulk-update" button for a BulkUpdateMenu dropdown Template that manages its
+                // own click/selection flow via its own ItemSelected event. Without this guard, a
+                // single click on such a templated toolbar item both opens its own popup/dropdown
+                // AND bubbles up as a native grid toolbar click here, double-firing the registered
+                // customAction.OnClick (e.g. immediately opening BulkCompensationUpdateDialog while
+                // the BulkUpdateMenu dropdown is still open), which caused the dialog to render on
+                // top of — and intercept pointer events for — the still-open dropdown menu.
+                if (args.Item.Type == ItemType.Input)
+                    break;
+
                 var customAction = _customActions.FirstOrDefault(a => a.Id == args.Item.Id);
                 if (customAction is not null && _hasSelection && Grid is not null)
                 {

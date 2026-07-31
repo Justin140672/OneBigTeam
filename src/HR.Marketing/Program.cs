@@ -1,11 +1,14 @@
 using HR.Marketing.Components;
+using HR.Marketing.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 // Add services to the container.
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+builder.Services.AddRazorComponents();
+
+builder.Services.Configure<PricingOptions>(builder.Configuration);
+builder.Services.AddSingleton<IMarketingAnalytics, LoggingMarketingAnalytics>();
 
 var app = builder.Build();
 
@@ -18,8 +21,7 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 app.UseAntiforgery();
 
 app.MapStaticAssets();
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+app.MapRazorComponents<App>();
 app.MapDefaultEndpoints();
 
 app.Run();

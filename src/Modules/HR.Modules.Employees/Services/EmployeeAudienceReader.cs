@@ -21,6 +21,23 @@ internal sealed class EmployeeAudienceReader(EmployeesDbContext dbContext) : IEm
             : new EmployeeAudienceProfile(employee.DepartmentId, employee.LocationId, employee.PositionProfileId);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, EmployeeAudienceProfile>> GetEmployeeAudienceProfilesAsync(
+        Guid companyId, IReadOnlyCollection<Guid> employeeIds, CancellationToken cancellationToken)
+    {
+        if (employeeIds.Count == 0)
+            return new Dictionary<Guid, EmployeeAudienceProfile>();
+
+        var employees = await dbContext.Employees
+            .AsNoTracking()
+            .Where(e => e.CompanyId == companyId && employeeIds.Contains(e.Id))
+            .Select(e => new { e.Id, e.DepartmentId, e.LocationId, e.PositionProfileId })
+            .ToListAsync(cancellationToken);
+
+        return employees.ToDictionary(
+            e => e.Id,
+            e => new EmployeeAudienceProfile(e.DepartmentId, e.LocationId, e.PositionProfileId));
+    }
+
     public async Task<IReadOnlyList<EmployeeAudienceDetail>> GetEmployeeAudienceDetailsAsync(
         Guid companyId, IReadOnlyCollection<Guid> employeeIds, CancellationToken cancellationToken)
     {

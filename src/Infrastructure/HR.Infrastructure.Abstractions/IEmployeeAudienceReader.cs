@@ -20,6 +20,16 @@ public interface IEmployeeAudienceReader
     Task<EmployeeAudienceProfile?> GetEmployeeAudienceAsync(
         Guid companyId, Guid employeeId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Batch equivalent of <see cref="GetEmployeeAudienceAsync(Guid,Guid,CancellationToken)"/> for a
+    /// set of employees in one query — avoids N+1 queries when a caller (e.g. the Document
+    /// Compliance Report, OBT-720) needs the department/location/position profile for many
+    /// employees at once. Employees with no match (not found) are simply absent from the returned
+    /// dictionary.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, EmployeeAudienceProfile>> GetEmployeeAudienceProfilesAsync(
+        Guid companyId, IReadOnlyCollection<Guid> employeeIds, CancellationToken cancellationToken);
+
     /// <summary>Batch department/location lookup for a set of employees — avoids N+1 queries when rendering an employee list.</summary>
     Task<IReadOnlyList<EmployeeAudienceDetail>> GetEmployeeAudienceDetailsAsync(
         Guid companyId, IReadOnlyCollection<Guid> employeeIds, CancellationToken cancellationToken);

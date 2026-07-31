@@ -27,7 +27,10 @@ public class ExportWorkloadActionsHandlerTests
         IEnumerable<IWorkloadActionProvider> providers, FakeReportExporter exporter) =>
         new(
             new GetWorkloadActionsHandler(
-                providers, new FakeEmployeeDirectoryReader([]), new FakeEmployeeRecruiterReader(), new FakeClock(FixedUtcNow)),
+                new FakeServiceScopeFactory([.. providers]),
+                new FakeEmployeeDirectoryReader([]),
+                new FakeEmployeeRecruiterReader(),
+                new FakeClock(FixedUtcNow)),
             exporter);
 
     private static System.Security.Claims.ClaimsPrincipal AnyCaller() =>

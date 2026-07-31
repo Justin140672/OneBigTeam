@@ -12,4 +12,11 @@ internal sealed class FakeAssignedAssetReader(
         Guid employeeId,
         CancellationToken cancellationToken) =>
         Task.FromResult(_items);
+
+    public Task<IReadOnlyDictionary<Guid, IReadOnlyList<AssignedAssetItem>>> GetAssignedAssetsAsync(
+        Guid companyId,
+        IReadOnlyCollection<Guid> employeeIds,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, IReadOnlyList<AssignedAssetItem>>>(
+            employeeIds.ToDictionary(id => id, _ => _items));
 }

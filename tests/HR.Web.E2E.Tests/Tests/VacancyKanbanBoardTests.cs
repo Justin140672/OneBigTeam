@@ -209,6 +209,7 @@ public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fi
         var unique         = Guid.NewGuid().ToString("N")[..8];
         var candidateFirst = "E2E";
         var candidateLast  = $"Kanban{unique}";
+        var candidateName = $"{candidateFirst} {candidateLast}";
         var candidateEmail = $"e2e.kanban{unique}@example.com";
         var vacancyTitle   = $"E2E Kanban Role {unique}";
         _vacancyTitle = vacancyTitle;
@@ -240,7 +241,7 @@ public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fi
         await vacancyList.ClickVacancyAsync(vacancyTitle);
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
-        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateEmail);
+        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateName);
         await vacancyDetail.SubmitAddApplicationAsync();
 
         Assert.Equal(InitialStage, await vacancyDetail.GetApplicationStatusAsync(candidateLast));

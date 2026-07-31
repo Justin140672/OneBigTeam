@@ -182,8 +182,9 @@ public sealed class WorkloadActionsReportTests(AppFixture fixture) : E2ETestBase
         // reliable either without known seed data, so instead narrow via the Due Date range to a
         // window far in the past, which the seeded E2E environment's outstanding (not-yet-resolved)
         // actions cannot fall inside.
-        await report.SelectUrgencyAsync("Overdue");
-        await report.SelectStatusAsync("Completed");
+        await report.SetDueDateRangeAsync(
+            new DateOnly(1900, 1, 1),
+            new DateOnly(1900, 1, 2));
         await report.ApplyFiltersAsync();
 
         Assert.False(await report.HasLoadErrorAsync());
@@ -229,19 +230,22 @@ public sealed class WorkloadActionsReportTests(AppFixture fixture) : E2ETestBase
     public async Task NonHrPersona_DoesNotSeeWorkloadActionsCard_InCatalog()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
-        var catalog = new ReportCatalogPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
-        await catalog.GoToAsync(AcmeId);
-
         // Tom (plain Employee, no reporting:view or any reporting sub-policy at all) cannot open
-        // the report catalog's data at all — the catalog endpoint filters out every entry
-        // server-side for a caller without any reporting role, so there is no card to hide
-        // client-side, mirroring EmployeeDirectoryReportTests.NonHrPersona_DoesNotSeeEmployeeDirectoryCard_InCatalog.
-        Assert.False(await catalog.HasCardAsync("Workload & HR Actions Report"),
-            "Expected a persona with no baseline reporting role to not see the Workload & HR Actions Report catalog card at all");
+        // the report catalog page at all — the catalog endpoint requires baseline reporting:view
+        // access and denies him outright (403), so ReportCatalogPage.razor redirects to his
+        // default location (Session.MyProfileUrl) instead of rendering the catalog (with or
+        // without the Workload & HR Actions Report card) or an error banner — mirroring the
+        // Session.MyProfileUrl redirect-on-unauthorized convention used by every other
+        // permission-gated list page (see DepartmentList.razor, LocationList.razor, etc.).
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/reporting");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        Assert.False(_page.Url.Contains("/reporting"),
+            "Expected a persona with no baseline reporting role to be redirected away from the report catalog, not shown an empty/error catalog page");
     }
 
     [Fact]

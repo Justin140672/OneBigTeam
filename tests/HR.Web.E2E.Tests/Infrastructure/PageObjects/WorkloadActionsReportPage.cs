@@ -66,6 +66,20 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
     public Task SelectGroupByAsync(string groupByLabel) =>
         DropDownSelector.SelectAsync(page, FilterField("Group By"), groupByLabel);
 
+    /// <summary>
+    /// Sets the Due Date From/To range via the Syncfusion date picker inputs — used to force a
+    /// window the seeded E2E environment's outstanding actions cannot fall inside, since the
+    /// Status/Action Type dropdowns are populated only from real loaded row data and can never
+    /// offer a guaranteed-nonexistent value (see WorkloadActionsReportPage.razor.LoadAsync).
+    /// </summary>
+    public async Task SetDueDateRangeAsync(DateOnly from, DateOnly to)
+    {
+        await FilterField("Due Date From").Locator("input").FillAsync(from.ToString("dd/MM/yyyy"));
+        await page.Keyboard.PressAsync("Escape");
+        await FilterField("Due Date To").Locator("input").FillAsync(to.ToString("dd/MM/yyyy"));
+        await page.Keyboard.PressAsync("Escape");
+    }
+
     public async Task ApplyFiltersAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Apply Filters" }).ClickAsync();

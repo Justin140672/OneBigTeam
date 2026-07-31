@@ -26,13 +26,18 @@ internal sealed class GetOffboardingProgressReportHandler(
         var accountStatuses = await employeeUserAccountStatusReader.GetStatusesAsync(
             request.CompanyId, employeeIds, cancellationToken);
 
+        // Bulk call (OBT-720 perf pass) — replaces a former per-employee loop over
+        // IAssignedAssetReader.GetAssignedAssetsAsync(companyId, employeeId, ...), which issued one
+        // query per row in this report.
+        var assignedAssetsByEmployee = await assignedAssetReader.GetAssignedAssetsAsync(
+            request.CompanyId, employeeIds, cancellationToken);
+
         var rows = new List<OffboardingProgressReportRow>();
         foreach (var item in items)
         {
-            // Per-employee call because IAssignedAssetReader has no bulk overload yet — a future
-            // pass could add one if this report is used at scale (see task doc comment).
-            var assignedAssets = await assignedAssetReader.GetAssignedAssetsAsync(
-                request.CompanyId, item.EmployeeId, cancellationToken);
+            var assignedAssets = assignedAssetsByEmployee.TryGetValue(item.EmployeeId, out var assets)
+                ? assets
+                : [];
 
             var accessDisabled = accountStatuses.TryGetValue(item.EmployeeId, out var summary)
                 && summary.Status != EmployeeUserAccountStatus.Active;

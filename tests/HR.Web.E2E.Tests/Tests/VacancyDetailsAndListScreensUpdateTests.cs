@@ -186,6 +186,7 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(AppFixture fixture) 
         var unique         = Guid.NewGuid().ToString("N")[..8];
         var candidateFirst = "E2E";
         var candidateLast  = $"Lock{unique}";
+        var candidateName = $"{candidateFirst} {candidateLast}";
         var candidateEmail = $"e2e.lock{unique}@example.com";
         var vacancyTitle   = $"E2E Locked Vacancy {unique}";
 
@@ -218,7 +219,7 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(AppFixture fixture) 
         await vacancyList.ClickVacancyAsync(vacancyTitle);
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
-        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateEmail);
+        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateName);
         await vacancyDetail.SubmitAddApplicationAsync();
 
         await vacancyDetail.GoToAsync(AcmeId, await GetVacancyIdFromUrlAsync());

@@ -178,7 +178,7 @@ public sealed class SelfServiceDocumentTests(AppFixture fixture) : E2ETestBase(f
         await _page.WaitForSelectorAsync(".e-gridcontent td, .card-body td",
             new() { Timeout = 15_000 });
 
-        var downloadBtn = _page.Locator("[title='Download']").First;
+        var downloadBtn = _page.GetByRole(AriaRole.Button, new() { Name = "Download" }).First;
         Assert.True(await downloadBtn.IsVisibleAsync(),
             "Expected a Download button to be visible for Tom's seeded documents");
 

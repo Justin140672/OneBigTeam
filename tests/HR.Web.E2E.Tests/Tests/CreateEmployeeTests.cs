@@ -16,6 +16,7 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
     private static readonly Guid TomWilliamsId = Guid.Parse("30000000-0000-0000-0000-000000000004");
 
     private const string LauraEmail = "laura.bennett@acme.example";
+    private const string CompanyAdminEmail = "priya.shah@acme.example";
 
     [Fact]
     public async Task CreateEmployee_WithRequiredFields_AppearsInEmployeeList()
@@ -512,7 +513,7 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
         var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await login.LoginAsync(CompanyAdminEmail);
 
         // Switch Acme's numbering mode to Automatic for the duration of this test.
         await companyEdit.GoToAsync(AcmeId);
@@ -522,6 +523,9 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
         await companyEdit.SaveAsync();
         Assert.False(await companyEdit.HasErrorAsync(),
             "Expected no error after switching the company's numbering mode to Automatic");
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
 
         try
         {
@@ -551,6 +555,8 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
         {
             // Restore the original numbering mode so this test doesn't leak state into other
             // tests/fixtures that rely on Acme's seeded default.
+            await login.GoToAsync();
+            await login.LoginAsync(CompanyAdminEmail);
             await companyEdit.GoToAsync(AcmeId);
             await companyEdit.OpenSettingsTabAsync();
             await companyEdit.SelectEmployeeNumberModeAsync(initialMode);

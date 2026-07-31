@@ -103,7 +103,7 @@ public sealed class OrganisationChartTests(AppFixture fixture) : E2ETestBase(fix
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees/{LauraId}");
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
-        await _page.GetByRole(AriaRole.Link, new() { Name = "View Org Chart" }).ClickAsync();
+        await _page.GetByRole(AriaRole.Button, new() { Name = "View Org Chart" }).ClickAsync();
         await _page.WaitForURLAsync(
             new Regex(@"/organisation-chart\?employeeId="), new() { Timeout = 15_000 });
 

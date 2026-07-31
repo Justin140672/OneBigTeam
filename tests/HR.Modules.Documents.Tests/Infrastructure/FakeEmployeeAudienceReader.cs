@@ -21,6 +21,15 @@ internal sealed class FakeEmployeeAudienceReader : IEmployeeAudienceReader
         Guid companyId, Guid employeeId, CancellationToken cancellationToken) =>
         Task.FromResult(EmployeeAudiences.TryGetValue(employeeId, out var profile) ? profile : null);
 
+    public Task<IReadOnlyDictionary<Guid, EmployeeAudienceProfile>> GetEmployeeAudienceProfilesAsync(
+        Guid companyId, IReadOnlyCollection<Guid> employeeIds, CancellationToken cancellationToken)
+    {
+        IReadOnlyDictionary<Guid, EmployeeAudienceProfile> result = employeeIds
+            .Where(id => EmployeeAudiences.ContainsKey(id))
+            .ToDictionary(id => id, id => EmployeeAudiences[id]);
+        return Task.FromResult(result);
+    }
+
     public Task<IReadOnlyList<EmployeeAudienceDetail>> GetEmployeeAudienceDetailsAsync(
         Guid companyId, IReadOnlyCollection<Guid> employeeIds, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<EmployeeAudienceDetail>>(employeeIds.Select(id =>

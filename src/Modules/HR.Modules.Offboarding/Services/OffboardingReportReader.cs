@@ -11,6 +11,11 @@ internal sealed class OffboardingReportReader(OffboardingDbContext dbContext) : 
     // signal to "documents returned" (see OffboardingReportItem.DocumentsReturned doc comment).
     private const string DocumentReviewTaskTitle = "Review outstanding documents for employee exit";
 
+    // Row cap (OBT-720 perf pass) — see HR.Modules.Sickness.Services.SicknessReportReader.MaxRows
+    // for rationale. Applied to the raw plan rows (each employee typically has 1-3 plans across
+    // their tenure), well above the report's final one-row-per-employee output size.
+    private const int MaxPlanRows = 50_000;
+
     public async Task<IReadOnlyList<OffboardingReportItem>> GetOffboardingReportAsync(
         Guid companyId,
         CancellationToken cancellationToken)
@@ -18,6 +23,8 @@ internal sealed class OffboardingReportReader(OffboardingDbContext dbContext) : 
         var plans = await dbContext.OffboardingPlans
             .AsNoTracking()
             .Where(p => p.CompanyId == companyId)
+            .OrderBy(p => p.Id)
+            .Take(MaxPlanRows)
             .ToListAsync(cancellationToken);
 
         var latestPlans = plans

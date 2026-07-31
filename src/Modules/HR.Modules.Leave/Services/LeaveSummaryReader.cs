@@ -7,6 +7,10 @@ namespace HR.Modules.Leave.Services;
 
 internal sealed class LeaveSummaryReader(LeaveDbContext dbContext) : ILeaveSummaryReader
 {
+    // Row cap (OBT-720 perf pass) — see HR.Modules.Sickness.Services.SicknessReportReader.MaxRows
+    // for rationale.
+    private const int MaxRows = 50_000;
+
     public async Task<IReadOnlyList<LeaveSummaryReportRow>> GetLeaveSummaryAsync(
         Guid companyId,
         IReadOnlyCollection<Guid>? employeeIds,
@@ -20,7 +24,10 @@ internal sealed class LeaveSummaryReader(LeaveDbContext dbContext) : ILeaveSumma
         if (employeeIds is { Count: > 0 })
             balanceQuery = balanceQuery.Where(b => employeeIds.Contains(b.EmployeeId));
 
-        var balances = await balanceQuery.ToListAsync(cancellationToken);
+        var balances = await balanceQuery
+            .OrderBy(b => b.Id)
+            .Take(MaxRows)
+            .ToListAsync(cancellationToken);
 
         var leaveTypeIds = balances.Select(b => b.LeaveTypeId).ToHashSet();
 

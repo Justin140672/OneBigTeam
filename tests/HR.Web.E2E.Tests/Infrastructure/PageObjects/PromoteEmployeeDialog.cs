@@ -18,6 +18,7 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 public sealed class PromoteEmployeeDialog(IPage page)
 {
     private ILocator Dialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Promote Employee" });
+    private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
 
     /// <summary>
     /// Clicks the "Promote" button on the (already-open) Promotion History tab and waits for the
@@ -179,7 +180,11 @@ public sealed class PromoteEmployeeDialog(IPage page)
     /// <summary>Dismisses the dialog by clicking Cancel (available on every step).</summary>
     public async Task CancelAsync()
     {
-        await Dialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
+        await Dialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();    }
+
+    public async Task ConfirmDiscardChangesAsync()
+    {
+        await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
         await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 

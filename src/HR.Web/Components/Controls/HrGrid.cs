@@ -33,6 +33,9 @@ public class HrGrid<TValue> : SfGrid<TValue>
         if (!parameters.TryGetValue<bool>(nameof(AllowFiltering), out _))
             AllowFiltering = true;
 
+        if (!parameters.TryGetValue<bool>(nameof(AllowResizing), out _))
+            AllowResizing = true;
+
         if (!parameters.TryGetValue<GridFilterSettings>(nameof(FilterSettings), out _))
             FilterSettings = _defaultFilterSettings ??= new GridFilterSettings { Type = FilterType.Excel };
 

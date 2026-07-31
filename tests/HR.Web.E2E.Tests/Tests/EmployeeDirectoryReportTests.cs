@@ -57,11 +57,13 @@ public sealed class EmployeeDirectoryReportTests(AppFixture fixture) : E2ETestBa
 
         await report.GoToAsync(AcmeId);
 
-        await report.SelectSortByAsync("Name");
+        await report.SortByColumnAsync("Name");
         Assert.False(await report.HasLoadErrorAsync());
+        Assert.Equal("ascending", await report.GetSortDirectionAsync("Name"));
 
-        await report.ToggleSortDirectionAsync();
+        await report.SortByColumnAsync("Name");
         Assert.False(await report.HasLoadErrorAsync());
+        Assert.Equal("descending", await report.GetSortDirectionAsync("Name"));
     }
 
     /// <summary>
@@ -69,7 +71,7 @@ public sealed class EmployeeDirectoryReportTests(AppFixture fixture) : E2ETestBa
     /// set isn't guaranteed to exceed one page (page size 20 — see EmployeeDirectoryReportPage.razor),
     /// so this asserts pager state correctness at both ends rather than assuming a second page
     /// exists: Previous must be disabled on page 1, and if Next is enabled, clicking it must
-    /// change the pager status text and (once on the last page) disable Next.
+    /// move to a new page number and enable Previous.
     /// </summary>
     [Fact]
     public async Task ServerSidePaging_PagerStateIsCorrect()
@@ -82,26 +84,26 @@ public sealed class EmployeeDirectoryReportTests(AppFixture fixture) : E2ETestBa
 
         await report.GoToAsync(AcmeId);
 
-        Assert.True(await report.IsPreviousDisabledAsync(), "Expected Previous to be disabled on the first page");
+        Assert.True(await report.IsPreviousPageDisabledAsync(), "Expected Previous to be disabled on the first page");
 
-        var firstPageStatus = await report.GetPagerStatusTextAsync();
+        var firstPageNumber = await report.GetCurrentPageNumberAsync();
 
-        if (await report.IsNextDisabledAsync())
+        if (await report.IsNextPageDisabledAsync())
         {
             // Seeded dev data doesn't exceed a single page — smoke-check only.
-            Assert.Contains("Page 1 of 1", firstPageStatus);
+            Assert.Equal(1, firstPageNumber);
             return;
         }
 
-        await report.ClickNextAsync();
-        var secondPageStatus = await report.GetPagerStatusTextAsync();
-        Assert.NotEqual(firstPageStatus, secondPageStatus);
-        Assert.False(await report.IsPreviousDisabledAsync(), "Expected Previous to be enabled after moving to page 2");
+        await report.ClickNextPageAsync();
+        var secondPageNumber = await report.GetCurrentPageNumberAsync();
+        Assert.NotEqual(firstPageNumber, secondPageNumber);
+        Assert.False(await report.IsPreviousPageDisabledAsync(), "Expected Previous to be enabled after moving to page 2");
 
-        await report.ClickPreviousAsync();
-        var backToFirstPageStatus = await report.GetPagerStatusTextAsync();
-        Assert.Equal(firstPageStatus, backToFirstPageStatus);
-        Assert.True(await report.IsPreviousDisabledAsync());
+        await report.ClickPreviousPageAsync();
+        var backToFirstPageNumber = await report.GetCurrentPageNumberAsync();
+        Assert.Equal(firstPageNumber, backToFirstPageNumber);
+        Assert.True(await report.IsPreviousPageDisabledAsync());
     }
 
     [Fact]

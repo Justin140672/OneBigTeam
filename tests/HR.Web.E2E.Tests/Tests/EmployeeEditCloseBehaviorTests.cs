@@ -120,7 +120,7 @@ public sealed class EmployeeEditCloseBehaviorTests(AppFixture fixture) : E2ETest
         await empEdit.GoToAsync(AcmeId, MarcusId);
         await empEdit.OpenEmploymentTabAsync();
 
-        var newNumber = $"E2E-SAVE-{Guid.NewGuid().ToString("N")[..6]}";
+        var newNumber = $"E2E-SAVE-{Guid.NewGuid().ToString("N")[..6].ToUpper()}";
         await empEdit.FillEmployeeNumberAsync(newNumber);
 
         await empEdit.ClickCloseAsync();

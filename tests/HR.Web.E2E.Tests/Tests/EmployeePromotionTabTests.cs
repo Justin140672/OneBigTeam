@@ -137,6 +137,7 @@ public sealed class EmployeePromotionTabTests(AppFixture fixture) : E2ETestBase(
         // than submit, to avoid this promotion leaking into any other test that inspects Marcus
         // Diallo's promotion history or reporting line.
         await wizard.CancelAsync();
+        await wizard.ConfirmDiscardChangesAsync();
 
         Assert.False(await wizard.IsVisibleAsync(), "Expected the wizard dialog to close after cancelling");
     }
@@ -210,6 +211,7 @@ public sealed class EmployeePromotionTabTests(AppFixture fixture) : E2ETestBase(
         Assert.Equal("2. Manager & Location", await wizard.GetActiveStepLabelAsync());
 
         await wizard.CancelAsync();
+        await wizard.ConfirmDiscardChangesAsync();
 
         Assert.False(await wizard.IsVisibleAsync(), "Expected the wizard dialog to close after cancelling");
 

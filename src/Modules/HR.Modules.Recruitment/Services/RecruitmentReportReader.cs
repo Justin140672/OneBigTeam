@@ -16,6 +16,12 @@ namespace HR.Modules.Recruitment.Services;
 internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext)
     : IRecruitmentPipelineReader, IVacancyPerformanceReader
 {
+    // Row cap (OBT-720 perf pass) — see HR.Modules.Sickness.Services.SicknessReportReader.MaxRows
+    // for rationale. Applied to the raw applications query that both reports' metrics are built
+    // from, bounding the per-vacancy aggregation fan-out for a company with an unusually large
+    // application history.
+    private const int MaxApplicationRows = 50_000;
+
     public async Task<IReadOnlyList<RecruitmentPipelineRecruiterRow>> GetByRecruiterAsync(
         Guid companyId,
         DateOnly? startDate,
@@ -144,6 +150,8 @@ internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext)
         }
 
         var applications = await applicationsQuery
+            .OrderBy(a => a.Id)
+            .Take(MaxApplicationRows)
             .Select(a => new { a.Id, a.VacancyId })
             .ToListAsync(cancellationToken);
 

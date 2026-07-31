@@ -32,7 +32,11 @@ public class GetWorkloadActionsHandlerTests
     // unaffected.
     private static GetWorkloadActionsHandler MakeHandler(
         IEnumerable<IWorkloadActionProvider> providers, HR.SharedKernel.IClock clock) =>
-        new(providers, new FakeEmployeeDirectoryReader([]), new FakeEmployeeRecruiterReader(), clock);
+        new(
+            new FakeServiceScopeFactory([.. providers]),
+            new FakeEmployeeDirectoryReader([]),
+            new FakeEmployeeRecruiterReader(),
+            clock);
 
     [Fact]
     public async Task HandleAsync_Merges_Results_From_Multiple_Providers()
@@ -224,7 +228,7 @@ public class GetWorkloadActionsHandlerTests
 
         var directoryReader = new FakeEmployeeDirectoryReader([DirectoryItem(matchingEmployeeId)]);
         var handler = new GetWorkloadActionsHandler(
-            [provider], directoryReader, new FakeEmployeeRecruiterReader(), new FakeClock(FixedUtcNow));
+            new FakeServiceScopeFactory([provider]), directoryReader, new FakeEmployeeRecruiterReader(), new FakeClock(FixedUtcNow));
 
         var managerId = Guid.NewGuid();
         var result = await handler.HandleAsync(
@@ -246,7 +250,7 @@ public class GetWorkloadActionsHandlerTests
 
         var directoryReader = new FakeEmployeeDirectoryReader([DirectoryItem(matchingEmployeeId)]);
         var handler = new GetWorkloadActionsHandler(
-            [provider], directoryReader, new FakeEmployeeRecruiterReader(), new FakeClock(FixedUtcNow));
+            new FakeServiceScopeFactory([provider]), directoryReader, new FakeEmployeeRecruiterReader(), new FakeClock(FixedUtcNow));
 
         var locationId = Guid.NewGuid();
         var result = await handler.HandleAsync(
@@ -275,7 +279,7 @@ public class GetWorkloadActionsHandlerTests
             },
         };
         var handler = new GetWorkloadActionsHandler(
-            [provider], new FakeEmployeeDirectoryReader([]), recruiterReader, new FakeClock(FixedUtcNow));
+            new FakeServiceScopeFactory([provider]), new FakeEmployeeDirectoryReader([]), recruiterReader, new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(
             new GetWorkloadActionsRequest(Guid.NewGuid(), RecruitmentUser: "jamie"), AnyCaller(), CancellationToken.None);
@@ -303,7 +307,7 @@ public class GetWorkloadActionsHandlerTests
             },
         };
         var handler = new GetWorkloadActionsHandler(
-            [provider], directoryReader, recruiterReader, new FakeClock(FixedUtcNow));
+            new FakeServiceScopeFactory([provider]), directoryReader, recruiterReader, new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(
             new GetWorkloadActionsRequest(Guid.NewGuid(), ManagerId: Guid.NewGuid(), RecruitmentUser: "jamie"),
