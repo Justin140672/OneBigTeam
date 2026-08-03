@@ -311,6 +311,12 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
         // James Okafor is seeded as Tom Williams's manager (EmployeesModule.SeedEmployeesAsync).
         await empEdit.GoToAsync(AcmeId, JamesOkaforId);
 
+        // The Reporting Chain/Direct Reports summary is a separate async-loaded panel — GoToAsync's
+        // own wait condition (the Details tab's combobox) doesn't guarantee it has rendered yet, so
+        // reading page content immediately after can race it (in the worst case even catching the
+        // pre-hydration HTML shell). Wait for a concrete signal from that panel first.
+        await _page.GetByText("Direct Reports:").WaitForAsync(new() { Timeout = 15_000 });
+
         var content = await _page.ContentAsync();
         Assert.Contains("Direct Reports:", content);
         Assert.Contains("1 Employee", content);
@@ -327,6 +333,10 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
 
         // Tom Williams reports to James Okafor, who reports to Sarah Chen (no manager).
         await empEdit.GoToAsync(AcmeId, TomWilliamsId);
+
+        // Same reasoning as Employee_WithDirectReports_ShowsDirectReportsCountOnOverview — wait
+        // for the async-loaded Reporting Chain panel's own heading before reading page content.
+        await _page.GetByRole(AriaRole.Heading, new() { Name = "Reporting Chain" }).WaitForAsync(new() { Timeout = 15_000 });
 
         var content = await _page.ContentAsync();
         Assert.Contains("Reporting Chain", content);
@@ -485,10 +495,16 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Acme's seeded numbering mode is Manual by default — confirm the plain text input
-        // renders and is required (see EmployeeEdit.razor's Employee Number field). Employee
-        // Numbering lives on the standalone HR Settings page (HrSettingsPage.razor).
+        // Set the mode explicitly rather than assuming Acme's seeded default is Manual — this is
+        // a shared company-wide setting, and another test in this suite (e.g. the Automatic-mode
+        // sibling below) can leave it changed if its own restore-in-finally didn't complete. Confirm
+        // the plain text input renders and is required (see EmployeeEdit.razor's Employee Number
+        // field). Employee Numbering lives on the standalone HR Settings page (HrSettingsPage.razor).
         await hrSettings.GoToAsync(AcmeId);
+        await hrSettings.SelectEmployeeNumberModeAsync("Manual");
+        await hrSettings.SaveAsync();
+        Assert.False(await hrSettings.HasErrorAsync(),
+            "Expected no error after switching the company's numbering mode to Manual");
         Assert.Equal("Manual", await hrSettings.GetEmployeeNumberModeAsync());
 
         await empEdit.GoToNewAsync(AcmeId);
@@ -565,7 +581,10 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
 
-        var unique = Guid.NewGuid().ToString("N")[..8];
+        // Uppercase — UpdateEmploymentDetailsHandler normalizes employee numbers to uppercase
+        // server-side (see Employee.NormalizeEmployeeNumber), and Guid.NewGuid()'s hex digits are
+        // lowercase, which would otherwise mismatch the persisted/displayed value.
+        var unique = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
         var newEmployeeNumber = $"EMP-{unique}";
 
         await login.GoToAsync();

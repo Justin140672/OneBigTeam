@@ -143,6 +143,11 @@ public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fi
 
         try
         {
+            // Deactivating the stage above navigated the browser away to the Recruitment Stages
+            // settings page — return to the vacancy's Kanban board before dragging.
+            await _page.GotoAsync(_kanbanUrl!);
+            await kanban.WaitForLoadedAsync();
+
             await kanban.DragCardToColumnAsync(candidateLast, "Interview");
 
             Assert.True(await kanban.IsErrorVisibleAsync(),
@@ -173,7 +178,11 @@ public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fi
 
         // The dashboard defaults to the Board view already (RecruitmentDashboard.razor's
         // PipelineView.Board), showing a per-vacancy Kanban board via a vacancy picker.
-        var vacancyPicker = _page.Locator("[data-testid='recruitment-board-vacancy-picker']");
+        // data-testid="recruitment-board-vacancy-picker" is set directly on the SfDropDownList,
+        // which Syncfusion renders AS the span[role='combobox'] itself — not a wrapping element —
+        // so it can't be used as DropDownSelector's scope (which searches for a descendant
+        // span[role='combobox']). Scope to the surrounding wrapper div instead.
+        var vacancyPicker = _page.Locator(".recruitment-dashboard-vacancy-picker");
         await vacancyPicker.WaitForAsync(new() { Timeout = 15_000 });
         await DropDownSelector.SelectAsync(_page, vacancyPicker, _vacancyTitle!);
 
@@ -203,6 +212,7 @@ public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fi
     /// last name and the ready-to-use board page object.
     /// </summary>
     private string? _vacancyTitle;
+    private string? _kanbanUrl;
 
     private async Task<(string CandidateLast, VacancyKanbanBoardPage Kanban)> ArrangeAppliedApplicationAsync()
     {
@@ -251,6 +261,7 @@ public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fi
 
         var kanban = new VacancyKanbanBoardPage(_page, _fixture.WebBaseUrl);
         await kanban.WaitForLoadedAsync();
+        _kanbanUrl = _page.Url;
 
         return (candidateLast, kanban);
     }

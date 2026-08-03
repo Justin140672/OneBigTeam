@@ -21,6 +21,10 @@ internal sealed class EmployeePromotedHandler(
         var previousTitle = titles.GetValueOrDefault(e.PreviousPositionProfileId, "their previous role");
         var newTitle = titles.GetValueOrDefault(e.NewPositionProfileId, "a new role");
 
+        // sourceRecordId ties this to the promotion record itself — a future-dated promotion
+        // already has a pending entry written eagerly at submission time (see PromoteEmployee's
+        // Handler), so this dedupes against that rather than writing a second "Promoted" entry
+        // once ProcessPromotionsJob (or an immediate same-day finalization) actually completes it.
         await timelineWriter.TryAddAsync(
             EmployeeTimelineEntry.Create(
                 Guid.NewGuid(),
@@ -33,7 +37,7 @@ internal sealed class EmployeePromotedHandler(
                 $"Promoted from {previousTitle} to {newTitle}.",
                 performedByUserId: null,
                 "Employees",
-                sourceRecordId: null,
+                sourceRecordId: e.PromotionId,
                 EmployeeTimelineVisibility.AuthorisedInternal,
                 DateTimeOffset.UtcNow),
             cancellationToken);

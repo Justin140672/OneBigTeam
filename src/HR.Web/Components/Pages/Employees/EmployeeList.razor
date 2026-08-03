@@ -180,10 +180,11 @@
     }
 
     // Swaps the plain "hr-bulk-update" toolbar button (registered via ConfigureToolbar/
-    // AddToolbarAction with selectionDependent: false, so it's always enabled — only its
-    // "Selected Employees" menu item needs a selection, which OnBulkUpdateClicked itself
-    // guards) for a Template-based dropdown mounting BulkUpdateMenu, mirroring how GridToolbar
-    // itself mounts ExportMenu for "hr-export".
+    // AddToolbarAction with selectionDependent: false, so the dropdown itself is always enabled —
+    // "Import" and "Download Template" don't need a selection, only "Selected Employees" does,
+    // which BulkUpdateMenu disables itself via its own HasSelection parameter, passed through here)
+    // for a Template-based dropdown mounting BulkUpdateMenu, mirroring how GridToolbar itself
+    // mounts ExportMenu for "hr-export".
     private IEnumerable<object> EmployeeToolbar =>
         GridToolbar.Select(item => item is Syncfusion.Blazor.Navigations.ItemModel im && im.Id == "hr-bulk-update"
             ? new Syncfusion.Blazor.Navigations.ItemModel
@@ -200,6 +201,7 @@
         builder.OpenComponent<HR.Web.Components.Controls.BulkUpdateMenu>(0);
         builder.AddAttribute(1, nameof(HR.Web.Components.Controls.BulkUpdateMenu.OnItemSelected),
             EventCallback.Factory.Create<string>(this, HandleBulkUpdateMenuItemSelected));
+        builder.AddAttribute(2, nameof(HR.Web.Components.Controls.BulkUpdateMenu.HasSelection), _hasSelection);
         builder.CloseComponent();
     };
 

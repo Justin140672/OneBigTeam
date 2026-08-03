@@ -45,6 +45,34 @@ public class EmployeeService(IHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<GetGenderSplitResponse?> GetGenderSplitAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetGenderSplitResponse>(
+                $"api/companies/{companyId}/employees/gender-split", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<GetEmploymentTypeSplitResponse?> GetEmploymentTypeSplitAsync(
+        Guid companyId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetEmploymentTypeSplitResponse>(
+                $"api/companies/{companyId}/employees/employment-type-split", HrApiJsonOptions.Default, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public async Task<GetNewHiresTrendResponse?> GetNewHiresTrendAsync(
         Guid companyId, CancellationToken cancellationToken = default)
     {

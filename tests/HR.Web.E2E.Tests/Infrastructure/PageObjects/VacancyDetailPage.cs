@@ -567,7 +567,15 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task<string?> GetApplicationStatusAsync(string candidateNameFragment)
     {
         var badge = ApplicationRow(candidateNameFragment).First.Locator(".badge").First;
-        return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
+        try
+        {
+            await badge.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
+        return (await badge.TextContentAsync())?.Trim();
     }
 
     /// <summary>
@@ -575,21 +583,58 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     /// anywhere in the row — Syncfusion Grid's RowSelected fires from a plain row click, no
     /// checkbox/radio needed here) and waits briefly for the toolbar's enabled state to catch up
     /// (VacancyApplicationsTab.razor's RefreshToolbarStateAsync round-trips to re-enable the
-    /// relevant buttons after selection).
+    /// relevant buttons after selection). Clicks the second cell (Email, column index 1), not the
+    /// first (Candidate) — that column renders as a hyperlink to the candidate's own edit page
+    /// (see VacancyApplicationsTab.razor's Candidate GridColumn), so clicking it navigates away
+    /// instead of just selecting the row.
     /// </summary>
     private async Task SelectApplicationRowAsync(string candidateNameFragment)
     {
-        await ApplicationRow(candidateNameFragment).First.Locator(".e-rowcell").First.ClickAsync();
+        await ApplicationRow(candidateNameFragment).First.Locator(".e-rowcell").Nth(1).ClickAsync();
         await page.WaitForTimeoutAsync(250);
     }
 
     /// <summary>
     /// Returns the (enabled/disabled) toolbar button with the given accessible name within the
     /// Applications tab's own grid toolbar — scoped there so this can't collide with any other
-    /// toolbar/button of the same name elsewhere on the page.
+    /// toolbar/button of the same name elsewhere on the page. With five items (Schedule Interview/
+    /// Offer/Hire/Reject/Withdraw) the EJ2 grid toolbar can overflow into an ".e-toolbar-pop" popup
+    /// on narrower viewports, pushing later items (Withdraw especially) out of ".e-toolbar" — if the
+    /// button isn't directly visible there, open the overflow popup ("..." nav button) and look
+    /// inside it instead.
     /// </summary>
-    private ILocator ApplicationsToolbarButton(string name) =>
-        ApplicationsTab.Locator(".e-toolbar").GetByRole(AriaRole.Button, new() { Name = name });
+    private async Task<ILocator> ApplicationsToolbarButtonAsync(string name)
+    {
+        var direct = ApplicationsTab.Locator(".e-toolbar").GetByRole(AriaRole.Button, new() { Name = name });
+
+        // RefreshToolbarStateAsync's own round-trip (re-enabling the relevant toolbar buttons
+        // after SelectApplicationRowAsync's click) can still be in flight — a disabled Syncfusion
+        // toolbar item isn't necessarily exposed with role="button" until it's actually enabled, so
+        // "not visible yet" here can just mean "hasn't finished enabling", not "has overflowed".
+        // Poll for a few seconds before falling back to the overflow popup.
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await direct.IsVisibleAsync())
+                return direct;
+            await page.WaitForTimeoutAsync(200);
+        }
+
+        var overflowToggle = ApplicationsTab.Locator(".e-toolbar .e-nav-right, .e-toolbar .e-hscroll-bar .e-nav-right");
+        if (await overflowToggle.CountAsync() == 0)
+        {
+            // No overflow either — give the direct button one last, longer wait so the real
+            // failure (if any) surfaces as a clear timeout on it rather than on a toggle that was
+            // never going to appear.
+            await direct.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+            return direct;
+        }
+
+        await overflowToggle.ClickAsync();
+        var popup = page.Locator(".e-toolbar-pop:visible").GetByRole(AriaRole.Button, new() { Name = name });
+        await popup.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+        return popup;
+    }
 
     /// <summary>
     /// True if no per-row action buttons (the older Actions-column pattern) render inside any
@@ -606,31 +651,51 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task ClickScheduleInterviewForAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
-        await ApplicationsToolbarButton("Schedule Interview").ClickAsync();
+        await (await ApplicationsToolbarButtonAsync("Schedule Interview")).ClickAsync();
     }
 
     public async Task ClickOfferForAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
-        await ApplicationsToolbarButton("Offer").ClickAsync();
+        await (await ApplicationsToolbarButtonAsync("Offer")).ClickAsync();
+
+        // Same reasoning as ClickWithdrawForAsync — OfferAsync sets _actionSuccess and awaits
+        // LoadAsync's grid refetch within the same event handler, with no intermediate render in
+        // between, so the alert showing this exact text only appears once the reload (and the
+        // row's now-moved stage) has already landed. Matching on text specifically, not just
+        // alert-success visibility, since an earlier action in the same flow can leave a
+        // differently-worded alert already visible.
+        await Assertions.Expect(page.Locator("[data-testid='vacancy-applications-tab'] .alert-success"))
+            .ToHaveTextAsync("Offer made to candidate.", new() { Timeout = 10_000 });
     }
 
     public async Task ClickRejectForAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
-        await ApplicationsToolbarButton("Reject").ClickAsync();
+        await (await ApplicationsToolbarButtonAsync("Reject")).ClickAsync();
     }
 
     public async Task ClickWithdrawForAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
-        await ApplicationsToolbarButton("Withdraw").ClickAsync();
+        await (await ApplicationsToolbarButtonAsync("Withdraw")).ClickAsync();
+
+        // WithdrawAsync sets _actionSuccess and awaits LoadAsync's grid refetch within the same
+        // event handler, with no intermediate render in between — so the alert showing this exact
+        // text only appears once the reload (and the row's now-updated "(Withdrawn)" status) has
+        // already landed. Matching on text specifically (not just alert-success visibility) matters
+        // here because an earlier action in the same flow (e.g. adding the candidate to the
+        // vacancy, which sets its own "Candidate added to vacancy." success message) can leave the
+        // .alert-success element already visible before this click, which would otherwise make a
+        // bare visibility wait resolve instantly against that stale banner.
+        await Assertions.Expect(page.Locator("[data-testid='vacancy-applications-tab'] .alert-success"))
+            .ToHaveTextAsync("Application withdrawn.", new() { Timeout = 10_000 });
     }
 
     public async Task ClickHireForAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
-        await ApplicationsToolbarButton("Hire").ClickAsync();
+        await (await ApplicationsToolbarButtonAsync("Hire")).ClickAsync();
     }
 
     // ── Schedule Interview dialog ────────────────────────────────────────────────
@@ -672,6 +737,13 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.Locator(".schedule-interview-dialog .e-footer-content button:has-text('Schedule')").ClickAsync();
         await page.Locator("[role='dialog'].schedule-interview-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+
+        // The dialog goes visually Hidden ahead of the server round-trip that actually reloads
+        // the applications grid with the new "InterviewScheduled" status — same race class as
+        // SubmitAddNoteDialogAsync/ClickWithdrawForAsync elsewhere in this suite. A caller reading
+        // the application's status badge immediately after this returns can otherwise still see
+        // the pre-schedule value.
+        await page.WaitForTimeoutAsync(250);
     }
 
     // ── Reject dialog ────────────────────────────────────────────────────────────

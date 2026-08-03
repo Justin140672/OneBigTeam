@@ -43,6 +43,10 @@ public sealed class VacancyManagementTests(AppFixture fixture) : E2ETestBase(fix
             "Expected 'Senior Software Engineer' in the vacancy list");
         Assert.True(await vacancyList.HasVacancyAsync("HR Business Partner"),
             "Expected 'HR Business Partner' in the vacancy list");
+
+        // "Product Designer" is seeded Closed (see RecruitmentModule.cs), and the grid hides
+        // closed vacancies until "Show Inactive" is toggled.
+        await vacancyList.ShowAllVacanciesAsync();
         Assert.True(await vacancyList.HasVacancyAsync("Product Designer"),
             "Expected 'Product Designer' in the vacancy list");
     }

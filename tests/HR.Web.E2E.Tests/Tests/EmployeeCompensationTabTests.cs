@@ -59,8 +59,10 @@ public sealed class EmployeeCompensationTabTests(AppFixture fixture) : E2ETestBa
             "Did not expect a 'Current Compensation' heading anywhere on the tab");
 
         // The Compensation History card/grid takes over showing the current record as just
-        // another (undated-end) row alongside past records.
-        Assert.True(await _page.GetByText("Compensation History", new() { Exact = true }).IsVisibleAsync(),
+        // another (undated-end) row alongside past records. Scoped to the <h5> card heading
+        // specifically — the Compensation History *tab* label is also "Compensation History"
+        // exactly, so a bare GetByText match is ambiguous between the two (Playwright strict mode).
+        Assert.True(await _page.GetByRole(AriaRole.Heading, new() { Name = "Compensation History", Exact = true }).IsVisibleAsync(),
             "Expected the 'Compensation History' card heading");
 
         var grid = _page.Locator("[data-testid='compensation-history-grid']");
@@ -95,13 +97,35 @@ public sealed class EmployeeCompensationTabTests(AppFixture fixture) : E2ETestBa
     public async Task CompensationTab_ShowsEmptyState_ForEmployeeWithNoCompensationRecord()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Tom Williams has no seeded compensation record.
-        await empEdit.GoToAsync(AcmeId, TomWilliams);
+        // Every seeded Acme employee (including Tom Williams — see EmployeesModule's
+        // newHireCompensation seed array) already has at least one compensation record, so a
+        // genuinely empty compensation history can only be exercised via a freshly created
+        // employee.
+        var unique    = Guid.NewGuid().ToString("N")[..8];
+        var lastName  = $"NoCompensation{unique}";
+        var workEmail = $"e2e.nocomp{unique}@acme.example";
+
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "Senior Software Engineer");
+        await empEdit.SaveNewEmployeeAsync();
+
+        await empList.ClickEmployeeAsync(lastName);
         await empEdit.OpenCompensationTabAsync();
 
         Assert.False(await empEdit.HasCurrentCompensationPanelAsync(),

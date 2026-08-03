@@ -28,11 +28,18 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
     public Task<bool> IsShowingActiveOnlyAsync() =>
         page.GetByRole(AriaRole.Button, new() { Name = "Show Inactive" }).IsVisibleAsync();
 
-    /// <summary>Clicks "Show Inactive" so closed vacancies are shown too, waiting for the grid to re-render.</summary>
+    /// <summary>
+    /// Clicks "Show Inactive" so closed vacancies are shown too. Waits for the toolbar toggle to
+    /// flip to "Show Active" rather than for <see cref="RowsRenderedSelector"/> — the grid already
+    /// has rows rendered from before the click (DisplayedItems is a client-side filter over
+    /// already-loaded Items, not a server round-trip), so that selector is satisfied instantly and
+    /// doesn't prove the re-filtered (now-including-closed) grid has actually re-rendered.
+    /// </summary>
     public async Task ShowAllVacanciesAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Show Inactive" }).ClickAsync();
-        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await page.GetByRole(AriaRole.Button, new() { Name = "Show Active" }).WaitForAsync(
+            new() { Timeout = 15_000 });
     }
 
     public async Task ClickNewVacancyAsync()

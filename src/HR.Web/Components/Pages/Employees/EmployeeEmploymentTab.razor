@@ -201,8 +201,12 @@ else
                                 }
                             </div>
                             <div class="col-md-6">
-                                <div class="text-muted small mb-1">Effective Notice Period</div>
-                                <p class="form-control-plaintext mb-0">@_effectiveNoticePeriodLength @(_effectiveNoticePeriodUnit)</p>
+                                <dl class="row mb-0">
+                                    <dt class="col-sm-5 text-muted fw-normal">Notice source</dt>
+                                    <dd class="col-sm-7">@NoticePeriodSourceLabel(_effectiveNoticePeriodSource)</dd>
+                                    <dt class="col-sm-5 text-muted fw-normal">Notice Period</dt>
+                                    <dd class="col-sm-7">@_effectiveNoticePeriodLength @(_effectiveNoticePeriodUnit)</dd>
+                                </dl>
                             </div>
                         </div>
                     </div>
@@ -329,6 +333,15 @@ else
         new(NoticePeriodUnit.Weeks, "Weeks"),
         new(NoticePeriodUnit.Months, "Months")
     ];
+
+    // Same convention as EmployeeLeavingTab.NoticePeriodSourceLabel.
+    private static string NoticePeriodSourceLabel(string source) => source switch
+    {
+        "Employee"        => "Employee",
+        "PositionProfile" => "Position Profile",
+        "CompanyDefault"  => "Company Default",
+        _                 => source
+    };
 
     private sealed record NoticePeriodUnitChoice(NoticePeriodUnit Value, string Label);
 

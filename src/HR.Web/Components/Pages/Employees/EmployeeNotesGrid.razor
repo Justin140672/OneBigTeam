@@ -25,7 +25,7 @@
         <GridColumn HeaderText="Created By" Width="140" AllowSorting="false" AllowFiltering="false">
             <Template>
                 @{ var item = (context as EmployeeNoteItemModel)!; }
-                <span class="text-muted small" title="@item.CreatedByUserId">@item.CreatedByUserId.ToString()[..8]</span>
+                @item.CreatedByName
             </Template>
         </GridColumn>
 

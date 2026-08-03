@@ -66,10 +66,12 @@ public class PromoteEmployeeHandlerTests
         FakeAuditPublisher? auditPublisher = null,
         CapturingIntegrationEventPublisher? integrationEventPublisher = null,
         DateTime? fixedUtcNow = null,
-        FakeCompanyTimeZoneReader? companyTimeZoneReader = null)
+        FakeCompanyTimeZoneReader? companyTimeZoneReader = null,
+        FakeEmployeeTimelineWriter? timelineWriter = null)
     {
         auditPublisher ??= new FakeAuditPublisher();
         integrationEventPublisher ??= new CapturingIntegrationEventPublisher();
+        timelineWriter ??= new FakeEmployeeTimelineWriter();
 
         var finalizer = new EmployeePromotionFinalizer(context, auditPublisher, integrationEventPublisher);
 
@@ -79,7 +81,8 @@ public class PromoteEmployeeHandlerTests
             companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
             new CompensationRecordWriter(context, new FakeClock(fixedUtcNow ?? FixedUtcNow)),
             auditPublisher,
-            finalizer);
+            finalizer,
+            timelineWriter);
     }
 
     [Fact]
@@ -224,10 +227,13 @@ public class PromoteEmployeeHandlerTests
 
         var newPositionProfileId = Guid.NewGuid();
         var integrationEventPublisher = new CapturingIntegrationEventPublisher();
-        var handler = BuildHandler(context, integrationEventPublisher: integrationEventPublisher);
+        var timelineWriter = new FakeEmployeeTimelineWriter();
+        var handler = BuildHandler(
+            context, integrationEventPublisher: integrationEventPublisher, timelineWriter: timelineWriter);
 
+        var effectiveDate = Today.AddDays(1);
         var result = await handler.HandleAsync(
-            BuildRequest(companyId, employee.Id, newPositionProfileId, effectiveDate: Today.AddDays(1)),
+            BuildRequest(companyId, employee.Id, newPositionProfileId, effectiveDate: effectiveDate),
             Guid.NewGuid(),
             CancellationToken.None);
 
@@ -241,6 +247,15 @@ public class PromoteEmployeeHandlerTests
         Assert.Equal(originalPositionProfileId, savedEmployee.PositionProfileId);
 
         Assert.Empty(integrationEventPublisher.Published);
+
+        // Not finalized yet, but the "Promoted" timeline entry is still written eagerly (dated
+        // with the future EffectiveDate, tagged with sourceRecordId=promotion.Id) so it's visible
+        // on the timeline — with the "Upcoming" badge — ahead of ProcessPromotionsJob actually
+        // completing it.
+        var pendingEntry = Assert.Single(timelineWriter.Added);
+        Assert.Equal(EmployeeTimelineEventType.EmployeePromoted, pendingEntry.EventType);
+        Assert.Equal(effectiveDate, pendingEntry.EventDate);
+        Assert.Equal(savedPromotion.Id, pendingEntry.SourceRecordId);
     }
 
     [Fact]

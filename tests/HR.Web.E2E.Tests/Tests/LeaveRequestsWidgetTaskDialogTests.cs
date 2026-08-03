@@ -84,7 +84,7 @@ public sealed class LeaveRequestsWidgetTaskDialogTests(AppFixture fixture) : E2E
     }
 
     [Fact]
-    public async Task ClickingAlreadyActionedLeaveRequest_OnHrDashboard_FallsBackToEmployeeProfileLeaveTab()
+    public async Task ClickingAlreadyActionedLeaveRequest_OnHrDashboard_IsANoOp()
     {
         var reason = $"E2E-WIDGET-FALLBACK-{Guid.NewGuid():N}";
 
@@ -131,23 +131,20 @@ public sealed class LeaveRequestsWidgetTaskDialogTests(AppFixture fixture) : E2E
         var names = await hrDash.GetLeaveRequestEmployeeNamesAsync();
         Assert.Contains(names, n => n.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase));
 
-        // ── Step 4: Clicking the row now falls back to navigating to Tom's admin employee
-        // view with the Leave tab active, since there is no longer an open task to open a
-        // dialog for. Not the self-service "/profile" route — MyProfile.razor hard-redirects
-        // to "/" for any EmployeeId other than the signed-in user's own (Laura viewing Tom's),
-        // which is exactly why this fell back to reloading the HR dashboard instead of
-        // navigating anywhere. Disambiguate by date ("14 Sep") — the sibling
-        // ClickingPendingLeaveRequest_... test deliberately leaves its own Tom Williams request
-        // with an open task, so a name-only match could land on that row instead and open a
-        // dialog rather than navigate. ─────────────────────────────────────────────────────
+        // ── Step 4: Only a Pending request is actionable (LeaveRequestsWidget.razor's
+        // IsActionable) — Tom's now-Approved request renders as a static, non-clickable row and
+        // clicking it does nothing: no dialog, no navigation. Disambiguate by date ("14 Sep") —
+        // the sibling ClickingPendingLeaveRequest_... test deliberately leaves its own Tom
+        // Williams request with an open task, so a name-only match could land on that row
+        // instead. ─────────────────────────────────────────────────────────────────────────
+        var urlBeforeClick = _page.Url;
         await hrDash.ClickLeaveRequestItemAsync("Tom Williams", "14 Sep");
 
-        await _page.WaitForURLAsync(
-            new Regex($@"/companies/{AcmeId}/employees/{TomId}\?tab=leave"),
-            new() { Timeout = 15_000 });
-
-        Assert.Contains($"/employees/{TomId}", _page.Url);
-        Assert.DoesNotContain("/profile", _page.Url);
-        Assert.Contains("tab=leave", _page.Url);
+        // No dialog and no navigation — give any (incorrect) async effect a moment to surface
+        // before asserting its absence.
+        await _page.WaitForTimeoutAsync(500);
+        Assert.Equal(urlBeforeClick, _page.Url);
+        Assert.False(await task.IsVisibleAsync(),
+            "Did not expect the task dialog to open for an already-actioned (non-Pending) leave request");
     }
 }

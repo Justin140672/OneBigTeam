@@ -5,4 +5,5 @@ public sealed record EmployeePromotedIntegrationEvent(
     Guid EmployeeId,
     Guid PreviousPositionProfileId,
     Guid NewPositionProfileId,
-    DateOnly EffectiveDate) : IIntegrationEvent;
+    DateOnly EffectiveDate,
+    Guid PromotionId) : IIntegrationEvent;

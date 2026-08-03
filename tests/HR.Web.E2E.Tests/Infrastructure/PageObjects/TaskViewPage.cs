@@ -19,6 +19,9 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     // bare ".task-view-dialog" locator ambiguous under Playwright's strict mode.
     private ILocator Dialog => page.Locator("[role='dialog'].task-view-dialog");
 
+    /// <summary>Returns true if the task dialog is currently open/visible.</summary>
+    public Task<bool> IsVisibleAsync() => Dialog.IsVisibleAsync();
+
     /// <summary>
     /// Navigates to the given employee's own Tasks tab and opens the specified task's dialog.
     /// The employee must be the currently logged-in user (this is the self-service route).

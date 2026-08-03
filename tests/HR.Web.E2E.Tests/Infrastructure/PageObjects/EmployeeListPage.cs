@@ -109,16 +109,25 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     }
 
     /// <summary>
-    /// Returns true if the "Bulk Update" toolbar dropdown button (id "hr-bulk-update", added via
-    /// EmployeeList.ConfigureToolbar, now rendered as a BulkUpdateMenu SfDropDownButton via
-    /// EmployeeList.EmployeeToolbar) is currently disabled — it tracks row selection the same way
-    /// as the built-in Edit/View actions (SearchPageBase.OnRowSelected/OnRowDeselected), so it's
-    /// disabled with zero rows selected and enabled once 1+ rows are selected.
+    /// Returns true if the "Bulk Update" dropdown's own "Selected Employees" menu item is
+    /// currently disabled (BulkUpdateMenu's HasSelection parameter, wired from EmployeeList's
+    /// _hasSelection) — not the dropdown button itself, which always stays enabled since its other
+    /// two items ("Import", "Download Template") don't require any row selection. Opens the
+    /// dropdown to inspect the item, then closes it again (Escape) so the grid is left as this
+    /// method found it.
     /// </summary>
     public async Task<bool> IsBulkUpdateButtonDisabledAsync()
     {
-        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Bulk Update" });
-        return await btn.IsDisabledAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Bulk Update" }).ClickAsync();
+        var item = page.GetByRole(AriaRole.Menuitem, new() { Name = "Selected Employees" });
+        await item.WaitForAsync(new() { Timeout = 10_000 });
+
+        var ariaDisabled = await item.GetAttributeAsync("aria-disabled");
+        var hasDisabledClass = (await item.GetAttributeAsync("class"))?.Contains("e-disabled") ?? false;
+
+        await page.Keyboard.PressAsync("Escape");
+
+        return ariaDisabled == "true" || hasDisabledClass;
     }
 
     /// <summary>
@@ -435,12 +444,26 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     }
 
     /// <summary>
-    /// Ticks the checkbox for <paramref name="valueLabel"/> (e.g. "No User") in the (already open)
-    /// Excel filter popup and applies it via the popup's own "OK" button, then waits for the grid
-    /// to settle on the filtered result.
+    /// Ticks the checkbox for <paramref name="valueLabel"/> (e.g. "No User") — and only that
+    /// value — in the (already open) Excel filter popup and applies it via the popup's own "OK"
+    /// button, then waits for the grid to settle on the filtered result. An unfiltered column's
+    /// popup opens with every value (and "Select All") already checked, since "all checked" is
+    /// what an unfiltered/show-everything state means — so a single click on
+    /// <paramref name="valueLabel"/> alone would *uncheck* it (filtering it out, leaving every
+    /// other value still selected) rather than isolating it. Unchecking "Select All" first clears
+    /// every value, then the search narrows the list so the one remaining click checks only
+    /// <paramref name="valueLabel"/> back on.
     /// </summary>
     public async Task ApplyUserAccountColumnFilterAsync(string valueLabel)
     {
+        var selectAllCheckbox = page.Locator(".e-excelfilter:visible .e-ftrchk")
+            .Filter(new() { HasText = "Select All" })
+            .First
+            .Locator(".e-frame, .e-checkbox-wrapper")
+            .First;
+        if (await selectAllCheckbox.CountAsync() > 0)
+            await selectAllCheckbox.ClickAsync();
+
         var searchInput = page.Locator(".e-excelfilter:visible .e-searchinput input");
         if (await searchInput.CountAsync() > 0)
             await searchInput.FillAsync(valueLabel);
@@ -462,15 +485,42 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     public async Task ClearUserAccountColumnFilterAsync()
     {
         await OpenUserAccountColumnFilterAsync();
-        var clearAll = page.Locator(".e-excelfilter:visible .e-ftrchk")
+
+        var okButton = page.Locator(".e-excelfilter:visible button").Filter(new() { HasText = "OK" }).First;
+
+        // Reopening the popup after a narrowed filter (e.g. only "No User" checked) leaves "Select
+        // All" indeterminate, and OK stays disabled until at least one value is checked. A single
+        // click on the row is not always reliable at hitting the actual checkbox input rather than
+        // its label/wrapper, so click the checkbox frame itself and poll for OK to become enabled,
+        // retrying the click if the first one didn't register.
+        var selectAllCheckbox = page.Locator(".e-excelfilter:visible .e-ftrchk")
             .Filter(new() { HasText = "Select All" })
-            .First;
-        if (await clearAll.CountAsync() > 0)
-            await clearAll.ClickAsync();
-        await page.Locator(".e-excelfilter:visible button")
-            .Filter(new() { HasText = "OK" })
             .First
-            .ClickAsync();
+            .Locator(".e-frame, .e-checkbox-wrapper")
+            .First;
+
+        if (await selectAllCheckbox.CountAsync() > 0)
+        {
+            for (var attempt = 0; attempt < 5; attempt++)
+            {
+                if (await okButton.IsEnabledAsync())
+                    break;
+
+                await selectAllCheckbox.ClickAsync();
+                try
+                {
+                    await okButton.WaitForAsync(new() { Timeout = 2_000 });
+                    if (await okButton.IsEnabledAsync())
+                        break;
+                }
+                catch (TimeoutException)
+                {
+                    // fall through and retry the click
+                }
+            }
+        }
+
+        await okButton.ClickAsync();
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 }

@@ -469,3 +469,22 @@ public sealed record TeamMemberItem(
     string? ProfilePhotoUrl,
     string Status);
 
+// ── DASHBOARD: GENDER SPLIT ──────────────────────────────────────────────────
+
+public sealed record GetGenderSplitResponse(IReadOnlyList<GenderSplitItem> Items);
+
+public sealed record GenderSplitItem(
+    string Gender,
+    int EmployeeCount,
+    double Percentage);
+
+// ── DASHBOARD: EMPLOYMENT TYPE SPLIT ─────────────────────────────────────────
+
+public sealed record GetEmploymentTypeSplitResponse(IReadOnlyList<EmploymentTypeSplitItem> Items);
+
+public sealed record EmploymentTypeSplitItem(
+    Guid? EmploymentTypeId,
+    string EmploymentTypeName,
+    int EmployeeCount,
+    double Percentage);
+

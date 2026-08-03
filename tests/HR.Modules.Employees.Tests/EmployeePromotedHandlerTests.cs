@@ -35,9 +35,10 @@ public class EmployeePromotedHandlerTests
 
         var employeeId = Guid.NewGuid();
         var effectiveDate = new DateOnly(2026, 8, 1);
+        var promotionId = Guid.NewGuid();
 
         await handler.HandleAsync(
-            new EmployeePromotedIntegrationEvent(companyId, employeeId, previousPosition.Id, newPosition.Id, effectiveDate),
+            new EmployeePromotedIntegrationEvent(companyId, employeeId, previousPosition.Id, newPosition.Id, effectiveDate, promotionId),
             CancellationToken.None);
 
         var entry = Assert.Single(timelineWriter.Added);
@@ -49,6 +50,10 @@ public class EmployeePromotedHandlerTests
         Assert.Equal(EmployeeTimelineVisibility.AuthorisedInternal, entry.Visibility);
         Assert.Contains("Engineer", entry.Summary);
         Assert.Contains("Senior Engineer", entry.Summary);
+        // sourceRecordId ties this entry to the promotion record, so a pending entry written
+        // eagerly at submission time (see PromoteEmployeeHandler) dedupes against this one rather
+        // than a second "Promoted" entry appearing once the promotion is actually finalized.
+        Assert.Equal(promotionId, entry.SourceRecordId);
     }
 
     [Fact]
@@ -59,7 +64,7 @@ public class EmployeePromotedHandlerTests
         var handler = new EmployeePromotedHandler(context, timelineWriter);
 
         await handler.HandleAsync(
-            new EmployeePromotedIntegrationEvent(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 8, 1)),
+            new EmployeePromotedIntegrationEvent(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 8, 1), Guid.NewGuid()),
             CancellationToken.None);
 
         var entry = Assert.Single(timelineWriter.Added);

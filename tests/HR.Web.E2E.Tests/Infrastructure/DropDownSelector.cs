@@ -31,8 +31,27 @@ public static class DropDownSelector
     public static async Task SelectAsync(IPage page, ILocator scope, string text, int index = 0)
     {
         var combobox = scope.Locator("span[role='combobox']").Nth(index);
+
+        // If the combobox already shows this value (e.g. a dialog whose dropdown defaults to the
+        // first/only option, or a caller re-selecting the same value across repeated iterations),
+        // opening the popup is a no-op selection-wise — and can be actively harmful: Syncfusion
+        // pre-highlights the already-active item on open, and since no ValueChanged fires for a
+        // same-value click, the popup can auto-close again before Playwright's actionability check
+        // on that item completes, surfacing as a spurious "element is not visible" timeout. Skip
+        // the whole open/click flow when there's nothing to change.
+        var currentValue = await combobox.Locator("input").First.InputValueAsync();
+        if (Regex.IsMatch(currentValue ?? "", Regex.Escape(text)))
+            return;
+
         await combobox.ClickAsync();
         await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+
+        // The popup container can become visible a tick before its item list is actually populated
+        // (a separate JS render pass) — filtering before that list exists filters against nothing,
+        // and typing into the filter box doesn't retroactively re-trigger it once the list does
+        // populate, leaving every item permanently hidden. Wait for at least one (unfiltered) item
+        // to exist first.
+        await page.WaitForSelectorAsync(".e-popup.e-ddl .e-list-item", new() { Timeout = 10_000 });
 
         var filterInput = page.Locator(".e-popup.e-ddl:visible input.e-input").First;
         if (await filterInput.CountAsync() > 0)
@@ -55,14 +74,16 @@ public static class DropDownSelector
         // ValueChange/ValueChanged handler and commits the bound value server-side. There is no
         // generic, provably-server-committed DOM signal exposed by the component for this (no
         // aria-busy toggle, no spinner tied to value-commit specifically — those only exist ad hoc
-        // on a handful of forms for unrelated async work). Waiting for the popup to fully detach
-        // (not just become hidden) plus a short fixed debounce is a pragmatic, non-deterministic
-        // mitigation for that race, matching the fixed-wait pattern already used elsewhere in this
-        // suite for the same class of Blazor Server timing issue (see e.g. EmployeeListPage,
-        // CompanyEditPage). It reduces — it does not guarantee — the race window; callers with a
-        // downstream element/condition that reliably only appears post-commit should still wait on
-        // that directly rather than relying solely on this.
-        await page.Locator(".e-popup.e-ddl").WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 5_000 });
+        // on a handful of forms for unrelated async work). Waiting for the popup to close
+        // (Syncfusion toggles it to hidden via the e-popup-close class rather than removing it
+        // from the DOM, so waiting for Detached here is wrong and times out) plus a short fixed
+        // debounce is a pragmatic, non-deterministic mitigation for that race, matching the
+        // fixed-wait pattern already used elsewhere in this suite for the same class of Blazor
+        // Server timing issue (see e.g. EmployeeListPage, CompanyEditPage). It reduces — it does
+        // not guarantee — the race window; callers with a downstream element/condition that
+        // reliably only appears post-commit should still wait on that directly rather than relying
+        // solely on this.
+        await page.Locator(".e-popup.e-ddl").WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 5_000 });
         await page.WaitForTimeoutAsync(250);
     }
 }

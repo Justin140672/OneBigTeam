@@ -11,15 +11,15 @@ namespace HR.Web.E2E.Tests.Tests;
 ///    "Vacancies", "Candidates", "Recruiters" and "Recruitment Settings" as top-level items, plus
 ///    a plain "Dashboard" link (not "Recruitment Dashboard" — that label is reserved for a combo
 ///    persona, see below) pointing at "/dashboard/recruitment".
-/// 2. A Manager-only persona also now gets a sidebar, with a "Manager Dashboard" link
-///    ("/dashboard/manager") plus "Reporting".
-/// 3. MainLayout.razor's ShowSidebar includes IsManager and IsRecruiter on their own (this used
-///    to deliberately exclude them — a Manager/Recruiter-only persona's dashboard was considered
-///    their home with no separate admin section to reach — but both roles are "reporting:view"-
-///    entitled server-side, so they need a way to reach the sidebar-only Reporting nav item; see
-///    ShowSidebar's own comment). The "Manager Dashboard"/"Recruitment Dashboard" labelled links
-///    (as opposed to the plain "Dashboard" label) only appear for a user who holds an *additional*
-///    role beyond Manager/Recruiter alone (e.g. an HR Administrator who is also a Manager).
+/// 2. A Manager-only persona still gets no sidebar at all — their dashboard is "home", and
+///    Reports are reached via the Reports section on that dashboard (see ManagerDashboard.razor's
+///    TeamReportsWidget), not via sidebar navigation.
+/// 3. MainLayout.razor's ShowSidebar includes IsRecruiter on its own (a plain Recruiter still
+///    gets a sidebar since their workflow — Vacancies, Candidates, etc. — has no dashboard-
+///    embedded equivalent for those sections; see ShowSidebar's own comment). The "Recruitment
+///    Dashboard" labelled link (as opposed to the plain "Dashboard" label) only appears for a
+///    user who holds an *additional* role beyond Recruiter alone (e.g. an HR Administrator who
+///    is also a Recruiter).
 ///
 /// Uses seeded personas:
 ///   - Marcus Diallo (marcus.diallo@acme.example) — Recruiter only (see RecruitmentDashboardTests).
@@ -89,7 +89,7 @@ public sealed class SidebarNavigationTests(AppFixture fixture) : E2ETestBase(fix
     }
 
     [Fact]
-    public async Task ManagerOnly_SeesSidebar_WithManagerDashboardLink()
+    public async Task ManagerOnly_DoesNotSeeSidebar()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var sidebar = new SidebarPage(_page);
@@ -101,11 +101,11 @@ public sealed class SidebarNavigationTests(AppFixture fixture) : E2ETestBase(fix
         await _page.WaitForURLAsync(new Regex("/dashboard/manager"), new() { Timeout = 15_000 });
         Assert.Contains("/dashboard/manager", _page.Url);
 
-        // MainLayout.razor's ShowSidebar includes IsManager on its own — a Manager-only persona
-        // sees a sidebar with a "Manager Dashboard" link (plus "Reporting").
-        Assert.True(await sidebar.IsSidebarVisibleAsync(),
-            "Expected a Manager-only persona to see a sidebar");
-        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Manager Dashboard"));
-        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Reporting"));
+        // MainLayout.razor's ShowSidebar deliberately excludes IsManager on its own — a
+        // Manager-only persona's dashboard is their "home", with Reports reached via the
+        // dashboard's own TeamReportsWidget rather than sidebar navigation (see ShowSidebar's
+        // comment in MainLayout.razor).
+        Assert.False(await sidebar.IsSidebarVisibleAsync(),
+            "Expected a Manager-only persona to not see a sidebar");
     }
 }

@@ -24,7 +24,7 @@ public class EmployeeNoteServiceTests
 
         var response = new GetEmployeeNotesResponse(
         [
-            new EmployeeNoteItemModel(Guid.NewGuid(), companyId, employeeId, "General", "Note text", false, false, null, Guid.NewGuid(), DateTimeOffset.UtcNow)
+            new EmployeeNoteItemModel(Guid.NewGuid(), companyId, employeeId, "General", "Note text", false, false, null, Guid.NewGuid(), "Someone", DateTimeOffset.UtcNow)
         ]);
 
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
@@ -142,10 +142,10 @@ public class EmployeeNoteServiceTests
         var employeeId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
 
-        var oldImportant = new EmployeeNoteItemModel(Guid.NewGuid(), companyId, employeeId, "General", "Old important", true, false, null, Guid.NewGuid(), now.AddDays(-10));
-        var newImportant = new EmployeeNoteItemModel(Guid.NewGuid(), companyId, employeeId, "General", "New important", true, false, null, Guid.NewGuid(), now.AddDays(-1));
-        var oldOther = new EmployeeNoteItemModel(Guid.NewGuid(), companyId, employeeId, "General", "Old other", false, false, null, Guid.NewGuid(), now.AddDays(-5));
-        var newOther = new EmployeeNoteItemModel(Guid.NewGuid(), companyId, employeeId, "General", "New other", false, false, null, Guid.NewGuid(), now);
+        var oldImportant = new EmployeeNoteItemModel(Guid.NewGuid(), companyId, employeeId, "General", "Old important", true, false, null, Guid.NewGuid(), "Someone", now.AddDays(-10));
+        var newImportant = new EmployeeNoteItemModel(Guid.NewGuid(), companyId, employeeId, "General", "New important", true, false, null, Guid.NewGuid(), "Someone", now.AddDays(-1));
+        var oldOther = new EmployeeNoteItemModel(Guid.NewGuid(), companyId, employeeId, "General", "Old other", false, false, null, Guid.NewGuid(), "Someone", now.AddDays(-5));
+        var newOther = new EmployeeNoteItemModel(Guid.NewGuid(), companyId, employeeId, "General", "New other", false, false, null, Guid.NewGuid(), "Someone", now);
 
         var notes = new List<EmployeeNoteItemModel> { oldOther, oldImportant, newOther, newImportant };
 

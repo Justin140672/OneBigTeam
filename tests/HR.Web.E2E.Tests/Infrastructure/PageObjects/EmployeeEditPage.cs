@@ -55,18 +55,19 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task FillStartDateAsync(string ddMMyyyy)
     {
         var inputs = page.Locator(".e-date-wrapper input.e-input");
-        // The start date picker is the first date input on the new employee form.
-        await inputs.First.ClickAsync();
-        await inputs.First.FillAsync(ddMMyyyy);
+        // Date of Birth renders before Start Date on the new employee form (EmployeeEdit.razor) —
+        // the start date picker is the second date input, not the first.
+        await inputs.Nth(1).ClickAsync();
+        await inputs.Nth(1).FillAsync(ddMMyyyy);
         await page.Keyboard.PressAsync("Tab");
     }
 
     public async Task FillDateOfBirthAsync(string ddMMyyyy)
     {
-        // Date of birth is the second date picker on the new employee form.
+        // Date of birth is the first date picker on the new employee form.
         var inputs = page.Locator(".e-date-wrapper input.e-input");
-        await inputs.Nth(1).ClickAsync();
-        await inputs.Nth(1).FillAsync(ddMMyyyy);
+        await inputs.First.ClickAsync();
+        await inputs.First.FillAsync(ddMMyyyy);
         await page.Keyboard.PressAsync("Tab");
     }
 
@@ -245,29 +246,63 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     /// Returns true if the Employee Number text input is visible on the new-employee form —
     /// false when the company's numbering mode is Automatic, in which case the informational
     /// message below is shown instead (see <see cref="HasEmployeeNumberAutoAssignedMessageAsync"/>).
+    /// Polls briefly rather than taking a single IsVisibleAsync() snapshot — same
+    /// _companyEmployeeNumberMode async-load race as that method.
     /// </summary>
-    public Task<bool> IsEmployeeNumberInputVisibleAsync() =>
-        page.GetByPlaceholder("e.g. EMP-001").IsVisibleAsync();
+    public async Task<bool> IsEmployeeNumberInputVisibleAsync()
+    {
+        try
+        {
+            await Assertions.Expect(page.GetByPlaceholder("e.g. EMP-001")).ToBeVisibleAsync(new() { Timeout = 10_000 });
+            return true;
+        }
+        catch (PlaywrightException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Returns true if the "An employee number will be assigned automatically when this employee
     /// is created." informational message is visible on the new-employee form (Automatic mode).
+    /// Polls briefly rather than taking a single IsVisibleAsync() snapshot — _companyEmployeeNumberMode
+    /// is resolved inside EmployeeEdit.razor's own LoadAsync, and GoToNewAsync's wait condition
+    /// (span[role='combobox']) can in principle be satisfied by an earlier render pass.
     /// </summary>
-    public Task<bool> HasEmployeeNumberAutoAssignedMessageAsync() =>
-        page.Locator("p").Filter(new() { HasText = "An employee number will be assigned automatically" }).First.IsVisibleAsync();
+    public async Task<bool> HasEmployeeNumberAutoAssignedMessageAsync()
+    {
+        try
+        {
+            await Assertions.Expect(page.Locator("p").Filter(new() { HasText = "An employee number will be assigned automatically" }).First)
+                .ToBeVisibleAsync(new() { Timeout = 10_000 });
+            return true;
+        }
+        catch (PlaywrightException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Returns the "#EMP-001"-style employee number badge shown next to the status badge in the
-    /// header of an existing employee's edit page, or null if not present.
+    /// header of an existing employee's edit page, or null if not present. Polls briefly rather
+    /// than taking a single instant snapshot of "span.text-muted" — the header summary is a
+    /// separate async-loaded render and GoToAsync's own wait condition (the Details tab's
+    /// combobox) can resolve on an earlier render pass before it appears.
     /// </summary>
     public async Task<string?> GetEmployeeNumberHeaderTextAsync()
     {
-        var spans = await page.Locator("span.text-muted").AllAsync();
-        foreach (var span in spans)
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
         {
-            var text = (await span.TextContentAsync())?.Trim();
-            if (text is not null && text.StartsWith('#'))
-                return text;
+            var spans = await page.Locator("span.text-muted").AllAsync();
+            foreach (var span in spans)
+            {
+                var text = (await span.TextContentAsync())?.Trim();
+                if (text is not null && text.StartsWith('#'))
+                    return text;
+            }
+            await page.WaitForTimeoutAsync(200);
         }
         return null;
     }
@@ -833,14 +868,42 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     /// <summary>
     /// Returns true if the profile photo header is showing an actual photo (an &lt;img&gt;)
     /// rather than the initials placeholder — i.e. the employee has an approved current photo.
+    /// Polls briefly (like <see cref="HasProfilePhotoInitialsAsync"/>) rather than taking a single
+    /// snapshot — see that method's own comment for why.
     /// </summary>
-    public Task<bool> HasProfilePhotoImageAsync() => ProfilePhotoImage.IsVisibleAsync();
+    public async Task<bool> HasProfilePhotoImageAsync()
+    {
+        try
+        {
+            await Assertions.Expect(ProfilePhotoImage).ToBeVisibleAsync(new() { Timeout = 10_000 });
+            return true;
+        }
+        catch (PlaywrightException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Returns true if the profile photo header is showing the initials placeholder — i.e. the
     /// employee has no approved current photo yet (see ProfilePhotoAvatar's fallback rendering).
+    /// Polls briefly rather than taking a single IsVisibleAsync() snapshot — EmployeeProfilePhotoHeader
+    /// loads its current-photo state asynchronously and can render after GoToAsync's own wait
+    /// condition (the Details tab's combobox) has already resolved on an earlier render pass, same
+    /// race class as the Probation/Notes tabs.
     /// </summary>
-    public Task<bool> HasProfilePhotoInitialsAsync() => ProfilePhotoInitials.IsVisibleAsync();
+    public async Task<bool> HasProfilePhotoInitialsAsync()
+    {
+        try
+        {
+            await Assertions.Expect(ProfilePhotoInitials).ToBeVisibleAsync(new() { Timeout = 10_000 });
+            return true;
+        }
+        catch (PlaywrightException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// HR uploads a photo directly via the "Upload / Replace Photo" button on the Employee Edit
@@ -863,8 +926,25 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
-    /// <summary>Returns true if a pending profile photo review card ("Pending Review") is visible in the header.</summary>
-    public Task<bool> HasPendingProfilePhotoCardAsync() => PendingProfilePhotoCard.IsVisibleAsync();
+    /// <summary>
+    /// Returns true if a pending profile photo review card ("Pending Review") is visible in the
+    /// header. Polls briefly rather than taking a single IsVisibleAsync() snapshot — same
+    /// EmployeeProfilePhotoHeader async-load race as HasProfilePhotoInitialsAsync/
+    /// HasProfilePhotoImageAsync, and this is typically checked right after a self-service upload
+    /// navigates HR here, before the header's own pending-photo fetch has necessarily finished.
+    /// </summary>
+    public async Task<bool> HasPendingProfilePhotoCardAsync()
+    {
+        try
+        {
+            await Assertions.Expect(PendingProfilePhotoCard).ToBeVisibleAsync(new() { Timeout = 10_000 });
+            return true;
+        }
+        catch (PlaywrightException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Approves the pending profile photo shown in the header's review card. Waits for the card
@@ -891,14 +971,51 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             new() { Timeout = 15_000 });
     }
 
-    public Task<bool> HasNotesTabAsync() =>
-        page.GetByRole(AriaRole.Tab, new() { Name = "Notes" }).IsVisibleAsync();
+    /// <summary>
+    /// Returns true if the "Notes" tab is visible — polls briefly rather than taking a single
+    /// IsVisibleAsync() snapshot, since (like Probation) it only renders once EmployeeEdit.razor's
+    /// own async LoadAsync sets its HR-administrator-gated flag, which can land after GoToAsync's
+    /// own wait condition (the Details tab's combobox) has already resolved on an earlier render.
+    /// </summary>
+    public async Task<bool> HasNotesTabAsync()
+    {
+        try
+        {
+            await Assertions.Expect(page.GetByRole(AriaRole.Tab, new() { Name = "Notes" }))
+                .ToBeVisibleAsync(new() { Timeout = 15_000 });
+            return true;
+        }
+        catch (PlaywrightException)
+        {
+            return false;
+        }
+    }
 
     public async Task ClickAddNoteAsync()
     {
-        await page.Locator("[data-testid='add-note-btn']").ClickAsync();
-        await page.Locator("[role='dialog'].add-employee-note-dialog").WaitForAsync(
-            new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        var dialog = page.Locator("[role='dialog'].add-employee-note-dialog");
+        var addNoteBtn = page.Locator("[data-testid='add-note-btn']");
+
+        // A click landing while the previous dialog's close is still committing server-side
+        // (see SubmitAddNoteDialogAsync's own comment) can be a no-op against still-IsOpen=true
+        // state — a fixed debounce there reduces but doesn't eliminate the race, especially across
+        // many iterations in a row (e.g. a loop adding several notes), so retry the click here too
+        // rather than trusting a single attempt.
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            await addNoteBtn.ClickAsync();
+            try
+            {
+                await dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 3_000 });
+                return;
+            }
+            catch (TimeoutException)
+            {
+                // fall through and retry the click
+            }
+        }
+
+        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
     /// <summary>
@@ -909,8 +1026,14 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public Task SelectAddNoteCategoryAsync(string categoryLabel) =>
         DropDownSelector.SelectAsync(page, page.Locator(".add-employee-note-dialog"), categoryLabel);
 
+    // Targets the placeholder text rather than [data-testid='add-note-text'] — that attribute is
+    // passed via HrTextBox's HtmlAttributes, which for a Multiline SfTextBox can land on the outer
+    // ".e-input-group" wrapper rather than the actual <textarea> (see AddEmployeeNoteDialog.razor),
+    // so filling by that selector can silently write into an element that isn't bound to
+    // Model.NoteText at all. GetByPlaceholder targets the real input directly, matching the
+    // pattern already used successfully elsewhere (e.g. PromoteEmployeeDialog.FillReasonAsync).
     public Task FillAddNoteTextAsync(string text) =>
-        page.Locator("[data-testid='add-note-text']").FillAsync(text);
+        page.GetByPlaceholder("Enter note details…").FillAsync(text);
 
     public Task CheckAddNoteImportantAsync() =>
         page.Locator(".add-employee-note-dialog").GetByLabel("Important").CheckAsync();
@@ -920,6 +1043,13 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.Locator(".add-employee-note-dialog .e-footer-content button:has-text('Add')").ClickAsync();
         await page.Locator("[role='dialog'].add-employee-note-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+
+        // The dialog goes visually Hidden (Syncfusion toggles the e-popup-close class client-side)
+        // ahead of the SignalR round-trip that actually commits IsOpen=false server-side — a caller
+        // that immediately reopens the dialog (e.g. a loop adding several notes in a row) can click
+        // "Add Note" before that commit lands, and the reopen is a no-op against still-IsOpen=true
+        // server state. Same race class as DropDownSelector's own popup-close debounce.
+        await page.WaitForTimeoutAsync(250);
     }
 
     public Task<bool> HasAddNoteDialogErrorAsync() =>

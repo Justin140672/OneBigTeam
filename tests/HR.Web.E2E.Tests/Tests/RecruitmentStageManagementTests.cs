@@ -67,14 +67,20 @@ public sealed class RecruitmentStageManagementTests(AppFixture fixture) : E2ETes
         await stageList.ClickRowLinkAsync(originalName);
         await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
 
+        // "None" rather than "Hired"/"Rejected" — UpdateRecruitmentStageHandler enforces that only
+        // one active stage per company may hold a given terminal outcome, and RecruitmentStageSeeder
+        // always seeds one active Hired and one active Rejected stage already, so either would be
+        // rejected here (see AssertOnlyActiveTerminalStageCannotBeDeactivatedAsync's doc comment for
+        // the full rule). "None" has no such uniqueness constraint and still exercises the dropdown
+        // selection and its persistence across reload.
         await stageEdit.FillNameAsync(updatedName);
-        await stageEdit.SelectTerminalOutcomeAsync("Rejected");
+        await stageEdit.SelectTerminalOutcomeAsync("None");
         await stageEdit.SaveAsync();
 
         await stageList.GoToAsync(AcmeId);
         Assert.True(await stageList.HasItemAsync(updatedName),
             "Expected the renamed stage to appear in the list");
-        Assert.Equal("Rejected", await stageList.GetTerminalOutcomeAsync(updatedName));
+        Assert.Equal("None", await stageList.GetTerminalOutcomeAsync(updatedName));
 
         // Reload to confirm the change persisted server-side, not just in local component state.
         await stageList.ClickRowLinkAsync(updatedName);

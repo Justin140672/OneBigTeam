@@ -89,8 +89,24 @@ public sealed class EmployeeDirectoryReportPage(IPage page, string baseUrl)
     /// </summary>
     public async Task SortByColumnAsync(string headerText)
     {
+        // Waiting for rows alone doesn't prove the sort actually applied — they're already
+        // present from the page's initial (unsorted) load, so that wait resolves instantly and
+        // can race this specific header's aria-sort attribute update, which lands in a separate
+        // DOM mutation. Wait for THIS header's own aria-sort to actually change instead — a bare
+        // "some header is sorted" check would be a false positive on the second call of a
+        // click-twice-to-toggle sequence, where a different (or the same, already-ascending)
+        // header can already satisfy it before the toggle to descending lands.
+        var before = await HeaderCell(headerText).GetAttributeAsync("aria-sort");
         await HeaderCell(headerText).ClickAsync();
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            var current = await HeaderCell(headerText).GetAttributeAsync("aria-sort");
+            if (current != before) return;
+            await page.WaitForTimeoutAsync(100);
+        }
     }
 
     /// <summary>

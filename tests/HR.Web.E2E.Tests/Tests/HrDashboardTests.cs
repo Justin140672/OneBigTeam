@@ -57,6 +57,8 @@ public sealed class HrDashboardTests(AppFixture fixture) : E2ETestBase(fixture)
         await dashboard.GoToAsync();
 
         Assert.True(await dashboard.HasWidgetAsync("Headcount by Department"));
+        Assert.True(await dashboard.HasWidgetAsync("Gender Split"));
+        Assert.True(await dashboard.HasWidgetAsync("Employment Type"));
         Assert.True(await dashboard.HasWidgetAsync("HR Inbox"));
         Assert.True(await dashboard.HasWidgetAsync("Leave Requests"));
         Assert.True(await dashboard.HasWidgetAsync("Upcoming Probation Reviews"));
@@ -79,6 +81,53 @@ public sealed class HrDashboardTests(AppFixture fixture) : E2ETestBase(fixture)
         await dashboard.GoToAsync();
 
         await dashboard.WaitForHeadcountChartLoadedAsync();
+    }
+
+    // ── Gender Split / Employment Type Split Charts ──────────────────────────
+    // GenderSplitChart.razor and EmploymentTypeSplitChart.razor are non-interactive
+    // SfAccumulationChart doughnuts, gated on Session.CanManageEmployees (redundant with the
+    // route guard, same as the sickness trio). The seeded Acme company (Laura's company) has
+    // active employees with genders and employment types set, so these tests exercise the
+    // populated-chart path; there is no seeded company with zero active employees available to
+    // this suite to exercise the "No employee data available." empty state end-to-end without
+    // provisioning a brand-new company, which is outside this suite's existing patterns.
+
+    [Fact]
+    public async Task GenderSplitChart_Loads()
+    {
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new HrDashboardPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await dashboard.GoToAsync();
+
+        Assert.True(await dashboard.HasWidgetAsync("Gender Split"));
+
+        await dashboard.WaitForGenderSplitChartLoadedAsync();
+
+        // Acme has active employees with genders set, so this should render the chart, not the
+        // empty state.
+        Assert.False(await dashboard.GenderSplitChartIsEmptyAsync());
+    }
+
+    [Fact]
+    public async Task EmploymentTypeSplitChart_Loads()
+    {
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new HrDashboardPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await dashboard.GoToAsync();
+
+        Assert.True(await dashboard.HasWidgetAsync("Employment Type"));
+
+        await dashboard.WaitForEmploymentTypeSplitChartLoadedAsync();
+
+        // Acme has active employees with employment types set, so this should render the chart,
+        // not the empty state.
+        Assert.False(await dashboard.EmploymentTypeSplitChartIsEmptyAsync());
     }
 
     [Fact]
@@ -139,20 +188,27 @@ public sealed class HrDashboardTests(AppFixture fixture) : E2ETestBase(fixture)
     }
 
     [Fact]
-    public async Task ClickingUpcomingProbationReviewItem_NavigatesToEmployeeProfile_WithProbationTabActive()
+    public async Task ClickingUpcomingProbationReviewItem_OpensReviewTaskDialog()
     {
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
         var dashboard = new HrDashboardPage(_page, _fixture.WebBaseUrl);
-        var employee  = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
+        var task      = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
         await dashboard.GoToAsync();
 
-        await dashboard.GetUpcomingProbationEmployeeNamesAsync();
+        var names = await dashboard.GetUpcomingProbationEmployeeNamesAsync();
         await dashboard.ClickFirstUpcomingProbationReviewAsync();
 
-        Assert.Equal("Probation", await employee.GetActiveTabNameAsync());
+        // GenerateDueProbationReviewsJob always creates a task for each seeded review, so
+        // UpcomingProbationReviewsWidget.OnReviewClicked opens the task dialog in place rather
+        // than navigating away (see ClickFirstUpcomingProbationReviewAsync).
+        await task.WaitForLoadedAsync();
+        Assert.Contains("/dashboard/hr", _page.Url);
+
+        var title = await task.GetTitleAsync();
+        Assert.Contains(names[0], title, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── Sickness trio ─────────────────────────────────────────────────────────

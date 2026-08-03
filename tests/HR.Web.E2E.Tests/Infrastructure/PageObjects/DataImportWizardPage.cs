@@ -32,21 +32,29 @@ public sealed class DataImportWizardPage(IPage page, string baseUrl)
     /// Reads the selected file-column value from the Column Mapping table for a given standard
     /// field's row (e.g. "First Name"). Scoped to the "2. Column Mapping" card specifically,
     /// since the Upload step's collapsible "Column reference" table also has rows containing
-    /// the same standard field names (but no &lt;select&gt;).
+    /// the same standard field names (but no dropdown). Each row's File Column cell is a
+    /// Syncfusion SfDropDownList (CssClass "mapping-select"), not a native &lt;select&gt; — its
+    /// current value lives in its own combobox's &lt;input&gt;, same convention as every other
+    /// SfDropDownList in this suite (see DropDownSelector).
     /// </summary>
     public async Task<string> GetMappingSelectionAsync(string standardHeaderName)
     {
         var mappingCard = page.Locator(".card", new() { HasText = "2. Column Mapping" });
 
         // Scoped to the Standard Field cell specifically, using an exact text match — every
-        // row's <select> lists ALL detected file headers as <option>s (only one of which is
+        // row's dropdown lists ALL detected file headers as options (only one of which is
         // actually selected), so filtering the whole <tr> by HasText is ambiguous: a header
-        // name like "First Name" also shows up as an unselected <option> inside every other
+        // name like "First Name" also shows up as an unselected option inside every other
         // row, and a plain HasText filter on <tr> would just match the first row in the table.
         var row = mappingCard.Locator("tr")
             .Filter(new() { Has = page.Locator($"td:text-is(\"{standardHeaderName}\")") })
             .First;
-        return await row.Locator("select").InputValueAsync();
+        // Not scoped via ".mapping-select" as an ancestor selector — Syncfusion applies that
+        // CssClass directly onto the combobox span itself (role="combobox"), not a wrapping
+        // element, so a ".mapping-select span[role='combobox']" descendant selector never matches
+        // anything. Same role-only scoping convention as DropDownSelector.
+        var combobox = row.Locator("span[role='combobox']").First;
+        return (await combobox.Locator("input").First.InputValueAsync()).Trim();
     }
 
     public async Task ContinueFromMappingAsync()

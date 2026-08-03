@@ -18,7 +18,10 @@ public class CompanyAuthorizationTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
-    private static readonly Guid NoRoleUser = new("cc000001-0000-0000-0000-000000000001");
+    // Guid.NewGuid() rather than a hardcoded literal — under the shared-database test
+    // collection, a hardcoded id here previously collided with the same literal used (and
+    // assigned a role) in another test file, silently granting this "no role" user a role.
+    private static readonly Guid NoRoleUser = Guid.NewGuid();
     private static readonly Guid EmployeeUser = new("cc000001-0000-0000-0000-000000000002");
     private static readonly Guid ManagerUser = new("cc000001-0000-0000-0000-000000000003");
     private static readonly Guid RecruiterUser = new("cc000001-0000-0000-0000-000000000004");

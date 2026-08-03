@@ -10,6 +10,7 @@ internal sealed record EmployeeNoteItem(
     bool IsSuperseded,
     Guid? SupersededByNoteId,
     Guid CreatedByUserId,
+    string CreatedByName,
     DateTimeOffset CreatedDate);
 
 internal sealed record GetEmployeeNotesResponse(IReadOnlyList<EmployeeNoteItem> Items);

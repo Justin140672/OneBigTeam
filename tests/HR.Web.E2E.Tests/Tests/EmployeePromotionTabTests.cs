@@ -47,10 +47,12 @@ public sealed class EmployeePromotionTabTests(AppFixture fixture) : E2ETestBase(
     }
 
     /// <summary>
-    /// The "New Position Profile" dropdown only offers position profiles with no employee
-    /// currently assigned to them — "Software Engineer" (Tom Williams' own current position) and
-    /// "CTO" (Sarah Chen's) are both occupied, so neither should appear as an option when
-    /// promoting Tom.
+    /// The "New Position Profile" dropdown only offers position profiles with no *other* employee
+    /// currently assigned to them (see PromoteEmployeeDialog.razor's OnOpenedAsync, which excludes
+    /// the promotee themselves — "e.Id != EmployeeId" — from the occupied set) — "CTO" (Sarah
+    /// Chen's) is occupied by someone else, so it should not appear as an option when promoting
+    /// Tom, but "Software Engineer" (Tom Williams' own current position) is deliberately still
+    /// offered since Tom occupying it doesn't make it unavailable to Tom himself.
     /// </summary>
     [Fact]
     public async Task PromoteEmployeeDialog_NewPositionProfileDropdown_OnlyOffersVacantProfiles()
@@ -68,7 +70,7 @@ public sealed class EmployeePromotionTabTests(AppFixture fixture) : E2ETestBase(
 
         var options = await wizard.GetNewPositionProfileDropdownOptionsAsync();
 
-        Assert.DoesNotContain(options, o => o.Contains("Software Engineer") && !o.Contains("Senior"));
+        Assert.Contains(options, o => o.Contains("Software Engineer") && !o.Contains("Senior"));
         Assert.DoesNotContain(options, o => o.Contains("CTO"));
     }
 

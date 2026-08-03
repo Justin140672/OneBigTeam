@@ -32,6 +32,8 @@ using HR.Modules.Employees.Features.DeactivateDepartment;
 using HR.Modules.Employees.Features.DeactivatePositionProfile;
 using HR.Modules.Employees.Features.GetDepartment;
 using HR.Modules.Employees.Features.GetEmployee;
+using HR.Modules.Employees.Features.GetEmploymentTypeSplit;
+using HR.Modules.Employees.Features.GetGenderSplit;
 using HR.Modules.Employees.Features.GetHeadcountSummary;
 using HR.Modules.Employees.Features.GetMyEmployee;
 using HR.Modules.Employees.Features.GetMyTeam;
@@ -212,6 +214,12 @@ public static class EmployeesModule
 
         services.AddScoped<GetNewHiresTrendHandler>();
         services.AddScoped<IValidator<GetNewHiresTrendRequest>, GetNewHiresTrendValidator>();
+
+        services.AddScoped<GetGenderSplitHandler>();
+        services.AddScoped<IValidator<GetGenderSplitRequest>, GetGenderSplitValidator>();
+
+        services.AddScoped<GetEmploymentTypeSplitHandler>();
+        services.AddScoped<IValidator<GetEmploymentTypeSplitRequest>, GetEmploymentTypeSplitValidator>();
 
         services.AddScoped<UpdateEmployeeProfileHandler>();
         services.AddScoped<IValidator<UpdateEmployeeProfileRequest>, UpdateEmployeeProfileValidator>();

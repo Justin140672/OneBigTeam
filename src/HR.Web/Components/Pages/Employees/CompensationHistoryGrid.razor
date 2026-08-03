@@ -32,8 +32,17 @@
 
         <GridColumn HeaderText="Salary" Width="160" AllowSorting="false" AllowFiltering="false">
             <Template>
-                @{ var item = (context as CompensationHistoryItemModel)!; }
-                @item.Salary.ToString("C2", CultureInfo.GetCultureInfo(Session.Locale))
+                @{
+                    var item = (context as CompensationHistoryItemModel)!;
+                    // Items arrives newest-first (GetCompensationHistoryHandler orders by
+                    // EffectiveFrom descending), so the first row is "the current salary" from the
+                    // UI's perspective — tagged so E2E tests can read it without depending on grid
+                    // row position/index directly.
+                    var isCurrent = item.Id == Items.FirstOrDefault()?.Id;
+                }
+                <span data-testid="@(isCurrent ? "compensation-salary" : null)">
+                    @item.Salary.ToString("C2", CultureInfo.GetCultureInfo(Session.Locale))
+                </span>
             </Template>
         </GridColumn>
 

@@ -25,7 +25,7 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
 
     protected bool ShowInactive { get; private set; }
 
-    private bool _hasSelection;
+    protected bool _hasSelection;
 
     private record ToolbarAction(string Id, string Text, string Icon, Func<TItem, Task> OnClick, string? Tooltip = null, bool SelectionDependent = true);
     private readonly List<ToolbarAction> _customActions = new();

@@ -10,9 +10,12 @@ public class CreateEmployeeNoteEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
-    private static readonly Guid AdminUserId = new("ffffffff-0000-0000-0000-000000000001");
-    private static readonly Guid ManagerUserId = new("ffffffff-0000-0000-0000-000000000002");
-    private static readonly Guid EmployeeUserId = new("ffffffff-0000-0000-0000-000000000003");
+    // Guid.NewGuid() rather than hardcoded literals — the shared-database test collection means
+    // a hardcoded id here can collide with the same literal used (for a different role) in
+    // another test file, silently granting this user extra roles/permissions.
+    private static readonly Guid AdminUserId = Guid.NewGuid();
+    private static readonly Guid ManagerUserId = Guid.NewGuid();
+    private static readonly Guid EmployeeUserId = Guid.NewGuid();
 
     public CreateEmployeeNoteEndpointTests(ApiWebApplicationFactory factory)
     {

@@ -125,6 +125,11 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<IReadOnlyList<string>> GetGroupHeadingsAsync()
     {
+        // ApplyFiltersAsync's own wait (LoadedSelector = ".e-grid .e-row, ...") can resolve against
+        // grid rows Blazor is reusing from before the click, returning before the group headings
+        // for the *new* grouping have actually rendered. Wait for either a heading or the
+        // empty-state alert directly so this doesn't race that re-render.
+        await page.WaitForSelectorAsync("h5.mt-4, .alert-info", new() { Timeout = 15_000 });
         var headings = await page.Locator("h5.mt-4").AllAsync();
         var result = new List<string>();
         foreach (var heading in headings)

@@ -28,7 +28,7 @@ public class EmployeePromotedHandlerTests
 
         await handler.HandleAsync(
             new EmployeePromotedIntegrationEvent(
-                companyId, Guid.NewGuid(), Guid.NewGuid(), positionProfileId, DateOnly.FromDateTime(FixedUtcNow)),
+                companyId, Guid.NewGuid(), Guid.NewGuid(), positionProfileId, DateOnly.FromDateTime(FixedUtcNow), Guid.NewGuid()),
             CancellationToken.None);
 
         var reloaded = await db.Vacancies.SingleAsync(v => v.Id == vacancy.Id);
@@ -52,7 +52,7 @@ public class EmployeePromotedHandlerTests
 
         await handler.HandleAsync(
             new EmployeePromotedIntegrationEvent(
-                companyId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateOnly.FromDateTime(FixedUtcNow)),
+                companyId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateOnly.FromDateTime(FixedUtcNow), Guid.NewGuid()),
             CancellationToken.None);
 
         var reloaded = await db.Vacancies.SingleAsync(v => v.Id == vacancy.Id);
@@ -70,7 +70,7 @@ public class EmployeePromotedHandlerTests
 
         var exception = await Record.ExceptionAsync(() => handler.HandleAsync(
             new EmployeePromotedIntegrationEvent(
-                companyId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateOnly.FromDateTime(FixedUtcNow)),
+                companyId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateOnly.FromDateTime(FixedUtcNow), Guid.NewGuid()),
             CancellationToken.None));
 
         Assert.Null(exception);

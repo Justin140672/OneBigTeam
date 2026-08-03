@@ -33,8 +33,17 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
-        // Wait for Syncfusion grid rows to be in the DOM (not just the card shell)
-        await page.WaitForSelectorAsync(".e-gridcontent td, .card-body td", new() { Timeout = 15_000 });
+        // Scoped to the actual Documents grid card specifically (data-testid=
+        // "employee-documents-grid-section"), not a bare ".card-body td" — EmployeeDocumentsTab.
+        // razor's "Document Requests" card above it (gated by its own, separately-loading
+        // _requestsLoading flag) can already have rows rendered while the main Documents card
+        // (which holds the "Upload" button) is still loading, making a bare selector resolve
+        // against the wrong section. Waiting for the card's own header (present regardless of
+        // whether the grid has any rows) rather than a grid-row selector, since an employee with
+        // no documents yet would otherwise never satisfy a rows-only wait.
+        await page.WaitForSelectorAsync(
+            "[data-testid='employee-documents-grid-section'] .card-header",
+            new() { Timeout = 15_000 });
     }
 
     /// <summary>Returns true if any grid cell in the Documents tab contains <paramref name="titleFragment"/>.</summary>
@@ -63,7 +72,15 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
     /// <summary>Clicks the Documents tab's "Upload" button and waits for the dialog to open.</summary>
     public async Task OpenUploadDocumentDialogAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
+        // No Exact match — the button's un-hidden FontAwesome <i> icon (no aria-hidden, same as
+        // every other icon+text button in this codebase) leaks a leading space into its computed
+        // accessible name (confirmed: literally " Upload"), which Exact matching never satisfies.
+        // But a bare substring match on "Upload" is ambiguous page-wide — it also matches the
+        // profile photo header's unrelated "Upload / Replace Photo" button — so this is scoped to
+        // the Documents grid card (data-testid="employee-documents-grid-section") specifically.
+        await page.Locator("[data-testid='employee-documents-grid-section']")
+            .GetByRole(AriaRole.Button, new() { Name = "Upload" })
+            .ClickAsync();
         await UploadDocumentDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 

@@ -60,7 +60,24 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
     private ILocator HeaderCell(string stageName) =>
         Board.Locator(".e-header-cell").Filter(new() { HasText = stageName }).First;
 
-    public Task<bool> HasColumnHeaderAsync(string stageName) => HeaderCell(stageName).IsVisibleAsync();
+    /// <summary>
+    /// Returns true if the Kanban column header for <paramref name="stageName"/> is visible.
+    /// Polls briefly rather than taking a single IsVisibleAsync() snapshot — WaitForLoadedAsync
+    /// only confirms the Kanban widget shell itself exists, not that all of its (up to six)
+    /// column headers have individually finished rendering yet.
+    /// </summary>
+    public async Task<bool> HasColumnHeaderAsync(string stageName)
+    {
+        try
+        {
+            await Assertions.Expect(HeaderCell(stageName)).ToBeVisibleAsync(new() { Timeout = 10_000 });
+            return true;
+        }
+        catch (PlaywrightException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Reads the ShowItemCount badge (".e-item-count") for the column headed by

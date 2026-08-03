@@ -211,16 +211,18 @@ html[data-theme="dark"] .hr-grid .e-row:hover .e-rowcell:not(.e-active) {
 }
 
 /* The grid's own toolbar buttons (Add/Edit/Print/Columns) render dark text via
-   .e-tbar-btn. The Export button is a separate SfDropDownButton mounted into the
-   toolbar through a template slot, so it doesn't pick up that rule — left on its
-   default "e-flat" styling it renders in Bootstrap's muted secondary grey (#6c757d),
-   which reads as disabled next to its dark-text siblings. Match the toolbar's text
+   .e-tbar-btn. Export and Bulk Update are separate SfDropDownButtons mounted into
+   the toolbar through a template slot, so neither picks up that rule — left on its
+   default "e-flat" styling they render in Bootstrap's muted secondary grey (#6c757d),
+   which reads as disabled next to their dark-text siblings. Match the toolbar's text
    color instead. */
-.hr-toolbar-export-btn.e-btn.e-flat {
+.hr-toolbar-export-btn.e-btn.e-flat,
+.hr-toolbar-bulk-update-btn.e-btn.e-flat {
     color: var(--hr-gray-900);
 }
 
-html[data-theme="dark"] .hr-toolbar-export-btn.e-btn.e-flat {
+html[data-theme="dark"] .hr-toolbar-export-btn.e-btn.e-flat,
+html[data-theme="dark"] .hr-toolbar-bulk-update-btn.e-btn.e-flat {
     color: #fff;
 }
 

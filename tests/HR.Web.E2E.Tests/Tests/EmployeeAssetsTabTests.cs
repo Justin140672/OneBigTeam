@@ -37,9 +37,11 @@ public sealed class EmployeeAssetsTabTests(AppFixture fixture) : E2ETestBase(fix
 
         await empAdmin.GoToAsync(AcmeId, TomId);
 
+        // Auto-retrying assertion rather than a single IsVisibleAsync() snapshot — the Assets tab
+        // item can render after GoToAsync's own wait condition (the Details tab's combobox) has
+        // already resolved on an earlier render pass, same race class as Probation/Notes.
         var assetsTab = _page.GetByRole(Microsoft.Playwright.AriaRole.Tab, new() { Name = "Assets" });
-        Assert.True(await assetsTab.IsVisibleAsync(),
-            "The Assets tab should be present on the admin employee edit page");
+        await Microsoft.Playwright.Assertions.Expect(assetsTab).ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
     [Fact]

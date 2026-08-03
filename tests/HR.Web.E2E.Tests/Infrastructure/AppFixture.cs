@@ -51,7 +51,8 @@ public sealed class AppFixture : IAsyncLifetime
         _playwright = await Playwright.CreateAsync();
         _browser    = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
-            Headless = true,
+            Headless  = false,
+            SlowMo    = 100, // ms pause between actions — makes the run watchable
         });
     }
 
@@ -64,15 +65,23 @@ public sealed class AppFixture : IAsyncLifetime
 
     private static void KillStaleTestHosts()
     {
-        try
+        // "testhost" holds Aspire's ports and causes "Service postgres should have valid address
+        // at this point"; a leftover "HR.Web" from a previous run that crashed or was killed
+        // mid-test (rather than disposed cleanly via DisposeAsync) can similarly hold the app's own
+        // port, causing every page load in a fresh run to hang against a dead/orphaned instance
+        // instead of the one this run just started.
+        foreach (var processName in new[] { "testhost", "HR.Web" })
         {
-            var current = System.Diagnostics.Process.GetCurrentProcess();
-            foreach (var p in System.Diagnostics.Process.GetProcessesByName("testhost"))
+            try
             {
-                if (p.Id == current.Id) continue;
-                try { p.Kill(entireProcessTree: true); } catch { /* best-effort */ }
+                var current = System.Diagnostics.Process.GetCurrentProcess();
+                foreach (var p in System.Diagnostics.Process.GetProcessesByName(processName))
+                {
+                    if (p.Id == current.Id) continue;
+                    try { p.Kill(entireProcessTree: true); } catch { /* best-effort */ }
+                }
             }
+            catch { /* best-effort */ }
         }
-        catch { /* best-effort */ }
     }
 }

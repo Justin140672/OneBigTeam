@@ -216,7 +216,15 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     public async Task OpenTasksTabAsync()
     {
         await page.GetByRole(AriaRole.Tab, new() { Name = "Tasks" }).ClickAsync();
-        await page.WaitForSelectorAsync(".e-grid, p", new() { Timeout = 15_000 });
+
+        // Scoped to the active tab item's own row/empty-state, not just any ".e-grid" on the page —
+        // Syncfusion's SfTab keeps other tab panels' content mounted (hidden, not destroyed), so a
+        // grid left over from a previously-visited tab (e.g. Leave) can already satisfy a bare
+        // ".e-grid" selector before MyProfileTasksTab's own async load (TaskService.GetMyTasksAsync)
+        // has actually finished and rendered this tab's rows.
+        await page.WaitForSelectorAsync(
+            ".e-tab .e-item.e-active .e-grid .e-row, .e-tab .e-item.e-active .e-grid .e-emptyrow",
+            new() { Timeout = 15_000 });
     }
 
     /// <summary>

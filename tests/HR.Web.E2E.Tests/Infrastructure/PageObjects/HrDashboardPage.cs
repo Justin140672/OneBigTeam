@@ -45,6 +45,40 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
             .WaitForAsync(new() { Timeout = 15_000 });
     }
 
+    // ── Gender Split Chart ───────────────────────────────────────────────────
+    // GenderSplitChart.razor ("Gender Split") — same non-interactive
+    // SfAccumulationChart pattern as the headcount chart above (renders an <svg>
+    // once loaded, or ".widget-empty" with "No employee data available." when
+    // there are no active employees).
+
+    private ILocator GenderSplitWidget =>
+        page.Locator(".widget-card").Filter(new() { HasText = "Gender Split" }).First;
+
+    /// <summary>Waits for the Gender Split chart tile to finish loading (chart svg or empty state).</summary>
+    public async Task WaitForGenderSplitChartLoadedAsync() =>
+        await GenderSplitWidget.Locator("svg, .widget-empty").First
+            .WaitForAsync(new() { Timeout = 15_000 });
+
+    /// <summary>Returns true once loaded if the Gender Split widget is showing its empty state.</summary>
+    public async Task<bool> GenderSplitChartIsEmptyAsync() =>
+        await GenderSplitWidget.Locator(".widget-empty").IsVisibleAsync();
+
+    // ── Employment Type Split Chart ──────────────────────────────────────────
+    // EmploymentTypeSplitChart.razor ("Employment Type") — identical structure/behavior
+    // to GenderSplitChart above, grouped by employment type instead of gender.
+
+    private ILocator EmploymentTypeSplitWidget =>
+        page.Locator(".widget-card").Filter(new() { HasText = "Employment Type" }).First;
+
+    /// <summary>Waits for the Employment Type chart tile to finish loading (chart svg or empty state).</summary>
+    public async Task WaitForEmploymentTypeSplitChartLoadedAsync() =>
+        await EmploymentTypeSplitWidget.Locator("svg, .widget-empty").First
+            .WaitForAsync(new() { Timeout = 15_000 });
+
+    /// <summary>Returns true once loaded if the Employment Type widget is showing its empty state.</summary>
+    public async Task<bool> EmploymentTypeSplitChartIsEmptyAsync() =>
+        await EmploymentTypeSplitWidget.Locator(".widget-empty").IsVisibleAsync();
+
     // ── HR Inbox Widget ───────────────────────────────────────────────────────
 
     private ILocator HrInboxWidget => page.Locator(".widget-card").Filter(new() { HasText = "HR Inbox" }).First;
@@ -86,10 +120,12 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
 
     /// <summary>
     /// Clicks the Leave Requests widget row whose employee name contains
-    /// <paramref name="nameFragment"/> (LeaveRequestsWidget.razor's NavigateToRequest). If the
-    /// request still has an open leave-approval task, this opens TaskViewDialog in place (use
-    /// TaskViewPage to interact with it); otherwise it navigates away to that employee's profile
-    /// Leave tab. Callers should assert on whichever outcome they expect.
+    /// <paramref name="nameFragment"/> (LeaveRequestsWidget.razor's OnRequestClicked). Only a
+    /// Pending request is actionable — clicking it opens TaskViewDialog in place for its open
+    /// leave-approval task (use TaskViewPage to interact with it). Any other status (Approved,
+    /// Declined, Rejected, etc.) renders as a static, non-clickable row (CSS class
+    /// "task-widget-item--static") with no dialog or navigation — clicking it is a deliberate
+    /// no-op. Callers should assert on whichever outcome they expect.
     ///
     /// <paramref name="dateFragment"/> optionally narrows further by the row's rendered date
     /// range text (e.g. "14 Sep"). Several tests in this suite create more than one leave
@@ -129,14 +165,21 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
         return names;
     }
 
-    /// <summary>Clicks the first item in the Upcoming Probation Reviews widget and waits for navigation.</summary>
+    /// <summary>
+    /// Clicks the first item in the Upcoming Probation Reviews widget. UpcomingProbationReviewsWidget.
+    /// razor's OnReviewClicked opens the review's task dialog in place when one exists — which
+    /// GenerateDueProbationReviewsJob always creates, so this is the normal case for any seeded
+    /// review — falling back to navigating to the employee's Probation tab only for the rare
+    /// review that predates task creation and has no open task. Does not itself wait for either
+    /// outcome; callers should follow up with TaskViewPage.WaitForLoadedAsync() (dialog case) or
+    /// page.WaitForURLAsync (navigation fallback case) as appropriate.
+    /// </summary>
     public async Task ClickFirstUpcomingProbationReviewAsync()
     {
         await UpcomingProbationWidget.Locator(".task-widget-item, .widget-empty").First
             .WaitForAsync(new() { Timeout = 15_000 });
 
         await UpcomingProbationWidget.Locator(".task-widget-item").First.ClickAsync();
-        await page.WaitForURLAsync(new Regex(@"/employees/[0-9a-f-]{36}\?tab=probation"), new() { Timeout = 15_000 });
     }
 
     // ── Document Reviews Widget ────────────────────────────────────────────────

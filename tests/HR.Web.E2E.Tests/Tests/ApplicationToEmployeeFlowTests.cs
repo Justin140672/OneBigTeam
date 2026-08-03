@@ -85,7 +85,7 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         await vacancyDetail.SelectCandidateInAddDialogAsync(candidateLast);
         await vacancyDetail.SubmitAddApplicationAsync();
 
-        Assert.Equal("Applied", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
+        Assert.Equal("Application Received", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
         // ── Step 4: Schedule an interview ──────────────────────────────────────────
         await vacancyDetail.ClickScheduleInterviewForAsync(candidateLast);
@@ -94,7 +94,11 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         await vacancyDetail.FillScheduledAtAsync("01/09/2026 10:00");
         await vacancyDetail.SubmitScheduleInterviewAsync();
 
-        Assert.Equal("InterviewScheduled", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
+        // Scheduling an interview never moves CurrentStageId — it's pure metadata (an Interview
+        // row plus InterviewOutcome defaulting to Pending); stage-shaped interview sub-states no
+        // longer exist (see ScheduleInterviewHandler's "Ticket #99" comment), moving stage is a
+        // separate explicit action, so the status badge is unchanged from "Application Received".
+        Assert.Equal("Application Received", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
         // ── Step 5: Record the interview outcome ───────────────────────────────────
         await vacancyDetail.OpenInterviewsTabAsync();
@@ -108,11 +112,15 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         Assert.Equal("Passed", await vacancyDetail.GetInterviewOutcomeAsync(candidateLast));
 
         // ── Step 6: Make an offer ───────────────────────────────────────────────────
+        // Recording the interview outcome, like scheduling it, is pure metadata (Application.
+        // InterviewOutcome) and never itself moves CurrentStageId either — see the same "Ticket #99"
+        // rationale referenced above. Status stays "Application Received" until an explicit
+        // stage-moving action (OfferCandidate below) runs.
         await vacancyDetail.OpenApplicationsTabAsync();
-        Assert.Equal("Interviewed", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
+        Assert.Equal("Application Received", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
         await vacancyDetail.ClickOfferForAsync(candidateLast);
-        Assert.Equal("Offered", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
+        Assert.Equal("Offer", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
         // ── Step 7: Hire — this provisions a real Employee and links the candidate ─
         await vacancyDetail.ClickHireForAsync(candidateLast);
@@ -128,7 +136,7 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         // Vacancy's own linked Position Profile ("Senior Software Engineer", selected when the
         // vacancy was created above) and shown read-only in the dialog for confirmation.
         Assert.Equal("Senior Software Engineer", await vacancyDetail.GetHireDerivedPositionProfileTextAsync());
-        Assert.Equal("Remote", await vacancyDetail.GetHireDerivedLocationTextAsync());
+        Assert.Equal("London Office", await vacancyDetail.GetHireDerivedLocationTextAsync());
 
         await vacancyDetail.FillHireEmployeeNumberAsync($"E2E-{unique}");
         await vacancyDetail.SelectHireDropdownAsync("Employment Type", "Permanent");
@@ -170,7 +178,7 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         Assert.False(await vacancyDetail.HasHireDropdownLabelAsync("Position Profile"),
             "Expected the manual Position Profile dropdown to no longer exist in the Hire dialog");
         Assert.Equal("Senior Software Engineer", await vacancyDetail.GetHireDerivedPositionProfileTextAsync());
-        Assert.Equal("Remote", await vacancyDetail.GetHireDerivedLocationTextAsync());
+        Assert.Equal("London Office", await vacancyDetail.GetHireDerivedLocationTextAsync());
 
         // Fill in the fields that were already required before Employment Type/Employee Number
         // became mandatory...
@@ -193,7 +201,7 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         // The dialog stayed open rather than closing (which SubmitHireAsync would otherwise wait
         // for), confirming the hire did not go through — the application should still be Offered.
         await vacancyDetail.CancelHireDialogAsync();
-        Assert.Equal("Offered", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
+        Assert.Equal("Offer", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
     }
 
     /// <summary>

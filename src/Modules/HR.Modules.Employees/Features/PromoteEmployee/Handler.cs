@@ -13,7 +13,8 @@ internal sealed class PromoteEmployeeHandler(
     ICompanyTimeZoneReader companyTimeZoneReader,
     CompensationRecordWriter compensationRecordWriter,
     IAuditEventPublisher auditEventPublisher,
-    IEmployeePromotionFinalizer promotionFinalizer)
+    IEmployeePromotionFinalizer promotionFinalizer,
+    IEmployeeTimelineWriter timelineWriter)
 {
     public async Task<Result<PromoteEmployeeResponse>> HandleAsync(
         PromoteEmployeeRequest request,
@@ -102,7 +103,44 @@ internal sealed class PromoteEmployeeHandler(
         // tomorrow's job run — the handler and ProcessPromotionsJob's own catch-up condition both
         // use <= so coverage is seamless with no gap.
         if (request.EffectiveDate <= today)
+        {
             await promotionFinalizer.FinalizeAsync(employee, promotion, actorEmployeeId, now, cancellationToken);
+        }
+        else
+        {
+            // Not finalized yet — FinalizeAsync (and the "Promoted" timeline entry it triggers via
+            // EmployeePromotedIntegrationEvent) only runs once ProcessPromotionsJob reaches this
+            // promotion's EffectiveDate. Write the entry eagerly here too, dated with EffectiveDate,
+            // so a still-pending promotion is visible on the timeline (with the "Upcoming" badge)
+            // rather than only appearing once it actually takes effect. sourceRecordId=promotion.Id
+            // lets CreateTimelineEntryOnEmployeePromoted's own write (same EventType+SourceRecordId)
+            // dedupe against this one when finalization eventually happens.
+            var titles = await dbContext.PositionProfiles
+                .AsNoTracking()
+                .Where(p => p.CompanyId == request.CompanyId &&
+                            (p.Id == previousPositionProfileId || p.Id == request.NewPositionProfileId))
+                .ToDictionaryAsync(p => p.Id, p => p.Title, cancellationToken);
+
+            var previousTitle = titles.GetValueOrDefault(previousPositionProfileId, "their previous role");
+            var newTitle = titles.GetValueOrDefault(request.NewPositionProfileId, "a new role");
+
+            await timelineWriter.TryAddAsync(
+                EmployeeTimelineEntry.Create(
+                    Guid.NewGuid(),
+                    request.CompanyId,
+                    request.EmployeeId,
+                    request.EffectiveDate,
+                    EmployeeTimelineEventType.EmployeePromoted,
+                    EmployeeTimelineCategory.Employment,
+                    "Promoted",
+                    $"Promoted from {previousTitle} to {newTitle}.",
+                    performedByUserId: null,
+                    "Employees",
+                    sourceRecordId: promotion.Id,
+                    EmployeeTimelineVisibility.AuthorisedInternal,
+                    now),
+                cancellationToken);
+        }
 
         return Result.Success(new PromoteEmployeeResponse(
             promotion.Id,

@@ -49,7 +49,8 @@ internal sealed class EmployeePromotionFinalizer(
                 promotion.EmployeeId,
                 promotion.PreviousPositionProfileId,
                 promotion.NewPositionProfileId,
-                promotion.EffectiveDate),
+                promotion.EffectiveDate,
+                promotion.Id),
             cancellationToken);
     }
 }

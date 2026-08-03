@@ -37,9 +37,13 @@ public sealed class EmployeeProbationTabTests(AppFixture fixture) : E2ETestBase(
 
         await empEdit.GoToAsync(AcmeId, CarlosRivera);
 
-        Assert.True(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Probation" }).IsVisibleAsync(),
-            "Expected a 'Probation' tab on the employee edit page");
+        // The Probation tab item only renders once EmployeeEdit.razor's own LoadAsync sets
+        // _showProbationTab from the employee response — GoToAsync's own wait (the Details tab's
+        // combobox) can resolve on an earlier render pass than that, before the tab strip has
+        // picked it up. Use an auto-retrying assertion rather than a single IsVisibleAsync()
+        // snapshot, which has no built-in wait and can catch the page mid-render.
+        await Assertions.Expect(_page.GetByRole(AriaRole.Tab, new() { Name = "Probation" }))
+            .ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
     [Fact]

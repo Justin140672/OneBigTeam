@@ -7,9 +7,30 @@
 @code {
     [Parameter] public EventCallback<string> OnItemSelected { get; set; }
 
-    private static readonly List<DropDownMenuItem> _items =
+    // The dropdown button itself always stays enabled — "Import" and "Download Template" don't
+    // require any row selection, only "Selected Employees" does (it operates on whatever rows are
+    // currently checked in the grid), so only that one item is conditionally disabled.
+    [Parameter] public bool HasSelection { get; set; }
+
+    private List<DropDownMenuItem> _items = BuildItems(hasSelection: false);
+    private bool _lastHasSelection;
+
+    protected override void OnParametersSet()
+    {
+        // Rebuild only when HasSelection actually changes rather than on every parameter binding
+        // evaluation — SfDropDownButton's Items is bound directly to this field (not recomputed
+        // as a live property), since handing it a brand-new list instance on every access confuses
+        // its own data-source change detection and can leave the popup failing to open/populate.
+        if (HasSelection != _lastHasSelection)
+        {
+            _items = BuildItems(HasSelection);
+            _lastHasSelection = HasSelection;
+        }
+    }
+
+    private static List<DropDownMenuItem> BuildItems(bool hasSelection) =>
     [
-        new() { Id = "hr-bulk-selected",           Text = "Selected Employees", IconCss = "fa-solid fa-users" },
+        new() { Id = "hr-bulk-selected",           Text = "Selected Employees", IconCss = "fa-solid fa-users", Disabled = !hasSelection },
         new() { Id = "hr-bulk-import",             Text = "Import",             IconCss = "fa-solid fa-file-import" },
         new() { Id = "hr-bulk-download-template",  Text = "Download Template",  IconCss = "fa-solid fa-file-arrow-down" },
     ];
