@@ -1,5 +1,4 @@
 @inject SicknessService SicknessService
-@inject NavigationManager Navigation
 @inject AppSession Session
 
 @if (Session.CanManageEmployees || Session.IsManager)
@@ -52,8 +51,7 @@
                     @foreach (var item in _items.Take(5))
                     {
                         var i = item;
-                        var url = $"/companies/{Session.CompanyId}/employees/{i.EmployeeId}";
-                        <div @key="i.ReviewId" class="task-widget-item" @onclick="() => Navigation.NavigateTo(url)">
+                        <div @key="i.ReviewId" class="task-widget-item @(IsActionable(i) ? "" : "task-widget-item--static")" @onclick="() => OnReviewClicked(i)">
                             <span class="priority-pip priority-pip--critical"></span>
                             <div class="task-widget-content">
                                 <span class="task-widget-title">@EmployeeName(i.EmployeeId)</span>
@@ -69,6 +67,8 @@
 }
 
 @code {
+    [Parameter] public EventCallback<Guid> OnOpenTask { get; set; }
+
     private bool _loading = true;
     private List<OverdueReturnToWorkReviewItem> _items = [];
     private IReadOnlyDictionary<Guid, string> _employeeNames = new Dictionary<Guid, string>();
@@ -94,4 +94,17 @@
 
     private string EmployeeName(Guid employeeId) =>
         _employeeNames.TryGetValue(employeeId, out var name) ? name : "Employee";
+
+    // Only overdue reviews that still have an open task can be actioned from here — a review
+    // whose task was already completed/cancelled (but whose status hasn't transitioned yet) has
+    // nothing to open, so the row renders as a static, non-clickable informational entry.
+    private static bool IsActionable(OverdueReturnToWorkReviewItem item) => item.TaskId.HasValue;
+
+    private async Task OnReviewClicked(OverdueReturnToWorkReviewItem item)
+    {
+        if (!IsActionable(item)) return;
+
+        if (item.TaskId.HasValue && OnOpenTask.HasDelegate)
+            await OnOpenTask.InvokeAsync(item.TaskId.Value);
+    }
 }

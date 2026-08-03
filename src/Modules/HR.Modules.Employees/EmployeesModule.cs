@@ -278,6 +278,7 @@ public static class EmployeesModule
 
         services.AddScoped<GetOnboardingTemplateHandler>();
 
+        services.AddScoped<OnboardingTemplateSeeder>();
         services.AddScoped<ListOnboardingTemplatesHandler>();
         services.AddScoped<IValidator<ListOnboardingTemplatesRequest>, ListOnboardingTemplatesValidator>();
 

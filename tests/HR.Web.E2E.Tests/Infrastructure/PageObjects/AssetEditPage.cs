@@ -22,9 +22,14 @@ public sealed class AssetEditPage(IPage page, string baseUrl)
     public async Task FillNameAsync(string value) =>
         await page.GetByPlaceholder("e.g. Dell Laptop").FillAsync(value);
 
-    /// <summary>Selects a category from the Category dropdown (no filtering support on this field).</summary>
+    /// <summary>
+    /// Selects a category from the Category dropdown (no filtering support on this field). Scoped
+    /// to the field's own ".col-md-6" group — an unscoped "body" locator would match the *first*
+    /// span[role='combobox'] anywhere on the page in DOM order, which is the top navbar's user
+    /// account dropdown, not this field.
+    /// </summary>
     public Task SelectCategoryAsync(string categoryName) =>
-        DropDownSelector.SelectAsync(page, page.Locator("body"), categoryName);
+        DropDownSelector.SelectAsync(page, page.Locator(".col-md-6").Filter(new() { HasText = "Category" }).First, categoryName);
 
     public async Task SaveAsync()
     {

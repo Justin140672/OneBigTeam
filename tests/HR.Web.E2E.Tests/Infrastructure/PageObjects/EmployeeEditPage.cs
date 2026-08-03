@@ -101,6 +101,31 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     }
 
     /// <summary>
+    /// Reads the plain-text value of the Employment tab's read-only "Hours"/"FTE"/"Effective
+    /// From" fields, which render alongside "Current Salary" (see EmployeeEmploymentTab.razor's
+    /// CurrentHoursDisplay/CurrentFteDisplay/CurrentEffectiveFromDisplay).
+    /// </summary>
+    public async Task<string?> GetEmploymentTabReadOnlyFieldAsync(string labelText)
+    {
+        var group = page.Locator(".col-md-6, .col-md-4").Filter(new() { HasText = labelText }).First;
+        var value = group.Locator("p.form-control-plaintext").First;
+        return await value.IsVisibleAsync() ? (await value.TextContentAsync())?.Trim() : null;
+    }
+
+    /// <summary>
+    /// Returns the trimmed card-header headings in DOM order on the (currently open) Employment
+    /// tab — used to assert the "Organisation" card renders above the "Dates" card.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetEmploymentTabCardHeadingsAsync()
+    {
+        var headers = await page.Locator(".card-header h5").AllAsync();
+        var result = new List<string>();
+        foreach (var header in headers)
+            result.Add((await header.TextContentAsync())?.Trim() ?? "");
+        return result;
+    }
+
+    /// <summary>
     /// Selects a manager from the Manager dropdown on the Employment tab. DropDownSelector itself
     /// confirms Blazor's ValueChanged round-trip actually committed the selection before
     /// returning — see its own doc comment.
@@ -364,15 +389,23 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
 
     // ── Compensation Tab ────────────────────────────────────────────────────────
+    // Tab label is "Compensation History" (renamed from "Compensation" — the separate
+    // "Current Compensation" panel/card was removed entirely; the tab now shows only the
+    // Compensation History card/grid or the single unified empty-state message).
 
     public async Task OpenCompensationTabAsync()
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Compensation" }).ClickAsync();
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Compensation History" }).ClickAsync();
         await page.WaitForSelectorAsync(
-            "[data-testid='current-compensation-panel'], [data-testid='no-compensation-message'], [data-testid='no-current-compensation-message']",
+            "[data-testid='compensation-history-grid'], [data-testid='no-compensation-message']",
             new() { Timeout = 15_000 });
     }
 
+    /// <summary>
+    /// True if a "Current Compensation" panel/card is rendered on the Compensation History tab —
+    /// expected to always be false now that panel was removed entirely; retained only so existing
+    /// callers asserting its absence still compile.
+    /// </summary>
     public Task<bool> HasCurrentCompensationPanelAsync() =>
         page.Locator("[data-testid='current-compensation-panel']").IsVisibleAsync();
 

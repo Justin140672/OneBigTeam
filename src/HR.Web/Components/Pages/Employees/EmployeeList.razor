@@ -121,8 +121,8 @@
         <InviteUserDialog CompanyId="CompanyId"
                           IsOpen="_showInviteUserDialog"
                           PreselectedEmployeeId="_inviteEmployeeId"
-                          PreselectedEmployeeName="_inviteEmployeeName"
-                          PreselectedEmployeeEmail="_inviteEmployeeEmail"
+                          PreselectedEmployeeName="@_inviteEmployeeName"
+                          PreselectedEmployeeEmail="@_inviteEmployeeEmail"
                           OnCancelled="HandleInviteUserDialogCancelled"
                           OnCompleted="HandleInviteUserDialogCompleted" />
     }
@@ -158,7 +158,12 @@
             text:    "Bulk Update",
             icon:    "fa-solid fa-money-bill-wave",
             onClick: OnBulkUpdateClicked,
-            tooltip: "Bulk update compensation for selected employees");
+            tooltip: "Bulk update compensation for selected employees",
+            // The dropdown itself also offers "Import" and "Download Template", neither of which
+            // needs a row selected — only the "Selected Employees" item does (see
+            // BulkUpdateMenuTemplate/HandleBulkUpdateMenuItemSelected below, which itself
+            // re-validates that a selection exists for that specific action).
+            selectionDependent: false);
     }
 
     private async Task OnBulkUpdateClicked(EmployeeListItemModel _)
@@ -175,9 +180,10 @@
     }
 
     // Swaps the plain "hr-bulk-update" toolbar button (registered via ConfigureToolbar/
-    // AddToolbarAction, so its Disabled state still tracks selection via
-    // SearchPageBase.SelectionDependentToolbarIds) for a Template-based dropdown mounting
-    // BulkUpdateMenu, mirroring how GridToolbar itself mounts ExportMenu for "hr-export".
+    // AddToolbarAction with selectionDependent: false, so it's always enabled — only its
+    // "Selected Employees" menu item needs a selection, which OnBulkUpdateClicked itself
+    // guards) for a Template-based dropdown mounting BulkUpdateMenu, mirroring how GridToolbar
+    // itself mounts ExportMenu for "hr-export".
     private IEnumerable<object> EmployeeToolbar =>
         GridToolbar.Select(item => item is Syncfusion.Blazor.Navigations.ItemModel im && im.Id == "hr-bulk-update"
             ? new Syncfusion.Blazor.Navigations.ItemModel
@@ -286,7 +292,6 @@
     private static string StatusBadgeClass(string status) => status switch
     {
         "Active"         => "bg-success",
-        "OnLeave"        => "bg-warning text-dark",
         "Suspended"      => "bg-danger",
         "Leaving"        => "bg-warning text-dark",
         "FormerEmployee" => "bg-secondary",

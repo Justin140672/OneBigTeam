@@ -137,13 +137,14 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     public async Task OpenCompanyDocumentsTabAsync()
     {
         await page.GetByRole(AriaRole.Tab, new() { Name = "Company Documents" }).ClickAsync();
-        await page.WaitForSelectorAsync(".overview-card, .spinner-border, p.text-muted",
+        // Renders as a data grid (HrGrid, Title/Category/Effective Date/Acknowledgement columns —
+        // "Render Company Documents As Grid" story), not the older icon-card layout. ".e-grid"'s
+        // own row selector (or its empty-row/"no documents" text sibling) is the only wait
+        // actually tied to the async document fetch having completed, same reasoning as
+        // VacancyListPage.RowsRenderedSelector.
+        await page.WaitForSelectorAsync(
+            ".overview-card, .e-grid .e-row, .e-grid .e-emptyrow, p.text-muted",
             new() { Timeout = 15_000 });
-        // Wait for the spinner to disappear before asserting tile/card content (same pattern as
-        // OpenAssetsTabAsync — the async document fetch runs after the initial render).
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border')",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
     }
 
     /// <summary>
@@ -160,42 +161,57 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
     }
 
     /// <summary>
-    /// Selects an option ("All" / "Requires Action" / "Completed") in the Company Documents tab's
-    /// status filter (a Syncfusion SfDropDownList — same combobox-click-then-list-item-click
-    /// interaction used throughout this suite, e.g. FillLeaveRequestAsync below).
+    /// Returns the Company Documents grid row matching <paramref name="title"/> (matched against
+    /// the Title column's link text — see MyProfileCompanyDocumentsTab.razor's Title GridColumn
+    /// Template) — used as the anchor for all of the grid-row helpers below.
     /// </summary>
-    public Task SetCompanyDocumentsStatusFilterAsync(string option) =>
-        DropDownSelector.SelectAsync(page, page.Locator(".col-md-3").Filter(new() { HasText = "Status" }), option);
+    private ILocator CompanyDocumentRow(string title) =>
+        page.Locator(".e-grid .e-row").Filter(new() { HasText = title }).First;
 
     /// <summary>
-    /// Returns true if a document card with the given title is currently shown on the Company
-    /// Documents tab (i.e. it matches the active status filter). Call
-    /// <see cref="OpenCompanyDocumentsTabAsync"/> first.
+    /// Returns true if a document row with the given title is currently shown on the Company
+    /// Documents tab. Call <see cref="OpenCompanyDocumentsTabAsync"/> first.
     /// </summary>
     public async Task<bool> HasCompanyDocumentCardAsync(string title) =>
-        await page.Locator(".overview-card").Filter(new() { HasText = title }).CountAsync() > 0;
+        await CompanyDocumentRow(title).CountAsync() > 0 && await CompanyDocumentRow(title).IsVisibleAsync();
 
     /// <summary>
     /// The acknowledgement-status badge text (e.g. "Acknowledgement Required · Due 28 July 2026"
-    /// or "Acknowledged 14 Jul 2026") shown on the document card with the given title, or null if
-    /// that card currently has no such badge (not shown on screen, or the document requires no
-    /// acknowledgement). Distinguishes this badge from the separate "New" badge on the same card.
+    /// or "Acknowledged 14 Jul 2026") shown in the grid row's "Acknowledgement" column for the
+    /// document matching <paramref name="title"/>, or null if that row currently has no such badge
+    /// (the document requires no acknowledgement — see MyProfileCompanyDocumentsTab.razor's
+    /// Acknowledgement GridColumn Template, which otherwise renders a plain "—").
     /// </summary>
     public async Task<string?> GetCompanyDocumentAcknowledgementBadgeTextAsync(string title)
     {
-        var card = page.Locator(".overview-card").Filter(new() { HasText = title }).First;
-        var badge = card.Locator(".badge").Filter(new() { HasText = "Acknowledg" });
+        var row = CompanyDocumentRow(title);
+        var badge = row.Locator(".badge").Filter(new() { HasText = "Acknowledg" });
         if (await badge.CountAsync() == 0) return null;
         return (await badge.First.InnerTextAsync()).Trim();
     }
 
     /// <summary>
-    /// Clicks the document card with the given title on the Company Documents tab, triggering its
-    /// navigation to the published-document detail page. Call
+    /// Reads the trimmed text of the Company Documents grid's column headers (expected: Title,
+    /// Category, Effective Date, Description, Acknowledgement — see
+    /// MyProfileCompanyDocumentsTab.razor's GridColumns). Call
+    /// <see cref="OpenCompanyDocumentsTabAsync"/> first.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetCompanyDocumentsGridColumnHeadersAsync()
+    {
+        var headers = await page.Locator(".e-grid .e-headercell").AllAsync();
+        var result = new List<string>();
+        foreach (var header in headers)
+            result.Add((await header.TextContentAsync())?.Trim() ?? "");
+        return result;
+    }
+
+    /// <summary>
+    /// Clicks the document row's title link with the given title on the Company Documents tab,
+    /// triggering its navigation to the published-document detail page. Call
     /// <see cref="OpenCompanyDocumentsTabAsync"/> first.
     /// </summary>
     public Task ClickCompanyDocumentCardAsync(string title) =>
-        page.Locator(".overview-card").Filter(new() { HasText = title }).First.ClickAsync();
+        CompanyDocumentRow(title).Locator("a").Filter(new() { HasText = title }).First.ClickAsync();
 
     public async Task OpenTasksTabAsync()
     {

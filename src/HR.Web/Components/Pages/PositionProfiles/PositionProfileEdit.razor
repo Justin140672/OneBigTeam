@@ -82,7 +82,7 @@
 
                         @DefaultsCard()
 
-                        <div class="d-flex gap-2 align-items-center mt-3">
+                        <div class="d-flex gap-2 align-items-center mt-3 justify-content-end">
                             <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
                                 @if (Saving)
                                 {
@@ -149,7 +149,7 @@
 
                                             @DefaultsCard()
 
-                                            <div class="d-flex gap-2 align-items-center mt-3">
+                                            <div class="d-flex gap-2 align-items-center mt-3 justify-content-end">
                                                 @if (!IsViewMode)
                                                 {
                                                     <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
@@ -460,20 +460,20 @@
                 {
                     <div class="row g-3 mt-2">
                         <div class="col-md-4">
+                            <label class="form-label">Length</label>
+                            <SfNumericTextBox TValue="int" @bind-Value="Model.NoticePeriodLength"
+                                              ShowSpinButton="false"
+                                              Min="1" />
+                            <ValidationMessage For="@(() => Model.NoticePeriodLength)" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Unit</label>
                             <SfDropDownList TValue="NoticePeriodUnit" TItem="NoticePeriodUnitChoice"
                                             DataSource="@NoticePeriodUnitOptions"
                                             @bind-Value="Model.NoticePeriodUnit"
                                             Placeholder="Unit">
                                 <DropDownListFieldSettings Value="Value" Text="Label" />
                             </SfDropDownList>
-                        </div>
-                        <div class="col-md-4">
-                            <SfNumericTextBox TValue="int" @bind-Value="Model.NoticePeriodLength"
-                                              Placeholder="Length"
-                                              FloatLabelType="FloatLabelType.Auto"
-                                              ShowSpinButton="false"
-                                              Min="1" />
-                            <ValidationMessage For="@(() => Model.NoticePeriodLength)" />
                         </div>
                     </div>
                 }

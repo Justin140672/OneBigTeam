@@ -38,44 +38,40 @@ else
         </div>
     </div>
 
-    <div class="row g-3">
-            @foreach (var doc in _documents)
-            {
-                var d = doc;
-                <div class="col-md-6">
-                    <div class="overview-card" @onclick="() => OpenDocument(d.Id)">
-                        <div class="overview-card-header">
-                            <i class="fa-solid fa-file-lines overview-card-icon"></i>
-                            <span class="overview-card-title">@d.Title</span>
-                            @if (IsNew(d))
-                            {
-                                <span class="badge bg-info ms-2">New</span>
-                            }
-                        </div>
-                        @if (d.RequiresAcknowledgement)
-                        {
-                            <div class="mb-2">
-                                <span class="badge @AcknowledgementBadgeClass(d)">@AcknowledgementBadgeText(d)</span>
-                            </div>
-                        }
-                        <dl class="overview-dl">
-                            <dt>Category</dt>
-                            <dd>@d.CategoryName</dd>
-                            @if (d.EffectiveDate.HasValue)
-                            {
-                                <dt>Effective Date</dt>
-                                <dd>@d.EffectiveDate.Value.ToString("d MMMM yyyy")</dd>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(d.Description))
-                            {
-                                <dt>Description</dt>
-                                <dd>@d.Description</dd>
-                            }
-                        </dl>
-                    </div>
-                </div>
-            }
-    </div>
+    <HrGrid TValue="PublishedSharedCompanyDocumentItem"
+            DataSource="@_documents"
+            AllowPaging="true"
+            AllowSorting="true"
+            AllowFiltering="true">
+        <GridColumns>
+            <GridColumn HeaderText="Title" Width="220">
+                <Template>
+                    @{ var d = (context as PublishedSharedCompanyDocumentItem)!; }
+                    <a href="javascript:void(0)" @onclick="@(() => OpenDocument(d.Id))">@d.Title</a>
+                    @if (IsNew(d))
+                    {
+                        <span class="badge bg-info ms-2">New</span>
+                    }
+                </Template>
+            </GridColumn>
+            <GridColumn Field="@nameof(PublishedSharedCompanyDocumentItem.CategoryName)" HeaderText="Category" Width="160" />
+            <GridColumn Field="@nameof(PublishedSharedCompanyDocumentItem.EffectiveDate)" HeaderText="Effective Date" Width="140" Format="d" />
+            <GridColumn Field="@nameof(PublishedSharedCompanyDocumentItem.Description)" HeaderText="Description" Width="220" />
+            <GridColumn HeaderText="Acknowledgement" Width="220" AllowSorting="false" AllowFiltering="false">
+                <Template>
+                    @{ var d = (context as PublishedSharedCompanyDocumentItem)!; }
+                    @if (d.RequiresAcknowledgement)
+                    {
+                        <span class="badge @AcknowledgementBadgeClass(d)">@AcknowledgementBadgeText(d)</span>
+                    }
+                    else
+                    {
+                        <span class="text-muted">—</span>
+                    }
+                </Template>
+            </GridColumn>
+        </GridColumns>
+    </HrGrid>
 }
 
 @code {

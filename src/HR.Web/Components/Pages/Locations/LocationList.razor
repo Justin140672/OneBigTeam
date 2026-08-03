@@ -70,8 +70,19 @@
     }
 </div>
 
+<HrConfirmDialog Visible="@(_deactivateTarget is not null)"
+                 Title="Deactivate Location"
+                 Message="@($"Are you sure you want to deactivate '{_deactivateTarget?.Name}'?")"
+                 ConfirmText="Deactivate"
+                 CancelText="Cancel"
+                 Busy="_deactivating"
+                 OnConfirmed="ConfirmDeactivateAsync"
+                 OnCancelled="@(() => _deactivateTarget = null)" />
+
 @code {
     private Dictionary<Guid, string> _nameMap = new();
+    private LocationListItemModel? _deactivateTarget;
+    private bool _deactivating;
 
     protected override bool SupportsActiveFilter => true;
 
@@ -88,10 +99,11 @@
             id:      "hr-deactivate",
             text:    "Deactivate",
             icon:    "fa-solid fa-circle-xmark",
-            onClick: async item =>
+            onClick: item =>
             {
-                if (!item.IsActive) return;
-                await Deactivate(item);
+                if (!item.IsActive) return Task.CompletedTask;
+                _deactivateTarget = item;
+                return Task.CompletedTask;
             },
             tooltip: "Deactivate selected location");
     }
@@ -112,6 +124,15 @@
     protected override string? GetAddUrl()  => $"/companies/{CompanyId}/locations/new";
     protected override string? GetEditUrl(LocationListItemModel item) => $"/companies/{CompanyId}/locations/{item.Id}";
     protected override string? GetViewUrl(LocationListItemModel item) => $"/companies/{CompanyId}/locations/{item.Id}/view";
+
+    private async Task ConfirmDeactivateAsync()
+    {
+        if (_deactivateTarget is null) return;
+        _deactivating = true;
+        await Deactivate(_deactivateTarget);
+        _deactivating = false;
+        _deactivateTarget = null;
+    }
 
     private async Task Deactivate(LocationListItemModel location)
     {

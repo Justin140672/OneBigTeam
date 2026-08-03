@@ -314,13 +314,25 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public Task<int> CountDepartmentFieldsInAdvertDetailsCardAsync() =>
         RecruitmentAdvertDetailsCard.Locator("label.form-label", new() { HasText = "Department" }).CountAsync();
 
-    /// <summary>Reads the "Advert Title (optional)" field label's exact text, if present.</summary>
+    /// <summary>
+    /// Reads the "Advert Title" field label's exact text, if present. No longer suffixed with
+    /// "(optional)" — the field itself is still genuinely optional, but that qualifier was
+    /// dropped from every field label across this card (see <see cref="HasOptionalSuffixAsync"/>).
+    /// </summary>
     public Task<bool> HasAdvertTitleLabelAsync() =>
-        RecruitmentAdvertDetailsCard.GetByText("Advert Title (optional)", new() { Exact = true }).IsVisibleAsync();
+        RecruitmentAdvertDetailsCard.GetByText("Advert Title", new() { Exact = true }).IsVisibleAsync();
 
-    /// <summary>Reads the "Advert Description (optional)" field label's exact text, if present.</summary>
+    /// <summary>Reads the "Advert Description" field label's exact text, if present (no "(optional)" suffix — see <see cref="HasAdvertTitleLabelAsync"/>).</summary>
     public Task<bool> HasAdvertDescriptionLabelAsync() =>
-        RecruitmentAdvertDetailsCard.GetByText("Advert Description (optional)", new() { Exact = true }).IsVisibleAsync();
+        RecruitmentAdvertDetailsCard.GetByText("Advert Description", new() { Exact = true }).IsVisibleAsync();
+
+    /// <summary>
+    /// True if any field label within the Recruitment Advert Details card still contains the
+    /// literal text "(optional)" — expected false; that qualifier was removed from every label on
+    /// this card.
+    /// </summary>
+    public async Task<bool> HasOptionalSuffixAsync() =>
+        await RecruitmentAdvertDetailsCard.GetByText("(optional)", new() { Exact = false }).CountAsync() > 0;
 
     /// <summary>
     /// Reads the page's main heading text — for an existing vacancy this is
@@ -332,6 +344,13 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     {
         var h1 = page.Locator("h1").First;
         return (await h1.TextContentAsync())?.Trim();
+    }
+
+    /// <summary>Reads the vacancy's status text from the StatusBadge next to the page heading (e.g. "Draft", "Open").</summary>
+    public async Task<string?> GetStatusBadgeTextAsync()
+    {
+        var badge = page.Locator(".status-badge").First;
+        return (await badge.TextContentAsync())?.Trim();
     }
 
     /// <summary>Reads the current value of the Hiring Manager dropdown's visible text.</summary>
@@ -414,7 +433,31 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
+    // ── Publish Vacancy (Draft/OnHold → Open) ────────────────────────────────────
+    // "Publish Vacancy" button, shown next to the Close Vacancy button whenever the loaded
+    // vacancy's status is Draft or OnHold (VacancyDetail.razor's CanPublish); calls
+    // VacancyService.PublishVacancyAsync (POST .../vacancies/{id}/publish) and reloads the
+    // vacancy on success, same pattern as CloseVacancyAsync.
+
+    public Task<bool> IsPublishButtonVisibleAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Publish Vacancy" }).IsVisibleAsync();
+
+    public async Task PublishVacancyAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Publish Vacancy" }).ClickAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Publish Vacancy" }))
+            .Not.ToBeVisibleAsync(new() { Timeout = 15_000 });
+    }
+
     // ── Tabs ──────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// True if a tab with the exact given name (e.g. "Applications"/"Interviews"/"Kanban") is
+    /// present — these are hidden entirely for a Draft-status vacancy (VacancyDetail.razor's
+    /// "_vacancy is not null &amp;&amp; _vacancy.Status != "Draft"" gate), not just disabled.
+    /// </summary>
+    public Task<bool> HasTabAsync(string name) =>
+        page.GetByRole(AriaRole.Tab, new() { Name = name, Exact = true }).IsVisibleAsync();
 
     public async Task OpenApplicationsTabAsync()
     {
@@ -502,10 +545,24 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         return (await cell.TextContentAsync())?.Trim();
     }
 
-    // ── Applications tab: per-row actions ────────────────────────────────────────
+    // ── Applications tab: row selection + toolbar actions ───────────────────────
+    // Row-level actions (Schedule Interview/Offer/Hire/Reject/Withdraw) moved from a per-row
+    // Actions column into the grid's own toolbar (see VacancyApplicationsTab.razor's GridToolbar/
+    // OnToolbarClick) — a caller now has to select the row first (click anywhere in it, which
+    // fires RowSelected and enables the toolbar buttons for that row), then click the toolbar
+    // button by its accessible name, rather than clicking a button embedded in the row itself.
+
+    private ILocator ApplicationsTab => page.Locator("[data-testid='vacancy-applications-tab']");
 
     private ILocator ApplicationRow(string candidateNameFragment) =>
-        page.Locator(".e-grid .e-row").Filter(new() { HasText = candidateNameFragment });
+        ApplicationsTab.Locator(".e-grid .e-row").Filter(new() { HasText = candidateNameFragment });
+
+    /// <summary>Returns the full trimmed text of the application row matching <paramref name="candidateNameFragment"/>, or null if not found.</summary>
+    public async Task<string?> GetApplicationRowTextAsync(string candidateNameFragment)
+    {
+        var row = ApplicationRow(candidateNameFragment).First;
+        return await row.IsVisibleAsync() ? (await row.TextContentAsync())?.Trim() : null;
+    }
 
     public async Task<string?> GetApplicationStatusAsync(string candidateNameFragment)
     {
@@ -513,20 +570,68 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
 
-    public Task ClickScheduleInterviewForAsync(string candidateNameFragment) =>
-        ApplicationRow(candidateNameFragment).First.GetByRole(AriaRole.Button, new() { Name = "Schedule Interview" }).ClickAsync();
+    /// <summary>
+    /// Selects the application row matching <paramref name="candidateNameFragment"/> (click
+    /// anywhere in the row — Syncfusion Grid's RowSelected fires from a plain row click, no
+    /// checkbox/radio needed here) and waits briefly for the toolbar's enabled state to catch up
+    /// (VacancyApplicationsTab.razor's RefreshToolbarStateAsync round-trips to re-enable the
+    /// relevant buttons after selection).
+    /// </summary>
+    private async Task SelectApplicationRowAsync(string candidateNameFragment)
+    {
+        await ApplicationRow(candidateNameFragment).First.Locator(".e-rowcell").First.ClickAsync();
+        await page.WaitForTimeoutAsync(250);
+    }
 
-    public Task ClickOfferForAsync(string candidateNameFragment) =>
-        ApplicationRow(candidateNameFragment).First.GetByRole(AriaRole.Button, new() { Name = "Offer" }).ClickAsync();
+    /// <summary>
+    /// Returns the (enabled/disabled) toolbar button with the given accessible name within the
+    /// Applications tab's own grid toolbar — scoped there so this can't collide with any other
+    /// toolbar/button of the same name elsewhere on the page.
+    /// </summary>
+    private ILocator ApplicationsToolbarButton(string name) =>
+        ApplicationsTab.Locator(".e-toolbar").GetByRole(AriaRole.Button, new() { Name = name });
 
-    public Task ClickRejectForAsync(string candidateNameFragment) =>
-        ApplicationRow(candidateNameFragment).First.GetByRole(AriaRole.Button, new() { Name = "Reject" }).ClickAsync();
+    /// <summary>
+    /// True if no per-row action buttons (the older Actions-column pattern) render inside any
+    /// application row — the toolbar (see <see cref="ApplicationsToolbarButton"/>) is now the only
+    /// place these actions live.
+    /// </summary>
+    public async Task<bool> HasAnyPerRowApplicationActionButtonAsync()
+    {
+        var rows = ApplicationsTab.Locator(".e-grid .e-row");
+        var count = await rows.Locator("button").CountAsync();
+        return count > 0;
+    }
 
-    public Task ClickWithdrawForAsync(string candidateNameFragment) =>
-        ApplicationRow(candidateNameFragment).First.GetByRole(AriaRole.Button, new() { Name = "Withdraw" }).ClickAsync();
+    public async Task ClickScheduleInterviewForAsync(string candidateNameFragment)
+    {
+        await SelectApplicationRowAsync(candidateNameFragment);
+        await ApplicationsToolbarButton("Schedule Interview").ClickAsync();
+    }
 
-    public Task ClickHireForAsync(string candidateNameFragment) =>
-        ApplicationRow(candidateNameFragment).First.GetByRole(AriaRole.Button, new() { Name = "Hire" }).ClickAsync();
+    public async Task ClickOfferForAsync(string candidateNameFragment)
+    {
+        await SelectApplicationRowAsync(candidateNameFragment);
+        await ApplicationsToolbarButton("Offer").ClickAsync();
+    }
+
+    public async Task ClickRejectForAsync(string candidateNameFragment)
+    {
+        await SelectApplicationRowAsync(candidateNameFragment);
+        await ApplicationsToolbarButton("Reject").ClickAsync();
+    }
+
+    public async Task ClickWithdrawForAsync(string candidateNameFragment)
+    {
+        await SelectApplicationRowAsync(candidateNameFragment);
+        await ApplicationsToolbarButton("Withdraw").ClickAsync();
+    }
+
+    public async Task ClickHireForAsync(string candidateNameFragment)
+    {
+        await SelectApplicationRowAsync(candidateNameFragment);
+        await ApplicationsToolbarButton("Hire").ClickAsync();
+    }
 
     // ── Schedule Interview dialog ────────────────────────────────────────────────
 

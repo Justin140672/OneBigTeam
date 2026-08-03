@@ -47,6 +47,18 @@ public sealed class EmployeeStarterReportPage(IPage page, string baseUrl)
         await DropDownSelector.SelectAsync(page, FilterField(labelText), valueText);
     }
 
+    /// <summary>
+    /// Reads the "Start Date From" SfDatePicker's current value (format dd/mm/yyyy, matching its
+    /// Format="dd/MM/yyyy" — see EmployeeStarterReportPage.razor's DateRangeStartLabel="Start Date
+    /// From"), which defaults to the 1st of the current month on first load (that page's own
+    /// _defaultStartDate).
+    /// </summary>
+    public async Task<string> GetStartDateFromValueAsync()
+    {
+        var input = FilterField("Start Date From").Locator(".e-date-wrapper input.e-input").First;
+        return await input.InputValueAsync();
+    }
+
     public async Task ApplyFiltersAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Apply Filters" }).ClickAsync();

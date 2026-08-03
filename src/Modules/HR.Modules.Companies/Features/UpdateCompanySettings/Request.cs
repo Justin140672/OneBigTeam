@@ -1,6 +1,3 @@
-using HR.Infrastructure.Abstractions;
-using HR.SharedKernel;
-
 namespace HR.Modules.Companies.Features.UpdateCompanySettings;
 
 internal sealed record UpdateCompanySettingsRequest
@@ -8,23 +5,4 @@ internal sealed record UpdateCompanySettingsRequest
 	public Guid Id { get; init; }
 	public string TimeZone { get; init; } = string.Empty;
 	public string Locale { get; init; } = string.Empty;
-	public WorkingDays WorkingDays { get; init; }
-	public decimal HoursPerDay { get; init; }
-	public int LeaveYearStartMonth { get; init; }
-	public decimal DefaultHolidayAllowance { get; init; }
-	public int ProbationMonths { get; init; }
-	public bool ExcludePublicHolidaysFromLeave { get; init; } = true;
-	public bool ExcludePublicHolidaysFromSickness { get; init; } = false;
-	public bool DisplaySalaryOnEmployeeProfile { get; init; } = false;
-	public int? FitNoteRequiredAfterDays { get; init; }
-	public int? ReturnToWorkRequiredAfterDays { get; init; }
-	public string DefaultAcknowledgementStatement { get; init; } = string.Empty;
-	public int AcknowledgementReminderIntervalDays { get; init; } = 3;
-	public NoticePeriodUnit NoticePeriodUnit { get; init; } = NoticePeriodUnit.Months;
-	public int NoticePeriodLength { get; init; } = 1;
-	public bool AutoDisableAccessOnLeavingDate { get; init; } = true;
-	public EmployeeNumberMode EmployeeNumberMode { get; init; } = EmployeeNumberMode.Manual;
-	public string? EmployeeNumberPrefix { get; init; }
-	public int NextEmployeeNumber { get; init; } = 1;
-	public int EmployeeNumberMinimumLength { get; init; } = 1;
 }

@@ -119,15 +119,17 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
         IsManager = me.IsManager;
         IsRecruiter = me.IsRecruiter;
 
-        var companyTask  = Http.GetFromJsonAsync<GetCompanyResponse>($"api/companies/{me.CompanyId}", HrApiJsonOptions.Default);
-        var settingsTask = Http.GetFromJsonAsync<GetCompanySettingsResponse>($"api/companies/{me.CompanyId}/settings", HrApiJsonOptions.Default);
-        var employeeTask = GetEmployeeOrNullAsync(me.CompanyId);
+        var companyTask    = Http.GetFromJsonAsync<GetCompanyResponse>($"api/companies/{me.CompanyId}", HrApiJsonOptions.Default);
+        var settingsTask   = Http.GetFromJsonAsync<GetCompanySettingsResponse>($"api/companies/{me.CompanyId}/settings", HrApiJsonOptions.Default);
+        var hrSettingsTask = Http.GetFromJsonAsync<GetHrSettingsResponse>($"api/companies/{me.CompanyId}/hr-settings", HrApiJsonOptions.Default);
+        var employeeTask   = GetEmployeeOrNullAsync(me.CompanyId);
 
-        await Task.WhenAll(companyTask, settingsTask, employeeTask);
+        await Task.WhenAll(companyTask, settingsTask, hrSettingsTask, employeeTask);
 
-        var company  = await companyTask;
-        var settings = await settingsTask;
-        var employee = await employeeTask;
+        var company    = await companyTask;
+        var settings   = await settingsTask;
+        var hrSettings = await hrSettingsTask;
+        var employee   = await employeeTask;
 
         if (company is not null)
         {
@@ -138,18 +140,22 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
 
         if (settings is not null)
         {
-            WorkingDays                  = settings.WorkingDays;
-            HoursPerDay                  = settings.HoursPerDay;
-            LeaveYearStartMonth          = settings.LeaveYearStartMonth;
-            DefaultHolidayAllowance      = settings.DefaultHolidayAllowance;
-            ProbationMonths              = settings.ProbationMonths;
-            ExcludePublicHolidaysFromLeave = settings.ExcludePublicHolidaysFromLeave;
-            DisplaySalaryOnEmployeeProfile = settings.DisplaySalaryOnEmployeeProfile;
             TimeZone                     = settings.TimeZone;
             Locale                       = settings.Locale;
             PostcodeRegex                = settings.PostcodeRegex;
             TelephoneRegex               = settings.TelephoneRegex;
             MobileRegex                  = settings.MobileRegex;
+        }
+
+        if (hrSettings is not null)
+        {
+            WorkingDays                  = hrSettings.WorkingDays;
+            HoursPerDay                  = hrSettings.HoursPerDay;
+            LeaveYearStartMonth          = hrSettings.LeaveYearStartMonth;
+            DefaultHolidayAllowance      = hrSettings.DefaultHolidayAllowance;
+            ProbationMonths              = hrSettings.ProbationMonths;
+            ExcludePublicHolidaysFromLeave = hrSettings.ExcludePublicHolidaysFromLeave;
+            DisplaySalaryOnEmployeeProfile = hrSettings.DisplaySalaryOnEmployeeProfile;
         }
 
         if (employee is not null)

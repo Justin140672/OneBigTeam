@@ -277,7 +277,21 @@
         _awaitingBackdateConfirmation = false;
 
         var profileResult = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
-        _positionProfiles = profileResult?.Items.ToList() ?? [];
+        var allActiveProfiles = (profileResult?.Items ?? []).Where(p => p.IsActive).ToList();
+
+        // Only offer position profiles that currently have no employee assigned — promoting into
+        // an occupied position isn't supported by this wizard (that's a manager/location change,
+        // not a promotion). Approximated via a company-wide employee listing since there is no
+        // dedicated "vacant position profiles" endpoint.
+        var allEmployeesResult = await EmployeeService.ListEmployeesAsync(CompanyId, pageSize: 1000);
+        var occupiedPositionProfileIds = (allEmployeesResult?.Items ?? [])
+            .Where(e => e.Id != EmployeeId && e.Status != "FormerEmployee" && e.PositionProfileId.HasValue)
+            .Select(e => e.PositionProfileId!.Value)
+            .ToHashSet();
+
+        _positionProfiles = allActiveProfiles
+            .Where(p => !occupiedPositionProfileIds.Contains(p.Id))
+            .ToList();
 
         var locationResult = await LocationService.ListLocationsAsync(CompanyId);
         _locationOptions = (locationResult?.Items ?? [])

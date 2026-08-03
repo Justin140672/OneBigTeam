@@ -2,7 +2,7 @@
 @inject DocumentService DocumentService
 @inherits EditDialogBase<UploadDocumentDialog.UploadDocumentFormModel>
 
-<SfDialog @bind-Visible="Visible" IsModal="true" Width="640px" ShowCloseIcon="true">
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="760px" ShowCloseIcon="true">
     <DialogEvents Closed="HandleDialogClosed" />
     <DialogTemplates>
         <Header>Upload Document</Header>
@@ -16,52 +16,68 @@
             }
             <EditForm EditContext="EditContext">
                 <DataAnnotationsValidator />
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Title <span class="text-danger">*</span></label>
-                        <HrTextBox @bind-Value="Model.Title" Placeholder="Document title" />
-                        <ValidationMessage For="@(() => Model.Title)" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Document Type <span class="text-danger">*</span></label>
-                        <SfDropDownList TValue="Guid?"
-                                        TItem="DocumentTypeItem"
-                                        DataSource="@_documentTypes"
-                                        @bind-Value="Model.DocumentTypeId"
-                                        Placeholder="Select type…"
-                                        AllowFiltering="true">
-                            <DropDownListFieldSettings Value="Id" Text="Name" />
-                        </SfDropDownList>
-                        <ValidationMessage For="@(() => Model.DocumentTypeId)" />
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label">Description</label>
-                        <HrTextBox @bind-Value="Model.Description"
-                                   Placeholder="Optional description"
-                                   Multiline="true" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Issue Date</label>
-                        <SfDatePicker TValue="DateOnly?"
-                                      @bind-Value="Model.IssueDate"
-                                      Format="dd/MM/yyyy"
-                                      Placeholder="dd/mm/yyyy"
-                                      ShowClearButton="true" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Expiry Date</label>
-                        <SfDatePicker TValue="DateOnly?"
-                                      @bind-Value="Model.ExpiryDate"
-                                      Format="dd/MM/yyyy"
-                                      Placeholder="dd/mm/yyyy"
-                                      ShowClearButton="true" />
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label">File <span class="text-danger">*</span></label>
-                        <InputFile class="form-control" OnChange="OnFileSelected"
-                                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
-                    </div>
-                </div>
+                <SfTab>
+                    <TabItems>
+                        <TabItem>
+                            <ChildContent><TabHeader Text="Document Details" /></ChildContent>
+                            <ContentTemplate>
+                                <div class="row g-3 mt-1">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Title <span class="text-danger">*</span></label>
+                                        <HrTextBox @bind-Value="Model.Title" Placeholder="Document title" />
+                                        <ValidationMessage For="@(() => Model.Title)" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Document Type <span class="text-danger">*</span></label>
+                                        <SfDropDownList TValue="Guid?"
+                                                        TItem="DocumentTypeItem"
+                                                        DataSource="@_documentTypes"
+                                                        @bind-Value="Model.DocumentTypeId"
+                                                        Placeholder="Select type…"
+                                                        AllowFiltering="true">
+                                            <DropDownListFieldSettings Value="Id" Text="Name" />
+                                        </SfDropDownList>
+                                        <ValidationMessage For="@(() => Model.DocumentTypeId)" />
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Description</label>
+                                        <HrTextBox @bind-Value="Model.Description"
+                                                   Placeholder="Optional description"
+                                                   Multiline="true" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Issue Date</label>
+                                        <SfDatePicker TValue="DateOnly?"
+                                                      @bind-Value="Model.IssueDate"
+                                                      Format="dd/MM/yyyy"
+                                                      Placeholder="dd/mm/yyyy"
+                                                      ShowClearButton="true" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Expiry Date</label>
+                                        <SfDatePicker TValue="DateOnly?"
+                                                      @bind-Value="Model.ExpiryDate"
+                                                      Format="dd/MM/yyyy"
+                                                      Placeholder="dd/mm/yyyy"
+                                                      ShowClearButton="true" />
+                                    </div>
+                                </div>
+                            </ContentTemplate>
+                        </TabItem>
+                        <TabItem>
+                            <ChildContent><TabHeader Text="File" /></ChildContent>
+                            <ContentTemplate>
+                                <div class="row g-3 mt-1">
+                                    <div class="col-12">
+                                        <label class="form-label">File <span class="text-danger">*</span></label>
+                                        <InputFile class="form-control" OnChange="OnFileSelected"
+                                                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
+                                    </div>
+                                </div>
+                            </ContentTemplate>
+                        </TabItem>
+                    </TabItems>
+                </SfTab>
             </EditForm>
         </Content>
         <FooterTemplate>

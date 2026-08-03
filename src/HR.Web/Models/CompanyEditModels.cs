@@ -31,10 +31,17 @@ public sealed class CompanyAddressEditModel
     public string? PostcodeRegexPattern { get; set; }
 }
 
+// Company Administrator territory — regional display settings only. HR-policy fields live in
+// HrSettingsEditModel (see HrSettingsPage), reachable only to HR Administrators.
 public sealed class CompanySettingsEditModel
 {
     public string? TimeZone { get; set; }
     public string? Locale { get; set; }
+}
+
+// HR Administrator territory — HR-policy fields moved out of CompanySettingsEditModel.
+public sealed class HrSettingsEditModel
+{
     public HashSet<string> WorkingWeek { get; set; } = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
     [Range(0.5, 24)]
     public decimal HoursPerDay { get; set; } = 7.5m;

@@ -76,6 +76,21 @@ function getLastDashboard() {
     try { return localStorage.getItem('lastDashboard') ?? ''; } catch { return ''; }
 }
 
+// Session-scoped (per-tab) scroll position memory, used e.g. by the Recruitment Kanban board so
+// navigating away to a candidate's detail page and back restores where the user was scrolled to,
+// instead of resetting to the top. Keyed by caller-supplied string so multiple scroll containers
+// (or the window itself) can each remember their own position independently.
+function saveScrollPosition(key, top) {
+    try { sessionStorage.setItem('scrollPos:' + key, top.toString()); } catch {}
+}
+
+function getScrollPosition(key) {
+    try {
+        const stored = sessionStorage.getItem('scrollPos:' + key);
+        return stored ? parseFloat(stored) : null;
+    } catch { return null; }
+}
+
 function downloadFileFromBase64(fileName, contentType, base64Content) {
     const link = document.createElement('a');
     link.href = `data:${contentType};base64,${base64Content}`;

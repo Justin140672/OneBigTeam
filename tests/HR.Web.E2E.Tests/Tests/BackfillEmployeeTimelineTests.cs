@@ -28,9 +28,10 @@ namespace HR.Web.E2E.Tests.Tests;
 /// 2. Nesting gap (RESOLVED): the "Employee Timeline" subsection was originally rendered inside
 ///    CompanySettingsTab.razor's `@if (Model.EmployeeNumberMode == EmployeeNumberMode.Automatic)`
 ///    block alongside the Employee Numbering fields. This has since been corrected so the section
-///    (and its button) renders independently of Numbering Mode, gated only on
-///    Session.CanManageEmployees. The test below verifies the button's visibility is independent of
-///    Numbering Mode.
+///    (and its button) renders independently of Numbering Mode — Employee Numbering has since
+///    moved entirely off the Settings tab to the standalone HR Settings page (see
+///    HrSettingsPage.razor), so there's no longer any Numbering Mode state on this tab to even
+///    couple to.
 /// </summary>
 [Collection("E2E")]
 public sealed class BackfillEmployeeTimelineTests(AppFixture fixture) : E2ETestBase(fixture)
@@ -43,8 +44,8 @@ public sealed class BackfillEmployeeTimelineTests(AppFixture fixture) : E2ETestB
     /// <summary>
     /// Priya Shah (CompanyAdministrator only) can reach the Settings tab but does not hold
     /// Session.CanManageEmployees, so the "Backfill Employee Timeline…" button must not render for
-    /// her regardless of Numbering Mode — this is the one half of the permission gating that's
-    /// actually verifiable given the current seed data (see class doc comment, gap 1).
+    /// her — this is the one half of the permission gating that's actually verifiable given the
+    /// current seed data (see class doc comment, gap 1).
     /// </summary>
     [Fact]
     public async Task BackfillTimelineButton_IsNotVisible_ForCompanyAdministratorWithoutEmployeeManagePermission()
@@ -58,60 +59,9 @@ public sealed class BackfillEmployeeTimelineTests(AppFixture fixture) : E2ETestB
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenSettingsTabAsync();
 
-        var initialMode = await companyEdit.GetEmployeeNumberModeAsync();
-
-        try
-        {
-            // Also exercise the Automatic-mode nesting (see class doc comment, gap 2) so this test
-            // fails loudly (rather than silently passing due to the button never being reachable at
-            // all) if the CanManageEmployees gate is ever loosened without a persona to match.
-            await companyEdit.SelectEmployeeNumberModeAsync("Automatic");
-
-            Assert.False(await companyEdit.IsBackfillEmployeeTimelineButtonVisibleAsync(),
-                "Did not expect the 'Backfill Employee Timeline…' button to be visible for a " +
-                "CompanyAdministrator-only persona (Session.CanManageEmployees should be false)");
-        }
-        finally
-        {
-            await companyEdit.SelectEmployeeNumberModeAsync(initialMode);
-            await companyEdit.SaveAsync();
-        }
-    }
-
-    /// <summary>
-    /// Confirms the Employee Timeline section's visibility is independent of Numbering Mode (see
-    /// class doc comment, gap 2 — resolved). Even with Numbering Mode set to Manual, a
-    /// CompanyAdministrator-only persona still does not see the button (Session.CanManageEmployees
-    /// is what gates it, not Numbering Mode).
-    /// </summary>
-    [Fact]
-    public async Task BackfillTimelineButton_IsNotVisible_WhenNumberingModeIsManual()
-    {
-        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
-        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
-
-        await companyEdit.GoToAsync(AcmeId);
-        await companyEdit.OpenSettingsTabAsync();
-
-        var initialMode = await companyEdit.GetEmployeeNumberModeAsync();
-
-        try
-        {
-            await companyEdit.SelectEmployeeNumberModeAsync("Manual");
-
-            Assert.False(await companyEdit.IsBackfillEmployeeTimelineButtonVisibleAsync(),
-                "Did not expect the 'Backfill Employee Timeline…' button to be visible for a " +
-                "CompanyAdministrator-only persona regardless of Numbering Mode " +
-                "(Session.CanManageEmployees should be false)");
-        }
-        finally
-        {
-            await companyEdit.SelectEmployeeNumberModeAsync(initialMode);
-            await companyEdit.SaveAsync();
-        }
+        Assert.False(await companyEdit.IsBackfillEmployeeTimelineButtonVisibleAsync(),
+            "Did not expect the 'Backfill Employee Timeline…' button to be visible for a " +
+            "CompanyAdministrator-only persona (Session.CanManageEmployees should be false)");
     }
 
     // ── Coverage gaps (documented rather than forced) ───────────────────────────
@@ -145,5 +95,6 @@ public sealed class BackfillEmployeeTimelineTests(AppFixture fixture) : E2ETestB
     //
     // 2. The Numbering-Mode nesting gap (see class doc comment, gap 2) has been resolved — the
     //    "Employee Timeline" subsection was moved out of the `EmployeeNumberMode == Automatic` block
-    //    in CompanySettingsTab.razor and is now gated only on Session.CanManageEmployees.
+    //    in CompanySettingsTab.razor and is now gated only on Session.CanManageEmployees. Employee
+    //    Numbering itself has since moved off this tab entirely (see HrSettingsPage.razor).
 }

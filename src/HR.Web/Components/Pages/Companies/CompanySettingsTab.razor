@@ -1,8 +1,6 @@
 @inject CompanyService CompanyService
 @inject AppSession Session
 @inherits EditSectionBase<CompanySettingsEditModel>
-@using HR.Infrastructure.Abstractions
-@using HR.SharedKernel
 
 @if (IsLoading)
 {
@@ -24,199 +22,14 @@ else
             <div class="card-body">
                 <div class="row g-4">
                     <div class="col-12">
-                        <label class="form-label fw-semibold">Working Week</label>
-                        <div class="d-flex flex-wrap gap-3 mt-1">
-                            @foreach (var day in AllDays)
-                            {
-                                <SfCheckBox TChecked="bool" Label="@day"
-                                            Checked="@Model.WorkingWeek.Contains(day)"
-                                            CheckedChanged="@(e => ToggleDay(day, e))" />
-                            }
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <SfNumericTextBox TValue="decimal" @bind-Value="Model.HoursPerDay"
-                                          Placeholder="Hours Per Day"
-                                          FloatLabelType="FloatLabelType.Auto"
-                                          ShowSpinButton="false"
-                                          Min="0.5m" Max="24m" Step="0.5m" />
-                        <ValidationMessage For="@(() => Model.HoursPerDay)" />
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Leave Year Start Month</label>
-                        <SfDropDownList TValue="int" TItem="MonthItem"
-                                        @bind-Value="Model.LeaveYearStartMonth"
-                                        DataSource="@Months">
-                            <DropDownListFieldSettings Value="Number" Text="Name" />
-                        </SfDropDownList>
-                        <div class="form-text">The month each employee's annual leave allowance resets.</div>
-                    </div>
-                    <div class="col-md-3">
-                        <SfNumericTextBox TValue="decimal" @bind-Value="Model.DefaultHolidayAllowance"
-                                          Placeholder="Default Holiday Allowance (days)"
-                                          FloatLabelType="FloatLabelType.Auto"
-                                          ShowSpinButton="false"
-                                          Min="0" Max="365" />
-                        <ValidationMessage For="@(() => Model.DefaultHolidayAllowance)" />
-                    </div>
-                    <div class="col-md-3">
-                        <SfNumericTextBox TValue="int" @bind-Value="Model.ProbationMonths"
-                                          Placeholder="Probation Months"
-                                          FloatLabelType="FloatLabelType.Auto"
-                                          ShowSpinButton="false"
-                                          Min="0" Max="24" />
-                        <ValidationMessage For="@(() => Model.ProbationMonths)" />
-                    </div>
-                    <div class="col-12">
-                        <SfCheckBox TChecked="bool" Label="Exclude public holidays from leave"
-                                    Checked="@Model.ExcludePublicHolidaysFromLeave"
-                                    CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromLeave = v)" />
-                    </div>
-                    <div class="col-12">
-                        <SfCheckBox TChecked="bool" Label="Display salary to employees on their profile"
-                                    Checked="@Model.DisplaySalaryOnEmployeeProfile"
-                                    CheckedChanged="@((bool v) => Model.DisplaySalaryOnEmployeeProfile = v)" />
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label fw-semibold">Sickness</label>
-                    </div>
-                    <div class="col-12">
-                        <SfCheckBox TChecked="bool" Label="Exclude public holidays from sickness"
-                                    Checked="@Model.ExcludePublicHolidaysFromSickness"
-                                    CheckedChanged="@((bool v) => Model.ExcludePublicHolidaysFromSickness = v)" />
+                        <label class="form-label fw-semibold">Regional</label>
                     </div>
                     <div class="col-md-4">
-                        <SfNumericTextBox TValue="int?" @bind-Value="Model.FitNoteRequiredAfterDays"
-                                          Placeholder="Fit Note Required After (Days)"
-                                          FloatLabelType="FloatLabelType.Auto"
-                                          ShowSpinButton="false"
-                                          Min="0" />
+                        <HrTextBox @bind-Value="Model.TimeZone" Placeholder="Time Zone" />
                     </div>
                     <div class="col-md-4">
-                        <SfNumericTextBox TValue="int?" @bind-Value="Model.ReturnToWorkRequiredAfterDays"
-                                          Placeholder="Return-to-Work Review Required After (Days)"
-                                          FloatLabelType="FloatLabelType.Auto"
-                                          ShowSpinButton="false"
-                                          Min="0" />
+                        <HrTextBox @bind-Value="Model.Locale" Placeholder="Locale" />
                     </div>
-                    <div class="col-12">
-                        <label class="form-label fw-semibold">Document Acknowledgement</label>
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label">Default Acknowledgement Statement</label>
-                        <HrTextBox @bind-Value="Model.DefaultAcknowledgementStatement"
-                                   Placeholder="I confirm that I have read and understood this document."
-                                   Multiline="true"
-                                   Maxlength="2000" />
-                        <div class="form-text">
-                            Shown to employees by default when a shared document requires acknowledgement and no
-                            document-specific statement is set. Plain text only — line breaks are preserved but no
-                            formatting/markup.
-                        </div>
-                        <div class="text-muted small text-end">@(Model.DefaultAcknowledgementStatement?.Length ?? 0) / 2000</div>
-                        <ValidationMessage For="@(() => Model.DefaultAcknowledgementStatement)" />
-                    </div>
-                    <div class="col-md-4">
-                        <SfNumericTextBox TValue="int" @bind-Value="Model.AcknowledgementReminderIntervalDays"
-                                          Placeholder="Acknowledgement Reminder Interval (days)"
-                                          FloatLabelType="FloatLabelType.Auto"
-                                          ShowSpinButton="false"
-                                          Min="1" />
-                        <ValidationMessage For="@(() => Model.AcknowledgementReminderIntervalDays)" />
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label fw-semibold">Leaving Process</label>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Default Notice Period <span class="text-danger">*</span></label>
-                        <SfDropDownList TValue="string" TItem="NoticePeriodPresetItem"
-                                        Value="_selectedNoticePeriodPreset"
-                                        ValueChanged="@OnNoticePeriodPresetChanged"
-                                        DataSource="@NoticePeriodPresets">
-                            <DropDownListFieldSettings Value="Value" Text="Label" />
-                        </SfDropDownList>
-                    </div>
-                    @if (_selectedNoticePeriodPreset == CustomPresetValue)
-                    {
-                        <div class="col-md-4">
-                            <label class="form-label">Unit <span class="text-danger">*</span></label>
-                            <SfDropDownList TValue="NoticePeriodUnit" TItem="NoticePeriodUnitOption"
-                                            @bind-Value="Model.NoticePeriodUnit"
-                                            DataSource="@NoticePeriodUnitOptions">
-                                <DropDownListFieldSettings Value="Value" Text="Label" />
-                            </SfDropDownList>
-                        </div>
-                        <div class="col-md-4">
-                            <SfNumericTextBox TValue="int" @bind-Value="Model.NoticePeriodLength"
-                                              Placeholder="Length"
-                                              FloatLabelType="FloatLabelType.Auto"
-                                              ShowSpinButton="false"
-                                              Min="1" />
-                            <ValidationMessage For="@(() => Model.NoticePeriodLength)" />
-                        </div>
-                    }
-                    <div class="col-12">
-                        <SfCheckBox TChecked="bool" Label="Automatically disable system access on the employee's leaving date"
-                                    Checked="@Model.AutoDisableAccessOnLeavingDate"
-                                    CheckedChanged="@((bool v) => Model.AutoDisableAccessOnLeavingDate = v)" />
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label fw-semibold">Employee Numbering</label>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Numbering Mode</label>
-                        <SfDropDownList TValue="EmployeeNumberMode" TItem="EmployeeNumberModeOption"
-                                        @bind-Value="Model.EmployeeNumberMode"
-                                        DataSource="@EmployeeNumberModeOptions">
-                            <DropDownListFieldSettings Value="Value" Text="Label" />
-                        </SfDropDownList>
-                    </div>
-                    @if (Model.EmployeeNumberMode == EmployeeNumberMode.Automatic)
-                    {
-                        <div class="col-md-4">
-                            <HrTextBox @bind-Value="Model.EmployeeNumberPrefix" Placeholder="e.g. EMP-" />
-                            <div class="form-text">
-                                Changing the prefix only affects employee numbers assigned in the future —
-                                existing employees' numbers are never changed retroactively.
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <SfNumericTextBox TValue="int" @bind-Value="Model.NextEmployeeNumber"
-                                              Placeholder="Next Number"
-                                              FloatLabelType="FloatLabelType.Auto"
-                                              ShowSpinButton="false"
-                                              Min="1" />
-                            <ValidationMessage For="@(() => Model.NextEmployeeNumber)" />
-                        </div>
-                        <div class="col-md-4">
-                            <SfNumericTextBox TValue="int" @bind-Value="Model.EmployeeNumberMinimumLength"
-                                              Placeholder="Minimum Numeric Length"
-                                              FloatLabelType="FloatLabelType.Auto"
-                                              ShowSpinButton="false"
-                                              Min="1" Max="10" />
-                            <ValidationMessage For="@(() => Model.EmployeeNumberMinimumLength)" />
-                        </div>
-                        <div class="col-12">
-                            <p class="text-muted mb-0">Preview: <strong>@PreviewEmployeeNumber</strong></p>
-                        </div>
-                        @if (Session.CanManageEmployees)
-                        {
-                            <div class="col-12">
-                                <SfButton OnClick="OpenBackfillDialog">Backfill Employee Numbers…</SfButton>
-                                <div class="form-text">
-                                    Assigns employee numbers to existing employees who don't have one yet, in start-date order.
-                                </div>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="col-12">
-                                <p class="text-muted mb-0">
-                                    Backfilling employee numbers requires HR Administrator permissions.
-                                </p>
-                            </div>
-                        }
-                    }
                     @if (Session.CanManageEmployees)
                     {
                         <div class="col-12">
@@ -233,11 +46,6 @@ else
         </div>
     </EditForm>
 
-    <BackfillEmployeeNumbersDialog CompanyId="CompanyId"
-                                    IsOpen="_backfillDialogOpen"
-                                    OnClosed="@(() => _backfillDialogOpen = false)"
-                                    OnCommitted="HandleBackfillCommittedAsync" />
-
     <BackfillEmployeeTimelineDialog CompanyId="CompanyId"
                                      IsOpen="_timelineBackfillDialogOpen"
                                      OnClosed="@(() => _timelineBackfillDialogOpen = false)"
@@ -246,52 +54,6 @@ else
 
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
-
-    private static readonly string[] AllDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
-    private static readonly List<MonthItem> Months = Enumerable.Range(1, 12)
-        .Select(m => new MonthItem(m, System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)))
-        .ToList();
-
-    private const string CustomPresetValue = "custom";
-
-    private static readonly List<NoticePeriodPresetItem> NoticePeriodPresets =
-    [
-        new("1w", "1 week", NoticePeriodUnit.Weeks, 1),
-        new("2w", "2 weeks", NoticePeriodUnit.Weeks, 2),
-        new("1m", "1 month", NoticePeriodUnit.Months, 1),
-        new("2m", "2 months", NoticePeriodUnit.Months, 2),
-        new("3m", "3 months", NoticePeriodUnit.Months, 3),
-        new("6m", "6 months", NoticePeriodUnit.Months, 6),
-        new(CustomPresetValue, "Custom duration", null, null),
-    ];
-
-    private static readonly List<NoticePeriodUnitOption> NoticePeriodUnitOptions =
-    [
-        new(NoticePeriodUnit.Weeks, "Weeks"),
-        new(NoticePeriodUnit.Months, "Months"),
-    ];
-
-    private string _selectedNoticePeriodPreset = CustomPresetValue;
-
-    private static readonly List<EmployeeNumberModeOption> EmployeeNumberModeOptions =
-    [
-        new(EmployeeNumberMode.Manual, "Manual"),
-        new(EmployeeNumberMode.Automatic, "Automatic"),
-    ];
-
-    private string PreviewEmployeeNumber =>
-        $"{Model.EmployeeNumberPrefix}{Model.NextEmployeeNumber.ToString().PadLeft(Model.EmployeeNumberMinimumLength, '0')}";
-
-    private bool _backfillDialogOpen;
-
-    private void OpenBackfillDialog() => _backfillDialogOpen = true;
-
-    private async Task HandleBackfillCommittedAsync()
-    {
-        // Refresh settings so the "Next Number" preview reflects the numbers just assigned.
-        await LoadAsync();
-    }
 
     private bool _timelineBackfillDialogOpen;
 
@@ -306,85 +68,14 @@ else
         {
             Model.TimeZone = settings.TimeZone;
             Model.Locale = settings.Locale;
-            Model.WorkingWeek = Enum.GetValues<WorkingDays>()
-                .Where(day => day != WorkingDays.None && ((WorkingDays)settings.WorkingDays).HasFlag(day))
-                .Select(day => day.ToString())
-                .ToHashSet();
-            Model.HoursPerDay = settings.HoursPerDay;
-            Model.LeaveYearStartMonth = settings.LeaveYearStartMonth;
-            Model.DefaultHolidayAllowance = settings.DefaultHolidayAllowance;
-            Model.ProbationMonths = settings.ProbationMonths;
-            Model.ExcludePublicHolidaysFromLeave = settings.ExcludePublicHolidaysFromLeave;
-            Model.ExcludePublicHolidaysFromSickness = settings.ExcludePublicHolidaysFromSickness;
-            Model.DisplaySalaryOnEmployeeProfile = settings.DisplaySalaryOnEmployeeProfile;
-            Model.FitNoteRequiredAfterDays = settings.FitNoteRequiredAfterDays;
-            Model.ReturnToWorkRequiredAfterDays = settings.ReturnToWorkRequiredAfterDays;
-            Model.DefaultAcknowledgementStatement = settings.DefaultAcknowledgementStatement;
-            Model.AcknowledgementReminderIntervalDays = settings.AcknowledgementReminderIntervalDays;
-            Model.NoticePeriodUnit = settings.NoticePeriodUnit;
-            Model.NoticePeriodLength = settings.NoticePeriodLength;
-            Model.AutoDisableAccessOnLeavingDate = settings.AutoDisableAccessOnLeavingDate;
-            Model.EmployeeNumberMode = settings.EmployeeNumberMode;
-            Model.EmployeeNumberPrefix = settings.EmployeeNumberPrefix;
-            Model.NextEmployeeNumber = settings.NextEmployeeNumber;
-            Model.EmployeeNumberMinimumLength = settings.EmployeeNumberMinimumLength;
-
-            var matchedPreset = NoticePeriodPresets.FirstOrDefault(p =>
-                p.Unit == settings.NoticePeriodUnit && p.Length == settings.NoticePeriodLength);
-            _selectedNoticePeriodPreset = matchedPreset?.Value ?? CustomPresetValue;
         }
     }
 
     protected override async Task<string?> SaveCoreAsync()
     {
-        var workingDays = Model.WorkingWeek
-            .Aggregate(WorkingDays.None, (acc, day) =>
-                Enum.TryParse<WorkingDays>(day, out var wd) ? acc | wd : acc);
-
-        var request = new UpdateCompanySettingsRequest(
-            CompanyId, Model.TimeZone, Model.Locale,
-            workingDays, Model.HoursPerDay,
-            Model.LeaveYearStartMonth, Model.DefaultHolidayAllowance,
-            Model.ProbationMonths, Model.ExcludePublicHolidaysFromLeave,
-            Model.ExcludePublicHolidaysFromSickness, Model.DisplaySalaryOnEmployeeProfile,
-            Model.FitNoteRequiredAfterDays,
-            Model.ReturnToWorkRequiredAfterDays,
-            Model.DefaultAcknowledgementStatement,
-            Model.AcknowledgementReminderIntervalDays,
-            Model.NoticePeriodUnit,
-            Model.NoticePeriodLength,
-            Model.AutoDisableAccessOnLeavingDate,
-            Model.EmployeeNumberMode,
-            string.IsNullOrWhiteSpace(Model.EmployeeNumberPrefix) ? null : Model.EmployeeNumberPrefix.Trim(),
-            Model.NextEmployeeNumber,
-            Model.EmployeeNumberMinimumLength);
+        var request = new UpdateCompanySettingsRequest(CompanyId, Model.TimeZone, Model.Locale);
 
         var result = await CompanyService.UpdateCompanySettingsAsync(CompanyId, request);
         return result is not null ? null : "Failed to save company settings.";
     }
-
-    private void ToggleDay(string day, bool isChecked)
-    {
-        if (isChecked) Model.WorkingWeek.Add(day);
-        else Model.WorkingWeek.Remove(day);
-    }
-
-    private void OnNoticePeriodPresetChanged(string value)
-    {
-        _selectedNoticePeriodPreset = value;
-        var preset = NoticePeriodPresets.FirstOrDefault(p => p.Value == value);
-        if (preset is { Unit: not null, Length: not null })
-        {
-            Model.NoticePeriodUnit = preset.Unit.Value;
-            Model.NoticePeriodLength = preset.Length.Value;
-        }
-    }
-
-    private sealed record MonthItem(int Number, string Name);
-
-    private sealed record NoticePeriodPresetItem(string Value, string Label, NoticePeriodUnit? Unit, int? Length);
-
-    private sealed record NoticePeriodUnitOption(NoticePeriodUnit Value, string Label);
-
-    private sealed record EmployeeNumberModeOption(EmployeeNumberMode Value, string Label);
 }

@@ -25,7 +25,7 @@ public class GetHeadcountSummaryHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Groups_By_Department_And_Counts_Active_And_OnLeave_Employees()
+    public async Task HandleAsync_Groups_By_Department_And_Counts_Active_Employees()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
@@ -42,16 +42,15 @@ public class GetHeadcountSummaryHandlerTests
         engActive2.Assign(engineering.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now);
         engActive2.Activate(Now);
 
-        var engOnLeave = NewEmployee(companyId, "Carol", "White");
-        engOnLeave.Assign(engineering.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now);
-        engOnLeave.Activate(Now);
-        engOnLeave.SetOnLeave(Now);
+        var engActive3 = NewEmployee(companyId, "Carol", "White");
+        engActive3.Assign(engineering.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now);
+        engActive3.Activate(Now);
 
         var salesActive = NewEmployee(companyId, "Dave", "Brown");
         salesActive.Assign(sales.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now);
         salesActive.Activate(Now);
 
-        context.Employees.AddRange(engActive1, engActive2, engOnLeave, salesActive);
+        context.Employees.AddRange(engActive1, engActive2, engActive3, salesActive);
         await context.SaveChangesAsync();
 
         var handler = new GetHeadcountSummaryHandler(context);

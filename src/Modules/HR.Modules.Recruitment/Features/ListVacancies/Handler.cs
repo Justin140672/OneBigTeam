@@ -59,6 +59,17 @@ internal sealed class ListVacanciesHandler(RecruitmentDbContext db, IPositionPro
                 : [])
             .ToDictionary(p => p.Id);
 
+        var vacancyIds = vacancies.Select(v => v.Id).ToList();
+
+        var applicationCounts = vacancyIds.Count > 0
+            ? await db.Applications
+                .AsNoTracking()
+                .Where(a => a.CompanyId == request.CompanyId && vacancyIds.Contains(a.VacancyId))
+                .GroupBy(a => a.VacancyId)
+                .Select(g => new { VacancyId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.VacancyId, x => x.Count, cancellationToken)
+            : new Dictionary<Guid, int>();
+
         var items = vacancies
             .Select(v =>
             {
@@ -77,7 +88,8 @@ internal sealed class ListVacanciesHandler(RecruitmentDbContext db, IPositionPro
                     positionProfile?.Title,
                     positionProfile?.DepartmentId,
                     v.AdvertTitle ?? positionProfile?.Title ?? "(untitled)",
-                    positionProfile?.LocationName);
+                    positionProfile?.LocationName,
+                    applicationCounts.GetValueOrDefault(v.Id));
             })
             .ToList();
 

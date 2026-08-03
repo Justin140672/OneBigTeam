@@ -10,6 +10,39 @@ public record ReportCatalogItemModel(
     string Category,
     string Description);
 
+/// <summary>
+/// Catalog report id -> the route segment for its dedicated page under
+/// /companies/{companyId}/reporting/{route}. Shared between ReportCatalogPage (main catalog grid)
+/// and FavouriteReportsWidget/TeamReportsWidget (dashboard widgets) so the two never drift apart —
+/// see ReportCatalogPage's "phase 1 proved the permission-filtered pattern" comment for why some
+/// catalog entries have no route yet ("Coming soon").
+/// </summary>
+public static class ReportRoutes
+{
+    public static readonly IReadOnlyDictionary<string, string> Map = new Dictionary<string, string>
+    {
+        ["employee-directory"] = "employee-directory",
+        ["employee-starters"] = "employee-starters",
+        ["employee-leavers"] = "employee-leavers",
+        ["leave-summary"] = "leave-summary",
+        ["leave-calendar"] = "leave-calendar",
+        ["sickness-report"] = "sickness",
+        ["recruitment-pipeline-report"] = "recruitment-pipeline",
+        ["vacancy-performance-report"] = "vacancy-performance",
+        ["probation-report"] = "probation",
+        ["onboarding-progress"] = "onboarding-progress",
+        ["offboarding-progress"] = "offboarding-progress",
+        ["document-compliance"] = "document-compliance",
+        ["document-acknowledgement"] = "document-acknowledgement",
+        ["asset-assignment"] = "asset-assignment",
+        ["workload-actions"] = "workload-actions",
+    };
+
+    public static bool IsClickable(string reportId) => Map.ContainsKey(reportId);
+
+    public static string? RouteFor(string reportId) => Map.GetValueOrDefault(reportId);
+}
+
 // ── Employee Directory report ────────────────────────────────────────────────
 
 public record EmployeeDirectoryReportFilter(

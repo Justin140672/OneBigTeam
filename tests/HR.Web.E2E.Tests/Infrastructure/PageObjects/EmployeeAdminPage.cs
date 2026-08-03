@@ -54,6 +54,54 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         }
     }
 
+    // ── Upload Document dialog (UploadDocumentDialog.razor, admin/EmployeeSelfUpload="false") ──
+    // Split into two tabs — "Document Details" (Title/Document Type/Description/Issue Date/Expiry
+    // Date) and "File" (the file input) — rather than a single flat form.
+
+    private ILocator UploadDocumentDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Upload Document" });
+
+    /// <summary>Clicks the Documents tab's "Upload" button and waits for the dialog to open.</summary>
+    public async Task OpenUploadDocumentDialogAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
+        await UploadDocumentDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+    }
+
+    /// <summary>True if the (open) Upload Document dialog shows a "Document Details" tab.</summary>
+    public Task<bool> HasUploadDialogDocumentDetailsTabAsync() =>
+        UploadDocumentDialog.GetByRole(AriaRole.Tab, new() { Name = "Document Details" }).IsVisibleAsync();
+
+    /// <summary>True if the (open) Upload Document dialog shows a "File" tab.</summary>
+    public Task<bool> HasUploadDialogFileTabAsync() =>
+        UploadDocumentDialog.GetByRole(AriaRole.Tab, new() { Name = "File" }).IsVisibleAsync();
+
+    /// <summary>
+    /// True if the file input is visible without switching tabs first — expected false, since it
+    /// lives on the separate "File" tab, not alongside the "Document Details" fields.
+    /// </summary>
+    public Task<bool> IsUploadDialogFileInputVisibleAsync() =>
+        UploadDocumentDialog.Locator("input[type='file']").IsVisibleAsync();
+
+    public Task FillUploadDialogTitleAsync(string value) =>
+        UploadDocumentDialog.GetByPlaceholder("Document title").FillAsync(value);
+
+    public Task SelectUploadDialogDocumentTypeAsync(string typeNameFragment) =>
+        DropDownSelector.SelectAsync(page, UploadDocumentDialog, typeNameFragment);
+
+    /// <summary>Switches to the dialog's "File" tab and sets the file to upload.</summary>
+    public async Task SelectUploadDialogFileAsync(string filePath)
+    {
+        await UploadDocumentDialog.GetByRole(AriaRole.Tab, new() { Name = "File" }).ClickAsync();
+        await UploadDocumentDialog.Locator("input[type='file']").SetInputFilesAsync(filePath);
+    }
+
+    /// <summary>Clicks "Upload" and waits for the dialog to close (successful submission).</summary>
+    public async Task SubmitUploadDocumentDialogAsync()
+    {
+        await UploadDocumentDialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
+        await UploadDocumentDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+    }
+
     /// <summary>Returns true if the Document Requests section is visible on the Documents tab.</summary>
     public async Task<bool> HasDocumentRequestsSectionAsync() =>
         await page.Locator("[data-testid='admin-document-requests-section']").IsVisibleAsync();

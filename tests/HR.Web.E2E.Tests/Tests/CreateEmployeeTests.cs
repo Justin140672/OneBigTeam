@@ -16,7 +16,6 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
     private static readonly Guid TomWilliamsId = Guid.Parse("30000000-0000-0000-0000-000000000004");
 
     private const string LauraEmail = "laura.bennett@acme.example";
-    private const string CompanyAdminEmail = "priya.shah@acme.example";
 
     [Fact]
     public async Task CreateEmployee_WithRequiredFields_AppearsInEmployeeList()
@@ -481,16 +480,16 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
-        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
         // Acme's seeded numbering mode is Manual by default — confirm the plain text input
-        // renders and is required (see EmployeeEdit.razor's Employee Number field).
-        await companyEdit.GoToAsync(AcmeId);
-        await companyEdit.OpenSettingsTabAsync();
-        Assert.Equal("Manual", await companyEdit.GetEmployeeNumberModeAsync());
+        // renders and is required (see EmployeeEdit.razor's Employee Number field). Employee
+        // Numbering lives on the standalone HR Settings page (HrSettingsPage.razor).
+        await hrSettings.GoToAsync(AcmeId);
+        Assert.Equal("Manual", await hrSettings.GetEmployeeNumberModeAsync());
 
         await empEdit.GoToNewAsync(AcmeId);
 
@@ -510,22 +509,21 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
         var login       = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList     = new EmployeeListPage(_page, _fixture.WebBaseUrl);
         var empEdit     = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
-        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
-
-        // Switch Acme's numbering mode to Automatic for the duration of this test.
-        await companyEdit.GoToAsync(AcmeId);
-        await companyEdit.OpenSettingsTabAsync();
-        var initialMode = await companyEdit.GetEmployeeNumberModeAsync();
-        await companyEdit.SelectEmployeeNumberModeAsync("Automatic");
-        await companyEdit.SaveAsync();
-        Assert.False(await companyEdit.HasErrorAsync(),
-            "Expected no error after switching the company's numbering mode to Automatic");
+        var hrSettings  = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
+
+        // Switch Acme's numbering mode to Automatic for the duration of this test. Employee
+        // Numbering lives on the standalone HR Settings page (HrSettingsPage.razor), gated on
+        // Session.IsHrAdministrator — Laura (HrAdministrator) can both change this setting and
+        // create employees, so no persona switch is needed here.
+        await hrSettings.GoToAsync(AcmeId);
+        var initialMode = await hrSettings.GetEmployeeNumberModeAsync();
+        await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
+        await hrSettings.SaveAsync();
+        Assert.False(await hrSettings.HasErrorAsync(),
+            "Expected no error after switching the company's numbering mode to Automatic");
 
         try
         {
@@ -555,12 +553,9 @@ public sealed class CreateEmployeeTests(AppFixture fixture) : E2ETestBase(fixtur
         {
             // Restore the original numbering mode so this test doesn't leak state into other
             // tests/fixtures that rely on Acme's seeded default.
-            await login.GoToAsync();
-            await login.LoginAsync(CompanyAdminEmail);
-            await companyEdit.GoToAsync(AcmeId);
-            await companyEdit.OpenSettingsTabAsync();
-            await companyEdit.SelectEmployeeNumberModeAsync(initialMode);
-            await companyEdit.SaveAsync();
+            await hrSettings.GoToAsync(AcmeId);
+            await hrSettings.SelectEmployeeNumberModeAsync(initialMode);
+            await hrSettings.SaveAsync();
         }
     }
 

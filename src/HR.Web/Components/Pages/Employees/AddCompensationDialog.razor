@@ -53,16 +53,6 @@
                         </SfDropDownList>
                         <ValidationMessage For="@(() => Model.Reason)" />
                     </div>
-                    <div class="col-6">
-                        <label class="form-label">Hours Per Week</label>
-                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.HoursPerWeek" Min="0" Max="168" ShowSpinButton="false"
-                                          Placeholder="e.g. 37.5" />
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label">FTE</label>
-                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.FTE" Min="0" Max="1" Step="0.05m" ShowSpinButton="false"
-                                          Placeholder="e.g. 1.0" />
-                    </div>
                     <div class="col-12">
                         <label class="form-label">Notes</label>
                         <HrTextBox @bind-Value="Model.Notes" Multiline="true" Rows="3" Maxlength="4000" Placeholder="Optional notes…" />
@@ -107,8 +97,8 @@
             Model.SalaryType,
             Model.Salary!.Value,
             Model.Currency.Trim().ToUpperInvariant(),
-            Model.HoursPerWeek,
-            Model.FTE,
+            null,
+            null,
             string.IsNullOrWhiteSpace(Model.Notes) ? null : Model.Notes.Trim(),
             Model.Reason);
 
@@ -129,8 +119,6 @@
         Model.SalaryType = "Annual";
         Model.Salary = null;
         Model.Currency = "GBP";
-        Model.HoursPerWeek = null;
-        Model.FTE = null;
         Model.Notes = null;
         Model.Reason = "NewHire";
     }
@@ -149,8 +137,6 @@
         [Required(ErrorMessage = "Please enter a currency code.")]
         [StringLength(3, MinimumLength = 3, ErrorMessage = "Currency must be a 3-letter code (e.g. GBP).")]
         public string Currency { get; set; } = "GBP";
-        public decimal? HoursPerWeek { get; set; }
-        public decimal? FTE { get; set; }
         public string? Notes { get; set; }
         [Required(ErrorMessage = "Please select a reason.")]
         public string Reason { get; set; } = "NewHire";

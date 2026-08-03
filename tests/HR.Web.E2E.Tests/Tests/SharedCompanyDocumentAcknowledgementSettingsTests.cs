@@ -7,7 +7,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// <summary>
 /// Verifies the Shared Company Document acknowledgement-settings feature set added alongside the
 /// audit history dialog:
-/// - Company Settings' new "Default Acknowledgement Statement" field (CompanySettingsTab.razor).
+/// - The standalone HR Settings page's "Default Acknowledgement Statement" field
+///   (HrSettingsPage.razor — moved off the Company Settings tab, see class doc history).
 /// - UploadSharedCompanyDocumentDialog.razor's auto-populate-from-default, live preview, and
 ///   required-when-enabled validation for the Acknowledgement Statement field.
 /// - EditSharedCompanyDocumentAcknowledgementDialog.razor's Draft-editable / Published-locked
@@ -15,67 +16,64 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - SharedCompanyDocumentAuditHistoryDialog.razor, opened from the document detail page's header.
 ///
 /// Complements SharedDocumentUploadTests (basic upload flow), CompanyDocumentsTabTests (uses the
-/// same upload-then-publish helper pattern), and CompanySettingsTests (Settings tab conventions) —
-/// this file focuses specifically on the acknowledgement-statement and audit-history additions.
+/// same upload-then-publish helper pattern), and HrSettingsPageTests (HR Settings page
+/// conventions) — this file focuses specifically on the acknowledgement-statement and
+/// audit-history additions.
 ///
-/// Uses Priya Shah (CompanyAdministrator, company:manage) to edit Company Settings — same
-/// requirement as CompanySettingsTests — and Laura Bennett (HrAdministrator,
-/// shared-document:manage) for the document upload/publish/edit flows, switching accounts via
-/// LoginPage.SwitchAccountAsync as needed (same pattern as CompanyDocumentsTabTests).
+/// Uses Laura Bennett (HrAdministrator) for both the HR Settings page (hr-settings:manage /
+/// Session.IsHrAdministrator) and the document upload/publish/edit flows
+/// (shared-document:manage) — the "Default Acknowledgement Statement" field used to live on
+/// Company Settings (CompanyAdministrator-only) but has since moved to the standalone HR Settings
+/// page, which only an HrAdministrator can reach.
 /// </summary>
 [Collection("E2E")]
 public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string CompanyAdminEmail = "priya.shah@acme.example";
     private const string HrEmail = "laura.bennett@acme.example";
 
     [Fact]
     public async Task CompanySettings_UpdateDefaultAcknowledgementStatement_PersistsAfterReload()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
-        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(HrEmail);
 
-        await companyEdit.GoToAsync(AcmeId);
-        await companyEdit.OpenSettingsTabAsync();
+        await hrSettings.GoToAsync(AcmeId);
 
         var statement = $"Default acknowledgement statement {Guid.NewGuid():N}";
-        await companyEdit.SetDefaultAcknowledgementStatementAsync(statement);
+        await hrSettings.SetDefaultAcknowledgementStatementAsync(statement);
 
-        await companyEdit.SaveAsync();
-        Assert.False(await companyEdit.HasErrorAsync(),
+        await hrSettings.SaveAsync();
+        Assert.False(await hrSettings.HasErrorAsync(),
             "Expected no error after saving the default acknowledgement statement");
 
         // Reload the page for real (re-navigate) to exercise the settings-hydration path, not
-        // just in-memory Blazor state — same pattern as CompanySettingsTests.
-        await companyEdit.GoToAsync(AcmeId);
-        await companyEdit.OpenSettingsTabAsync();
+        // just in-memory Blazor state — same pattern as HrSettingsPageTests.
+        await hrSettings.GoToAsync(AcmeId);
 
-        Assert.Equal(statement, await companyEdit.GetDefaultAcknowledgementStatementAsync());
+        Assert.Equal(statement, await hrSettings.GetDefaultAcknowledgementStatementAsync());
     }
 
     [Fact]
     public async Task UploadDialog_RequiresAcknowledgement_AutoPopulatesFromCompanyDefault_AndShowsLivePreview()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
-        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
         var upload = new UploadSharedCompanyDocumentDialogPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(HrEmail);
 
         var defaultStatement = $"Default statement {Guid.NewGuid():N}";
-        await companyEdit.GoToAsync(AcmeId);
-        await companyEdit.OpenSettingsTabAsync();
-        await companyEdit.SetDefaultAcknowledgementStatementAsync(defaultStatement);
-        await companyEdit.SaveAsync();
-        Assert.False(await companyEdit.HasErrorAsync());
+        await hrSettings.GoToAsync(AcmeId);
+        await hrSettings.SetDefaultAcknowledgementStatementAsync(defaultStatement);
+        await hrSettings.SaveAsync();
+        Assert.False(await hrSettings.HasErrorAsync());
 
-        await login.SwitchAccountAsync(HrEmail);
         await upload.GoToListAsync(AcmeId);
         await upload.OpenAsync();
 
@@ -188,20 +186,18 @@ public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(AppFixture
     public async Task EditDialog_ResetToDefault_RestoresCompanyDefaultStatement()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
-        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
         var detail = new SharedDocumentDetailPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(HrEmail);
 
         var defaultStatement = $"Default statement {Guid.NewGuid():N}";
-        await companyEdit.GoToAsync(AcmeId);
-        await companyEdit.OpenSettingsTabAsync();
-        await companyEdit.SetDefaultAcknowledgementStatementAsync(defaultStatement);
-        await companyEdit.SaveAsync();
-        Assert.False(await companyEdit.HasErrorAsync());
+        await hrSettings.GoToAsync(AcmeId);
+        await hrSettings.SetDefaultAcknowledgementStatementAsync(defaultStatement);
+        await hrSettings.SaveAsync();
+        Assert.False(await hrSettings.HasErrorAsync());
 
-        await login.SwitchAccountAsync(HrEmail);
         var documentId = await UploadDraftDocumentAsync();
 
         await detail.GoToAsync(AcmeId, documentId);

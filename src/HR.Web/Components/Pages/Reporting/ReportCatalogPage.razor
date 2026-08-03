@@ -32,7 +32,7 @@
     {
         @foreach (var category in _filteredGroups)
         {
-            <h5 class="mt-4 mb-2">@category.Category</h5>
+            <h5 class="mt-4 mb-2">@CategoryLabel(category.Category)</h5>
             <div class="row g-3">
                 @foreach (var item in category.Items)
                 {
@@ -72,27 +72,6 @@
     private string? _error;
     private string _searchTerm = string.Empty;
     private HashSet<string> _favouriteIds = [];
-
-    // Reports with a real target page this pass. Every other catalog entry is rendered but not
-    // yet clickable — see epic note about phase-1 catalog scope.
-    private static readonly Dictionary<string, string> _reportRoutes = new()
-    {
-        ["employee-directory"] = "employee-directory",
-        ["employee-starters"] = "employee-starters",
-        ["employee-leavers"] = "employee-leavers",
-        ["leave-summary"] = "leave-summary",
-        ["leave-calendar"] = "leave-calendar",
-        ["sickness-report"] = "sickness",
-        ["recruitment-pipeline-report"] = "recruitment-pipeline",
-        ["vacancy-performance-report"] = "vacancy-performance",
-        ["probation-report"] = "probation",
-        ["onboarding-progress"] = "onboarding-progress",
-        ["offboarding-progress"] = "offboarding-progress",
-        ["document-compliance"] = "document-compliance",
-        ["document-acknowledgement"] = "document-acknowledgement",
-        ["asset-assignment"] = "asset-assignment",
-        ["workload-actions"] = "workload-actions",
-    };
 
     protected override async Task OnParametersSetAsync()
     {
@@ -139,11 +118,20 @@
 
     private void OnSearchChanged(string value) => _searchTerm = value;
 
-    private static bool IsClickable(ReportCatalogItemModel item) => _reportRoutes.ContainsKey(item.Id);
+    // ReportCategory.Hr.ToString() yields "Hr" (PascalCase enum name) rather than the correct
+    // "HR" capitalisation — map it explicitly rather than relying on the raw enum name for display.
+    private static string CategoryLabel(string category) => category switch
+    {
+        "Hr" => "HR",
+        _ => category,
+    };
+
+    private static bool IsClickable(ReportCatalogItemModel item) => ReportRoutes.IsClickable(item.Id);
 
     private void OnCardClicked(ReportCatalogItemModel item)
     {
-        if (_reportRoutes.TryGetValue(item.Id, out var route))
+        var route = ReportRoutes.RouteFor(item.Id);
+        if (route is not null)
             Navigation.NavigateTo($"/companies/{CompanyId}/reporting/{route}");
     }
 

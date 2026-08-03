@@ -69,9 +69,17 @@ public sealed class ApplicationSourceExternalRecruiterTests(AppFixture fixture) 
         await vacancyDetail.SaveNewVacancyAsync();
 
         // ── Add the candidate with Source = External Recruiter ────────────────────
+        // SaveNewVacancyAsync navigates back to the vacancy list, and the Applications tab only
+        // renders once the vacancy is Open (Draft hides it entirely) — reopen the vacancy and
+        // publish it before reaching for the tab.
+        await vacancyList.ClickVacancyAsync(vacancyTitle);
+        await vacancyDetail.PublishVacancyAsync();
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
-        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateEmail);
+        // The Add Candidate popup's item text is name-only (no email — item #26/product fix),
+        // so the candidate must be matched by name here even though search-as-you-type still
+        // works server-side against any field including email.
+        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateLast);
         await vacancyDetail.SelectAddApplicationSourceAsync("External Recruiter");
         await vacancyDetail.SelectAddApplicationRecruiterAsync(agencyName);
 
@@ -80,7 +88,7 @@ public sealed class ApplicationSourceExternalRecruiterTests(AppFixture fixture) 
 
         await vacancyDetail.SubmitAddApplicationAsync();
 
-        Assert.Equal("Applied", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
+        Assert.Equal("Application Received", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
         var sourceText = await vacancyDetail.GetApplicationSourceColumnTextAsync(candidateLast);
         Assert.NotNull(sourceText);
@@ -136,9 +144,13 @@ public sealed class ApplicationSourceExternalRecruiterTests(AppFixture fixture) 
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.ClickVacancyAsync(vacancyTitle);
+        await vacancyDetail.PublishVacancyAsync();
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
-        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateEmail);
+        // The Add Candidate popup's item text is name-only (no email — item #26/product fix),
+        // so the candidate must be matched by name here even though search-as-you-type still
+        // works server-side against any field including email.
+        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateLast);
         await vacancyDetail.SelectAddApplicationSourceAsync("External Recruiter");
         await vacancyDetail.SelectAddApplicationRecruiterAsync(agencyName);
 

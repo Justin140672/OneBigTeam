@@ -89,7 +89,7 @@
         }
 
         _companyDefaultAcknowledgementStatement =
-            (await CompanyService.GetCompanySettingsAsync(CompanyId))?.DefaultAcknowledgementStatement;
+            (await CompanyService.GetHrSettingsAsync(CompanyId))?.DefaultAcknowledgementStatement;
     }
 
     private void ResetToDefault()

@@ -13,7 +13,7 @@ public class GetCompensationHistoryHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Employee_Does_Not_Exist()
     {
         await using var context = BuildContext();
-        var handler = new GetCompensationHistoryHandler(context);
+        var handler = new GetCompensationHistoryHandler(context, new HR.Modules.Employees.Tests.Infrastructure.FakeEmployeeNameReader());
 
         var result = await handler.HandleAsync(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
@@ -30,7 +30,7 @@ public class GetCompensationHistoryHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        var handler = new GetCompensationHistoryHandler(context);
+        var handler = new GetCompensationHistoryHandler(context, new HR.Modules.Employees.Tests.Infrastructure.FakeEmployeeNameReader());
 
         var result = await handler.HandleAsync(companyId, employee.Id, CancellationToken.None);
 
@@ -54,7 +54,7 @@ public class GetCompensationHistoryHandlerTests
         context.Compensations.AddRange(middle, oldest, newest);
         await context.SaveChangesAsync();
 
-        var handler = new GetCompensationHistoryHandler(context);
+        var handler = new GetCompensationHistoryHandler(context, new HR.Modules.Employees.Tests.Infrastructure.FakeEmployeeNameReader());
 
         var result = await handler.HandleAsync(companyId, employee.Id, CancellationToken.None);
 
@@ -81,7 +81,7 @@ public class GetCompensationHistoryHandlerTests
         context.Compensations.AddRange(mine, theirs);
         await context.SaveChangesAsync();
 
-        var handler = new GetCompensationHistoryHandler(context);
+        var handler = new GetCompensationHistoryHandler(context, new HR.Modules.Employees.Tests.Infrastructure.FakeEmployeeNameReader());
 
         var result = await handler.HandleAsync(companyId, employee.Id, CancellationToken.None);
 
@@ -103,12 +103,40 @@ public class GetCompensationHistoryHandlerTests
         context.Compensations.Add(compensation);
         await context.SaveChangesAsync();
 
-        var handler = new GetCompensationHistoryHandler(context);
+        var handler = new GetCompensationHistoryHandler(context, new HR.Modules.Employees.Tests.Infrastructure.FakeEmployeeNameReader());
 
         var result = await handler.HandleAsync(otherCompanyId, employee.Id, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Resolves_CreatedByName_And_Falls_Back_To_Unknown_When_Unresolvable()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2024, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
+        context.Employees.Add(employee);
+
+        var knownCreator = Guid.NewGuid();
+        var unknownCreator = Guid.NewGuid();
+
+        var known = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2025, 1, 1), SalaryType.Annual, 40000m, "GBP", null, null, null, CompensationChangeReason.AnnualReview, knownCreator, Now);
+        var unknown = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2026, 1, 1), SalaryType.Annual, 45000m, "GBP", null, null, null, CompensationChangeReason.AnnualReview, unknownCreator, Now);
+        context.Compensations.AddRange(known, unknown);
+        await context.SaveChangesAsync();
+
+        var names = new Dictionary<Guid, string> { [knownCreator] = "Hank HR" };
+        var handler = new GetCompensationHistoryHandler(context, new HR.Modules.Employees.Tests.Infrastructure.FakeEmployeeNameReader(names));
+
+        var result = await handler.HandleAsync(companyId, employee.Id, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var knownItem = result.Value!.Items.Single(i => i.Id == known.Id);
+        Assert.Equal("Hank HR", knownItem.CreatedByName);
+        var unknownItem = result.Value.Items.Single(i => i.Id == unknown.Id);
+        Assert.Equal("Unknown", unknownItem.CreatedByName);
     }
 
     private static EmployeesDbContext BuildContext()

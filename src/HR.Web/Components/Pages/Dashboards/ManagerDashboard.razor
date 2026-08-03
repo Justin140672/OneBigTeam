@@ -6,6 +6,7 @@
 @using HR.Web.Components.Pages.Leave
 @using HR.Web.Components.Pages.Onboarding
 @using HR.Web.Components.Pages.Employees
+@using HR.Web.Components.Pages.Reporting
 @inject AppSession Session
 @inject NavigationManager Navigation
 
@@ -29,7 +30,7 @@
                 <UpcomingProbationReviewsWidget OnOpenTask="OpenTask" />
                 <TeamOnboardingWidget />
                 <TeamSicknessTodayWidget />
-                <OverdueReturnToWorkReviewsWidget />
+                <OverdueReturnToWorkReviewsWidget OnOpenTask="OpenTask" />
                 <MissingFitNotesWidget />
             </div>
         </section>
@@ -38,6 +39,13 @@
             <h2 class="dashboard-section-title">My Team</h2>
             <div class="dashboard-detail-grid">
                 <MyTeamWidget />
+            </div>
+        </section>
+
+        <section class="dashboard-section">
+            <h2 class="dashboard-section-title">Reports</h2>
+            <div class="dashboard-detail-grid">
+                <TeamReportsWidget />
             </div>
         </section>
     </div>

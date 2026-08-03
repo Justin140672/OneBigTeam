@@ -59,9 +59,19 @@
             {
                 <StatusBadge Variant="@StatusVariant(_vacancy.Status)">@_vacancy.Status</StatusBadge>
             }
+            @if (CanPublish)
+            {
+                <SfButton CssClass="ms-auto" IsPrimary="true" OnClick="PublishVacancyAsync" Disabled="@_publishing">
+                    @if (_publishing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Publish Vacancy
+                </SfButton>
+            }
             @if (CanClose)
             {
-                <SfButton CssClass="ms-auto" OnClick="CloseVacancyAsync" Disabled="@_closing">
+                <SfButton CssClass="@(CanPublish ? null : "ms-auto")" OnClick="CloseVacancyAsync" Disabled="@_closing">
                     @if (_closing)
                     {
                         <span class="spinner-border spinner-border-sm me-1" role="status"></span>
@@ -79,6 +89,10 @@
         @if (!string.IsNullOrEmpty(_closeError))
         {
             <div class="alert alert-danger mb-3">@_closeError</div>
+        }
+        @if (!string.IsNullOrEmpty(_publishError))
+        {
+            <div class="alert alert-danger mb-3">@_publishError</div>
         }
 
         <SfTab>
@@ -108,34 +122,37 @@
                     </ContentTemplate>
                 </TabItem>
 
-                <TabItem>
-                    <ChildContent><TabHeader Text="Applications" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4">
-                            <VacancyApplicationsTab CompanyId="CompanyId" VacancyId="Id!.Value" />
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
-
-                <TabItem>
-                    <ChildContent><TabHeader Text="Interviews" /></ChildContent>
-                    <ContentTemplate>
-                        <div class="mt-4">
-                            <VacancyInterviewsTab CompanyId="CompanyId" VacancyId="Id!.Value" />
-                        </div>
-                    </ContentTemplate>
-                </TabItem>
-
-                @if (Session.IsRecruiter)
+                @if (_vacancy is not null && _vacancy.Status != "Draft")
                 {
                     <TabItem>
-                        <ChildContent><TabHeader Text="Kanban" /></ChildContent>
+                        <ChildContent><TabHeader Text="Applications" /></ChildContent>
                         <ContentTemplate>
                             <div class="mt-4">
-                                <VacancyKanbanBoard CompanyId="CompanyId" VacancyId="Id!.Value" @bind-SearchText="_kanbanSearchText" />
+                                <VacancyApplicationsTab CompanyId="CompanyId" VacancyId="Id!.Value" />
                             </div>
                         </ContentTemplate>
                     </TabItem>
+
+                    <TabItem>
+                        <ChildContent><TabHeader Text="Interviews" /></ChildContent>
+                        <ContentTemplate>
+                            <div class="mt-4">
+                                <VacancyInterviewsTab CompanyId="CompanyId" VacancyId="Id!.Value" />
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+
+                    @if (Session.IsRecruiter)
+                    {
+                        <TabItem>
+                            <ChildContent><TabHeader Text="Kanban" /></ChildContent>
+                            <ContentTemplate>
+                                <div class="mt-4">
+                                    <VacancyKanbanBoard CompanyId="CompanyId" VacancyId="Id!.Value" @bind-SearchText="_kanbanSearchText" />
+                                </div>
+                            </ContentTemplate>
+                        </TabItem>
+                    }
                 }
             </TabItems>
         </SfTab>
@@ -162,6 +179,8 @@
     private GetPositionProfileResponse? _selectedProfileDefaults;
     private bool _closing;
     private string? _closeError;
+    private bool _publishing;
+    private string? _publishError;
     private string _kanbanSearchText = string.Empty;
 
     private string PageTitle => IsNew ? "Add Vacancy"
@@ -169,6 +188,7 @@
         : IsViewMode ? "View Vacancy" : "Edit Vacancy";
 
     private bool CanClose => _vacancy is not null && _vacancy.Status is not ("Closed" or "Cancelled") && !IsViewMode;
+    private bool CanPublish => _vacancy is not null && _vacancy.Status is "Draft" or "OnHold" && !IsViewMode;
 
     // Locked (CanChangePositionProfile == false) unless the user is requesting an authorised
     // correction — gated behind the same Recruiter role that already owns UpdateVacancy
@@ -265,6 +285,27 @@
         if (result is null)
         {
             _closeError = error;
+            return;
+        }
+
+        _vacancy = await VacancyService.GetVacancyAsync(CompanyId, _vacancy.Id);
+    }
+
+    private async Task PublishVacancyAsync()
+    {
+        if (_vacancy is null) return;
+
+        _publishing = true;
+        _publishError = null;
+        StateHasChanged();
+
+        var (result, error) = await VacancyService.PublishVacancyAsync(CompanyId, _vacancy.Id);
+
+        _publishing = false;
+
+        if (result is null)
+        {
+            _publishError = error;
             return;
         }
 
@@ -450,7 +491,7 @@
                     <div class="form-text mb-3">The role itself (title, department, location, job description) is defined by the Position Profile above. These fields are only for recruitment-specific advert wording — e.g. a tailored posting title/description.</div>
                     <div class="row g-3">
                         <div class="col-md-8">
-                            <label class="form-label">Advert Title (optional)</label>
+                            <label class="form-label">Advert Title</label>
                             <HrTextBox @bind-Value="Model.AdvertTitle" Placeholder="e.g. Senior Software Engineer" />
                             <ValidationMessage For="@(() => Model.AdvertTitle)" />
                         </div>
@@ -475,7 +516,7 @@
                             <ValidationMessage For="@(() => Model.HiringManagerId)" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Recruitment Agency (optional)</label>
+                            <label class="form-label">Recruitment Agency</label>
                             <SfDropDownList TValue="Guid"
                                             TItem="ExternalRecruiterListItemModel"
                                             DataSource="@_externalRecruiters"
@@ -487,7 +528,7 @@
                             </SfDropDownList>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Advert Description (optional)</label>
+                            <label class="form-label">Advert Description</label>
                             <SfTextBox @bind-Value="Model.AdvertDescription" Multiline="true" Rows="4" Readonly="@IsViewMode" />
                         </div>
                     </div>

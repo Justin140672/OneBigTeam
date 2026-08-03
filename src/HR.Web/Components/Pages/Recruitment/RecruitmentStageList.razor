@@ -115,16 +115,26 @@
         </Content>
         <FooterTemplate>
             <SfButton CssClass="e-danger" Disabled="_deactivating" OnClick="ConfirmDeactivateAsync">Deactivate</SfButton>
-            <SfButton Disabled="_deactivating" OnClick="@(() => _deactivateConfirmOpen = false)">Cancel</SfButton>
+            <SfButton Disabled="_deactivating" OnClick="CancelDeactivate">Cancel</SfButton>
         </FooterTemplate>
     </DialogTemplates>
 </SfDialog>
+
+<HrConfirmDialog Visible="@(_simpleDeactivateTarget is not null)"
+                 Title="Deactivate Stage"
+                 Message="@($"Are you sure you want to deactivate '{_simpleDeactivateTarget?.Name}'?")"
+                 ConfirmText="Deactivate"
+                 CancelText="Cancel"
+                 Busy="_deactivating"
+                 OnConfirmed="ConfirmSimpleDeactivateAsync"
+                 OnCancelled="@(() => _simpleDeactivateTarget = null)" />
 
 @code {
     private bool _deactivateConfirmOpen;
     private bool _deactivating;
     private RecruitmentStageListItem? _deactivateTarget;
     private GetRecruitmentStageUsageResponse? _deactivateUsage;
+    private RecruitmentStageListItem? _simpleDeactivateTarget;
     protected override bool SupportsActiveFilter => true;
 
     protected override Task OnBeforeLoadAsync()
@@ -206,6 +216,10 @@
                 _deactivateConfirmOpen = true;
                 return;
             }
+
+            // Not in use — still confirm before deactivating, just without the usage warning.
+            _simpleDeactivateTarget = item;
+            return;
         }
 
         await ApplyActiveStatusAsync(item, isActive);
@@ -221,6 +235,23 @@
         _deactivateConfirmOpen = false;
         _deactivateTarget = null;
         _deactivateUsage = null;
+    }
+
+    private void CancelDeactivate()
+    {
+        _deactivateConfirmOpen = false;
+        _deactivateTarget = null;
+        _deactivateUsage = null;
+    }
+
+    private async Task ConfirmSimpleDeactivateAsync()
+    {
+        if (_simpleDeactivateTarget is null) return;
+
+        _deactivating = true;
+        await ApplyActiveStatusAsync(_simpleDeactivateTarget, false);
+        _deactivating = false;
+        _simpleDeactivateTarget = null;
     }
 
     private async Task ApplyActiveStatusAsync(RecruitmentStageListItem item, bool isActive)

@@ -191,3 +191,27 @@
         flex-direction: column;
     }
 }
+
+/* ── Dark mode ───────────────────────────────────────── */
+
+html[data-theme="dark"] .ec-card {
+    background: var(--hr-gray-800);
+    border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .ec-card-header {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .ec-card-title,
+html[data-theme="dark"] .ec-contact-name,
+html[data-theme="dark"] .ec-label {
+    color: var(--hr-gray-50);
+}
+
+html[data-theme="dark"] .ec-contact-card,
+html[data-theme="dark"] .ec-contact-form {
+    background: var(--hr-gray-900);
+    border-color: var(--hr-gray-700);
+}

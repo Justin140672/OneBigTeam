@@ -31,7 +31,7 @@
 
         <HrGrid @ref="Grid"
                 TValue="VacancyListItemModel"
-                DataSource="@Items"
+                DataSource="@DisplayedItems"
                 Toolbar="@GridToolbar"
                 AllowFiltering="true">
             <GridEvents TValue="VacancyListItemModel" OnToolbarClick="OnToolbarClick"
@@ -52,6 +52,7 @@
                 </GridColumn>
                 <GridColumn Field="@nameof(VacancyListItemModel.PositionProfileTitle)" HeaderText="Position Profile" Width="200" />
                 <GridColumn Field="@nameof(VacancyListItemModel.EffectiveLocation)" HeaderText="Location" Width="200" />
+                <GridColumn Field="@nameof(VacancyListItemModel.ApplicationCount)" HeaderText="Applications" Width="120" TextAlign="TextAlign.Center" />
                 <GridColumn Field="@nameof(VacancyListItemModel.Status)" HeaderText="Status" Width="130">
                     <Template>
                         @{
@@ -83,6 +84,16 @@
         var result = await VacancyService.ListVacanciesAsync(CompanyId);
         return result?.Items;
     }
+
+    // Reuses the standard SearchPageBase "Show Inactive"/"Show Active" toolbar toggle rather than
+    // a bespoke checkbox — Vacancy doesn't have a plain IsActive bool like most SupportsActiveFilter
+    // entities (it has a 5-value Status), so "inactive" here specifically means Closed, and the
+    // filtering happens client-side against the already-loaded Items since the list endpoint only
+    // supports filtering to a single status, not an "active" grouping.
+    protected override bool SupportsActiveFilter => true;
+
+    private IReadOnlyList<VacancyListItemModel> DisplayedItems =>
+        ShowInactive ? Items : Items.Where(i => i.Status != "Closed").ToList();
 
     protected override string LoadErrorMessage => "Failed to load vacancies.";
 

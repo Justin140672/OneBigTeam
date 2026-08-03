@@ -5,9 +5,11 @@ using HR.Modules.Companies.Features.CreateCompany;
 using HR.Modules.Companies.Features.CreatePublicHoliday;
 using HR.Modules.Companies.Features.GetCompany;
 using HR.Modules.Companies.Features.GetCompanySettings;
+using HR.Modules.Companies.Features.GetHrSettings;
 using HR.Modules.Companies.Features.ListPublicHolidays;
 using HR.Modules.Companies.Features.UpdateCompany;
 using HR.Modules.Companies.Features.UpdateCompanySettings;
+using HR.Modules.Companies.Features.UpdateHrSettings;
 using HR.Modules.Companies.Features.UpdatePublicHoliday;
 using HR.Modules.Companies.Features.UploadCompanyLogo;
 using HR.Modules.Companies.Persistence;
@@ -111,8 +113,10 @@ public static class CompaniesModule
         services.AddScoped<CreateCompanyHandler>();
         services.AddScoped<GetCompanyHandler>();
         services.AddScoped<GetCompanySettingsHandler>();
+        services.AddScoped<GetHrSettingsHandler>();
         services.AddScoped<UpdateCompanyHandler>();
         services.AddScoped<UpdateCompanySettingsHandler>();
+        services.AddScoped<UpdateHrSettingsHandler>();
         services.AddScoped<UploadCompanyLogoHandler>();
         services.AddScoped<IBrandingStorage, StubBrandingStorage>();
         services.AddScoped<ICompanyLeaveSettingsReader, CompanyLeaveSettingsReader>();
@@ -134,6 +138,7 @@ public static class CompaniesModule
         services.AddScoped<IValidator<CreateCompanyRequest>, CreateCompanyValidator>();
         services.AddScoped<IValidator<UpdateCompanyRequest>, UpdateCompanyValidator>();
         services.AddScoped<IValidator<UpdateCompanySettingsRequest>, UpdateCompanySettingsValidator>();
+        services.AddScoped<IValidator<UpdateHrSettingsRequest>, UpdateHrSettingsValidator>();
         services.AddScoped<IValidator<UploadCompanyLogoRequest>, UploadCompanyLogoValidator>();
     }
 }

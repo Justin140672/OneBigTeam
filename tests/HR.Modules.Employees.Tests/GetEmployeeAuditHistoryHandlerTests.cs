@@ -269,7 +269,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
         var change = Assert.Single(item.Changes);
-        Assert.Equal("Department Id", change.Field);
+        Assert.Equal("Department", change.Field);
         Assert.Equal("Engineering", change.After);
     }
 
@@ -297,7 +297,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
         var change = Assert.Single(item.Changes);
-        Assert.Equal("Position Profile Id", change.Field);
+        Assert.Equal("Position", change.Field);
         Assert.Equal("Engineering Manager", change.After);
     }
 
@@ -324,7 +324,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
         var change = Assert.Single(item.Changes);
-        Assert.Equal("Location Id", change.Field);
+        Assert.Equal("Location", change.Field);
         Assert.Equal("London Office", change.After);
     }
 
@@ -533,7 +533,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
         var change = Assert.Single(item.Changes);
-        Assert.Equal("Manager Id", change.Field);
+        Assert.Equal("Manager", change.Field);
         Assert.Equal("Grace Hopper", change.After);
     }
 
@@ -560,7 +560,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
         var change = Assert.Single(item.Changes);
-        Assert.Equal("Manager Id", change.Field);
+        Assert.Equal("Manager", change.Field);
         Assert.Equal("Grace Hopper", change.Before);
         Assert.Equal("—", change.After);
     }

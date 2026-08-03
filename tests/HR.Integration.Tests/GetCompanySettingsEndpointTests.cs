@@ -38,7 +38,7 @@ public class GetCompanySettingsEndpointTests : IClassFixture<ApiWebApplicationFa
     }
 
     [Fact]
-    public async Task Get_Company_Settings_Returns_Default_EmployeeNumberSettings_When_Never_Customised()
+    public async Task Get_Company_Settings_Returns_Slimmed_ProfileScoped_Fields_When_Never_Customised()
     {
         using var client = AuthenticatedClient(UserId);
 
@@ -62,12 +62,22 @@ public class GetCompanySettingsEndpointTests : IClassFixture<ApiWebApplicationFa
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
+        var rawJson = await response.Content.ReadAsStringAsync();
+
+        // Lock in that HR-policy fields no longer appear in the company-settings response.
+        Assert.DoesNotContain("workingDays", rawJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("employeeNumberMode", rawJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("noticePeriodUnit", rawJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("defaultAcknowledgementStatement", rawJson, StringComparison.OrdinalIgnoreCase);
+
         var payload = await response.Content.ReadFromJsonAsync<GetCompanySettingsPayload>();
         Assert.NotNull(payload);
-        Assert.Equal("Manual", payload!.EmployeeNumberMode);
-        Assert.Null(payload.EmployeeNumberPrefix);
-        Assert.Equal(1, payload.NextEmployeeNumber);
-        Assert.Equal(1, payload.EmployeeNumberMinimumLength);
+        Assert.Equal(createdCompany.Id, payload!.CompanyId);
+        Assert.Equal("UTC", payload.TimeZone);
+        Assert.Equal("en-GB", payload.Locale);
+        Assert.False(string.IsNullOrEmpty(payload.PostcodeRegex));
+        Assert.False(string.IsNullOrEmpty(payload.TelephoneRegex));
+        Assert.False(string.IsNullOrEmpty(payload.MobileRegex));
     }
 
     [Fact]
@@ -86,27 +96,8 @@ public class GetCompanySettingsEndpointTests : IClassFixture<ApiWebApplicationFa
         Guid CompanyId,
         string TimeZone,
         string Locale,
-        int WorkingDays,
-        decimal HoursPerDay,
-        int LeaveYearStartMonth,
-        decimal DefaultHolidayAllowance,
-        int ProbationMonths,
-        bool ExcludePublicHolidaysFromLeave,
-        bool ExcludePublicHolidaysFromSickness,
-        bool DisplaySalaryOnEmployeeProfile,
-        int? FitNoteRequiredAfterDays,
-        int? ReturnToWorkRequiredAfterDays,
         string PostcodeRegex,
         string TelephoneRegex,
         string MobileRegex,
-        string DefaultAcknowledgementStatement,
-        int AcknowledgementReminderIntervalDays,
-        string NoticePeriodUnit,
-        int NoticePeriodLength,
-        bool AutoDisableAccessOnLeavingDate,
-        string EmployeeNumberMode,
-        string? EmployeeNumberPrefix,
-        int NextEmployeeNumber,
-        int EmployeeNumberMinimumLength,
         DateTimeOffset UpdatedAt);
 }

@@ -328,6 +328,34 @@ public class ListVacanciesHandlerTests
         Assert.Equal(ownVacancy.Id, item.Id);
     }
 
+    [Fact]
+    public async Task HandleAsync_Computes_ApplicationCount_Per_Vacancy()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var vacancyWithApplications = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "With Applications", null, Guid.NewGuid(), Now);
+        var vacancyWithoutApplications = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Without Applications", null, Guid.NewGuid(), Now);
+        db.Vacancies.AddRange(vacancyWithApplications, vacancyWithoutApplications);
+
+        db.Applications.AddRange(
+            Application.Create(Guid.NewGuid(), companyId, vacancyWithApplications.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now),
+            Application.Create(Guid.NewGuid(), companyId, vacancyWithApplications.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now),
+            Application.Create(Guid.NewGuid(), companyId, vacancyWithApplications.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now));
+        await db.SaveChangesAsync();
+
+        var result = await new ListVacanciesHandler(db, new FakePositionProfileReader()).HandleAsync(
+            new ListVacanciesRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var itemWith = result.Value!.Items.Single(i => i.Id == vacancyWithApplications.Id);
+        Assert.Equal(3, itemWith.ApplicationCount);
+
+        var itemWithout = result.Value.Items.Single(i => i.Id == vacancyWithoutApplications.Id);
+        Assert.Equal(0, itemWithout.ApplicationCount);
+    }
+
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))

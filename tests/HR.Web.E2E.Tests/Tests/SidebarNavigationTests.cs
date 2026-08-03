@@ -7,20 +7,19 @@ namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
 /// Verifies sidebar changes in MainLayout.razor:
-/// 1. "Vacancies" and "Candidates" are no longer sidebar items at all — they now live as
-///    prominent action buttons on the Recruitment Dashboard (see RecruitmentDashboardTests),
-///    reached directly since a Recruiter-only persona lands there on login with no sidebar.
-/// 2. New top-level role-gated dashboard links: "Dashboard" (Session.IsHrAdministrator, points to
-///    "/dashboard/hr"), "Manager Dashboard" (Session.IsManager, "/dashboard/manager") and
-///    "Recruitment Dashboard" (Session.IsRecruiter, "/dashboard/recruitment"). Note that
-///    MainLayout.razor's ShowSidebar deliberately excludes IsManager and IsRecruiter on their
-///    own — a Manager-only or Recruiter-only persona's dashboard IS their home, with no separate
-///    admin section to reach, so they get no sidebar at all (see
-///    ManagerOnly_SeesNoSidebar_AndLandsDirectlyOnManagerDashboard and
-///    RecruiterOnly_SeesNoSidebar_AndLandsDirectlyOnRecruitmentDashboard below). The "Manager
-///    Dashboard"/"Recruitment Dashboard" links only ever appear for a user who *also* holds a
-///    role that independently qualifies for the sidebar (e.g. an HR Administrator who is also a
-///    Manager or Recruiter).
+/// 1. A Recruiter-only persona now gets a full sidebar (not just their dashboard as "home") with
+///    "Vacancies", "Candidates", "Recruiters" and "Recruitment Settings" as top-level items, plus
+///    a plain "Dashboard" link (not "Recruitment Dashboard" — that label is reserved for a combo
+///    persona, see below) pointing at "/dashboard/recruitment".
+/// 2. A Manager-only persona also now gets a sidebar, with a "Manager Dashboard" link
+///    ("/dashboard/manager") plus "Reporting".
+/// 3. MainLayout.razor's ShowSidebar includes IsManager and IsRecruiter on their own (this used
+///    to deliberately exclude them — a Manager/Recruiter-only persona's dashboard was considered
+///    their home with no separate admin section to reach — but both roles are "reporting:view"-
+///    entitled server-side, so they need a way to reach the sidebar-only Reporting nav item; see
+///    ShowSidebar's own comment). The "Manager Dashboard"/"Recruitment Dashboard" labelled links
+///    (as opposed to the plain "Dashboard" label) only appear for a user who holds an *additional*
+///    role beyond Manager/Recruiter alone (e.g. an HR Administrator who is also a Manager).
 ///
 /// Uses seeded personas:
 ///   - Marcus Diallo (marcus.diallo@acme.example) — Recruiter only (see RecruitmentDashboardTests).
@@ -36,7 +35,7 @@ public sealed class SidebarNavigationTests(AppFixture fixture) : E2ETestBase(fix
     private const string JamesEmail  = "james.okafor@acme.example";
 
     [Fact]
-    public async Task RecruiterOnly_SeesNoSidebar_AndLandsDirectlyOnRecruitmentDashboard()
+    public async Task RecruiterOnly_SeesSidebar_WithDashboardVacanciesCandidatesRecruitersAndSettings()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var sidebar = new SidebarPage(_page);
@@ -44,16 +43,28 @@ public sealed class SidebarNavigationTests(AppFixture fixture) : E2ETestBase(fix
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
-        // A Recruiter-only persona's dashboard IS their home — there's no separate admin section
-        // to reach, so MainLayout.razor's ShowSidebar deliberately excludes IsRecruiter on its
-        // own (it only renders the sidebar when combined with another qualifying role). Home.razor's
-        // post-login redirect already lands Marcus on /dashboard/recruitment without him ever
-        // needing to click anything, so there's nothing for a sidebar to do here.
+        // Home.razor's post-login redirect lands Marcus on /dashboard/recruitment.
         await _page.WaitForURLAsync(new Regex("/dashboard/recruitment"), new() { Timeout = 15_000 });
         Assert.Contains("/dashboard/recruitment", _page.Url);
 
-        Assert.False(await sidebar.IsSidebarVisibleAsync(),
-            "Expected a Recruiter-only persona (no other qualifying role) to see no sidebar at all");
+        // MainLayout.razor's ShowSidebar now includes IsRecruiter on its own (not just combined
+        // with another qualifying role) — a Recruiter-only persona sees a sidebar with a
+        // "Dashboard" link (not "Recruitment Dashboard" — that label is reserved for an
+        // HR-Administrator-and-Recruiter combo persona's separate link) plus Vacancies,
+        // Candidates, Recruiters and Recruitment Settings.
+        Assert.True(await sidebar.IsSidebarVisibleAsync(),
+            "Expected a Recruiter-only persona to see a sidebar");
+
+        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Dashboard"),
+            "Expected a 'Dashboard' link (not 'Recruitment Dashboard') for a Recruiter-only persona");
+        Assert.False(await sidebar.HasTopLevelMenuItemAsync("Recruitment Dashboard"),
+            "Did not expect a link labelled exactly 'Recruitment Dashboard'");
+
+        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Vacancies"));
+        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Candidates"));
+        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Recruiters"));
+        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Recruitment Settings"));
+        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Reporting"));
     }
 
     [Fact]
@@ -78,7 +89,7 @@ public sealed class SidebarNavigationTests(AppFixture fixture) : E2ETestBase(fix
     }
 
     [Fact]
-    public async Task ManagerOnly_SeesNoSidebar_AndLandsDirectlyOnManagerDashboard()
+    public async Task ManagerOnly_SeesSidebar_WithManagerDashboardLink()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var sidebar = new SidebarPage(_page);
@@ -86,15 +97,15 @@ public sealed class SidebarNavigationTests(AppFixture fixture) : E2ETestBase(fix
         await login.GoToAsync();
         await login.LoginAsync(JamesEmail);
 
-        // A Manager-only persona's dashboard IS their home — there's no separate admin section
-        // to reach, so MainLayout.razor's ShowSidebar deliberately excludes IsManager on its own
-        // (it only renders the sidebar when combined with another qualifying role). Home.razor's
-        // post-login redirect already lands James on /dashboard/manager without him ever needing
-        // to click anything, so there's nothing for a sidebar to do here.
+        // Home.razor's post-login redirect lands James on /dashboard/manager.
         await _page.WaitForURLAsync(new Regex("/dashboard/manager"), new() { Timeout = 15_000 });
         Assert.Contains("/dashboard/manager", _page.Url);
 
-        Assert.False(await sidebar.IsSidebarVisibleAsync(),
-            "Expected a Manager-only persona (no other qualifying role) to see no sidebar at all");
+        // MainLayout.razor's ShowSidebar includes IsManager on its own — a Manager-only persona
+        // sees a sidebar with a "Manager Dashboard" link (plus "Reporting").
+        Assert.True(await sidebar.IsSidebarVisibleAsync(),
+            "Expected a Manager-only persona to see a sidebar");
+        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Manager Dashboard"));
+        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Reporting"));
     }
 }

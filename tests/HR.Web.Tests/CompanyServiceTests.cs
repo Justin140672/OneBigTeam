@@ -23,11 +23,9 @@ public class CompanyServiceTests
     public async Task GetCompanySettingsAsync_Returns_Settings_Including_Contact_Validation_Regexes()
     {
         var response = new GetCompanySettingsResponse(
-            Guid.NewGuid(), "UTC", "en-GB", 31, 7.5m, 1, 25m, 6, true, false, false, null, null,
+            Guid.NewGuid(), "UTC", "en-GB",
             "^[A-Za-z]{1,2}\\d[A-Za-z\\d]?\\s?\\d[A-Za-z]{2}$", "^0\\d{9,10}$", "^07\\d{9}$",
-            "I confirm that I have read and understood this document.", 3,
-            NoticePeriodUnit.Months, 1, true,
-            EmployeeNumberMode.Automatic, "EMP-", 1, 4, DateTime.UtcNow);
+            DateTime.UtcNow);
 
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
         var service = new CompanyService(factory);
@@ -124,19 +122,12 @@ public class CompanyServiceTests
     public async Task UpdateCompanySettingsAsync_Returns_Response_When_Api_Returns_Ok()
     {
         var response = new UpdateCompanySettingsResponse(
-            Guid.NewGuid(), "UTC", "en-GB", WorkingDays.Monday, 7.5m, 1, 25m, 6, true, false, false, null, null,
-            "I confirm that I have read and understood this document.", 3,
-            NoticePeriodUnit.Months, 1, true,
-            EmployeeNumberMode.Automatic, "EMP-", 1, 4, DateTime.UtcNow);
+            Guid.NewGuid(), "UTC", "en-GB", DateTime.UtcNow);
 
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
         var service = new CompanyService(factory);
 
-        var request = new UpdateCompanySettingsRequest(
-            Guid.NewGuid(), "UTC", "en-GB", WorkingDays.Monday, 7.5m, 1, 25m, 6, true, false, false, null, null,
-            "I confirm that I have read and understood this document.", 3,
-            NoticePeriodUnit.Months, 1, true,
-            EmployeeNumberMode.Automatic, "EMP-", 1, 4);
+        var request = new UpdateCompanySettingsRequest(Guid.NewGuid(), "UTC", "en-GB");
 
         var result = await service.UpdateCompanySettingsAsync(Guid.NewGuid(), request);
 
@@ -150,11 +141,7 @@ public class CompanyServiceTests
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.BadRequest, new { }));
         var service = new CompanyService(factory);
 
-        var request = new UpdateCompanySettingsRequest(
-            Guid.NewGuid(), "UTC", "en-GB", WorkingDays.Monday, 7.5m, 1, 25m, 6, true, false, false, null, null,
-            "I confirm that I have read and understood this document.", 3,
-            NoticePeriodUnit.Months, 1, true,
-            EmployeeNumberMode.Automatic, "EMP-", 1, 4);
+        var request = new UpdateCompanySettingsRequest(Guid.NewGuid(), "UTC", "en-GB");
 
         var result = await service.UpdateCompanySettingsAsync(Guid.NewGuid(), request);
 

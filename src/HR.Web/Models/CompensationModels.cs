@@ -30,6 +30,7 @@ public sealed record CompensationHistoryItemModel(
     string? Notes,
     string Reason,
     Guid CreatedBy,
+    string CreatedByName,
     DateTimeOffset CreatedAt);
 
 public sealed record GetCompensationHistoryResponse(IReadOnlyList<CompensationHistoryItemModel> Items);

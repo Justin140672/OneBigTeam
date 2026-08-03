@@ -20,6 +20,21 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 20_000 });
     }
 
+    /// <summary>
+    /// The standard SearchPageBase "Show Inactive"/"Show Active" toolbar toggle (SupportsActiveFilter)
+    /// — defaults to hiding Closed vacancies from the list until toggled; see VacancyList.razor's
+    /// ShowInactive/DisplayedItems.
+    /// </summary>
+    public Task<bool> IsShowingActiveOnlyAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Show Inactive" }).IsVisibleAsync();
+
+    /// <summary>Clicks "Show Inactive" so closed vacancies are shown too, waiting for the grid to re-render.</summary>
+    public async Task ShowAllVacanciesAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Show Inactive" }).ClickAsync();
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+    }
+
     public async Task ClickNewVacancyAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
@@ -63,7 +78,7 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
     /// <summary>
     /// Returns the text of the given 0-based column index for the row matching
     /// <paramref name="titleFragment"/>. Column order matches VacancyList.razor's GridColumns:
-    /// 0=Title, 1=Position Profile, 2=Location, 3=Status, 4=Opened, 5=Closed.
+    /// 0=Title, 1=Position Profile, 2=Location, 3=Applications, 4=Status, 5=Opened, 6=Closed.
     /// </summary>
     public async Task<string> GetRowCellAsync(string titleFragment, int columnIndex)
     {
@@ -81,6 +96,10 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
     /// </summary>
     public Task<string> GetPositionProfileColumnTextAsync(string titleFragment) =>
         GetRowCellAsync(titleFragment, columnIndex: 1);
+
+    /// <summary>Reads the "Applications" column's text (VacancyListItemModel.ApplicationCount) for the row matching <paramref name="titleFragment"/>.</summary>
+    public Task<string> GetApplicationsColumnTextAsync(string titleFragment) =>
+        GetRowCellAsync(titleFragment, columnIndex: 3);
 
     /// <summary>
     /// Returns true if the Title column's "(from Position Profile)" muted-italic fallback

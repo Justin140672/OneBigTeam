@@ -82,7 +82,7 @@ public sealed class VacancyManagementTests(AppFixture fixture) : E2ETestBase(fix
     /// Position Profile.)
     /// </summary>
     [Fact]
-    public async Task CreateVacancy_ShowsRenamedOptionalAdvertFieldLabels()
+    public async Task CreateVacancy_ShowsAdvertFieldLabels_WithNoOptionalSuffix()
     {
         var login         = new LoginPage(_page, _fixture.WebBaseUrl);
         var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
@@ -93,9 +93,14 @@ public sealed class VacancyManagementTests(AppFixture fixture) : E2ETestBase(fix
         await vacancyDetail.GoToNewAsync(AcmeId);
 
         Assert.True(await vacancyDetail.HasAdvertTitleLabelAsync(),
-            "Expected the 'Advert Title (optional)' label to render");
+            "Expected the 'Advert Title' label to render");
         Assert.True(await vacancyDetail.HasAdvertDescriptionLabelAsync(),
-            "Expected the 'Advert Description (optional)' label to render");
+            "Expected the 'Advert Description' label to render");
+
+        // The "(optional)" qualifier was removed from every field label on this card — the fields
+        // are still genuinely optional, just no longer labelled as such.
+        Assert.False(await vacancyDetail.HasOptionalSuffixAsync(),
+            "Did not expect any '(optional)' suffix on the Recruitment Advert Details card's field labels");
     }
 
     [Fact]
@@ -232,7 +237,12 @@ public sealed class VacancyManagementTests(AppFixture fixture) : E2ETestBase(fix
 
         // Give the vacancy an application — CanChangePositionProfile requires both Draft status
         // AND zero applications, so a bare Draft vacancy alone is not enough to lock this field.
+        // The Applications tab only renders once the vacancy is Open (Draft hides it entirely),
+        // so this publishes first — CanChangePositionProfile is still false afterwards (status is
+        // no longer Draft at all, let alone Draft-with-zero-applications), just no longer for the
+        // application-count reason specifically. The field-locked assertion below still holds.
         await vacancyList.ClickVacancyAsync(vacancyTitle);
+        await vacancyDetail.PublishVacancyAsync();
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
         // Search by last name (not email) here: the candidate dropdown's committed input is bound

@@ -91,7 +91,9 @@ public sealed class UserAdministrationManagementTests(AppFixture fixture) : E2ET
         await list.GoToAsync(AcmeId);
         await list.OpenInviteDialogAsync();
 
-        await list.InviteEmployeeAsync(UninvitedEmployeeName, ["Employee"]);
+        // "Employee" is always applied automatically (fixed badge, not a selectable role) — no
+        // additional roles are needed for this happy-path invite.
+        await list.InviteEmployeeAsync(UninvitedEmployeeName, []);
 
         // A successful invite navigates to the new user's detail page.
         Assert.Contains("/user-administration/", _page.Url);

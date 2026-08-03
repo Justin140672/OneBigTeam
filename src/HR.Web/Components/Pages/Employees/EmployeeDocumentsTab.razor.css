@@ -1,0 +1,15 @@
+/* ── Dark mode ─────────────────────────────────────────
+   Bootstrap's .table-light header (used by the Document Requests table) is a
+   hard-coded light grey that doesn't respond to data-bs-theme/data-theme, so
+   it renders as a white-on-white header in dark mode. Re-point it at the same
+   gray-800/gray-200 pairing used by the Syncfusion grid header (.hr-grid
+   .e-gridheader) elsewhere in the app. */
+html[data-theme="dark"] .table-light {
+    background-color: var(--hr-gray-800);
+    color: var(--hr-gray-200);
+}
+
+html[data-theme="dark"] .table > :not(caption) > * > * {
+    color: var(--hr-gray-50);
+    border-color: var(--hr-gray-700);
+}

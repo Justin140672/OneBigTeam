@@ -55,8 +55,14 @@ public sealed class CompanyDocumentsTabTests(AppFixture fixture) : E2ETestBase(f
             "Expected the just-published document to appear as a card on the Company Documents tab");
     }
 
+    /// <summary>
+    /// Renders as a data grid (HrGrid) with Title/Category/Effective Date/Acknowledgement columns
+    /// — not the older icon-card layout, and with no separate status filter dropdown (that filter
+    /// was removed entirely along with the card layout; the grid's own built-in column
+    /// filtering/sorting takes its place).
+    /// </summary>
     [Fact]
-    public async Task CompanyDocumentsTab_StatusFilter_ShowsOnlyMatchingDocuments()
+    public async Task CompanyDocumentsTab_RendersAsDataGrid_WithExpectedColumns()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
@@ -64,8 +70,8 @@ public sealed class CompanyDocumentsTabTests(AppFixture fixture) : E2ETestBase(f
         await login.GoToAsync();
         await login.LoginAsync(HrEmail);
 
-        var noAckTitle  = $"Test Policy {Guid.NewGuid():N}";
-        var outstandingTitle = $"Test Policy {Guid.NewGuid():N}";
+        var noAckTitle        = $"Test Policy {Guid.NewGuid():N}";
+        var outstandingTitle  = $"Test Policy {Guid.NewGuid():N}";
 
         await UploadAndPublishDocumentAsync(noAckTitle);
         await UploadAndPublishDocumentAsync(outstandingTitle,
@@ -76,26 +82,20 @@ public sealed class CompanyDocumentsTabTests(AppFixture fixture) : E2ETestBase(f
         await profile.GoToAsync(AcmeId, TomId);
         await profile.OpenCompanyDocumentsTabAsync();
 
-        // "All" (the default filter) shows both.
+        var headers = await profile.GetCompanyDocumentsGridColumnHeadersAsync();
+        Assert.Contains(headers, h => h.Contains("Title"));
+        Assert.Contains(headers, h => h.Contains("Category"));
+        Assert.Contains(headers, h => h.Contains("Effective Date"));
+        Assert.Contains(headers, h => h.Contains("Acknowledgement"));
+
         Assert.True(await profile.HasCompanyDocumentCardAsync(noAckTitle));
         Assert.True(await profile.HasCompanyDocumentCardAsync(outstandingTitle));
-
-        await profile.SetCompanyDocumentsStatusFilterAsync("Requires Action");
-
-        Assert.True(await profile.HasCompanyDocumentCardAsync(outstandingTitle),
-            "Expected the unacknowledged, acknowledgement-required document to remain under 'Requires Action'");
-        Assert.False(await profile.HasCompanyDocumentCardAsync(noAckTitle),
-            "Expected the document with no acknowledgement requirement to be filtered out under 'Requires Action'");
 
         var badge = await profile.GetCompanyDocumentAcknowledgementBadgeTextAsync(outstandingTitle);
         Assert.NotNull(badge);
         Assert.Contains("Acknowledgement Required", badge);
 
-        // Switching back to "All" restores the full list.
-        await profile.SetCompanyDocumentsStatusFilterAsync("All");
-
-        Assert.True(await profile.HasCompanyDocumentCardAsync(noAckTitle));
-        Assert.True(await profile.HasCompanyDocumentCardAsync(outstandingTitle));
+        Assert.Null(await profile.GetCompanyDocumentAcknowledgementBadgeTextAsync(noAckTitle));
     }
 
     [Fact]

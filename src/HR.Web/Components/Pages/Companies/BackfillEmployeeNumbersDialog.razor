@@ -51,10 +51,10 @@
             }
         </Content>
         <FooterTemplate>
-            @if (_result is null)
+            @if (_result is null && (_loadingPreview || _candidates.Count > 0))
             {
                 <SfButton IsPrimary="true"
-                          Disabled="@(_loadingPreview || _committing || _candidates.Count == 0 || _globalError is not null)"
+                          Disabled="@(_loadingPreview || _committing || _globalError is not null)"
                           OnClick="ConfirmCommitAsync">
                     @if (_committing)
                     {

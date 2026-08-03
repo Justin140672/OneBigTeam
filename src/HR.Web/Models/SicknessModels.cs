@@ -62,7 +62,8 @@ public sealed record OverdueReturnToWorkReviewItem(
     Guid ReviewId,
     Guid EmployeeId,
     Guid SicknessRecordId,
-    DateOnly DueDate);
+    DateOnly DueDate,
+    Guid? TaskId);
 
 public sealed record GetOverdueReturnToWorkReviewsResponseModel(List<OverdueReturnToWorkReviewItem> Items);
 

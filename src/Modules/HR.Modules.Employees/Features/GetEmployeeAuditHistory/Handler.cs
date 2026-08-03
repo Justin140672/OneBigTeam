@@ -259,6 +259,19 @@ internal sealed class GetEmployeeAuditHistoryHandler(
         return element.ToString();
     }
 
+    // Fields carrying a raw foreign-key Guid are resolved to a display name (see FormatValue) so
+    // their label should read as the plain entity name too, not "<Entity> Id" — Humanize alone
+    // would otherwise leave the "Id" suffix in place (e.g. "Location Id").
+    private static readonly IReadOnlyDictionary<string, string> FriendlyFieldLabels = new Dictionary<string, string>
+    {
+        [DepartmentIdField] = "Department",
+        [PositionProfileIdField] = "Position",
+        [LocationIdField] = "Location",
+        [ManagerIdField] = "Manager",
+    };
+
     private static string Humanize(string fieldName) =>
-        System.Text.RegularExpressions.Regex.Replace(fieldName, "(?<!^)([A-Z])", " $1");
+        FriendlyFieldLabels.TryGetValue(fieldName, out var friendly)
+            ? friendly
+            : System.Text.RegularExpressions.Regex.Replace(fieldName, "(?<!^)([A-Z])", " $1");
 }

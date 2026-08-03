@@ -103,6 +103,18 @@ public sealed class VacancyService(IHttpClientFactory httpClientFactory) : IEdit
         return (null, await ReadErrorAsync(response, "Failed to close vacancy."));
     }
 
+    public async Task<(PublishVacancyResponse? Result, string? Error)> PublishVacancyAsync(Guid companyId, Guid id, DateOnly? openedAt = null)
+    {
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/vacancies/{id}/publish",
+            new PublishVacancyRequest(companyId, id, openedAt));
+
+        if (response.IsSuccessStatusCode)
+            return (await response.Content.ReadFromJsonAsync<PublishVacancyResponse>(), null);
+
+        return (null, await ReadErrorAsync(response, "Failed to publish vacancy."));
+    }
+
     // ── IEditService<VacancyEditModel, Guid> ────────────────────────────────────
 
     async Task<VacancyEditModel?> IEditService<VacancyEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)

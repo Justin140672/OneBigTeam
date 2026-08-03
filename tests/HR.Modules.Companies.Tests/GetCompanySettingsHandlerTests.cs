@@ -15,8 +15,9 @@ public class GetCompanySettingsHandlerTests
         var now = DateTimeOffset.UtcNow;
         var company = Company.Create(Guid.NewGuid(), "Acme", now);
         var settings = CompanySettings.CreateDefault(company.Id, now);
-        settings.Update(
-            "Europe/London", "en-GB", WorkingDays.Monday | WorkingDays.Tuesday, 6m, 4, 30, 8,
+        settings.UpdateCompanyProfile("Europe/London", "en-GB", now);
+        settings.UpdateHrPolicy(
+            WorkingDays.Monday | WorkingDays.Tuesday, 6m, 4, 30, 8,
             false, true, true, 7, 3, "Custom acknowledgement statement.", 5,
             NoticePeriodUnit.Weeks, 2, false, EmployeeNumberMode.Manual, null, 1, 1, now);
         company.SetSettings(settings, now);
@@ -29,15 +30,11 @@ public class GetCompanySettingsHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Europe/London", result.Value!.TimeZone);
-        Assert.Equal(4, result.Value.LeaveYearStartMonth);
-        Assert.Equal(30, result.Value.DefaultHolidayAllowance);
-        Assert.True(result.Value.ExcludePublicHolidaysFromSickness);
-        Assert.True(result.Value.DisplaySalaryOnEmployeeProfile);
-        Assert.Equal(7, result.Value.FitNoteRequiredAfterDays);
-        Assert.Equal("Custom acknowledgement statement.", result.Value.DefaultAcknowledgementStatement);
-        Assert.Equal(NoticePeriodUnit.Weeks, result.Value.NoticePeriodUnit);
-        Assert.Equal(2, result.Value.NoticePeriodLength);
-        Assert.False(result.Value.AutoDisableAccessOnLeavingDate);
+        Assert.Equal("en-GB", result.Value.Locale);
+        Assert.Equal(company.Id, result.Value.CompanyId);
+        Assert.False(string.IsNullOrEmpty(result.Value.PostcodeRegex));
+        Assert.False(string.IsNullOrEmpty(result.Value.TelephoneRegex));
+        Assert.False(string.IsNullOrEmpty(result.Value.MobileRegex));
     }
 
     [Fact]
@@ -57,62 +54,7 @@ public class GetCompanySettingsHandlerTests
         Assert.Equal(company.Id, result.Value!.CompanyId);
         Assert.Equal("UTC", result.Value.TimeZone);
         Assert.Equal("en-GB", result.Value.Locale);
-        Assert.Equal(1, result.Value.LeaveYearStartMonth);
-        Assert.Equal(25, result.Value.DefaultHolidayAllowance);
-        Assert.False(result.Value.DisplaySalaryOnEmployeeProfile);
         Assert.False(string.IsNullOrEmpty(result.Value.PostcodeRegex));
-        Assert.Equal(CompanySettings.DefaultAcknowledgementStatementText, result.Value.DefaultAcknowledgementStatement);
-        Assert.Equal(NoticePeriodUnit.Months, result.Value.NoticePeriodUnit);
-        Assert.Equal(1, result.Value.NoticePeriodLength);
-        Assert.True(result.Value.AutoDisableAccessOnLeavingDate);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Returns_Configured_EmployeeNumberSettings_When_Settings_Row_Exists()
-    {
-        await using var context = BuildContext();
-        var now = DateTimeOffset.UtcNow;
-        var company = Company.Create(Guid.NewGuid(), "Acme", now);
-        var settings = CompanySettings.CreateDefault(company.Id, now);
-        settings.Update(
-            "UTC", "en-GB", WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
-                             WorkingDays.Thursday | WorkingDays.Friday,
-            7.5m, 1, 25, 6, true, false, false, null, null,
-            "Custom statement.", 3, NoticePeriodUnit.Months, 1, true,
-            EmployeeNumberMode.Automatic, "EMP-", 125, 5, now);
-        company.SetSettings(settings, now);
-        context.Companies.Add(company);
-        await context.SaveChangesAsync();
-
-        var handler = new GetCompanySettingsHandler(context);
-
-        var result = await handler.HandleAsync(new GetCompanySettingsRequest { Id = company.Id }, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(EmployeeNumberMode.Automatic, result.Value!.EmployeeNumberMode);
-        Assert.Equal("EMP-", result.Value.EmployeeNumberPrefix);
-        Assert.Equal(125, result.Value.NextEmployeeNumber);
-        Assert.Equal(5, result.Value.EmployeeNumberMinimumLength);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Returns_Default_EmployeeNumberSettings_When_No_Customised_Settings_Exist()
-    {
-        await using var context = BuildContext();
-        var now = DateTimeOffset.UtcNow;
-        var company = Company.Create(Guid.NewGuid(), "Acme", now); // no SetSettings call
-        context.Companies.Add(company);
-        await context.SaveChangesAsync();
-
-        var handler = new GetCompanySettingsHandler(context);
-
-        var result = await handler.HandleAsync(new GetCompanySettingsRequest { Id = company.Id }, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(EmployeeNumberMode.Manual, result.Value!.EmployeeNumberMode);
-        Assert.Null(result.Value.EmployeeNumberPrefix);
-        Assert.Equal(1, result.Value.NextEmployeeNumber);
-        Assert.Equal(1, result.Value.EmployeeNumberMinimumLength);
     }
 
     [Fact]

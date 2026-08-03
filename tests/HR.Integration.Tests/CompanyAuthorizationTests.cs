@@ -194,6 +194,70 @@ public class CompanyAuthorizationTests : IClassFixture<ApiWebApplicationFactory>
     {
         timeZone = "UTC",
         locale = "en-GB",
+    };
+
+    // --- UpdateHrSettings ---
+
+    [Fact]
+    public async Task Put_Hr_Settings_Returns_Forbidden_For_User_With_No_Roles()
+    {
+        using var client = ClientFor(Guid.NewGuid(), NoRoleUser);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}/hr-settings", HrSettingsBody());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_Hr_Settings_Returns_Forbidden_For_Employee_Role()
+    {
+        using var client = ClientFor(Guid.NewGuid(), EmployeeUser);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}/hr-settings", HrSettingsBody());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_Hr_Settings_Returns_Forbidden_For_Manager_Role()
+    {
+        using var client = ClientFor(Guid.NewGuid(), ManagerUser);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}/hr-settings", HrSettingsBody());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_Hr_Settings_Returns_Forbidden_For_CompanyAdministrator_Role()
+    {
+        // Mirrors the company:manage vs employee:manage separation above, but inverted:
+        // HR Administrator is the only role permitted to change HR-policy settings, and
+        // Company Administrator (without HR Administrator) must now be denied here — this
+        // is the specific authorization-gap fix this file guards against.
+        var tenantId = Guid.NewGuid();
+        var companyId = await CreateCompanyAsync(tenantId);
+        using var client = ClientFor(tenantId, CompanyAdminUser);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", HrSettingsBody());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_Hr_Settings_Succeeds_For_HrAdministrator_Role()
+    {
+        var tenantId = Guid.NewGuid();
+        var companyId = await CreateCompanyAsync(tenantId);
+        using var client = ClientFor(tenantId, HrAdminUser);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", HrSettingsBody());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    private static object HrSettingsBody() => new
+    {
         workingDays = 31,
         hoursPerDay = 7.5,
         leaveYearStartMonth = 1,

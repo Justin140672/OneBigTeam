@@ -30,8 +30,11 @@ web
 	.WaitFor(api);
 
 // Public marketing site — static content only, no database/API dependency.
+// References web only to resolve its URL for the "Log in" link, not for data access.
 var marketing = isE2ETesting
 	? builder.AddProject<Projects.HR_Marketing>("marketing", launchProfileName: "http")
 	: builder.AddProject<Projects.HR_Marketing>("marketing");
+
+marketing.WithReference(web);
 
 builder.Build().Run();

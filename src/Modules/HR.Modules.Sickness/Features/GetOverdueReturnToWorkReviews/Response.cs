@@ -6,4 +6,5 @@ internal sealed record OverdueReturnToWorkReviewItem(
     Guid ReviewId,
     Guid EmployeeId,
     Guid SicknessRecordId,
-    DateOnly DueDate);
+    DateOnly DueDate,
+    Guid? TaskId);

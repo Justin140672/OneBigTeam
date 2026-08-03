@@ -23,4 +23,5 @@ internal sealed record VacancyListItem(
     string EffectiveTitle,
     // Location comes exclusively from the linked Position Profile — see GetVacancyResponse's
     // EffectiveLocation remarks.
-    string? EffectiveLocation);
+    string? EffectiveLocation,
+    int ApplicationCount);

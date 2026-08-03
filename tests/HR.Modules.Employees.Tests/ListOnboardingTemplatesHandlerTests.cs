@@ -28,7 +28,10 @@ public class ListOnboardingTemplatesHandlerTests
         context.OnboardingTemplates.AddRange(templateB, templateA, inactiveTemplate);
         await context.SaveChangesAsync();
 
-        var handler = new ListOnboardingTemplatesHandler(context);
+        var handler = new ListOnboardingTemplatesHandler(
+            context,
+            new HR.Modules.Employees.Services.OnboardingTemplateSeeder(context),
+            new HR.Modules.Employees.Tests.Infrastructure.FakeClock(Now.UtcDateTime));
         var result = await handler.HandleAsync(
             new ListOnboardingTemplatesRequest { CompanyId = companyId },
             CancellationToken.None);
@@ -51,7 +54,10 @@ public class ListOnboardingTemplatesHandlerTests
         context.OnboardingTemplates.Add(inactiveTemplate);
         await context.SaveChangesAsync();
 
-        var handler = new ListOnboardingTemplatesHandler(context);
+        var handler = new ListOnboardingTemplatesHandler(
+            context,
+            new HR.Modules.Employees.Services.OnboardingTemplateSeeder(context),
+            new HR.Modules.Employees.Tests.Infrastructure.FakeClock(Now.UtcDateTime));
         var result = await handler.HandleAsync(
             new ListOnboardingTemplatesRequest { CompanyId = companyId, IncludeInactive = true },
             CancellationToken.None);
@@ -69,13 +75,21 @@ public class ListOnboardingTemplatesHandlerTests
             OnboardingTemplate.Create(Guid.NewGuid(), Guid.NewGuid(), "Other Company Template", null, Now));
         await context.SaveChangesAsync();
 
-        var handler = new ListOnboardingTemplatesHandler(context);
+        var handler = new ListOnboardingTemplatesHandler(
+            context,
+            new HR.Modules.Employees.Services.OnboardingTemplateSeeder(context),
+            new HR.Modules.Employees.Tests.Infrastructure.FakeClock(Now.UtcDateTime));
         var result = await handler.HandleAsync(
             new ListOnboardingTemplatesRequest { CompanyId = Guid.NewGuid() },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Empty(result.Value!.Items);
+
+        // The requesting company has no templates of its own yet, so OnboardingTemplateSeeder
+        // lazily seeds the default "Standard Onboarding" template on this call — the other
+        // company's template must never leak into this company's result regardless.
+        Assert.Single(result.Value!.Items);
+        Assert.Equal("Standard Onboarding", result.Value.Items[0].Name);
     }
 
     private static EmployeesDbContext BuildContext()

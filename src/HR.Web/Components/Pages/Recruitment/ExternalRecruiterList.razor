@@ -42,7 +42,7 @@
                     <Template>
                         @{
                             var row = (context as ExternalRecruiterListItemModel)!;
-                            <a href="/companies/@CompanyId/external-recruiters/@row.Id/view">@row.AgencyName</a>
+                            <a href="@(Session.IsRecruiter ? $"/companies/{CompanyId}/external-recruiters/{row.Id}" : $"/companies/{CompanyId}/external-recruiters/{row.Id}/view")">@row.AgencyName</a>
                         }
                     </Template>
                 </GridColumn>
@@ -112,16 +112,26 @@
         </Content>
         <FooterTemplate>
             <SfButton CssClass="e-danger" Disabled="_deactivating" OnClick="ConfirmDeactivateAsync">Deactivate</SfButton>
-            <SfButton Disabled="_deactivating" OnClick="@(() => _deactivateConfirmOpen = false)">Cancel</SfButton>
+            <SfButton Disabled="_deactivating" OnClick="CancelDeactivate">Cancel</SfButton>
         </FooterTemplate>
     </DialogTemplates>
 </SfDialog>
+
+<HrConfirmDialog Visible="@(_simpleDeactivateTarget is not null)"
+                 Title="Deactivate Recruiter"
+                 Message="@($"Are you sure you want to deactivate '{_simpleDeactivateTarget?.AgencyName}'?")"
+                 ConfirmText="Deactivate"
+                 CancelText="Cancel"
+                 Busy="_deactivating"
+                 OnConfirmed="ConfirmSimpleDeactivateAsync"
+                 OnCancelled="@(() => _simpleDeactivateTarget = null)" />
 
 @code {
     private bool _deactivateConfirmOpen;
     private bool _deactivating;
     private ExternalRecruiterListItemModel? _deactivateTarget;
     private GetExternalRecruiterUsageResponse? _deactivateUsage;
+    private ExternalRecruiterListItemModel? _simpleDeactivateTarget;
     protected override bool SupportsActiveFilter => true;
 
     protected override Task OnBeforeLoadAsync()
@@ -190,6 +200,10 @@
                 _deactivateConfirmOpen = true;
                 return;
             }
+
+            // Not in use — still confirm before deactivating, just without the usage warning.
+            _simpleDeactivateTarget = item;
+            return;
         }
 
         await ApplyActiveStatusAsync(item, isActive);
@@ -205,6 +219,23 @@
         _deactivateConfirmOpen = false;
         _deactivateTarget = null;
         _deactivateUsage = null;
+    }
+
+    private void CancelDeactivate()
+    {
+        _deactivateConfirmOpen = false;
+        _deactivateTarget = null;
+        _deactivateUsage = null;
+    }
+
+    private async Task ConfirmSimpleDeactivateAsync()
+    {
+        if (_simpleDeactivateTarget is null) return;
+
+        _deactivating = true;
+        await ApplyActiveStatusAsync(_simpleDeactivateTarget, false);
+        _deactivating = false;
+        _simpleDeactivateTarget = null;
     }
 
     private async Task ApplyActiveStatusAsync(ExternalRecruiterListItemModel item, bool isActive)

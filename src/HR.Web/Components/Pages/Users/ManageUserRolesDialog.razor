@@ -6,16 +6,33 @@
         <Content>
             <div class="mb-3">
                 <label class="form-label">Roles <span class="text-danger">*</span></label>
-                <SfMultiSelect TValue="List<Guid>"
-                               TItem="RoleOption"
-                               DataSource="@_roleOptions"
-                               @bind-Value="_selectedRoleIds"
-                               @bind-Value:after="EnsureEmployeeRoleSelected"
-                               Placeholder="Select one or more roles"
-                               Mode="VisualMode.CheckBox"
-                               AllowFiltering="true">
-                    <MultiSelectFieldSettings Value="Id" Text="Name" />
-                </SfMultiSelect>
+                <table class="table table-sm table-borderless mb-1">
+                    <tbody>
+                        @foreach (var role in _roleOptions)
+                        {
+                            var isEmployeeRole = role.Id == SystemRoleOptions.EmployeeRoleId;
+                            <tr>
+                                <td class="ps-0" style="width: 2.5rem;">
+                                    <input type="checkbox"
+                                           class="form-check-input"
+                                           id="@($"role-{role.Id}")"
+                                           checked="@_selectedRoleIds.Contains(role.Id)"
+                                           disabled="@isEmployeeRole"
+                                           @onchange="@(e => OnRoleCheckedChanged(role.Id, e.Value is bool b && b))" />
+                                </td>
+                                <td class="align-middle">
+                                    <label class="form-check-label mb-0" for="@($"role-{role.Id}")">
+                                        @role.Name
+                                        @if (isEmployeeRole)
+                                        {
+                                            <span class="text-muted small ms-1">(always assigned)</span>
+                                        }
+                                    </label>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
                 <p class="text-muted small mt-2 mb-0">Employee is required for every user and can't be removed.</p>
             </div>
 
@@ -69,6 +86,21 @@
     {
         if (!_selectedRoleIds.Contains(SystemRoleOptions.EmployeeRoleId))
             _selectedRoleIds.Add(SystemRoleOptions.EmployeeRoleId);
+    }
+
+    // The Employee row's checkbox is rendered disabled (see the table above), so this only ever
+    // runs for the other, genuinely toggleable roles.
+    private void OnRoleCheckedChanged(Guid roleId, bool isChecked)
+    {
+        if (isChecked)
+        {
+            if (!_selectedRoleIds.Contains(roleId))
+                _selectedRoleIds.Add(roleId);
+        }
+        else
+        {
+            _selectedRoleIds.Remove(roleId);
+        }
     }
 
     private async Task SaveAsync()

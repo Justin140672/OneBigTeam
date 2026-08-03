@@ -124,6 +124,14 @@ public static class IdentityModule
         builder.AddPolicy("company:manage", RolePolicy(
             SystemRoles.CompanyAdministrator));
 
+        // HR Settings domain policy — the HR-policy fields split out of Company Settings
+        // (working pattern, leave defaults, probation, sickness, employee profile display-salary,
+        // acknowledgements, leaving/offboarding, employee numbering) are HR Administrator
+        // territory only. Company Administrator must not manage HR policy, matching the
+        // mirror-image rule on company:manage above.
+        builder.AddPolicy("hr-settings:manage", RolePolicy(
+            SystemRoles.HrAdministrator));
+
         // User Administration domain policies (ticket #92) — viewing/inviting/managing roles and
         // disabling/enabling accounts, plus resending/cancelling invitations, are HR/Company Admin
         // territory, matching employee:manage/company:manage's precedent of restricting

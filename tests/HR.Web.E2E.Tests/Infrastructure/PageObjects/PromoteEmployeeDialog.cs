@@ -55,6 +55,27 @@ public sealed class PromoteEmployeeDialog(IPage page)
     public Task SelectNewPositionProfileAsync(string profileTitle) =>
         DropDownSelector.SelectAsync(page, Dialog.Locator(".col-12").Filter(new() { HasText = "New Position Profile" }).First, profileTitle);
 
+    /// <summary>
+    /// Opens the "New Position Profile" dropdown's popup without selecting anything, returns its
+    /// visible option titles, then closes it again — used to assert only vacant (unoccupied)
+    /// position profiles are offered (see PromoteEmployeeDialog.razor's OnOpenedAsync, which
+    /// excludes any profile currently occupied by another active employee).
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetNewPositionProfileDropdownOptionsAsync()
+    {
+        var field = Dialog.Locator(".col-12").Filter(new() { HasText = "New Position Profile" }).First;
+        await field.Locator("span[role='combobox']").First.ClickAsync();
+        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+
+        var items = await page.Locator(".e-popup.e-ddl:visible .e-list-item").AllAsync();
+        var titles = new List<string>();
+        foreach (var item in items)
+            titles.Add((await item.TextContentAsync())?.Trim() ?? "");
+
+        await page.Keyboard.PressAsync("Escape");
+        return titles;
+    }
+
     public async Task FillEffectiveDateAsync(string ddMMyyyy)
     {
         var input = Dialog.Locator(".e-date-wrapper input.e-input").First;
@@ -174,6 +195,19 @@ public sealed class PromoteEmployeeDialog(IPage page)
         {
             await Dialog.Locator(".alert-danger")
                 .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 8_000 });
+
+            // A backdated effective date makes the server ask for confirmation instead of
+            // promoting immediately (PromoteEmployeeDialog.razor's _awaitingBackdateConfirmation),
+            // which re-labels the submit button "Confirm & Promote" rather than closing the
+            // dialog. A caller expecting a genuine validation failure (not a backdate confirmation)
+            // will still see the dialog open with .alert-danger visible, same as before; a caller
+            // that hit the backdate path gets the confirmation click it needs to actually complete.
+            var confirmButton = Dialog.GetByRole(AriaRole.Button, new() { Name = "Confirm & Promote" });
+            if (await confirmButton.IsVisibleAsync())
+            {
+                await confirmButton.ClickAsync();
+                await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+            }
         }
     }
 

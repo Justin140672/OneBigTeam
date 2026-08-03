@@ -27,6 +27,18 @@ public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
     public Task FillContactNameAsync(string value) =>
         page.GetByPlaceholder("Primary contact").FillAsync(value);
 
+    /// <summary>
+    /// True if the "Contact Name" field sits alone on its own full-width row (".col-12" — see
+    /// ExternalRecruiterDetail.razor), rather than sharing a row with another field
+    /// (e.g. previously paired 6-wide alongside another ".col-md-6" field).
+    /// </summary>
+    public async Task<bool> IsContactNameOnItsOwnRowAsync()
+    {
+        var field = page.GetByPlaceholder("Primary contact");
+        var column = field.Locator("xpath=ancestor::div[contains(@class,'col-12')][1]");
+        return await column.CountAsync() > 0;
+    }
+
     public Task FillContactEmailAsync(string value) =>
         page.GetByPlaceholder("contact@agency.com").FillAsync(value);
 

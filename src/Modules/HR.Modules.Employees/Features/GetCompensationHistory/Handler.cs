@@ -1,10 +1,11 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Features.GetCompensationHistory;
 
-internal sealed class GetCompensationHistoryHandler(EmployeesDbContext dbContext)
+internal sealed class GetCompensationHistoryHandler(EmployeesDbContext dbContext, IEmployeeNameReader employeeNameReader)
 {
     public async Task<Result<GetCompensationHistoryResponse>> HandleAsync(
         Guid companyId,
@@ -18,10 +19,16 @@ internal sealed class GetCompensationHistoryHandler(EmployeesDbContext dbContext
             return Result.Failure<GetCompensationHistoryResponse>(
                 Error.NotFound($"Employee '{employeeId}' was not found."));
 
-        var items = await dbContext.Compensations
+        var records = await dbContext.Compensations
             .Where(c => c.CompanyId == companyId && c.EmployeeId == employeeId)
             .OrderByDescending(c => c.EffectiveFrom)
             .ThenByDescending(c => c.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var creatorIds = records.Select(c => c.CreatedBy).Distinct().ToList();
+        var creatorNames = await employeeNameReader.GetNamesAsync(companyId, creatorIds, cancellationToken);
+
+        var items = records
             .Select(c => new CompensationHistoryItem(
                 c.Id,
                 c.EffectiveFrom,
@@ -34,8 +41,9 @@ internal sealed class GetCompensationHistoryHandler(EmployeesDbContext dbContext
                 c.Notes,
                 c.Reason.ToString(),
                 c.CreatedBy,
+                creatorNames.TryGetValue(c.CreatedBy, out var name) ? name : "Unknown",
                 c.CreatedAt))
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         return Result.Success(new GetCompensationHistoryResponse(items));
     }

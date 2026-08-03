@@ -15,7 +15,7 @@ internal sealed class GetHeadcountSummaryHandler(EmployeesDbContext dbContext)
         var counts = await dbContext.Employees
             .AsNoTracking()
             .Where(e => e.CompanyId == request.CompanyId
-                     && (e.Status == EmploymentStatus.Active || e.Status == EmploymentStatus.OnLeave))
+                     && e.Status == EmploymentStatus.Active)
             .GroupBy(e => e.DepartmentId)
             .Select(g => new { DepartmentId = g.Key, EmployeeCount = g.Count() })
             .ToListAsync(cancellationToken);

@@ -27,11 +27,18 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
 
     private bool _hasSelection;
 
-    private record ToolbarAction(string Id, string Text, string Icon, Func<TItem, Task> OnClick, string? Tooltip = null);
+    private record ToolbarAction(string Id, string Text, string Icon, Func<TItem, Task> OnClick, string? Tooltip = null, bool SelectionDependent = true);
     private readonly List<ToolbarAction> _customActions = new();
 
-    protected void AddToolbarAction(string id, string text, string icon, Func<TItem, Task> onClick, string? tooltip = null)
-        => _customActions.Add(new(id, text, icon, onClick, tooltip));
+    /// <param name="selectionDependent">
+    /// Whether this action should start disabled and only enable once a row is selected (the
+    /// default, matching every action that operates on the current selection). Pass false for an
+    /// action that doesn't need a selection at all — e.g. a dropdown covering several actions
+    /// where only some of them are selection-dependent (see EmployeeList's "Bulk Update" menu,
+    /// which also offers "Import"/"Download Template" alongside "Selected Employees").
+    /// </param>
+    protected void AddToolbarAction(string id, string text, string icon, Func<TItem, Task> onClick, string? tooltip = null, bool selectionDependent = true)
+        => _customActions.Add(new(id, text, icon, onClick, tooltip, selectionDependent));
 
     // Override to register custom toolbar actions via AddToolbarAction.
     protected virtual void ConfigureToolbar() { }
@@ -61,7 +68,7 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
                     Text        = action.Text,
                     PrefixIcon  = action.Icon,
                     TooltipText = action.Tooltip ?? action.Text,
-                    Disabled    = !_hasSelection,
+                    Disabled    = action.SelectionDependent && !_hasSelection,
                 });
 
             if (SupportsActiveFilter)
@@ -131,7 +138,9 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
     // an already-rendered toolbar just because a new Toolbar object was bound, so selection
     // changes after first render need this explicit interop call to actually update the DOM.
     private List<string> SelectionDependentToolbarIds =>
-        new List<string> { "hr-edit", "hr-view" }.Concat(_customActions.Select(a => a.Id)).ToList();
+        new List<string> { "hr-edit", "hr-view" }
+            .Concat(_customActions.Where(a => a.SelectionDependent).Select(a => a.Id))
+            .ToList();
 
     protected async Task OnRowSelected(RowSelectEventArgs<TItem> args)
     {

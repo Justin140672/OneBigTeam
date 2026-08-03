@@ -67,7 +67,19 @@
     }
 </div>
 
+<HrConfirmDialog Visible="@(_deactivateTarget is not null)"
+                 Title="Deactivate Position Profile"
+                 Message="@($"Are you sure you want to deactivate '{_deactivateTarget?.Title}'?")"
+                 ConfirmText="Deactivate"
+                 CancelText="Cancel"
+                 Busy="_deactivating"
+                 OnConfirmed="ConfirmDeactivateAsync"
+                 OnCancelled="@(() => _deactivateTarget = null)" />
+
 @code {
+    private PositionProfileListItemModel? _deactivateTarget;
+    private bool _deactivating;
+
     protected override bool SupportsActiveFilter => true;
 
     protected override Task OnBeforeLoadAsync()
@@ -83,10 +95,11 @@
             id:      "hr-deactivate",
             text:    "Deactivate",
             icon:    "fa-solid fa-circle-xmark",
-            onClick: async item =>
+            onClick: item =>
             {
-                if (!item.IsActive) return;
-                await Deactivate(item);
+                if (!item.IsActive) return Task.CompletedTask;
+                _deactivateTarget = item;
+                return Task.CompletedTask;
             },
             tooltip: "Deactivate selected position profile");
     }
@@ -121,6 +134,15 @@
             return $"£{item.SalaryMin.Value:N0}+{suffix}";
 
         return $"Up to £{item.SalaryMax!.Value:N0}{suffix}";
+    }
+
+    private async Task ConfirmDeactivateAsync()
+    {
+        if (_deactivateTarget is null) return;
+        _deactivating = true;
+        await Deactivate(_deactivateTarget);
+        _deactivating = false;
+        _deactivateTarget = null;
     }
 
     private async Task Deactivate(PositionProfileListItemModel profile)

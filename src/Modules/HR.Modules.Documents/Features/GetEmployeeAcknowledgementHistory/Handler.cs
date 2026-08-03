@@ -17,11 +17,12 @@ internal sealed class GetEmployeeAcknowledgementHistoryHandler(DocumentsDbContex
                 db.SharedCompanyDocuments.AsNoTracking(),
                 a => a.SharedCompanyDocumentId,
                 d => d.Id,
-                (a, d) => new GetEmployeeAcknowledgementHistoryItem(
-                    d.Title,
-                    a.VersionNumber,
-                    a.AcknowledgedAt))
+                (a, d) => new { d.Title, a.VersionNumber, a.AcknowledgedAt })
             .OrderByDescending(i => i.AcknowledgedAt)
+            .Select(i => new GetEmployeeAcknowledgementHistoryItem(
+                i.Title,
+                i.VersionNumber,
+                i.AcknowledgedAt))
             .ToListAsync(cancellationToken);
 
         return Result.Success(new GetEmployeeAcknowledgementHistoryResponse(items));

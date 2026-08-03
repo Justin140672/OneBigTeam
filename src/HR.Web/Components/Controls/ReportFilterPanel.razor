@@ -33,20 +33,26 @@
                 </div>
             }
             <div class="col-md-auto pb-1">
-                <SfButton CssClass="e-flat e-small" OnClick="@(() => _showSaveAs = !_showSaveAs)">Save current filters as view</SfButton>
+                <SfButton CssClass="e-flat e-small" OnClick="@(() => _showSaveAs = true)">Save current filters as view</SfButton>
             </div>
         </div>
+
         @if (_showSaveAs)
         {
-            <div class="row g-3 align-items-end mb-2">
-                <div class="col-md-4">
-                    <HrTextBox @bind-Value="_newViewName" Placeholder="View name" />
-                </div>
-                <div class="col-md-auto pb-1 d-flex gap-2">
-                    <SfButton CssClass="e-primary e-small" Disabled="@(string.IsNullOrWhiteSpace(_newViewName))" OnClick="SaveCurrentAsViewAsync">Save</SfButton>
-                    <SfButton CssClass="e-outline e-small" OnClick="@(() => _showSaveAs = false)">Cancel</SfButton>
-                </div>
-            </div>
+            <SfDialog Visible="_showSaveAs" IsModal="true" Width="420px" ShowCloseIcon="true" CssClass="report-save-view-dialog">
+                <DialogEvents Closed="@(() => _showSaveAs = false)" />
+                <DialogTemplates>
+                    <Header>Save current filters as view</Header>
+                    <Content>
+                        <label class="form-label">View name</label>
+                        <HrTextBox @bind-Value="_newViewName" Placeholder="View name" />
+                    </Content>
+                    <FooterTemplate>
+                        <SfButton CssClass="e-success e-small" Disabled="@(string.IsNullOrWhiteSpace(_newViewName))" OnClick="SaveCurrentAsViewAsync">Save</SfButton>
+                        <SfButton CssClass="e-outline e-small" OnClick="@(() => _showSaveAs = false)">Cancel</SfButton>
+                    </FooterTemplate>
+                </DialogTemplates>
+            </SfDialog>
         }
         @if (_showRename)
         {
@@ -77,8 +83,7 @@
                                     DataSource="@_departments"
                                     @bind-Value="_departmentId"
                                     Placeholder="All Departments"
-                                    AllowFiltering="true"
-                                    ShowClearButton="true">
+                                    AllowFiltering="true">
                         <DropDownListFieldSettings Value="Id" Text="Name" />
                     </SfDropDownList>
                 </div>
@@ -92,8 +97,7 @@
                                     DataSource="@_locations"
                                     @bind-Value="_locationId"
                                     Placeholder="All Locations"
-                                    AllowFiltering="true"
-                                    ShowClearButton="true">
+                                    AllowFiltering="true">
                         <DropDownListFieldSettings Value="Id" Text="Name" />
                     </SfDropDownList>
                 </div>
@@ -107,8 +111,7 @@
                                     DataSource="@_positionProfiles"
                                     @bind-Value="_positionProfileId"
                                     Placeholder="All Positions"
-                                    AllowFiltering="true"
-                                    ShowClearButton="true">
+                                    AllowFiltering="true">
                         <DropDownListFieldSettings Value="Id" Text="Title" />
                     </SfDropDownList>
                 </div>
@@ -123,8 +126,7 @@
                                     DataSource="@_managerOptions"
                                     @bind-Value="_managerId"
                                     Placeholder="All Managers"
-                                    AllowFiltering="true"
-                                    ShowClearButton="true">
+                                    AllowFiltering="true">
                         <DropDownListFieldSettings Value="Id" Text="Name" />
                         <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnManagerFilteringAsync" />
                     </SfDropDownList>
@@ -139,8 +141,7 @@
                                     DataSource="@_employmentTypes"
                                     @bind-Value="_employmentTypeId"
                                     Placeholder="All Employment Types"
-                                    AllowFiltering="true"
-                                    ShowClearButton="true">
+                                    AllowFiltering="true">
                         <DropDownListFieldSettings Value="Id" Text="Name" />
                     </SfDropDownList>
                 </div>
@@ -153,8 +154,7 @@
                                     TItem="StatusOption"
                                     DataSource="@_statusOptions"
                                     @bind-Value="_employeeStatus"
-                                    Placeholder="All Statuses"
-                                    ShowClearButton="true">
+                                    Placeholder="All Statuses">
                         <DropDownListFieldSettings Value="Value" Text="Label" />
                     </SfDropDownList>
                 </div>
@@ -194,6 +194,11 @@
     [Parameter] public bool ShowStatusFilter { get; set; } = true;
     [Parameter] public string DateRangeStartLabel { get; set; } = "Start Date From";
     [Parameter] public string DateRangeEndLabel { get; set; } = "Start Date To";
+
+    // Optional initial value for the "date range start" filter, applied once on first render only
+    // (e.g. the Employee Starters report defaults this to the 1st of the current month). A saved
+    // default view, if one is applied during that same initial load, takes precedence.
+    [Parameter] public DateOnly? DefaultDateRangeStart { get; set; }
 
     private List<DepartmentListItemModel> _departments = [];
     private List<LocationListItemModel> _locations = [];
@@ -238,14 +243,21 @@
     private static readonly StatusOption[] _statusOptions =
     [
         new("Active", "Active"),
-        new("OnLeave", "On Leave"),
         new("Suspended", "Suspended"),
         new("Leaving", "Leaving"),
         new("FormerEmployee", "Former Employee"),
     ];
 
+    private bool _defaultsApplied;
+
     protected override async Task OnParametersSetAsync()
     {
+        if (!_defaultsApplied)
+        {
+            _defaultsApplied = true;
+            _dateRangeStart ??= DefaultDateRangeStart;
+        }
+
         var departmentsTask = DepartmentService.ListDepartmentsAsync(CompanyId);
         var locationsTask = LocationService.ListLocationsAsync(CompanyId);
         var positionProfilesTask = PositionProfileService.ListPositionProfilesAsync(CompanyId);
@@ -322,11 +334,11 @@
         _savedViewError = null;
         var json = JsonSerializer.Serialize(BuildSavedFilterState());
         var request = new SaveReportViewRequest(ReportId, _newViewName.Trim(), json, null);
-        var result = await ReportingService.SaveReportViewAsync(CompanyId, request);
+        var (result, error) = await ReportingService.SaveReportViewAsync(CompanyId, request);
 
         if (result is null)
         {
-            _savedViewError = "Failed to save the current filters as a view.";
+            _savedViewError = error ?? "Failed to save the current filters as a view.";
             return;
         }
 
@@ -349,11 +361,11 @@
         if (_selectedView is null || string.IsNullOrWhiteSpace(_renameViewName)) return;
 
         _savedViewError = null;
-        var result = await ReportingService.RenameReportViewAsync(CompanyId, _selectedView.Id, _renameViewName.Trim());
+        var (result, error) = await ReportingService.RenameReportViewAsync(CompanyId, _selectedView.Id, _renameViewName.Trim());
 
         if (result is null)
         {
-            _savedViewError = "Failed to rename the saved view.";
+            _savedViewError = error ?? "Failed to rename the saved view.";
             return;
         }
 

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
@@ -7,6 +8,21 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// </summary>
 public sealed class EmployeeListPage(IPage page, string baseUrl)
 {
+    /// <summary>
+    /// Builds a word-order-agnostic matcher for a "First Last" name fragment. EmployeeList.razor's
+    /// grid renders Last Name before First Name (see the GridColumns order), so a row/cell's text
+    /// reads "Bennett Laura ..." — a plain HasText substring match on "Laura Bennett" (First-Last
+    /// order) never matches. This requires every whitespace-separated word in
+    /// <paramref name="nameFragment"/> to appear somewhere in the target's text, in any order —
+    /// works whether given a single word (e.g. just a last name) or a full "First Last" name.
+    /// </summary>
+    private static Regex NameMatcher(string nameFragment)
+    {
+        var words = nameFragment.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var lookaheads = string.Concat(words.Select(w => $"(?=.*{Regex.Escape(w)})"));
+        return new Regex(lookaheads, RegexOptions.Singleline);
+    }
+
     // Waiting for ".e-grid" alone is NOT sufficient to guarantee rows are queryable: Syncfusion's
     // EJ2 grid does its own JS render pass to populate ".e-row"/".e-rowcell" into the DOM on a
     // separate tick after the Blazor component itself has mounted. Waiting for the row selector
@@ -61,10 +77,12 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         await page.WaitForTimeoutAsync(400);
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
-        return await page.Locator(".e-rowcell")
-            .Filter(new() { HasText = nameFragment })
-            .First
-            .IsVisibleAsync();
+        // The search box already narrowed the grid server-side to rows matching nameFragment
+        // (name/email/employee number) — a single ".e-rowcell" can never contain a full "First
+        // Last" name anyway (Last Name and First Name are separate columns; see NameMatcher's
+        // doc comment), so just confirm at least one real data row came back rather than the
+        // empty-state row.
+        return await page.Locator(".e-grid .e-row").CountAsync() > 0;
     }
 
     public async Task<IReadOnlyList<string>> GetEmployeeNamesAsync()
@@ -86,7 +104,7 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
-        var row = page.Locator(".e-grid .e-row").Filter(new() { HasText = nameFragment }).First;
+        var row = page.Locator(".e-grid .e-row").Filter(new() { HasTextRegex = NameMatcher(nameFragment) }).First;
         await row.Locator(".e-checkbox-wrapper").First.ClickAsync();
     }
 
@@ -172,8 +190,15 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
-        var link = page.Locator(".e-rowcell a")
-            .Filter(new() { HasText = nameFragment })
+        // Only the Last Name column cell renders as an <a> (EmployeeList.razor's Last Name
+        // GridColumn Template — First Name is plain text), so a link's own text is never more
+        // than the last name alone. Find the row first (order-agnostic across its Last/First Name
+        // cells — see NameMatcher), then click that row's link rather than filtering the link
+        // itself by the full nameFragment.
+        var link = page.Locator(".e-grid .e-row")
+            .Filter(new() { HasTextRegex = NameMatcher(nameFragment) })
+            .First
+            .Locator(".e-rowcell a")
             .First;
         await link.ClickAsync();
         await page.WaitForURLAsync("**/employees/**", new() { Timeout = 15_000 });
@@ -204,11 +229,12 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     // ── User Account column (tickets #90/#91 — "User Account" status + Quick Invite) ──────────
 
     /// <summary>
-    /// Returns the row matching <paramref name="nameFragment"/> in the last name/first name cells
-    /// — used as the anchor for all of the User-Account-column helpers below.
+    /// Returns the row matching <paramref name="nameFragment"/> across the separate Last Name/
+    /// First Name cells (see NameMatcher) — used as the anchor for all of the User-Account-column
+    /// helpers below.
     /// </summary>
     private ILocator Row(string nameFragment) =>
-        page.Locator(".e-grid .e-row").Filter(new() { HasText = nameFragment }).First;
+        page.Locator(".e-grid .e-row").Filter(new() { HasTextRegex = NameMatcher(nameFragment) }).First;
 
     /// <summary>
     /// Returns the trimmed rendered text (icon label, e.g. "Active"/"Pending Invitation"/"No
@@ -269,11 +295,11 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
 
     /// <summary>
     /// The InviteUserDialog opened via <see cref="ClickInviteUserLinkAsync"/> — same component as
-    /// UserAdministrationListPage's invite wizard (shares the "Invite Employee User" dialog title),
-    /// just parameterised with PreselectedEmployeeId/Name/Email so it skips straight to step 2.
+    /// UserAdministrationListPage's invite wizard (shares the "Invite Employee" dialog title), just
+    /// parameterised with PreselectedEmployeeId/Name/Email so it skips straight to step 2 (Roles).
     /// </summary>
     public ILocator InviteUserDialog =>
-        page.GetByRole(AriaRole.Dialog, new() { Name = "Invite Employee User" });
+        page.GetByRole(AriaRole.Dialog, new() { Name = "Invite Employee" });
 
     /// <summary>
     /// Returns true if the (open) InviteUserDialog is still showing the step-1 employee-picker
@@ -284,39 +310,44 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         await InviteUserDialog.Locator("span[role='combobox']").CountAsync() > 0;
 
     /// <summary>
-    /// Returns the read-only email text shown on the dialog's step 2 (InviteUserDialog no longer
-    /// lets an admin type/edit the email — it's derived from the employee's own work email and
-    /// rendered as plain text, or a "no work email on file" warning if the employee has none).
+    /// Returns true if the (open) InviteUserDialog's step nav shows an "Employee" step pill —
+    /// expected false for the pre-selected Quick Invite flow, which hides that step entirely (see
+    /// InviteUserDialog.razor's VisibleSteps, gated on PreselectedEmployeeId being set).
     /// </summary>
-    public async Task<string?> GetInviteDialogEmailValueAsync() =>
-        (await InviteUserDialog.Locator("p.form-control-plaintext").TextContentAsync())?.Trim();
+    public Task<bool> InviteDialogHasEmployeeStepPillAsync() =>
+        InviteUserDialog.Locator(".nav-link", new() { HasText = "Employee" }).IsVisibleAsync();
 
     /// <summary>
-    /// Completes the pre-selected Quick Invite flow from step 2 (Email & Roles) onward: selects
-    /// the given role(s) via the SfMultiSelect checkbox popup, advances to step 3 (Confirm), and
-    /// submits. Mirrors the step 2/3 portion of UserAdministrationListPage.InviteEmployeeAsync
-    /// (same InviteUserDialog component, same Syncfusion widgets/interaction patterns), but skips
-    /// step 1 entirely since the employee is already pre-selected. Waits for the dialog to close.
+    /// Completes the pre-selected Quick Invite flow from step 2 (Roles) onward: selects the given
+    /// additional role(s) (beyond the always-applied, non-selectable "Employee" role — see
+    /// InviteUserDialog.razor's fixed badge) via the SfMultiSelect checkbox popup, advances to step
+    /// 3 (Confirm), and submits. Mirrors the step 2/3 portion of
+    /// UserAdministrationListPage.InviteEmployeeAsync (same InviteUserDialog component, same
+    /// Syncfusion widgets/interaction patterns), but skips step 1 entirely since the employee is
+    /// already pre-selected. Waits for the dialog to close.
     /// </summary>
-    public async Task CompleteQuickInviteAsync(IReadOnlyList<string> roleNames)
+    public async Task CompleteQuickInviteAsync(IReadOnlyList<string> additionalRoleNames)
     {
-        await InviteUserDialog.Locator("input[placeholder='Select one or more roles']").ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup:visible", new() { Timeout = 10_000 });
-        foreach (var roleName in roleNames)
+        if (additionalRoleNames.Count > 0)
         {
-            await page.Locator(".e-popup .e-list-item")
-                .Filter(new() { HasText = roleName })
-                .First
-                .ClickAsync();
+            await InviteUserDialog.Locator("input[placeholder='Select additional roles (optional)']").ClickAsync();
+            await page.WaitForSelectorAsync(".e-popup:visible", new() { Timeout = 10_000 });
+            foreach (var roleName in additionalRoleNames)
+            {
+                await page.Locator(".e-popup .e-list-item")
+                    .Filter(new() { HasText = roleName })
+                    .First
+                    .ClickAsync();
+            }
+            // Checkbox-mode multiselect popups stay open to allow further selections, and being an
+            // overlay it can sit visually on top of (and intercept clicks intended for) whatever sits
+            // beneath it, including the dialog's own "Next" button — clicking a "neutral" element
+            // underneath it is not reliable. Escape is the standard, unambiguous way to close a
+            // Syncfusion dropdown/multiselect popup without depending on its rendered size/position —
+            // same reasoning as UserDetailPage.ToggleRolesAndSaveAsync for the equivalent widget.
+            await page.Keyboard.PressAsync("Escape");
+            await page.WaitForSelectorAsync(".e-popup:visible", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
         }
-        // Checkbox-mode multiselect popups stay open to allow further selections, and being an
-        // overlay it can sit visually on top of (and intercept clicks intended for) whatever sits
-        // beneath it, including the dialog's own "Next" button — clicking a "neutral" element
-        // underneath it is not reliable. Escape is the standard, unambiguous way to close a
-        // Syncfusion dropdown/multiselect popup without depending on its rendered size/position —
-        // same reasoning as UserDetailPage.ToggleRolesAndSaveAsync for the equivalent widget.
-        await page.Keyboard.PressAsync("Escape");
-        await page.WaitForSelectorAsync(".e-popup:visible", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
 
         await InviteUserDialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
 

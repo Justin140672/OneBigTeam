@@ -46,6 +46,32 @@ public sealed class EmployeePromotionTabTests(AppFixture fixture) : E2ETestBase(
             "Did not expect a promotion history grid to render alongside the empty state");
     }
 
+    /// <summary>
+    /// The "New Position Profile" dropdown only offers position profiles with no employee
+    /// currently assigned to them — "Software Engineer" (Tom Williams' own current position) and
+    /// "CTO" (Sarah Chen's) are both occupied, so neither should appear as an option when
+    /// promoting Tom.
+    /// </summary>
+    [Fact]
+    public async Task PromoteEmployeeDialog_NewPositionProfileDropdown_OnlyOffersVacantProfiles()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var wizard = new PromoteEmployeeDialog(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empEdit.GoToAsync(AcmeId, TomWilliams);
+        await empEdit.OpenPromotionHistoryTabAsync();
+        await wizard.OpenAsync();
+
+        var options = await wizard.GetNewPositionProfileDropdownOptionsAsync();
+
+        Assert.DoesNotContain(options, o => o.Contains("Software Engineer") && !o.Contains("Senior"));
+        Assert.DoesNotContain(options, o => o.Contains("CTO"));
+    }
+
     [Fact]
     public async Task PromoteEmployee_WithPositionStepOnly_AppearsInHistoryGrid()
     {

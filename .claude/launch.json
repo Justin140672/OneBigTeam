@@ -6,6 +6,12 @@
       "runtimeExecutable": "dotnet",
       "runtimeArgs": ["run", "--project", "src/HR.AppHost/HR.AppHost.csproj", "--launch-profile", "http"],
       "port": 5157
+    },
+    {
+      "name": "hr-marketing",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/HR.Marketing/HR.Marketing.csproj", "--launch-profile", "http"],
+      "port": 5166
     }
   ]
 }

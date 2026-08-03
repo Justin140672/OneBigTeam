@@ -36,7 +36,11 @@ internal sealed class GetProbationReportHandler(
             ? await employeeDepartmentReader.GetDepartmentsAsync(request.CompanyId, allEmployeeIds, cancellationToken)
             : new Dictionary<Guid, EmployeeDepartmentInfo>();
 
+        // Employees who have already passed probation are no longer relevant to this report's
+        // purpose (tracking *current/outstanding* probation) — excluded from the row list, but
+        // still counted in the summary card below (passedCount) for context.
         var rows = items
+            .Where(i => i.Status != "Passed")
             .Select(i => new ProbationReportRow(
                 i.EmployeeId,
                 departments.TryGetValue(i.EmployeeId, out var d) ? d.EmployeeName : i.EmployeeId.ToString(),

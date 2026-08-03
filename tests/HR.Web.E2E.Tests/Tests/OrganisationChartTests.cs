@@ -150,7 +150,7 @@ public sealed class OrganisationChartTests(AppFixture fixture) : E2ETestBase(fix
     }
 
     [Fact]
-    public async Task OrganisationChart_HasPrintAndExportButtons()
+    public async Task OrganisationChart_HasExportButton()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
 
@@ -162,8 +162,6 @@ public sealed class OrganisationChartTests(AppFixture fixture) : E2ETestBase(fix
 
         await _page.Locator(".org-chart-zoom-toolbar").WaitForAsync(new() { Timeout = 15_000 });
 
-        Assert.True(await _page.GetByTitle("Print").IsVisibleAsync(),
-            "Expected a Print button on the organisation chart toolbar");
         Assert.True(await _page.GetByTitle("Export as image").IsVisibleAsync(),
             "Expected an Export button on the organisation chart toolbar");
     }

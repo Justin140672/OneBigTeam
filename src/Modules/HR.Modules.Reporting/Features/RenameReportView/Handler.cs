@@ -1,4 +1,5 @@
 using HR.Modules.Reporting.Persistence;
+using HR.Modules.Reporting.Features.SaveReportView;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,7 +20,28 @@ internal sealed class RenameReportViewHandler(ReportingDbContext dbContext)
         if (view is null)
             return Result.Failure<RenameReportViewResponse>(Error.NotFound("Saved report view not found."));
 
-        view.Rename(request.Name);
+        var name = request.Name.Trim();
+
+        if (string.Equals(name, SaveReportViewHandler.ReservedStandardViewName, StringComparison.OrdinalIgnoreCase))
+            return Result.Failure<RenameReportViewResponse>(
+                Error.Validation($"'{SaveReportViewHandler.ReservedStandardViewName}' is a reserved name — please choose another."));
+
+        // Excludes the view's own current row so renaming to its own existing name (a no-op) isn't
+        // flagged as a collision with itself.
+        var nameInUse = await dbContext.SavedReportViews
+            .AnyAsync(
+                v => v.Id != view.Id
+                    && v.CompanyId == request.CompanyId
+                    && v.UserId == userId
+                    && v.ReportId == view.ReportId
+                    && v.Name.ToLower() == name.ToLower(),
+                cancellationToken);
+
+        if (nameInUse)
+            return Result.Failure<RenameReportViewResponse>(
+                Error.Conflict($"A saved view named '{name}' already exists."));
+
+        view.Rename(name);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

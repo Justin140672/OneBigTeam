@@ -76,9 +76,13 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
 
         // ── Step 3: Add the candidate's application to the vacancy ────────────────
         await vacancyList.ClickVacancyAsync(vacancyTitle);
+        await vacancyDetail.PublishVacancyAsync();
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
-        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateEmail);
+        // The Add Candidate popup's item text is name-only (no email — item #26/product fix),
+        // so the candidate must be matched by name here even though search-as-you-type still
+        // works server-side against any field including email.
+        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateLast);
         await vacancyDetail.SubmitAddApplicationAsync();
 
         Assert.Equal("Applied", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
@@ -231,9 +235,13 @@ public sealed class ApplicationToEmployeeFlowTests(AppFixture fixture) : E2ETest
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.ClickVacancyAsync(vacancyTitle);
+        await vacancyDetail.PublishVacancyAsync();
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
-        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateEmail);
+        // The Add Candidate popup's item text is name-only (no email — item #26/product fix),
+        // so the candidate must be matched by name here even though search-as-you-type still
+        // works server-side against any field including email.
+        await vacancyDetail.SelectCandidateInAddDialogAsync(candidateLast);
         await vacancyDetail.SubmitAddApplicationAsync();
 
         await vacancyDetail.ClickScheduleInterviewForAsync(candidateLast);

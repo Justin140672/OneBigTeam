@@ -215,8 +215,13 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(AppFixture fixture) 
 
         // Adding an application (even while the vacancy stays Draft) is enough to make
         // UpdateVacancyHandler.CanChangePositionProfile false — the eligibility rule is
-        // "status == Draft && applicationCount == 0", not status alone.
+        // "status == Draft && applicationCount == 0", not status alone. The Applications tab only
+        // renders once Open (Draft hides it entirely), so this publishes first — the field stays
+        // locked afterwards regardless (status alone is now sufficient), so the assertion below
+        // still holds even though the "Draft-with-application" combination itself is no longer
+        // being exercised specifically.
         await vacancyList.ClickVacancyAsync(vacancyTitle);
+        await vacancyDetail.PublishVacancyAsync();
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
         await vacancyDetail.SelectCandidateInAddDialogAsync(candidateName);

@@ -90,7 +90,7 @@ public sealed class ProfileOverviewTabTests(AppFixture fixture) : E2ETestBase(fi
         var employmentStatus = await overview.GetDetailAsync("Employment Status");
         Assert.False(string.IsNullOrWhiteSpace(employmentStatus),
             "Expected an Employment Status to be displayed in the overview");
-        Assert.Contains(employmentStatus, new[] { "Active", "On Leave", "Suspended", "Leaver" });
+        Assert.Contains(employmentStatus, new[] { "Active", "Suspended", "Leaver" });
 
         var lengthOfService = await overview.GetDetailAsync("Length of Service");
         Assert.False(string.IsNullOrWhiteSpace(lengthOfService),
@@ -123,15 +123,16 @@ public sealed class ProfileOverviewTabTests(AppFixture fixture) : E2ETestBase(fi
     [Fact]
     public async Task OverviewTab_Salary_HiddenByDefault_ShownWhenCompanySettingEnabled()
     {
-        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
-        var profile     = new MyProfilePage(_page, _fixture.WebBaseUrl);
-        var overview    = new OverviewTab(_page);
-        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+        var login      = new LoginPage(_page, _fixture.WebBaseUrl);
+        var profile    = new MyProfilePage(_page, _fixture.WebBaseUrl);
+        var overview   = new OverviewTab(_page);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
-        // CompanyEdit's edit mode gates on Session.CanManageCompany (company:manage policy),
-        // which is CompanyAdministrator-only — HrAdministrator can no longer save company
-        // settings, so this needs a CompanyAdministrator persona.
-        const string companyAdminEmail = "priya.shah@acme.example";
+        // "Display salary to employees on their profile" lives on the standalone HR Settings page
+        // (HrSettingsPage.razor), gated on Session.IsHrAdministrator — it used to live on the
+        // Company Settings tab (CompanyAdministrator-only) before the HR-policy fields were split
+        // out, so this needs an HrAdministrator persona.
+        const string hrAdminEmail = "laura.bennett@acme.example";
 
         // ── Baseline: Salary row is not rendered while the company setting is off ──
         await login.GoToAsync();
@@ -146,18 +147,17 @@ public sealed class ProfileOverviewTabTests(AppFixture fixture) : E2ETestBase(fi
 
         try
         {
-            // ── Enable the setting as a company administrator ───────────────────
+            // ── Enable the setting as an HR administrator ───────────────────────
             await login.GoToAsync();
-            await login.LoginAsync(companyAdminEmail);
-            await companyEdit.GoToAsync(AcmeId);
-            await companyEdit.OpenSettingsTabAsync();
+            await login.LoginAsync(hrAdminEmail);
+            await hrSettings.GoToAsync(AcmeId);
 
-            wasEnabled = await companyEdit.IsDisplaySalaryOnEmployeeProfileCheckedAsync();
+            wasEnabled = await hrSettings.IsDisplaySalaryOnEmployeeProfileCheckedAsync();
             if (!wasEnabled)
             {
-                await companyEdit.SetDisplaySalaryOnEmployeeProfileAsync(true);
-                await companyEdit.SaveAsync();
-                Assert.False(await companyEdit.HasErrorAsync(),
+                await hrSettings.SetDisplaySalaryOnEmployeeProfileAsync(true);
+                await hrSettings.SaveAsync();
+                Assert.False(await hrSettings.HasErrorAsync(),
                     "Expected no error after enabling 'display salary on employee profile'");
             }
             else
@@ -188,11 +188,10 @@ public sealed class ProfileOverviewTabTests(AppFixture fixture) : E2ETestBase(fi
             if (!wasEnabled)
             {
                 await login.GoToAsync();
-                await login.LoginAsync(companyAdminEmail);
-                await companyEdit.GoToAsync(AcmeId);
-                await companyEdit.OpenSettingsTabAsync();
-                await companyEdit.SetDisplaySalaryOnEmployeeProfileAsync(false);
-                await companyEdit.SaveAsync();
+                await login.LoginAsync(hrAdminEmail);
+                await hrSettings.GoToAsync(AcmeId);
+                await hrSettings.SetDisplaySalaryOnEmployeeProfileAsync(false);
+                await hrSettings.SaveAsync();
             }
         }
     }

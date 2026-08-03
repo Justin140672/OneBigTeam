@@ -24,6 +24,21 @@ public sealed class ExternalRecruiterManagementTests(AppFixture fixture) : E2ETe
     private const string MarcusEmail = "marcus.diallo@acme.example";
 
     [Fact]
+    public async Task NewExternalRecruiterForm_ContactNameField_IsOnItsOwnRow()
+    {
+        var login         = new LoginPage(_page, _fixture.WebBaseUrl);
+        var recruiterEdit = new ExternalRecruiterDetailPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(MarcusEmail);
+
+        await recruiterEdit.GoToNewAsync(AcmeId);
+
+        Assert.True(await recruiterEdit.IsContactNameOnItsOwnRowAsync(),
+            "Expected the 'Contact Name' field to render on its own full-width row");
+    }
+
+    [Fact]
     public async Task CreateExternalRecruiter_AppearsInList()
     {
         var agencyName = $"E2E Agency {Guid.NewGuid().ToString("N")[..8]}";

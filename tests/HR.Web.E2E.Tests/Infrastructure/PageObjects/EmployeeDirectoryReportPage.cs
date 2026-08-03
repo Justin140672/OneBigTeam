@@ -196,12 +196,34 @@ public sealed class EmployeeDirectoryReportPage(IPage page, string baseUrl)
         return result;
     }
 
+    /// <summary>
+    /// The "Save current filters as view" modal dialog (ReportFilterPanel.razor's
+    /// CssClass="report-save-view-dialog" SfDialog, IsModal="true") — opened by clicking the "Save
+    /// current filters as view" button, distinct from the older inline expand-row pattern this
+    /// replaced.
+    /// </summary>
+    public ILocator SaveViewDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Save current filters as view" });
+
+    /// <summary>Clicks "Save current filters as view" and waits for the resulting modal dialog to open.</summary>
+    public async Task OpenSaveViewDialogAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save current filters as view" }).ClickAsync();
+        await SaveViewDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+    }
+
     /// <summary>Clicks "Save current filters as view", fills the "View name" textbox, then clicks "Save".</summary>
     public async Task SaveCurrentFiltersAsNewViewAsync(string name)
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Save current filters as view" }).ClickAsync();
+        await OpenSaveViewDialogAsync();
         await page.GetByPlaceholder("View name").FillAsync(name);
+        // The Save button's Disabled state is bound to the HrTextBox's server-side value
+        // (ReportFilterPanel.razor's _newViewName), which only round-trips on blur/change — not
+        // on FillAsync's raw "input" DOM event — so the button stays disabled until the field is
+        // blurred. Same convention as this suite's date/numeric inputs (see e.g.
+        // BulkCompensationUpdateDialogPage, AmendLeavingProcessDialog).
+        await page.Keyboard.PressAsync("Tab");
         await page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
+        await SaveViewDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
@@ -210,6 +232,9 @@ public sealed class EmployeeDirectoryReportPage(IPage page, string baseUrl)
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Rename", Exact = true }).ClickAsync();
         await page.GetByPlaceholder("View name").FillAsync(newName);
+        // See SaveCurrentFiltersAsNewViewAsync — the "Save Name" button is likewise disabled until
+        // the field's value round-trips server-side, which needs a blur/change, not just FillAsync.
+        await page.Keyboard.PressAsync("Tab");
         await page.GetByRole(AriaRole.Button, new() { Name = "Save Name" }).ClickAsync();
     }
 

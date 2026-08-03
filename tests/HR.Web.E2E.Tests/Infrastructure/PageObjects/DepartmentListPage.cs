@@ -72,6 +72,12 @@ public sealed class DepartmentListPage(IPage page, string baseUrl)
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Deactivate" });
         await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await btn.ClickAsync();
+        // Opens a confirmation dialog (HrConfirmDialog) rather than deactivating immediately —
+        // scoped to the dialog since its own confirm button shares the "Deactivate" label with
+        // the toolbar button just clicked above.
+        var confirmButton = page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Deactivate", Exact = true });
+        await confirmButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await confirmButton.ClickAsync();
         // Wait for the grid to refresh.
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",

@@ -1,4 +1,5 @@
 @page "/features"
+@using HR.Marketing.Services
 
 <PageTitle>Features | One Big Team</PageTitle>
 <HeadContent>
@@ -8,195 +9,41 @@
 <SiteHeader CurrentPage="features" />
 
 <main>
-  <section class="features-hero section-band">
-    <div class="section-inner two-column">
-      <div class="hero-copy">
-        <p class="eyebrow">Features</p>
-        <h1>One simple platform for everyday HR admin.</h1>
-      </div>
-      <div class="copy-block">
-        <p class="hero-text">
-          One Big Team helps growing businesses replace spreadsheets, email trails
-          and disconnected HR admin with one simple platform for people, documents,
-          hiring, absence and reporting.
-        </p>
-        <div class="hero-actions" id="trial">
-          <a class="button button-primary button-large" href="/contact#contact-form">Start free trial</a>
-          <a class="button button-secondary button-large" href="/pricing">View pricing</a>
+    <section class="pricing-hero section-band">
+        <div class="section-inner hero-copy">
+            <p class="eyebrow">Features</p>
+            <h1>Everything you need to manage your people in one place.</h1>
+            <p class="hero-text">
+                Explore every feature included with your subscription.
+            </p>
         </div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="section feature-index-section">
-    <div class="section-inner">
-      <div class="section-heading">
-        <p class="eyebrow">Product areas</p>
-        <h2>Everything is designed to keep growing teams organised.</h2>
-      </div>
+    <section class="section pricing-section">
+        <div class="section-inner section-inner-wide">
+            <div class="feature-grid">
+                @foreach (var feature in FeatureCatalog.All)
+                {
+                    <a class="feature-card" href="/features/@feature.Slug">
+                        <span class="feature-icon" aria-hidden="true"><i class="@feature.IconClass"></i></span>
+                        <h3>@feature.Title</h3>
+                        <p>@feature.Summary</p>
+                        <span class="feature-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+                    </a>
+                }
+            </div>
+        </div>
+    </section>
 
-      <div class="feature-index">
-        <a href="#employee-management">Employee management</a>
-        <a href="#leave-management">Leave management</a>
-        <a href="#sickness-absence">Sickness and absence</a>
-        <a href="#recruitment">Recruitment</a>
-        <a href="#company-documents">Company documents</a>
-        <a href="#workflows-reminders">Workflows and reminders</a>
-        <a href="#reporting">Reporting</a>
-      </div>
-    </div>
-  </section>
-
-  <section id="employee-management" class="section section-muted feature-detail-section">
-    <div class="section-inner feature-detail">
-      <div>
-        <span class="feature-kicker">01</span>
-        <h2>Employee management</h2>
-        <p>
-          Keep core employee information organised, accessible and consistent as your
-          business grows beyond ad hoc files and scattered records.
-        </p>
-        <a class="button button-primary" href="#trial">Start free trial</a>
-      </div>
-      <ul class="feature-benefits">
-        <li>Centralise employee profiles, roles and key employment details.</li>
-        <li>Give managers a clearer view of the people they support.</li>
-        <li>Reduce duplicate records across spreadsheets and shared drives.</li>
-        <li>Make everyday HR information easier to find when decisions are needed.</li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="leave-management" class="section feature-detail-section">
-    <div class="section-inner feature-detail">
-      <div>
-        <span class="feature-kicker">02</span>
-        <h2>Leave management</h2>
-        <p>
-          Bring leave requests, balances and approvals into a shared process so
-          everyone understands who is away and what needs action.
-        </p>
-        <a class="button button-primary" href="#trial">Start free trial</a>
-      </div>
-      <ul class="feature-benefits">
-        <li>Replace back-and-forth email requests with a clearer approval path.</li>
-        <li>Help managers plan cover with better visibility of upcoming leave.</li>
-        <li>Keep absence records in the same system as employee information.</li>
-        <li>Support consistent leave handling across teams and locations.</li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="sickness-absence" class="section section-muted feature-detail-section">
-    <div class="section-inner feature-detail">
-      <div>
-        <span class="feature-kicker">03</span>
-        <h2>Sickness and absence</h2>
-        <p>
-          Track sickness and other absence clearly, so managers can respond with
-          better context and keep records complete without relying on inbox history.
-        </p>
-        <a class="button button-primary" href="#trial">Start free trial</a>
-      </div>
-      <ul class="feature-benefits">
-        <li>Record sickness events consistently across the organisation.</li>
-        <li>Keep absence context close to the employee record.</li>
-        <li>Spot patterns that may need follow-up or manager support.</li>
-        <li>Reduce reliance on informal notes and fragmented email trails.</li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="recruitment" class="section feature-detail-section">
-    <div class="section-inner feature-detail">
-      <div>
-        <span class="feature-kicker">04</span>
-        <h2>Recruitment</h2>
-        <p>
-          Give hiring activity a simple home, from open roles to candidate progress,
-          so recruitment does not disappear into personal inboxes.
-        </p>
-        <a class="button button-primary" href="#trial">Start free trial</a>
-      </div>
-      <ul class="feature-benefits">
-        <li>Track roles, candidates and hiring stages in one place.</li>
-        <li>Help hiring managers understand what needs attention next.</li>
-        <li>Keep recruitment notes easier to share with the right people.</li>
-        <li>Improve continuity when hiring involves multiple team members.</li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="company-documents" class="section section-muted feature-detail-section">
-    <div class="section-inner feature-detail">
-      <div>
-        <span class="feature-kicker">05</span>
-        <h2>Company documents</h2>
-        <p>
-          Store company policies, templates and employee-facing documents where
-          teams can find the right version without searching several folders.
-        </p>
-        <a class="button button-primary" href="#trial">Start free trial</a>
-      </div>
-      <ul class="feature-benefits">
-        <li>Keep key HR documents in an organised shared library.</li>
-        <li>Make policies and templates easier for employees to access.</li>
-        <li>Reduce confusion caused by outdated copies in different locations.</li>
-        <li>Support clearer onboarding and internal communication.</li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="workflows-reminders" class="section feature-detail-section">
-    <div class="section-inner feature-detail">
-      <div>
-        <span class="feature-kicker">06</span>
-        <h2>Workflows and reminders</h2>
-        <p>
-          Turn repeat HR admin into more reliable prompts and follow-ups, helping
-          managers stay on top of tasks that otherwise depend on memory.
-        </p>
-        <a class="button button-primary" href="#trial">Start free trial</a>
-      </div>
-      <ul class="feature-benefits">
-        <li>Give recurring HR tasks a clearer route from request to completion.</li>
-        <li>Prompt the right people when reviews, checks or follow-ups are due.</li>
-        <li>Reduce manual chasing for routine people operations.</li>
-        <li>Help growing teams keep processes consistent as headcount increases.</li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="reporting" class="section section-muted feature-detail-section">
-    <div class="section-inner feature-detail">
-      <div>
-        <span class="feature-kicker">07</span>
-        <h2>Reporting</h2>
-        <p>
-          See useful people information more clearly, so leaders can understand
-          workforce activity without stitching together separate spreadsheets.
-        </p>
-        <a class="button button-primary" href="#trial">Start free trial</a>
-      </div>
-      <ul class="feature-benefits">
-        <li>Understand headcount, absence, leave and hiring activity at a glance.</li>
-        <li>Give managers better context for planning and follow-up.</li>
-        <li>Reduce time spent preparing manual status updates.</li>
-        <li>Support more confident people decisions as the business grows.</li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="contact" class="section final-cta">
-    <div class="section-inner cta-panel">
-      <p class="eyebrow">Ready to replace scattered HR admin?</p>
-      <h2>Start building one simple people workspace for your growing team.</h2>
-      <div class="hero-actions">
-        <a class="button button-primary button-large" href="/contact#contact-form">Start free trial</a>
-        <a class="button button-secondary button-large" href="/contact#contact-form">Contact us</a>
-      </div>
-    </div>
-  </section>
+    <section id="contact" class="section final-cta">
+        <div class="section-inner cta-panel">
+            <p class="eyebrow">Ready to simplify HR?</p>
+            <h2>Start your free trial today. No setup fees. Cancel anytime.</h2>
+            <div class="hero-actions">
+                <a class="button button-primary button-large" href="/contact#contact-form">Start free trial</a>
+            </div>
+        </div>
+    </section>
 </main>
 
 <SiteFooter />

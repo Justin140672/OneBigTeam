@@ -45,7 +45,11 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
     public async Task<bool> IsActiveAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
-        return await Row(nameFragment).Locator(".badge.bg-success").IsVisibleAsync();
+        // A terminal stage (e.g. "Hired") also has its own Terminal Outcome badge, which reuses
+        // the same bg-success styling as the Active status badge when the outcome itself is
+        // "positive" — scope to .First (the Active status badge, which always renders before the
+        // Terminal Outcome cell) to avoid a strict-mode violation on rows with both.
+        return await Row(nameFragment).Locator(".badge.bg-success").First.IsVisibleAsync();
     }
 
     public async Task<string?> GetTerminalOutcomeAsync(string nameFragment)
@@ -113,6 +117,12 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Deactivate" });
         await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await btn.ClickAsync();
+        // Opens a confirmation dialog (HrConfirmDialog) rather than deactivating immediately —
+        // scoped to the dialog since its own confirm button shares the "Deactivate" label with
+        // the toolbar button just clicked above.
+        var confirmButton = page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Deactivate", Exact = true });
+        await confirmButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await confirmButton.ClickAsync();
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });

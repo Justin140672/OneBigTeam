@@ -10,12 +10,22 @@ public class RecordSicknessEndpointTests : IClassFixture<ApiWebApplicationFactor
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUserId = new("cc000010-0000-0000-0000-000000000001");
+    private static readonly Guid ManagerUserId = new("cc000010-0000-0000-0000-000000000002");
+    private static readonly Guid OtherManagerUserId = new("cc000010-0000-0000-0000-000000000003");
+    private static readonly Guid PlainEmployeeUserId = new("cc000010-0000-0000-0000-000000000004");
 
     public RecordSicknessEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator))
-            .GetAwaiter().GetResult();
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, ManagerUserId, SystemRoles.Employee);
+            await TestRoleSeeder.AssignRoleAsync(factory, ManagerUserId, SystemRoles.Manager);
+            await TestRoleSeeder.AssignRoleAsync(factory, OtherManagerUserId, SystemRoles.Employee);
+            await TestRoleSeeder.AssignRoleAsync(factory, OtherManagerUserId, SystemRoles.Manager);
+            await TestRoleSeeder.AssignRoleAsync(factory, PlainEmployeeUserId, SystemRoles.Employee);
+        }).GetAwaiter().GetResult();
     }
 
     private HttpClient AdminClient(Guid companyId)
@@ -24,6 +34,124 @@ public class RecordSicknessEndpointTests : IClassFixture<ApiWebApplicationFactor
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         return client;
+    }
+
+    private HttpClient ClientFor(Guid companyId, Guid userId)
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        return client;
+    }
+
+    private async Task<Guid> CreateEmployeeAsync(HttpClient client, Guid companyId)
+    {
+        var referenceData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId,
+                referenceData,
+                "Report",
+                $"Employee-{Guid.NewGuid():N}",
+                $"report.{Guid.NewGuid():N}@example.com"));
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<EmployeePayload>();
+        return payload!.Id;
+    }
+
+    private async Task AssignManagerAsync(HttpClient client, Guid companyId, Guid employeeId, Guid managerId)
+    {
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/manager",
+            new { companyId, id = employeeId, managerId });
+        response.EnsureSuccessStatusCode();
+    }
+
+    private sealed record EmployeePayload(Guid Id);
+
+    // RecordSickness authorizes a non-HR manager by comparing the authenticated "sub" claim
+    // against the target employee's manager id (IManagerReader) — the acting user's id must
+    // therefore equal an actual Employee.Id, not just an arbitrary role-assigned identity GUID.
+    // These two tests create the manager as a real employee (server-generated id) and both
+    // authenticate as and assign-manager using that id, matching how ManagerId comparisons work
+    // for real users in this system.
+    [Fact]
+    public async Task Post_SicknessRecords_Manager_Can_Record_For_Own_Direct_Report()
+    {
+        var companyId = Guid.NewGuid();
+        using var adminClient = AdminClient(companyId);
+        var categoryId = await CreateCategory(adminClient, companyId);
+        var managerEmployeeId = await CreateEmployeeAsync(adminClient, companyId);
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerEmployeeId, SystemRoles.Employee);
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerEmployeeId, SystemRoles.Manager);
+        var reportId = await CreateEmployeeAsync(adminClient, companyId);
+        await AssignManagerAsync(adminClient, companyId, reportId, managerEmployeeId);
+
+        using var managerClient = ClientFor(companyId, managerEmployeeId);
+        var response = await managerClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{reportId}/sickness-records",
+            new
+            {
+                companyId,
+                employeeId = reportId,
+                categoryId,
+                startDate = "2026-07-01",
+                startDayPart = 0
+            });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_SicknessRecords_Manager_Gets_Forbidden_Recording_For_NonReport()
+    {
+        var companyId = Guid.NewGuid();
+        using var adminClient = AdminClient(companyId);
+        var categoryId = await CreateCategory(adminClient, companyId);
+        var managerEmployeeId = await CreateEmployeeAsync(adminClient, companyId);
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerEmployeeId, SystemRoles.Employee);
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerEmployeeId, SystemRoles.Manager);
+        var otherManagerEmployeeId = await CreateEmployeeAsync(adminClient, companyId);
+        var reportId = await CreateEmployeeAsync(adminClient, companyId);
+        await AssignManagerAsync(adminClient, companyId, reportId, otherManagerEmployeeId);
+
+        using var managerClient = ClientFor(companyId, managerEmployeeId);
+        var response = await managerClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{reportId}/sickness-records",
+            new
+            {
+                companyId,
+                employeeId = reportId,
+                categoryId,
+                startDate = "2026-07-01",
+                startDayPart = 0
+            });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_SicknessRecords_PlainEmployee_Gets_Forbidden()
+    {
+        var companyId = Guid.NewGuid();
+        using var adminClient = AdminClient(companyId);
+        var categoryId = await CreateCategory(adminClient, companyId);
+        var reportId = await CreateEmployeeAsync(adminClient, companyId);
+
+        using var employeeClient = ClientFor(companyId, PlainEmployeeUserId);
+        var response = await employeeClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{reportId}/sickness-records",
+            new
+            {
+                companyId,
+                employeeId = reportId,
+                categoryId,
+                startDate = "2026-07-01",
+                startDayPart = 0
+            });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     private async Task<Guid> CreateCategory(HttpClient client, Guid companyId)

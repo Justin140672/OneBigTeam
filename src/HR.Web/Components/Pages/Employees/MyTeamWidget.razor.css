@@ -3,15 +3,16 @@
 .team-widget-scope {
     display: flex;
     gap: 6px;
-    padding: 0 16px 12px;
+    padding: 10px 16px 12px;
 }
 
 /* Responsive grid of per-member cards, replacing the single-column stacked-row layout
    task-widget-item/task-widget-content are shared with (HrInboxWidget, LeaveRequestsWidget, …) —
-   these classes are scoped to this widget only, so they don't affect anything else. */
+   these classes are scoped to this widget only, so they don't affect anything else.
+   Widened the minimum card width (120px -> 150px) so cards have more breathing room. */
 .team-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 10px;
     padding: 14px 16px;
 }
@@ -26,6 +27,12 @@
     border: 1px solid var(--hr-gray-100);
     border-radius: var(--hr-radius-md);
     transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.team-widget-body--switching {
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 0.1s ease-in;
 }
 
 .team-card:hover {

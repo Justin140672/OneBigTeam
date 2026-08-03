@@ -56,7 +56,11 @@ else
                             }
                             @if (Session.IsRecruiter)
                             {
-                                <MenuItem Text="Recruitment Dashboard" IconCss="fa-solid fa-chart-line" Url="/dashboard/recruitment" />
+                                <MenuItem Text="Dashboard" IconCss="fa-solid fa-chart-line" Url="/dashboard/recruitment" />
+                                <MenuItem Text="Vacancies" IconCss="fa-solid fa-briefcase" Url="@_menuItems["Vacancies"]" />
+                                <MenuItem Text="Candidates" IconCss="fa-solid fa-user-tie" Url="@_menuItems["Candidates"]" />
+                                <MenuItem Text="Recruiters" IconCss="fa-solid fa-people-arrows" Url="@_menuItems["ExternalRecruiters"]" />
+                                <MenuItem Text="Recruitment Settings" IconCss="fa-solid fa-gear" Url="@_menuItems["RecruitmentStages"]" />
                             }
                             @if (Session.CanManageEmployees)
                             {
@@ -98,6 +102,10 @@ else
                             @if (Session.CanManageCompany)
                             {
                                 <MenuItem Text="Company" IconCss="fa-solid fa-building" Url="@_menuItems["Company"]" />
+                            }
+                            @if (Session.IsHrAdministrator)
+                            {
+                                <MenuItem Text="HR Settings" IconCss="fa-solid fa-sliders" Url="@_menuItems["HrSettings"]" />
                             }
                             @if (Session.IsHrAdministrator || Session.CanManageCompany)
                             {
@@ -245,7 +253,7 @@ else
     <TaskViewDialog CompanyId="Session.CompanyId"
                     TaskId="_notifiedTaskId"
                     IsOpen="_taskDialogOpen"
-                    OnClosed="@(() => _taskDialogOpen = false)" />
+                    OnClosed="OnTaskDialogClosedAsync" />
 
 }
 
@@ -310,8 +318,13 @@ else
         ["ImportHistory"] = "/",
         ["SicknessCategories"] = "/",
         ["OrganisationChart"] = "/",
+        ["Vacancies"] = "/",
+        ["Candidates"] = "/",
+        ["ExternalRecruiters"] = "/",
+        ["RecruitmentStages"] = "/",
         ["Reporting"] = "/",
         ["Company"] = "/",
+        ["HrSettings"] = "/",
         ["UserAdministration"] = "/",
     };
 
@@ -340,8 +353,13 @@ else
         _menuItems["ImportHistory"] = $"/companies/{companyId}/data-import/history";
         _menuItems["SicknessCategories"] = $"/companies/{companyId}/sickness-categories";
         _menuItems["OrganisationChart"] = $"/companies/{companyId}/organisation-chart";
+        _menuItems["Vacancies"] = $"/companies/{companyId}/vacancies";
+        _menuItems["Candidates"] = $"/companies/{companyId}/candidates";
+        _menuItems["ExternalRecruiters"] = $"/companies/{companyId}/external-recruiters";
+        _menuItems["RecruitmentStages"] = $"/companies/{companyId}/recruitment-stages";
         _menuItems["Reporting"] = $"/companies/{companyId}/reporting";
         _menuItems["Company"] = $"/companies/{companyId}/edit";
+        _menuItems["HrSettings"] = $"/companies/{companyId}/hr-settings";
         _menuItems["UserAdministration"] = $"/companies/{companyId}/user-administration";
 
         await LoadUnreadCountAsync();
@@ -388,6 +406,16 @@ else
         }
         _notifiedTaskId = notification.SourceEntityId;
         _taskDialogOpen = true;
+    }
+
+    // Mirrors HrInboxWidget's CloseTaskDialogAsync convention: refresh unconditionally on close
+    // (rather than trying to detect "was completed") so a task completed via the notification's
+    // TaskViewDialog is removed from — or updated in — the notification list immediately, instead
+    // of lingering until the next unrelated reload.
+    private async Task OnTaskDialogClosedAsync()
+    {
+        _taskDialogOpen = false;
+        await LoadNotificationsAsync();
     }
 
     private async Task MarkAllRead()

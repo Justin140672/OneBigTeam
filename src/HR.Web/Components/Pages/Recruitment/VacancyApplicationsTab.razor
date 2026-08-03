@@ -1,4 +1,7 @@
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
 @using Syncfusion.Blazor.Data
+@using Syncfusion.Blazor.Navigations
 @inject ApplicationService ApplicationService
 @inject CandidateService CandidateService
 @inject EmployeeService EmployeeService
@@ -38,10 +41,14 @@
     }
     else
     {
-        <HrGrid TValue="ApplicationListItemModel"
+        <HrGrid @ref="_grid"
+                TValue="ApplicationListItemModel"
                 DataSource="@_applications"
+                Toolbar="@GridToolbar"
                 AllowFiltering="false"
                 AllowPaging="false">
+            <GridEvents TValue="ApplicationListItemModel" OnToolbarClick="OnToolbarClick"
+                        RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
             <GridColumns>
                 <GridColumn HeaderText="Candidate" Width="200">
                     <Template>
@@ -100,27 +107,6 @@
                         }
                     </Template>
                 </GridColumn>
-                <GridColumn HeaderText="Actions" Width="260">
-                    <Template>
-                        @{
-                            var row = (ApplicationListItemModel)context;
-                        }
-                        <div class="d-flex gap-1 flex-wrap">
-                            @if (IsActive(row))
-                            {
-                                var pendingInterview = HasPendingInterview(row);
-                                var pendingTitle = pendingInterview
-                                    ? "An interview is scheduled — record its outcome before moving this application further."
-                                    : null;
-                                <SfButton CssClass="e-small" Disabled="@pendingInterview" title="@pendingTitle" OnClick="() => OpenScheduleDialog(row)">Schedule Interview</SfButton>
-                                <SfButton CssClass="e-small" IsPrimary="true" Disabled="@pendingInterview" title="@pendingTitle" OnClick="() => OfferAsync(row)">Offer</SfButton>
-                                <SfButton CssClass="e-small" IsPrimary="true" Disabled="@pendingInterview" title="@pendingTitle" OnClick="() => OpenHireDialog(row)">Hire</SfButton>
-                                <SfButton CssClass="e-small" Disabled="@pendingInterview" title="@pendingTitle" OnClick="() => OpenRejectDialog(row)">Reject</SfButton>
-                                <SfButton CssClass="e-small" OnClick="() => WithdrawAsync(row)">Withdraw</SfButton>
-                            }
-                        </div>
-                    </Template>
-                </GridColumn>
             </GridColumns>
         </HrGrid>
     }
@@ -140,7 +126,7 @@
                     <DropDownListTemplates TItem="CandidateListItemModel">
                         <ItemTemplate>
                             @{ var c = (CandidateListItemModel)context; }
-                            <span><strong>@c.FirstName @c.LastName</strong> <span class="text-muted ms-1">@c.Email</span></span>
+                            <span>@c.FirstName @c.LastName</span>
                         </ItemTemplate>
                     </DropDownListTemplates>
                 </SfDropDownList>
@@ -202,32 +188,37 @@
 <SfDialog Width="480px" IsModal="true" @bind-Visible="_showScheduleDialog" Header="Schedule Interview" CssClass="schedule-interview-dialog">
     <DialogTemplates>
         <Content>
-            <div class="mb-3">
-                <label class="form-label">Interviewer</label>
-                <SfDropDownList TValue="Guid?" TItem="EmployeeListItemModel"
-                                DataSource="@_employees" @bind-Value="_interviewerId"
-                                Placeholder="Select interviewer" AllowFiltering="true">
-                    <DropDownListFieldSettings Value="Id" Text="FullName" />
-                    <DropDownListTemplates TItem="EmployeeListItemModel">
-                        <ItemTemplate>
-                            @{ var e = (EmployeeListItemModel)context; }
-                            <span>@e.FirstName @e.LastName</span>
-                        </ItemTemplate>
-                    </DropDownListTemplates>
-                </SfDropDownList>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Scheduled At</label>
-                <SfDateTimePicker TValue="DateTime?" @bind-Value="_scheduledAt" Format="dd/MM/yyyy HH:mm" />
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Duration (minutes)</label>
-                <SfNumericTextBox TValue="int?" @bind-Value="_durationMinutes" ShowSpinButton="false" />
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Location</label>
-                <SfTextBox @bind-Value="_location" Placeholder="e.g. Remote" />
-            </div>
+            <EditForm EditContext="_scheduleEditContext">
+                <DataAnnotationsValidator />
+                <div class="mb-3">
+                    <label class="form-label">Interviewer <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="Guid?" TItem="EmployeeListItemModel"
+                                    DataSource="@_employees" @bind-Value="_scheduleModel.InterviewerId"
+                                    Placeholder="Select interviewer" AllowFiltering="true">
+                        <DropDownListFieldSettings Value="Id" Text="FullName" />
+                        <DropDownListTemplates TItem="EmployeeListItemModel">
+                            <ItemTemplate Context="employeeItem">
+                                @{ var e = (EmployeeListItemModel)employeeItem; }
+                                <span>@e.FirstName @e.LastName</span>
+                            </ItemTemplate>
+                        </DropDownListTemplates>
+                    </SfDropDownList>
+                    <ValidationMessage For="@(() => _scheduleModel.InterviewerId)" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Scheduled At <span class="text-danger">*</span></label>
+                    <SfDateTimePicker TValue="DateTime?" @bind-Value="_scheduleModel.ScheduledAt" Format="dd/MM/yyyy HH:mm" />
+                    <ValidationMessage For="@(() => _scheduleModel.ScheduledAt)" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Duration (minutes)</label>
+                    <SfNumericTextBox TValue="int?" @bind-Value="_scheduleModel.DurationMinutes" ShowSpinButton="false" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Location</label>
+                    <SfTextBox @bind-Value="_scheduleModel.Location" Placeholder="e.g. Remote" />
+                </div>
+            </EditForm>
             @if (_dialogError is not null)
             {
                 <div class="alert alert-danger py-2">@_dialogError</div>
@@ -345,6 +336,8 @@
 
     private bool _loading = true;
     private List<ApplicationListItemModel> _applications = [];
+    private HrGrid<ApplicationListItemModel>? _grid;
+    private ApplicationListItemModel? _selectedRow;
     // Ticket #99: the company's own configured pipeline, used to resolve CurrentStageId -> display
     // name/IsTerminal/TerminalOutcome for the Status column and to drive action-button visibility.
     private List<RecruitmentStageListItem> _stages = [];
@@ -388,10 +381,25 @@
     private bool _showScheduleDialog;
     private List<EmployeeListItemModel> _employees = [];
     private ApplicationListItemModel? _activeApplication;
-    private Guid? _interviewerId;
-    private DateTime? _scheduledAt;
-    private int? _durationMinutes;
-    private string? _location;
+    private readonly ScheduleInterviewFormModel _scheduleModel = new();
+    private EditContext _scheduleEditContext = default!;
+
+    protected override void OnInitialized()
+    {
+        _scheduleEditContext = new EditContext(_scheduleModel);
+    }
+
+    public sealed class ScheduleInterviewFormModel
+    {
+        [Required(ErrorMessage = "Please select an interviewer.")]
+        public Guid? InterviewerId { get; set; }
+
+        [Required(ErrorMessage = "Please select a scheduled time.")]
+        public DateTime? ScheduledAt { get; set; }
+
+        public int? DurationMinutes { get; set; }
+        public string? Location { get; set; }
+    }
 
     private bool _showRejectDialog;
     private string? _rejectionReason;
@@ -590,10 +598,11 @@
     {
         _dialogError = null;
         _activeApplication = row;
-        _interviewerId = null;
-        _scheduledAt = DateTime.Today.AddDays(3).AddHours(10);
-        _durationMinutes = 30;
-        _location = null;
+        _scheduleModel.InterviewerId = null;
+        _scheduleModel.ScheduledAt = DateTime.Today.AddDays(3).AddHours(10);
+        _scheduleModel.DurationMinutes = 30;
+        _scheduleModel.Location = null;
+        _scheduleEditContext = new EditContext(_scheduleModel);
 
         if (_employees.Count == 0)
         {
@@ -606,9 +615,8 @@
 
     private async Task ConfirmScheduleAsync()
     {
-        if (_activeApplication is null || _interviewerId is null || _scheduledAt is null)
+        if (_activeApplication is null || !_scheduleEditContext.Validate())
         {
-            _dialogError = "Please select an interviewer and a scheduled time.";
             return;
         }
 
@@ -632,15 +640,15 @@
         InterviewService.ScheduleInterviewAsync(
             CompanyId, VacancyId, _activeApplication!.Id,
             new ScheduleInterviewRequest(
-                CompanyId, VacancyId, _activeApplication.Id, _interviewerId!.Value,
-                // _scheduledAt is Kind=Unspecified (bound straight from the picker), so
-                // `new DateTimeOffset(_scheduledAt)` resolves its offset from the server's local
+                CompanyId, VacancyId, _activeApplication.Id, _scheduleModel.InterviewerId!.Value,
+                // _scheduleModel.ScheduledAt is Kind=Unspecified (bound straight from the picker), so
+                // `new DateTimeOffset(...)` resolves its offset from the server's local
                 // time zone — +01:00 for any date in BST. Postgres's timestamptz columns only
                 // accept offset-zero DateTimeOffsets (Npgsql rejects anything else outright), so
                 // normalize to UTC here. ToUniversalTime() keeps the same absolute instant — it
                 // only changes the offset, not the wall-clock moment being saved.
-                new DateTimeOffset(_scheduledAt!.Value).ToUniversalTime(), _durationMinutes,
-                string.IsNullOrWhiteSpace(_location) ? null : _location.Trim()));
+                new DateTimeOffset(_scheduleModel.ScheduledAt!.Value).ToUniversalTime(), _scheduleModel.DurationMinutes,
+                string.IsNullOrWhiteSpace(_scheduleModel.Location) ? null : _scheduleModel.Location.Trim()));
 
     private void OpenRejectDialog(ApplicationListItemModel row)
     {
@@ -738,6 +746,81 @@
             .ToList();
 
         _showHireDialog = true;
+    }
+
+    // Row-level actions (Schedule Interview/Offer/Hire/Reject/Withdraw) moved into the grid toolbar
+    // rather than a dedicated Actions column, matching the toolbar pattern used elsewhere in the app
+    // (see SearchPageBase's selection-dependent toolbar buttons). Enabled state tracks the current
+    // row selection and that row's eligibility (IsActive/HasPendingInterview), same rules as before.
+    private IEnumerable<object> GridToolbar
+    {
+        get
+        {
+            var active = _selectedRow is not null && IsActive(_selectedRow);
+            var pendingInterview = _selectedRow is not null && HasPendingInterview(_selectedRow);
+            var enabled = active && !pendingInterview;
+
+            return new List<object>
+            {
+                new ItemModel { Id = "app-schedule", Text = "Schedule Interview", PrefixIcon = "fa-solid fa-calendar-plus", Disabled = !enabled, TooltipText = "Schedule an interview for the selected application" },
+                new ItemModel { Id = "app-offer",     Text = "Offer",              PrefixIcon = "fa-solid fa-file-signature", Disabled = !enabled, TooltipText = "Make an offer to the selected candidate" },
+                new ItemModel { Id = "app-hire",      Text = "Hire",               PrefixIcon = "fa-solid fa-user-check", Disabled = !enabled, TooltipText = "Hire the selected candidate" },
+                new ItemModel { Id = "app-reject",    Text = "Reject",             PrefixIcon = "fa-solid fa-user-xmark", Disabled = !enabled, TooltipText = "Reject the selected candidate" },
+                new ItemModel { Id = "app-withdraw",  Text = "Withdraw",           PrefixIcon = "fa-solid fa-arrow-rotate-left", Disabled = _selectedRow is null, TooltipText = "Withdraw the selected application" },
+            };
+        }
+    }
+
+    private async Task OnRowSelected(RowSelectEventArgs<ApplicationListItemModel> args)
+    {
+        _selectedRow = args.Data;
+        await RefreshToolbarStateAsync();
+    }
+
+    private async Task OnRowDeselected(RowDeselectEventArgs<ApplicationListItemModel> args)
+    {
+        _selectedRow = null;
+        await RefreshToolbarStateAsync();
+    }
+
+    // Same rationale as SearchPageBase.OnRowSelected/OnRowDeselected: re-assigning the Toolbar
+    // parameter only sets the *initial* Disabled state, so selection changes after first render
+    // need this explicit interop call per button to actually update the DOM.
+    private async Task RefreshToolbarStateAsync()
+    {
+        if (_grid is null) return;
+
+        var active = _selectedRow is not null && IsActive(_selectedRow);
+        var pendingInterview = _selectedRow is not null && HasPendingInterview(_selectedRow);
+        var enabled = active && !pendingInterview;
+
+        await _grid.EnableToolbarItemsAsync(["app-schedule", "app-offer", "app-hire", "app-reject"], enabled);
+        await _grid.EnableToolbarItemsAsync(["app-withdraw"], _selectedRow is not null);
+    }
+
+    private async Task OnToolbarClick(ClickEventArgs args)
+    {
+        if (_selectedRow is null) return;
+        var row = _selectedRow;
+
+        switch (args.Item.Id)
+        {
+            case "app-schedule":
+                await OpenScheduleDialog(row);
+                break;
+            case "app-offer":
+                await OfferAsync(row);
+                break;
+            case "app-hire":
+                await OpenHireDialog(row);
+                break;
+            case "app-reject":
+                OpenRejectDialog(row);
+                break;
+            case "app-withdraw":
+                await WithdrawAsync(row);
+                break;
+        }
     }
 
     // Same pattern as OnCandidateFilteringAsync above / EmployeeEmploymentTab.OnManagerFilteringAsync

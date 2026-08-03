@@ -124,6 +124,64 @@ public class RenameReportViewEndpointTests : IClassFixture<ApiWebApplicationFact
         Assert.Equal("Owner's View", reloaded.Name);
     }
 
+    [Fact]
+    public async Task Patch_SavedView_Returns_BadRequest_When_Name_Is_Reserved()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientFor(userId, companyId);
+
+        var view = await CreateViewAsync(client, companyId);
+
+        var response = await client.PatchAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views/{view.Id}",
+            new { companyId, viewId = view.Id, name = "Standard View" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_SavedView_Returns_BadRequest_When_Name_Already_Used_By_Another_View()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientFor(userId, companyId);
+
+        await CreateViewAsync(client, companyId, name: "First");
+        var second = await CreateViewAsync(client, companyId, name: "Second");
+
+        // Case-insensitive and whitespace-insensitive collision with the other view's name.
+        var response = await client.PatchAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views/{second.Id}",
+            new { companyId, viewId = second.Id, name = "  first  " });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var listResponse = await client.GetAsync($"/api/companies/{companyId}/reporting/saved-views/employee-directory");
+        var payload = await listResponse.Content.ReadFromJsonAsync<ViewsListPayload>();
+        Assert.NotNull(payload);
+        Assert.Contains(payload!.Views, v => v.Id == second.Id && v.Name == "Second");
+    }
+
+    [Fact]
+    public async Task Patch_SavedView_Allows_Renaming_To_Its_Own_Current_Name()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientFor(userId, companyId);
+
+        var view = await CreateViewAsync(client, companyId, name: "My View");
+
+        var response = await client.PatchAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views/{view.Id}",
+            new { companyId, viewId = view.Id, name = "My View" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     private sealed record SavedViewPayload(Guid Id, string ReportId, string Name, string FilterCriteriaJson, bool IsDefault, DateTimeOffset CreatedAt);
 
     private sealed record RenamePayload(Guid Id, string Name);

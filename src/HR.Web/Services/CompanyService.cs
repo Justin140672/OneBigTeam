@@ -50,6 +50,25 @@ public class CompanyService(IHttpClientFactory httpClientFactory)
         return await response.Content.ReadFromJsonAsync<UpdateCompanySettingsResponse>(HrApiJsonOptions.Default);
     }
 
+    public async Task<GetHrSettingsResponse?> GetHrSettingsAsync(Guid id)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetHrSettingsResponse>($"api/companies/{id}/hr-settings", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<UpdateHrSettingsResponse?> UpdateHrSettingsAsync(Guid id, UpdateHrSettingsRequest request)
+    {
+        var response = await Http.PutAsJsonAsync($"api/companies/{id}/hr-settings", request, HrApiJsonOptions.Default);
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<UpdateHrSettingsResponse>(HrApiJsonOptions.Default);
+    }
+
     public async Task<UploadCompanyLogoResponse?> UploadCompanyLogoAsync(
         Guid id, string assetType, Stream fileStream, string fileName, string contentType)
     {

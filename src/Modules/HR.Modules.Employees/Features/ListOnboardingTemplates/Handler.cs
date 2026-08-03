@@ -1,15 +1,20 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Features.ListOnboardingTemplates;
 
-internal sealed class ListOnboardingTemplatesHandler(EmployeesDbContext dbContext)
+internal sealed class ListOnboardingTemplatesHandler(
+    EmployeesDbContext dbContext, OnboardingTemplateSeeder templateSeeder, IClock clock)
 {
     public async Task<Result<ListOnboardingTemplatesResponse>> HandleAsync(
         ListOnboardingTemplatesRequest request,
         CancellationToken cancellationToken)
     {
+        await templateSeeder.EnsureDefaultTemplateSeededAsync(request.CompanyId, clock.UtcNowOffset(), cancellationToken);
+
         var query = dbContext.OnboardingTemplates
             .AsNoTracking()
             .Include(t => t.Tasks)

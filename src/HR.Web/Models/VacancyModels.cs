@@ -21,7 +21,8 @@ public record VacancyListItemModel(
     string EffectiveTitle,
     // Resolved exclusively from the linked Position Profile — a vacancy no longer has a location of
     // its own to override.
-    string? EffectiveLocation);
+    string? EffectiveLocation,
+    int ApplicationCount);
 
 // ── DASHBOARD: STALE VACANCIES ──────────────────────────────────────────────────
 
@@ -114,6 +115,23 @@ public record UpdateVacancyResponse(
 public record CloseVacancyRequest(Guid CompanyId, Guid VacancyId, DateOnly? ClosedAt);
 
 public record CloseVacancyResponse(
+    Guid Id,
+    Guid CompanyId,
+    Guid PositionProfileId,
+    string? AdvertTitle,
+    string? AdvertDescription,
+    string Status,
+    Guid HiringManagerId,
+    DateOnly? OpenedAt,
+    DateOnly? ClosedAt,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
+
+// ── PUBLISH ───────────────────────────────────────────────────────────────────
+
+public record PublishVacancyRequest(Guid CompanyId, Guid VacancyId, DateOnly? OpenedAt);
+
+public record PublishVacancyResponse(
     Guid Id,
     Guid CompanyId,
     Guid PositionProfileId,

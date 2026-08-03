@@ -67,7 +67,7 @@
         <GridColumn HeaderText="Created By" Width="140" AllowSorting="false" AllowFiltering="false">
             <Template>
                 @{ var item = (context as CompensationHistoryItemModel)!; }
-                <span class="text-muted small" title="@item.CreatedBy">@item.CreatedBy.ToString()[..8]</span>
+                <span class="text-muted small">@item.CreatedByName</span>
             </Template>
         </GridColumn>
 
@@ -84,8 +84,8 @@
                     }
                     else
                     {
-                        <SfButton CssClass="e-outline e-small me-1" OnClick="() => OnEdit.InvokeAsync(item)">Edit</SfButton>
-                        <SfButton CssClass="e-danger e-outline e-small" OnClick="() => StartDelete(item.Id)">Delete</SfButton>
+                        <SfButton CssClass="e-outline e-small me-1" title="Edit" OnClick="() => OnEdit.InvokeAsync(item)">Edit</SfButton>
+                        <SfButton CssClass="e-danger e-outline e-small" title="Delete" OnClick="() => StartDelete(item.Id)">Delete</SfButton>
                     }
                 }
             </Template>

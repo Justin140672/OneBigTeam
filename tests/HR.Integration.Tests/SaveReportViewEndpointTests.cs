@@ -114,6 +114,105 @@ public class SaveReportViewEndpointTests : IClassFixture<ApiWebApplicationFactor
         Assert.Equal("Second", defaultViews[0].Name);
     }
 
+    [Fact]
+    public async Task Post_SavedViews_Returns_BadRequest_When_Name_Is_Reserved()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientFor(userId, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "employee-directory", name = "Standard View", filterCriteriaJson = "{}" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_SavedViews_Returns_BadRequest_When_Name_Is_Reserved_CaseInsensitive_WithWhitespace()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientFor(userId, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "employee-directory", name = "  standard VIEW  ", filterCriteriaJson = "{}" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_SavedViews_Returns_BadRequest_When_Name_Already_Used_By_Same_User_And_Report()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientFor(userId, companyId);
+
+        var first = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "employee-directory", name = "My View", filterCriteriaJson = "{}" });
+        first.EnsureSuccessStatusCode();
+
+        // Case-insensitive and whitespace-insensitive collision with the same name.
+        var duplicate = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "employee-directory", name = "  my view  ", filterCriteriaJson = "{}" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, duplicate.StatusCode);
+
+        var listResponse = await client.GetAsync($"/api/companies/{companyId}/reporting/saved-views/employee-directory");
+        var payload = await listResponse.Content.ReadFromJsonAsync<ViewsListPayload>();
+        Assert.NotNull(payload);
+        Assert.Single(payload!.Views);
+    }
+
+    [Fact]
+    public async Task Post_SavedViews_Allows_Same_Name_For_Different_Report()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = ClientFor(userId, companyId);
+
+        var first = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "employee-directory", name = "My View", filterCriteriaJson = "{}" });
+        first.EnsureSuccessStatusCode();
+
+        var second = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "employee-leavers", name = "My View", filterCriteriaJson = "{}" });
+
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_SavedViews_Allows_Same_Name_For_Different_User()
+    {
+        var companyId = Guid.NewGuid();
+        var firstUserId = Guid.NewGuid();
+        var secondUserId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, firstUserId, SystemRoles.HrAdministrator);
+        await TestRoleSeeder.AssignRoleAsync(_factory, secondUserId, SystemRoles.HrAdministrator);
+        using var firstClient = ClientFor(firstUserId, companyId);
+        using var secondClient = ClientFor(secondUserId, companyId);
+
+        var first = await firstClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "employee-directory", name = "My View", filterCriteriaJson = "{}" });
+        first.EnsureSuccessStatusCode();
+
+        var second = await secondClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/reporting/saved-views",
+            new { companyId, reportId = "employee-directory", name = "My View", filterCriteriaJson = "{}" });
+
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+    }
+
     private sealed record SavedViewPayload(Guid Id, string ReportId, string Name, string FilterCriteriaJson, bool IsDefault, DateTimeOffset CreatedAt);
 
     private sealed record ViewsListPayload(List<SavedViewPayload> Views);

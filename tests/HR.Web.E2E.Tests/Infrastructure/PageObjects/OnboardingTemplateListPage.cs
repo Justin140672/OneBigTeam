@@ -41,6 +41,13 @@ public sealed class OnboardingTemplateListPage(IPage page, string baseUrl)
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Delete" });
         await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await btn.ClickAsync();
+        // Opens a confirmation dialog (HrConfirmDialog) rather than deactivating immediately.
+        // Unlike the other list pages, OnboardingTemplateList.razor doesn't override
+        // HrConfirmDialog's ConfirmText, so the confirm button reads the component default
+        // ("Yes"), not "Delete"/"Deactivate".
+        var confirmButton = page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Yes", Exact = true });
+        await confirmButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await confirmButton.ClickAsync();
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });

@@ -72,10 +72,12 @@ public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenSettingsTabAsync();
 
-        // Edit a field that lives entirely on the Settings tab's own model — this is what
-        // exercises CompanyEdit's HasUnsavedChanges override.
-        var initialExcludeLeave = await companyEdit.IsExcludePublicHolidaysFromLeaveCheckedAsync();
-        await companyEdit.SetExcludePublicHolidaysFromLeaveAsync(!initialExcludeLeave);
+        // Edit a field that lives entirely on the Settings tab's own model (Regional section) —
+        // this is what exercises CompanyEdit's HasUnsavedChanges override. Most of the Settings
+        // tab's fields have since moved to the standalone HR Settings page (see HrSettingsPage),
+        // leaving only TimeZone/Locale (Regional) and the Backfill Employee Timeline trigger here.
+        var initialTimeZone = await companyEdit.GetTimeZoneAsync();
+        await companyEdit.SetTimeZoneAsync($"{initialTimeZone}-edited");
 
         await companyEdit.ClickCloseAsync();
 
@@ -95,8 +97,8 @@ public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenSettingsTabAsync();
 
-        var initialExcludeLeave = await companyEdit.IsExcludePublicHolidaysFromLeaveCheckedAsync();
-        await companyEdit.SetExcludePublicHolidaysFromLeaveAsync(!initialExcludeLeave);
+        var initialTimeZone = await companyEdit.GetTimeZoneAsync();
+        await companyEdit.SetTimeZoneAsync($"{initialTimeZone}-edited");
 
         await companyEdit.ClickCloseAsync();
         Assert.True(await companyEdit.IsUnsavedChangesDialogVisibleAsync());
@@ -106,7 +108,7 @@ public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
 
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenSettingsTabAsync();
-        Assert.Equal(initialExcludeLeave, await companyEdit.IsExcludePublicHolidaysFromLeaveCheckedAsync());
+        Assert.Equal(initialTimeZone, await companyEdit.GetTimeZoneAsync());
     }
 
     [Fact]
@@ -121,9 +123,9 @@ public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenSettingsTabAsync();
 
-        var initialExcludeLeave = await companyEdit.IsExcludePublicHolidaysFromLeaveCheckedAsync();
-        var desiredExcludeLeave = !initialExcludeLeave;
-        await companyEdit.SetExcludePublicHolidaysFromLeaveAsync(desiredExcludeLeave);
+        var initialTimeZone = await companyEdit.GetTimeZoneAsync();
+        var desiredTimeZone = $"{initialTimeZone}-edited";
+        await companyEdit.SetTimeZoneAsync(desiredTimeZone);
 
         await companyEdit.ClickCloseAsync();
         Assert.True(await companyEdit.IsUnsavedChangesDialogVisibleAsync());
@@ -135,7 +137,7 @@ public sealed class CompanyEditCloseBehaviorTests(AppFixture fixture) : E2ETestB
 
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenSettingsTabAsync();
-        Assert.Equal(desiredExcludeLeave, await companyEdit.IsExcludePublicHolidaysFromLeaveCheckedAsync());
+        Assert.Equal(desiredTimeZone, await companyEdit.GetTimeZoneAsync());
     }
 
     [Fact]

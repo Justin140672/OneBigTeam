@@ -122,6 +122,30 @@ public sealed class CompanyAdministratorAccessTests(AppFixture fixture) : E2ETes
     }
 
     [Fact]
+    public async Task CompanyAdministrator_CannotAccess_HrSettingsPage()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        // ── Step 1: Login as Priya (CompanyAdministrator-only) ────────────────
+        await login.GoToAsync();
+        await login.LoginAsync(CompanyAdminEmail);
+
+        // ── Step 2: Attempt to navigate directly to the standalone HR Settings page ──
+        // Priya has Session.CanManageCompany but not Session.IsHrAdministrator, which is what
+        // HrSettingsPage.razor's LoadAsync gates on (redirecting to Session.MyProfileUrl
+        // otherwise). Proves the HR-policy fields that moved off the Company Settings tab are
+        // no longer reachable by a Company-Administrator-only persona, closing the permission
+        // gap that used to let her edit them via CompanySettingsTab.
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/hr-settings");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        var finalUrl = _page.Url;
+        Assert.False(finalUrl.TrimEnd('/').EndsWith($"/companies/{AcmeId}/hr-settings", StringComparison.OrdinalIgnoreCase),
+            $"Expected Priya (CompanyAdministrator-only, no IsHrAdministrator) to be redirected away " +
+            $"from the HR Settings page, but ended up at: {finalUrl}");
+    }
+
+    [Fact]
     public async Task HrAdministrator_StillSeesFullSidebar_AndDashboard()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);

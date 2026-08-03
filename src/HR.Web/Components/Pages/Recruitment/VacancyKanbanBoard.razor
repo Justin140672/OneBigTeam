@@ -3,6 +3,7 @@
 @inject RecruitmentStageService RecruitmentStageService
 @inject CandidateService CandidateService
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <div class="vacancy-kanban-board" data-testid="vacancy-kanban-board">
     <div class="vacancy-kanban-board__toolbar mb-3">
@@ -166,17 +167,53 @@
         await SearchTextChanged.InvokeAsync(SearchText);
     }
 
-    private Task OpenApplicant(KanbanApplicantModel applicant)
+    private async Task OpenApplicant(KanbanApplicantModel applicant)
     {
         // Carry a returnUrl so CandidateDetail.razor's "Close" button comes back to wherever this
         // board is actually embedded (the standalone Kanban route, the Vacancy Detail tab, or the
         // Recruitment Dashboard's Board view) instead of always falling back to the plain Candidate
         // List — previously the card click had no memory of where it was opened from.
         var returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
+
+        // Remember the page's scroll position (keyed by vacancy, per-tab via sessionStorage) so that
+        // when CandidateDetail's "Close" navigates back here, the board is restored to where the user
+        // was scrolled to instead of resetting to the top — see OnAfterRenderAsync below.
+        try
+        {
+            var scrollY = await JS.InvokeAsync<double>("eval", "window.scrollY");
+            await JS.InvokeVoidAsync("saveScrollPosition", $"kanban-{VacancyId}", scrollY);
+        }
+        catch
+        {
+            // ignore — scroll memory is a nice-to-have, never block navigation on it
+        }
+
         var candidateUrl = $"/companies/{CompanyId}/candidates/{applicant.CandidateId}" +
             $"?returnUrl={Uri.EscapeDataString(returnUrl)}";
         Navigation.NavigateTo(candidateUrl);
-        return Task.CompletedTask;
+    }
+
+    // Restored once, the first time the board finishes loading after being rendered (not
+    // necessarily on Blazor's firstRender, since that can fire while _loading is still true and the
+    // board hasn't rendered its columns yet).
+    private bool _scrollRestored;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_loading && !_scrollRestored)
+        {
+            _scrollRestored = true;
+            try
+            {
+                var top = await JS.InvokeAsync<double?>("getScrollPosition", $"kanban-{VacancyId}");
+                if (top is > 0)
+                    await JS.InvokeVoidAsync("window.scrollTo", 0, top.Value);
+            }
+            catch
+            {
+                // ignore — scroll memory is a nice-to-have
+            }
+        }
     }
 
     private Task OnCardClickAsync(CardClickEventArgs<KanbanApplicantModel> args) =>

@@ -54,7 +54,7 @@ public sealed class EmployeeLeaverReportTests(AppFixture fixture) : E2ETestBase(
 
         var unfilteredRowCount = await report.GetRowCountAsync();
 
-        await report.SelectFilterAsync("Department", "");
+        await report.SelectFilterAsync("Department", "Engineering");
         await report.ApplyFiltersAsync();
 
         Assert.False(await report.HasLoadErrorAsync(),

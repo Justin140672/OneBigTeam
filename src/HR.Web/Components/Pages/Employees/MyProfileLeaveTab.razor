@@ -116,30 +116,10 @@ else
                                 @{ var r = (context as LeaveRequestListItem)!; }
                                 @if (r.Status == "Pending")
                                 {
-                                    @if (_cancelTargetId == r.Id)
-                                    {
-                                        <span class="me-2 text-muted small">Cancel this request?</span>
-                                        <SfButton CssClass="e-danger e-small me-1"
-                                                  Disabled="@(_cancelling == r.Id)"
-                                                  OnClick="@(() => CancelRequestAsync(r.Id))">
-                                            @if (_cancelling == r.Id)
-                                            {
-                                                <span class="spinner-border spinner-border-sm"></span>
-                                            }
-                                            else
-                                            {
-                                                <span>Yes</span>
-                                            }
-                                        </SfButton>
-                                        <SfButton CssClass="e-small" OnClick="ClearCancelTarget">No</SfButton>
-                                    }
-                                    else
-                                    {
-                                        <SfButton CssClass="e-outline e-danger e-small"
-                                                  OnClick="@(() => _cancelTargetId = r.Id)">
-                                            Cancel
-                                        </SfButton>
-                                    }
+                                    <SfButton CssClass="e-outline e-danger e-small"
+                                              OnClick="@(() => _cancelTargetId = r.Id)">
+                                        Cancel
+                                    </SfButton>
                                 }
                             </Template>
                         </GridColumn>
@@ -160,6 +140,15 @@ else
                       OnSubmitted="OnLeaveSubmitted"
                       OnCancelled="@(() => _showRequestForm = false)" />
 }
+
+<HrConfirmDialog Visible="@(_cancelTargetId is not null)"
+                 Title="Cancel Leave Request"
+                 Message="Are you sure you want to cancel this leave request?"
+                 ConfirmText="Yes, Cancel Request"
+                 CancelText="No"
+                 Busy="@(_cancelling is not null)"
+                 OnConfirmed="@(() => CancelRequestAsync(_cancelTargetId!.Value))"
+                 OnCancelled="ClearCancelTarget" />
 
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }

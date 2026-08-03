@@ -69,7 +69,19 @@
     }
 </div>
 
+<HrConfirmDialog Visible="@(_deactivateTarget is not null)"
+                 Title="Deactivate Document Type"
+                 Message="@($"Are you sure you want to deactivate '{_deactivateTarget?.Name}'?")"
+                 ConfirmText="Deactivate"
+                 CancelText="Cancel"
+                 Busy="_deactivating"
+                 OnConfirmed="ConfirmDeactivateAsync"
+                 OnCancelled="@(() => _deactivateTarget = null)" />
+
 @code {
+    private DocumentTypeListItemModel? _deactivateTarget;
+    private bool _deactivating;
+
     protected override bool SupportsActiveFilter => true;
 
     protected override Task OnBeforeLoadAsync()
@@ -85,10 +97,11 @@
             id:      "hr-deactivate",
             text:    "Deactivate",
             icon:    "fa-solid fa-circle-xmark",
-            onClick: async item =>
+            onClick: item =>
             {
-                if (!item.IsActive) return;
-                await Deactivate(item);
+                if (!item.IsActive) return Task.CompletedTask;
+                _deactivateTarget = item;
+                return Task.CompletedTask;
             },
             tooltip: "Deactivate selected document type");
     }
@@ -104,6 +117,15 @@
     protected override string? GetAddUrl()  => $"/companies/{CompanyId}/document-types/new";
     protected override string? GetEditUrl(DocumentTypeListItemModel item) => $"/companies/{CompanyId}/document-types/{item.Id}";
     protected override string? GetViewUrl(DocumentTypeListItemModel item) => $"/companies/{CompanyId}/document-types/{item.Id}/view";
+
+    private async Task ConfirmDeactivateAsync()
+    {
+        if (_deactivateTarget is null) return;
+        _deactivating = true;
+        await Deactivate(_deactivateTarget);
+        _deactivating = false;
+        _deactivateTarget = null;
+    }
 
     private async Task Deactivate(DocumentTypeListItemModel item)
     {

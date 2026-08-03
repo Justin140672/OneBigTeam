@@ -4,6 +4,7 @@ using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.ApplyPositionProfileMatches;
 using HR.Modules.Recruitment.Features.AssignVacancyPositionProfile;
 using HR.Modules.Recruitment.Features.CloseVacancy;
+using HR.Modules.Recruitment.Features.CloseVacancyOnEmployeePromoted;
 using HR.Modules.Recruitment.Features.CreateApplication;
 using HR.Modules.Recruitment.Features.CreateCandidate;
 using HR.Modules.Recruitment.Features.CreateExternalRecruiter;
@@ -33,6 +34,7 @@ using HR.Modules.Recruitment.Features.ListInterviewsForVacancy;
 using HR.Modules.Recruitment.Features.ListVacancies;
 using HR.Modules.Recruitment.Features.MoveApplicationStage;
 using HR.Modules.Recruitment.Features.OfferCandidate;
+using HR.Modules.Recruitment.Features.PublishVacancy;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 using HR.Modules.Recruitment.Features.RejectCandidate;
 using HR.Modules.Recruitment.Features.ListRecruitmentStages;
@@ -102,6 +104,11 @@ public static class RecruitmentModule
 
         services.AddScoped<CloseVacancyHandler>();
         services.AddScoped<IValidator<CloseVacancyRequest>, CloseVacancyValidator>();
+
+        services.AddScoped<PublishVacancyHandler>();
+        services.AddScoped<IValidator<PublishVacancyRequest>, PublishVacancyValidator>();
+
+        services.AddScoped<HR.SharedKernel.IIntegrationEventHandler<HR.SharedKernel.EmployeePromotedIntegrationEvent>, EmployeePromotedHandler>();
 
         services.AddScoped<CreateCandidateHandler>();
         services.AddScoped<IValidator<CreateCandidateRequest>, CreateCandidateValidator>();

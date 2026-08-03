@@ -142,3 +142,26 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* ── Dark mode ───────────────────────────────────────── */
+
+html[data-theme="dark"] .cd-card {
+    background: var(--hr-gray-800);
+    border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .cd-card-header,
+html[data-theme="dark"] .cd-section-label,
+html[data-theme="dark"] .cd-form-footer {
+    border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .cd-card-title,
+html[data-theme="dark"] .cd-label {
+    color: var(--hr-gray-50);
+}
+
+html[data-theme="dark"] .cd-readonly {
+    background: var(--hr-gray-900);
+    color: var(--hr-gray-400);
+}

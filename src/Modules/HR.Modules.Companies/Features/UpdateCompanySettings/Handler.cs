@@ -43,50 +43,12 @@ internal sealed class UpdateCompanySettingsHandler
 			? null
 			: new CompanySettingsAuditSnapshot(
 				company.Settings.TimeZone,
-				company.Settings.Locale,
-				company.Settings.WorkingDays,
-				company.Settings.HoursPerDay,
-				company.Settings.LeaveYearStartMonth,
-				company.Settings.DefaultHolidayAllowance,
-				company.Settings.ProbationMonths,
-				company.Settings.ExcludePublicHolidaysFromLeave,
-				company.Settings.ExcludePublicHolidaysFromSickness,
-				company.Settings.DisplaySalaryOnEmployeeProfile,
-				company.Settings.FitNoteRequiredAfterDays,
-				company.Settings.ReturnToWorkRequiredAfterDays,
-				company.Settings.DefaultAcknowledgementStatement,
-				company.Settings.AcknowledgementReminderIntervalDays,
-				company.Settings.NoticePeriodUnit,
-				company.Settings.NoticePeriodLength,
-				company.Settings.AutoDisableAccessOnLeavingDate,
-				company.Settings.EmployeeNumberMode,
-				company.Settings.EmployeeNumberPrefix,
-				company.Settings.NextEmployeeNumber,
-				company.Settings.EmployeeNumberMinimumLength);
+				company.Settings.Locale);
 
 		var settings = company.Settings ?? CompanySettings.CreateDefault(company.Id, now);
-		settings.Update(
+		settings.UpdateCompanyProfile(
 			request.TimeZone.Trim(),
 			request.Locale.Trim(),
-			request.WorkingDays,
-			request.HoursPerDay,
-			request.LeaveYearStartMonth,
-			request.DefaultHolidayAllowance,
-			request.ProbationMonths,
-			request.ExcludePublicHolidaysFromLeave,
-			request.ExcludePublicHolidaysFromSickness,
-			request.DisplaySalaryOnEmployeeProfile,
-			request.FitNoteRequiredAfterDays,
-			request.ReturnToWorkRequiredAfterDays,
-			request.DefaultAcknowledgementStatement.Trim(),
-			request.AcknowledgementReminderIntervalDays,
-			request.NoticePeriodUnit,
-			request.NoticePeriodLength,
-			request.AutoDisableAccessOnLeavingDate,
-			request.EmployeeNumberMode,
-			request.EmployeeNumberPrefix,
-			request.NextEmployeeNumber,
-			request.EmployeeNumberMinimumLength,
 			now);
 
 		company.SetSettings(settings, now);
@@ -95,16 +57,6 @@ internal sealed class UpdateCompanySettingsHandler
 			company.Id,
 			settings.TimeZone,
 			settings.Locale,
-			settings.WorkingDays,
-			settings.HoursPerDay,
-			settings.LeaveYearStartMonth,
-			settings.DefaultHolidayAllowance,
-			settings.ProbationMonths,
-			settings.ExcludePublicHolidaysFromLeave,
-			settings.ExcludePublicHolidaysFromSickness,
-			settings.DisplaySalaryOnEmployeeProfile,
-			settings.FitNoteRequiredAfterDays,
-			settings.ReturnToWorkRequiredAfterDays,
 			now));
 
 		var outboxMessage = OutboxMessage.CreatePending(
@@ -125,51 +77,13 @@ internal sealed class UpdateCompanySettingsHandler
 				previousSettings,
 				new CompanySettingsAuditSnapshot(
 					settings.TimeZone,
-					settings.Locale,
-					settings.WorkingDays,
-					settings.HoursPerDay,
-					settings.LeaveYearStartMonth,
-					settings.DefaultHolidayAllowance,
-					settings.ProbationMonths,
-					settings.ExcludePublicHolidaysFromLeave,
-					settings.ExcludePublicHolidaysFromSickness,
-					settings.DisplaySalaryOnEmployeeProfile,
-					settings.FitNoteRequiredAfterDays,
-					settings.ReturnToWorkRequiredAfterDays,
-					settings.DefaultAcknowledgementStatement,
-					settings.AcknowledgementReminderIntervalDays,
-					settings.NoticePeriodUnit,
-					settings.NoticePeriodLength,
-					settings.AutoDisableAccessOnLeavingDate,
-					settings.EmployeeNumberMode,
-					settings.EmployeeNumberPrefix,
-					settings.NextEmployeeNumber,
-					settings.EmployeeNumberMinimumLength)),
+					settings.Locale)),
 			cancellationToken);
 
 		return Result.Success(new UpdateCompanySettingsResponse(
 			company.Id,
 			settings.TimeZone,
 			settings.Locale,
-			settings.WorkingDays,
-			settings.HoursPerDay,
-			settings.LeaveYearStartMonth,
-			settings.DefaultHolidayAllowance,
-			settings.ProbationMonths,
-			settings.ExcludePublicHolidaysFromLeave,
-			settings.ExcludePublicHolidaysFromSickness,
-			settings.DisplaySalaryOnEmployeeProfile,
-			settings.FitNoteRequiredAfterDays,
-			settings.ReturnToWorkRequiredAfterDays,
-			settings.DefaultAcknowledgementStatement,
-			settings.AcknowledgementReminderIntervalDays,
-			settings.NoticePeriodUnit,
-			settings.NoticePeriodLength,
-			settings.AutoDisableAccessOnLeavingDate,
-			settings.EmployeeNumberMode,
-			settings.EmployeeNumberPrefix,
-			settings.NextEmployeeNumber,
-			settings.EmployeeNumberMinimumLength,
 			settings.UpdatedAt));
 	}
 }

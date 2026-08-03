@@ -336,10 +336,15 @@ internal sealed class EmployeeStagingRowValidator(
     private static void ValidateCompensationFields(ParsedImportRow row, List<string> rowErrors)
     {
         var salaryAmount = GetField(row, "SalaryAmount");
-        if (!string.IsNullOrWhiteSpace(salaryAmount))
+        if (string.IsNullOrWhiteSpace(salaryAmount))
         {
-            if (!decimal.TryParse(salaryAmount, NumberStyles.Number, CultureInfo.InvariantCulture, out var salary) || salary <= 0)
-                rowErrors.Add($"'SalaryAmount' value '{salaryAmount}' must be a positive number.");
+            // Once any compensation column is mapped for the import, SalaryAmount is mandatory —
+            // an employee can't have an opening compensation record with no salary figure.
+            rowErrors.Add("'SalaryAmount' is required.");
+        }
+        else if (!decimal.TryParse(salaryAmount, NumberStyles.Number, CultureInfo.InvariantCulture, out var salary) || salary <= 0)
+        {
+            rowErrors.Add($"'SalaryAmount' value '{salaryAmount}' must be a positive number.");
         }
 
         var salaryType = GetField(row, "SalaryType");

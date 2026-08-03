@@ -67,3 +67,25 @@
     width: 100%;
     margin-top: 8px;
 }
+
+/* This page is deliberately light-only (the card above is hardcoded to a white background,
+   never adapting to dark mode) — but the SfTextBox inputs don't know that: App.razor's
+   theme-detection script runs on every page including this one and defaults to dark based on
+   the OS/browser's prefers-color-scheme when the visitor has never explicitly toggled a
+   preference, enabling Syncfusion's separate dark-theme stylesheet and Bootstrap's
+   data-bs-theme="dark" globally. Without this override the inputs render with a dark
+   background inside the always-white card. !important is needed to beat the dark Syncfusion
+   stylesheet's own specificity; ::deep reaches into SfTextBox's own generated markup, which
+   Blazor's CSS isolation wouldn't otherwise scope to this component. */
+::deep .e-input-group,
+::deep .e-input-group.e-control-wrapper,
+::deep .e-float-input.e-control-wrapper {
+    background: #fff !important;
+    border-color: #d1d5db !important;
+}
+
+::deep .e-input-group input.e-input,
+::deep .e-float-input input {
+    background: #fff !important;
+    color: #111827 !important;
+}

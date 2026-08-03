@@ -327,7 +327,7 @@
         if (value && string.IsNullOrWhiteSpace(Model.AcknowledgementStatement))
         {
             _companyDefaultAcknowledgementStatement ??=
-                (await CompanyService.GetCompanySettingsAsync(CompanyId))?.DefaultAcknowledgementStatement;
+                (await CompanyService.GetHrSettingsAsync(CompanyId))?.DefaultAcknowledgementStatement;
 
             if (!string.IsNullOrWhiteSpace(_companyDefaultAcknowledgementStatement))
                 Model.AcknowledgementStatement = _companyDefaultAcknowledgementStatement;

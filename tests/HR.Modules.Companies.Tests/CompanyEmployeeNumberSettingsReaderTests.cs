@@ -15,8 +15,9 @@ public class CompanyEmployeeNumberSettingsReaderTests
         var now = DateTimeOffset.UtcNow;
         var company = Company.Create(Guid.NewGuid(), "Acme", now);
         var settings = CompanySettings.CreateDefault(company.Id, now);
-        settings.Update(
-            "UTC", "en-GB", WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
+        settings.UpdateCompanyProfile("UTC", "en-GB", now);
+        settings.UpdateHrPolicy(
+            WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday |
                              WorkingDays.Thursday | WorkingDays.Friday,
             7.5m, 1, 25, 6, true, false, false, null, null,
             "Custom statement.", 3, NoticePeriodUnit.Months, 1, true,

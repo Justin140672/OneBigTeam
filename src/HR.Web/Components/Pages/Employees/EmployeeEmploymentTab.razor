@@ -67,73 +67,21 @@ else
                                 <label class="form-label">Current Salary</label>
                                 <p class="form-control-plaintext mb-0">@CurrentSalaryDisplay()</p>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Dates</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Start Date <span class="text-danger">*</span></label>
-                                <SfDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" Format="dd/MM/yyyy" />
+                            <div class="col-md-4">
+                                <label class="form-label">Hours</label>
+                                <p class="form-control-plaintext mb-0">@CurrentHoursDisplay()</p>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">FTE</label>
+                                <p class="form-control-plaintext mb-0">@CurrentFteDisplay()</p>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Effective From</label>
+                                <p class="form-control-plaintext mb-0">@CurrentEffectiveFromDisplay()</p>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Continuous Service Date</label>
-                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ContinuousServiceDate" Format="dd/MM/yyyy" ShowClearButton="true" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Probation End Date</label>
-                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ProbationEndDate" Format="dd/MM/yyyy" ShowClearButton="true" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Leaving Date</label>
-                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.LeavingDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="false" />
-                                <div class="form-text">Handled via Start Leaving Process.</div>
-                            </div>
-                        </div>
-
-                        <hr class="my-3" />
-
-                        <div class="row g-3 align-items-start">
-                            <div class="col-md-6">
-                                <SfCheckBox TChecked="bool"
-                                            Label="Override notice period"
-                                            Checked="@Model.OverrideNoticePeriod"
-                                            CheckedChanged="@((bool v) => Model.OverrideNoticePeriod = v)" />
-                                @if (Model.OverrideNoticePeriod)
-                                {
-                                    <div class="row g-3 mt-2">
-                                        <div class="col-md-6">
-                                            <label class="form-label">Length</label>
-                                            <SfNumericTextBox TValue="int" @bind-Value="Model.NoticePeriodLength"
-                                                              ShowSpinButton="false"
-                                                              Min="1" />
-                                            <ValidationMessage For="@(() => Model.NoticePeriodLength)" />
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label">Unit</label>
-                                            <SfDropDownList TValue="NoticePeriodUnit" TItem="NoticePeriodUnitChoice"
-                                                            DataSource="@NoticePeriodUnitOptions"
-                                                            @bind-Value="Model.NoticePeriodUnit"
-                                                            Placeholder="Unit">
-                                                <DropDownListFieldSettings Value="Value" Text="Label" />
-                                            </SfDropDownList>
-                                        </div>
-                                    </div>
-                                }
-                            </div>
-                            <div class="col-md-6">
-                                <div class="text-muted small mb-1">Notice source</div>
-                                <dl class="row mb-0 small">
-                                    <dt class="col-6 text-muted fw-normal">Source</dt>
-                                    <dd class="col-6">@NoticePeriodSourceLabel(_effectiveNoticePeriodSource)</dd>
-                                    <dt class="col-6 text-muted fw-normal">Notice Period</dt>
-                                    <dd class="col-6">@_effectiveNoticePeriodLength @(_effectiveNoticePeriodUnit)</dd>
-                                </dl>
+                                <label class="form-label">Working Pattern</label>
+                                <p class="form-control-plaintext mb-0">@WorkingPatternSummary()</p>
                             </div>
                         </div>
                     </div>
@@ -192,6 +140,69 @@ else
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
                                     <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnManagerFilteringAsync" />
                                 </SfDropDownList>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Dates</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                                <SfDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" Format="dd/MM/yyyy" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Continuous Service Date</label>
+                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ContinuousServiceDate" Format="dd/MM/yyyy" ShowClearButton="true" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Probation End Date</label>
+                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ProbationEndDate" Format="dd/MM/yyyy" ShowClearButton="true" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Leaving Date</label>
+                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.LeavingDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="false" />
+                                <div class="form-text">Handled via Start Leaving Process.</div>
+                            </div>
+                        </div>
+
+                        <hr class="my-3" />
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <SfCheckBox TChecked="bool"
+                                            Label="Override notice period"
+                                            Checked="@Model.OverrideNoticePeriod"
+                                            CheckedChanged="@((bool v) => Model.OverrideNoticePeriod = v)" />
+                                @if (Model.OverrideNoticePeriod)
+                                {
+                                    <div class="row g-3 mt-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Length</label>
+                                            <SfNumericTextBox TValue="int" @bind-Value="Model.NoticePeriodLength"
+                                                              ShowSpinButton="false"
+                                                              Min="1" />
+                                            <ValidationMessage For="@(() => Model.NoticePeriodLength)" />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Unit</label>
+                                            <SfDropDownList TValue="NoticePeriodUnit" TItem="NoticePeriodUnitChoice"
+                                                            DataSource="@NoticePeriodUnitOptions"
+                                                            @bind-Value="Model.NoticePeriodUnit"
+                                                            Placeholder="Unit">
+                                                <DropDownListFieldSettings Value="Value" Text="Label" />
+                                            </SfDropDownList>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            <div class="col-md-6">
+                                <div class="text-muted small mb-1">Effective Notice Period</div>
+                                <p class="form-control-plaintext mb-0">@_effectiveNoticePeriodLength @(_effectiveNoticePeriodUnit)</p>
                             </div>
                         </div>
                     </div>
@@ -304,6 +315,7 @@ else
 
     private ProbationRecordModel? _probationRecord;
     private CurrentCompensationModel? _currentCompensation;
+    private GetEmployeeResponse? _employee;
 
     private NoticePeriodUnit _effectiveNoticePeriodUnit;
     private int _effectiveNoticePeriodLength;
@@ -333,13 +345,27 @@ else
         _        => "year"
     };
 
-    private static string NoticePeriodSourceLabel(string source) => source switch
+    // Read-only — same source as CurrentSalaryDisplay, sourced from the current compensation record.
+    private string CurrentHoursDisplay() =>
+        _currentCompensation?.HoursPerWeek is { } hours ? $"{hours:0.##} hrs/week" : "—";
+
+    private string CurrentFteDisplay() =>
+        _currentCompensation?.FTE is { } fte ? fte.ToString("P0") : "—";
+
+    private string CurrentEffectiveFromDisplay() =>
+        _currentCompensation is not null ? _currentCompensation.EffectiveFrom.ToString("d MMM yyyy") : "—";
+
+    // Reuses the same company-default-fallback pattern as MyProfileOverviewTab.WorkingPatternSummary.
+    private string WorkingPatternSummary()
     {
-        "Employee"        => "Employee",
-        "PositionProfile" => "Position Profile",
-        "CompanyDefault"  => "Company Default",
-        _                 => source
-    };
+        if (_employee is null)
+            return "—";
+
+        var workingDays = _employee.WorkingDaysOverride ?? (WorkingDays)Session.WorkingDays;
+        var hoursPerDay = _employee.HoursPerDayOverride ?? Session.HoursPerDay;
+
+        return WorkingPatternFormatter.Summarize(workingDays, hoursPerDay);
+    }
 
     // Draft, Leaving, and FormerEmployee must be real options here even though nobody should ever
     // *pick* them (a brand-new employee's Employment tab loads with Model.Status == "Draft" — see
@@ -359,7 +385,6 @@ else
     [
         new("Draft",          "Draft"),
         new("Active",         "Active"),
-        new("OnLeave",        "On Leave"),
         new("Suspended",      "Suspended"),
         new("Leaving",        "Leaving"),
         new("FormerEmployee", "Former Employee"),
@@ -386,6 +411,7 @@ else
         _currentCompensation = await compensationTask;
 
         var employee = await EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
+        _employee = employee;
         if (employee is not null)
             PopulateModel(employee);
 
@@ -429,7 +455,7 @@ else
     {
         Model.EmployeeNumber        = e.EmployeeNumber ?? string.Empty;
         Model.EmploymentTypeId      = e.EmploymentTypeId;
-        Model.Status                = e.Status is "Draft" or "Active" or "OnLeave" or "Suspended" or "Leaving" or "FormerEmployee"
+        Model.Status                = e.Status is "Draft" or "Active" or "Suspended" or "Leaving" or "FormerEmployee"
                                            ? e.Status
                                            : "Active";
         Model.DepartmentId          = e.DepartmentId;

@@ -116,8 +116,7 @@
                                         DataSource="@_actionTypeOptions"
                                         @bind-Value="_actionType"
                                         Placeholder="All Action Types"
-                                        AllowFiltering="true"
-                                        ShowClearButton="true" />
+                                        AllowFiltering="true" />
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Department</label>
@@ -126,8 +125,7 @@
                                         DataSource="@_departmentOptions"
                                         @bind-Value="_department"
                                         Placeholder="All Departments"
-                                        AllowFiltering="true"
-                                        ShowClearButton="true" />
+                                        AllowFiltering="true" />
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Urgency</label>
@@ -135,8 +133,7 @@
                                         TItem="UrgencyOption"
                                         DataSource="@_urgencyOptions"
                                         @bind-Value="_urgency"
-                                        Placeholder="All Urgencies"
-                                        ShowClearButton="true">
+                                        Placeholder="All Urgencies">
                             <DropDownListFieldSettings Value="Value" Text="Label" />
                         </SfDropDownList>
                     </div>
@@ -147,8 +144,7 @@
                                         DataSource="@_statusOptions"
                                         @bind-Value="_status"
                                         Placeholder="All Statuses"
-                                        AllowFiltering="true"
-                                        ShowClearButton="true" />
+                                        AllowFiltering="true" />
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Employee</label>
@@ -158,8 +154,7 @@
                                         DataSource="@_employeeOptions"
                                         @bind-Value="_employeeId"
                                         Placeholder="All Employees"
-                                        AllowFiltering="true"
-                                        ShowClearButton="true">
+                                        AllowFiltering="true">
                             <DropDownListFieldSettings Value="Id" Text="Name" />
                             <DropDownListEvents TValue="Guid?" TItem="EmployeeOption" Filtering="OnEmployeeFilteringAsync" />
                         </SfDropDownList>
@@ -180,8 +175,7 @@
                                         DataSource="@_managerOptions"
                                         @bind-Value="_managerId"
                                         Placeholder="All Managers"
-                                        AllowFiltering="true"
-                                        ShowClearButton="true">
+                                        AllowFiltering="true">
                             <DropDownListFieldSettings Value="Id" Text="Name" />
                             <DropDownListEvents TValue="Guid?" TItem="EmployeeOption" Filtering="OnManagerFilteringAsync" />
                         </SfDropDownList>
@@ -193,8 +187,7 @@
                                         DataSource="@_locationOptions"
                                         @bind-Value="_locationId"
                                         Placeholder="All Locations"
-                                        AllowFiltering="true"
-                                        ShowClearButton="true">
+                                        AllowFiltering="true">
                             <DropDownListFieldSettings Value="Id" Text="Name" />
                         </SfDropDownList>
                     </div>
@@ -207,9 +200,9 @@
                         <SfDropDownList TValue="WorkloadActionsGroupBy?"
                                         TItem="GroupByOption"
                                         DataSource="@_groupByOptions"
-                                        @bind-Value="_groupBy"
-                                        Placeholder="No Grouping"
-                                        ShowClearButton="true">
+                                        Value="@_groupBy"
+                                        ValueChanged="OnGroupByChangedAsync"
+                                        Placeholder="No Grouping">
                             <DropDownListFieldSettings Value="Value" Text="Label" />
                         </SfDropDownList>
                     </div>
@@ -239,6 +232,11 @@
         }
     }
 </div>
+
+<TaskViewDialog CompanyId="CompanyId"
+                TaskId="_selectedTaskId"
+                IsOpen="_taskDialogOpen"
+                OnClosed="CloseTaskDialogAsync" />
 
 @code {
     [Parameter] public Guid CompanyId { get; set; }
@@ -395,11 +393,11 @@
         _savedViewError = null;
         var json = JsonSerializer.Serialize(BuildSavedFilterState());
         var request = new SaveReportViewRequest(ReportId, _newViewName.Trim(), json, null);
-        var result = await ReportingService.SaveReportViewAsync(CompanyId, request);
+        var (result, error) = await ReportingService.SaveReportViewAsync(CompanyId, request);
 
         if (result is null)
         {
-            _savedViewError = "Failed to save the current filters as a view.";
+            _savedViewError = error ?? "Failed to save the current filters as a view.";
             return;
         }
 
@@ -422,11 +420,11 @@
         if (_selectedView is null || string.IsNullOrWhiteSpace(_renameViewName)) return;
 
         _savedViewError = null;
-        var result = await ReportingService.RenameReportViewAsync(CompanyId, _selectedView.Id, _renameViewName.Trim());
+        var (result, error) = await ReportingService.RenameReportViewAsync(CompanyId, _selectedView.Id, _renameViewName.Trim());
 
         if (result is null)
         {
-            _savedViewError = "Failed to rename the saved view.";
+            _savedViewError = error ?? "Failed to rename the saved view.";
             return;
         }
 
@@ -469,6 +467,7 @@
         _selectedView = null;
         _showRename = false;
         await LoadSavedViewsAsync();
+        await LoadAsync();
     }
 
     private async Task OnEmployeeFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
@@ -505,6 +504,15 @@
         ManagerId: _managerId,
         LocationId: _locationId,
         RecruitmentUser: _recruitmentUser);
+
+    private async Task OnGroupByChangedAsync(WorkloadActionsGroupBy? value)
+    {
+        // Selecting a Group By value switches the render path to _groups before that collection
+        // has been repopulated for the new grouping, making the grid appear to "clear". Reload
+        // immediately so the grouped view is populated as soon as it's selected.
+        _groupBy = value;
+        await LoadAsync();
+    }
 
     private async Task ClearFiltersAsync()
     {
@@ -606,10 +614,32 @@
         _ => "badge bg-secondary",
     };
 
+    private Guid? _selectedTaskId;
+    private bool _taskDialogOpen;
+
     private void GoToAction(WorkloadActionRowModel row)
     {
-        if (!string.IsNullOrWhiteSpace(row.DeepLinkUrl))
-            Navigation.NavigateTo(row.DeepLinkUrl);
+        if (string.IsNullOrWhiteSpace(row.DeepLinkUrl))
+            return;
+
+        // Manager task actions link to /companies/{companyId}/tasks/{taskId} — show the task
+        // in-place via the existing TaskViewDialog rather than navigating away from the report.
+        var taskLinkPrefix = $"/companies/{CompanyId}/tasks/";
+        if (row.DeepLinkUrl.StartsWith(taskLinkPrefix, StringComparison.OrdinalIgnoreCase)
+            && Guid.TryParse(row.DeepLinkUrl[taskLinkPrefix.Length..], out var taskId))
+        {
+            _selectedTaskId = taskId;
+            _taskDialogOpen = true;
+            return;
+        }
+
+        Navigation.NavigateTo(row.DeepLinkUrl);
+    }
+
+    private async Task CloseTaskDialogAsync()
+    {
+        _taskDialogOpen = false;
+        await LoadAsync();
     }
 
     private RenderFragment RenderGrid(List<WorkloadActionRowModel> rows) => @<HrGrid TValue="WorkloadActionRowModel"

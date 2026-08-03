@@ -84,6 +84,28 @@ public class GetProbationReportHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Excludes_Passed_Employees_From_Rows_But_Still_Counts_Them_In_PassedCount()
+    {
+        var activeEmployeeId = Guid.NewGuid();
+        var passedEmployeeId = Guid.NewGuid();
+        var reader = new FakeProbationReportReader(
+        [
+            BuildItem(activeEmployeeId, "Active"),
+            BuildItem(passedEmployeeId, "Passed"),
+        ]);
+        var handler = new GetProbationReportHandler(reader, new FakeEmployeeDepartmentReader(), new FakeDirectReportsReader());
+
+        var result = await handler.HandleAsync(
+            new GetProbationReportRequest(Guid.NewGuid()), callerIsHr: true, callerEmployeeId: Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var row = Assert.Single(result.Value!.Items);
+        Assert.Equal(activeEmployeeId, row.EmployeeId);
+        Assert.DoesNotContain(result.Value.Items, i => i.EmployeeId == passedEmployeeId);
+        Assert.Equal(1, result.Value.PassedCount);
+    }
+
+    [Fact]
     public async Task HandleAsync_Computes_Summary_Counts_From_Status()
     {
         var reader = new FakeProbationReportReader(

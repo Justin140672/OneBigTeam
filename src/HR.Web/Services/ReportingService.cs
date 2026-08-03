@@ -872,7 +872,7 @@ public class ReportingService(IHttpClientFactory httpClientFactory)
         }
     }
 
-    public async Task<SaveReportViewResponse?> SaveReportViewAsync(
+    public async Task<(SaveReportViewResponse? Result, string? Error)> SaveReportViewAsync(
         Guid companyId, SaveReportViewRequest request, CancellationToken cancellationToken = default)
     {
         try
@@ -881,17 +881,17 @@ public class ReportingService(IHttpClientFactory httpClientFactory)
                 $"api/companies/{companyId}/reporting/saved-views", request, HrApiJsonOptions.Default, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
-                return null;
+                return (null, await ReadErrorAsync(response, "Failed to save the current filters as a view."));
 
-            return await response.Content.ReadFromJsonAsync<SaveReportViewResponse>(HrApiJsonOptions.Default, cancellationToken);
+            return (await response.Content.ReadFromJsonAsync<SaveReportViewResponse>(HrApiJsonOptions.Default, cancellationToken), null);
         }
         catch (HttpRequestException)
         {
-            return null;
+            return (null, "Failed to save the current filters as a view.");
         }
     }
 
-    public async Task<RenameReportViewResponse?> RenameReportViewAsync(
+    public async Task<(RenameReportViewResponse? Result, string? Error)> RenameReportViewAsync(
         Guid companyId, Guid viewId, string name, CancellationToken cancellationToken = default)
     {
         try
@@ -900,13 +900,13 @@ public class ReportingService(IHttpClientFactory httpClientFactory)
                 $"api/companies/{companyId}/reporting/saved-views/{viewId}", new RenameReportViewRequest(name), HrApiJsonOptions.Default, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
-                return null;
+                return (null, await ReadErrorAsync(response, "Failed to rename the saved view."));
 
-            return await response.Content.ReadFromJsonAsync<RenameReportViewResponse>(HrApiJsonOptions.Default, cancellationToken);
+            return (await response.Content.ReadFromJsonAsync<RenameReportViewResponse>(HrApiJsonOptions.Default, cancellationToken), null);
         }
         catch (HttpRequestException)
         {
-            return null;
+            return (null, "Failed to rename the saved view.");
         }
     }
 
@@ -940,4 +940,19 @@ public class ReportingService(IHttpClientFactory httpClientFactory)
             return false;
         }
     }
+
+    private static async Task<string?> ReadErrorAsync(HttpResponseMessage response, string fallback)
+    {
+        try
+        {
+            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
+            return body?.Error ?? fallback;
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
+
+    private sealed record ErrorEnvelope(string? Error);
 }

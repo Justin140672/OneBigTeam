@@ -107,6 +107,46 @@ html, body {
     border-color: var(--hr-color-primary-active);
 }
 
+/* Syncfusion's e-success button variant (e.g. the "Save" button on the "Save current filters as
+   view" dialog — ReportFilterPanel.razor) was rendering black text on its green background
+   instead of the expected white. */
+.e-btn.e-success,
+.e-css.e-btn.e-success {
+    color: #fff;
+}
+
+/* Tab text (both Syncfusion SfTab and plain Bootstrap nav-pills/nav-tabs used across edit dialogs
+   and report pages) defaults to a Bootstrap/Syncfusion blue accent that doesn't belong to this
+   app's theme — re-point the active/selected state to the brand teal token instead. */
+.e-tab .e-toolbar-item.e-active .e-tab-text,
+.e-tab .e-toolbar-item.e-active .e-icons,
+.e-tab .e-toolbar-item:hover .e-tab-text {
+    color: var(--hr-color-primary);
+}
+
+.e-tab .e-indicator {
+    background: var(--hr-color-primary) !important;
+}
+
+/* nav-tabs' active state is text-color-only (transparent background, bordered underline), so the
+   color-only override is correct there. nav-pills' active state is a solid colored *background*
+   with light text (Bootstrap's default $primary pill) — color-only wasn't enough, the pill's
+   background was still falling back to Bootstrap blue. */
+.nav-tabs .nav-link.active {
+    color: var(--hr-color-primary) !important;
+    border-color: var(--hr-color-primary);
+}
+
+.nav-pills .nav-link.active {
+    background-color: var(--hr-color-primary) !important;
+    border-color: var(--hr-color-primary);
+    color: #fff !important;
+}
+
+.nav-pills .nav-link.text-success {
+    color: var(--hr-color-success) !important;
+}
+
 .e-frame.e-check,
 .e-css.e-checkbox-wrapper .e-frame.e-check {
     background-color: var(--hr-color-primary);
@@ -138,6 +178,11 @@ html, body {
 .hr-grid {
     max-width: 100%;
     overflow-x: auto;
+    /* Give short grids (few rows) enough room that the Excel-style column filter popup —
+       anchored relative to the grid's own box — opens fully inside the visible page instead
+       of past the bottom of a grid that's only a couple of rows tall, which otherwise forces
+       the user to scroll the page down just to see the filter dropdown they just opened. */
+    min-height: 320px;
 }
 
 .hr-grid .e-gridheader {
@@ -949,6 +994,22 @@ html[data-theme="dark"] .dashboard-greeting {
 
 html[data-theme="dark"] .dashboard-heading {
     color: var(--hr-gray-50);
+}
+
+/* ── Chart backgrounds (HiringPipelineChart, NewHiresTrendChart, HeadcountByDepartmentChart) ──
+   Syncfusion SfChart/SfAccumulationChart render an inline SVG whose background rect and axis/
+   legend text are painted via presentation attributes (not an inline style attribute), so a CSS
+   rule with equal/higher specificity still wins over them — no need to touch the component's
+   Background parameter. Chart containers otherwise render on a hard-coded white SVG in dark mode. */
+html[data-theme="dark"] .chart-tile .e-chart,
+html[data-theme="dark"] .chart-tile .e-accumulationchart,
+html[data-theme="dark"] .chart-tile svg {
+    background: var(--hr-gray-800);
+}
+
+html[data-theme="dark"] .chart-tile .e-chart text,
+html[data-theme="dark"] .chart-tile .e-accumulationchart text {
+    fill: var(--hr-gray-200);
 }
 
 

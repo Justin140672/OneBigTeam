@@ -364,6 +364,21 @@ public class EmployeeStagingRowValidatorTests
     }
 
     [Fact]
+    public async Task ValidateAsync_Flags_Missing_SalaryAmount_When_SalaryType_Is_Mapped()
+    {
+        var validator = BuildValidator();
+        // SalaryAmount itself is blank/omitted, but SalaryType is mapped for the import — any
+        // mapped compensation column makes SalaryAmount mandatory.
+        var row = ValidRow(2, salaryAmount: null, salaryType: "Annual");
+
+        var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
+
+        var result = Assert.Single(results);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("'SalaryAmount' is required."));
+    }
+
+    [Fact]
     public async Task ValidateAsync_Flags_Invalid_SalaryType()
     {
         var validator = BuildValidator();
@@ -383,7 +398,7 @@ public class EmployeeStagingRowValidatorTests
     public async Task ValidateAsync_Accepts_Valid_SalaryType_Case_Insensitively(string salaryType)
     {
         var validator = BuildValidator();
-        var row = ValidRow(2, salaryType: salaryType);
+        var row = ValidRow(2, salaryAmount: "50000", salaryType: salaryType);
 
         var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
 
@@ -422,7 +437,7 @@ public class EmployeeStagingRowValidatorTests
     public async Task ValidateAsync_Flags_FTE_Out_Of_Bounds(string fte)
     {
         var validator = BuildValidator();
-        var row = ValidRow(2, fte: fte);
+        var row = ValidRow(2, salaryAmount: "50000", fte: fte);
 
         var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
 
@@ -438,7 +453,7 @@ public class EmployeeStagingRowValidatorTests
     public async Task ValidateAsync_Accepts_FTE_Within_Bounds(string fte)
     {
         var validator = BuildValidator();
-        var row = ValidRow(2, fte: fte);
+        var row = ValidRow(2, salaryAmount: "50000", fte: fte);
 
         var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
 

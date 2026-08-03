@@ -160,3 +160,28 @@
     text-align: right;
     margin-top: 4px;
 }
+
+/* ── Dark mode ───────────────────────────────────────── */
+
+html[data-theme="dark"] .pd-card {
+    background: var(--hr-gray-800);
+    border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .pd-card-header {
+    border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .pd-card-title,
+html[data-theme="dark"] .pd-dl dd {
+    color: var(--hr-gray-50);
+}
+
+html[data-theme="dark"] .pd-dl dt,
+html[data-theme="dark"] .pd-dl dd {
+    border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .pd-change-btn {
+    border-color: var(--hr-gray-700);
+}

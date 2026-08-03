@@ -69,8 +69,8 @@ public class CompensationServiceTests
 
         var response = new GetCompensationHistoryResponse(
         [
-            new CompensationHistoryItemModel(Guid.NewGuid(), new DateOnly(2023, 1, 1), null, "Annual", 145000m, "GBP", 37.5m, 1m, "Promoted to CTO", "Promotion", Guid.NewGuid(), DateTimeOffset.UtcNow),
-            new CompensationHistoryItemModel(Guid.NewGuid(), new DateOnly(2020, 1, 6), new DateOnly(2022, 12, 31), "Annual", 120000m, "GBP", 37.5m, 1m, "Starting salary", "NewHire", Guid.NewGuid(), DateTimeOffset.UtcNow)
+            new CompensationHistoryItemModel(Guid.NewGuid(), new DateOnly(2023, 1, 1), null, "Annual", 145000m, "GBP", 37.5m, 1m, "Promoted to CTO", "Promotion", Guid.NewGuid(), "Jane Doe", DateTimeOffset.UtcNow),
+            new CompensationHistoryItemModel(Guid.NewGuid(), new DateOnly(2020, 1, 6), new DateOnly(2022, 12, 31), "Annual", 120000m, "GBP", 37.5m, 1m, "Starting salary", "NewHire", Guid.NewGuid(), "Jane Doe", DateTimeOffset.UtcNow)
         ]);
 
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));

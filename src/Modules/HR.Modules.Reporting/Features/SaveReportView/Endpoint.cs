@@ -25,6 +25,12 @@ internal sealed class Endpoint(SaveReportViewHandler handler, ICurrentUser curre
 
         var result = await handler.HandleAsync(request, userId, cancellationToken);
 
+        if (result.IsFailure)
+        {
+            await Send.ResultAsync(TypedResults.BadRequest(new { error = result.Error.Message }));
+            return;
+        }
+
         await Send.ResultAsync(TypedResults.Created((string?)null, result.Value!));
     }
 }

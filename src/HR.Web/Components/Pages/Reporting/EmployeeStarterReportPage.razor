@@ -27,7 +27,8 @@
                         ShowManagerFilter="false"
                         ShowStatusFilter="false"
                         DateRangeStartLabel="Start Date From"
-                        DateRangeEndLabel="Start Date To" />
+                        DateRangeEndLabel="Start Date To"
+                        DefaultDateRangeStart="@_defaultStartDate" />
 
     @if (_isLoading)
     {
@@ -75,13 +76,17 @@
     private bool _isLoading = true;
     private string? _error;
 
-    private ReportFilterCriteriaModel _currentFilter = new();
+    // Defaults the Start Date filter to the 1st of the current month so the report opens already
+    // scoped to "this month's starters" rather than every starter ever recorded.
+    private readonly DateOnly _defaultStartDate = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private ReportFilterCriteriaModel _currentFilter = null!;
 
     private bool _exporting;
     private string? _exportError;
 
     protected override async Task OnParametersSetAsync()
     {
+        _currentFilter ??= new ReportFilterCriteriaModel(DateRangeStart: _defaultStartDate);
         await LoadAsync();
     }
 

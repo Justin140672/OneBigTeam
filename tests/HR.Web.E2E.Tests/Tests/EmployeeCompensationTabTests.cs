@@ -31,13 +31,18 @@ public sealed class EmployeeCompensationTabTests(AppFixture fixture) : E2ETestBa
 
         await empEdit.GoToAsync(AcmeId, SarahChen);
 
+        // Renamed from "Compensation" to "Compensation History" (the separate "Current
+        // Compensation" card was removed entirely — see the next test).
         Assert.True(
-            await _page.GetByRole(AriaRole.Tab, new() { Name = "Compensation" }).IsVisibleAsync(),
-            "Expected a 'Compensation' tab on the employee edit page");
+            await _page.GetByRole(AriaRole.Tab, new() { Name = "Compensation History" }).IsVisibleAsync(),
+            "Expected a 'Compensation History' tab on the employee edit page");
+        Assert.False(
+            await _page.GetByRole(AriaRole.Tab, new() { Name = "Compensation", Exact = true }).IsVisibleAsync(),
+            "Did not expect a tab labelled exactly 'Compensation' (renamed to 'Compensation History')");
     }
 
     [Fact]
-    public async Task CompensationTab_ShowsCurrentCompensationPanel_WithExpectedFields()
+    public async Task CompensationTab_NoLongerShowsCurrentCompensationCard_ButShowsHistoryGrid()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
@@ -48,24 +53,21 @@ public sealed class EmployeeCompensationTabTests(AppFixture fixture) : E2ETestBa
         await empEdit.GoToAsync(AcmeId, SarahChen);
         await empEdit.OpenCompensationTabAsync();
 
-        Assert.True(await empEdit.HasCurrentCompensationPanelAsync(),
-            "Expected the Current Compensation panel to be visible");
+        Assert.False(await empEdit.HasCurrentCompensationPanelAsync(),
+            "Expected the 'Current Compensation' panel to have been removed entirely");
+        Assert.False(await _page.GetByText("Current Compensation", new() { Exact = true }).IsVisibleAsync(),
+            "Did not expect a 'Current Compensation' heading anywhere on the tab");
 
-        var salary = await empEdit.GetCompensationFieldTextAsync("compensation-salary");
-        Assert.Contains("145,000.00", salary);
-        Assert.Contains("per year", salary);
+        // The Compensation History card/grid takes over showing the current record as just
+        // another (undated-end) row alongside past records.
+        Assert.True(await _page.GetByText("Compensation History", new() { Exact = true }).IsVisibleAsync(),
+            "Expected the 'Compensation History' card heading");
 
-        var annualisedSalary = await empEdit.GetCompensationFieldTextAsync("compensation-annualised-salary");
-        Assert.Contains("145,000.00", annualisedSalary);
+        var grid = _page.Locator("[data-testid='compensation-history-grid']");
+        Assert.True(await grid.IsVisibleAsync(), "Expected the Compensation History grid to be visible");
 
-        var hours = await empEdit.GetCompensationFieldTextAsync("compensation-hours");
-        Assert.Contains("37.5", hours);
-
-        var fte = await empEdit.GetCompensationFieldTextAsync("compensation-fte");
-        Assert.Contains("100", fte);
-
-        var effectiveFrom = await empEdit.GetCompensationFieldTextAsync("compensation-effective-from");
-        Assert.Contains("2023", effectiveFrom);
+        var gridText = await grid.TextContentAsync();
+        Assert.Contains("145,000.00", gridText);
     }
 
     [Fact]

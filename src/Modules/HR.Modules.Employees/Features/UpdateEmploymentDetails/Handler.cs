@@ -156,7 +156,6 @@ internal sealed class UpdateEmploymentDetailsHandler
             switch (request.Status)
             {
                 case EmploymentStatus.Active:     employee.Activate(now);    break;
-                case EmploymentStatus.OnLeave:    employee.SetOnLeave(now);  break;
                 case EmploymentStatus.Suspended:  employee.Suspend(now);     break;
             }
         }

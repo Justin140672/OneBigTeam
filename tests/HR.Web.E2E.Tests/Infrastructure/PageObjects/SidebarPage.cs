@@ -16,12 +16,27 @@ public sealed class SidebarPage(IPage page)
     private ILocator NavMenu => page.Locator(".app-nav-menu");
 
     /// <summary>
-    /// Returns true if the sidebar (MainLayout.razor's ShowSidebar) is rendered at all. False for
-    /// personas with no qualifying role — a plain Employee, or a plain Manager whose dashboard IS
-    /// their home with no separate admin section to reach (see ManagerOnly_SeesNoSidebar... test).
+    /// Returns true if the sidebar (MainLayout.razor's ShowSidebar) is rendered at all — false for
+    /// a persona with no qualifying role. ShowSidebar depends on AppSession.IsManager/IsRecruiter/
+    /// IsHrAdministrator, which only become true after AppSession's own async /api/me round-trip
+    /// completes in OnInitializedAsync; on the very first render those flags default to false, so
+    /// ".app-sidebar" may not be in the DOM yet even for a persona that will end up seeing it a
+    /// moment later. A bounded wait (rather than an instant CountAsync snapshot) avoids racing that
+    /// round-trip; a genuine "no sidebar" persona still resolves promptly via the short timeout.
     /// </summary>
-    public async Task<bool> IsSidebarVisibleAsync() =>
-        await page.Locator(".app-sidebar").CountAsync() > 0;
+    public async Task<bool> IsSidebarVisibleAsync()
+    {
+        try
+        {
+            await page.Locator(".app-sidebar").First.WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Returns true if a menu item with exactly this text is present and visible without

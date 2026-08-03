@@ -239,6 +239,7 @@ public sealed class VacancyKanbanBoardTests(AppFixture fixture) : E2ETestBase(fi
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.ClickVacancyAsync(vacancyTitle);
+        await vacancyDetail.PublishVacancyAsync();
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
         await vacancyDetail.SelectCandidateInAddDialogAsync(candidateName);

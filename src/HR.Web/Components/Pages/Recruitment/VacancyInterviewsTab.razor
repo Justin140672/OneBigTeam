@@ -114,7 +114,9 @@
     {
         _loading = true;
         var result = await InterviewService.ListInterviewsForVacancyAsync(CompanyId, VacancyId);
-        _interviews = result?.Items ?? [];
+        // Cancelled interviews are excluded from this tab — they're no longer relevant to the
+        // active hiring workflow shown here.
+        _interviews = result?.Items.Where(i => i.Outcome != "Cancelled").ToList() ?? [];
         _loading = false;
     }
 

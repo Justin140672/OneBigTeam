@@ -20,6 +20,36 @@ public sealed class SavedReportViewsTests(AppFixture fixture) : E2ETestBase(fixt
     private static string UniqueViewName(string prefix) => $"{prefix} {Guid.NewGuid():N}"[..30];
 
     /// <summary>
+    /// "Save current filters as view" opens a modal dialog (ReportFilterPanel.razor's
+    /// CssClass="report-save-view-dialog" SfDialog) to name and save the view — not an inline
+    /// expand row. Cancelling it must close the dialog without creating a view.
+    /// </summary>
+    [Fact]
+    public async Task SaveCurrentFiltersAsView_OpensModalDialog_CancelDiscardsWithoutSaving()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var report = new EmployeeDirectoryReportPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await report.GoToAsync(AcmeId);
+        await report.OpenSaveViewDialogAsync();
+
+        Assert.True(await report.SaveViewDialog.IsVisibleAsync(),
+            "Expected a modal dialog titled 'Save current filters as view' to open");
+
+        var viewName = UniqueViewName("Cancelled");
+        await _page.GetByPlaceholder("View name").FillAsync(viewName);
+        await _page.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
+
+        await report.SaveViewDialog.WaitForAsync(new() { State = Microsoft.Playwright.WaitForSelectorState.Hidden, Timeout = 10_000 });
+
+        var options = await report.GetSavedViewOptionTextsAsync();
+        Assert.DoesNotContain(viewName, options);
+    }
+
+    /// <summary>
     /// Saving the current filters as a new named view must persist it and immediately surface it
     /// as a selectable option in the "Saved Views" dropdown (GetReportViews re-fetch after
     /// SaveCurrentAsViewAsync in ReportFilterPanel.razor).

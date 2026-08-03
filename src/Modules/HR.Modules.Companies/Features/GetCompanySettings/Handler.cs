@@ -1,5 +1,4 @@
 using HR.Modules.Companies.Persistence;
-using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,47 +28,13 @@ internal sealed class GetCompanySettingsHandler(CompaniesDbContext dbContext)
             var defaults = Domain.CompanySettings.CreateDefault(request.Id, DateTimeOffset.UtcNow);
             return Result.Success(new GetCompanySettingsResponse(
                 defaults.CompanyId, defaults.TimeZone, defaults.Locale,
-                (int)defaults.WorkingDays, defaults.HoursPerDay, defaults.LeaveYearStartMonth,
-                defaults.DefaultHolidayAllowance, defaults.ProbationMonths,
-                defaults.ExcludePublicHolidaysFromLeave, defaults.ExcludePublicHolidaysFromSickness,
-                defaults.DisplaySalaryOnEmployeeProfile,
-                defaults.FitNoteRequiredAfterDays,
-                defaults.ReturnToWorkRequiredAfterDays,
-                defaults.PostcodeRegex,
-                defaults.TelephoneRegex,
-                defaults.MobileRegex,
-                defaults.DefaultAcknowledgementStatement,
-                defaults.AcknowledgementReminderIntervalDays,
-                defaults.NoticePeriodUnit,
-                defaults.NoticePeriodLength,
-                defaults.AutoDisableAccessOnLeavingDate,
-                defaults.EmployeeNumberMode,
-                defaults.EmployeeNumberPrefix,
-                defaults.NextEmployeeNumber,
-                defaults.EmployeeNumberMinimumLength,
+                defaults.PostcodeRegex, defaults.TelephoneRegex, defaults.MobileRegex,
                 defaults.UpdatedAt));
         }
 
         return Result.Success(new GetCompanySettingsResponse(
             settings.CompanyId, settings.TimeZone, settings.Locale,
-            (int)settings.WorkingDays, settings.HoursPerDay, settings.LeaveYearStartMonth,
-            settings.DefaultHolidayAllowance, settings.ProbationMonths,
-            settings.ExcludePublicHolidaysFromLeave, settings.ExcludePublicHolidaysFromSickness,
-            settings.DisplaySalaryOnEmployeeProfile,
-            settings.FitNoteRequiredAfterDays,
-            settings.ReturnToWorkRequiredAfterDays,
-            settings.PostcodeRegex,
-            settings.TelephoneRegex,
-            settings.MobileRegex,
-            settings.DefaultAcknowledgementStatement,
-            settings.AcknowledgementReminderIntervalDays,
-            settings.NoticePeriodUnit,
-            settings.NoticePeriodLength,
-            settings.AutoDisableAccessOnLeavingDate,
-            settings.EmployeeNumberMode,
-            settings.EmployeeNumberPrefix,
-            settings.NextEmployeeNumber,
-            settings.EmployeeNumberMinimumLength,
+            settings.PostcodeRegex, settings.TelephoneRegex, settings.MobileRegex,
             settings.UpdatedAt));
     }
 }

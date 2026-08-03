@@ -97,16 +97,6 @@ public class GetOrganisationChartHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Filters_By_Status_Active_Excludes_OnLeave_Employees()
-    {
-        await AssertStatusFilteredAsync(employee =>
-        {
-            employee.Activate(default);
-            employee.SetOnLeave(default);
-        });
-    }
-
-    [Fact]
     public async Task HandleAsync_Filters_By_Status_Active_Excludes_Suspended_Employees()
     {
         await AssertStatusFilteredAsync(employee =>

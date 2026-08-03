@@ -373,3 +373,29 @@
     0%   { background-position: 200% 0; }
     100% { background-position: -200% 0; }
 }
+
+/* ── Dark mode ───────────────────────────────────────── */
+
+html[data-theme="dark"] .overview-card,
+html[data-theme="dark"] .stat-card,
+html[data-theme="dark"] .skeleton-card {
+    background: var(--hr-gray-800);
+    border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .overview-card-header,
+html[data-theme="dark"] .upcoming-leave-item {
+    border-color: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .overview-card-title,
+html[data-theme="dark"] .overview-dl dd,
+html[data-theme="dark"] .stat-value,
+html[data-theme="dark"] .upcoming-leave-type,
+html[data-theme="dark"] .action-btn {
+    color: var(--hr-gray-50);
+}
+
+html[data-theme="dark"] .action-btn:hover {
+    background: var(--hr-gray-700);
+}

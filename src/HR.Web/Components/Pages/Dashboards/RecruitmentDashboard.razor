@@ -18,25 +18,20 @@
 
         <DashboardSwitcher />
 
-        <div class="recruitment-dashboard-actions mb-4">
-            <SfButton IsPrimary="true" CssClass="recruitment-dashboard-action-btn" OnClick="NavigateToVacancies" data-testid="recruitment-dashboard-vacancies-btn">
-                <i class="fa-solid fa-briefcase me-2"></i>Vacancies
-            </SfButton>
-            <SfButton CssClass="recruitment-dashboard-action-btn" OnClick="NavigateToCandidates" data-testid="recruitment-dashboard-candidates-btn">
-                <i class="fa-solid fa-user-tie me-2"></i>Candidates
-            </SfButton>
-            <SfButton CssClass="recruitment-dashboard-action-btn" OnClick="NavigateToExternalRecruiters" data-testid="recruitment-dashboard-recruiters-btn">
-                <i class="fa-solid fa-people-arrows me-2"></i>Recruiters
-            </SfButton>
-            <SfButton CssClass="recruitment-dashboard-action-btn" OnClick="NavigateToRecruitmentSettings" data-testid="recruitment-dashboard-settings-btn">
-                <i class="fa-solid fa-gear me-2"></i>Recruitment Settings
-            </SfButton>
-        </div>
-
         <div class="dashboard-overview-row">
             <HiringPipelineChart />
             <NewHiresTrendChart />
         </div>
+
+        <section class="dashboard-section">
+            <h2 class="dashboard-section-title">Recruitment</h2>
+            <div class="dashboard-detail-grid">
+                <RecruitmentSummaryWidget />
+                <UpcomingInterviewsWidget />
+                <OffersAwaitingResponseWidget />
+                <OpenVacanciesNoActivityWidget />
+            </div>
+        </section>
 
         <section class="dashboard-section">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
@@ -81,16 +76,6 @@
                 <VacancyList CompanyId="Session.CompanyId" />
             }
         </section>
-
-        <section class="dashboard-section">
-            <h2 class="dashboard-section-title">Recruitment</h2>
-            <div class="dashboard-detail-grid">
-                <RecruitmentSummaryWidget />
-                <UpcomingInterviewsWidget />
-                <OffersAwaitingResponseWidget />
-                <OpenVacanciesNoActivityWidget />
-            </div>
-        </section>
     </div>
 }
 
@@ -132,18 +117,6 @@
     }
 
     private void SetView(PipelineView view) => _view = view;
-
-    private void NavigateToVacancies() =>
-        Navigation.NavigateTo($"/companies/{Session.CompanyId}/vacancies");
-
-    private void NavigateToCandidates() =>
-        Navigation.NavigateTo($"/companies/{Session.CompanyId}/candidates");
-
-    private void NavigateToExternalRecruiters() =>
-        Navigation.NavigateTo($"/companies/{Session.CompanyId}/external-recruiters");
-
-    private void NavigateToRecruitmentSettings() =>
-        Navigation.NavigateTo($"/companies/{Session.CompanyId}/recruitment-stages");
 
     private static string Greeting()
     {

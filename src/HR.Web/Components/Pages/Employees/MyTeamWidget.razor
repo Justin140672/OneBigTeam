@@ -34,11 +34,11 @@
             </div>
 
             <div class="team-widget-scope" role="group" aria-label="Team scope">
-                <SfButton CssClass="e-small" IsPrimary="@(!_includeIndirect)" OnClick="@(() => SetScopeAsync(false))">Direct Reports</SfButton>
-                <SfButton CssClass="e-small" IsPrimary="@_includeIndirect" OnClick="@(() => SetScopeAsync(true))">All Reports</SfButton>
+                <SfButton CssClass="e-small" IsPrimary="@(!_includeIndirect)" Disabled="_scopeSwitching" OnClick="@(() => SetScopeAsync(false))">Direct Reports</SfButton>
+                <SfButton CssClass="e-small" IsPrimary="@_includeIndirect" Disabled="_scopeSwitching" OnClick="@(() => SetScopeAsync(true))">All Reports</SfButton>
             </div>
 
-            <div class="widget-body">
+            <div class="widget-body @(_scopeSwitching ? "team-widget-body--switching" : "")">
                 @if (_items.Count == 0)
                 {
                     <div class="widget-empty">
@@ -82,6 +82,7 @@
 
 @code {
     private bool _loading = true;
+    private bool _scopeSwitching;
     private bool _includeIndirect;
     private List<TeamMemberItem> _items = [];
     private bool _recordSicknessOpen;
@@ -110,11 +111,15 @@
         if (_includeIndirect == includeIndirect) return;
 
         _includeIndirect = includeIndirect;
-        _loading = true;
+
+        // Unlike the initial load, switching scope keeps the existing card grid visible (dimmed via
+        // team-widget-body--switching) rather than swapping the whole widget out for a loading
+        // spinner — that full remount/collapse was the source of the reported jumpy re-render.
+        _scopeSwitching = true;
         StateHasChanged();
 
         await LoadTeamAsync();
-        _loading = false;
+        _scopeSwitching = false;
     }
 
     private void OpenNotifySickness(Guid employeeId)

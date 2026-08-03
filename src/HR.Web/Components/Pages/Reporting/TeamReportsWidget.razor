@@ -1,0 +1,86 @@
+@using HR.Web.Models
+@inject ReportingService ReportingService
+@inject NavigationManager Navigation
+@inject AppSession Session
+
+@if (_loading)
+{
+    <div class="widget-card">
+        <div class="widget-header">
+            <i class="fa-solid fa-chart-column widget-icon"></i>
+            <span class="widget-title">Team Reports</span>
+        </div>
+        <div class="widget-body d-flex align-items-center gap-2 py-3 px-3">
+            <HrLoadingIndicator Label="Loading team reports…" />
+        </div>
+    </div>
+}
+else
+{
+    <div class="widget-card">
+        <div class="widget-header">
+            <i class="fa-solid fa-chart-column widget-icon"></i>
+            <span class="widget-title">Team Reports</span>
+            @if (_reports.Count > 0)
+            {
+                <span class="widget-count-badge">@_reports.Count</span>
+            }
+            <a href="/companies/@Session.CompanyId/reporting" class="widget-view-all ms-auto">
+                Browse all <i class="fa-solid fa-arrow-right fa-xs"></i>
+            </a>
+        </div>
+
+        <div class="widget-body">
+            @if (_reports.Count == 0)
+            {
+                <div class="widget-empty">
+                    <i class="fa-solid fa-chart-column fa-lg mb-2"></i>
+                    <p class="mb-0">No reports available for your team yet</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var report in _reports)
+                {
+                    var r = report;
+                    <div @key="r.Id" class="task-widget-item" @onclick="() => OpenReport(r)">
+                        <span class="priority-pip priority-pip--low"></span>
+                        <div class="task-widget-content">
+                            <span class="task-widget-title">@r.DisplayName</span>
+                            <span class="task-widget-meta">@r.Description</span>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    // The catalog endpoint already scopes results to what a Manager is permitted to see
+    // (reporting:view-* policies — probation, onboarding, leave summary, workload actions are all
+    // Manager-visible; each report's own handler further row-scopes the data itself to the
+    // manager's direct reports). Showing every returned item here is therefore already "reports
+    // relevant to their team" with no extra client-side filtering needed.
+    private bool _loading = true;
+    private List<ReportCatalogItemModel> _reports = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var catalog = (await ReportingService.GetReportCatalogAsync(Session.CompanyId))?.Items ?? [];
+
+        _reports = catalog
+            .Where(c => ReportRoutes.IsClickable(c.Id))
+            .OrderBy(c => c.DisplayName)
+            .ToList();
+
+        _loading = false;
+    }
+
+    private void OpenReport(ReportCatalogItemModel report)
+    {
+        var route = ReportRoutes.RouteFor(report.Id);
+        if (route is not null)
+            Navigation.NavigateTo($"/companies/{Session.CompanyId}/reporting/{route}");
+    }
+}

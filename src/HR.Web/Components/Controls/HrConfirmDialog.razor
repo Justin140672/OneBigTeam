@@ -1,0 +1,34 @@
+@if (Visible)
+{
+    <SfDialog Visible="Visible" IsModal="true" Width="420px" ShowCloseIcon="false">
+        <DialogTemplates>
+            <Header>@Title</Header>
+            <Content>@Message</Content>
+            <FooterTemplate>
+                <SfButton IsPrimary="true" CssClass="@(DangerConfirm ? "e-danger" : "")" Disabled="Busy" OnClick="OnConfirmed">
+                    @if (Busy)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    @ConfirmText
+                </SfButton>
+                <SfButton Disabled="Busy" OnClick="OnCancelled">@CancelText</SfButton>
+            </FooterTemplate>
+        </DialogTemplates>
+    </SfDialog>
+}
+
+@code {
+    // Generic app-wide confirmation "message box" — mirrors UnsavedChangesDialog's structure
+    // (plain SfDialog + parameter-driven content/callbacks) so any page can show a consistent
+    // Yes/No confirmation instead of hand-rolling inline grid confirmation UI or ad-hoc dialogs.
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public string Title { get; set; } = "Confirm";
+    [Parameter] public string Message { get; set; } = "Are you sure?";
+    [Parameter] public string ConfirmText { get; set; } = "Yes";
+    [Parameter] public string CancelText { get; set; } = "No";
+    [Parameter] public bool DangerConfirm { get; set; } = true;
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback OnConfirmed { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+}

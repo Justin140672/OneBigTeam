@@ -3,10 +3,10 @@
 
 <SfDialog Visible="IsOpen" IsModal="true" Width="560px" ShowCloseIcon="false">
     <DialogTemplates>
-        <Header>Invite Employee User</Header>
+        <Header>Invite Employee</Header>
         <Content>
             <ul class="nav nav-pills mb-3">
-                @foreach (var step in _steps)
+                @foreach (var step in VisibleSteps)
                 {
                     <li class="nav-item">
                         <span class="nav-link @(step.Number == _step ? "active" : (step.Number < _step ? "text-success" : "text-muted"))">
@@ -43,32 +43,27 @@
                 }
                 else if (_step == 2)
                 {
-                    <div class="mb-3">
-                        <label class="form-label">Email</label>
-                        @if (string.IsNullOrWhiteSpace(_email))
-                        {
-                            <p class="text-danger small mb-0">
-                                This employee has no work email on file. Add one on their profile before inviting them.
-                            </p>
-                        }
-                        else
-                        {
-                            <p class="form-control-plaintext mb-0">@_email</p>
-                        }
-                    </div>
+                    @if (string.IsNullOrWhiteSpace(_email))
+                    {
+                        <div class="alert alert-danger py-2">
+                            This employee has no work email on file. Add one on their profile before inviting them.
+                        </div>
+                    }
                     <div class="mb-3">
                         <label class="form-label">Roles <span class="text-danger">*</span></label>
+                        <div class="mb-2">
+                            <span class="badge bg-secondary-subtle text-secondary-emphasis">Employee</span>
+                            <span class="text-muted small ms-1">— every user always has this role</span>
+                        </div>
                         <SfMultiSelect TValue="List<Guid>"
                                        TItem="RoleOption"
-                                       DataSource="@_roleOptions"
-                                       @bind-Value="_selectedRoleIds"
-                                       @bind-Value:after="EnsureEmployeeRoleSelected"
-                                       Placeholder="Select one or more roles"
+                                       DataSource="@_additionalRoleOptions"
+                                       @bind-Value="_selectedAdditionalRoleIds"
+                                       Placeholder="Select additional roles (optional)"
                                        Mode="VisualMode.CheckBox"
                                        AllowFiltering="true">
                             <MultiSelectFieldSettings Value="Id" Text="Name" />
                         </SfMultiSelect>
-                        <p class="text-muted small mt-2 mb-0">Employee is required for every user and can't be removed.</p>
                     </div>
                 }
                 else if (_step == 3)
@@ -76,10 +71,8 @@
                     <dl class="row mb-0">
                         <dt class="col-sm-4 text-muted fw-normal">Employee</dt>
                         <dd class="col-sm-8">@_selectedEmployeeName</dd>
-                        <dt class="col-sm-4 text-muted fw-normal">Email</dt>
-                        <dd class="col-sm-8">@_email</dd>
                         <dt class="col-sm-4 text-muted fw-normal">Roles</dt>
-                        <dd class="col-sm-8">@string.Join(", ", _selectedRoleIds.Select(SystemRoleOptions.NameFor))</dd>
+                        <dd class="col-sm-8">@string.Join(", ", AllSelectedRoleIds.Select(SystemRoleOptions.NameFor))</dd>
                     </dl>
                 }
 
@@ -137,16 +130,34 @@
     private Guid? _selectedEmployeeId;
     private string _selectedEmployeeName = string.Empty;
     private string _email = string.Empty;
-    private List<Guid> _selectedRoleIds = [];
 
-    private readonly List<RoleOption> _roleOptions = SystemRoleOptions.All.ToList();
+    // The Employee role is mandatory for every invited user and is always applied — it's shown as
+    // a fixed, non-removable badge (see step 2 markup) rather than a selectable multiselect item,
+    // which avoids the multiselect having to represent a "checked but disabled" item (Syncfusion's
+    // SfMultiSelect doesn't support disabling individual items, and mutating the bound list in
+    // @bind-Value:after previously caused a NullReferenceException when re-selecting the Employee
+    // entry). _selectedAdditionalRoleIds holds only roles beyond Employee.
+    private List<Guid> _selectedAdditionalRoleIds = [];
+
+    private readonly List<RoleOption> _additionalRoleOptions =
+        SystemRoleOptions.All.Where(r => r.Id != SystemRoleOptions.EmployeeRoleId).ToList();
+
+    private List<Guid> AllSelectedRoleIds =>
+        _selectedAdditionalRoleIds.Prepend(SystemRoleOptions.EmployeeRoleId).Distinct().ToList();
 
     private static readonly (int Number, string Label)[] _steps =
     [
         (1, "Employee"),
-        (2, "Email & Roles"),
+        (2, "Roles"),
         (3, "Confirm"),
     ];
+
+    // When launched with a pre-selected employee (e.g. from the Employee List's row-level "Invite"
+    // action), there is always exactly one employee context already established, so the Employee
+    // step is skipped entirely (ResetStateAsync jumps straight to step 2) — hide its pill too
+    // rather than showing a step the wizard never actually visits.
+    private IEnumerable<(int Number, string Label)> VisibleSteps =>
+        PreselectedEmployeeId is not null ? _steps.Where(s => s.Number != 1) : _steps;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -165,13 +176,13 @@
         _selectedEmployeeId = null;
         _selectedEmployeeName = string.Empty;
         _email = string.Empty;
-        _selectedRoleIds = [SystemRoleOptions.EmployeeRoleId];
+        _selectedAdditionalRoleIds = [];
 
         if (PreselectedEmployeeId is not null)
         {
-            // Pre-selected-employee flow (e.g. from the Employee List's row-level "Invite User"
-            // action): the employee/name/email are already known from the calling page, so skip
-            // the employee lookup entirely and jump straight to step 2 (Email & Roles).
+            // Pre-selected-employee flow (e.g. from the Employee List's row-level "Invite" action):
+            // the employee/name/email are already known from the calling page, so skip the
+            // employee lookup entirely and jump straight to step 2 (Roles).
             _employeeOptions = [];
             _selectedEmployeeId = PreselectedEmployeeId;
             _selectedEmployeeName = PreselectedEmployeeName ?? string.Empty;
@@ -206,12 +217,6 @@
         _loading = false;
     }
 
-    private void EnsureEmployeeRoleSelected()
-    {
-        if (!_selectedRoleIds.Contains(SystemRoleOptions.EmployeeRoleId))
-            _selectedRoleIds.Add(SystemRoleOptions.EmployeeRoleId);
-    }
-
     private void OnEmployeeChanged(ChangeEventArgs<Guid?, InviteEmployeeOption> args)
     {
         _selectedEmployeeId = args.Value;
@@ -240,11 +245,6 @@
                     _stepError = "This employee has no work email on file. Add one on their profile before inviting them.";
                     return;
                 }
-                if (_selectedRoleIds.Count == 0)
-                {
-                    _stepError = "Please select at least one role.";
-                    return;
-                }
                 break;
         }
 
@@ -261,7 +261,7 @@
 
     private async Task ConfirmAsync()
     {
-        if (_selectedEmployeeId is null || string.IsNullOrWhiteSpace(_email) || _selectedRoleIds.Count == 0)
+        if (_selectedEmployeeId is null || string.IsNullOrWhiteSpace(_email))
         {
             _globalError = "Please complete all steps before sending the invite.";
             return;
@@ -271,7 +271,7 @@
         _globalError = null;
 
         var (result, error) = await UserAdministrationService.InviteEmployeeUserAsync(
-            CompanyId, _selectedEmployeeId.Value, _email.Trim(), _selectedRoleIds);
+            CompanyId, _selectedEmployeeId.Value, _email.Trim(), AllSelectedRoleIds);
 
         _submitting = false;
 

@@ -32,8 +32,10 @@ public class AppSessionTests
         var company = new GetCompanyResponse(companyId, "Acme Corporation", true, DateTime.UtcNow, [],
             new GetCompanyBrandingResponse("logo.png", "small-logo.png", null));
         var settings = new GetCompanySettingsResponse(
-            companyId, "Europe/London", "en-GB", 31, 7.5m, 1, 25m, 6, true, false, true, null, null,
-            "^postcode$", "^telephone$", "^mobile$",
+            companyId, "Europe/London", "en-GB",
+            "^postcode$", "^telephone$", "^mobile$", DateTime.UtcNow);
+        var hrSettings = new GetHrSettingsResponse(
+            companyId, 31, 7.5m, 1, 25m, 6, true, false, true, null, null,
             "I confirm that I have read and understood this document.", 3,
             NoticePeriodUnit.Months, 1, true,
             EmployeeNumberMode.Automatic, "EMP-", 1, 4, DateTime.UtcNow);
@@ -44,6 +46,7 @@ public class AppSessionTests
             ["api/me"] = me,
             [$"api/companies/{companyId}"] = company,
             [$"api/companies/{companyId}/settings"] = settings,
+            [$"api/companies/{companyId}/hr-settings"] = hrSettings,
             [$"api/companies/{companyId}/employees/me"] = employee,
         });
     }

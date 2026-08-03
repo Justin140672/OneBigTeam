@@ -23,6 +23,27 @@ public sealed class ReportCatalogTests(AppFixture fixture) : E2ETestBase(fixture
     private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
     private const string MarcusEmail = "marcus.diallo@acme.example"; // Recruiter
 
+    /// <summary>
+    /// The category heading for ReportCategory.Hr must render as "HR" (correct capitalisation),
+    /// not the raw PascalCase enum name "Hr" — see ReportCatalogPage.razor's CategoryLabel mapping.
+    /// </summary>
+    [Fact]
+    public async Task CatalogPage_HrCategoryHeading_RendersAsUppercaseHR()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var catalog = new ReportCatalogPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await catalog.GoToAsync(AcmeId);
+
+        Assert.True(await _page.Locator("h5").GetByText("HR", new() { Exact = true }).IsVisibleAsync(),
+            "Expected an exact 'HR' category heading");
+        Assert.False(await _page.Locator("h5").GetByText("Hr", new() { Exact = true }).IsVisibleAsync(),
+            "Did not expect the raw enum name 'Hr' as a category heading");
+    }
+
     [Fact]
     public async Task CatalogPage_Loads_WithEmployeeDirectoryCardVisible()
     {

@@ -56,6 +56,26 @@ internal sealed record VacancyClosedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
+internal sealed record VacancyPublishedAuditEvent(
+    Guid CompanyId,
+    Guid VacancyId,
+    string EffectiveTitle,
+    Domain.VacancyStatus PreviousStatus,
+    DateOnly OpenedAt,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "vacancy.published";
+    string IAuditEvent.EntityType => "Vacancy";
+    Guid IAuditEvent.EntityId => VacancyId;
+    Guid? IAuditEvent.ActorUserId => null;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => $"Vacancy '{EffectiveTitle}' published";
+    object? IAuditEvent.Before => new { Status = PreviousStatus };
+    object? IAuditEvent.After => new { Status = Domain.VacancyStatus.Open, OpenedAt };
+    object? IAuditEvent.Metadata => null;
+}
+
 internal sealed record VacancyPositionProfileAssignedAuditEvent(
     Guid CompanyId,
     Guid VacancyId,

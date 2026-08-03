@@ -41,6 +41,15 @@ public sealed class LeaveCalendarReportTests(AppFixture fixture) : E2ETestBase(f
         Assert.Contains(headers, h => h.Contains("Approval Status"));
     }
 
+    /// <summary>
+    /// LeaveCalendarReportPage.razor has no "all months" state to filter down from — _month
+    /// defaults to DateTime.UtcNow.Month at load, and the Month dropdown only offers
+    /// January-December (no "All" option). So changing Month swaps between two different
+    /// month-filtered result sets rather than narrowing a broader one; there's no guaranteed
+    /// row-count ordering between them (a month with more seeded/E2E-created leave requests can
+    /// legitimately have more rows than the current month's default view). This only asserts the
+    /// reload itself succeeds without an error banner.
+    /// </summary>
     [Fact]
     public async Task MonthFilter_ReloadsGridWithoutErroring()
     {
@@ -52,16 +61,11 @@ public sealed class LeaveCalendarReportTests(AppFixture fixture) : E2ETestBase(f
 
         await report.GoToAsync(AcmeId);
 
-        var unfilteredRowCount = await report.GetRowCountAsync();
-
         await report.SelectMonthAsync("January");
         await report.ApplyFiltersAsync();
 
         Assert.False(await report.HasLoadErrorAsync(),
             "Expected the grid to reload without an error banner after changing Month");
-        var filteredRowCount = await report.GetRowCountAsync();
-        Assert.True(filteredRowCount <= unfilteredRowCount || unfilteredRowCount == 0,
-            "Expected filtering by Month to return no more rows than the unfiltered set");
     }
 
     [Fact]

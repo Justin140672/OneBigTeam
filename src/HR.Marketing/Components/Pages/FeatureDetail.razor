@@ -1,0 +1,76 @@
+@page "/features/{Slug}"
+@using HR.Marketing.Services
+
+@if (feature is null)
+{
+    <PageTitle>Features | One Big Team</PageTitle>
+    <SiteHeader CurrentPage="features" />
+    <main>
+        <section class="section">
+            <div class="section-inner">
+                <h1>Feature not found</h1>
+                <p>We couldn't find that feature. <a href="/features">Browse all features</a>.</p>
+            </div>
+        </section>
+    </main>
+    <SiteFooter />
+}
+else
+{
+    <PageTitle>@feature.Title | One Big Team</PageTitle>
+    <HeadContent>
+        <meta name="description" content="@feature.Summary">
+    </HeadContent>
+
+    <SiteHeader CurrentPage="features" />
+
+    <main>
+        <section class="pricing-hero section-band">
+            <div class="section-inner hero-copy">
+                <span class="feature-icon feature-icon-large" aria-hidden="true"><i class="@feature.IconClass"></i></span>
+                <p class="eyebrow"><a href="/features">Features</a></p>
+                <h1>@feature.Title</h1>
+                <p class="hero-text">@feature.Intro</p>
+            </div>
+        </section>
+
+        <section class="section pricing-section" id="trial">
+            <div class="section-inner">
+                <div class="feature-detail">
+                    <ul class="feature-benefits">
+                        @foreach (var benefit in feature.Benefits)
+                        {
+                            <li>@benefit</li>
+                        }
+                    </ul>
+                    <div class="feature-video-placeholder" aria-label="Screenshot coming soon">
+                        <span>Screenshot coming soon</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="contact" class="section final-cta">
+            <div class="section-inner cta-panel">
+                <p class="eyebrow">Ready to replace scattered HR admin?</p>
+                <h2>Start building one simple people workspace for your growing team.</h2>
+                <div class="hero-actions">
+                    <a class="button button-primary button-large" href="/contact#contact-form">Start free trial</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <SiteFooter />
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+
+    private FeatureInfo? feature;
+
+    protected override void OnParametersSet()
+    {
+        FeatureCatalog.TryGet(Slug, out feature);
+    }
+}

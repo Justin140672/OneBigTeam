@@ -80,7 +80,7 @@ public class GetHeadcountSummaryEndpointTests : IClassFixture<ApiWebApplicationF
 
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Active);
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Active);
-            AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.OnLeave);
+            AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Active);
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Draft);
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Suspended);
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.FormerEmployee);
@@ -100,7 +100,7 @@ public class GetHeadcountSummaryEndpointTests : IClassFixture<ApiWebApplicationF
 
         var engineering = Assert.Single(payload.Items, i => i.DepartmentId == departmentId);
         Assert.Equal("Engineering", engineering.DepartmentName);
-        Assert.Equal(3, engineering.EmployeeCount); // 2 Active + 1 OnLeave
+        Assert.Equal(3, engineering.EmployeeCount); // 3 Active (Draft/Suspended/FormerEmployee excluded)
 
         // DepartmentId is mandatory on Employee now, so a "no real department" row still carries
         // a real (orphan) Guid rather than null — "Unassigned" is signaled by DepartmentName only.
@@ -152,10 +152,6 @@ public class GetHeadcountSummaryEndpointTests : IClassFixture<ApiWebApplicationF
                 break;
             case EmploymentStatus.Active:
                 employee.Activate(now);
-                break;
-            case EmploymentStatus.OnLeave:
-                employee.Activate(now);
-                employee.SetOnLeave(now);
                 break;
             case EmploymentStatus.Suspended:
                 employee.Activate(now);

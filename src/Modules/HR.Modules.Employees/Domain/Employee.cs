@@ -144,12 +144,6 @@ internal sealed class Employee
         UpdatedAt = now;
     }
 
-    public void SetOnLeave(DateTimeOffset now)
-    {
-        Status = EmploymentStatus.OnLeave;
-        UpdatedAt = now;
-    }
-
     public void Suspend(DateTimeOffset now)
     {
         Status = EmploymentStatus.Suspended;

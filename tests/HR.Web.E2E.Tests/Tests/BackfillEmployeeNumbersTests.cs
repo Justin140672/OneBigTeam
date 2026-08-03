@@ -5,89 +5,79 @@ namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
 /// Verifies the "Backfill Employee Numbers" dialog (BackfillEmployeeNumbersDialog.razor), reachable
-/// from the "Employee Numbering" section of the Company Settings tab only while the company's
-/// employee-numbering mode is Automatic (see CompanySettingsTab.razor).
+/// from the "Employee Numbering" section of the standalone HR Settings page
+/// (/companies/{id}/hr-settings — see HrSettingsPage.razor) only while the company's
+/// employee-numbering mode is Automatic.
 ///
-/// IMPORTANT — persona/policy gap discovered while writing these tests: the Settings tab (and
-/// therefore this feature's entry-point button) is gated behind Session.CanManageCompany, which the
-/// "company:manage" policy restricts to CompanyAdministrator only (see CompanyEdit.razor,
-/// IdentityModule.AddRolePolicies). But the backend preview/commit endpoints
-/// (PreviewBackfillEmployeeNumbers/Endpoint.cs, CommitBackfillEmployeeNumbers/Endpoint.cs) are both
-/// gated behind "employee:manage", which that same policy table restricts to HrAdministrator only —
-/// and no persona seeded by IdentityModule.SeedDevPersonasAsync holds both roles simultaneously
-/// (Priya Shah has CompanyAdministrator only; Laura Bennett/David Park have HrAdministrator only).
-/// So with the current seed data there is no single logged-in user who can both see the "Backfill
-/// Employee Numbers…" button and successfully call the preview/commit endpoints behind it — the
-/// dialog-opening tests below use Priya Shah (the only persona that can reach the Settings tab at
-/// all) and may need re-pointing at a persona with both roles if one is added to the seed data, or
-/// may surface this as a genuine 403 in the dialog's error banner until the policies/role
-/// assignment are reconciled. This is a product/seed-data question, not something addressed here —
-/// see the class-level test names for what's actually independently verifiable regardless of that
-/// question.
+/// Employee Numbering (and this feature's entry-point button) used to live on the Company
+/// Settings tab, gated behind Session.CanManageCompany (CompanyAdministrator-only). It has since
+/// moved to the standalone HR Settings page, gated behind Session.IsHrAdministrator — which
+/// matches the "employee:manage" policy guarding the backend preview/commit endpoints
+/// (PreviewBackfillEmployeeNumbers/Endpoint.cs, CommitBackfillEmployeeNumbers/Endpoint.cs), so the
+/// persona/policy mismatch previously documented here (CompanyAdministrator could open the button
+/// but not call the endpoints behind it) no longer applies — Laura Bennett (HrAdministrator) can
+/// do both.
 /// </summary>
 [Collection("E2E")]
 public sealed class BackfillEmployeeNumbersTests(AppFixture fixture) : E2ETestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // Only a CompanyAdministrator can open the Settings tab at all (see class doc comment).
-    private const string CompanyAdminEmail = "priya.shah@acme.example";
+    private const string HrAdminEmail = "laura.bennett@acme.example";
 
     [Fact]
     public async Task BackfillButton_IsVisible_WhenNumberingModeIsAutomatic()
     {
-        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
-        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+        var login      = new LoginPage(_page, _fixture.WebBaseUrl);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(HrAdminEmail);
 
-        await companyEdit.GoToAsync(AcmeId);
-        await companyEdit.OpenSettingsTabAsync();
+        await hrSettings.GoToAsync(AcmeId);
 
-        var initialMode = await companyEdit.GetEmployeeNumberModeAsync();
+        var initialMode = await hrSettings.GetEmployeeNumberModeAsync();
 
         try
         {
-            await companyEdit.SelectEmployeeNumberModeAsync("Automatic");
+            await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
 
-            Assert.True(await companyEdit.IsBackfillEmployeeNumbersButtonVisibleAsync(),
+            Assert.True(await hrSettings.IsBackfillEmployeeNumbersButtonVisibleAsync(),
                 "Expected the 'Backfill Employee Numbers…' button to be visible while Numbering Mode is Automatic");
         }
         finally
         {
             // Restore the original mode so this test doesn't leak state into other tests/fixtures.
-            await companyEdit.SelectEmployeeNumberModeAsync(initialMode);
-            await companyEdit.SaveAsync();
+            await hrSettings.SelectEmployeeNumberModeAsync(initialMode);
+            await hrSettings.SaveAsync();
         }
     }
 
     [Fact]
     public async Task BackfillButton_IsNotVisible_WhenNumberingModeIsManual()
     {
-        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
-        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
+        var login      = new LoginPage(_page, _fixture.WebBaseUrl);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(HrAdminEmail);
 
-        await companyEdit.GoToAsync(AcmeId);
-        await companyEdit.OpenSettingsTabAsync();
+        await hrSettings.GoToAsync(AcmeId);
 
-        var initialMode = await companyEdit.GetEmployeeNumberModeAsync();
+        var initialMode = await hrSettings.GetEmployeeNumberModeAsync();
 
         try
         {
-            await companyEdit.SelectEmployeeNumberModeAsync("Manual");
+            await hrSettings.SelectEmployeeNumberModeAsync("Manual");
 
-            Assert.False(await companyEdit.IsBackfillEmployeeNumbersButtonVisibleAsync(),
+            Assert.False(await hrSettings.IsBackfillEmployeeNumbersButtonVisibleAsync(),
                 "Did not expect the 'Backfill Employee Numbers…' button to be visible while Numbering Mode is Manual");
         }
         finally
         {
             // Restore the original mode so this test doesn't leak state into other tests/fixtures.
-            await companyEdit.SelectEmployeeNumberModeAsync(initialMode);
-            await companyEdit.SaveAsync();
+            await hrSettings.SelectEmployeeNumberModeAsync(initialMode);
+            await hrSettings.SaveAsync();
         }
     }
 
@@ -104,30 +94,28 @@ public sealed class BackfillEmployeeNumbersTests(AppFixture fixture) : E2ETestBa
     [Fact]
     public async Task BackfillDialog_WithNoCandidates_ShowsEmptyStateAndDisablesConfirm()
     {
-        var login       = new LoginPage(_page, _fixture.WebBaseUrl);
-        var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
-        var dialog      = new BackfillEmployeeNumbersDialogPage(_page, _fixture.WebBaseUrl);
+        var login      = new LoginPage(_page, _fixture.WebBaseUrl);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
+        var dialog     = new BackfillEmployeeNumbersDialogPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(HrAdminEmail);
 
-        await companyEdit.GoToAsync(AcmeId);
-        await companyEdit.OpenSettingsTabAsync();
+        await hrSettings.GoToAsync(AcmeId);
 
-        var initialMode = await companyEdit.GetEmployeeNumberModeAsync();
+        var initialMode = await hrSettings.GetEmployeeNumberModeAsync();
 
         try
         {
-            await companyEdit.SelectEmployeeNumberModeAsync("Automatic");
-            await companyEdit.SaveAsync();
-            Assert.False(await companyEdit.HasErrorAsync(),
+            await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
+            await hrSettings.SaveAsync();
+            Assert.False(await hrSettings.HasErrorAsync(),
                 "Expected no error after switching the company's numbering mode to Automatic");
 
             // Re-navigate so the dialog is opened against the freshly-saved Automatic mode.
-            await companyEdit.GoToAsync(AcmeId);
-            await companyEdit.OpenSettingsTabAsync();
+            await hrSettings.GoToAsync(AcmeId);
 
-            await companyEdit.OpenBackfillEmployeeNumbersDialogAsync();
+            await hrSettings.OpenBackfillEmployeeNumbersDialogAsync();
             await dialog.WaitForPreviewLoadedAsync();
 
             Assert.False(await dialog.HasGlobalErrorAsync(),
@@ -143,10 +131,9 @@ public sealed class BackfillEmployeeNumbersTests(AppFixture fixture) : E2ETestBa
         finally
         {
             // Restore the original mode so this test doesn't leak state into other tests/fixtures.
-            await companyEdit.GoToAsync(AcmeId);
-            await companyEdit.OpenSettingsTabAsync();
-            await companyEdit.SelectEmployeeNumberModeAsync(initialMode);
-            await companyEdit.SaveAsync();
+            await hrSettings.GoToAsync(AcmeId);
+            await hrSettings.SelectEmployeeNumberModeAsync(initialMode);
+            await hrSettings.SaveAsync();
         }
     }
 

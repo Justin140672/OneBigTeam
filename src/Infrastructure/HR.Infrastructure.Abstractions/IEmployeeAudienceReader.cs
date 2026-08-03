@@ -63,7 +63,7 @@ public interface IEmployeeAudienceReader
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Every employee ID in the company regardless of employment status (Draft/Active/OnLeave/
+    /// Every employee ID in the company regardless of employment status (Draft/Active/
     /// Suspended/Leaving) — unlike <see cref="GetEligibleEmployeeIdsAsync"/>, which is scoped to
     /// document-audience matching and deliberately excludes anyone not Active. Used where a
     /// consumer genuinely needs the full roster, e.g. User Administration listing every employee

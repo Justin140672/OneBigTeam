@@ -47,12 +47,32 @@ public record UpdateCompanyAddressRequest(
 // Generic response envelope used for PUT /api/companies/{id}
 public record UpdateCompanyResponse(Guid Id, string Name, bool IsActive);
 
-// ── SETTINGS ──────────────────────────────────────────────────────────────────
+// ── SETTINGS (Company Administrator territory — profile/regional only) ────────
 
 public record GetCompanySettingsResponse(
     Guid CompanyId,
     string TimeZone,
     string Locale,
+    string PostcodeRegex,
+    string TelephoneRegex,
+    string MobileRegex,
+    DateTime UpdatedAt);
+
+public record UpdateCompanySettingsRequest(
+    Guid Id,
+    string? TimeZone,
+    string? Locale);
+
+public record UpdateCompanySettingsResponse(
+    Guid CompanyId,
+    string? TimeZone,
+    string? Locale,
+    DateTime UpdatedAt);
+
+// ── HR SETTINGS (HR Administrator territory — HR policy fields) ──────────────
+
+public record GetHrSettingsResponse(
+    Guid CompanyId,
     int WorkingDays,
     decimal HoursPerDay,
     int LeaveYearStartMonth,
@@ -63,9 +83,6 @@ public record GetCompanySettingsResponse(
     bool DisplaySalaryOnEmployeeProfile,
     int? FitNoteRequiredAfterDays,
     int? ReturnToWorkRequiredAfterDays,
-    string PostcodeRegex,
-    string TelephoneRegex,
-    string MobileRegex,
     string DefaultAcknowledgementStatement,
     int AcknowledgementReminderIntervalDays,
     NoticePeriodUnit NoticePeriodUnit,
@@ -77,10 +94,8 @@ public record GetCompanySettingsResponse(
     int EmployeeNumberMinimumLength,
     DateTime UpdatedAt);
 
-public record UpdateCompanySettingsRequest(
+public record UpdateHrSettingsRequest(
     Guid Id,
-    string? TimeZone,
-    string? Locale,
     WorkingDays WorkingDays,
     decimal HoursPerDay,
     int LeaveYearStartMonth,
@@ -101,10 +116,8 @@ public record UpdateCompanySettingsRequest(
     int NextEmployeeNumber,
     int EmployeeNumberMinimumLength);
 
-public record UpdateCompanySettingsResponse(
+public record UpdateHrSettingsResponse(
     Guid CompanyId,
-    string? TimeZone,
-    string? Locale,
     WorkingDays WorkingDays,
     decimal HoursPerDay,
     int LeaveYearStartMonth,

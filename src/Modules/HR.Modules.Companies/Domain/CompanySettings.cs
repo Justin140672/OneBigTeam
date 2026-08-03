@@ -82,9 +82,26 @@ internal sealed class CompanySettings
         };
     }
 
-    public void Update(
+    /// <summary>
+    /// Updates the company-profile-scoped fields (Company Administrator territory).
+    /// HR-policy fields are updated separately via <see cref="UpdateHrPolicy"/> so the two
+    /// concerns can be authorized and audited independently against the same aggregate.
+    /// </summary>
+    public void UpdateCompanyProfile(
         string timeZone,
         string locale,
+        DateTimeOffset now)
+    {
+        TimeZone = timeZone;
+        Locale = locale;
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// Updates the HR-policy fields (HR Administrator territory). See
+    /// <see cref="UpdateCompanyProfile"/> for the company-profile counterpart.
+    /// </summary>
+    public void UpdateHrPolicy(
         WorkingDays workingDays,
         decimal hoursPerDay,
         int leaveYearStartMonth,
@@ -106,8 +123,6 @@ internal sealed class CompanySettings
         int employeeNumberMinimumLength,
         DateTimeOffset now)
     {
-        TimeZone = timeZone;
-        Locale = locale;
         WorkingDays = workingDays;
         HoursPerDay = hoursPerDay;
         LeaveYearStartMonth = leaveYearStartMonth;

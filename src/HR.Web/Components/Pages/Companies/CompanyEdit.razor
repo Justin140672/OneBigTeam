@@ -85,13 +85,15 @@
             {
                 <div class="alert alert-success py-2 mb-0 d-flex align-items-center">@SuccessMsg</div>
             }
-            @if (!IsViewMode)
-            {
-                <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
-                    @(Saving ? "Saving…" : "Save")
-                </SfButton>
-            }
-            <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+            <div class="ms-auto d-flex gap-2">
+                @if (!IsViewMode)
+                {
+                    <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                        @(Saving ? "Saving…" : "Save")
+                    </SfButton>
+                }
+                <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+            </div>
         </div>
     }
 

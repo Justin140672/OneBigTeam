@@ -17,6 +17,27 @@ public sealed class EmployeeStarterReportTests(AppFixture fixture) : E2ETestBase
 
     private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
 
+    /// <summary>
+    /// The "Start Date From" filter defaults to the 1st of the current month on first load
+    /// (EmployeeStarterReportPage.razor's _defaultStartDate), not blank or today's date.
+    /// </summary>
+    [Fact]
+    public async Task StartDateFromFilter_DefaultsToFirstOfCurrentMonth()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var report = new EmployeeStarterReportPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await report.GoToAsync(AcmeId);
+
+        var expected = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1).ToString("dd/MM/yyyy");
+        var actual = await report.GetStartDateFromValueAsync();
+
+        Assert.Equal(expected, actual);
+    }
+
     [Fact]
     public async Task Page_Loads_WithExpectedColumns()
     {
@@ -53,11 +74,12 @@ public sealed class EmployeeStarterReportTests(AppFixture fixture) : E2ETestBase
 
         var unfilteredRowCount = await report.GetRowCountAsync();
 
-        // With seeded dev data we can't assume a specific department exists/row-count delta, but
-        // the filter panel's own combobox items (all departments in the company) are always safe
-        // to pick the first one from — mirrors EmployeeDirectoryReportTests' status-filter smoke
-        // check in spirit: reload must not error, and filtering can only narrow the result set.
-        await report.SelectFilterAsync("Department", "");
+        // "Engineering" is the seeded Acme department used throughout this suite (see
+        // DataImportWizardTests etc.) — DropDownSelector.SelectAsync's own post-selection
+        // round-trip assertion needs a real, non-empty expected value to match against (passing
+        // "" here made Regex.Escape("") produce an empty pattern that never matches the actually-
+        // selected item's text, failing even though selection itself succeeded).
+        await report.SelectFilterAsync("Department", "Engineering");
         await report.ApplyFiltersAsync();
 
         Assert.False(await report.HasLoadErrorAsync(),

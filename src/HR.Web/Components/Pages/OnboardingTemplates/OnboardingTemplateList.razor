@@ -60,6 +60,13 @@
     }
 </div>
 
+<HrConfirmDialog Visible="@(_deactivateTarget is not null)"
+                 Title="Deactivate Onboarding Template"
+                 Message="@($"Are you sure you want to deactivate '{_deactivateTarget?.Name}'?")"
+                 Busy="_deactivating"
+                 OnConfirmed="ConfirmDeactivateAsync"
+                 OnCancelled="@(() => _deactivateTarget = null)" />
+
 @code {
     protected override bool SupportsActiveFilter => true;
 
@@ -76,7 +83,11 @@
             id:      "hr-delete",
             text:    "Delete",
             icon:    "fa-solid fa-trash",
-            onClick: async item => await Delete(item),
+            onClick: item =>
+            {
+                _deactivateTarget = item;
+                return Task.CompletedTask;
+            },
             tooltip: "Deactivate selected onboarding template");
     }
 
@@ -92,10 +103,19 @@
     protected override string? GetEditUrl(OnboardingTemplateListItemModel item) => $"/companies/{CompanyId}/onboarding-templates/{item.Id}";
     protected override string? GetViewUrl(OnboardingTemplateListItemModel item) => $"/companies/{CompanyId}/onboarding-templates/{item.Id}/view";
 
-    private async Task Delete(OnboardingTemplateListItemModel item)
+    private OnboardingTemplateListItemModel? _deactivateTarget;
+    private bool _deactivating;
+
+    private async Task ConfirmDeactivateAsync()
     {
+        if (_deactivateTarget is null) return;
+
+        _deactivating = true;
         ClearActionError();
-        var error = await OnboardingTemplateService.DeactivateAsync(CompanyId, item.Id);
+        var error = await OnboardingTemplateService.DeactivateAsync(CompanyId, _deactivateTarget.Id);
+        _deactivating = false;
+        _deactivateTarget = null;
+
         if (error is not null)
             SetActionError(error);
         else

@@ -154,6 +154,7 @@ public sealed class VacancyPositionProfileCorrectionTests(AppFixture fixture) : 
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.ClickVacancyAsync(vacancyTitle);
+        await vacancyDetail.PublishVacancyAsync();
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
         await vacancyDetail.SelectCandidateInAddDialogAsync(candidateName);
