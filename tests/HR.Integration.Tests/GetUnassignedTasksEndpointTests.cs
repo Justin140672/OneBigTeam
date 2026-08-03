@@ -6,7 +6,8 @@ using HR.SharedKernel;
 
 namespace HR.Integration.Tests;
 
-public class GetUnassignedTasksEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetUnassignedTasksEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUser       = Guid.Parse("11100005-0000-0000-0000-000000000001");

@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class RenameReportViewEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class RenameReportViewEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

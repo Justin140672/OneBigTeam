@@ -8,7 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class UserInviteEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class UserInviteEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

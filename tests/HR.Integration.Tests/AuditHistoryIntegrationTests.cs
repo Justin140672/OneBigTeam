@@ -21,7 +21,8 @@ namespace HR.Integration.Tests;
 /// (which filters by EmployeeId) and there is no company-level audit-history endpoint. That test
 /// instead reads AuditDbContext directly via the test host's DI container.
 /// </summary>
-public class AuditHistoryIntegrationTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class AuditHistoryIntegrationTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
@@ -241,7 +242,7 @@ public class AuditHistoryIntegrationTests : IClassFixture<ApiWebApplicationFacto
         var entry = Assert.Single(history!.Items, i => i.Action == "Employee profile updated");
         Assert.Equal("Employees", entry.Module);
 
-        var departmentChange = Assert.Single(entry.Changes, c => c.Field == "Department Id");
+        var departmentChange = Assert.Single(entry.Changes, c => c.Field == "Department");
         Assert.Equal(newDepartment.Name, departmentChange.After);
     }
 

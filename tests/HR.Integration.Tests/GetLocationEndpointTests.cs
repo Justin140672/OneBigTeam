@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class GetLocationEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetLocationEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUserId = new("ff000008-0000-0000-0000-000000000001");

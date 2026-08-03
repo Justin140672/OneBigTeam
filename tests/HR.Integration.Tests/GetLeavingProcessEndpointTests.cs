@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class GetLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetLeavingProcessEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
@@ -40,6 +41,11 @@ public class GetLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationFac
         return (await response.Content.ReadFromJsonAsync<IdPayload>())!.Id;
     }
 
+    // Relative to "today" rather than hardcoded literals — see StartLeavingProcessEndpointTests'
+    // identical fields for why a fixed near-term literal eventually becomes "backdated".
+    private static readonly DateOnly LeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
+    private static readonly DateOnly LastWorkingDay = LeavingDate.AddDays(-1);
+
     private static async Task StartLeavingProcessAsync(HttpClient client, Guid companyId, Guid employeeId)
     {
         var response = await client.PostAsJsonAsync(
@@ -48,9 +54,9 @@ public class GetLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationFac
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                resignationReceivedDate = LeavingDate.AddDays(-30).ToString("yyyy-MM-dd"),
+                leavingDate = LeavingDate.ToString("yyyy-MM-dd"),
+                lastWorkingDay = LastWorkingDay.ToString("yyyy-MM-dd"),
                 leavingReason = "Resignation"
             });
         response.EnsureSuccessStatusCode();
@@ -100,9 +106,9 @@ public class GetLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationFac
         var payload = await response.Content.ReadFromJsonAsync<LeavingProcessPayload>();
         Assert.NotNull(payload);
         Assert.NotEqual(Guid.Empty, payload!.Id);
-        Assert.Equal(new DateOnly(2026, 7, 1), payload.ResignationReceivedDate);
-        Assert.Equal(new DateOnly(2026, 8, 1), payload.LeavingDate);
-        Assert.Equal(new DateOnly(2026, 7, 31), payload.LastWorkingDay);
+        Assert.Equal(LeavingDate.AddDays(-30), payload.ResignationReceivedDate);
+        Assert.Equal(LeavingDate, payload.LeavingDate);
+        Assert.Equal(LastWorkingDay, payload.LastWorkingDay);
         Assert.Equal("Resignation", payload.LeavingReason);
         Assert.Equal("InProgress", payload.Status);
     }

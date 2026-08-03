@@ -6,7 +6,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class GetEmployeeDocumentEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetEmployeeDocumentEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUser       = Guid.Parse("11100010-0000-0000-0000-000000000001");

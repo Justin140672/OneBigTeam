@@ -9,7 +9,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class LeaveLifecycleIntegrationTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class LeaveLifecycleIntegrationTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid UserId = new("dddddddd-0000-0000-0000-000000000001");

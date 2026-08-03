@@ -6,8 +6,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace HR.Integration.Tests;
 
+[Collection("Integration")]
 public class DownloadEmployeeDocumentEndpointTests(ApiWebApplicationFactory factory)
-    : IClassFixture<ApiWebApplicationFactory>
 {
     private static readonly Guid AcmeCompanyId      = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid SarahEmployeeId    = Guid.Parse("30000000-0000-0000-0000-000000000001");

@@ -97,7 +97,7 @@
                             <span class="user-account-status-label @cssClass">
                                 <i class="@icon me-1"></i>@label
                             </span>
-                            @if (row.UserAccountStatus == "NoUser")
+                            @if (row.UserAccountStatus == "No User")
                             {
                                 <a href="javascript:void(0)" class="ms-2" @onclick="@(() => OnInviteUserClicked(row))">&nbsp;Invite User</a>
                             }
@@ -302,12 +302,12 @@
     // "User Account" column, which renders an icon + text instead of a badge.
     private static (string Icon, string CssClass, string Label) UserAccountStatusDisplay(string status) => status switch
     {
-        "Active"             => ("fa-solid fa-circle-check", "text-success", "Active"),
-        "Disabled"           => ("fa-solid fa-ban", "text-danger", "Disabled"),
-        "PendingInvitation"  => ("fa-solid fa-clock", "text-warning", "Pending Invitation"),
-        "InvitationExpired"  => ("fa-solid fa-clock", "text-warning", "Invitation Expired"),
-        "NoUser"             => ("fa-solid fa-circle-minus", "text-secondary", "No User"),
-        _                    => ("fa-solid fa-circle-question", "text-muted", status)
+        "Active"              => ("fa-solid fa-circle-check", "text-success", "Active"),
+        "Disabled"            => ("fa-solid fa-ban", "text-danger", "Disabled"),
+        "Pending Invitation"  => ("fa-solid fa-clock", "text-warning", "Pending Invitation"),
+        "Invitation Expired"  => ("fa-solid fa-clock", "text-warning", "Invitation Expired"),
+        "No User"             => ("fa-solid fa-circle-minus", "text-secondary", "No User"),
+        _                     => ("fa-solid fa-circle-question", "text-muted", status)
     };
 
     private void OnInviteUserClicked(EmployeeListItemModel row)

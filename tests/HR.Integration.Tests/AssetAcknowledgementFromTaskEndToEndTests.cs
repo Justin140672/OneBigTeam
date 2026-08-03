@@ -13,7 +13,8 @@ namespace HR.Integration.Tests;
 /// calls AssetAcknowledgementService, marking the assignment as acknowledged and then
 /// creating a follow-up Return task.
 /// </summary>
-public class AssetAcknowledgementFromTaskEndToEndTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class AssetAcknowledgementFromTaskEndToEndTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

@@ -7,7 +7,8 @@ using HR.SharedKernel;
 
 namespace HR.Integration.Tests;
 
-public class GetEmployeeTasksEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetEmployeeTasksEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid SeededCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");

@@ -11,7 +11,8 @@ namespace HR.Integration.Tests;
 /// is within the next 7 days (overdue, due today, or due this week) come back, Archived documents
 /// are always excluded regardless of ReviewDate, and results are scoped to the company in the route.
 /// </summary>
-public class ListSharedCompanyDocumentsDueForReviewEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ListSharedCompanyDocumentsDueForReviewEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);

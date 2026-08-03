@@ -9,7 +9,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class CommitBackfillEmployeeNumbersEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class CommitBackfillEmployeeNumbersEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid User1 = new("61000000-0000-0000-0000-000000000001");
@@ -55,13 +56,16 @@ public class CommitBackfillEmployeeNumbersEndpointTests : IClassFixture<ApiWebAp
         return payload!.Id;
     }
 
+    // Was calling PUT /api/companies/{id}/settings (UpdateCompanySettingsHandler), which only
+    // persists TimeZone/Locale and silently ignores every other field in the request body
+    // (including employeeNumberMode) — it still returned 200 OK. The actual employee-number/HR
+    // settings live behind PUT /api/companies/{id}/hr-settings (UpdateHrSettingsHandler).
     private static async Task SetEmployeeNumberModeAsync(
         HttpClient client, Guid companyId, string mode, string? prefix = null, int nextEmployeeNumber = 1, int minimumLength = 1)
     {
-        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/settings", new
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
         {
-            timeZone = "UTC",
-            locale = "en-GB",
+            id = companyId,
             workingDays = 31,
             hoursPerDay = 7.5,
             leaveYearStartMonth = 1,
@@ -200,7 +204,7 @@ public class CommitBackfillEmployeeNumbersEndpointTests : IClassFixture<ApiWebAp
         // Pre-existing number is never touched by the backfill.
         Assert.Equal("EMP-EXISTING", await GetSavedEmployeeNumberAsync(numberedEmployeeId));
 
-        var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/settings");
+        var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/hr-settings");
         settingsResponse.EnsureSuccessStatusCode();
         var settings = await settingsResponse.Content.ReadFromJsonAsync<SettingsPayload>();
         Assert.NotNull(settings);
@@ -232,7 +236,7 @@ public class CommitBackfillEmployeeNumbersEndpointTests : IClassFixture<ApiWebAp
         Assert.Empty(secondPayload.Items);
 
         // No number was re-claimed for the already-numbered employee on the second call.
-        var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/settings");
+        var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/hr-settings");
         settingsResponse.EnsureSuccessStatusCode();
         var settings = await settingsResponse.Content.ReadFromJsonAsync<SettingsPayload>();
         Assert.NotNull(settings);

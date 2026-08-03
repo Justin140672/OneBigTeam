@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class GetCompensationHistoryEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetCompensationHistoryEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

@@ -14,7 +14,8 @@ namespace HR.Integration.Tests;
 /// GetProbationRecordByEmployee endpoint ("probation:manage") which 403s a real employee viewing
 /// their own profile.
 /// </summary>
-public class GetMyProbationStatusEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetMyProbationStatusEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid SelfUser = new("cc00000a-0000-0000-0000-000000000001");

@@ -6,8 +6,8 @@ using HR.SharedKernel;
 
 namespace HR.Integration.Tests;
 
+[Collection("Integration")]
 public class ListDocumentTypesEndpointTests(ApiWebApplicationFactory factory)
-    : IClassFixture<ApiWebApplicationFactory>
 {
     private static readonly Guid AcmeCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

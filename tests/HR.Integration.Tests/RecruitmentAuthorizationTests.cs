@@ -19,7 +19,8 @@ namespace HR.Integration.Tests;
 /// Company Administrator is scoped to company profile/settings and does not hold recruitment
 /// permissions either.
 /// </summary>
-public class RecruitmentAuthorizationTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class RecruitmentAuthorizationTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

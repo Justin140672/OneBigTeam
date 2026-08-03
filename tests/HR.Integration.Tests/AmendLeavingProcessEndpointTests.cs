@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class AmendLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class AmendLeavingProcessEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
@@ -17,6 +18,15 @@ public class AmendLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
     private static readonly Guid User6 = new("ffffffff-3000-0000-0000-000000000008");
     private static readonly Guid EmployeeRoleUser = new("ffffffff-3000-0000-0000-000000000005");
     private static readonly Guid ManagerRoleUser = new("ffffffff-3000-0000-0000-000000000006");
+
+    // Relative to "today" rather than hardcoded literals — see StartLeavingProcessEndpointTests'
+    // identical fields for why a fixed near-term literal eventually becomes "backdated".
+    // OriginalLeavingDate is what StartLeavingProcessAsync below sets; AmendedLeavingDate is the
+    // later date most tests here amend it to.
+    private static readonly DateOnly OriginalLeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
+    private static readonly DateOnly OriginalLastWorkingDay = OriginalLeavingDate.AddDays(-1);
+    private static readonly DateOnly AmendedLeavingDate = OriginalLeavingDate.AddDays(31);
+    private static readonly DateOnly AmendedLastWorkingDay = AmendedLeavingDate.AddDays(-1);
 
     public AmendLeavingProcessEndpointTests(ApiWebApplicationFactory factory)
     {
@@ -61,9 +71,9 @@ public class AmendLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                resignationReceivedDate = OriginalLeavingDate.AddDays(-30).ToString("yyyy-MM-dd"),
+                leavingDate = OriginalLeavingDate.ToString("yyyy-MM-dd"),
+                lastWorkingDay = OriginalLastWorkingDay.ToString("yyyy-MM-dd"),
                 leavingReason = "Resignation"
             });
         response.EnsureSuccessStatusCode();
@@ -82,8 +92,8 @@ public class AmendLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                leavingDate = "2026-09-01",
-                lastWorkingDay = "2026-08-31",
+                leavingDate = AmendedLeavingDate.ToString("yyyy-MM-dd"),
+                lastWorkingDay = AmendedLastWorkingDay.ToString("yyyy-MM-dd"),
                 leavingReason = "MutualAgreement"
             });
 
@@ -107,8 +117,8 @@ public class AmendLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                leavingDate = "2026-09-01",
-                lastWorkingDay = "2026-08-31",
+                leavingDate = AmendedLeavingDate.ToString("yyyy-MM-dd"),
+                lastWorkingDay = AmendedLastWorkingDay.ToString("yyyy-MM-dd"),
                 leavingReason = "MutualAgreement"
             });
 
@@ -118,8 +128,8 @@ public class AmendLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
         Assert.NotNull(payload);
         Assert.Equal(companyId, payload!.CompanyId);
         Assert.Equal(employeeId, payload.EmployeeId);
-        Assert.Equal(new DateOnly(2026, 9, 1), payload.LeavingDate);
-        Assert.Equal(new DateOnly(2026, 8, 31), payload.LastWorkingDay);
+        Assert.Equal(AmendedLeavingDate, payload.LeavingDate);
+        Assert.Equal(AmendedLastWorkingDay, payload.LastWorkingDay);
         Assert.Equal("MutualAgreement", payload.LeavingReason);
         Assert.Equal("InProgress", payload.Status);
 
@@ -127,8 +137,8 @@ public class AmendLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
         getResponse.EnsureSuccessStatusCode();
         var getPayload = await getResponse.Content.ReadFromJsonAsync<GetLeavingProcessPayload>();
         Assert.NotNull(getPayload);
-        Assert.Equal(new DateOnly(2026, 9, 1), getPayload!.LeavingDate);
-        Assert.Equal(new DateOnly(2026, 8, 31), getPayload.LastWorkingDay);
+        Assert.Equal(AmendedLeavingDate, getPayload!.LeavingDate);
+        Assert.Equal(AmendedLastWorkingDay, getPayload.LastWorkingDay);
         Assert.Equal("MutualAgreement", getPayload.LeavingReason);
     }
 
@@ -148,8 +158,8 @@ public class AmendLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                leavingDate = "2026-09-01",
-                lastWorkingDay = "2026-08-31",
+                leavingDate = AmendedLeavingDate.ToString("yyyy-MM-dd"),
+                lastWorkingDay = AmendedLastWorkingDay.ToString("yyyy-MM-dd"),
                 leavingReason = "MutualAgreement"
             });
 
@@ -173,8 +183,8 @@ public class AmendLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                leavingDate = "2026-08-31",
-                lastWorkingDay = "2026-09-01",
+                leavingDate = AmendedLastWorkingDay.ToString("yyyy-MM-dd"),
+                lastWorkingDay = AmendedLeavingDate.ToString("yyyy-MM-dd"),
                 leavingReason = "MutualAgreement"
             });
 
@@ -199,8 +209,8 @@ public class AmendLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId = otherCompanyId,
                 employeeId,
-                leavingDate = "2026-09-01",
-                lastWorkingDay = "2026-08-31",
+                leavingDate = AmendedLeavingDate.ToString("yyyy-MM-dd"),
+                lastWorkingDay = AmendedLastWorkingDay.ToString("yyyy-MM-dd"),
                 leavingReason = "MutualAgreement"
             });
 
@@ -224,8 +234,8 @@ public class AmendLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                leavingDate = "2026-09-01",
-                lastWorkingDay = "2026-08-31",
+                leavingDate = AmendedLeavingDate.ToString("yyyy-MM-dd"),
+                lastWorkingDay = AmendedLastWorkingDay.ToString("yyyy-MM-dd"),
                 leavingReason = "MutualAgreement"
             });
 
@@ -247,8 +257,8 @@ public class AmendLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                leavingDate = "2026-09-01",
-                lastWorkingDay = "2026-08-31",
+                leavingDate = AmendedLeavingDate.ToString("yyyy-MM-dd"),
+                lastWorkingDay = AmendedLastWorkingDay.ToString("yyyy-MM-dd"),
                 leavingReason = "MutualAgreement"
             });
 
@@ -287,7 +297,7 @@ public class AmendLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
         getResponse.EnsureSuccessStatusCode();
         var getPayload = await getResponse.Content.ReadFromJsonAsync<GetLeavingProcessPayload>();
         Assert.NotNull(getPayload);
-        Assert.Equal(new DateOnly(2026, 8, 1), getPayload!.LeavingDate);
+        Assert.Equal(OriginalLeavingDate, getPayload!.LeavingDate);
         Assert.Equal("InProgress", getPayload.Status);
     }
 

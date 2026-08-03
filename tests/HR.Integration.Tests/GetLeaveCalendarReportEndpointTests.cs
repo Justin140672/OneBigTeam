@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class GetLeaveCalendarReportEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetLeaveCalendarReportEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

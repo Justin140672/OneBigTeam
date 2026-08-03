@@ -10,7 +10,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class ListVacanciesEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ListVacanciesEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid RecruiterUser = new("cc000013-0000-0000-0000-000000000001");

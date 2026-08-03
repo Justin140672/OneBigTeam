@@ -9,7 +9,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class UploadEmployeeProfilePhotoEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class UploadEmployeeProfilePhotoEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid ManagerUser = Guid.Parse("dd000001-0000-0000-0000-000000000001");

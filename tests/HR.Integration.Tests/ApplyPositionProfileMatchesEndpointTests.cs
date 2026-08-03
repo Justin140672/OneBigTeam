@@ -16,7 +16,8 @@ namespace HR.Integration.Tests;
 /// was rewritten to always short-circuit and return an empty result; these tests assert exactly that
 /// and confirm it never touches existing rows.
 /// </summary>
-public class ApplyPositionProfileMatchesEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ApplyPositionProfileMatchesEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid RecruiterUser = new("cc000010-0000-0000-0000-000000000001");

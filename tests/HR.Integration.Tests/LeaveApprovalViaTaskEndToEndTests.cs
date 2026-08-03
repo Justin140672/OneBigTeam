@@ -23,7 +23,8 @@ namespace HR.Integration.Tests;
 /// (which uses the direct /approve endpoint) or LeaveSubmittedCreatesTaskTests (which only
 /// checks that the task was created, not that completing it approves the leave).
 /// </summary>
-public class LeaveApprovalViaTaskEndToEndTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class LeaveApprovalViaTaskEndToEndTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

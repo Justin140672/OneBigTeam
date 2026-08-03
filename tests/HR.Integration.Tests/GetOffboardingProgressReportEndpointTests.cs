@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class GetOffboardingProgressReportEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetOffboardingProgressReportEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

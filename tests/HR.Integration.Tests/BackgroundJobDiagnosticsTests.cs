@@ -4,8 +4,8 @@ using HR.Integration.Tests.Infrastructure;
 
 namespace HR.Integration.Tests;
 
+[Collection("Integration")]
 public class BackgroundJobDiagnosticsTests(ApiWebApplicationFactory factory)
-    : IClassFixture<ApiWebApplicationFactory>
 {
     private static readonly JsonDocumentOptions JsonOptions = new()
     {

@@ -13,7 +13,8 @@ namespace HR.Integration.Tests;
 ///     → Complete acknowledgement → Return task auto-created
 ///     → Complete return → Asset back to Available, assignment inactive
 /// </summary>
-public class AssetLifecycleEndToEndTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class AssetLifecycleEndToEndTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

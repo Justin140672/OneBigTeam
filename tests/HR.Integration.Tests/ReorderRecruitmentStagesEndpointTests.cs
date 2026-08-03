@@ -8,7 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class ReorderRecruitmentStagesEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ReorderRecruitmentStagesEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid RecruiterUser = new("cc0000a1-0000-0000-0000-000000000001");

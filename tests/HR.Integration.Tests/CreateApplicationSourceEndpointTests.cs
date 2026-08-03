@@ -13,7 +13,8 @@ namespace HR.Integration.Tests;
 /// See CreateApplicationHandlerTests/CreateApplicationValidatorTests in HR.Modules.Recruitment.Tests
 /// for the equivalent unit-level coverage of the same behaviour.
 /// </summary>
-public class CreateApplicationSourceEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class CreateApplicationSourceEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid RecruiterUser = new("cd000011-0000-0000-0000-000000000001");

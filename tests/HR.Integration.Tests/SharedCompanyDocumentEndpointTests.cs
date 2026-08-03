@@ -15,7 +15,8 @@ namespace HR.Integration.Tests;
 /// hold HrAdministrator, Manager excluded entirely), that a category from a different company
 /// cannot be used (tenant isolation), and that a new upload always lands as Draft.
 /// </summary>
-public class SharedCompanyDocumentEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class SharedCompanyDocumentEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

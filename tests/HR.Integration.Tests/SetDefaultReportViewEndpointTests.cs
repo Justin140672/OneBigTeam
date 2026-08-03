@@ -6,7 +6,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class SetDefaultReportViewEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class SetDefaultReportViewEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

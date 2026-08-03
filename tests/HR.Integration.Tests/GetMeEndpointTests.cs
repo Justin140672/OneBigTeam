@@ -12,14 +12,23 @@ namespace HR.Integration.Tests;
 /// it drifts from the policy, a role either sees an edit UI it can't actually save
 /// with, or is hidden a UI it should have.
 /// </summary>
-public class GetMeEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetMeEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
-    private static readonly Guid EmployeeUser = new("dd000001-0000-0000-0000-000000000001");
-    private static readonly Guid ManagerUser = new("dd000001-0000-0000-0000-000000000002");
-    private static readonly Guid HrAdminUser = new("dd000001-0000-0000-0000-000000000003");
-    private static readonly Guid CompanyAdminUser = new("dd000001-0000-0000-0000-000000000004");
+    // Was hardcoded ("dd000001-...") — now that HR.Integration.Tests shares one Postgres
+    // Testcontainer/database across the whole assembly instead of one per test class (see
+    // IntegrationTestCollection), a fixed literal here could collide with the same literal used
+    // by an unrelated test file's own "arbitrary placeholder user" (this one specifically
+    // collided with LeaveAuthorizationTests/RecruitmentDashboardSummaryEndpointTests, each
+    // assigning the same GUID a different, conflicting role). Guid.NewGuid() is evaluated once
+    // per static initialization (i.e. once for this whole test run), so it stays stable across
+    // this class's own test methods while being guaranteed unique across every other file.
+    private static readonly Guid EmployeeUser = Guid.NewGuid();
+    private static readonly Guid ManagerUser = Guid.NewGuid();
+    private static readonly Guid HrAdminUser = Guid.NewGuid();
+    private static readonly Guid CompanyAdminUser = Guid.NewGuid();
 
     public GetMeEndpointTests(ApiWebApplicationFactory factory)
     {

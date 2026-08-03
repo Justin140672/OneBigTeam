@@ -135,13 +135,28 @@ internal sealed class ListEmployeesHandler
                 e.Status,
                 e.CreatedAt,
                 photoUrls.TryGetValue(e.Id, out var photoUrl) ? photoUrl : null,
-                accountStatuses.TryGetValue(e.Id, out var accountSummary)
-                    ? accountSummary.Status.ToString()
-                    : EmployeeUserAccountStatus.NoUser.ToString()))
+                FormatAccountStatus(accountStatuses.TryGetValue(e.Id, out var accountSummary)
+                    ? accountSummary.Status
+                    : EmployeeUserAccountStatus.NoUser)))
             .ToList();
 
         var totalPages = request.PageSize == 0 ? 0 : (int)Math.Ceiling((double)totalCount / request.PageSize);
 
         return Result.Success(new ListEmployeesResponse(items, totalCount, request.PageNumber, request.PageSize, totalPages));
     }
+
+    // Sent as the display-ready label (not the raw enum name) so the grid's "User Account"
+    // column, its Excel filter checkbox list, and any client-side filter query all agree on
+    // "No User" — previously this was a bare enum ToString() ("NoUser"), which rendered fine
+    // via client-side reformatting but meant the value the grid actually filtered/queried by
+    // was the unspaced enum name.
+    private static string FormatAccountStatus(EmployeeUserAccountStatus status) => status switch
+    {
+        EmployeeUserAccountStatus.NoUser => "No User",
+        EmployeeUserAccountStatus.PendingInvitation => "Pending Invitation",
+        EmployeeUserAccountStatus.InvitationExpired => "Invitation Expired",
+        EmployeeUserAccountStatus.Active => "Active",
+        EmployeeUserAccountStatus.Disabled => "Disabled",
+        _ => status.ToString()
+    };
 }

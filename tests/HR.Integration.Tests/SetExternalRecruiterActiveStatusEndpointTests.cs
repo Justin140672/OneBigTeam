@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class SetExternalRecruiterActiveStatusEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class SetExternalRecruiterActiveStatusEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid RecruiterUser = new("cd00000d-0000-0000-0000-000000000001");

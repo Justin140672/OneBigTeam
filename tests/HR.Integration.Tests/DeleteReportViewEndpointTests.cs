@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class DeleteReportViewEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class DeleteReportViewEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

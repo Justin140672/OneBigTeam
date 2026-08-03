@@ -13,7 +13,8 @@ namespace HR.Integration.Tests;
 /// employee/leave/sickness data elsewhere — and must be denied here; that's the
 /// specific regression this file guards against.
 /// </summary>
-public class CompanyAuthorizationTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class CompanyAuthorizationTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

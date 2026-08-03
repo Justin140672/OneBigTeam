@@ -6,7 +6,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class GetEmployeeProfilePhotoEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetEmployeeProfilePhotoEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid ManagerUser = Guid.Parse("cc200001-0000-0000-0000-000000000001");

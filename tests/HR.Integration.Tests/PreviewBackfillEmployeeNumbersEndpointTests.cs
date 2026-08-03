@@ -8,7 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class PreviewBackfillEmployeeNumbersEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class PreviewBackfillEmployeeNumbersEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid User1 = new("60000000-0000-0000-0000-000000000001");
@@ -53,13 +54,16 @@ public class PreviewBackfillEmployeeNumbersEndpointTests : IClassFixture<ApiWebA
         return payload!.Id;
     }
 
+    // Was calling PUT /api/companies/{id}/settings (UpdateCompanySettingsHandler), which only
+    // persists TimeZone/Locale and silently ignores every other field in the request body
+    // (including employeeNumberMode) — it still returned 200 OK. The actual employee-number/HR
+    // settings live behind PUT /api/companies/{id}/hr-settings (UpdateHrSettingsHandler).
     private static async Task SetEmployeeNumberModeAsync(
         HttpClient client, Guid companyId, string mode, string? prefix = null, int nextEmployeeNumber = 1, int minimumLength = 1)
     {
-        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/settings", new
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
         {
-            timeZone = "UTC",
-            locale = "en-GB",
+            id = companyId,
             workingDays = 31,
             hoursPerDay = 7.5,
             leaveYearStartMonth = 1,
@@ -207,7 +211,7 @@ public class PreviewBackfillEmployeeNumbersEndpointTests : IClassFixture<ApiWebA
         Assert.Single(secondPayload!.Candidates);
         Assert.Equal(firstPayload.Candidates[0].PredictedEmployeeNumber, secondPayload.Candidates[0].PredictedEmployeeNumber);
 
-        var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/settings");
+        var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/hr-settings");
         settingsResponse.EnsureSuccessStatusCode();
         var settings = await settingsResponse.Content.ReadFromJsonAsync<SettingsPayload>();
         Assert.NotNull(settings);

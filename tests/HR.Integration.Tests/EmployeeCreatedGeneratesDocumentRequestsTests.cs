@@ -9,7 +9,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class EmployeeCreatedGeneratesDocumentRequestsTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class EmployeeCreatedGeneratesDocumentRequestsTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUser = Guid.Parse("ff000001-0000-0000-0000-000000000001");

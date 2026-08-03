@@ -10,7 +10,8 @@ namespace HR.Integration.Tests;
 /// GetMyContactDetails. All three use the 'sub' claim (X-Test-User) as the
 /// employee identity and look up by employee.Id == userId.
 /// </summary>
-public class SelfServiceReadEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class SelfServiceReadEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUser       = Guid.Parse("11100007-0000-0000-0000-000000000001");

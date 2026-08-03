@@ -10,7 +10,8 @@ using Microsoft.AspNetCore.Routing;
 
 namespace HR.Integration.Tests;
 
-public class RequireTenantMiddlewareTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class RequireTenantMiddlewareTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

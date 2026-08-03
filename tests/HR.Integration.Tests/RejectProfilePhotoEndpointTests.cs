@@ -10,7 +10,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class RejectProfilePhotoEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class RejectProfilePhotoEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid ManagerUser = Guid.Parse("bb100001-0000-0000-0000-000000000001");

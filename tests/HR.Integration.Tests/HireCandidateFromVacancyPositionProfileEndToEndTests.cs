@@ -16,7 +16,8 @@ namespace HR.Integration.Tests;
 /// client-supplied values — HireCandidateRequest no longer even carries those fields. Also proves
 /// OfferCandidate surfaces the linked Position Profile's employment defaults as read-only context.
 /// </summary>
-public class HireCandidateFromVacancyPositionProfileEndToEndTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class HireCandidateFromVacancyPositionProfileEndToEndTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid RecruiterUser = new("cc00001a-0000-0000-0000-000000000001");

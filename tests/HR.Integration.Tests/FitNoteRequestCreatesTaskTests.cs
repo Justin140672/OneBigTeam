@@ -15,7 +15,8 @@ namespace HR.Integration.Tests;
 /// which is handled by SicknessEvidenceRequestedHandler in the Tasks module,
 /// creating an Upload task assigned to the employee.
 /// </summary>
-public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class FitNoteRequestCreatesTaskTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid CompanyAdminUser = Guid.Parse("fa000001-0000-0000-0000-000000000001");
@@ -45,7 +46,7 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
         using var _2 = hrClient;
 
         // 1. Create company settings with FitNoteRequiredAfterDays = 1
-        await SetFitNoteThresholdAsync(companyAdminClient, companyId, fitNoteRequiredAfterDays: 1);
+        await SetFitNoteThresholdAsync(hrClient, companyId, fitNoteRequiredAfterDays: 1);
 
         // 2. Create an employee
         var employeeId = await CreateEmployeeAsync(hrClient, companyId);
@@ -76,7 +77,7 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
         using var _1 = companyAdminClient;
         using var _2 = hrClient;
 
-        await SetFitNoteThresholdAsync(companyAdminClient, companyId, fitNoteRequiredAfterDays: 1);
+        await SetFitNoteThresholdAsync(hrClient, companyId, fitNoteRequiredAfterDays: 1);
         var employeeId = await CreateEmployeeAsync(hrClient, companyId);
         var categoryId = await CreateSicknessCategoryAsync(hrClient, companyId);
         await CreateSicknessRecordAsync(hrClient, companyId, employeeId, categoryId);
@@ -99,7 +100,7 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
         using var _2 = hrClient;
 
         // Threshold is 5 but TotalDays will be 1
-        await SetFitNoteThresholdAsync(companyAdminClient, companyId, fitNoteRequiredAfterDays: 5);
+        await SetFitNoteThresholdAsync(hrClient, companyId, fitNoteRequiredAfterDays: 5);
         var employeeId = await CreateEmployeeAsync(hrClient, companyId);
         var categoryId = await CreateSicknessCategoryAsync(hrClient, companyId);
         await CreateSicknessRecordAsync(hrClient, companyId, employeeId, categoryId);
@@ -118,7 +119,7 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
         using var _1 = companyAdminClient;
         using var _2 = hrClient;
 
-        await SetFitNoteThresholdAsync(companyAdminClient, companyId, fitNoteRequiredAfterDays: 1);
+        await SetFitNoteThresholdAsync(hrClient, companyId, fitNoteRequiredAfterDays: 1);
         var employeeId = await CreateEmployeeAsync(hrClient, companyId);
         var categoryId = await CreateSicknessCategoryAsync(hrClient, companyId);
         await CreateSicknessRecordAsync(hrClient, companyId, employeeId, categoryId);
@@ -172,15 +173,17 @@ public class FitNoteRequestCreatesTaskTests : IClassFixture<ApiWebApplicationFac
         return (companyAdminClient, hrClient, company.Id);
     }
 
+    // fitNoteRequiredAfterDays lives on HR settings, not company settings — PUT .../settings
+    // (UpdateCompanySettingsHandler) only persists TimeZone/Locale and silently ignores this
+    // field while still returning 200 OK. HR settings are gated by hr-settings:manage, which
+    // is HrAdministrator-only, so the caller must be the HR admin client, not company admin.
     private async Task SetFitNoteThresholdAsync(HttpClient client, Guid companyId, int fitNoteRequiredAfterDays)
     {
         var resp = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/settings",
+            $"/api/companies/{companyId}/hr-settings",
             new
             {
                 id                             = companyId,
-                timeZone                       = "Europe/London",
-                locale                         = "en-GB",
                 workingDays                    = 31, // Monday|Tuesday|Wednesday|Thursday|Friday
                 hoursPerDay                    = 8m,
                 leaveYearStartMonth            = 1,

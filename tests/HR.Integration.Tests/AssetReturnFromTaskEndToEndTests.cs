@@ -13,7 +13,8 @@ namespace HR.Integration.Tests;
 /// calls AssetReturnService, marking the assignment inactive and returning the asset
 /// status to Available.
 /// </summary>
-public class AssetReturnFromTaskEndToEndTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class AssetReturnFromTaskEndToEndTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

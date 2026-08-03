@@ -4,7 +4,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class ExportRecruitmentPipelineReportEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ExportRecruitmentPipelineReportEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

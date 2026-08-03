@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class GetEmployeeNotesEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetEmployeeNotesEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class DeleteFutureCompensationRecordEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class DeleteFutureCompensationRecordEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

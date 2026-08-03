@@ -6,7 +6,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class GetExpiringDocumentsEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetExpiringDocumentsEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid ExpiryAdmin = Guid.Parse("ee000001-0000-0000-0000-000000000001");

@@ -12,7 +12,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class ExportWorkloadActionsEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ExportWorkloadActionsEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow;

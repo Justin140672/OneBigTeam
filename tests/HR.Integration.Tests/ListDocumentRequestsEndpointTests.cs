@@ -8,7 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class ListDocumentRequestsEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ListDocumentRequestsEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUser = Guid.Parse("cd000001-0000-0000-0000-000000000001");

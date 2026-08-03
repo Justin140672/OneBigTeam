@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class CreateEmployeeEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
@@ -60,13 +61,18 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         return payload!.Id;
     }
 
+    // Was calling PUT /api/companies/{id}/settings (UpdateCompanySettingsHandler), which only
+    // persists TimeZone/Locale and silently ignores every other field in the request body
+    // (including employeeNumberMode) — it still returned 200 OK, so CreateEmployee's
+    // "Automatic mode" checks kept reading back the default Manual mode and failing with
+    // "Employee number is required.". The actual employee-number/HR settings live behind
+    // PUT /api/companies/{id}/hr-settings (UpdateHrSettingsHandler/UpdateHrSettingsRequest).
     private static async Task SetEmployeeNumberModeAsync(
         HttpClient client, Guid companyId, string mode, string? prefix = null, int nextEmployeeNumber = 1, int minimumLength = 1)
     {
-        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/settings", new
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
         {
-            timeZone = "UTC",
-            locale = "en-GB",
+            id = companyId,
             workingDays = 31,
             hoursPerDay = 7.5,
             leaveYearStartMonth = 1,
@@ -471,7 +477,7 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
 
         // The response contract doesn't currently surface EmployeeNumber, so assert against the
         // company settings' advanced counter — proof a number was actually claimed.
-        var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/settings");
+        var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/hr-settings");
         settingsResponse.EnsureSuccessStatusCode();
         var settings = await settingsResponse.Content.ReadFromJsonAsync<SettingsPayload>();
         Assert.NotNull(settings);
@@ -511,7 +517,7 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         }
 
-        var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/settings");
+        var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/hr-settings");
         settingsResponse.EnsureSuccessStatusCode();
         var settings = await settingsResponse.Content.ReadFromJsonAsync<SettingsPayload>();
         Assert.NotNull(settings);
@@ -562,7 +568,7 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
 
         Assert.All(responses, r => Assert.Equal(HttpStatusCode.Created, r.StatusCode));
 
-        var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/settings");
+        var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/hr-settings");
         settingsResponse.EnsureSuccessStatusCode();
         var settings = await settingsResponse.Content.ReadFromJsonAsync<SettingsPayload>();
         Assert.NotNull(settings);
@@ -626,7 +632,7 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
         });
         Assert.Equal(HttpStatusCode.Created, responseB1.StatusCode);
 
-        var settingsAResponse = await client.GetAsync($"/api/companies/{companyB}/settings");
+        var settingsAResponse = await client.GetAsync($"/api/companies/{companyB}/hr-settings");
         // Still scoped to companyB via the tenant header set above.
         settingsAResponse.EnsureSuccessStatusCode();
         var settingsB = await settingsAResponse.Content.ReadFromJsonAsync<SettingsPayload>();
@@ -635,7 +641,7 @@ public class CreateEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactor
 
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyA.ToString());
-        var settingsAOnlyResponse = await client.GetAsync($"/api/companies/{companyA}/settings");
+        var settingsAOnlyResponse = await client.GetAsync($"/api/companies/{companyA}/hr-settings");
         settingsAOnlyResponse.EnsureSuccessStatusCode();
         var settingsA = await settingsAOnlyResponse.Content.ReadFromJsonAsync<SettingsPayload>();
         Assert.NotNull(settingsA);

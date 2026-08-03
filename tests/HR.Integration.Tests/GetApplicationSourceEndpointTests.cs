@@ -13,7 +13,8 @@ namespace HR.Integration.Tests;
 /// Covers the ticket #78 Source/SourceExternalRecruiterId/SourceExternalRecruiterAgencyName fields
 /// now surfaced on GetApplication's response.
 /// </summary>
-public class GetApplicationSourceEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetApplicationSourceEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid RecruiterUser = new("cd000012-0000-0000-0000-000000000001");

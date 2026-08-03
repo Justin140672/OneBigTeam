@@ -10,7 +10,8 @@ namespace HR.Integration.Tests;
 /// Verifies that ProcessDocumentExpiryNotifications creates tasks that are
 /// subsequently visible when querying an employee's task list.
 /// </summary>
-public class DocumentExpiryTasksEndToEndTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class DocumentExpiryTasksEndToEndTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid ExpiryE2EAdmin = Guid.Parse("11100003-0000-0000-0000-000000000001");

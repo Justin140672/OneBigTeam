@@ -17,10 +17,16 @@ namespace HR.Integration.Tests;
 /// always agree (both Company B) — isolation has to come from the handlers' own CompanyId-scoped
 /// queries, which is what these tests actually verify.
 /// </summary>
-public class LeavingProcessTenantIsolationTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class LeavingProcessTenantIsolationTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid HrAdminUser = new("dd000001-0000-0000-0000-000000000001");
+
+    // Relative to "today" rather than hardcoded literals — see StartLeavingProcessEndpointTests'
+    // identical fields for why a fixed near-term literal eventually becomes "backdated".
+    private static readonly DateOnly LeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
+    private static readonly DateOnly LastWorkingDay = LeavingDate.AddDays(-1);
 
     public LeavingProcessTenantIsolationTests(ApiWebApplicationFactory factory)
     {
@@ -60,9 +66,9 @@ public class LeavingProcessTenantIsolationTests : IClassFixture<ApiWebApplicatio
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                resignationReceivedDate = LeavingDate.AddDays(-30).ToString("yyyy-MM-dd"),
+                leavingDate = LeavingDate.ToString("yyyy-MM-dd"),
+                lastWorkingDay = LastWorkingDay.ToString("yyyy-MM-dd"),
                 leavingReason = "Resignation"
             });
         response.EnsureSuccessStatusCode();
@@ -102,9 +108,9 @@ public class LeavingProcessTenantIsolationTests : IClassFixture<ApiWebApplicatio
             {
                 companyId = companyB,
                 employeeId = employeeAId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                resignationReceivedDate = LeavingDate.AddDays(-30).ToString("yyyy-MM-dd"),
+                leavingDate = LeavingDate.ToString("yyyy-MM-dd"),
+                lastWorkingDay = LastWorkingDay.ToString("yyyy-MM-dd"),
                 leavingReason = "Resignation"
             });
 
@@ -130,8 +136,8 @@ public class LeavingProcessTenantIsolationTests : IClassFixture<ApiWebApplicatio
             {
                 companyId = companyB,
                 employeeId = employeeAId,
-                leavingDate = "2026-09-01",
-                lastWorkingDay = "2026-08-31",
+                leavingDate = LeavingDate.AddDays(31).ToString("yyyy-MM-dd"),
+                lastWorkingDay = LeavingDate.AddDays(30).ToString("yyyy-MM-dd"),
                 leavingReason = "MutualAgreement"
             });
 
@@ -142,7 +148,7 @@ public class LeavingProcessTenantIsolationTests : IClassFixture<ApiWebApplicatio
         getResponse.EnsureSuccessStatusCode();
         var payload = await getResponse.Content.ReadFromJsonAsync<GetLeavingProcessPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(new DateOnly(2026, 8, 1), payload!.LeavingDate);
+        Assert.Equal(LeavingDate, payload!.LeavingDate);
         Assert.Equal("Resignation", payload.LeavingReason);
     }
 

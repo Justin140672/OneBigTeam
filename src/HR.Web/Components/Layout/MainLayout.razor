@@ -275,16 +275,12 @@ else
     // also hold a role that grants CanManageEmployees/IsHrAdministrator the sidebar still shows
     // (with the Company/User Administration items already gated in below).
     //
-    // A plain Manager or a plain Recruiter previously got no sidebar either (their dashboard was
-    // considered "home", with sub-pages reached via buttons on that dashboard). That excluded
-    // them from ever reaching the sidebar-only Reporting nav item below, even though both roles
-    // are granted the "reporting:view" policy server-side (see IdentityModule.cs) and can see at
-    // least one reporting category. IsManager/IsRecruiter are included here so any
-    // reporting:view-entitled user can reach the sidebar; the Reporting menu item itself remains
-    // separately gated below, and no other existing sidebar section's visibility is changed by
-    // this addition since every section under it keeps its own independent role check.
+    // A plain Manager never gets a sidebar — their dashboard is "home", and Reports are reached
+    // via the Reports section on that dashboard (see ManagerDashboard.razor's TeamReportsWidget),
+    // not via sidebar navigation. A plain Recruiter still gets a sidebar since their workflow
+    // (Vacancies, Candidates, etc.) has no dashboard-embedded equivalent for those sections.
     private bool ShowSidebar =>
-        Session.CanManageEmployees || Session.IsHrAdministrator || Session.IsManager || Session.IsRecruiter;
+        Session.CanManageEmployees || Session.IsHrAdministrator || Session.IsRecruiter;
 
     private int _unreadCount;
     private List<NotificationDto> _notifications = [];

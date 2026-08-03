@@ -15,7 +15,8 @@ namespace HR.Integration.Tests;
 /// Manager has leave:approve but NOT leave:manage, which makes it the correct role to
 /// exercise the 403 boundary for this leave:manage-gated endpoint.
 /// </summary>
-public class AdjustLeaveBalanceEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class AdjustLeaveBalanceEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

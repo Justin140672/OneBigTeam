@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class StartLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class StartLeavingProcessEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
@@ -19,6 +20,19 @@ public class StartLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
     private static readonly Guid User8 = new("ffffffff-1000-0000-0000-00000000000a");
     private static readonly Guid EmployeeRoleUser = new("ffffffff-1000-0000-0000-000000000007");
     private static readonly Guid ManagerRoleUser = new("ffffffff-1000-0000-0000-000000000008");
+
+    // Relative to "today" rather than hardcoded literals ("2026-07-01"/"2026-08-01" etc.) — those
+    // were comfortably in the future when this file was written, but StartLeavingProcessHandler
+    // treats any LeavingDate before "today" as backdated (requiring explicit confirmation), so a
+    // fixed near-term literal silently starts failing once real time catches up to it. Computed
+    // once per test run so every test in this file agrees on the same non-backdated window.
+    private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
+    private static readonly DateOnly ResignationReceivedDate = Today.AddDays(-14);
+    private static readonly DateOnly LeavingDate = Today.AddDays(30);
+    private static readonly DateOnly LastWorkingDay = LeavingDate.AddDays(-1);
+    private static string ResignationReceivedDateString => ResignationReceivedDate.ToString("yyyy-MM-dd");
+    private static string LeavingDateString => LeavingDate.ToString("yyyy-MM-dd");
+    private static string LastWorkingDayString => LastWorkingDay.ToString("yyyy-MM-dd");
 
     public StartLeavingProcessEndpointTests(ApiWebApplicationFactory factory)
     {
@@ -72,9 +86,9 @@ public class StartLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                resignationReceivedDate = ResignationReceivedDateString,
+                leavingDate = LeavingDateString,
+                lastWorkingDay = LastWorkingDayString,
                 leavingReason = "Resignation"
             });
 
@@ -97,9 +111,9 @@ public class StartLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                resignationReceivedDate = ResignationReceivedDateString,
+                leavingDate = LeavingDateString,
+                lastWorkingDay = LastWorkingDayString,
                 leavingReason = "Resignation"
             });
 
@@ -111,9 +125,9 @@ public class StartLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
         Assert.NotEqual(Guid.Empty, payload!.Id);
         Assert.Equal(companyId, payload.CompanyId);
         Assert.Equal(employeeId, payload.EmployeeId);
-        Assert.Equal(new DateOnly(2026, 7, 1), payload.ResignationReceivedDate);
-        Assert.Equal(new DateOnly(2026, 8, 1), payload.LeavingDate);
-        Assert.Equal(new DateOnly(2026, 7, 31), payload.LastWorkingDay);
+        Assert.Equal(ResignationReceivedDate, payload.ResignationReceivedDate);
+        Assert.Equal(LeavingDate, payload.LeavingDate);
+        Assert.Equal(LastWorkingDay, payload.LastWorkingDay);
         Assert.Equal("Resignation", payload.LeavingReason);
         Assert.Equal("InProgress", payload.Status);
 
@@ -141,9 +155,9 @@ public class StartLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                resignationReceivedDate = ResignationReceivedDateString,
+                leavingDate = LeavingDateString,
+                lastWorkingDay = LastWorkingDayString,
                 leavingReason = "Resignation"
             });
         first.EnsureSuccessStatusCode();
@@ -154,9 +168,9 @@ public class StartLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-05",
-                leavingDate = "2026-08-05",
-                lastWorkingDay = "2026-08-04",
+                resignationReceivedDate = ResignationReceivedDateString,
+                leavingDate = LeavingDate.AddDays(4).ToString("yyyy-MM-dd"),
+                lastWorkingDay = LeavingDate.AddDays(3).ToString("yyyy-MM-dd"),
                 leavingReason = "Resignation"
             });
 
@@ -179,9 +193,9 @@ public class StartLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                resignationReceivedDate = ResignationReceivedDateString,
+                leavingDate = LeavingDateString,
+                lastWorkingDay = LastWorkingDayString,
                 leavingReason = "Resignation"
             });
 
@@ -204,9 +218,9 @@ public class StartLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-07-31",
-                lastWorkingDay = "2026-08-01",
+                resignationReceivedDate = ResignationReceivedDateString,
+                leavingDate = LeavingDateString,
+                lastWorkingDay = LeavingDate.AddDays(1).ToString("yyyy-MM-dd"),
                 leavingReason = "Resignation"
             });
 
@@ -234,9 +248,9 @@ public class StartLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                resignationReceivedDate = ResignationReceivedDateString,
+                leavingDate = LeavingDateString,
+                lastWorkingDay = LastWorkingDayString,
                 leavingReason = 999
             });
 
@@ -259,9 +273,9 @@ public class StartLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                resignationReceivedDate = ResignationReceivedDateString,
+                leavingDate = LeavingDateString,
+                lastWorkingDay = LastWorkingDayString,
                 leavingReason = "Resignation"
             });
         response.EnsureSuccessStatusCode();
@@ -293,9 +307,9 @@ public class StartLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                resignationReceivedDate = ResignationReceivedDateString,
+                leavingDate = LeavingDateString,
+                lastWorkingDay = LastWorkingDayString,
                 leavingReason = "Resignation"
             });
 
@@ -317,9 +331,9 @@ public class StartLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationF
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                resignationReceivedDate = ResignationReceivedDateString,
+                leavingDate = LeavingDateString,
+                lastWorkingDay = LastWorkingDayString,
                 leavingReason = "Resignation"
             });
 

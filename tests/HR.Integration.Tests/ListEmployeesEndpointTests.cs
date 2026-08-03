@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class ListEmployeesEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ListEmployeesEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
@@ -187,7 +188,7 @@ public class ListEmployeesEndpointTests : IClassFixture<ApiWebApplicationFactory
         var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
         Assert.NotNull(payload);
         var item = payload!.Items.Single(i => i.Id == employeeId);
-        Assert.Equal("PendingInvitation", item.UserAccountStatus);
+        Assert.Equal("Pending Invitation", item.UserAccountStatus);
     }
 
     [Fact]
@@ -206,7 +207,7 @@ public class ListEmployeesEndpointTests : IClassFixture<ApiWebApplicationFactory
         var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
         Assert.NotNull(payload);
         var item = payload!.Items.Single(i => i.Id == employeeId);
-        Assert.Equal("NoUser", item.UserAccountStatus);
+        Assert.Equal("No User", item.UserAccountStatus);
     }
 
     private static async Task<(Guid DepartmentId, Guid LocationId, Guid PositionProfileId, Guid EmploymentTypeId)> CreateReferenceDataAsync(

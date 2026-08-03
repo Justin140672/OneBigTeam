@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class CancelLeavingProcessEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class CancelLeavingProcessEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
@@ -47,6 +48,11 @@ public class CancelLeavingProcessEndpointTests : IClassFixture<ApiWebApplication
         return (await response.Content.ReadFromJsonAsync<IdPayload>())!.Id;
     }
 
+    // Relative to "today" rather than hardcoded literals — see StartLeavingProcessEndpointTests'
+    // identical fields for why a fixed near-term literal eventually becomes "backdated".
+    private static readonly DateOnly LeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
+    private static readonly DateOnly LastWorkingDay = LeavingDate.AddDays(-1);
+
     private static async Task StartLeavingProcessAsync(HttpClient client, Guid companyId, Guid employeeId)
     {
         var response = await client.PostAsJsonAsync(
@@ -55,9 +61,9 @@ public class CancelLeavingProcessEndpointTests : IClassFixture<ApiWebApplication
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                resignationReceivedDate = LeavingDate.AddDays(-30).ToString("yyyy-MM-dd"),
+                leavingDate = LeavingDate.ToString("yyyy-MM-dd"),
+                lastWorkingDay = LastWorkingDay.ToString("yyyy-MM-dd"),
                 leavingReason = "Resignation"
             });
         response.EnsureSuccessStatusCode();

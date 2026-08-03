@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class GetEmployeeDirectoryReportEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetEmployeeDirectoryReportEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

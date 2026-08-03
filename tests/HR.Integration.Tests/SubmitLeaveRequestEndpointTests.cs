@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class SubmitLeaveRequestEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class SubmitLeaveRequestEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

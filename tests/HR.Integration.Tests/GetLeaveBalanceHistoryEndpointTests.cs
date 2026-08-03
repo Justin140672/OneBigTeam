@@ -14,7 +14,8 @@ namespace HR.Integration.Tests;
 /// CompanyAdministrator is scoped to company profile/settings and does not hold it) —
 /// Manager has leave:approve but NOT leave:manage.
 /// </summary>
-public class GetLeaveBalanceHistoryEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetLeaveBalanceHistoryEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

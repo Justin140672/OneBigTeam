@@ -12,7 +12,8 @@ namespace HR.Integration.Tests;
 /// Verifies that completing a task whose Source is ProbationReview triggers
 /// CompleteProbationReviewFromTaskAction and updates both the review and the record.
 /// </summary>
-public class ProbationReviewCompletionFromTaskEndToEndTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ProbationReviewCompletionFromTaskEndToEndTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

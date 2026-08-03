@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class ListOnboardingTemplatesEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ListOnboardingTemplatesEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUserId = new("cc000013-0000-0000-0000-000000000001");
@@ -48,8 +49,14 @@ public class ListOnboardingTemplatesEndpointTests : IClassFixture<ApiWebApplicat
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    /// <summary>
+    /// ListOnboardingTemplatesHandler lazily seeds a default "Standard Onboarding" template for
+    /// any company that has never had one (OnboardingTemplateSeeder.EnsureDefaultTemplateSeededAsync,
+    /// called unconditionally at the top of the handler) — so a company that has never created its
+    /// own template still isn't truly empty; it always has exactly this one.
+    /// </summary>
     [Fact]
-    public async Task Get_OnboardingTemplates_Returns_Empty_List_When_No_Templates_Exist()
+    public async Task Get_OnboardingTemplates_Returns_Only_The_Seeded_Default_When_No_Templates_Created()
     {
         var companyId = Guid.NewGuid();
         using var client = AdminClient(companyId);
@@ -59,7 +66,9 @@ public class ListOnboardingTemplatesEndpointTests : IClassFixture<ApiWebApplicat
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ListOnboardingTemplatesPayload>();
         Assert.NotNull(payload);
-        Assert.Empty(payload!.Items);
+        var item = Assert.Single(payload!.Items);
+        Assert.Equal("Standard Onboarding", item.Name);
+        Assert.True(item.IsActive);
     }
 
     [Fact]
@@ -147,7 +156,10 @@ public class ListOnboardingTemplatesEndpointTests : IClassFixture<ApiWebApplicat
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ListOnboardingTemplatesPayload>();
         Assert.NotNull(payload);
-        Assert.Empty(payload!.Items);
+        // Only this company's own lazily-seeded default — never the other company's
+        // manually-created "Other Company Onboarding" template.
+        var item = Assert.Single(payload!.Items);
+        Assert.Equal("Standard Onboarding", item.Name);
     }
 
     private sealed record OnboardingTemplatePayload(

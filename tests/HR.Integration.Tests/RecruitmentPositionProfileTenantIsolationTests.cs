@@ -15,7 +15,8 @@ namespace HR.Integration.Tests;
 /// DepartmentId filters, and through the Hire/Offer actions that now derive Department/Location from
 /// the Vacancy's linked Position Profile.
 /// </summary>
-public class RecruitmentPositionProfileTenantIsolationTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class RecruitmentPositionProfileTenantIsolationTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid RecruiterUser = new("cc00001b-0000-0000-0000-000000000001");

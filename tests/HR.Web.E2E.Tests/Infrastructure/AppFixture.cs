@@ -51,8 +51,7 @@ public sealed class AppFixture : IAsyncLifetime
         _playwright = await Playwright.CreateAsync();
         _browser    = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
-            Headless  = false,
-            SlowMo    = 100, // ms pause between actions — makes the run watchable
+            Headless = true,
         });
     }
 

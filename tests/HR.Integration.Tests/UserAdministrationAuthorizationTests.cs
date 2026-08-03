@@ -13,7 +13,8 @@ namespace HR.Integration.Tests;
 /// seeded directly via TestRoleSeeder, since the dev seeder itself only runs in the real
 /// Development-environment host, not the test WebApplicationFactory.
 /// </summary>
-public class UserAdministrationAuthorizationTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class UserAdministrationAuthorizationTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

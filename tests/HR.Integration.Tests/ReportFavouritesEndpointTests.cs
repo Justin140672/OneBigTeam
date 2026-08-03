@@ -6,7 +6,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class ReportFavouritesEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ReportFavouritesEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

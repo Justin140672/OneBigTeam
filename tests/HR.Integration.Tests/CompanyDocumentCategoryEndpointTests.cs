@@ -11,7 +11,8 @@ namespace HR.Integration.Tests;
 /// permissions spec: HR can manage, Managers do not automatically get manage rights, and a
 /// Company Administrator only gets access if they ALSO hold the HrAdministrator role.
 /// </summary>
-public class CompanyDocumentCategoryEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class CompanyDocumentCategoryEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

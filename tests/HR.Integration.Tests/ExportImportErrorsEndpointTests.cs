@@ -7,7 +7,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class ExportImportErrorsEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ExportImportErrorsEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid ImportAdmin = Guid.Parse("61000000-0000-0000-0000-000000000001");

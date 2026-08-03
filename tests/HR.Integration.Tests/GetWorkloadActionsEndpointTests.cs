@@ -25,7 +25,8 @@ namespace HR.Integration.Tests;
 /// no persona ever receives another manager's or another category's company-wide data — the
 /// aggregation endpoint's baseline "reporting:view" policy is only a menu gate.
 /// </summary>
-public class GetWorkloadActionsEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetWorkloadActionsEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow;

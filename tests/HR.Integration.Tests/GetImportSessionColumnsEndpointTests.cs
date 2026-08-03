@@ -7,7 +7,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class GetImportSessionColumnsEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetImportSessionColumnsEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid ImportAdmin = Guid.Parse("60000000-0000-0000-0000-000000000001");

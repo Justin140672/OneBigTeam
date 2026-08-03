@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class UpdatePositionProfileEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class UpdatePositionProfileEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid UserId = new("eeeeeeee-0000-0000-0000-000000000005");

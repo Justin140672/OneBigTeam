@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class LeavePolicyCrudEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class LeavePolicyCrudEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     // leave:approve = Manager, HrAdministrator

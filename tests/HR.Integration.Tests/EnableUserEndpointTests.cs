@@ -8,7 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class EnableUserEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class EnableUserEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUser = new("aaaaaaa6-0000-0000-0000-000000000001");
@@ -75,7 +76,7 @@ public class EnableUserEndpointTests : IClassFixture<ApiWebApplicationFactory>
         using var client = AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
         var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
-            _factory, employeeId, "active@test.com", isActive: true);
+            _factory, employeeId, $"active.{Guid.NewGuid():N}@test.com", isActive: true);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/users/{userId}/enable", EmptyJson());
@@ -90,7 +91,7 @@ public class EnableUserEndpointTests : IClassFixture<ApiWebApplicationFactory>
         using var client = AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
         var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
-            _factory, employeeId, "disabled@test.com", isActive: false);
+            _factory, employeeId, $"disabled.{Guid.NewGuid():N}@test.com", isActive: false);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/users/{userId}/enable", EmptyJson());

@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class GetCompensationImportTemplateEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetCompensationImportTemplateEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid TemplateAdmin = new("cccccccc-1000-0000-0000-000000000001");

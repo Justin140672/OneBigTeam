@@ -6,7 +6,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetEmployeeEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
@@ -623,9 +624,12 @@ public class GetEmployeeEndpointTests : IClassFixture<ApiWebApplicationFactory>
             {
                 companyId,
                 employeeId = created.Id,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                // Relative to "today" rather than a hardcoded literal — see
+                // StartLeavingProcessEndpointTests for why a fixed near-term literal eventually
+                // becomes "backdated".
+                resignationReceivedDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-30).ToString("yyyy-MM-dd"),
+                leavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30).ToString("yyyy-MM-dd"),
+                lastWorkingDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(29).ToString("yyyy-MM-dd"),
                 leavingReason = "Resignation"
             });
         startResponse.EnsureSuccessStatusCode();

@@ -8,7 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class InviteEmployeeUserEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class InviteEmployeeUserEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUser = new("aaaaaaa1-0000-0000-0000-000000000001");

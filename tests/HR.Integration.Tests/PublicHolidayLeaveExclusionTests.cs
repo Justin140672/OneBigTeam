@@ -8,7 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class PublicHolidayLeaveExclusionTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid CompanyAdminUserId = new("cccccccc-0000-0000-0000-000000000001");
@@ -115,12 +116,14 @@ public class PublicHolidayLeaveExclusionTests : IClassFixture<ApiWebApplicationF
         var company = await createResp.Content.ReadFromJsonAsync<CompanyPayload>();
         var companyId = company!.Id;
 
-        // Update settings — company:manage is CompanyAdministrator-only
-        var companyAdminClient = ClientForCompany(companyId, CompanyAdminUserId);
-        var settingsResp = await companyAdminClient.PutAsJsonAsync($"/api/companies/{companyId}/settings", new
+        // excludePublicHolidaysFromLeave lives on HR settings, not company settings — PUT
+        // .../settings (UpdateCompanySettingsHandler) only persists TimeZone/Locale and
+        // silently ignores this field while still returning 200 OK. HR settings are gated by
+        // hr-settings:manage, which is HrAdministrator-only (not CompanyAdministrator).
+        var hrSettingsClient = ClientForCompany(companyId, HrAdminUserId);
+        var settingsResp = await hrSettingsClient.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
         {
-            timeZone = "UTC",
-            locale = "en-GB",
+            id = companyId,
             workingDays = 31,
             hoursPerDay = 8.0,
             leaveYearStartMonth = 1,

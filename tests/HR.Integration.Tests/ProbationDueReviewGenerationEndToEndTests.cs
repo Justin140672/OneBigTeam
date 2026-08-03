@@ -10,7 +10,8 @@ namespace HR.Integration.Tests;
 /// Verifies that GenerateDueProbationReviewsJob creates the correct reviews
 /// and transitions records when run against a real database.
 /// </summary>
-public class ProbationDueReviewGenerationEndToEndTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ProbationDueReviewGenerationEndToEndTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

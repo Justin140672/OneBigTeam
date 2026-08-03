@@ -6,7 +6,8 @@ using HR.SharedKernel;
 
 namespace HR.Integration.Tests;
 
-public class GetCompanyEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetCompanyEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AuthenticatedUser = new("ee000002-0000-0000-0000-000000000001");

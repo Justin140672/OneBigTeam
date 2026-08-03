@@ -11,7 +11,8 @@ namespace HR.Integration.Tests;
 /// is scoped to company profile/settings management only and no longer holds either
 /// permission — see the narrowing in HR.Modules.Identity.IdentityModule.AddRolePolicies.
 /// </summary>
-public class AssetAuthorizationTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class AssetAuthorizationTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

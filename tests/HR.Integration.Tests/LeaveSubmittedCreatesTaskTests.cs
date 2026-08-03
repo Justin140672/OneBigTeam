@@ -13,7 +13,8 @@ namespace HR.Integration.Tests;
 /// a task (and notification) for the employee's manager via the in-process
 /// LeaveRequestedIntegrationEvent → LeaveRequestedHandler pipeline.
 /// </summary>
-public class LeaveSubmittedCreatesTaskTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class LeaveSubmittedCreatesTaskTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUser          = Guid.Parse("11100001-0000-0000-0000-000000000001");

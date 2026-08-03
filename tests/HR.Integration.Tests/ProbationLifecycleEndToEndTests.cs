@@ -17,7 +17,8 @@ namespace HR.Integration.Tests;
 ///     → Manager completes FinalDecision task with Pass outcome
 ///     → Record transitions to Passed
 /// </summary>
-public class ProbationLifecycleEndToEndTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ProbationLifecycleEndToEndTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

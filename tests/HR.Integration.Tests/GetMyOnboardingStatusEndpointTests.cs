@@ -14,7 +14,8 @@ namespace HR.Integration.Tests;
 /// employee purely from the caller's own "sub" claim — backing the "Onboarding Progress" card on
 /// MyProfileOverviewTab.razor.
 /// </summary>
-public class GetMyOnboardingStatusEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetMyOnboardingStatusEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid SelfUser = new("cc00000b-0000-0000-0000-000000000001");

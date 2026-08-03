@@ -5,7 +5,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class UpdateMyContactDetailsEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class UpdateMyContactDetailsEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

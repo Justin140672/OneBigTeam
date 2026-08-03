@@ -8,8 +8,8 @@ namespace HR.Integration.Tests;
 /// Verifies that the structured logging middleware (correlation ID, request logging)
 /// is active and behaves correctly for all requests.
 /// </summary>
+[Collection("Integration")]
 public class StructuredLoggingIntegrationTests(ApiWebApplicationFactory factory)
-    : IClassFixture<ApiWebApplicationFactory>
 {
     // ─── Correlation ID ────────────────────────────────────────────────────────
 

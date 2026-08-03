@@ -15,7 +15,8 @@ namespace HR.Integration.Tests;
 /// endpoint was rewritten to always short-circuit and return an empty result; these tests assert
 /// exactly that, regardless of what vacancy data exists.
 /// </summary>
-public class GetVacanciesNeedingPositionProfileReviewEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class GetVacanciesNeedingPositionProfileReviewEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid RecruiterUser = new("cc00000f-0000-0000-0000-000000000001");

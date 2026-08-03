@@ -6,7 +6,8 @@ using HR.Modules.Sickness.Domain;
 
 namespace HR.Integration.Tests;
 
-public class RecordSicknessEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class RecordSicknessEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUserId = new("cc000010-0000-0000-0000-000000000001");

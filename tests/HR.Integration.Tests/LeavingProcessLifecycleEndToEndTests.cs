@@ -19,11 +19,17 @@ namespace HR.Integration.Tests;
 ///   Start (with an already-past leaving date) → ProcessLeavingEmployeesJob → employee becomes
 ///   FormerEmployee and the leaving process completes.
 /// </summary>
-public class LeavingProcessLifecycleEndToEndTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class LeavingProcessLifecycleEndToEndTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
     private static readonly Guid AdminUser = new("ee000001-0000-0000-0000-000000000001");
+
+    // Relative to "today" rather than hardcoded literals — see StartLeavingProcessEndpointTests'
+    // identical fields for why a fixed near-term literal eventually becomes "backdated".
+    private static readonly DateOnly LeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
+    private static readonly DateOnly LastWorkingDay = LeavingDate.AddDays(-1);
 
     public LeavingProcessLifecycleEndToEndTests(ApiWebApplicationFactory factory)
     {
@@ -71,9 +77,9 @@ public class LeavingProcessLifecycleEndToEndTests : IClassFixture<ApiWebApplicat
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                resignationReceivedDate = LeavingDate.AddDays(-30).ToString("yyyy-MM-dd"),
+                leavingDate = LeavingDate.ToString("yyyy-MM-dd"),
+                lastWorkingDay = LastWorkingDay.ToString("yyyy-MM-dd"),
                 leavingReason = "Resignation"
             });
         startResp.EnsureSuccessStatusCode();
@@ -120,16 +126,16 @@ public class LeavingProcessLifecycleEndToEndTests : IClassFixture<ApiWebApplicat
             {
                 companyId,
                 employeeId,
-                leavingDate = "2026-09-01",
-                lastWorkingDay = "2026-08-31",
+                leavingDate = LeavingDate.AddDays(31).ToString("yyyy-MM-dd"),
+                lastWorkingDay = LeavingDate.AddDays(30).ToString("yyyy-MM-dd"),
                 leavingReason = "MutualAgreement"
             });
         amendResp.EnsureSuccessStatusCode();
 
         var amendPayload = await amendResp.Content.ReadFromJsonAsync<AmendLeavingProcessPayload>();
         Assert.NotNull(amendPayload);
-        Assert.Equal(new DateOnly(2026, 9, 1), amendPayload!.LeavingDate);
-        Assert.Equal(new DateOnly(2026, 8, 31), amendPayload.LastWorkingDay);
+        Assert.Equal(LeavingDate.AddDays(31), amendPayload!.LeavingDate);
+        Assert.Equal(LeavingDate.AddDays(30), amendPayload.LastWorkingDay);
         Assert.Equal("MutualAgreement", amendPayload.LeavingReason);
 
         // Offboarding was already auto-started in Step 3, so AmendLeavingProcessHandler's
@@ -151,9 +157,9 @@ public class LeavingProcessLifecycleEndToEndTests : IClassFixture<ApiWebApplicat
             {
                 companyId,
                 employeeId,
-                resignationReceivedDate = "2026-07-01",
-                leavingDate = "2026-08-01",
-                lastWorkingDay = "2026-07-31",
+                resignationReceivedDate = LeavingDate.AddDays(-30).ToString("yyyy-MM-dd"),
+                leavingDate = LeavingDate.ToString("yyyy-MM-dd"),
+                lastWorkingDay = LastWorkingDay.ToString("yyyy-MM-dd"),
                 leavingReason = "Resignation"
             });
         startResp.EnsureSuccessStatusCode();

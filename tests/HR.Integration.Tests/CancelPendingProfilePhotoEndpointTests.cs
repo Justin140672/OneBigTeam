@@ -8,7 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class CancelPendingProfilePhotoEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class CancelPendingProfilePhotoEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

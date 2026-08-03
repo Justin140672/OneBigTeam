@@ -14,12 +14,18 @@ namespace HR.Integration.Tests;
 /// is scoped to company profile/settings management only and no longer holds any of these
 /// permissions — see the narrowing in HR.Modules.Identity.IdentityModule.AddRolePolicies.
 /// </summary>
-public class LeaveAuthorizationTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class LeaveAuthorizationTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
-    private static readonly Guid HrAdminUserId = new("dd000001-0000-0000-0000-000000000001");
-    private static readonly Guid CompanyAdministratorUserId = new("dd000001-0000-0000-0000-000000000002");
+    // Was hardcoded ("dd000001-...") — collided with GetMeEndpointTests/
+    // RecruitmentDashboardSummaryEndpointTests, each assigning the same literal GUID a different,
+    // conflicting role, now that all test classes share one database (see IntegrationTestCollection).
+    // Guid.NewGuid() is evaluated once per static initialization (stable across this class's own
+    // tests), guaranteed unique across every other file.
+    private static readonly Guid HrAdminUserId = Guid.NewGuid();
+    private static readonly Guid CompanyAdministratorUserId = Guid.NewGuid();
 
     public LeaveAuthorizationTests(ApiWebApplicationFactory factory)
     {

@@ -13,7 +13,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class UploadRequestedDocumentEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class UploadRequestedDocumentEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUser = Guid.Parse("cc000001-0000-0000-0000-000000000001");

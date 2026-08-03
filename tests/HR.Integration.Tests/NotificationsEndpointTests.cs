@@ -6,7 +6,8 @@ using HR.SharedKernel;
 
 namespace HR.Integration.Tests;
 
-public class NotificationsEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class NotificationsEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUser       = Guid.Parse("11100004-0000-0000-0000-000000000001");

@@ -10,7 +10,8 @@ namespace HR.Integration.Tests;
 /// actually enforce access end-to-end over real HTTP. Unit tests on handlers cannot
 /// exercise policy middleware, so this coverage lives exclusively at this layer.
 /// </summary>
-public class SicknessAuthorizationTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class SicknessAuthorizationTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

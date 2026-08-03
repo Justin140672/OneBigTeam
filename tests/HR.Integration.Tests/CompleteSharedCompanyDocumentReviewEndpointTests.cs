@@ -18,7 +18,8 @@ namespace HR.Integration.Tests;
 /// that the reviewer identity is always resolved from the caller's own claims (never accepted
 /// from the request body), tenant isolation, and validation of ReviewNotes.
 /// </summary>
-public class CompleteSharedCompanyDocumentReviewEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class CompleteSharedCompanyDocumentReviewEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

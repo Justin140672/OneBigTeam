@@ -7,7 +7,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace HR.Integration.Tests;
 
-public class UploadEmployeeDocumentEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class UploadEmployeeDocumentEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AcmeCompanyId      = Guid.Parse("00000000-0000-0000-0000-000000000001");

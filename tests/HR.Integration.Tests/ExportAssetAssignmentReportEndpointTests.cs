@@ -4,7 +4,8 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-public class ExportAssetAssignmentReportEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ExportAssetAssignmentReportEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

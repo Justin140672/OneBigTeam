@@ -9,7 +9,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace HR.Integration.Tests;
 
-public class UploadImportFileEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class UploadImportFileEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 

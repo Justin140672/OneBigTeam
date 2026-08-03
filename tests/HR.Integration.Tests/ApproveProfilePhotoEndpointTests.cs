@@ -11,7 +11,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class ApproveProfilePhotoEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class ApproveProfilePhotoEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid ManagerUser = Guid.Parse("aa100001-0000-0000-0000-000000000001");

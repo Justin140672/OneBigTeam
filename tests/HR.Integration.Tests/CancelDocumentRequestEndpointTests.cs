@@ -12,7 +12,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class CancelDocumentRequestEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class CancelDocumentRequestEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUser = Guid.Parse("cb000001-0000-0000-0000-000000000001");

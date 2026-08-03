@@ -9,12 +9,18 @@ namespace HR.Integration.Tests;
 /// Covers the two endpoints backing the Recruitment dashboard widget:
 /// GetInterviewsTodayCount (Recruitment module) and GetOutstandingTaskCount (Tasks module).
 /// </summary>
-public class RecruitmentDashboardSummaryEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class RecruitmentDashboardSummaryEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
-    private static readonly Guid HrAdminUserId  = new("dd000001-0000-0000-0000-000000000001");
-    private static readonly Guid EmployeeUserId = new("dd000001-0000-0000-0000-000000000002");
+    // Was hardcoded ("dd000001-...") — collided with GetMeEndpointTests/LeaveAuthorizationTests,
+    // each assigning the same literal GUID a different, conflicting role, now that all test
+    // classes share one database (see IntegrationTestCollection). Guid.NewGuid() is evaluated once
+    // per static initialization (stable across this class's own tests), guaranteed unique across
+    // every other file.
+    private static readonly Guid HrAdminUserId  = Guid.NewGuid();
+    private static readonly Guid EmployeeUserId = Guid.NewGuid();
 
     public RecruitmentDashboardSummaryEndpointTests(ApiWebApplicationFactory factory)
     {

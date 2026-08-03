@@ -10,7 +10,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-public class SetDefaultLeavePolicyEndpointTests : IClassFixture<ApiWebApplicationFactory>
+[Collection("Integration")]
+public class SetDefaultLeavePolicyEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid HrAdminUser    = Guid.Parse("11100009-0000-0000-0000-000000000001");

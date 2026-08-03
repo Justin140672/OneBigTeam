@@ -324,7 +324,7 @@ public class ListEmployeesHandlerTests
 
     [Theory]
     [InlineData(EmployeeUserAccountStatus.Active, "Active")]
-    [InlineData(EmployeeUserAccountStatus.PendingInvitation, "PendingInvitation")]
+    [InlineData(EmployeeUserAccountStatus.PendingInvitation, "Pending Invitation")]
     [InlineData(EmployeeUserAccountStatus.Disabled, "Disabled")]
     public async Task HandleAsync_Maps_UserAccountStatus_When_Present_In_Reader(
         EmployeeUserAccountStatus status, string expected)
@@ -371,7 +371,7 @@ public class ListEmployeesHandlerTests
 
         Assert.True(result.IsSuccess);
         var item = result.Value!.Items.Single();
-        Assert.Equal("NoUser", item.UserAccountStatus);
+        Assert.Equal("No User", item.UserAccountStatus);
     }
 
     [Fact]
