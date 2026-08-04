@@ -92,11 +92,12 @@ public class PublicHolidayLeaveExclusionTests
         Assert.Equal(5m, payload!.TotalDays);
     }
 
-    private HttpClient ClientForCompany(Guid companyId, Guid userId)
+    private async Task<HttpClient> ClientForCompany(Guid companyId, Guid userId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -106,6 +107,7 @@ public class PublicHolidayLeaveExclusionTests
         var bootstrapClient = _factory.CreateClient();
         bootstrapClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, CompanyAdminUserId.ToString());
         bootstrapClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, CompanyAdminUserId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdminUserId, SystemRoles.CompanyAdministrator, CompanyAdminUserId);
 
         var createResp = await bootstrapClient.PostAsJsonAsync("/api/companies", new
         {
@@ -120,7 +122,7 @@ public class PublicHolidayLeaveExclusionTests
         // .../settings (UpdateCompanySettingsHandler) only persists TimeZone/Locale and
         // silently ignores this field while still returning 200 OK. HR settings are gated by
         // hr-settings:manage, which is HrAdministrator-only (not CompanyAdministrator).
-        var hrSettingsClient = ClientForCompany(companyId, HrAdminUserId);
+        var hrSettingsClient = await ClientForCompany(companyId, HrAdminUserId);
         var settingsResp = await hrSettingsClient.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
         {
             id = companyId,
@@ -144,7 +146,7 @@ public class PublicHolidayLeaveExclusionTests
 
         // All subsequent calls (public holidays, leave policies, employees, leave requests)
         // require leave:manage / employee:manage / leave:request — HrAdministrator only.
-        var hrAdminClient = ClientForCompany(companyId, HrAdminUserId);
+        var hrAdminClient = await ClientForCompany(companyId, HrAdminUserId);
         return (hrAdminClient, companyId, leaveTypeId);
     }
 

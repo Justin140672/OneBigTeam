@@ -15,11 +15,12 @@ public class GetEmployeeLeaverReportEndpointTests
         _factory = factory;
     }
 
-    private HttpClient ClientFor(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientFor(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager, companyId);
         return client;
     }
 
@@ -40,7 +41,7 @@ public class GetEmployeeLeaverReportEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/reporting/employee-leavers");
@@ -55,7 +56,7 @@ public class GetEmployeeLeaverReportEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Recruiter);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/reporting/employee-leavers");
@@ -69,7 +70,7 @@ public class GetEmployeeLeaverReportEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/reporting/employee-leavers");
@@ -86,7 +87,7 @@ public class GetEmployeeLeaverReportEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/reporting/employee-leavers" +
@@ -101,7 +102,7 @@ public class GetEmployeeLeaverReportEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/reporting/employee-leavers?pageSize=0");

@@ -43,7 +43,7 @@ public class GetProbationStatusEndpointTests
     public async Task Get_ProbationStatus_Returns_HasRecord_False_When_Employee_Has_No_Record()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(User1, companyId);
+        using var client = await AuthenticatedClient(User1, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/probation-status");
@@ -59,7 +59,7 @@ public class GetProbationStatusEndpointTests
     public async Task Get_ProbationStatus_Returns_Active_After_Record_Created()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(User2, companyId);
+        using var client = await AuthenticatedClient(User2, companyId);
 
         var employeeId = await CreateProbationRecordAsync(client, companyId);
 
@@ -77,7 +77,7 @@ public class GetProbationStatusEndpointTests
     public async Task Get_ProbationStatus_Returns_Passed_After_FinalDecision_Review_Completed_With_Pass()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(User3, companyId);
+        using var client = await AuthenticatedClient(User3, companyId);
 
         var (employeeId, recordId) = await CreateProbationRecordWithIdAsync(client, companyId);
         var reviewId = await CreateReviewAsync(client, companyId, recordId, "FinalDecision");
@@ -97,7 +97,7 @@ public class GetProbationStatusEndpointTests
     public async Task Get_ProbationStatus_Returns_Failed_After_FinalDecision_Review_Completed_With_Fail()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(User4, companyId);
+        using var client = await AuthenticatedClient(User4, companyId);
 
         var (employeeId, recordId) = await CreateProbationRecordWithIdAsync(client, companyId);
         var reviewId = await CreateReviewAsync(client, companyId, recordId, "FinalDecision");
@@ -115,11 +115,12 @@ public class GetProbationStatusEndpointTests
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient(Guid user, Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid user, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, user.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, user, companyId);
         return client;
     }
 

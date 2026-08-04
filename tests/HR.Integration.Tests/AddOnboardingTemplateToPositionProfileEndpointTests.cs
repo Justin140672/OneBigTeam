@@ -22,19 +22,21 @@ public class AddOnboardingTemplateToPositionProfileEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
-    private HttpClient CompanyAdministratorClient(Guid companyId)
+    private async Task<HttpClient> CompanyAdministratorClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, CompanyAdministratorUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdministratorUserId, SystemRoles.CompanyAdministrator, companyId);
         return client;
     }
 
@@ -54,11 +56,11 @@ public class AddOnboardingTemplateToPositionProfileEndpointTests
     public async Task Post_OnboardingTemplates_Returns_Forbidden_For_User_Without_Employee_Manage_Permission()
     {
         var companyId = Guid.NewGuid();
-        using var adminClient = AdminClient(companyId);
+        using var adminClient = await AdminClient(companyId);
         var profileId = await CreatePositionProfileAsync(adminClient, companyId, "Software Engineer");
         var templateId = await CreateOnboardingTemplateAsync(adminClient, companyId, "Standard Onboarding");
 
-        using var client = CompanyAdministratorClient(companyId);
+        using var client = await CompanyAdministratorClient(companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/position-profiles/{profileId}/onboarding-templates",
@@ -71,7 +73,7 @@ public class AddOnboardingTemplateToPositionProfileEndpointTests
     public async Task Post_OnboardingTemplates_Returns_Created_With_Correct_Payload()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Software Engineer");
         var templateId = await CreateOnboardingTemplateAsync(client, companyId, "Standard Onboarding");
@@ -99,7 +101,7 @@ public class AddOnboardingTemplateToPositionProfileEndpointTests
     public async Task Post_OnboardingTemplates_Returns_Conflict_For_Duplicate_Assignment()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "HR Manager");
         var templateId = await CreateOnboardingTemplateAsync(client, companyId, "Standard Onboarding");
@@ -120,7 +122,7 @@ public class AddOnboardingTemplateToPositionProfileEndpointTests
     public async Task Post_OnboardingTemplates_Returns_NotFound_For_Unknown_PositionProfile()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var templateId = await CreateOnboardingTemplateAsync(client, companyId, "Standard Onboarding");
 
@@ -135,7 +137,7 @@ public class AddOnboardingTemplateToPositionProfileEndpointTests
     public async Task Post_OnboardingTemplates_Returns_NotFound_For_Unknown_OnboardingTemplate()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Finance Manager");
 
@@ -150,7 +152,7 @@ public class AddOnboardingTemplateToPositionProfileEndpointTests
     public async Task Post_OnboardingTemplates_Returns_NotFound_For_Inactive_OnboardingTemplate()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Operations Lead");
         var templateId = await CreateOnboardingTemplateAsync(client, companyId, "Retired Onboarding");
@@ -170,7 +172,7 @@ public class AddOnboardingTemplateToPositionProfileEndpointTests
     public async Task Post_OnboardingTemplates_Allows_Same_Template_On_Different_Profile()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var profileAId = await CreatePositionProfileAsync(client, companyId, "Developer");
         var profileBId = await CreatePositionProfileAsync(client, companyId, "Designer");
@@ -192,7 +194,7 @@ public class AddOnboardingTemplateToPositionProfileEndpointTests
     public async Task Post_OnboardingTemplates_Returns_UnprocessableEntity_For_Empty_OnboardingTemplateId()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Recruiter");
 

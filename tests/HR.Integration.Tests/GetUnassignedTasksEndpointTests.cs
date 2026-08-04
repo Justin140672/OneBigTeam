@@ -43,7 +43,7 @@ public class GetUnassignedTasksEndpointTests
     [Fact]
     public async Task Returns_OK_With_Empty_List_When_No_Unassigned_Tasks()
     {
-        using var client = AdminClient();
+        using var client = await AdminClient();
 
         // Seed a task WITH an assignee to ensure it does not pollute unassigned results
         var uniqueEmployee = Guid.NewGuid();
@@ -61,7 +61,7 @@ public class GetUnassignedTasksEndpointTests
     [Fact]
     public async Task Returns_Tasks_With_No_Assigned_Employee_Or_User()
     {
-        using var client = AdminClient();
+        using var client = await AdminClient();
         var title        = $"Unassigned-{Guid.NewGuid():N}";
 
         await TaskSeeder.SeedAsync(_factory, SeededCompanyId, title: title);
@@ -75,7 +75,7 @@ public class GetUnassignedTasksEndpointTests
     [Fact]
     public async Task Does_Not_Return_Assigned_Tasks()
     {
-        using var client     = AdminClient();
+        using var client     = await AdminClient();
         var assignedTitle    = $"Assigned-{Guid.NewGuid():N}";
         var unassignedTitle  = $"Unassigned-{Guid.NewGuid():N}";
 
@@ -92,11 +92,12 @@ public class GetUnassignedTasksEndpointTests
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
-    private HttpClient AdminClient()
+    private async Task<HttpClient> AdminClient()
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, SeededCompanyId);
         return client;
     }
 

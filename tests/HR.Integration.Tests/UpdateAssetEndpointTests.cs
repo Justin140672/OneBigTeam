@@ -18,11 +18,12 @@ public class UpdateAssetEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -66,7 +67,7 @@ public class UpdateAssetEndpointTests
     public async Task Put_Asset_Returns_NotFound_When_Asset_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var category = await CreateCategoryAsync(client, companyId);
 
         var response = await client.PutAsJsonAsync(
@@ -87,7 +88,7 @@ public class UpdateAssetEndpointTests
     public async Task Put_Asset_Updates_All_Fields()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var category = await CreateCategoryAsync(client, companyId);
         var asset = await CreateAssetAsync(client, companyId, category.Id);
 
@@ -126,7 +127,7 @@ public class UpdateAssetEndpointTests
     public async Task Put_Asset_Returns_UnprocessableEntity_When_Name_Is_Empty()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var category = await CreateCategoryAsync(client, companyId);
         var asset = await CreateAssetAsync(client, companyId, category.Id);
 
@@ -148,7 +149,7 @@ public class UpdateAssetEndpointTests
     public async Task Put_Asset_Returns_UnprocessableEntity_When_AssetNumber_Is_Empty()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var category = await CreateCategoryAsync(client, companyId);
         var asset = await CreateAssetAsync(client, companyId, category.Id);
 
@@ -170,7 +171,7 @@ public class UpdateAssetEndpointTests
     public async Task Put_Asset_Returns_Conflict_When_AssetNumber_Belongs_To_Another_Asset()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var category = await CreateCategoryAsync(client, companyId);
         var asset1 = await CreateAssetAsync(client, companyId, category.Id, "ASSET-001", "Laptop");
         await CreateAssetAsync(client, companyId, category.Id, "ASSET-002", "Monitor");
@@ -195,8 +196,8 @@ public class UpdateAssetEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
-        using var otherClient = AdminClient(otherCompanyId);
+        using var client = await AdminClient(companyId);
+        using var otherClient = await AdminClient(otherCompanyId);
 
         var category = await CreateCategoryAsync(client, companyId);
         var asset = await CreateAssetAsync(client, companyId, category.Id);

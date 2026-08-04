@@ -20,11 +20,13 @@ public class GetSubscriptionStatusEndpointTests
         _factory = factory;
     }
 
-    private HttpClient ClientFor(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientFor(Guid userId, Guid companyId, bool ensureActiveSubscription = true)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(
+            _factory, userId, SystemRoles.Employee, companyId, ensureActiveSubscription);
         return client;
     }
 
@@ -73,7 +75,7 @@ public class GetSubscriptionStatusEndpointTests
         var trialStartedAt = DateTimeOffset.UtcNow;
         await SeedTrialSubscriptionAsync(companyId, trialStartedAt, trialLengthDays: 14);
 
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync("/api/companies/subscription-status");
         response.EnsureSuccessStatusCode();
@@ -97,7 +99,7 @@ public class GetSubscriptionStatusEndpointTests
         var trialStartedAt = DateTimeOffset.UtcNow.AddDays(-30);
         await SeedTrialSubscriptionAsync(companyId, trialStartedAt, trialLengthDays: 14);
 
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync("/api/companies/subscription-status");
         response.EnsureSuccessStatusCode();
@@ -117,7 +119,7 @@ public class GetSubscriptionStatusEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee);
 
         // No CustomerSubscription row seeded for this company at all.
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId, ensureActiveSubscription: false);
 
         var response = await client.GetAsync("/api/companies/subscription-status");
         response.EnsureSuccessStatusCode();

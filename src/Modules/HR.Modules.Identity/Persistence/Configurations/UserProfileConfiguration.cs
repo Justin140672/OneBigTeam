@@ -23,6 +23,12 @@ internal sealed class UserProfileConfiguration : IEntityTypeConfiguration<UserPr
             .HasColumnName("supabase_auth_user_id")
             .IsRequired();
 
+        builder.Property(profile => profile.CompanyId)
+            .HasColumnName("company_id")
+            .IsRequired();
+
+        builder.HasIndex(profile => profile.CompanyId);
+
         builder.Property(profile => profile.Email)
             .HasColumnName("email")
             .HasMaxLength(256)

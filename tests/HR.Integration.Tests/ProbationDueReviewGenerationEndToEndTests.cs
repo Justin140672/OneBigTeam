@@ -41,7 +41,7 @@ public class ProbationDueReviewGenerationEndToEndTests
     public async Task Job_Creates_ManagerCheckIn_And_HrReview_For_Past_Due_Dates()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(User1, companyId);
+        using var client = await AuthenticatedClient(User1, companyId);
 
         var recordId = await CreateRecordAsync(client, companyId);
 
@@ -57,7 +57,7 @@ public class ProbationDueReviewGenerationEndToEndTests
     public async Task Job_Does_Not_Create_FinalDecision_When_Not_Yet_Due()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(User2, companyId);
+        using var client = await AuthenticatedClient(User2, companyId);
 
         var recordId = await CreateRecordAsync(client, companyId);
 
@@ -71,7 +71,7 @@ public class ProbationDueReviewGenerationEndToEndTests
     public async Task Job_Transitions_Active_Record_To_ReviewDue()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(User3, companyId);
+        using var client = await AuthenticatedClient(User3, companyId);
 
         var recordId = await CreateRecordAsync(client, companyId);
 
@@ -87,7 +87,7 @@ public class ProbationDueReviewGenerationEndToEndTests
         var companyId = Guid.NewGuid();
         var userId    = new Guid("cccccccc-0000-0000-0000-000000000004");
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = AuthenticatedClient(userId, companyId);
+        using var client = await AuthenticatedClient(userId, companyId);
 
         var recordId = await CreateRecordAsync(client, companyId);
 
@@ -102,11 +102,12 @@ public class ProbationDueReviewGenerationEndToEndTests
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient(Guid userId, Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

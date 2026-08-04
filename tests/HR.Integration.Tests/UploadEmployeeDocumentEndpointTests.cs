@@ -55,6 +55,7 @@ public class UploadEmployeeDocumentEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, AcmeCompanyId);
 
         // uploadedBy (userId) != employeeId in route
         var response = await client.PostAsync(
@@ -71,6 +72,7 @@ public class UploadEmployeeDocumentEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, AcmeCompanyId);
 
         var response = await client.PostAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{userId}/documents",
@@ -82,7 +84,7 @@ public class UploadEmployeeDocumentEndpointTests
     public async Task Returns_Created_When_Manager_Uploads_Valid_Document()
     {
         var employeeId   = Guid.NewGuid();
-        using var client = ManagerClient();
+        using var client = await ManagerClient();
 
         var response = await client.PostAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents",
@@ -102,7 +104,7 @@ public class UploadEmployeeDocumentEndpointTests
     public async Task Uploaded_Document_Appears_In_List()
     {
         var employeeId   = Guid.NewGuid();
-        using var client = ManagerClient();
+        using var client = await ManagerClient();
 
         await client.PostAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents",
@@ -121,7 +123,7 @@ public class UploadEmployeeDocumentEndpointTests
     public async Task Uploaded_Document_Can_Be_Downloaded()
     {
         var employeeId   = Guid.NewGuid();
-        using var client = ManagerClient();
+        using var client = await ManagerClient();
 
         var uploadResponse = await client.PostAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents",
@@ -133,6 +135,7 @@ public class UploadEmployeeDocumentEndpointTests
             new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         noRedirect.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UploadAdmin.ToString());
         noRedirect.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UploadAdmin, SystemRoles.HrAdministrator, AcmeCompanyId);
 
         var downloadResponse = await noRedirect.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents/{uploaded!.EmployeeDocumentId}/download");
@@ -141,11 +144,12 @@ public class UploadEmployeeDocumentEndpointTests
         Assert.NotNull(downloadResponse.Headers.Location);
     }
 
-    private HttpClient ManagerClient()
+    private async Task<HttpClient> ManagerClient()
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UploadAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UploadAdmin, SystemRoles.HrAdministrator, AcmeCompanyId);
         return client;
     }
 

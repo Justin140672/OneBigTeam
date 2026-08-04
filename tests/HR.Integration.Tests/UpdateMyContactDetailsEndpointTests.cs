@@ -78,6 +78,7 @@ public class UpdateMyContactDetailsEndpointTests
         using var adminClient = _factory.CreateClient();
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, adminUserId.ToString());
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, adminUserId, companyId);
 
         var refData = await CreateReferenceDataAsync(adminClient, companyId);
 

@@ -18,11 +18,12 @@ public class GetExploreCardsEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientFor(Guid companyId, Guid userId)
+    private async Task<HttpClient> ClientFor(Guid companyId, Guid userId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -40,7 +41,7 @@ public class GetExploreCardsEndpointTests
     public async Task Get_ExploreCards_Returns_Six_Static_Cards_With_Reports_ComingSoon()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, HrAdminUserId);
+        using var client = await ClientFor(companyId, HrAdminUserId);
 
         var response = await client.GetAsync("/api/company-onboarding/explore-cards");
 

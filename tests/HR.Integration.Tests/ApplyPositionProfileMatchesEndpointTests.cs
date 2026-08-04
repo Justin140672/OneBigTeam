@@ -30,11 +30,12 @@ public class ApplyPositionProfileMatchesEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -52,7 +53,7 @@ public class ApplyPositionProfileMatchesEndpointTests
     public async Task Post_ApplyPositionProfileMatches_Always_Returns_Empty_Results_When_Nothing_Exists()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies/position-profile-matches/apply", new { companyId });
 
@@ -66,7 +67,7 @@ public class ApplyPositionProfileMatchesEndpointTests
     public async Task Post_ApplyPositionProfileMatches_Always_Returns_Empty_Results_And_Never_Touches_Existing_Vacancies()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
 
         Guid vacancyId;

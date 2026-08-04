@@ -18,11 +18,12 @@ public class DeactivateAssetCategoryEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -41,7 +42,7 @@ public class DeactivateAssetCategoryEndpointTests
     public async Task Delete_AssetCategory_Returns_NotFound_When_Category_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/asset-categories/{Guid.NewGuid()}");
@@ -53,7 +54,7 @@ public class DeactivateAssetCategoryEndpointTests
     public async Task Delete_AssetCategory_Returns_NoContent_On_Success()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var created = await client.PostAsJsonAsync($"/api/companies/{companyId}/asset-categories", new
         {
@@ -74,7 +75,7 @@ public class DeactivateAssetCategoryEndpointTests
     public async Task Delete_AssetCategory_Deactivates_The_Category()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var created = await client.PostAsJsonAsync($"/api/companies/{companyId}/asset-categories", new
         {
@@ -102,7 +103,7 @@ public class DeactivateAssetCategoryEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var createClient = AdminClient(companyId);
+        using var createClient = await AdminClient(companyId);
 
         var created = await createClient.PostAsJsonAsync($"/api/companies/{companyId}/asset-categories", new
         {
@@ -113,7 +114,7 @@ public class DeactivateAssetCategoryEndpointTests
         var category = await created.Content.ReadFromJsonAsync<AssetCategoryPayload>();
         Assert.NotNull(category);
 
-        using var otherClient = AdminClient(otherCompanyId);
+        using var otherClient = await AdminClient(otherCompanyId);
         var response = await otherClient.DeleteAsync(
             $"/api/companies/{otherCompanyId}/asset-categories/{category!.Id}");
 

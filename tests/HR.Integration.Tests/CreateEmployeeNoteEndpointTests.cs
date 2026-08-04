@@ -29,11 +29,12 @@ public class CreateEmployeeNoteEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -60,7 +61,7 @@ public class CreateEmployeeNoteEndpointTests
     public async Task Post_EmployeeNote_Creates_Note_For_HrAdministrator()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var employeeId = await CompensationTestHelpers.CreateEmployeeAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees/{employeeId}/notes", new
@@ -92,7 +93,7 @@ public class CreateEmployeeNoteEndpointTests
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees/{employeeId}/notes", new
         {
@@ -110,7 +111,7 @@ public class CreateEmployeeNoteEndpointTests
     public async Task Post_EmployeeNote_Returns_UnprocessableEntity_When_NoteText_Is_Empty()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var employeeId = await CompensationTestHelpers.CreateEmployeeAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees/{employeeId}/notes", new
@@ -133,6 +134,7 @@ public class CreateEmployeeNoteEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ManagerUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ManagerUserId, SystemRoles.Manager, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees/{employeeId}/notes", new
         {
@@ -154,6 +156,7 @@ public class CreateEmployeeNoteEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, EmployeeUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, EmployeeUserId, SystemRoles.Employee, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees/{employeeId}/notes", new
         {

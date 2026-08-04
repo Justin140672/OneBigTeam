@@ -26,11 +26,12 @@ public class GetRecruitmentStageUsageEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -59,7 +60,7 @@ public class GetRecruitmentStageUsageEndpointTests
     public async Task Get_Usage_Returns_NotFound_For_Unknown_Stage()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/recruitment-stages/{Guid.NewGuid()}/usage");
@@ -72,7 +73,7 @@ public class GetRecruitmentStageUsageEndpointTests
     {
         var companyId = Guid.NewGuid();
         var stages = await SeedDefaultStagesAsync(companyId);
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/recruitment-stages/{stages["Offer"]}/usage");
@@ -89,7 +90,7 @@ public class GetRecruitmentStageUsageEndpointTests
     {
         var companyId = Guid.NewGuid();
         var stages = await SeedDefaultStagesAsync(companyId);
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         using (var scope = _factory.Services.CreateScope())
         {

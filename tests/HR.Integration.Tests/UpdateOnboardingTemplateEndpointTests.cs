@@ -22,19 +22,21 @@ public class UpdateOnboardingTemplateEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
-    private HttpClient CompanyAdministratorClient(Guid companyId)
+    private async Task<HttpClient> CompanyAdministratorClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, CompanyAdministratorUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdministratorUserId, SystemRoles.CompanyAdministrator, companyId);
         return client;
     }
 
@@ -67,10 +69,10 @@ public class UpdateOnboardingTemplateEndpointTests
     public async Task Put_OnboardingTemplate_Returns_Forbidden_For_User_Without_Employee_Manage_Permission()
     {
         var companyId = Guid.NewGuid();
-        using var adminClient = AdminClient(companyId);
+        using var adminClient = await AdminClient(companyId);
         var template = await CreateTemplateAsync(adminClient, companyId);
 
-        using var client = CompanyAdministratorClient(companyId);
+        using var client = await CompanyAdministratorClient(companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/onboarding-templates/{template.Id}",
@@ -83,7 +85,7 @@ public class UpdateOnboardingTemplateEndpointTests
     public async Task Put_OnboardingTemplate_Returns_NotFound_When_Template_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/onboarding-templates/{Guid.NewGuid()}",
@@ -96,7 +98,7 @@ public class UpdateOnboardingTemplateEndpointTests
     public async Task Put_OnboardingTemplate_Updates_Name_Description_And_Tasks()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var template = await CreateTemplateAsync(client, companyId, "Standard Onboarding");
 
         var response = await client.PutAsJsonAsync(
@@ -164,7 +166,7 @@ public class UpdateOnboardingTemplateEndpointTests
     public async Task Put_OnboardingTemplate_Replaces_Existing_Tasks_On_Subsequent_Update()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var template = await CreateTemplateAsync(client, companyId, "Standard Onboarding");
 
         var firstUpdate = await client.PutAsJsonAsync(
@@ -223,7 +225,7 @@ public class UpdateOnboardingTemplateEndpointTests
     public async Task Put_OnboardingTemplate_Returns_Conflict_When_Renamed_To_Existing_Active_Template_Name()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         await CreateTemplateAsync(client, companyId, "Standard Onboarding");
         var second = await CreateTemplateAsync(client, companyId, "Executive Onboarding");
@@ -239,7 +241,7 @@ public class UpdateOnboardingTemplateEndpointTests
     public async Task Put_OnboardingTemplate_Allows_Keeping_Its_Own_Name()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var template = await CreateTemplateAsync(client, companyId, "Standard Onboarding");
 
         var response = await client.PutAsJsonAsync(
@@ -264,7 +266,7 @@ public class UpdateOnboardingTemplateEndpointTests
     public async Task Put_OnboardingTemplate_Returns_UnprocessableEntity_When_Name_Is_Empty()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var template = await CreateTemplateAsync(client, companyId, "Standard Onboarding");
 
         var response = await client.PutAsJsonAsync(
@@ -278,7 +280,7 @@ public class UpdateOnboardingTemplateEndpointTests
     public async Task Put_OnboardingTemplate_Returns_UnprocessableEntity_When_Task_Title_Is_Empty()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var template = await CreateTemplateAsync(client, companyId, "Standard Onboarding");
 
         var response = await client.PutAsJsonAsync(

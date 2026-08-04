@@ -58,7 +58,7 @@ public class GetMyProfilePhotoEndpointTests
         var employeeId = Guid.NewGuid();
 
         // HR uploads a live photo directly on behalf of the employee.
-        using (var managerClient = ManagerClient(companyId))
+        using (var managerClient = await ManagerClient(companyId))
         {
             var liveUpload = await managerClient.PostAsync(
                 $"/api/companies/{companyId}/employees/{employeeId}/profile-photo",
@@ -99,15 +99,17 @@ public class GetMyProfilePhotoEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, companyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }
 
-    private HttpClient ManagerClient(Guid companyId)
+    private async Task<HttpClient> ManagerClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ManagerUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ManagerUser, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

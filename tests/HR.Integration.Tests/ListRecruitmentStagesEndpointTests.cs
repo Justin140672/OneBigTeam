@@ -26,11 +26,12 @@ public class ListRecruitmentStagesEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientAs(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -57,7 +58,7 @@ public class ListRecruitmentStagesEndpointTests
     {
         var companyId = Guid.NewGuid();
         await SeedDefaultStagesAsync(companyId);
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/recruitment-stages");
 
@@ -73,7 +74,7 @@ public class ListRecruitmentStagesEndpointTests
         var companyId = Guid.NewGuid();
         await SeedDefaultStagesAsync(companyId);
 
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
         var response = await client.GetAsync($"/api/companies/{companyId}/recruitment-stages");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -91,7 +92,7 @@ public class ListRecruitmentStagesEndpointTests
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
         await SeedDefaultStagesAsync(otherCompanyId);
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/recruitment-stages");
 

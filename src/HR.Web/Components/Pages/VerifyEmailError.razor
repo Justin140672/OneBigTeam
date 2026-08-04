@@ -1,0 +1,56 @@
+@page "/verify-email-error"
+@layout HR.Web.Components.Layout.LoginLayout
+@rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@inject NavigationManager Navigation
+@inject IConfiguration Configuration
+
+<PageTitle>Verification link invalid — One Big Team</PageTitle>
+
+<div class="login-card">
+    <div class="login-brand">
+        <img src="/images/logo.svg" alt="One Big Team" class="login-logo-img" />
+    </div>
+
+    <h1 class="login-heading">This verification link is invalid or has expired</h1>
+    <p class="login-subheading">
+        Verification links only work once and expire after a while. Enter your email below and
+        we'll send you a fresh one.
+    </p>
+
+    <EditForm Model="_form" OnValidSubmit="SubmitAsync" FormName="verify-email-error">
+        <DataAnnotationsValidator />
+
+        <div class="login-field">
+            <label class="login-label">Email</label>
+            <SfTextBox @bind-Value="_form.Email"
+                       Placeholder="you@example.com"
+                       Type="InputType.Email" />
+            <ValidationMessage For="() => _form.Email" class="login-validation" />
+        </div>
+
+        <SfButton IsPrimary="true"
+                  Type="ButtonType.Submit"
+                  CssClass="login-btn">
+            Resend verification email
+        </SfButton>
+    </EditForm>
+</div>
+
+@code {
+    private readonly ResendForm _form = new();
+
+    private void SubmitAsync()
+    {
+        var marketingBaseUrl = Configuration["Marketing:BaseUrl"] ?? "http://localhost:5166";
+        var url = $"{marketingBaseUrl}/check-your-email?email={Uri.EscapeDataString(_form.Email)}";
+        Navigation.NavigateTo(url, forceLoad: true);
+    }
+
+    private sealed class ResendForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Email is required.")]
+        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Enter a valid email address.")]
+        public string Email { get; set; } = string.Empty;
+    }
+}

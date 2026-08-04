@@ -26,11 +26,12 @@ public class UpdateRecruitmentStageEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientAs(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -61,7 +62,7 @@ public class UpdateRecruitmentStageEndpointTests
     {
         var companyId = Guid.NewGuid();
         var stageIds = await SeedDefaultStagesAsync(companyId);
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages/{stageIds[0]}",
@@ -75,7 +76,7 @@ public class UpdateRecruitmentStageEndpointTests
     {
         var companyId = Guid.NewGuid();
         var stageIds = await SeedDefaultStagesAsync(companyId);
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages/{stageIds[0]}",
@@ -91,7 +92,7 @@ public class UpdateRecruitmentStageEndpointTests
     public async Task Put_RecruitmentStage_Returns_NotFound_For_Unknown_Stage()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages/{Guid.NewGuid()}",
@@ -105,7 +106,7 @@ public class UpdateRecruitmentStageEndpointTests
     {
         var companyId = Guid.NewGuid();
         var stageIds = await SeedDefaultStagesAsync(companyId);
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages/{stageIds[0]}",

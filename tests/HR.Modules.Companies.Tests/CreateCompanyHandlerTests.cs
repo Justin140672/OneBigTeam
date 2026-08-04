@@ -28,7 +28,11 @@ public class CreateCompanyHandlerTests
         var company = await context.Companies.SingleAsync();
         Assert.Equal(result.Value.Id, company.Id);
         Assert.Equal("Acme Corporation", company.Name);
-        Assert.True(company.IsActive);
+        // Company.Create now always starts a company in PendingVerification (self-service signup
+        // requires email verification before activation) — IsActive is a computed shim over
+        // Status, so a freshly created company (even via this admin-facing endpoint) is not yet
+        // "active" until Company.Activate(now) is called.
+        Assert.False(company.IsActive);
 
         var settings = await context.CompanySettings.SingleAsync();
         Assert.Equal(company.Id, settings.CompanyId);

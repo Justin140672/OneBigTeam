@@ -15,11 +15,12 @@ public class GetReportViewsEndpointTests
         _factory = factory;
     }
 
-    private HttpClient ClientFor(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientFor(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -52,7 +53,7 @@ public class GetReportViewsEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/saved-views/employee-directory");
 
@@ -71,8 +72,8 @@ public class GetReportViewsEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, otherUserId, SystemRoles.HrAdministrator);
 
-        using var client = ClientFor(userId, companyId);
-        using var otherClient = ClientFor(otherUserId, companyId);
+        using var client = await ClientFor(userId, companyId);
+        using var otherClient = await ClientFor(otherUserId, companyId);
 
         await CreateViewAsync(client, companyId, reportId: "employee-directory", name: "Mine");
         await CreateViewAsync(client, companyId, reportId: "sickness-report", name: "Different Report");
@@ -92,7 +93,7 @@ public class GetReportViewsEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var first = await CreateViewAsync(client, companyId, name: "First", isDefault: true);
         var second = await CreateViewAsync(client, companyId, name: "Second", isDefault: false);

@@ -46,7 +46,7 @@ public class GetLeaveBalanceHistoryEndpointTests
     public async Task Get_BalanceHistory_Returns_Forbidden_For_Caller_Without_LeaveManage_Policy()
     {
         var companyId = Guid.NewGuid();
-        using var managerClient = AuthenticatedClient(ManagerUser, companyId);
+        using var managerClient = await AuthenticatedClient(ManagerUser, companyId);
 
         var response = await managerClient.GetAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/leave-types/{Guid.NewGuid()}/balance-history");
@@ -57,7 +57,7 @@ public class GetLeaveBalanceHistoryEndpointTests
     public async Task Get_BalanceHistory_Returns_NotFound_When_LeaveType_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(HrAdminUser, companyId);
+        using var client = await AuthenticatedClient(HrAdminUser, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/leave-types/{Guid.NewGuid()}/balance-history");
@@ -69,7 +69,7 @@ public class GetLeaveBalanceHistoryEndpointTests
     public async Task Get_BalanceHistory_Returns_Empty_List_For_Employee_With_No_History_On_A_Real_LeaveType()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(HrAdminUser, companyId);
+        using var client = await AuthenticatedClient(HrAdminUser, companyId);
 
         var leaveTypeId = await CreateLeaveTypeAsync(companyId);
 
@@ -90,7 +90,7 @@ public class GetLeaveBalanceHistoryEndpointTests
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AuthenticatedClient(HrAdminUser, companyId);
+        using var client = await AuthenticatedClient(HrAdminUser, companyId);
 
         var leaveTypeId = await SeedBalanceHistoryAsync(companyId, employeeId);
 
@@ -126,11 +126,12 @@ public class GetLeaveBalanceHistoryEndpointTests
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient(Guid userId, Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 

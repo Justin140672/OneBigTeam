@@ -31,7 +31,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
     public async Task CreateEmployee_WithPositionProfile_GeneratesDocumentRequests_For_Each_RequiredDocument()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId  = await CreatePositionProfileAsync(client, companyId, "Software Engineer");
         var docTypeId1 = await CreateDocumentTypeAsync(client, companyId, "Passport");
@@ -55,7 +55,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
     public async Task CreateEmployee_WithPositionProfile_Sets_DueDate_From_DueDaysAfterStart()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "HR Manager");
         var docTypeId = await CreateDocumentTypeAsync(client, companyId, "Contract");
@@ -71,7 +71,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
     public async Task CreateEmployee_WithPositionProfile_Sets_DueDate_Null_When_DueDaysAfterStart_Not_Set()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Account Executive");
         var docTypeId = await CreateDocumentTypeAsync(client, companyId, "Driving Licence");
@@ -87,7 +87,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
     public async Task CreateEmployee_WithPositionProfile_Sets_PositionProfileRequiredDocumentId()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Designer");
         var docTypeId = await CreateDocumentTypeAsync(client, companyId, "Portfolio");
@@ -103,7 +103,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
     public async Task CreateEmployee_WithoutPositionProfile_CreatesNoDocumentRequests()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId, positionProfileId: null);
 
@@ -114,7 +114,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
     public async Task CreateEmployee_WithPositionProfile_ThatHasNoRequiredDocuments_CreatesNoRequests()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId  = await CreatePositionProfileAsync(client, companyId, "Finance Manager");
         var employeeId = await CreateEmployeeAsync(client, companyId, profileId);
@@ -126,7 +126,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
     public async Task CreateEmployee_WithPositionProfile_DoesNotDuplicateRequests_For_Different_Employees()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Sales Manager");
         var docTypeId = await CreateDocumentTypeAsync(client, companyId, "Certificate");
@@ -143,7 +143,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
     public async Task CreateEmployee_Returns_Created_Regardless_Of_DocumentRequest_Outcome()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
@@ -160,7 +160,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
     public async Task CreateEmployee_WithPositionProfile_Creates_One_Upload_Task_Per_DocumentRequest()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId  = await CreatePositionProfileAsync(client, companyId, "Engineer");
         var docTypeId1 = await CreateDocumentTypeAsync(client, companyId, "Passport");
@@ -179,7 +179,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
     public async Task CreateEmployee_WithPositionProfile_Upload_Tasks_Are_Assigned_To_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Analyst");
         var docTypeId = await CreateDocumentTypeAsync(client, companyId, "Passport");
@@ -196,7 +196,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
     public async Task CreateEmployee_WithPositionProfile_Upload_Task_ActionType_Is_Upload()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Coordinator");
         var docTypeId = await CreateDocumentTypeAsync(client, companyId, "Certificate");
@@ -213,7 +213,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
     public async Task CreateEmployee_WithPositionProfile_Upload_Task_DueDate_Matches_DocumentRequest()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Developer");
         var docTypeId = await CreateDocumentTypeAsync(client, companyId, "Contract");
@@ -230,7 +230,7 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
     public async Task CreateEmployee_WithoutPositionProfile_Creates_No_Upload_Tasks()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId, positionProfileId: null);
 
@@ -240,11 +240,12 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

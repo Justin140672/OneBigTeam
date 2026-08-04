@@ -46,7 +46,7 @@ public class SetEmployeeWorkingPatternEndpointTests
     [Fact]
     public async Task Returns_NotFound_For_Unknown_Employee()
     {
-        using var client = AdminClient();
+        using var client = await AdminClient();
         var unknownId    = Guid.NewGuid();
 
         var response = await client.PutAsJsonAsync(
@@ -58,7 +58,7 @@ public class SetEmployeeWorkingPatternEndpointTests
     [Fact]
     public async Task Returns_OK_And_Persists_HoursPerDay_Override()
     {
-        using var client = AdminClient();
+        using var client = await AdminClient();
         var employee     = await CreateEmployeeAsync(client);
 
         var response = await client.PutAsJsonAsync(
@@ -75,7 +75,7 @@ public class SetEmployeeWorkingPatternEndpointTests
     [Fact]
     public async Task Working_Pattern_Override_Is_Reflected_In_GetMyEmployee()
     {
-        using var client = AdminClient();
+        using var client = await AdminClient();
         var employee     = await CreateEmployeeAsync(client);
 
         await client.PutAsJsonAsync(
@@ -83,7 +83,7 @@ public class SetEmployeeWorkingPatternEndpointTests
             new { companyId = SeededCompanyId, employeeId = employee.Id, hoursPerDayOverride = 6.5m });
 
         // GetMyEmployee uses employee.Id as the userId (sub claim)
-        using var selfClient = SelfClient(employee.Id);
+        using var selfClient = await SelfClient(employee.Id);
         var meResp = await selfClient.GetAsync(
             $"/api/companies/{SeededCompanyId}/employees/me");
         Assert.Equal(HttpStatusCode.OK, meResp.StatusCode);
@@ -95,7 +95,7 @@ public class SetEmployeeWorkingPatternEndpointTests
     [Fact]
     public async Task Clearing_Override_Returns_Null_Values()
     {
-        using var client = AdminClient();
+        using var client = await AdminClient();
         var employee     = await CreateEmployeeAsync(client);
 
         // First set an override
@@ -117,21 +117,23 @@ public class SetEmployeeWorkingPatternEndpointTests
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
-    private HttpClient AdminClient()
+    private async Task<HttpClient> AdminClient()
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, SeededCompanyId);
         return client;
     }
 
-    private HttpClient SelfClient(Guid userId)
+    private async Task<HttpClient> SelfClient(Guid userId)
     {
         TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
 
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, SeededCompanyId);
         return client;
     }
 

@@ -26,11 +26,12 @@ public class ReorderRecruitmentStagesEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientAs(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -61,7 +62,7 @@ public class ReorderRecruitmentStagesEndpointTests
     {
         var companyId = Guid.NewGuid();
         var stageIds = await SeedDefaultStagesAsync(companyId);
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages/reorder",
@@ -75,7 +76,7 @@ public class ReorderRecruitmentStagesEndpointTests
     {
         var companyId = Guid.NewGuid();
         var stageIds = await SeedDefaultStagesAsync(companyId);
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var reversed = stageIds.Reverse().ToArray();
 
@@ -89,7 +90,7 @@ public class ReorderRecruitmentStagesEndpointTests
         Assert.Equal(reversed, payload!.Items.Select(i => i.Id).ToArray());
         Assert.Equal([1, 2, 3, 4, 5, 6], payload.Items.Select(i => i.DisplayOrder));
 
-        using var listClient = ClientAs(RecruiterUser, companyId);
+        using var listClient = await ClientAs(RecruiterUser, companyId);
         var listResponse = await listClient.GetAsync($"/api/companies/{companyId}/recruitment-stages");
         var listPayload = await listResponse.Content.ReadFromJsonAsync<ListPayload>();
         Assert.Equal(reversed, listPayload!.Items.Select(i => i.Id).ToArray());
@@ -100,7 +101,7 @@ public class ReorderRecruitmentStagesEndpointTests
     {
         var companyId = Guid.NewGuid();
         var stageIds = await SeedDefaultStagesAsync(companyId);
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var partial = stageIds.Take(stageIds.Length - 1).ToArray();
 
@@ -116,7 +117,7 @@ public class ReorderRecruitmentStagesEndpointTests
     {
         var companyId = Guid.NewGuid();
         var stageIds = await SeedDefaultStagesAsync(companyId);
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var withUnknown = stageIds.Skip(1).Append(Guid.NewGuid()).ToArray();
 
@@ -132,7 +133,7 @@ public class ReorderRecruitmentStagesEndpointTests
     {
         var companyId = Guid.NewGuid();
         await SeedDefaultStagesAsync(companyId);
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages/reorder",

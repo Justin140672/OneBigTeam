@@ -24,11 +24,12 @@ public class GetEmploymentTypeSplitEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.Employee, companyId);
         return client;
     }
 
@@ -46,7 +47,7 @@ public class GetEmploymentTypeSplitEndpointTests
     public async Task Get_EmploymentTypeSplit_Returns_Empty_List_When_No_Employees()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees/employment-type-split");
 
@@ -60,7 +61,7 @@ public class GetEmploymentTypeSplitEndpointTests
     public async Task Get_EmploymentTypeSplit_Groups_By_EmploymentType_And_Excludes_Inactive_Employees()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         Guid employmentTypeId = Guid.Empty;
         await SeedAsync(companyId, (db, refData) =>
@@ -105,7 +106,7 @@ public class GetEmploymentTypeSplitEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         await SeedAsync(companyId, (db, refData) =>
         {

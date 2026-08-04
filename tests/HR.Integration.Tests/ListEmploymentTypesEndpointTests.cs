@@ -20,11 +20,12 @@ public class ListEmploymentTypesEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -42,7 +43,7 @@ public class ListEmploymentTypesEndpointTests
     public async Task Get_EmploymentTypes_Returns_Empty_List_When_None_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employment-types");
 
@@ -57,7 +58,7 @@ public class ListEmploymentTypesEndpointTests
     public async Task Get_EmploymentTypes_Returns_Created_Types()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var create1 = await client.PostAsJsonAsync($"/api/companies/{companyId}/employment-types", new
         {
@@ -92,7 +93,7 @@ public class ListEmploymentTypesEndpointTests
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        using var clientA = AdminClient(companyA);
+        using var clientA = await AdminClient(companyA);
         var create = await clientA.PostAsJsonAsync($"/api/companies/{companyA}/employment-types", new
         {
             companyId = companyA,
@@ -100,7 +101,7 @@ public class ListEmploymentTypesEndpointTests
         });
         create.EnsureSuccessStatusCode();
 
-        using var clientB = AdminClient(companyB);
+        using var clientB = await AdminClient(companyB);
         var response = await clientB.GetAsync($"/api/companies/{companyB}/employment-types");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

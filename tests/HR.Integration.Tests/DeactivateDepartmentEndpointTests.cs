@@ -21,11 +21,12 @@ public class DeactivateDepartmentEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -44,7 +45,7 @@ public class DeactivateDepartmentEndpointTests
     public async Task Delete_Department_Returns_NotFound_When_Department_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/departments/{Guid.NewGuid()}");
@@ -56,7 +57,7 @@ public class DeactivateDepartmentEndpointTests
     public async Task Delete_Department_Deactivates_Active_Department()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var created = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments",
             new { companyId, name = "Engineering" });
@@ -79,7 +80,7 @@ public class DeactivateDepartmentEndpointTests
     public async Task Delete_Department_Returns_NotFound_When_Already_Inactive()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var created = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments",
             new { companyId, name = "Engineering" });
@@ -100,7 +101,7 @@ public class DeactivateDepartmentEndpointTests
     public async Task Delete_Department_Returns_BadRequest_When_Department_Has_Active_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 

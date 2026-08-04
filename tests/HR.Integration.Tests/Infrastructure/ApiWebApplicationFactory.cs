@@ -1,4 +1,5 @@
 using HR.Modules.Companies.Services;
+using HR.Modules.Identity.Services;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
@@ -20,6 +21,8 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, I
     public FakeEmailSender EmailSender { get; } = new FakeEmailSender();
 
     internal FakeStripeGateway StripeGateway { get; } = new FakeStripeGateway();
+
+    internal FakeSupabaseAuthGateway SupabaseAuthGateway { get; } = new FakeSupabaseAuthGateway();
 
     async Task IAsyncLifetime.InitializeAsync()
     {
@@ -56,6 +59,10 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, I
 
             // Replace the real Stripe gateway so no test ever calls out to Stripe's network API.
             services.AddScoped<IStripeGateway>(_ => StripeGateway);
+
+            // Replace the real Supabase Auth gateway so no test ever calls out to Supabase's live
+            // Auth Admin API.
+            services.AddScoped<ISupabaseAuthGateway>(_ => SupabaseAuthGateway);
         });
     }
 }

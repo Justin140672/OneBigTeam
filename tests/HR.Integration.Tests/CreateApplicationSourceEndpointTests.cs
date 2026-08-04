@@ -30,11 +30,12 @@ public class CreateApplicationSourceEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -64,7 +65,7 @@ public class CreateApplicationSourceEndpointTests
     public async Task Post_Applications_Succeeds_With_Valid_ExternalRecruiter_Source()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var (vacancyId, candidateId) = await SeedVacancyAndCandidateAsync(companyId);
         var recruiterId = await SeedRecruiterAsync(companyId);
 
@@ -90,7 +91,7 @@ public class CreateApplicationSourceEndpointTests
     public async Task Post_Applications_Returns_UnprocessableEntity_When_Source_ExternalRecruiter_But_RecruiterId_Missing()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var (vacancyId, candidateId) = await SeedVacancyAndCandidateAsync(companyId);
 
         var response = await client.PostAsJsonAsync(
@@ -110,7 +111,7 @@ public class CreateApplicationSourceEndpointTests
     public async Task Post_Applications_Returns_NotFound_When_SourceExternalRecruiterId_Unknown()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var (vacancyId, candidateId) = await SeedVacancyAndCandidateAsync(companyId);
 
         var response = await client.PostAsJsonAsync(
@@ -131,7 +132,7 @@ public class CreateApplicationSourceEndpointTests
     public async Task Post_Applications_Succeeds_With_Direct_Source_And_No_Recruiter_Id()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var (vacancyId, candidateId) = await SeedVacancyAndCandidateAsync(companyId);
 
         var response = await client.PostAsJsonAsync(

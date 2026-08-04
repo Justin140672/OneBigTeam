@@ -22,7 +22,7 @@ public class ListDocumentTypesEndpointTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task Returns_Six_Active_Types_For_Acme()
     {
-        using var client   = AuthenticatedClient(AcmeCompanyId);
+        using var client   = await AuthenticatedClient(AcmeCompanyId);
         var response       = await client.GetAsync($"/api/companies/{AcmeCompanyId}/document-types");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload        = await response.Content.ReadFromJsonAsync<DocTypesPayload>();
@@ -33,7 +33,7 @@ public class ListDocumentTypesEndpointTests(ApiWebApplicationFactory factory)
     public async Task Returns_Empty_For_Unknown_Company()
     {
         var unknownId      = Guid.NewGuid();
-        using var client   = AuthenticatedClient(unknownId);
+        using var client   = await AuthenticatedClient(unknownId);
         var response       = await client.GetAsync($"/api/companies/{unknownId}/document-types");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload        = await response.Content.ReadFromJsonAsync<DocTypesPayload>();
@@ -43,7 +43,7 @@ public class ListDocumentTypesEndpointTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task Returns_Empty_When_EmployeeUploadOnly_And_None_Configured()
     {
-        using var client   = AuthenticatedClient(AcmeCompanyId);
+        using var client   = await AuthenticatedClient(AcmeCompanyId);
         var response       = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/document-types?employeeUploadOnly=true");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -51,7 +51,7 @@ public class ListDocumentTypesEndpointTests(ApiWebApplicationFactory factory)
         Assert.Empty(payload!.Items);
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var userId = Guid.NewGuid();
         TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
@@ -59,6 +59,7 @@ public class ListDocumentTypesEndpointTests(ApiWebApplicationFactory factory)
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee, companyId);
         return client;
     }
 

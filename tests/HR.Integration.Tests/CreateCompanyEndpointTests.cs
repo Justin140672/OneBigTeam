@@ -70,7 +70,10 @@ public class CreateCompanyEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<CreateCompanyPayload>();
         Assert.NotNull(payload);
         Assert.Equal("New Corp", payload!.Name);
-        Assert.True(payload.IsActive);
+        // Company.Create now always starts a company in PendingVerification (self-service signup
+        // requires email verification before activation) — IsActive is a computed shim over
+        // Status, so a freshly created company is not yet "active".
+        Assert.False(payload.IsActive);
         Assert.NotEqual(Guid.Empty, payload.Id);
         Assert.Equal(2, payload.Addresses.Count);
         Assert.Contains(payload.Addresses, address => address.Type == "RegisteredOffice");

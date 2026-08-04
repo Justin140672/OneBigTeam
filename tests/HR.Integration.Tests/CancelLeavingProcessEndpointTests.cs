@@ -90,6 +90,7 @@ public class CancelLeavingProcessEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
         await StartLeavingProcessAsync(client, companyId, employeeId);
@@ -132,6 +133,7 @@ public class CancelLeavingProcessEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
 
@@ -149,6 +151,7 @@ public class CancelLeavingProcessEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User3, SystemRoles.HrAdministrator, companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
         await StartLeavingProcessAsync(client, companyId, employeeId);
@@ -168,6 +171,7 @@ public class CancelLeavingProcessEndpointTests
         var otherCompanyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User4.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User4, SystemRoles.HrAdministrator, companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
         await StartLeavingProcessAsync(client, companyId, employeeId);
@@ -189,6 +193,7 @@ public class CancelLeavingProcessEndpointTests
         var employeeId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, EmployeeRoleUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, EmployeeRoleUser, SystemRoles.Employee, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leaving-process/cancel",
@@ -205,6 +210,7 @@ public class CancelLeavingProcessEndpointTests
         var employeeId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ManagerRoleUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ManagerRoleUser, SystemRoles.Manager, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leaving-process/cancel",

@@ -27,7 +27,7 @@ public class ValidateImportSessionEndpointTests
     public async Task Returns_Ok_With_Expected_Response_After_Uploading_And_Validating_A_Valid_File()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         await EnsureDefaultLeavePolicyAsync(client, companyId);
 
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
@@ -48,7 +48,7 @@ public class ValidateImportSessionEndpointTests
     public async Task Returns_Ok_And_Validated_When_One_Row_Is_Invalid_But_Another_Succeeds()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         // Second data row is missing a required "Last Name" value. One row is still valid, so
         // per ImportSession.Validate() the session lands on Validated (ready to confirm the
@@ -79,7 +79,7 @@ public class ValidateImportSessionEndpointTests
     public async Task Returns_Ok_And_Validated_When_A_Row_References_A_New_Department()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         // Department, Location, Employment Type and Position Profile are all mandatory lookups
         // now — Location/Employment Type/Position Profile use pre-existing values here so the
@@ -107,7 +107,7 @@ public class ValidateImportSessionEndpointTests
     public async Task Returns_Ok_And_CompletedWithErrors_When_PositionProfile_Present_Without_Department_Or_Location()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         // Every other required field is present (including Employment Type) — Department and
         // Location are the only ones deliberately missing, so the row's single failure is
@@ -133,7 +133,7 @@ public class ValidateImportSessionEndpointTests
     public async Task Returns_Ok_And_Validated_When_Department_Location_And_PositionProfile_All_New()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         const string csv =
             "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile\n" +
@@ -157,7 +157,7 @@ public class ValidateImportSessionEndpointTests
     public async Task Returns_Ok_And_Validated_When_ColumnMapping_Override_Maps_NonStandard_Headers()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         // Headers don't match the standard template ("Given Name"/"Family Name" instead of
         // "First Name"/"Last Name") — without a mapping override this would fail to populate
@@ -189,7 +189,7 @@ public class ValidateImportSessionEndpointTests
     public async Task Returns_CompletedWithErrors_When_NonStandard_Headers_Used_Without_ColumnMapping_Override()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         // Same non-standard headers as the mapping-override test above, but posted with no
         // override — proves the override in that test is actually doing something, not a no-op.
@@ -226,7 +226,7 @@ public class ValidateImportSessionEndpointTests
     public async Task Returns_Forbidden_When_Company_Claim_Mismatches_Route()
     {
         var companyId = Guid.NewGuid();
-        using var uploadClient = AdminClient(companyId);
+        using var uploadClient = await AdminClient(companyId);
         var sessionId = await UploadAsync(uploadClient, companyId, ValidCsv());
 
         using var mismatchedClient = _factory.CreateClient();
@@ -245,10 +245,10 @@ public class ValidateImportSessionEndpointTests
         var ownerCompanyId = Guid.NewGuid();
         var callerCompanyId = Guid.NewGuid();
 
-        using var ownerClient = AdminClient(ownerCompanyId);
+        using var ownerClient = await AdminClient(ownerCompanyId);
         var sessionId = await UploadAsync(ownerClient, ownerCompanyId, ValidCsv());
 
-        using var callerClient = AdminClient(callerCompanyId);
+        using var callerClient = await AdminClient(callerCompanyId);
 
         // Caller's claim matches the route company (passes the auth check), but the session
         // was created under a different company, so the handler cannot find it for this caller.
@@ -261,7 +261,7 @@ public class ValidateImportSessionEndpointTests
     public async Task Returns_Conflict_When_Session_Has_Already_Been_Validated()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
 
         var firstResponse = await client.PostAsync(ValidateUrl(companyId, sessionId), EmptyJson());
@@ -272,11 +272,12 @@ public class ValidateImportSessionEndpointTests
         Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

@@ -38,11 +38,12 @@ public class LeavingProcessTenantIsolationTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, HrAdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, HrAdminUser, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -80,13 +81,13 @@ public class LeavingProcessTenantIsolationTests
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        using var clientA = AuthenticatedClient(companyA);
+        using var clientA = await AuthenticatedClient(companyA);
         var employeeAId = await CreateEmployeeAsync(clientA, companyA);
         await StartLeavingProcessAsync(clientA, companyA, employeeAId);
 
         // Authenticated as Company B (route and tenant header both companyB — no middleware
         // rejection), but the employee id belongs to Company A's leaving process.
-        using var clientB = AuthenticatedClient(companyB);
+        using var clientB = await AuthenticatedClient(companyB);
         var response = await clientB.GetAsync($"/api/companies/{companyB}/employees/{employeeAId}/leaving-process");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -98,10 +99,10 @@ public class LeavingProcessTenantIsolationTests
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        using var clientA = AuthenticatedClient(companyA);
+        using var clientA = await AuthenticatedClient(companyA);
         var employeeAId = await CreateEmployeeAsync(clientA, companyA);
 
-        using var clientB = AuthenticatedClient(companyB);
+        using var clientB = await AuthenticatedClient(companyB);
         var response = await clientB.PostAsJsonAsync(
             $"/api/companies/{companyB}/employees/{employeeAId}/leaving-process",
             new
@@ -125,11 +126,11 @@ public class LeavingProcessTenantIsolationTests
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        using var clientA = AuthenticatedClient(companyA);
+        using var clientA = await AuthenticatedClient(companyA);
         var employeeAId = await CreateEmployeeAsync(clientA, companyA);
         await StartLeavingProcessAsync(clientA, companyA, employeeAId);
 
-        using var clientB = AuthenticatedClient(companyB);
+        using var clientB = await AuthenticatedClient(companyB);
         var response = await clientB.PutAsJsonAsync(
             $"/api/companies/{companyB}/employees/{employeeAId}/leaving-process",
             new
@@ -158,11 +159,11 @@ public class LeavingProcessTenantIsolationTests
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        using var clientA = AuthenticatedClient(companyA);
+        using var clientA = await AuthenticatedClient(companyA);
         var employeeAId = await CreateEmployeeAsync(clientA, companyA);
         await StartLeavingProcessAsync(clientA, companyA, employeeAId);
 
-        using var clientB = AuthenticatedClient(companyB);
+        using var clientB = await AuthenticatedClient(companyB);
         var response = await clientB.PostAsJsonAsync(
             $"/api/companies/{companyB}/employees/{employeeAId}/leaving-process/cancel",
             new { companyId = companyB, employeeId = employeeAId, cancellationReason = "Attempted cross-tenant cancellation." });

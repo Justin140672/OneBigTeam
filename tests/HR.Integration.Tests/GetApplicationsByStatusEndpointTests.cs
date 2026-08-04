@@ -28,11 +28,12 @@ public class GetApplicationsByStatusEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientAs(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -51,7 +52,7 @@ public class GetApplicationsByStatusEndpointTests
     public async Task Get_ApplicationsByStatus_Returns_Forbidden_For_Plain_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/recruitment/applications?stageId={Guid.NewGuid()}");
@@ -63,7 +64,7 @@ public class GetApplicationsByStatusEndpointTests
     public async Task Get_ApplicationsByStatus_Returns_UnprocessableEntity_For_Empty_StageId()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/recruitment/applications?stageId={Guid.Empty}");
@@ -75,7 +76,7 @@ public class GetApplicationsByStatusEndpointTests
     public async Task Get_ApplicationsByStatus_Returns_Empty_List_When_No_Matches()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/recruitment/applications?stageId={Guid.NewGuid()}");
@@ -90,7 +91,7 @@ public class GetApplicationsByStatusEndpointTests
     public async Task Get_ApplicationsByStatus_Returns_Matching_Applications_With_Candidate_And_Vacancy_Details()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         Guid applicationId = Guid.Empty, candidateId = Guid.Empty, vacancyId = Guid.Empty, stageId = Guid.Empty;
         using (var scope = _factory.Services.CreateScope())
@@ -141,7 +142,7 @@ public class GetApplicationsByStatusEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         Guid otherStageId = Guid.Empty;
         using (var scope = _factory.Services.CreateScope())

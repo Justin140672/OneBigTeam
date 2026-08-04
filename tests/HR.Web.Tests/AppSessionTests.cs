@@ -155,46 +155,6 @@ public class AppSessionTests
     }
 
     [Fact]
-    public async Task InitialiseAsync_Sets_IsEmailConfirmed_True_By_Default()
-    {
-        var userId = Guid.NewGuid();
-        var companyId = Guid.NewGuid();
-        var employeeId = Guid.NewGuid();
-
-        var factory = BuildFactory(BuildHappyPathHandler(userId, companyId, employeeId));
-        var session = BuildSession(factory);
-
-        await session.InitialiseAsync();
-
-        Assert.True(session.IsEmailConfirmed);
-    }
-
-    [Fact]
-    public async Task InitialiseAsync_Sets_IsEmailConfirmed_False_For_Unconfirmed_Account()
-    {
-        var userId = Guid.NewGuid();
-        var companyId = Guid.NewGuid();
-        var employeeId = Guid.NewGuid();
-
-        var factory = BuildFactory(BuildHappyPathHandler(userId, companyId, employeeId, isEmailConfirmed: false));
-        var session = BuildSession(factory);
-
-        await session.InitialiseAsync();
-
-        Assert.False(session.IsEmailConfirmed);
-    }
-
-    [Fact]
-    public void SetEmailConfirmed_Flips_IsEmailConfirmed_To_True()
-    {
-        var session = BuildSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
-
-        session.SetEmailConfirmed();
-
-        Assert.True(session.IsEmailConfirmed);
-    }
-
-    [Fact]
     public async Task LandingUrl_Prioritises_HrAdministrator_Over_Other_Roles()
     {
         var userId = Guid.NewGuid();

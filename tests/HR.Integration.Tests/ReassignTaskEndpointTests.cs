@@ -43,6 +43,7 @@ public class ReassignTaskEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, unprivilegedUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, unprivilegedUser, SeededCompanyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/tasks/{Guid.NewGuid()}/assignee",
@@ -56,7 +57,7 @@ public class ReassignTaskEndpointTests
     [Fact]
     public async Task Reassign_Task_Returns_NotFound_When_Task_Does_Not_Exist()
     {
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClient();
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/tasks/{Guid.NewGuid()}/assignee",
@@ -70,7 +71,7 @@ public class ReassignTaskEndpointTests
     [Fact]
     public async Task Reassign_Task_Updates_AssignedEmployeeId()
     {
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClient();
 
         var employee = await CreateEmployeeAsync(client, "Dave", "Miller");
         var taskId   = await CreateTaskAsync("Task to reassign");
@@ -89,7 +90,7 @@ public class ReassignTaskEndpointTests
     [Fact]
     public async Task Reassign_Task_Clears_Assignment_When_Null()
     {
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClient();
 
         var employee = await CreateEmployeeAsync(client, "Frank", "Brown");
         var taskId   = await CreateTaskAsync("Task to unassign", assignedEmployeeId: employee.Id);
@@ -106,11 +107,12 @@ public class ReassignTaskEndpointTests
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient()
+    private async Task<HttpClient> AuthenticatedClient()
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, SeededCompanyId);
         return client;
     }
 

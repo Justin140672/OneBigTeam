@@ -14,11 +14,12 @@ public class ExportEmployeeLeaverReportEndpointTests
         _factory = factory;
     }
 
-    private HttpClient ClientFor(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientFor(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -39,7 +40,7 @@ public class ExportEmployeeLeaverReportEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Recruiter);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/reporting/employee-leavers/export");
@@ -53,7 +54,7 @@ public class ExportEmployeeLeaverReportEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/reporting/employee-leavers/export?format=Csv");
@@ -73,7 +74,7 @@ public class ExportEmployeeLeaverReportEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/reporting/employee-leavers/export" +

@@ -24,11 +24,12 @@ public class GetExternalRecruiterUsageEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -57,7 +58,7 @@ public class GetExternalRecruiterUsageEndpointTests
     public async Task Get_Usage_Returns_NotFound_For_Unknown_Recruiter()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/external-recruiters/{Guid.NewGuid()}/usage");
@@ -69,7 +70,7 @@ public class GetExternalRecruiterUsageEndpointTests
     public async Task Get_Usage_Returns_Not_InUse_When_No_Vacancies_Assigned()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var recruiterId = await SeedRecruiterAsync(companyId);
 
         var response = await client.GetAsync(
@@ -86,7 +87,7 @@ public class GetExternalRecruiterUsageEndpointTests
     public async Task Get_Usage_Returns_InUse_When_Vacancy_Assigned_To_Recruiter_Is_Active()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var recruiterId = await SeedRecruiterAsync(companyId);
 
         using (var scope = _factory.Services.CreateScope())

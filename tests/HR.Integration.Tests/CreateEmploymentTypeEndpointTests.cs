@@ -18,11 +18,12 @@ public class CreateEmploymentTypeEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -43,7 +44,7 @@ public class CreateEmploymentTypeEndpointTests
     public async Task Post_EmploymentTypes_Creates_EmploymentType()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employment-types", new
         {
@@ -68,7 +69,7 @@ public class CreateEmploymentTypeEndpointTests
     public async Task Post_EmploymentTypes_Returns_Conflict_For_Duplicate_Name()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var first = await client.PostAsJsonAsync($"/api/companies/{companyId}/employment-types", new
         {

@@ -25,12 +25,6 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
     public bool IsManager { get; private set; }
     public bool IsRecruiter { get; private set; }
 
-    // Interim stub for the real Supabase-Auth email-confirmation flow (out of scope for now — see
-    // ApplicationUser.IsEmailConfirmed remarks). Only self-service SignUp accounts start
-    // unconfirmed; every other creation path defaults to already-confirmed. False blocks the
-    // entire app behind EmailConfirmationRequired.razor (see MainLayout.razor).
-    public bool IsEmailConfirmed { get; private set; } = true;
-
     // True when the "Getting Started" onboarding checklist should be shown/landed-on for this
     // user — set from the company-onboarding checklist endpoint below. Only ever true for an HR
     // Administrator or Company Administrator (the only roles granted onboarding:view/manage);
@@ -137,7 +131,6 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
         PermissionIds = me.PermissionIds;
         CanManageCompany = me.CanManageCompany;
         IsHrAdministrator = me.IsHrAdministrator;
-        IsEmailConfirmed = me.IsEmailConfirmed;
         IsManager = me.IsManager;
         IsRecruiter = me.IsRecruiter;
 
@@ -321,10 +314,6 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
 
     public Task<IReadOnlyDictionary<Guid, string>> GetSicknessCategoryNamesAsync() =>
         _sicknessCategoryNamesTask ??= LoadSicknessCategoryNamesAsync();
-
-    // Optimistic local update after EmailConfirmationRequired's dev-only confirm call succeeds —
-    // avoids a full session reload just to flip one flag.
-    public void SetEmailConfirmed() => IsEmailConfirmed = true;
 
     private async Task<IReadOnlyDictionary<Guid, string>> LoadSicknessCategoryNamesAsync()
     {

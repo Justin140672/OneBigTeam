@@ -27,11 +27,12 @@ public class GetRecruitmentKanbanEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid userId, Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -60,7 +61,7 @@ public class GetRecruitmentKanbanEndpointTests
     public async Task Get_Kanban_Returns_NotFound_When_Vacancy_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(RecruiterUser, companyId);
+        using var client = await AuthenticatedClient(RecruiterUser, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/vacancies/{Guid.NewGuid()}/kanban");
@@ -77,7 +78,7 @@ public class GetRecruitmentKanbanEndpointTests
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var vacancyId = await SeedVacancyAsync(companyId, referenceData.PositionProfileId);
 
-        using var client = AuthenticatedClient(PlainEmployeeUser, companyId);
+        using var client = await AuthenticatedClient(PlainEmployeeUser, companyId);
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/{vacancyId}/kanban");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -103,7 +104,7 @@ public class GetRecruitmentKanbanEndpointTests
             await db.SaveChangesAsync();
         }
 
-        using var client = AuthenticatedClient(RecruiterUser, companyId);
+        using var client = await AuthenticatedClient(RecruiterUser, companyId);
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/{vacancyId}/kanban");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -132,7 +133,7 @@ public class GetRecruitmentKanbanEndpointTests
         var referenceDataA = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyA);
         var vacancyId = await SeedVacancyAsync(companyA, referenceDataA.PositionProfileId);
 
-        using var clientB = AuthenticatedClient(RecruiterUser, companyB);
+        using var clientB = await AuthenticatedClient(RecruiterUser, companyB);
         var response = await clientB.GetAsync($"/api/companies/{companyB}/vacancies/{vacancyId}/kanban");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

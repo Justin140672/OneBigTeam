@@ -29,11 +29,12 @@ public class RecruitmentPositionProfileTenantIsolationTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -55,7 +56,7 @@ public class RecruitmentPositionProfileTenantIsolationTests
             vacancyAId = vacancyA.Id;
         }
 
-        using var clientB = AuthenticatedClient(companyB);
+        using var clientB = await AuthenticatedClient(companyB);
         var response = await clientB.GetAsync($"/api/companies/{companyB}/vacancies");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -96,7 +97,7 @@ public class RecruitmentPositionProfileTenantIsolationTests
 
         // Company B's caller supplies Company A's real Vacancy/Application IDs, but authenticates as
         // Company B — the request must be scoped away (404), never operate on Company A's data.
-        using var clientB = AuthenticatedClient(companyB);
+        using var clientB = await AuthenticatedClient(companyB);
 
         var offerResponse = await clientB.PostAsJsonAsync(
             $"/api/companies/{companyB}/vacancies/{vacancyAId}/applications/{applicationAId}/offer", new
@@ -139,7 +140,7 @@ public class RecruitmentPositionProfileTenantIsolationTests
             await recruitmentDb.SaveChangesAsync();
         }
 
-        using var clientB = AuthenticatedClient(companyB);
+        using var clientB = await AuthenticatedClient(companyB);
 
         var byPositionProfile = await clientB.GetAsync(
             $"/api/companies/{companyB}/vacancies?PositionProfileId={referenceDataA.PositionProfileId}");

@@ -31,7 +31,7 @@ public class GetTaskEndpointTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task Get_Task_Returns_NotFound_When_Task_Does_Not_Exist()
     {
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClient();
 
         var response = await client.GetAsync(
             $"/api/companies/{SeededCompanyId}/tasks/{Guid.NewGuid()}");
@@ -45,7 +45,7 @@ public class GetTaskEndpointTests(ApiWebApplicationFactory factory)
         var taskId = await TaskSeeder.SeedAsync(factory, SeededCompanyId, "Private task", priority: TaskPriority.Low);
 
         // Authenticated as SeededCompanyId but route targets a different company — middleware blocks it.
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClient();
         var response = await client.GetAsync($"/api/companies/{Guid.NewGuid()}/tasks/{taskId}");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -67,7 +67,7 @@ public class GetTaskEndpointTests(ApiWebApplicationFactory factory)
             assignedEmployeeId: assignedEmployee,
             createdBy: UserId);
 
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClient();
         var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/{taskId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -89,13 +89,14 @@ public class GetTaskEndpointTests(ApiWebApplicationFactory factory)
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient()
+    private async Task<HttpClient> AuthenticatedClient()
     {
         TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.Employee).GetAwaiter().GetResult();
 
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.Employee, SeededCompanyId);
         return client;
     }
 

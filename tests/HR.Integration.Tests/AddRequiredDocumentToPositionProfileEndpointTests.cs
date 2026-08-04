@@ -18,11 +18,12 @@ public class AddRequiredDocumentToPositionProfileEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -42,7 +43,7 @@ public class AddRequiredDocumentToPositionProfileEndpointTests
     public async Task Post_RequiredDocuments_Returns_Created_With_Correct_Payload()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Software Engineer");
         var documentTypeId = await CreateDocumentTypeAsync(client, companyId, "Passport");
@@ -76,7 +77,7 @@ public class AddRequiredDocumentToPositionProfileEndpointTests
     public async Task Post_RequiredDocuments_Returns_Conflict_For_Duplicate_DocumentType()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "HR Manager");
         var documentTypeId = await CreateDocumentTypeAsync(client, companyId, "Driving Licence");
@@ -97,7 +98,7 @@ public class AddRequiredDocumentToPositionProfileEndpointTests
     public async Task Post_RequiredDocuments_Returns_NotFound_For_Unknown_PositionProfile()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var documentTypeId = await CreateDocumentTypeAsync(client, companyId, "Contract");
 
@@ -112,7 +113,7 @@ public class AddRequiredDocumentToPositionProfileEndpointTests
     public async Task Post_RequiredDocuments_Returns_NotFound_For_Unknown_DocumentType()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Finance Manager");
 
@@ -127,7 +128,7 @@ public class AddRequiredDocumentToPositionProfileEndpointTests
     public async Task Post_RequiredDocuments_Allows_Same_DocumentType_On_Different_Profile()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileAId = await CreatePositionProfileAsync(client, companyId, "Developer");
         var profileBId = await CreatePositionProfileAsync(client, companyId, "Designer");

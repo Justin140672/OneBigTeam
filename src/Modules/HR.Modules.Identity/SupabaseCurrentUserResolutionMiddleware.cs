@@ -47,10 +47,14 @@ internal sealed class SupabaseCurrentUserResolutionMiddleware(RequestDelegate ne
                 IsAuthenticated: true);
         }
 
+        // Tenant resolution moves server-side: once a UserProfile exists (Phase B onwards), the
+        // company is resolved from the DB (profile.CompanyId), never trusted from a client-supplied
+        // JWT claim. Until Phase B starts creating UserProfile rows, this branch is unreachable in
+        // practice (profile is always null today), so the claim-based fallback above is unaffected.
         return new ResolvedCurrentUser(
             UserId: profile.Id,
             Email: profile.Email,
-            TenantId: tenantId,
+            TenantId: profile.CompanyId.ToString(),
             IsAuthenticated: true);
     }
 }

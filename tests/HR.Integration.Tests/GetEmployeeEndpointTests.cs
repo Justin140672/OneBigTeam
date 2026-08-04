@@ -47,6 +47,7 @@ public class GetEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, GetEmpUser1, SystemRoles.HrAdministrator, companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
@@ -79,6 +80,7 @@ public class GetEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, GetEmpUser2, SystemRoles.HrAdministrator, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees/{Guid.NewGuid()}");
 
@@ -95,6 +97,7 @@ public class GetEmployeeEndpointTests
         // Create employee under company A
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyA.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, GetEmpUser3, SystemRoles.HrAdministrator, companyA);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyA);
 
@@ -120,6 +123,7 @@ public class GetEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, GetEmpUser1, SystemRoles.HrAdministrator, companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
@@ -210,6 +214,7 @@ public class GetEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, GetEmpUser3, SystemRoles.HrAdministrator, companyId);
 
         // Department, Location, Position Profile, Employee Number and Employment Type are all
         // mandatory on employee creation — set up shared reference data once, then reuse it for
@@ -317,6 +322,7 @@ public class GetEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, GetEmpUser1, SystemRoles.HrAdministrator, companyId);
 
         var deptResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/departments",
@@ -522,6 +528,7 @@ public class GetEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, GetEmpUser2, SystemRoles.HrAdministrator, companyId);
 
         var deptResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/departments",
@@ -601,6 +608,7 @@ public class GetEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, GetEmpUser3, SystemRoles.HrAdministrator, companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
@@ -654,6 +662,7 @@ public class GetEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, GetEmpUser1, SystemRoles.HrAdministrator, companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
@@ -699,6 +708,7 @@ public class GetEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, GetEmpUser2, SystemRoles.HrAdministrator, companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 

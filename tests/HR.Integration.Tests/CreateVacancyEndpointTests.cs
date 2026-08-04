@@ -25,11 +25,12 @@ public class CreateVacancyEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -51,7 +52,7 @@ public class CreateVacancyEndpointTests
     public async Task Post_Vacancies_Creates_Vacancy_With_Valid_PositionProfile()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
@@ -79,7 +80,7 @@ public class CreateVacancyEndpointTests
     public async Task Post_Vacancies_Returns_NotFound_When_PositionProfile_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
         {
@@ -97,7 +98,7 @@ public class CreateVacancyEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         // Position profile exists, but for a different company than the one making the request.
         var otherCompanyReferenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, otherCompanyId);
@@ -117,7 +118,7 @@ public class CreateVacancyEndpointTests
     public async Task Post_Vacancies_Returns_BadRequest_When_PositionProfileId_Is_Empty()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
         {
@@ -134,7 +135,7 @@ public class CreateVacancyEndpointTests
     public async Task Post_Vacancies_Returns_BadRequest_When_PositionProfileId_Is_Omitted()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
         {
@@ -154,7 +155,7 @@ public class CreateVacancyEndpointTests
 
         // Same recruiter, but the tenant header on this client claims a different company than
         // the one in the route — must be rejected before the position-profile lookup even runs.
-        using var mismatchedClient = AuthenticatedClient(differentCompany);
+        using var mismatchedClient = await AuthenticatedClient(differentCompany);
 
         var response = await mismatchedClient.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
         {
@@ -171,7 +172,7 @@ public class CreateVacancyEndpointTests
     public async Task Post_Vacancies_Succeeds_Without_AdvertTitle_And_GetVacancy_Falls_Back_To_PositionProfile_Title()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
 
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
@@ -201,7 +202,7 @@ public class CreateVacancyEndpointTests
     public async Task Post_Vacancies_Response_Does_Not_Include_DepartmentId_On_The_Wire()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
@@ -225,7 +226,7 @@ public class CreateVacancyEndpointTests
     public async Task Post_Vacancies_Request_Ignores_Client_Supplied_DepartmentId()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
 
         // DepartmentId is no longer a bound property of CreateVacancyRequest at all, so supplying one
@@ -247,7 +248,7 @@ public class CreateVacancyEndpointTests
     public async Task Post_Vacancies_Persists_AdvertTitle_And_AdvertDescription_Exactly_As_Supplied()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         const string advertTitle = "Staff Platform Engineer";
         const string advertDescription = "Own reliability and platform tooling company-wide.";
@@ -293,7 +294,7 @@ public class CreateVacancyEndpointTests
     public async Task Post_Vacancies_Creates_Vacancy_With_Active_AssignedRecruiter()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var recruiterId = await SeedExternalRecruiterAsync(companyId);
 
@@ -316,7 +317,7 @@ public class CreateVacancyEndpointTests
     public async Task Post_Vacancies_Returns_Validation_Error_When_AssignedRecruiter_Is_Inactive()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var recruiterId = await SeedExternalRecruiterAsync(companyId, isActive: false);
 
@@ -340,7 +341,7 @@ public class CreateVacancyEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var recruiterId = await SeedExternalRecruiterAsync(otherCompanyId);
 
@@ -360,7 +361,7 @@ public class CreateVacancyEndpointTests
     public async Task Post_Vacancies_Succeeds_Without_AssignedRecruiterId_Since_It_Is_Optional()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new

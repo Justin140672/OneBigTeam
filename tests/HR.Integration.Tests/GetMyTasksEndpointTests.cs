@@ -29,7 +29,7 @@ public class GetMyTasksEndpointTests(ApiWebApplicationFactory factory)
     public async Task Get_MyTasks_Returns_Empty_List_When_No_Tasks_Assigned()
     {
         var userId = Guid.NewGuid();
-        using var client = AuthenticatedClient(userId);
+        using var client = await AuthenticatedClient(userId);
 
         var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/my");
 
@@ -49,7 +49,7 @@ public class GetMyTasksEndpointTests(ApiWebApplicationFactory factory)
         await TaskSeeder.SeedAsync(factory, SeededCompanyId, "Also for A", assignedUserId: userA);
         await TaskSeeder.SeedAsync(factory, SeededCompanyId, "Task for B", assignedUserId: userB);
 
-        using var client = AuthenticatedClient(userA);
+        using var client = await AuthenticatedClient(userA);
         var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/my");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -66,7 +66,7 @@ public class GetMyTasksEndpointTests(ApiWebApplicationFactory factory)
         await TaskSeeder.SeedAsync(factory, SeededCompanyId, "Open task",    assignedUserId: userId);
         await TaskSeeder.SeedAsync(factory, SeededCompanyId, "Another open", assignedUserId: userId);
 
-        using var client = AuthenticatedClient(userId);
+        using var client = await AuthenticatedClient(userId);
         var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/my?status=Open");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -82,7 +82,7 @@ public class GetMyTasksEndpointTests(ApiWebApplicationFactory factory)
 
         await TaskSeeder.SeedAsync(factory, SeededCompanyId, "Unassigned");
 
-        using var client = AuthenticatedClient(userId);
+        using var client = await AuthenticatedClient(userId);
         var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/my");
 
         var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
@@ -91,13 +91,14 @@ public class GetMyTasksEndpointTests(ApiWebApplicationFactory factory)
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient(Guid userId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId)
     {
         TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
 
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee, SeededCompanyId);
         return client;
     }
 

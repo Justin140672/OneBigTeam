@@ -14,7 +14,7 @@ internal sealed class CreateBillingPortalSessionHandler(
     IConfiguration configuration)
 {
     // Mirrors CreateCheckoutSessionHandler's base-URL resolution pattern.
-    private const string FallbackWebAppBaseUrl = "http://localhost:5270";
+    private const string FallbackWebAppBaseUrl = "http://localhost:5157";
 
     public async Task<Result<CreateBillingPortalSessionResponse>> HandleAsync(CancellationToken cancellationToken)
     {

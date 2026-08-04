@@ -50,6 +50,7 @@ public class UpdateProbationRecordEndpointTests
         var newManagerId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
 
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
         {
@@ -90,6 +91,7 @@ public class UpdateProbationRecordEndpointTests
         var managerId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
         {
@@ -130,6 +132,7 @@ public class UpdateProbationRecordEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User3, SystemRoles.HrAdministrator, companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/probation-records/{Guid.NewGuid()}", new

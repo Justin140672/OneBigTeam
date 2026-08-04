@@ -18,11 +18,12 @@ public class CreateLocationEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -57,7 +58,7 @@ public class CreateLocationEndpointTests
     public async Task Post_Locations_Creates_Location()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var locationTypeId = await CreateLocationTypeAsync(client, companyId);
 
@@ -86,7 +87,7 @@ public class CreateLocationEndpointTests
     public async Task Post_Locations_Returns_Conflict_For_Duplicate_Name()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var locationTypeId = await CreateLocationTypeAsync(client, companyId);
 
@@ -112,7 +113,7 @@ public class CreateLocationEndpointTests
     public async Task Post_Locations_Returns_NotFound_For_Unknown_LocationType()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/locations", new
         {
@@ -130,10 +131,10 @@ public class CreateLocationEndpointTests
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        using var clientA = AuthenticatedClient(companyA);
+        using var clientA = await AuthenticatedClient(companyA);
         var locationTypeIdForA = await CreateLocationTypeAsync(clientA, companyA);
 
-        using var clientB = AuthenticatedClient(companyB);
+        using var clientB = await AuthenticatedClient(companyB);
 
         var response = await clientB.PostAsJsonAsync($"/api/companies/{companyB}/locations", new
         {

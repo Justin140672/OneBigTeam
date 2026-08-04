@@ -33,11 +33,12 @@ public class GetMyOnboardingStatusEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientAs(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -55,7 +56,7 @@ public class GetMyOnboardingStatusEndpointTests
     public async Task Get_MyOnboardingStatus_Returns_HasPlan_False_When_No_Plan_Exists()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(SelfUser, companyId);
+        using var client = await ClientAs(SelfUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees/me/onboarding-status");
 
@@ -70,7 +71,7 @@ public class GetMyOnboardingStatusEndpointTests
     public async Task Get_MyOnboardingStatus_Returns_Ok_With_Own_Plan_And_Task_Progress_For_Plain_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(SelfUser, companyId);
+        using var client = await ClientAs(SelfUser, companyId);
 
         using (var scope = _factory.Services.CreateScope())
         {
@@ -107,7 +108,7 @@ public class GetMyOnboardingStatusEndpointTests
     public async Task Get_MyOnboardingStatus_Does_Not_Return_Another_Employees_Plan()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(SelfUser, companyId);
+        using var client = await ClientAs(SelfUser, companyId);
 
         using (var scope = _factory.Services.CreateScope())
         {

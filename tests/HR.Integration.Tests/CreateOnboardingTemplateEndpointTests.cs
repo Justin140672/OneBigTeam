@@ -22,19 +22,21 @@ public class CreateOnboardingTemplateEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
-    private HttpClient CompanyAdministratorClient(Guid companyId)
+    private async Task<HttpClient> CompanyAdministratorClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, CompanyAdministratorUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdministratorUserId, SystemRoles.CompanyAdministrator, companyId);
         return client;
     }
 
@@ -53,7 +55,7 @@ public class CreateOnboardingTemplateEndpointTests
     public async Task Post_OnboardingTemplates_Returns_Forbidden_For_User_Without_Employee_Manage_Permission()
     {
         var companyId = Guid.NewGuid();
-        using var client = CompanyAdministratorClient(companyId);
+        using var client = await CompanyAdministratorClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/onboarding-templates", new
         {
@@ -68,7 +70,7 @@ public class CreateOnboardingTemplateEndpointTests
     public async Task Post_OnboardingTemplates_Creates_OnboardingTemplate()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/onboarding-templates", new
         {
@@ -93,7 +95,7 @@ public class CreateOnboardingTemplateEndpointTests
     public async Task Post_OnboardingTemplates_Creates_OnboardingTemplate_Without_Description()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/onboarding-templates", new
         {
@@ -113,7 +115,7 @@ public class CreateOnboardingTemplateEndpointTests
     public async Task Post_OnboardingTemplates_Returns_Conflict_When_Active_Template_With_Same_Name_Exists()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var created = await client.PostAsJsonAsync($"/api/companies/{companyId}/onboarding-templates", new
         {
@@ -136,8 +138,8 @@ public class CreateOnboardingTemplateEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
-        using var otherClient = AdminClient(otherCompanyId);
+        using var client = await AdminClient(companyId);
+        using var otherClient = await AdminClient(otherCompanyId);
 
         var created = await client.PostAsJsonAsync($"/api/companies/{companyId}/onboarding-templates", new
         {
@@ -159,7 +161,7 @@ public class CreateOnboardingTemplateEndpointTests
     public async Task Post_OnboardingTemplates_Returns_UnprocessableEntity_When_Name_Is_Missing()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/onboarding-templates", new
         {

@@ -38,11 +38,12 @@ app.MapDefaultEndpoints();
 // Server-side proxy for the "Start free trial" form (SignUp.razor) — a plain HTML <form>
 // post (this Blazor app renders statically, no interactive circuit), so this is a conventional
 // minimal API endpoint rather than a Blazor event handler. Calls HR.Api's public /api/signup
-// endpoint, then establishes a dev-stub session (see HR.Api's /api/dev/persona/register remarks)
-// and redirects the browser straight into HR.Web's "/getting-started", landing the new admin in
-// an already-"signed-in" app — matching the plan's auto-login UX without introducing real
-// Supabase Auth in this epic.
-app.MapPost("/signup-submit", async (HttpRequest request, IHttpClientFactory httpClientFactory, IConfiguration configuration) =>
+// endpoint. The admin is deliberately NOT auto-logged-in here: /api/signup now creates a real,
+// pending Supabase Auth user (no session/token yet), so on success we redirect to the
+// check-your-email page instead of establishing a session and jumping into HR.Web. The real
+// sign-in only happens once the admin clicks the verification email link (Phase D's
+// /verify-email flow in HR.Web).
+app.MapPost("/signup-submit", async (HttpRequest request, IHttpClientFactory httpClientFactory) =>
 {
     var form = await request.ReadFormAsync();
     var model = new CreateCompanyModel
@@ -53,11 +54,6 @@ app.MapPost("/signup-submit", async (HttpRequest request, IHttpClientFactory htt
         AdminEmail = form["email"].ToString(),
         Password = form["password"].ToString(),
     };
-
-    var webBaseUrl =
-        configuration["services:web:https:0"] ??
-        configuration["services:web:http:0"] ??
-        "http://localhost:5270";
 
     var http = httpClientFactory.CreateClient("hrapi");
 
@@ -84,16 +80,22 @@ app.MapPost("/signup-submit", async (HttpRequest request, IHttpClientFactory htt
         return Results.Redirect("/signup?error=" + Uri.EscapeDataString("Something went wrong. Please try again."));
     }
 
-    await http.PostAsJsonAsync("api/dev/persona/register", new
-    {
-        signUp.UserId,
-        signUp.CompanyId,
-        signUp.FirstName,
-        signUp.LastName,
-        signUp.Email,
-    });
+    return Results.Redirect($"/check-your-email?email={Uri.EscapeDataString(signUp.Email)}");
+});
 
-    return Results.Redirect($"{webBaseUrl.TrimEnd('/')}/getting-started");
+// Server-side proxy for the "Resend verification email" button on CheckYourEmail.razor. Mirrors
+// /signup-submit's shape: reads the posted form, calls HR.Api's public /api/resend-verification
+// endpoint (which never leaks whether the email is actually registered), then redirects back to
+// the check-your-email page with a "resent" flag so the page can show a brief confirmation.
+app.MapPost("/resend-verification", async (HttpRequest request, IHttpClientFactory httpClientFactory) =>
+{
+    var form = await request.ReadFormAsync();
+    var email = form["email"].ToString();
+
+    var http = httpClientFactory.CreateClient("hrapi");
+    await http.PostAsJsonAsync("api/resend-verification", new { Email = email });
+
+    return Results.Redirect($"/check-your-email?email={Uri.EscapeDataString(email)}&resent=true");
 });
 
 app.Run();

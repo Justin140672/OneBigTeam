@@ -47,6 +47,7 @@ public class UpdateEmploymentDetailsEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
 
         var employee = await CreateEmployeeAsync(client, companyId);
 
@@ -80,6 +81,7 @@ public class UpdateEmploymentDetailsEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
         var employee = await CreateEmployeeAsync(client, companyId);
 
@@ -105,6 +107,7 @@ public class UpdateEmploymentDetailsEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User3, SystemRoles.HrAdministrator, companyId);
 
         var employee = await CreateEmployeeAsync(client, companyId);
 
@@ -130,6 +133,7 @@ public class UpdateEmploymentDetailsEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
 
         var employee = await CreateEmployeeAsync(client, companyId);
 
@@ -162,6 +166,7 @@ public class UpdateEmploymentDetailsEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
         var employee = await CreateEmployeeAsync(client, companyId);
 
@@ -189,6 +194,7 @@ public class UpdateEmploymentDetailsEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User3, SystemRoles.HrAdministrator, companyId);
 
         var employee = await CreateEmployeeAsync(client, companyId);
 
@@ -216,6 +222,7 @@ public class UpdateEmploymentDetailsEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
 
         var employee1 = await CreateEmployeeAsync(client, companyId);
         var employee2 = await CreateEmployeeAsync(client, companyId);
@@ -255,6 +262,7 @@ public class UpdateEmploymentDetailsEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
         var employee = await CreateEmployeeAsync(client, companyId);
 
@@ -280,6 +288,7 @@ public class UpdateEmploymentDetailsEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User4.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User4, SystemRoles.HrAdministrator, companyId);
 
         var unknownId = Guid.NewGuid();
         var response = await client.PutAsJsonAsync(

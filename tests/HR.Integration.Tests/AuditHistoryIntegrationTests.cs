@@ -46,7 +46,7 @@ public class AuditHistoryIntegrationTests
     public async Task AdjustLeaveBalance_Creates_Audit_Record_Retrievable_Via_AuditHistory_Endpoint()
     {
         var companyId = Guid.NewGuid();
-        using var hrAdminClient = AuthenticatedClient(companyId);
+        using var hrAdminClient = await AuthenticatedClient(companyId);
 
         var leaveTypeId = await CreateLeaveTypeAsync(companyId);
 
@@ -91,7 +91,7 @@ public class AuditHistoryIntegrationTests
     public async Task CreateCompensationRecord_Creates_Audit_Record_Retrievable_Via_AuditHistory_Endpoint()
     {
         var companyId = Guid.NewGuid();
-        using var hrAdminClient = AuthenticatedClient(companyId);
+        using var hrAdminClient = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
 
@@ -127,7 +127,7 @@ public class AuditHistoryIntegrationTests
     public async Task UpdateMyContactDetails_Creates_Audit_Record_Retrievable_Via_AuditHistory_Endpoint()
     {
         var companyId = Guid.NewGuid();
-        using var hrAdminClient = AuthenticatedClient(companyId);
+        using var hrAdminClient = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
 
@@ -136,6 +136,7 @@ public class AuditHistoryIntegrationTests
         using var employeeClient = _factory.CreateClient();
         employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, companyId);
 
         var updateResp = await employeeClient.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/me/contact-details",
@@ -166,7 +167,7 @@ public class AuditHistoryIntegrationTests
     public async Task UpdateEmployeeProfile_Creates_Audit_Record_Retrievable_Via_AuditHistory_Endpoint()
     {
         var companyId = Guid.NewGuid();
-        using var hrAdminClient = AuthenticatedClient(companyId);
+        using var hrAdminClient = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
 
@@ -207,7 +208,7 @@ public class AuditHistoryIntegrationTests
     public async Task UpdateEmployeeProfile_Changing_Department_Resolves_Department_Name_In_AuditHistory()
     {
         var companyId = Guid.NewGuid();
-        using var hrAdminClient = AuthenticatedClient(companyId);
+        using var hrAdminClient = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
 
@@ -253,7 +254,7 @@ public class AuditHistoryIntegrationTests
         // it into both UpdateEmployeeProfile and UpdateEmploymentDetails so their two audit rows
         // read back as a single merged entry rather than two separate ones.
         var companyId = Guid.NewGuid();
-        using var hrAdminClient = AuthenticatedClient(companyId);
+        using var hrAdminClient = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
         var correlationId = Guid.NewGuid();
@@ -312,6 +313,7 @@ public class AuditHistoryIntegrationTests
         // Placeholder tenant header for the creation call itself (RequireTenantMiddleware
         // requires one on every authenticated request) — swapped for the real company id below.
         companyAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, CompanyAdminUser.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdminUser, SystemRoles.CompanyAdministrator, CompanyAdminUser);
 
         var createResp = await companyAdminClient.PostAsJsonAsync("/api/companies", new
         {
@@ -361,7 +363,7 @@ public class AuditHistoryIntegrationTests
         // CompanySettings it can never appear via GetEmployeeAuditHistory. Read the audit table
         // directly via the test host's own DI container instead.
         var companyId = Guid.NewGuid();
-        using var hrAdminClient = AuthenticatedClient(companyId);
+        using var hrAdminClient = await AuthenticatedClient(companyId);
 
         var (departmentId, locationId, leavePolicyId) = await CreatePositionProfileReferenceDataAsync(hrAdminClient, companyId);
 
@@ -396,7 +398,7 @@ public class AuditHistoryIntegrationTests
     public async Task UpdatePositionProfile_Persists_Audit_Record_With_Before_And_After()
     {
         var companyId = Guid.NewGuid();
-        using var hrAdminClient = AuthenticatedClient(companyId);
+        using var hrAdminClient = await AuthenticatedClient(companyId);
 
         var (departmentId, locationId, leavePolicyId) = await CreatePositionProfileReferenceDataAsync(hrAdminClient, companyId);
 
@@ -471,11 +473,12 @@ public class AuditHistoryIntegrationTests
         return (departmentId, locationId, leavePolicyId);
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, HrAdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, HrAdminUser, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

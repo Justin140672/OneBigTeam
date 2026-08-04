@@ -26,11 +26,12 @@ public class CreateRecruitmentStageEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientAs(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -50,7 +51,7 @@ public class CreateRecruitmentStageEndpointTests
     public async Task Post_RecruitmentStages_Returns_Forbidden_For_RecruitmentView_Only_User()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages",
@@ -63,7 +64,7 @@ public class CreateRecruitmentStageEndpointTests
     public async Task Post_RecruitmentStages_Creates_Stage()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages",
@@ -86,7 +87,7 @@ public class CreateRecruitmentStageEndpointTests
     public async Task Post_RecruitmentStages_Returns_UnprocessableEntity_When_Name_Is_Missing()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages",
@@ -99,7 +100,7 @@ public class CreateRecruitmentStageEndpointTests
     public async Task Post_RecruitmentStages_Returns_UnprocessableEntity_For_Duplicate_Name()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages",
@@ -116,7 +117,7 @@ public class CreateRecruitmentStageEndpointTests
     public async Task Post_RecruitmentStages_Returns_UnprocessableEntity_For_Duplicate_DisplayOrder()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages",
@@ -140,7 +141,7 @@ public class CreateRecruitmentStageEndpointTests
             await db.SaveChangesAsync();
         }
 
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages",

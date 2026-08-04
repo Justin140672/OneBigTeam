@@ -37,11 +37,12 @@ public class GetWorkloadActionsEndpointTests
         _factory = factory;
     }
 
-    private HttpClient ClientFor(Guid companyId, Guid userId)
+    private async Task<HttpClient> ClientFor(Guid companyId, Guid userId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, companyId);
         return client;
     }
 
@@ -61,7 +62,7 @@ public class GetWorkloadActionsEndpointTests
         var companyId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee);
-        using var client = ClientFor(companyId, userId);
+        using var client = await ClientFor(companyId, userId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions");
 
@@ -78,7 +79,7 @@ public class GetWorkloadActionsEndpointTests
         // so this persona also needs the Recruiter role to exercise that category alongside the
         // HR-only/Manager-or-HR categories below.
         await TestRoleSeeder.AssignRoleAsync(_factory, hrAdminId, SystemRoles.Recruiter);
-        using var hrClient = ClientFor(companyId, hrAdminId);
+        using var hrClient = await ClientFor(companyId, hrAdminId);
 
         var employeeId = await SeedEmployeeAsync(companyId, "Priya", "Patel");
 
@@ -124,7 +125,7 @@ public class GetWorkloadActionsEndpointTests
         // seeds the reporting-line data — the Manager persona under test never needs that policy.
         var hrBootstrapUserId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, hrBootstrapUserId, SystemRoles.HrAdministrator);
-        using var hrBootstrapClient = ClientFor(companyId, hrBootstrapUserId);
+        using var hrBootstrapClient = await ClientFor(companyId, hrBootstrapUserId);
         await AssignManagerAsync(hrBootstrapClient, companyId, directReportId, managerId);
         await AssignManagerAsync(hrBootstrapClient, companyId, otherManagersReportId, otherManagerId);
 
@@ -138,7 +139,7 @@ public class GetWorkloadActionsEndpointTests
         // Overdue task for the other manager's report — must never be visible.
         await SeedOverdueTaskAsync(companyId, otherManagersReportId, Today.AddDays(-1));
 
-        using var client = ClientFor(companyId, managerId);
+        using var client = await ClientFor(companyId, managerId);
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -170,7 +171,7 @@ public class GetWorkloadActionsEndpointTests
         await SeedLeaveRequestAsync(companyId, otherEmployeeId, Today.AddDays(5));
         await SeedOverdueTaskAsync(companyId, otherEmployeeId, Today.AddDays(-1));
 
-        using var client = ClientFor(companyId, recruiterId);
+        using var client = await ClientFor(companyId, recruiterId);
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -186,7 +187,7 @@ public class GetWorkloadActionsEndpointTests
         var companyId = Guid.NewGuid();
         var hrAdminId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, hrAdminId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(companyId, hrAdminId);
+        using var client = await ClientFor(companyId, hrAdminId);
 
         var employeeId = await SeedEmployeeAsync(companyId, "Farah", "Overdue");
         var otherEmployeeId = await SeedEmployeeAsync(companyId, "Upcoming", "Task");
@@ -209,7 +210,7 @@ public class GetWorkloadActionsEndpointTests
         var companyId = Guid.NewGuid();
         var hrAdminId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, hrAdminId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(companyId, hrAdminId);
+        using var client = await ClientFor(companyId, hrAdminId);
 
         var employeeId = await SeedEmployeeAsync(companyId, "Leave", "Requester");
         await SeedLeaveRequestAsync(companyId, employeeId, Today.AddDays(5));
@@ -231,7 +232,7 @@ public class GetWorkloadActionsEndpointTests
         var companyId = Guid.NewGuid();
         var hrAdminId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, hrAdminId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(companyId, hrAdminId);
+        using var client = await ClientFor(companyId, hrAdminId);
 
         var employeeId = await SeedEmployeeAsync(companyId, "Nadia", "Newstarter");
         await SeedOutstandingOnboardingTaskAsync(companyId, employeeId);
@@ -255,7 +256,7 @@ public class GetWorkloadActionsEndpointTests
         // reporting:view gate before any provider even runs.
         var callerId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, callerId, SystemRoles.Employee);
-        using var client = ClientFor(companyId, callerId);
+        using var client = await ClientFor(companyId, callerId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions");
 
@@ -268,7 +269,7 @@ public class GetWorkloadActionsEndpointTests
         var companyId = Guid.NewGuid();
         var hrAdminId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, hrAdminId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(companyId, hrAdminId);
+        using var client = await ClientFor(companyId, hrAdminId);
 
         var employeeId = await SeedEmployeeAsync(companyId, "Ivan", "Invited");
         await SeedUserInviteAsync(companyId, employeeId);
@@ -293,7 +294,7 @@ public class GetWorkloadActionsEndpointTests
         var invitedEmployeeId = await SeedEmployeeAsync(companyId, "Ivan", "Invited");
         await SeedUserInviteAsync(companyId, invitedEmployeeId);
 
-        using var client = ClientFor(companyId, managerId);
+        using var client = await ClientFor(companyId, managerId);
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

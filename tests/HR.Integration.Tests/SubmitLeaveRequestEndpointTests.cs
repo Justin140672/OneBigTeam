@@ -58,6 +58,7 @@ public class SubmitLeaveRequestEndpointTests
 
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-requests",
@@ -81,6 +82,7 @@ public class SubmitLeaveRequestEndpointTests
 
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
         // Create a leave policy with AllowNegativeBalance so no balance initialisation is required
         var policyResponse = await client.PostAsJsonAsync(

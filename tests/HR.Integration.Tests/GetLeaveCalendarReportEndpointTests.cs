@@ -15,11 +15,12 @@ public class GetLeaveCalendarReportEndpointTests
         _factory = factory;
     }
 
-    private HttpClient ClientFor(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientFor(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager, companyId);
         return client;
     }
 
@@ -40,7 +41,7 @@ public class GetLeaveCalendarReportEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/reporting/leave-calendar?year=2026&month=7");
@@ -54,7 +55,7 @@ public class GetLeaveCalendarReportEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/reporting/leave-calendar?year=2026&month=7");
@@ -71,7 +72,7 @@ public class GetLeaveCalendarReportEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/reporting/leave-calendar?year=2026&month=13");
@@ -85,7 +86,7 @@ public class GetLeaveCalendarReportEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/reporting/leave-calendar?year=1900&month=7");

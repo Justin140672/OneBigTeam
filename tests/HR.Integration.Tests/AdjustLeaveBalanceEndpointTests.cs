@@ -50,7 +50,7 @@ public class AdjustLeaveBalanceEndpointTests
     {
         var (companyId, leaveTypeId, employeeId, _) = await SetupEmployeeWithBalanceAsync();
 
-        using var managerClient = AuthenticatedClient(ManagerUser, companyId);
+        using var managerClient = await AuthenticatedClient(ManagerUser, companyId);
         var response = await managerClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-balance-adjustments",
             AdjustmentPayload(companyId, employeeId, leaveTypeId, 7.5m, "Correction"));
@@ -134,7 +134,7 @@ public class AdjustLeaveBalanceEndpointTests
 
         // Re-authenticate a fresh HR admin scoped to Company A only (not Company B).
         var freshCompanyAId = Guid.NewGuid();
-        using var hrAdminClientForA = AuthenticatedClient(HrAdminUser, freshCompanyAId);
+        using var hrAdminClientForA = await AuthenticatedClient(HrAdminUser, freshCompanyAId);
 
         var response = await hrAdminClientForA.PostAsJsonAsync(
             $"/api/companies/{freshCompanyAId}/employees/{employeeIdB}/leave-balance-adjustments",
@@ -143,7 +143,7 @@ public class AdjustLeaveBalanceEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
         // Sanity check: Company B's own balance must be completely unaffected.
-        using var hrAdminClientForB = AuthenticatedClient(HrAdminUser, companyBId);
+        using var hrAdminClientForB = await AuthenticatedClient(HrAdminUser, companyBId);
         var balanceResponse = await hrAdminClientForB.GetAsync(
             $"/api/companies/{companyBId}/employees/{employeeIdB}/leave-balances?policyYear={DateTimeOffset.UtcNow.Year}");
         balanceResponse.EnsureSuccessStatusCode();
@@ -157,7 +157,7 @@ public class AdjustLeaveBalanceEndpointTests
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AuthenticatedClient(HrAdminUser, companyId);
+        using var client = await AuthenticatedClient(HrAdminUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-balance-adjustments",
@@ -183,7 +183,7 @@ public class AdjustLeaveBalanceEndpointTests
     public async Task Post_AdjustLeaveBalance_Returns_NotFound_When_No_Balance_Exists_For_Employee_And_Type()
     {
         var companyId = Guid.NewGuid();
-        using var hrAdminClient = AuthenticatedClient(HrAdminUser, companyId);
+        using var hrAdminClient = await AuthenticatedClient(HrAdminUser, companyId);
 
         // NOTE: PositionProfile.DefaultLeavePolicyId is now a mandatory field, and employee
         // creation auto-initialises a LeaveBalance row (via EmployeeCreatedHandler) for every
@@ -252,11 +252,12 @@ public class AdjustLeaveBalanceEndpointTests
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient(Guid userId, Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -370,7 +371,7 @@ public class AdjustLeaveBalanceEndpointTests
         bool allowNegativeBalance = false)
     {
         var companyId = Guid.NewGuid();
-        var hrAdminClient = AuthenticatedClient(HrAdminUser, companyId);
+        var hrAdminClient = await AuthenticatedClient(HrAdminUser, companyId);
 
         var leaveTypeId = await CreateLeaveTypeAsync(companyId, defaultEntitlementDays);
 

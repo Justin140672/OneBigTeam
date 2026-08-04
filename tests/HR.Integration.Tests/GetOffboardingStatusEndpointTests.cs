@@ -37,7 +37,7 @@ public class GetOffboardingStatusEndpointTests
     public async Task Get_OffboardingStatus_Returns_HasPlan_False_When_Employee_Has_No_Plan()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/offboarding-status");
@@ -53,7 +53,7 @@ public class GetOffboardingStatusEndpointTests
     public async Task Get_OffboardingStatus_Returns_InProgress_After_Started()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
         await StartOffboardingAsync(client, companyId, employeeId, new DateOnly(2026, 8, 1), "Resigned.");
@@ -72,7 +72,7 @@ public class GetOffboardingStatusEndpointTests
     public async Task Get_OffboardingStatus_Returns_Completed_After_All_Tasks_Completed()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
         await StartOffboardingAsync(client, companyId, employeeId, new DateOnly(2026, 8, 1), "Resigned.");
@@ -110,11 +110,12 @@ public class GetOffboardingStatusEndpointTests
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

@@ -43,17 +43,18 @@ public class CompanyAuthorizationTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientFor(Guid tenantId, Guid userId)
+    private async Task<HttpClient> ClientFor(Guid tenantId, Guid userId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, tenantId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, tenantId);
         return client;
     }
 
     private async Task<Guid> CreateCompanyAsync(Guid tenantId)
     {
-        using var client = ClientFor(tenantId, CompanyAdminUser);
+        using var client = await ClientFor(tenantId, CompanyAdminUser);
 
         var response = await client.PostAsJsonAsync("/api/companies", new
         {
@@ -74,7 +75,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Put_Company_Returns_Forbidden_For_User_With_No_Roles()
     {
-        using var client = ClientFor(Guid.NewGuid(), NoRoleUser);
+        using var client = await ClientFor(Guid.NewGuid(), NoRoleUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}", new { name = "X" });
 
@@ -84,7 +85,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Put_Company_Returns_Forbidden_For_Employee_Role()
     {
-        using var client = ClientFor(Guid.NewGuid(), EmployeeUser);
+        using var client = await ClientFor(Guid.NewGuid(), EmployeeUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}", new { name = "X" });
 
@@ -94,7 +95,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Put_Company_Returns_Forbidden_For_Manager_Role()
     {
-        using var client = ClientFor(Guid.NewGuid(), ManagerUser);
+        using var client = await ClientFor(Guid.NewGuid(), ManagerUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}", new { name = "X" });
 
@@ -104,7 +105,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Put_Company_Returns_Forbidden_For_Recruiter_Role()
     {
-        using var client = ClientFor(Guid.NewGuid(), RecruiterUser);
+        using var client = await ClientFor(Guid.NewGuid(), RecruiterUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}", new { name = "X" });
 
@@ -114,7 +115,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Put_Company_Returns_Forbidden_For_HrAdministrator_Role()
     {
-        using var client = ClientFor(Guid.NewGuid(), HrAdminUser);
+        using var client = await ClientFor(Guid.NewGuid(), HrAdminUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}", new { name = "X" });
 
@@ -126,7 +127,7 @@ public class CompanyAuthorizationTests
     {
         var tenantId = Guid.NewGuid();
         var companyId = await CreateCompanyAsync(tenantId);
-        using var client = ClientFor(tenantId, CompanyAdminUser);
+        using var client = await ClientFor(tenantId, CompanyAdminUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{companyId}", new
         {
@@ -145,7 +146,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Put_Company_Settings_Returns_Forbidden_For_User_With_No_Roles()
     {
-        using var client = ClientFor(Guid.NewGuid(), NoRoleUser);
+        using var client = await ClientFor(Guid.NewGuid(), NoRoleUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}/settings", SettingsBody());
 
@@ -155,7 +156,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Put_Company_Settings_Returns_Forbidden_For_Employee_Role()
     {
-        using var client = ClientFor(Guid.NewGuid(), EmployeeUser);
+        using var client = await ClientFor(Guid.NewGuid(), EmployeeUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}/settings", SettingsBody());
 
@@ -165,7 +166,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Put_Company_Settings_Returns_Forbidden_For_Manager_Role()
     {
-        using var client = ClientFor(Guid.NewGuid(), ManagerUser);
+        using var client = await ClientFor(Guid.NewGuid(), ManagerUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}/settings", SettingsBody());
 
@@ -175,7 +176,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Put_Company_Settings_Returns_Forbidden_For_HrAdministrator_Role()
     {
-        using var client = ClientFor(Guid.NewGuid(), HrAdminUser);
+        using var client = await ClientFor(Guid.NewGuid(), HrAdminUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}/settings", SettingsBody());
 
@@ -187,7 +188,7 @@ public class CompanyAuthorizationTests
     {
         var tenantId = Guid.NewGuid();
         var companyId = await CreateCompanyAsync(tenantId);
-        using var client = ClientFor(tenantId, CompanyAdminUser);
+        using var client = await ClientFor(tenantId, CompanyAdminUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/settings", SettingsBody());
 
@@ -205,7 +206,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Put_Hr_Settings_Returns_Forbidden_For_User_With_No_Roles()
     {
-        using var client = ClientFor(Guid.NewGuid(), NoRoleUser);
+        using var client = await ClientFor(Guid.NewGuid(), NoRoleUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}/hr-settings", HrSettingsBody());
 
@@ -215,7 +216,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Put_Hr_Settings_Returns_Forbidden_For_Employee_Role()
     {
-        using var client = ClientFor(Guid.NewGuid(), EmployeeUser);
+        using var client = await ClientFor(Guid.NewGuid(), EmployeeUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}/hr-settings", HrSettingsBody());
 
@@ -225,7 +226,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Put_Hr_Settings_Returns_Forbidden_For_Manager_Role()
     {
-        using var client = ClientFor(Guid.NewGuid(), ManagerUser);
+        using var client = await ClientFor(Guid.NewGuid(), ManagerUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}/hr-settings", HrSettingsBody());
 
@@ -241,7 +242,7 @@ public class CompanyAuthorizationTests
         // is the specific authorization-gap fix this file guards against.
         var tenantId = Guid.NewGuid();
         var companyId = await CreateCompanyAsync(tenantId);
-        using var client = ClientFor(tenantId, CompanyAdminUser);
+        using var client = await ClientFor(tenantId, CompanyAdminUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", HrSettingsBody());
 
@@ -253,7 +254,7 @@ public class CompanyAuthorizationTests
     {
         var tenantId = Guid.NewGuid();
         var companyId = await CreateCompanyAsync(tenantId);
-        using var client = ClientFor(tenantId, HrAdminUser);
+        using var client = await ClientFor(tenantId, HrAdminUser);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", HrSettingsBody());
 
@@ -274,7 +275,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Post_Company_Logo_Returns_Forbidden_For_User_With_No_Roles()
     {
-        using var client = ClientFor(Guid.NewGuid(), NoRoleUser);
+        using var client = await ClientFor(Guid.NewGuid(), NoRoleUser);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{Guid.NewGuid()}/branding/logos/PrimaryLogo", LogoBody());
@@ -285,7 +286,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Post_Company_Logo_Returns_Forbidden_For_Employee_Role()
     {
-        using var client = ClientFor(Guid.NewGuid(), EmployeeUser);
+        using var client = await ClientFor(Guid.NewGuid(), EmployeeUser);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{Guid.NewGuid()}/branding/logos/PrimaryLogo", LogoBody());
@@ -296,7 +297,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Post_Company_Logo_Returns_Forbidden_For_Manager_Role()
     {
-        using var client = ClientFor(Guid.NewGuid(), ManagerUser);
+        using var client = await ClientFor(Guid.NewGuid(), ManagerUser);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{Guid.NewGuid()}/branding/logos/PrimaryLogo", LogoBody());
@@ -307,7 +308,7 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Post_Company_Logo_Returns_Forbidden_For_HrAdministrator_Role()
     {
-        using var client = ClientFor(Guid.NewGuid(), HrAdminUser);
+        using var client = await ClientFor(Guid.NewGuid(), HrAdminUser);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{Guid.NewGuid()}/branding/logos/PrimaryLogo", LogoBody());
@@ -320,7 +321,7 @@ public class CompanyAuthorizationTests
     {
         var tenantId = Guid.NewGuid();
         var companyId = await CreateCompanyAsync(tenantId);
-        using var client = ClientFor(tenantId, CompanyAdminUser);
+        using var client = await ClientFor(tenantId, CompanyAdminUser);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/branding/logos/PrimaryLogo", LogoBody());

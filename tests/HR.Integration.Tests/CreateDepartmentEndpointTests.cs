@@ -18,11 +18,12 @@ public class CreateDepartmentEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -43,7 +44,7 @@ public class CreateDepartmentEndpointTests
     public async Task Post_Departments_Creates_Department()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
         {
@@ -69,7 +70,7 @@ public class CreateDepartmentEndpointTests
     public async Task Post_Departments_Creates_Department_With_Parent()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var parentResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
         {
@@ -98,7 +99,7 @@ public class CreateDepartmentEndpointTests
     public async Task Post_Departments_Returns_Conflict_For_Duplicate_Name()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var first = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
         {
@@ -120,7 +121,7 @@ public class CreateDepartmentEndpointTests
     public async Task Post_Departments_Returns_NotFound_For_Unknown_Parent()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
         {

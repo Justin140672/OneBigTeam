@@ -38,7 +38,7 @@ public class GetOffboardingOverviewEndpointTests
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/offboarding-overview");
@@ -58,7 +58,7 @@ public class GetOffboardingOverviewEndpointTests
     public async Task Get_OffboardingOverview_Returns_Plan_And_Tasks_With_Mixed_AssignTo_And_Status_After_Start()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
 
@@ -117,12 +117,12 @@ public class GetOffboardingOverviewEndpointTests
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        using var clientA = AdminClient(companyA);
+        using var clientA = await AdminClient(companyA);
         var employeeId = await CreateEmployeeAsync(clientA, companyA);
         await StartOffboardingAsync(clientA, companyA, employeeId, new DateOnly(2026, 8, 1), "Resigned.");
 
         // Query the same employeeId, but scoped to a different company/tenant.
-        using var clientB = AdminClient(companyB);
+        using var clientB = await AdminClient(companyB);
         var response = await clientB.GetAsync(
             $"/api/companies/{companyB}/employees/{employeeId}/offboarding-overview");
 
@@ -138,11 +138,12 @@ public class GetOffboardingOverviewEndpointTests
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

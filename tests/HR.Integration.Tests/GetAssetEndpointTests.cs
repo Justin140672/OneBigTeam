@@ -18,11 +18,12 @@ public class GetAssetEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -64,7 +65,7 @@ public class GetAssetEndpointTests
     public async Task Get_Asset_Returns_NotFound_When_Asset_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/assets/{Guid.NewGuid()}");
 
@@ -75,7 +76,7 @@ public class GetAssetEndpointTests
     public async Task Get_Asset_Returns_Asset_When_Found()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var category = await CreateCategoryAsync(client, companyId);
         var asset = await CreateAssetAsync(client, companyId, category.Id, "ASSET-GET-001", "Laptop Pro");
 
@@ -97,7 +98,7 @@ public class GetAssetEndpointTests
     public async Task Get_Asset_Returns_All_Optional_Fields_When_Set()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var category = await CreateCategoryAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/assets", new
@@ -132,8 +133,8 @@ public class GetAssetEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
-        using var otherClient = AdminClient(otherCompanyId);
+        using var client = await AdminClient(companyId);
+        using var otherClient = await AdminClient(otherCompanyId);
 
         var category = await CreateCategoryAsync(client, companyId);
         var asset = await CreateAssetAsync(client, companyId, category.Id);

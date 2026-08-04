@@ -74,7 +74,7 @@ public class UploadImportFileEndpointTests
     [Fact]
     public async Task Returns_Created_When_Valid_Csv_Is_Uploaded()
     {
-        using var client = AdminClient();
+        using var client = await AdminClient();
 
         const string csv = "first_name,last_name,email\nJohn,Doe,john@example.com\nJane,Doe,jane@example.com\n";
 
@@ -96,7 +96,7 @@ public class UploadImportFileEndpointTests
     [Fact]
     public async Task Returns_Created_When_Valid_Xlsx_Is_Uploaded()
     {
-        using var client = AdminClient();
+        using var client = await AdminClient();
         var xlsxBytes    = BuildXlsxBytes(dataRowCount: 4);
 
         var response = await client.PostAsync(
@@ -113,7 +113,7 @@ public class UploadImportFileEndpointTests
     [Fact]
     public async Task Returns_UnprocessableEntity_When_File_Exceeds_Max_Size()
     {
-        using var client = AdminClient();
+        using var client = await AdminClient();
 
         // Default max is 10 MB; build an oversized CSV payload.
         var oversized = new byte[11 * 1024 * 1024];
@@ -128,7 +128,7 @@ public class UploadImportFileEndpointTests
     [Fact]
     public async Task Returns_UnprocessableEntity_When_Extension_Not_Allowed()
     {
-        using var client = AdminClient();
+        using var client = await AdminClient();
 
         var response = await client.PostAsync(
             $"/api/companies/{AcmeCompanyId}/data-import/sessions",
@@ -137,11 +137,12 @@ public class UploadImportFileEndpointTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
-    private HttpClient AdminClient()
+    private async Task<HttpClient> AdminClient()
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.HrAdministrator, AcmeCompanyId);
         return client;
     }
 

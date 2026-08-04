@@ -52,6 +52,7 @@ public class UserInviteEndpointTests
 
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/invite",
@@ -70,6 +71,7 @@ public class UserInviteEndpointTests
 
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, InviteAdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, InviteAdminUser, SystemRoles.HrAdministrator, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/invite",
@@ -99,6 +101,7 @@ public class UserInviteEndpointTests
 
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, InviteAdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, InviteAdminUser, SystemRoles.HrAdministrator, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/invite",
@@ -125,6 +128,7 @@ public class UserInviteEndpointTests
 
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, InviteAdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, InviteAdminUser, SystemRoles.HrAdministrator, companyId);
 
         var first = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/invite",

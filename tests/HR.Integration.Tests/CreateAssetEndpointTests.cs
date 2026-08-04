@@ -18,11 +18,12 @@ public class CreateAssetEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -55,7 +56,7 @@ public class CreateAssetEndpointTests
     public async Task Post_Assets_Creates_Asset_With_All_Fields()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateActiveCategoryAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/assets", new
@@ -92,7 +93,7 @@ public class CreateAssetEndpointTests
     public async Task Post_Assets_Creates_Asset_With_Minimal_Fields()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateActiveCategoryAsync(client, companyId, "Furniture");
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/assets", new
@@ -121,7 +122,7 @@ public class CreateAssetEndpointTests
     public async Task Post_Assets_Returns_UnprocessableEntity_When_AssetNumber_Is_Missing()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateActiveCategoryAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/assets", new
@@ -139,7 +140,7 @@ public class CreateAssetEndpointTests
     public async Task Post_Assets_Returns_UnprocessableEntity_When_Name_Is_Missing()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateActiveCategoryAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/assets", new
@@ -157,7 +158,7 @@ public class CreateAssetEndpointTests
     public async Task Post_Assets_Returns_Conflict_When_AssetNumber_Already_Exists()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateActiveCategoryAsync(client, companyId);
 
         var body = new
@@ -186,7 +187,7 @@ public class CreateAssetEndpointTests
     public async Task Post_Assets_Returns_NotFound_When_Category_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/assets", new
         {
@@ -204,8 +205,8 @@ public class CreateAssetEndpointTests
     {
         var companyId1 = Guid.NewGuid();
         var companyId2 = Guid.NewGuid();
-        using var client1 = AdminClient(companyId1);
-        using var client2 = AdminClient(companyId2);
+        using var client1 = await AdminClient(companyId1);
+        using var client2 = await AdminClient(companyId2);
 
         var categoryId = await CreateActiveCategoryAsync(client1, companyId1);
 

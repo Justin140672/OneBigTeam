@@ -28,11 +28,12 @@ public class MoveApplicationStageEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid userId, Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -77,7 +78,7 @@ public class MoveApplicationStageEndpointTests
         var (vacancyId, applicationId, _, cvReviewStageId, _) = await SeedApplicationAsync(companyId, referenceData.PositionProfileId);
 
         // Plain Employee holds recruitment:view but not recruitment:manage (ticket #68).
-        using var client = AuthenticatedClient(PlainEmployeeUser, companyId);
+        using var client = await AuthenticatedClient(PlainEmployeeUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/move-stage",
@@ -93,7 +94,7 @@ public class MoveApplicationStageEndpointTests
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var (vacancyId, applicationId, _, cvReviewStageId, _) = await SeedApplicationAsync(companyId, referenceData.PositionProfileId);
 
-        using var client = AuthenticatedClient(RecruiterUser, companyId);
+        using var client = await AuthenticatedClient(RecruiterUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/move-stage",
@@ -112,7 +113,7 @@ public class MoveApplicationStageEndpointTests
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var (vacancyId, _, _, cvReviewStageId, _) = await SeedApplicationAsync(companyId, referenceData.PositionProfileId);
 
-        using var client = AuthenticatedClient(RecruiterUser, companyId);
+        using var client = await AuthenticatedClient(RecruiterUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{Guid.NewGuid()}/move-stage",
@@ -129,7 +130,7 @@ public class MoveApplicationStageEndpointTests
         var referenceDataA = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyA);
         var (vacancyId, applicationId, _, cvReviewStageId, _) = await SeedApplicationAsync(companyA, referenceDataA.PositionProfileId);
 
-        using var clientB = AuthenticatedClient(RecruiterUser, companyB);
+        using var clientB = await AuthenticatedClient(RecruiterUser, companyB);
 
         var response = await clientB.PostAsJsonAsync(
             $"/api/companies/{companyB}/vacancies/{vacancyId}/applications/{applicationId}/move-stage",
@@ -153,7 +154,7 @@ public class MoveApplicationStageEndpointTests
             await db.SaveChangesAsync();
         }
 
-        using var client = AuthenticatedClient(RecruiterUser, companyId);
+        using var client = await AuthenticatedClient(RecruiterUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/move-stage",

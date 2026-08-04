@@ -34,11 +34,12 @@ public class PromoteEmployeeEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid userId, Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -63,7 +64,7 @@ public class PromoteEmployeeEndpointTests
     public async Task Post_Promotions_Creates_Promotion_And_Applies_Immediately_When_Effective_Today()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser1, companyId);
+        using var client = await AdminClient(AdminUser1, companyId);
 
         var (departmentId, locationId, positionProfileId, employmentTypeId, defaultLeavePolicyId) =
             await CreateEmployeeReferenceDataAsync(client, companyId);
@@ -106,7 +107,7 @@ public class PromoteEmployeeEndpointTests
     public async Task Post_Promotions_Returns_NotFound_When_Employee_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser2, companyId);
+        using var client = await AdminClient(AdminUser2, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/promotions",
@@ -126,7 +127,7 @@ public class PromoteEmployeeEndpointTests
     public async Task Post_Promotions_Returns_Conflict_When_Backdated_And_Not_Confirmed()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser3, companyId);
+        using var client = await AdminClient(AdminUser3, companyId);
 
         var (departmentId, locationId, positionProfileId, employmentTypeId, defaultLeavePolicyId) =
             await CreateEmployeeReferenceDataAsync(client, companyId);
@@ -154,7 +155,7 @@ public class PromoteEmployeeEndpointTests
     public async Task Post_Promotions_Applies_Backdated_Promotion_When_Confirmed()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser4, companyId);
+        using var client = await AdminClient(AdminUser4, companyId);
 
         var (departmentId, locationId, positionProfileId, employmentTypeId, defaultLeavePolicyId) =
             await CreateEmployeeReferenceDataAsync(client, companyId);
@@ -182,7 +183,7 @@ public class PromoteEmployeeEndpointTests
     public async Task Post_Promotions_Returns_UnprocessableEntity_When_Reason_Is_Missing()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser5, companyId);
+        using var client = await AdminClient(AdminUser5, companyId);
 
         var (departmentId, locationId, positionProfileId, employmentTypeId, defaultLeavePolicyId) =
             await CreateEmployeeReferenceDataAsync(client, companyId);
@@ -207,7 +208,7 @@ public class PromoteEmployeeEndpointTests
     public async Task Post_Promotions_Returns_UnprocessableEntity_When_NewPositionProfileId_Is_Empty()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser5, companyId);
+        using var client = await AdminClient(AdminUser5, companyId);
 
         var (departmentId, locationId, positionProfileId, employmentTypeId, _) =
             await CreateEmployeeReferenceDataAsync(client, companyId);

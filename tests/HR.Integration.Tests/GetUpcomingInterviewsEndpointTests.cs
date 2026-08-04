@@ -30,11 +30,12 @@ public class GetUpcomingInterviewsEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientAs(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -52,7 +53,7 @@ public class GetUpcomingInterviewsEndpointTests
     public async Task Get_UpcomingInterviews_Returns_Forbidden_For_Plain_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/interviews/upcoming");
 
@@ -67,7 +68,7 @@ public class GetUpcomingInterviewsEndpointTests
     public async Task Get_UpcomingInterviews_Returns_Forbidden_For_HrAdministrator_Without_Recruiter_Role()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(HrAdminUser, companyId);
+        using var client = await ClientAs(HrAdminUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/interviews/upcoming");
 
@@ -78,7 +79,7 @@ public class GetUpcomingInterviewsEndpointTests
     public async Task Get_UpcomingInterviews_Returns_Empty_List_When_No_Interviews()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/interviews/upcoming");
 
@@ -92,7 +93,7 @@ public class GetUpcomingInterviewsEndpointTests
     public async Task Get_UpcomingInterviews_Returns_Only_Future_Pending_Interviews_With_Candidate_And_Vacancy_Details()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         Guid interviewId = Guid.Empty, candidateId = Guid.Empty, vacancyId = Guid.Empty;
         using (var scope = _factory.Services.CreateScope())
@@ -141,7 +142,7 @@ public class GetUpcomingInterviewsEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         using (var scope = _factory.Services.CreateScope())
         {

@@ -20,11 +20,12 @@ public class GetOnboardingTemplateEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -81,7 +82,7 @@ public class GetOnboardingTemplateEndpointTests
     public async Task Get_OnboardingTemplate_Returns_NotFound_When_Template_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/onboarding-templates/{Guid.NewGuid()}");
 
@@ -92,7 +93,7 @@ public class GetOnboardingTemplateEndpointTests
     public async Task Get_OnboardingTemplate_Returns_Template_With_Tasks_When_Found()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var template = await CreateTemplateAsync(client, companyId, "Standard Onboarding", "Default checklist");
 
         var updateResponse = await UpdateWithTaskAsync(client, companyId, template);
@@ -120,8 +121,8 @@ public class GetOnboardingTemplateEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
-        using var otherClient = AdminClient(otherCompanyId);
+        using var client = await AdminClient(companyId);
+        using var otherClient = await AdminClient(otherCompanyId);
 
         var template = await CreateTemplateAsync(client, companyId);
 

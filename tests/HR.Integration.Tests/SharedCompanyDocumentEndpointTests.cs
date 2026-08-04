@@ -41,7 +41,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var (_, response) = await UploadAsync(client, companyId, Guid.NewGuid());
 
@@ -54,7 +54,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.CompanyAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var (_, response) = await UploadAsync(client, companyId, Guid.NewGuid());
 
@@ -67,7 +67,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (payload, response) = await UploadAsync(client, companyId, categoryId, title: "Remote Working Policy");
@@ -84,7 +84,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, response) = await UploadAsync(
@@ -106,7 +106,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (_, response) = await UploadAsync(
@@ -121,7 +121,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var reviewOwnerId = Guid.NewGuid();
         await CreateActiveEmployeeAsync(companyId, reviewOwnerId);
@@ -147,7 +147,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (_, response) = await UploadAsync(
@@ -167,11 +167,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
 
         // Same category id, but the caller now belongs to (and is uploading into) company B.
-        using var clientB = ClientAs(companyB, hrInB);
+        using var clientB = await ClientAs(companyB, hrInB);
         var (_, response) = await UploadAsync(clientB, companyB, categoryInA);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -183,7 +183,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
 
         var form = new MultipartFormDataContent();
@@ -204,7 +204,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Handbook");
 
         await UploadAsync(client, companyId, categoryId, title: "Employee Handbook");
@@ -222,7 +222,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/shared-documents");
 
@@ -244,7 +244,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
 
         await UploadAsync(client, companyId, categoryId, title: "Some Policy");
@@ -262,7 +262,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
 
         var reviewOwnerId = Guid.NewGuid();
@@ -292,14 +292,14 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         await UploadAsync(clientA, companyA, categoryInA, title: "Company A Only Policy");
 
         // Company B's HR administrator lists documents scoped to company B — company A's
         // document must not leak into the results even though no filter would otherwise
         // exclude it by title/category.
-        using var clientB = ClientAs(companyB, hrInB);
+        using var clientB = await ClientAs(companyB, hrInB);
         var list = await clientB.GetFromJsonAsync<ListPayload>($"/api/companies/{companyB}/shared-documents");
 
         Assert.DoesNotContain(list!.Items, i => i.Title == "Company A Only Policy");
@@ -323,7 +323,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, roleId);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/shared-documents/published");
 
@@ -345,7 +345,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.CompanyAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/shared-documents/published");
 
@@ -362,12 +362,12 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeInB, SystemRoles.Employee);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         var (doc, _) = await UploadAsync(clientA, companyA, categoryInA, title: "Company A Published Policy");
         await PublishDirectlyAsync(companyA, doc!.Id);
 
-        using var clientB = ClientAs(companyB, employeeInB);
+        using var clientB = await ClientAs(companyB, employeeInB);
         var list = await clientB.GetFromJsonAsync<ListPayload>($"/api/companies/{companyB}/shared-documents/published");
 
         Assert.DoesNotContain(list!.Items, i => i.Title == "Company A Published Policy");
@@ -384,11 +384,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
 
-        using var managerClient = ClientAs(companyId, managerId);
+        using var managerClient = await ClientAs(companyId, managerId);
         var response = await managerClient.GetAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -400,7 +400,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Some Policy");
 
@@ -422,11 +422,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
 
-        using var clientB = ClientAs(companyB, hrInB);
+        using var clientB = await ClientAs(companyB, hrInB);
         var response = await clientB.GetAsync($"/api/companies/{companyB}/shared-documents/{doc!.Id}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -446,12 +446,12 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId, title: "Some Policy");
         await PublishDirectlyAsync(companyId, doc!.Id);
 
-        using var employeeClient = ClientAs(companyId, employeeId);
+        using var employeeClient = await ClientAs(companyId, employeeId);
         var response = await employeeClient.GetAsync($"/api/companies/{companyId}/shared-documents/published/{doc.Id}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -472,11 +472,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
 
-        using var employeeClient = ClientAs(companyId, employeeId);
+        using var employeeClient = await ClientAs(companyId, employeeId);
         var response = await employeeClient.GetAsync($"/api/companies/{companyId}/shared-documents/published/{doc!.Id}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -492,12 +492,12 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeInB, SystemRoles.Employee);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
         await PublishDirectlyAsync(companyA, doc!.Id);
 
-        using var clientB = ClientAs(companyB, employeeInB);
+        using var clientB = await ClientAs(companyB, employeeInB);
         var response = await clientB.GetAsync($"/api/companies/{companyB}/shared-documents/published/{doc.Id}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -509,7 +509,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.CompanyAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/shared-documents/published/{Guid.NewGuid()}");
 
@@ -527,12 +527,12 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
         await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
 
-        using var employeeClient = ClientAs(companyId, employeeId);
+        using var employeeClient = await ClientAs(companyId, employeeId);
         var response = await employeeClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", new { Confirmed = true });
 
@@ -545,7 +545,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.CompanyAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/acknowledge", EmptyJson());
@@ -563,12 +563,12 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeInB, SystemRoles.Employee);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
         await PublishDirectlyAsync(companyA, doc!.Id, requiresAcknowledgement: true);
 
-        using var clientB = ClientAs(companyB, employeeInB);
+        using var clientB = await ClientAs(companyB, employeeInB);
         var response = await clientB.PostAsJsonAsync(
             $"/api/companies/{companyB}/shared-documents/{doc.Id}/acknowledge", new { Confirmed = true });
 
@@ -584,12 +584,12 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
         await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
 
-        using var employeeClient = ClientAs(companyId, employeeId);
+        using var employeeClient = await ClientAs(companyId, employeeId);
         var response = await employeeClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", new { Confirmed = false });
 
@@ -608,12 +608,12 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
         await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
 
-        using var employeeClient = ClientAs(companyId, employeeId);
+        using var employeeClient = await ClientAs(companyId, employeeId);
         var response = await employeeClient.PostAsync(
             $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", EmptyJson());
 
@@ -629,12 +629,12 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
         await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
 
-        using var employeeClient = ClientAs(companyId, employeeId);
+        using var employeeClient = await ClientAs(companyId, employeeId);
         var response = await employeeClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", new { Confirmed = true });
 
@@ -669,11 +669,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
 
-        using var managerClient = ClientAs(companyId, managerId);
+        using var managerClient = await ClientAs(companyId, managerId);
         var response = await managerClient.GetAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/audit-history");
 
@@ -689,12 +689,12 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
         await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
 
-        using var employeeClient = ClientAs(companyId, employeeId);
+        using var employeeClient = await ClientAs(companyId, employeeId);
         var ackResponse = await employeeClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", new { Confirmed = true });
         Assert.Equal(HttpStatusCode.OK, ackResponse.StatusCode);
@@ -716,7 +716,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var hrUserId  = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
 
         var response = await hrClient.GetAsync(
             $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/audit-history");
@@ -737,7 +737,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId, allowAutoRedirect: false);
+        using var client = await ClientAs(companyId, userId, allowAutoRedirect: false);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
 
@@ -753,13 +753,13 @@ public class SharedCompanyDocumentEndpointTests
         var differentCompany = Guid.NewGuid();
         var userId          = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var uploadClient = ClientAs(companyId, userId);
+        using var uploadClient = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(uploadClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(uploadClient, companyId, categoryId);
 
         // Same user, but the tenant header on this client claims a different company than the
         // one in the route — must be rejected before the document lookup even runs.
-        using var mismatchedClient = ClientAs(differentCompany, userId, allowAutoRedirect: false);
+        using var mismatchedClient = await ClientAs(differentCompany, userId, allowAutoRedirect: false);
         var response = await mismatchedClient.GetAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}/download");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -774,11 +774,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
 
-        using var employeeClient = ClientAs(companyId, employeeId, allowAutoRedirect: false);
+        using var employeeClient = await ClientAs(companyId, employeeId, allowAutoRedirect: false);
         var response = await employeeClient.GetAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}/download");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -795,11 +795,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
 
-        using var managerClient = ClientAs(companyId, managerId);
+        using var managerClient = await ClientAs(companyId, managerId);
         var response = await managerClient.PutAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}",
             new { Title = "New Title", CategoryId = categoryId });
@@ -813,7 +813,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Old Title");
 
@@ -840,7 +840,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Old Title");
 
@@ -871,7 +871,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Old Title");
 
@@ -893,7 +893,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Old Title");
 
@@ -919,11 +919,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
 
-        using var clientB = ClientAs(companyB, hrInB);
+        using var clientB = await ClientAs(companyB, hrInB);
         var categoryInB = await CreateCategoryAsync(clientB, companyB, "Policy");
 
         // Caller is HR in company A, editing a document in company A, but supplying a category
@@ -945,11 +945,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
 
-        using var clientB = ClientAs(companyB, hrInB);
+        using var clientB = await ClientAs(companyB, hrInB);
         var categoryInB = await CreateCategoryAsync(clientB, companyB, "Policy");
 
         var response = await clientB.PutAsJsonAsync(
@@ -972,11 +972,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
 
-        using var managerClient = ClientAs(companyId, managerId);
+        using var managerClient = await ClientAs(companyId, managerId);
         var response = await managerClient.PutAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/audience",
             new { });
@@ -990,7 +990,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
         var departmentId = await SeedDepartmentAsync(companyId, "Engineering");
@@ -1011,7 +1011,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
 
@@ -1032,11 +1032,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
 
-        using var clientB = ClientAs(companyB, hrInB);
+        using var clientB = await ClientAs(companyB, hrInB);
         var response = await clientB.PutAsJsonAsync(
             $"/api/companies/{companyB}/shared-documents/{doc!.Id}/audience",
             new { });
@@ -1061,11 +1061,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
 
-        using var managerClient = ClientAs(companyId, managerId);
+        using var managerClient = await ClientAs(companyId, managerId);
         var response = await managerClient.PostAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/publish", EmptyJson());
 
@@ -1078,7 +1078,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Remote Working Policy");
 
@@ -1093,7 +1093,7 @@ public class SharedCompanyDocumentEndpointTests
         // A published document is now visible to employees via the published-list endpoint.
         var employeeId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
-        using var employeeClient = ClientAs(companyId, employeeId);
+        using var employeeClient = await ClientAs(companyId, employeeId);
         var list = await employeeClient.GetFromJsonAsync<ListPayload>($"/api/companies/{companyId}/shared-documents/published");
         Assert.Contains(list!.Items, i => i.Title == "Remote Working Policy");
     }
@@ -1104,7 +1104,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
 
@@ -1120,7 +1120,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/publish", EmptyJson());
@@ -1134,7 +1134,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
 
@@ -1157,11 +1157,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
 
-        using var clientB = ClientAs(companyB, hrInB);
+        using var clientB = await ClientAs(companyB, hrInB);
         var response = await clientB.PostAsync(
             $"/api/companies/{companyB}/shared-documents/{doc!.Id}/publish", EmptyJson());
 
@@ -1179,11 +1179,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
 
-        using var managerClient = ClientAs(companyId, managerId);
+        using var managerClient = await ClientAs(companyId, managerId);
         var response = await managerClient.PutAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/acknowledgement-settings",
             new { RequiresAcknowledgement = true, AcknowledgementDueDate = "2027-01-01" });
@@ -1197,7 +1197,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
 
@@ -1227,7 +1227,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/acknowledgement-settings",
@@ -1246,11 +1246,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
 
-        using var clientB = ClientAs(companyB, hrInB);
+        using var clientB = await ClientAs(companyB, hrInB);
         var response = await clientB.PutAsJsonAsync(
             $"/api/companies/{companyB}/shared-documents/{doc!.Id}/acknowledgement-settings",
             new { RequiresAcknowledgement = false });
@@ -1273,12 +1273,12 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
         await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
 
-        using var managerClient = ClientAs(companyId, managerId);
+        using var managerClient = await ClientAs(companyId, managerId);
         var response = await managerClient.GetAsync(
             $"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledgement-progress");
 
@@ -1294,7 +1294,7 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId, title: "Remote Working Policy");
         await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
@@ -1307,7 +1307,7 @@ public class SharedCompanyDocumentEndpointTests
         // Id == employeeId so they're counted as eligible.
         await CreateActiveEmployeeAsync(companyId, employeeId);
 
-        using var employeeClient = ClientAs(companyId, employeeId);
+        using var employeeClient = await ClientAs(companyId, employeeId);
         await employeeClient.PostAsJsonAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/acknowledge", new { Confirmed = true });
 
         var response = await hrClient.GetAsync(
@@ -1338,7 +1338,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
         await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: false);
@@ -1355,7 +1355,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/acknowledgement-progress");
@@ -1373,12 +1373,12 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
         await PublishDirectlyAsync(companyA, doc!.Id, requiresAcknowledgement: true);
 
-        using var clientB = ClientAs(companyB, hrInB);
+        using var clientB = await ClientAs(companyB, hrInB);
         var response = await clientB.GetAsync(
             $"/api/companies/{companyB}/shared-documents/{doc.Id}/acknowledgement-progress");
 
@@ -1408,11 +1408,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
 
-        using var managerClient = ClientAs(companyId, managerId);
+        using var managerClient = await ClientAs(companyId, managerId);
         var response = await managerClient.PostAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/versions", BuildVersionUpload());
 
@@ -1425,7 +1425,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Remote Working Policy");
 
@@ -1443,7 +1443,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/versions", BuildVersionUpload());
@@ -1461,11 +1461,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
 
-        using var clientB = ClientAs(companyB, hrInB);
+        using var clientB = await ClientAs(companyB, hrInB);
         var response = await clientB.PostAsync(
             $"/api/companies/{companyB}/shared-documents/{doc!.Id}/versions", BuildVersionUpload());
 
@@ -1478,7 +1478,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(
             client, companyId, categoryId, title: "Remote Working Policy",
@@ -1506,7 +1506,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(
             client, companyId, categoryId, title: "Remote Working Policy",
@@ -1557,11 +1557,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
 
-        using var managerClient = ClientAs(companyId, managerId, allowAutoRedirect: false);
+        using var managerClient = await ClientAs(companyId, managerId, allowAutoRedirect: false);
         var response = await managerClient.GetAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/versions/1/download");
 
@@ -1574,7 +1574,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId, allowAutoRedirect: false);
+        using var client = await ClientAs(companyId, userId, allowAutoRedirect: false);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
 
@@ -1590,7 +1590,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId, allowAutoRedirect: false);
+        using var client = await ClientAs(companyId, userId, allowAutoRedirect: false);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
 
@@ -1610,11 +1610,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
 
-        using var clientB = ClientAs(companyB, hrInB, allowAutoRedirect: false);
+        using var clientB = await ClientAs(companyB, hrInB, allowAutoRedirect: false);
         var response = await clientB.GetAsync(
             $"/api/companies/{companyB}/shared-documents/{doc!.Id}/versions/1/download");
 
@@ -1632,11 +1632,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
 
-        using var managerClient = ClientAs(companyId, managerId);
+        using var managerClient = await ClientAs(companyId, managerId);
         var response = await managerClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/archive",
             new { Reason = "No longer needed" });
@@ -1650,7 +1650,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Draft Policy");
 
@@ -1671,14 +1671,14 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Remote Working Policy");
         await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}/publish", EmptyJson());
 
         var employeeId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
-        using var employeeClient = ClientAs(companyId, employeeId);
+        using var employeeClient = await ClientAs(companyId, employeeId);
         var beforeArchive = await employeeClient.GetFromJsonAsync<ListPayload>($"/api/companies/{companyId}/shared-documents/published");
         Assert.Contains(beforeArchive!.Items, i => i.Title == "Remote Working Policy");
 
@@ -1700,7 +1700,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
 
@@ -1718,7 +1718,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/archive",
@@ -1737,11 +1737,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
 
-        using var clientB = ClientAs(companyB, hrInB);
+        using var clientB = await ClientAs(companyB, hrInB);
         var response = await clientB.PostAsJsonAsync(
             $"/api/companies/{companyB}/shared-documents/{doc!.Id}/archive",
             new { Reason = "No longer needed" });
@@ -1755,7 +1755,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
 
@@ -1791,11 +1791,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
 
-        using var managerClient = ClientAs(companyId, managerId);
+        using var managerClient = await ClientAs(companyId, managerId);
         var response = await managerClient.PostAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/expire", EmptyJson());
 
@@ -1808,7 +1808,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId, title: "Aging Policy");
         await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc!.Id}/publish", EmptyJson());
@@ -1828,7 +1828,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
 
@@ -1845,7 +1845,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
 
@@ -1863,7 +1863,7 @@ public class SharedCompanyDocumentEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/expire", EmptyJson());
@@ -1881,11 +1881,11 @@ public class SharedCompanyDocumentEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
 
-        using var clientB = ClientAs(companyB, hrInB);
+        using var clientB = await ClientAs(companyB, hrInB);
         var response = await clientB.PostAsync(
             $"/api/companies/{companyB}/shared-documents/{doc!.Id}/expire", EmptyJson());
 
@@ -2019,7 +2019,7 @@ public class SharedCompanyDocumentEndpointTests
         return bytes;
     }
 
-    private HttpClient ClientAs(Guid companyId, Guid userId, bool allowAutoRedirect = true)
+    private async Task<HttpClient> ClientAs(Guid companyId, Guid userId, bool allowAutoRedirect = true)
     {
         var client = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {
@@ -2027,6 +2027,13 @@ public class SharedCompanyDocumentEndpointTests
         });
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        // Role-agnostic sync only — every caller of this helper already granted the specific
+        // role(s) it wants to test beforehand via AssignRoleAsync. Hardcoding a role here (this
+        // used to always grant SystemRoles.Manager) additionally granted it to every caller
+        // regardless of intent, which used to be harmless only because tenant resolution didn't
+        // actually key off UserProfile.CompanyId yet — now that it does, an unconditional extra
+        // role grant here changes real authorization outcomes.
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 

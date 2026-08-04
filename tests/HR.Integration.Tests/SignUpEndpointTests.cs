@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Companies.Domain;
+using HR.Modules.Companies.Persistence;
+using HR.Modules.Employees.Persistence;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +19,7 @@ public class SignUpEndpointTests
     public SignUpEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+        _factory.SupabaseAuthGateway.Reset();
     }
 
     private static object ValidSignUpRequest(string? email = null) => new
@@ -42,6 +46,8 @@ public class SignUpEndpointTests
     {
         using var client = _factory.CreateClient();
         var email = $"ada-{Guid.NewGuid():N}@example.com";
+        var supabaseUserId = Guid.NewGuid();
+        _factory.SupabaseAuthGateway.UserIdToReturn = supabaseUserId;
 
         var response = await client.PostAsJsonAsync("/api/signup", ValidSignUpRequest(email));
 
@@ -55,19 +61,59 @@ public class SignUpEndpointTests
         Assert.Equal("Ada", payload.FirstName);
         Assert.Equal("Lovelace", payload.LastName);
 
+        // The gateway was invoked instead of any real Supabase call, and the resulting
+        // UserProfile carries the Supabase auth user id it returned.
+        Assert.Contains(_factory.SupabaseAuthGateway.CreatedUsers, u => u.Email == email);
+
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        var user = await db.Users.SingleOrDefaultAsync(u => u.Id == payload.UserId);
-        Assert.NotNull(user);
-        Assert.False(user!.IsEmailConfirmed);
+        var profile = await db.UserProfiles.SingleOrDefaultAsync(p => p.Id == payload.UserId);
+        Assert.NotNull(profile);
+        Assert.Equal(supabaseUserId, profile!.SupabaseAuthUserId);
+        Assert.Equal(payload.CompanyId, profile.CompanyId);
+        Assert.Equal(email, profile.Email);
 
         // Also granted SystemRoles.Employee alongside CompanyAdministrator — it's the floor role
         // required by "role:employee", which gates core session endpoints (GetMe, GetCompany,
-        // etc.) that every seeded persona also carries (see SignUpHandler remarks).
+        // etc.) that every seeded persona also carries (see SignUpHandler remarks). Roles are
+        // keyed to UserProfile.Id (payload.UserId), not the raw Supabase auth user id.
         var roleIds = await db.UserRoles.Where(r => r.UserId == payload.UserId).Select(r => r.RoleId).ToListAsync();
         Assert.Contains(SystemRoles.CompanyAdministrator, roleIds);
         Assert.Contains(SystemRoles.Employee, roleIds);
         Assert.Equal(2, roleIds.Count);
+
+        // Self-service signup starts a company in PendingVerification — it is not yet Active
+        // until an email-verification step (out of scope for Phase A) flips it.
+        var companiesDb = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        var company = await companiesDb.Companies.SingleOrDefaultAsync(c => c.Id == payload.CompanyId);
+        Assert.NotNull(company);
+        Assert.Equal(CompanyStatus.PendingVerification, company!.Status);
+        Assert.False(company.IsActive);
+
+        // Default setup data (Department/Location/EmploymentType/PositionProfile) was seeded so the
+        // admin's own Employee record could be created against it.
+        var employeesDb = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
+        var department = await employeesDb.Departments.SingleOrDefaultAsync(d => d.CompanyId == payload.CompanyId);
+        Assert.NotNull(department);
+        Assert.Equal("General", department!.Name);
+
+        var location = await employeesDb.Locations.SingleOrDefaultAsync(l => l.CompanyId == payload.CompanyId);
+        Assert.NotNull(location);
+        Assert.Equal("Head Office", location!.Name);
+
+        var employmentType = await employeesDb.EmploymentTypes.SingleOrDefaultAsync(et => et.CompanyId == payload.CompanyId);
+        Assert.NotNull(employmentType);
+        Assert.Equal("Full-time", employmentType!.Name);
+
+        var positionProfile = await employeesDb.PositionProfiles.SingleOrDefaultAsync(pp => pp.CompanyId == payload.CompanyId);
+        Assert.NotNull(positionProfile);
+        Assert.Equal("Administrator", positionProfile!.Title);
+        Assert.Equal(department.Id, positionProfile.DepartmentId);
+        Assert.Equal(location.Id, positionProfile.LocationId);
+
+        var employee = await employeesDb.Employees.SingleOrDefaultAsync(e => e.CompanyId == payload.CompanyId);
+        Assert.NotNull(employee);
+        Assert.Equal(positionProfile.Id, employee!.PositionProfileId);
     }
 
     [Fact]

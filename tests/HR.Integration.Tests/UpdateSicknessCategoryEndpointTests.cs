@@ -18,11 +18,12 @@ public class UpdateSicknessCategoryEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -42,7 +43,7 @@ public class UpdateSicknessCategoryEndpointTests
     public async Task Put_SicknessCategory_Updates_Name_And_DisplayOrder()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var created = await client.PostAsJsonAsync($"/api/companies/{companyId}/sickness-categories", new
         {
@@ -79,7 +80,7 @@ public class UpdateSicknessCategoryEndpointTests
     public async Task Put_SicknessCategory_Returns_UnprocessableEntity_When_Name_Is_Empty()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var created = await client.PostAsJsonAsync($"/api/companies/{companyId}/sickness-categories", new
         {
@@ -102,7 +103,7 @@ public class UpdateSicknessCategoryEndpointTests
     public async Task Put_SicknessCategory_Returns_NotFound_When_Category_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/sickness-categories/{Guid.NewGuid()}",
@@ -115,7 +116,7 @@ public class UpdateSicknessCategoryEndpointTests
     public async Task Put_SicknessCategory_Returns_Conflict_When_Name_Conflicts_With_Different_Category()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var first = await client.PostAsJsonAsync($"/api/companies/{companyId}/sickness-categories", new
         {

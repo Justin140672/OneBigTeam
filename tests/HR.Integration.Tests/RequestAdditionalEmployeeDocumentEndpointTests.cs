@@ -31,7 +31,7 @@ public class RequestAdditionalEmployeeDocumentEndpointTests
     public async Task Returns_Created_With_DocumentRequest_When_Valid()
     {
         var (companyId, employeeId, docTypeId) = await SetupAsync();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests",
@@ -52,7 +52,7 @@ public class RequestAdditionalEmployeeDocumentEndpointTests
     public async Task Creates_DocumentRequest_In_Database()
     {
         var (companyId, employeeId, docTypeId) = await SetupAsync();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests",
@@ -74,7 +74,7 @@ public class RequestAdditionalEmployeeDocumentEndpointTests
     public async Task Creates_Upload_Task_Assigned_To_Employee()
     {
         var (companyId, employeeId, docTypeId) = await SetupAsync();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests",
@@ -96,7 +96,7 @@ public class RequestAdditionalEmployeeDocumentEndpointTests
     public async Task DueDate_Is_Stored_On_Request_And_Task()
     {
         var (companyId, employeeId, docTypeId) = await SetupAsync();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests",
@@ -165,7 +165,7 @@ public class RequestAdditionalEmployeeDocumentEndpointTests
     public async Task Returns_NotFound_When_DocumentType_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/document-requests",
@@ -178,7 +178,7 @@ public class RequestAdditionalEmployeeDocumentEndpointTests
     public async Task Returns_Conflict_When_Request_Already_Exists_For_Same_Employee_And_Type()
     {
         var (companyId, employeeId, docTypeId) = await SetupAsync();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
         var url = $"/api/companies/{companyId}/employees/{employeeId}/document-requests";
 
         var first = await client.PostAsJsonAsync(url, new { documentTypeId = docTypeId });
@@ -195,7 +195,7 @@ public class RequestAdditionalEmployeeDocumentEndpointTests
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var typeResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/document-types",
@@ -206,11 +206,12 @@ public class RequestAdditionalEmployeeDocumentEndpointTests
         return (companyId, employeeId, docTypeId);
     }
 
-    private HttpClient ManagerClient(Guid companyId)
+    private async Task<HttpClient> ManagerClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

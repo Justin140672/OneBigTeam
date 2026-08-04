@@ -41,11 +41,12 @@ public class LeavingProcessLifecycleEndToEndTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -66,7 +67,7 @@ public class LeavingProcessLifecycleEndToEndTests
     public async Task Full_Leaving_Process_Lifecycle_Starts_Offboarding_Records_Audit_And_Amends()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId, "Leaver");
 
@@ -147,7 +148,7 @@ public class LeavingProcessLifecycleEndToEndTests
     public async Task Cancel_LeavingProcess_Reactivates_Employee_And_Cancels_Offboarding_Tasks()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId, "Retracted");
 
@@ -194,7 +195,7 @@ public class LeavingProcessLifecycleEndToEndTests
     public async Task ProcessLeavingEmployeesJob_Finalises_Departure_Once_LeavingDate_Has_Passed()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId, "Departed");
 

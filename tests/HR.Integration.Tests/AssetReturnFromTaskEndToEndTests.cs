@@ -38,7 +38,7 @@ public class AssetReturnFromTaskEndToEndTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AuthenticatedClient(User1, companyId);
+        using var client = await AuthenticatedClient(User1, companyId);
 
         var (assetId, assignmentId) = await CreateActiveAssignmentAsync(client, companyId, employeeId);
 
@@ -71,7 +71,7 @@ public class AssetReturnFromTaskEndToEndTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AuthenticatedClient(User2, companyId);
+        using var client = await AuthenticatedClient(User2, companyId);
 
         var (assetId, assignmentId) = await CreateActiveAssignmentAsync(client, companyId, employeeId);
 
@@ -99,11 +99,12 @@ public class AssetReturnFromTaskEndToEndTests
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient(Guid userId, Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 

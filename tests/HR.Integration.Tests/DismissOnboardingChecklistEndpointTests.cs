@@ -22,11 +22,12 @@ public class DismissOnboardingChecklistEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientFor(Guid companyId, Guid userId)
+    private async Task<HttpClient> ClientFor(Guid companyId, Guid userId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -44,7 +45,7 @@ public class DismissOnboardingChecklistEndpointTests
     public async Task Post_Dismiss_Returns_Forbidden_For_Employee_Role()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, EmployeeUserId);
+        using var client = await ClientFor(companyId, EmployeeUserId);
 
         var response = await client.PostAsync("/api/company-onboarding/checklist/dismiss", content: null);
 
@@ -55,7 +56,7 @@ public class DismissOnboardingChecklistEndpointTests
     public async Task Post_Dismiss_Returns_Ok_And_Sets_IsHidden()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, HrAdminUserId);
+        using var client = await ClientFor(companyId, HrAdminUserId);
 
         var response = await client.PostAsync("/api/company-onboarding/checklist/dismiss", content: null);
 
@@ -70,7 +71,7 @@ public class DismissOnboardingChecklistEndpointTests
     public async Task Post_Dismiss_Then_Get_Checklist_Reflects_IsHidden_True()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, HrAdminUserId);
+        using var client = await ClientFor(companyId, HrAdminUserId);
 
         var dismissResponse = await client.PostAsync("/api/company-onboarding/checklist/dismiss", content: null);
         Assert.Equal(HttpStatusCode.OK, dismissResponse.StatusCode);

@@ -33,11 +33,12 @@ public class GetMyProbationStatusEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientAs(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -55,7 +56,7 @@ public class GetMyProbationStatusEndpointTests
     public async Task Get_MyProbationStatus_Returns_HasRecord_False_When_No_Record_Exists()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(SelfUser, companyId);
+        using var client = await ClientAs(SelfUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees/me/probation-status");
 
@@ -69,7 +70,7 @@ public class GetMyProbationStatusEndpointTests
     public async Task Get_MyProbationStatus_Returns_Ok_With_Own_Record_For_Plain_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(SelfUser, companyId);
+        using var client = await ClientAs(SelfUser, companyId);
 
         using (var scope = _factory.Services.CreateScope())
         {
@@ -94,7 +95,7 @@ public class GetMyProbationStatusEndpointTests
     public async Task Get_MyProbationStatus_Does_Not_Return_Another_Employees_Record()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(SelfUser, companyId);
+        using var client = await ClientAs(SelfUser, companyId);
 
         using (var scope = _factory.Services.CreateScope())
         {

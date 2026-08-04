@@ -44,7 +44,7 @@ public class ProbationLifecycleEndToEndTests
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var managerId  = Guid.NewGuid();
-        using var client = AuthenticatedClient(AdminUser, companyId);
+        using var client = await AuthenticatedClient(AdminUser, companyId);
 
         // ── Step 1: Create probation record ───────────────────────────────────
         var recordResp = await client.PostAsJsonAsync(
@@ -119,11 +119,12 @@ public class ProbationLifecycleEndToEndTests
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient(Guid userId, Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 

@@ -32,7 +32,7 @@ public class CancelDocumentRequestEndpointTests
     public async Task Returns_NoContent_When_Cancelled_Successfully()
     {
         var (companyId, employeeId, requestId) = await SetupAsync();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests/{requestId}");
@@ -44,7 +44,7 @@ public class CancelDocumentRequestEndpointTests
     public async Task Sets_DocumentRequest_Status_To_Cancelled()
     {
         var (companyId, employeeId, requestId) = await SetupAsync();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         await client.DeleteAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests/{requestId}");
@@ -61,7 +61,7 @@ public class CancelDocumentRequestEndpointTests
     public async Task Cancels_Associated_Upload_Task()
     {
         var (companyId, employeeId, requestId) = await SetupAsync();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         await client.DeleteAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests/{requestId}");
@@ -78,7 +78,7 @@ public class CancelDocumentRequestEndpointTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests/{Guid.NewGuid()}");
@@ -98,7 +98,7 @@ public class CancelDocumentRequestEndpointTests
         req.MarkUploaded(employeeId, DateTimeOffset.UtcNow);
         await db.SaveChangesAsync();
 
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests/{requestId}");
 
@@ -183,11 +183,12 @@ public class CancelDocumentRequestEndpointTests
         return (companyId, employeeId, request.Id);
     }
 
-    private HttpClient ManagerClient(Guid companyId)
+    private async Task<HttpClient> ManagerClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 }

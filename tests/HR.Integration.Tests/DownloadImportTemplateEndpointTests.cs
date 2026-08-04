@@ -24,7 +24,7 @@ public class DownloadImportTemplateEndpointTests
     public async Task Returns_Ok_With_Csv_Content_Type_And_Header_Row()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.GetAsync(TemplateUrl(companyId));
 
@@ -47,11 +47,12 @@ public class DownloadImportTemplateEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

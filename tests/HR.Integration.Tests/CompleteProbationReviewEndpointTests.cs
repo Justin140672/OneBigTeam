@@ -54,6 +54,7 @@ public class CompleteProbationReviewEndpointTests
         var completedBy = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
 
         var (recordId, reviewId) = await CreateRecordAndReview(client, companyId, "ManagerCheckIn");
 
@@ -86,6 +87,7 @@ public class CompleteProbationReviewEndpointTests
         var completedBy = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
         var (recordId, reviewId) = await CreateRecordAndReview(client, companyId, "FinalDecision");
 
@@ -122,6 +124,7 @@ public class CompleteProbationReviewEndpointTests
         var completedBy = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User3, SystemRoles.HrAdministrator, companyId);
 
         var (recordId, reviewId) = await CreateRecordAndReview(client, companyId, "FinalDecision");
 
@@ -153,6 +156,7 @@ public class CompleteProbationReviewEndpointTests
         var completedBy = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User4.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User4, SystemRoles.HrAdministrator, companyId);
 
         var (recordId, reviewId) = await CreateRecordAndReview(client, companyId, "ExtensionConfirmation");
 
@@ -186,6 +190,7 @@ public class CompleteProbationReviewEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User5.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User5, SystemRoles.HrAdministrator, companyId);
 
         var (recordId, _) = await CreateRecordAndReview(client, companyId, "ManagerCheckIn");
 
@@ -209,6 +214,7 @@ public class CompleteProbationReviewEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User6.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User6, SystemRoles.HrAdministrator, companyId);
 
         var (recordId, reviewId) = await CreateRecordAndReview(client, companyId, "FinalDecision");
 
@@ -232,6 +238,7 @@ public class CompleteProbationReviewEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User7.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User7, SystemRoles.HrAdministrator, companyId);
 
         var (recordId, reviewId) = await CreateRecordAndReview(client, companyId, "ManagerCheckIn");
 

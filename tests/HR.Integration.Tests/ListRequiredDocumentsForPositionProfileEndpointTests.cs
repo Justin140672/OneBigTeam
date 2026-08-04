@@ -20,11 +20,12 @@ public class ListRequiredDocumentsForPositionProfileEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -43,7 +44,7 @@ public class ListRequiredDocumentsForPositionProfileEndpointTests
     public async Task Get_RequiredDocuments_Returns_NotFound_For_Unknown_PositionProfile()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/position-profiles/{Guid.NewGuid()}/required-documents");
@@ -55,7 +56,7 @@ public class ListRequiredDocumentsForPositionProfileEndpointTests
     public async Task Get_RequiredDocuments_Returns_Empty_List_When_None_Added()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Operations Lead");
 
@@ -72,7 +73,7 @@ public class ListRequiredDocumentsForPositionProfileEndpointTests
     public async Task Get_RequiredDocuments_Returns_Active_Documents()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Software Engineer");
         var docTypeAId = await CreateDocumentTypeAsync(client, companyId, "Passport");
@@ -96,7 +97,7 @@ public class ListRequiredDocumentsForPositionProfileEndpointTests
     public async Task Get_RequiredDocuments_Excludes_Removed_Documents()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "HR Manager");
         var docTypeAId = await CreateDocumentTypeAsync(client, companyId, "Driving Licence");
@@ -124,8 +125,8 @@ public class ListRequiredDocumentsForPositionProfileEndpointTests
     {
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
-        using var clientA = AuthenticatedClient(companyA);
-        using var clientB = AuthenticatedClient(companyB);
+        using var clientA = await AuthenticatedClient(companyA);
+        using var clientB = await AuthenticatedClient(companyB);
 
         var profileAId = await CreatePositionProfileAsync(clientA, companyA, "Developer");
         var profileBId = await CreatePositionProfileAsync(clientB, companyB, "Developer");

@@ -46,6 +46,7 @@ public class DeleteFutureCompensationRecordEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
 
         var employeeId = await CompensationTestHelpers.CreateEmployeeAsync(client, companyId);
 
@@ -83,6 +84,7 @@ public class DeleteFutureCompensationRecordEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
         var employeeId = await CompensationTestHelpers.CreateEmployeeAsync(client, companyId);
 
@@ -99,6 +101,7 @@ public class DeleteFutureCompensationRecordEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User3, SystemRoles.HrAdministrator, companyId);
 
         var employeeId = await CompensationTestHelpers.CreateEmployeeAsync(client, companyId);
 

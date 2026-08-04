@@ -33,11 +33,12 @@ public class CommitBackfillEmployeeNumbersEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid userId, Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -132,7 +133,7 @@ public class CommitBackfillEmployeeNumbersEndpointTests
     [Fact]
     public async Task Returns_Conflict_When_Company_Is_In_Manual_Mode()
     {
-        using var client = AuthenticatedClient(User1, Guid.NewGuid());
+        using var client = await AuthenticatedClient(User1, Guid.NewGuid());
         var companyId = await CreateCompanyAsync(client);
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
@@ -147,7 +148,7 @@ public class CommitBackfillEmployeeNumbersEndpointTests
     [Fact]
     public async Task Returns_Ok_With_Empty_Result_When_No_Employees_Are_Missing_A_Number()
     {
-        using var client = AuthenticatedClient(User2, Guid.NewGuid());
+        using var client = await AuthenticatedClient(User2, Guid.NewGuid());
         var companyId = await CreateCompanyAsync(client);
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
@@ -166,7 +167,7 @@ public class CommitBackfillEmployeeNumbersEndpointTests
     [Fact]
     public async Task Assigns_Numbers_Only_To_Employees_Missing_One_And_Leaves_Existing_Numbers_Untouched()
     {
-        using var client = AuthenticatedClient(User3, Guid.NewGuid());
+        using var client = await AuthenticatedClient(User3, Guid.NewGuid());
         var companyId = await CreateCompanyAsync(client);
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
@@ -214,7 +215,7 @@ public class CommitBackfillEmployeeNumbersEndpointTests
     [Fact]
     public async Task Second_Commit_Call_Assigns_Nothing_Once_All_Employees_Are_Numbered()
     {
-        using var client = AuthenticatedClient(User4, Guid.NewGuid());
+        using var client = await AuthenticatedClient(User4, Guid.NewGuid());
         var companyId = await CreateCompanyAsync(client);
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());

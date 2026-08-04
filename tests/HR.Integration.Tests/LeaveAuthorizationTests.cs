@@ -42,11 +42,12 @@ public class LeaveAuthorizationTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientForCompany(Guid companyId, Guid userId)
+    private async Task<HttpClient> ClientForCompany(Guid companyId, Guid userId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -55,6 +56,7 @@ public class LeaveAuthorizationTests
         var bootstrapClient = _factory.CreateClient();
         bootstrapClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, HrAdminUserId.ToString());
         bootstrapClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, HrAdminUserId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, HrAdminUserId, SystemRoles.HrAdministrator, HrAdminUserId);
 
         var createResp = await bootstrapClient.PostAsJsonAsync("/api/companies", new
         {
@@ -65,8 +67,8 @@ public class LeaveAuthorizationTests
         var company = await createResp.Content.ReadFromJsonAsync<CompanyPayload>();
         var companyId = company!.Id;
 
-        var hrAdminClient = ClientForCompany(companyId, HrAdminUserId);
-        var companyAdminClient = ClientForCompany(companyId, CompanyAdministratorUserId);
+        var hrAdminClient = await ClientForCompany(companyId, HrAdminUserId);
+        var companyAdminClient = await ClientForCompany(companyId, CompanyAdministratorUserId);
 
         // Seed a leave type directly — no API endpoint exists for this.
         var leaveTypeId = Guid.NewGuid();

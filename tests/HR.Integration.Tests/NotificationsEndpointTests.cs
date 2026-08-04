@@ -36,7 +36,7 @@ public class NotificationsEndpointTests
     public async Task GetMyNotifications_Returns_Empty_When_No_Notifications()
     {
         var userId       = Guid.NewGuid();
-        using var client = AuthenticatedClient(userId);
+        using var client = await AuthenticatedClient(userId);
 
         var response = await client.GetAsync(
             $"/api/companies/{SeededCompanyId}/notifications/my");
@@ -52,7 +52,7 @@ public class NotificationsEndpointTests
     {
         // userId == employeeId — sub claim is used as employeeId
         var userId       = Guid.NewGuid();
-        using var client = AuthenticatedClient(userId);
+        using var client = await AuthenticatedClient(userId);
 
         await TaskSeeder.SeedAsync(_factory, SeededCompanyId,
             title: "Notification test task",
@@ -73,7 +73,7 @@ public class NotificationsEndpointTests
     public async Task GetMyNotifications_Returns_Notifications_Newest_First()
     {
         var userId       = Guid.NewGuid();
-        using var client = AuthenticatedClient(userId);
+        using var client = await AuthenticatedClient(userId);
 
         await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "First task",  assignedEmployeeId: userId);
         await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Second task", assignedEmployeeId: userId);
@@ -92,7 +92,7 @@ public class NotificationsEndpointTests
     {
         var userA        = Guid.NewGuid();
         var userB        = Guid.NewGuid();
-        using var client = AuthenticatedClient(userA);
+        using var client = await AuthenticatedClient(userA);
 
         await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Task for B", assignedEmployeeId: userB);
 
@@ -117,7 +117,7 @@ public class NotificationsEndpointTests
     [Fact]
     public async Task MarkNotificationRead_Returns_NotFound_For_Unknown_Notification()
     {
-        using var client = AuthenticatedClient(Guid.NewGuid());
+        using var client = await AuthenticatedClient(Guid.NewGuid());
         var response     = await client.PutAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/notifications/{Guid.NewGuid()}/read",
             new { companyId = SeededCompanyId, notificationId = Guid.NewGuid() });
@@ -128,7 +128,7 @@ public class NotificationsEndpointTests
     public async Task MarkNotificationRead_Returns_NoContent_And_Decrements_UnreadCount()
     {
         var userId       = Guid.NewGuid();
-        using var client = AuthenticatedClient(userId);
+        using var client = await AuthenticatedClient(userId);
 
         await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Mark-read test", assignedEmployeeId: userId);
 
@@ -162,7 +162,7 @@ public class NotificationsEndpointTests
     public async Task MarkAllNotificationsRead_Returns_NoContent_And_Clears_Unread_Count()
     {
         var userId       = Guid.NewGuid();
-        using var client = AuthenticatedClient(userId);
+        using var client = await AuthenticatedClient(userId);
 
         await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Bulk read A", assignedEmployeeId: userId);
         await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Bulk read B", assignedEmployeeId: userId);
@@ -181,13 +181,14 @@ public class NotificationsEndpointTests
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient(Guid userId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId)
     {
         TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
 
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, SeededCompanyId);
         return client;
     }
 

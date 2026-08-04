@@ -48,7 +48,7 @@ public class DeleteEmployeeDocumentEndpointTests
     [Fact]
     public async Task Returns_NotFound_For_Unknown_Document()
     {
-        using var client = ManagerClient();
+        using var client = await ManagerClient();
         var response     = await client.DeleteAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{Guid.NewGuid()}/documents/{Guid.NewGuid()}");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -58,7 +58,7 @@ public class DeleteEmployeeDocumentEndpointTests
     public async Task Returns_NoContent_And_Document_Removed_From_List()
     {
         var employeeId   = Guid.NewGuid();
-        using var client = ManagerClient();
+        using var client = await ManagerClient();
 
         var uploadResponse = await client.PostAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents",
@@ -77,11 +77,12 @@ public class DeleteEmployeeDocumentEndpointTests
         Assert.Empty(payload!.Items);
     }
 
-    private HttpClient ManagerClient()
+    private async Task<HttpClient> ManagerClient()
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, DeleteAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, DeleteAdmin, SystemRoles.HrAdministrator, AcmeCompanyId);
         return client;
     }
 

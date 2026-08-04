@@ -48,8 +48,8 @@ public class LeaveApprovalViaTaskEndToEndTests
         var employeeId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Employee);
 
-        using var adminClient   = AuthenticatedClient(AdminUser, companyId);
-        using var managerClient = AuthenticatedClient(managerId, companyId);
+        using var adminClient   = await AuthenticatedClient(AdminUser, companyId);
+        using var managerClient = await AuthenticatedClient(managerId, companyId);
 
         // ── Step 1: Create leave type ─────────────────────────────────────────
         var leaveTypeId = Guid.NewGuid();
@@ -146,8 +146,8 @@ public class LeaveApprovalViaTaskEndToEndTests
         var managerId  = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Employee);
 
-        using var adminClient   = AuthenticatedClient(AdminUser, companyId);
-        using var managerClient = AuthenticatedClient(managerId, companyId);
+        using var adminClient   = await AuthenticatedClient(AdminUser, companyId);
+        using var managerClient = await AuthenticatedClient(managerId, companyId);
 
         var leaveTypeId = Guid.NewGuid();
         using (var scope = _factory.Services.CreateScope())
@@ -225,11 +225,12 @@ public class LeaveApprovalViaTaskEndToEndTests
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient(Guid userId, Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 

@@ -385,6 +385,7 @@ public static class EmployeesModule
         services.AddScoped<ICurrentEmployeeReader, CurrentEmployeeReader>();
         services.AddScoped<IOnboardingTemplateReader, OnboardingTemplateReader>();
         services.AddScoped<IEmployeeProvisioningService, EmployeeProvisioningService>();
+        services.AddScoped<ICompanyDefaultDataSeeder, CompanyDefaultDataSeeder>();
         services.AddScoped<IEmployeeImportLookupReader, EmployeeImportLookupReader>();
         services.AddScoped<IImportLookupResolver, ImportLookupResolver>();
         services.AddScoped<IEmployeeImportWriter, EmployeeImportWriter>();

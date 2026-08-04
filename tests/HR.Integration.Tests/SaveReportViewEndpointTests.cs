@@ -15,11 +15,12 @@ public class SaveReportViewEndpointTests
         _factory = factory;
     }
 
-    private HttpClient ClientFor(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientFor(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -41,7 +42,7 @@ public class SaveReportViewEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/reporting/saved-views",
@@ -63,7 +64,7 @@ public class SaveReportViewEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/reporting/saved-views",
@@ -78,7 +79,7 @@ public class SaveReportViewEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/reporting/saved-views",
@@ -93,7 +94,7 @@ public class SaveReportViewEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var first = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/reporting/saved-views",
@@ -121,7 +122,7 @@ public class SaveReportViewEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/reporting/saved-views",
@@ -136,7 +137,7 @@ public class SaveReportViewEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/reporting/saved-views",
@@ -151,7 +152,7 @@ public class SaveReportViewEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var first = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/reporting/saved-views",
@@ -177,7 +178,7 @@ public class SaveReportViewEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var first = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/reporting/saved-views",
@@ -199,8 +200,8 @@ public class SaveReportViewEndpointTests
         var secondUserId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, firstUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, secondUserId, SystemRoles.HrAdministrator);
-        using var firstClient = ClientFor(firstUserId, companyId);
-        using var secondClient = ClientFor(secondUserId, companyId);
+        using var firstClient = await ClientFor(firstUserId, companyId);
+        using var secondClient = await ClientFor(secondUserId, companyId);
 
         var first = await firstClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/reporting/saved-views",

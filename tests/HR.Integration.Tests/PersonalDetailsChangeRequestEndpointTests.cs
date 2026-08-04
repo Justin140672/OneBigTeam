@@ -34,7 +34,7 @@ public class PersonalDetailsChangeRequestEndpointTests
     public async Task Returns_NotFound_For_Unknown_Employee()
     {
         var userId       = Guid.NewGuid();
-        using var client = AuthenticatedClient(userId);
+        using var client = await AuthenticatedClient(userId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/employees/{userId}/personal-details-change-requests",
@@ -47,12 +47,12 @@ public class PersonalDetailsChangeRequestEndpointTests
     public async Task Returns_Forbidden_When_Requesting_For_Different_Employee()
     {
         // Create an employee
-        using var adminClient = AdminClient();
+        using var adminClient = await AdminClient();
         var employee          = await CreateEmployeeAsync(adminClient);
 
         // Authenticate as a different user (not the employee) and try to request a change for them
         var otherUserId  = Guid.NewGuid();
-        using var client = AuthenticatedClient(otherUserId);
+        using var client = await AuthenticatedClient(otherUserId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/employees/{employee.Id}/personal-details-change-requests",
@@ -64,11 +64,11 @@ public class PersonalDetailsChangeRequestEndpointTests
     [Fact]
     public async Task Returns_Created_With_TaskId_When_Employee_Requests_Own_Change()
     {
-        using var adminClient = AdminClient();
+        using var adminClient = await AdminClient();
         var employee          = await CreateEmployeeAsync(adminClient);
 
         // Authenticate as the employee (sub == employee.Id)
-        using var client = AuthenticatedClient(employee.Id);
+        using var client = await AuthenticatedClient(employee.Id);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/employees/{employee.Id}/personal-details-change-requests",
@@ -82,10 +82,10 @@ public class PersonalDetailsChangeRequestEndpointTests
     [Fact]
     public async Task Task_Appears_In_Unassigned_Tasks_After_Request()
     {
-        using var adminClient = AdminClient();
+        using var adminClient = await AdminClient();
         var employee          = await CreateEmployeeAsync(adminClient);
 
-        using var selfClient  = AuthenticatedClient(employee.Id);
+        using var selfClient  = await AuthenticatedClient(employee.Id);
         var changeResp        = await selfClient.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/employees/{employee.Id}/personal-details-change-requests",
             new { companyId = SeededCompanyId, employeeId = employee.Id, notes = "Unassigned task check." });
@@ -103,21 +103,23 @@ public class PersonalDetailsChangeRequestEndpointTests
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
-    private HttpClient AdminClient()
+    private async Task<HttpClient> AdminClient()
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, SeededCompanyId);
         return client;
     }
 
-    private HttpClient AuthenticatedClient(Guid userId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId)
     {
         TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
 
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, SeededCompanyId);
         return client;
     }
 

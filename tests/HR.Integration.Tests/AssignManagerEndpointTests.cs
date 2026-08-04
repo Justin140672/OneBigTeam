@@ -49,6 +49,7 @@ public class AssignManagerEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, MgrUser1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, MgrUser1, SystemRoles.HrAdministrator, companyId);
 
         var manager = await CreateEmployeeAsync(client, companyId, "Jane", "Manager", $"jane.{Guid.NewGuid():N}@example.com");
         var employee = await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com");
@@ -72,6 +73,7 @@ public class AssignManagerEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, MgrUser2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, MgrUser2, SystemRoles.HrAdministrator, companyId);
 
         var manager = await CreateEmployeeAsync(client, companyId, "Jane", "Manager", $"jane2.{Guid.NewGuid():N}@example.com");
         var employee = await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"alice2.{Guid.NewGuid():N}@example.com");
@@ -101,6 +103,7 @@ public class AssignManagerEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, MgrUser3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, MgrUser3, SystemRoles.HrAdministrator, companyId);
 
         var empA = await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"alice3.{Guid.NewGuid():N}@example.com");
         var empB = await CreateEmployeeAsync(client, companyId, "Bob", "Jones", $"bob3.{Guid.NewGuid():N}@example.com");
@@ -125,6 +128,7 @@ public class AssignManagerEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, MgrUser4.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, MgrUser4, SystemRoles.HrAdministrator, companyId);
 
         var empA = await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"a4.{Guid.NewGuid():N}@example.com");
         var empB = await CreateEmployeeAsync(client, companyId, "Bob", "Jones", $"b4.{Guid.NewGuid():N}@example.com");
@@ -151,6 +155,7 @@ public class AssignManagerEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, MgrUser5.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, MgrUser5, SystemRoles.HrAdministrator, companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/manager",

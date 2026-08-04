@@ -32,19 +32,21 @@ public class GetRecentLeaveRequestsEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
-    private HttpClient ClientFor(Guid companyId, Guid userId)
+    private async Task<HttpClient> ClientFor(Guid companyId, Guid userId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -65,7 +67,7 @@ public class GetRecentLeaveRequestsEndpointTests
     public async Task Get_RecentLeaveRequests_Returns_UnprocessableEntity_For_Take_Out_Of_Range(int take)
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/leave-requests/recent?take={take}");
 
@@ -76,7 +78,7 @@ public class GetRecentLeaveRequestsEndpointTests
     public async Task Get_RecentLeaveRequests_Returns_Empty_List_When_No_Requests()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/leave-requests/recent");
 
@@ -90,7 +92,7 @@ public class GetRecentLeaveRequestsEndpointTests
     public async Task Get_RecentLeaveRequests_Defaults_To_Ten_Most_Recent_Ordered_By_CreatedAt_Descending()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var employeeId = await SeedEmployeeAsync(companyId, "Alice", "Smith");
         var leaveTypeId = await SeedLeaveTypeAsync(companyId);
 
@@ -115,7 +117,7 @@ public class GetRecentLeaveRequestsEndpointTests
     public async Task Get_RecentLeaveRequests_Respects_Explicit_Take_Value()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var employeeId = await SeedEmployeeAsync(companyId, "Bob", "Jones");
         var leaveTypeId = await SeedLeaveTypeAsync(companyId);
 
@@ -136,7 +138,7 @@ public class GetRecentLeaveRequestsEndpointTests
     public async Task Get_RecentLeaveRequests_Resolves_Employee_And_LeaveType_Names()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var employeeId = await SeedEmployeeAsync(companyId, "Carol", "White");
         var leaveTypeId = await SeedLeaveTypeAsync(companyId, "Annual Leave");
 
@@ -158,7 +160,7 @@ public class GetRecentLeaveRequestsEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var otherEmployeeId = await SeedEmployeeAsync(otherCompanyId, "Dave", "Brown");
         var otherLeaveTypeId = await SeedLeaveTypeAsync(otherCompanyId);
@@ -178,7 +180,7 @@ public class GetRecentLeaveRequestsEndpointTests
     public async Task Get_RecentLeaveRequests_Manager_Sees_Only_Direct_Reports_Pending_Requests()
     {
         var companyId = Guid.NewGuid();
-        using var hrAdminClient = AuthenticatedClient(companyId);
+        using var hrAdminClient = await AuthenticatedClient(companyId);
 
         var managerId = await SeedEmployeeAsync(companyId, "Meredith", "Manager");
         var reportId = await SeedEmployeeAsync(companyId, "Ricky", "Report");
@@ -194,7 +196,7 @@ public class GetRecentLeaveRequestsEndpointTests
         await SeedLeaveRequestAsync(companyId, outsiderId, leaveTypeId, Now);
         var managerOwnPendingId = await SeedLeaveRequestAsync(companyId, managerId, leaveTypeId, Now);
 
-        using var managerClient = ClientFor(companyId, managerId);
+        using var managerClient = await ClientFor(companyId, managerId);
         var response = await managerClient.GetAsync($"/api/companies/{companyId}/leave-requests/recent");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -210,7 +212,7 @@ public class GetRecentLeaveRequestsEndpointTests
     public async Task Get_RecentLeaveRequests_HrAdministrator_Sees_All_Company_Requests_Regardless_Of_Requester()
     {
         var companyId = Guid.NewGuid();
-        using var hrAdminClient = AuthenticatedClient(companyId);
+        using var hrAdminClient = await AuthenticatedClient(companyId);
 
         var employeeAId = await SeedEmployeeAsync(companyId, "Faye", "AlphaEmp");
         var employeeBId = await SeedEmployeeAsync(companyId, "Gareth", "BetaEmp");
@@ -246,7 +248,7 @@ public class GetRecentLeaveRequestsEndpointTests
         // it would for a real user. Regression coverage for: an HR administrator's dashboard widget
         // failing to open the task dialog for a still-pending request.
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var managerId = await SeedEmployeeAsync(companyId, "Mona", "Manager");
         var reportId = await SeedEmployeeAsync(companyId, "Remy", "Report");
@@ -308,7 +310,7 @@ public class GetRecentLeaveRequestsEndpointTests
         // checking whether TaskCreator still creates an (unassigned) open task in that case, since
         // that's the one variable the reported "clicking doesn't show the task" bug could hinge on.
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var reportId = await SeedEmployeeAsync(companyId, "Orla", "Orphan");
         // Deliberately no AssignManagerAsync call.
@@ -351,7 +353,7 @@ public class GetRecentLeaveRequestsEndpointTests
     public async Task Get_RecentLeaveRequests_HrAdministrator_Hides_Approved_Requests_Once_Started()
     {
         var companyId = Guid.NewGuid();
-        using var hrAdminClient = AuthenticatedClient(companyId);
+        using var hrAdminClient = await AuthenticatedClient(companyId);
 
         var employeeId = await SeedEmployeeAsync(companyId, "Ivy", "Started");
         var leaveTypeId = await SeedLeaveTypeAsync(companyId);

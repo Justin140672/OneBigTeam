@@ -35,19 +35,21 @@ public class GetEmployeeTimelineEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid userId, Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
-    private HttpClient ClientFor(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientFor(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -66,7 +68,7 @@ public class GetEmployeeTimelineEndpointTests
     public async Task Get_Timeline_Returns_NotFound_For_Unknown_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser1, companyId);
+        using var client = await AdminClient(AdminUser1, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/timeline");
@@ -79,7 +81,7 @@ public class GetEmployeeTimelineEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser2, companyId);
+        using var client = await AdminClient(AdminUser2, companyId);
 
         var employee = await CreateEmployeeAsync(client, companyId);
 
@@ -97,7 +99,7 @@ public class GetEmployeeTimelineEndpointTests
         // longer an empty timeline, it has exactly one EmployeeJoined entry from the
         // EmployeeCreatedIntegrationEvent handler.
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser3, companyId);
+        using var client = await AdminClient(AdminUser3, companyId);
 
         var employee = await CreateEmployeeAsync(client, companyId);
 
@@ -117,7 +119,7 @@ public class GetEmployeeTimelineEndpointTests
     public async Task Get_Timeline_Returns_Ok_For_Employee_Viewing_Own_Timeline()
     {
         var companyId = Guid.NewGuid();
-        using var adminClient = AdminClient(AdminUser4, companyId);
+        using var adminClient = await AdminClient(AdminUser4, companyId);
 
         var employee = await CreateEmployeeAsync(adminClient, companyId);
 
@@ -125,7 +127,7 @@ public class GetEmployeeTimelineEndpointTests
         // SelfServiceReadEndpointTests' "employee.Id is the sub claim" convention. It needs the
         // Employee role assigned to satisfy the "role:employee" policy at the endpoint layer.
         await TestRoleSeeder.AssignRoleAsync(_factory, employee, SystemRoles.Employee);
-        using var selfClient = ClientFor(employee, companyId);
+        using var selfClient = await ClientFor(employee, companyId);
 
         var response = await selfClient.GetAsync($"/api/companies/{companyId}/employees/{employee}/timeline");
 
@@ -139,14 +141,14 @@ public class GetEmployeeTimelineEndpointTests
     public async Task Get_Timeline_Returns_Ok_With_Empty_List_For_Unrelated_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var adminClient = AdminClient(AdminUser5, companyId);
+        using var adminClient = await AdminClient(AdminUser5, companyId);
 
         var employee = await CreateEmployeeAsync(adminClient, companyId);
         var unrelatedEmployee = await CreateEmployeeAsync(adminClient, companyId);
 
         // unrelatedEmployee is neither HR, nor self, nor the target's manager.
         await TestRoleSeeder.AssignRoleAsync(_factory, unrelatedEmployee, SystemRoles.Employee);
-        using var unrelatedClient = ClientFor(unrelatedEmployee, companyId);
+        using var unrelatedClient = await ClientFor(unrelatedEmployee, companyId);
 
         var response = await unrelatedClient.GetAsync(
             $"/api/companies/{companyId}/employees/{employee}/timeline");
@@ -162,7 +164,7 @@ public class GetEmployeeTimelineEndpointTests
     public async Task Get_Timeline_Returns_BadRequest_For_Invalid_PageSize()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser2, companyId);
+        using var client = await AdminClient(AdminUser2, companyId);
 
         var employee = await CreateEmployeeAsync(client, companyId);
 
@@ -176,7 +178,7 @@ public class GetEmployeeTimelineEndpointTests
     public async Task Get_Timeline_Returns_BadRequest_For_Invalid_PageNumber()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser3, companyId);
+        using var client = await AdminClient(AdminUser3, companyId);
 
         var employee = await CreateEmployeeAsync(client, companyId);
 
@@ -193,7 +195,7 @@ public class GetEmployeeTimelineEndpointTests
         // EmployeeCreatedHandler (in-process, synchronous) turns into an EmployeeJoined timeline
         // entry. HR admin should see it show up immediately on GET.
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser4, companyId);
+        using var client = await AdminClient(AdminUser4, companyId);
 
         var employee = await CreateEmployeeAsync(client, companyId);
 
@@ -211,7 +213,7 @@ public class GetEmployeeTimelineEndpointTests
     public async Task Get_Timeline_Shows_Promotion_Entry_Visible_To_HrAdministrator_After_Promoting_An_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser5, companyId);
+        using var client = await AdminClient(AdminUser5, companyId);
 
         var referenceData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
         var createResponse = await client.PostAsJsonAsync(

@@ -171,6 +171,7 @@ public class UploadRequestedDocumentEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, companyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }

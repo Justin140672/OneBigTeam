@@ -21,11 +21,12 @@ public class DeactivatePositionProfileEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -44,7 +45,7 @@ public class DeactivatePositionProfileEndpointTests
     public async Task Delete_PositionProfile_Returns_NotFound_When_PositionProfile_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/position-profiles/{Guid.NewGuid()}");
@@ -56,7 +57,7 @@ public class DeactivatePositionProfileEndpointTests
     public async Task Delete_PositionProfile_Deactivates_Active_PositionProfile()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
         var response = await client.DeleteAsync(
@@ -74,7 +75,7 @@ public class DeactivatePositionProfileEndpointTests
     public async Task Delete_PositionProfile_Returns_NotFound_When_Already_Inactive()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
         var first = await client.DeleteAsync(
@@ -91,7 +92,7 @@ public class DeactivatePositionProfileEndpointTests
     public async Task Delete_PositionProfile_Returns_BadRequest_When_PositionProfile_Has_Active_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
         var employeeResponse = await client.PostAsJsonAsync(

@@ -73,10 +73,13 @@ internal sealed class CompanySettings
             NoticePeriodUnit = NoticePeriodUnit.Months,
             NoticePeriodLength = 1,
             AutoDisableAccessOnLeavingDate = true,
-            EmployeeNumberMode = EmployeeNumberMode.Manual,
+            // No prefix/suffix, auto-generated numbers zero-padded to 4 digits (e.g. "0001") — a
+            // new company shouldn't need to configure a numbering scheme before it can add
+            // employees.
+            EmployeeNumberMode = EmployeeNumberMode.Automatic,
             EmployeeNumberPrefix = null,
             NextEmployeeNumber = 1,
-            EmployeeNumberMinimumLength = 1,
+            EmployeeNumberMinimumLength = 4,
             CreatedAt = now,
             UpdatedAt = now,
         };

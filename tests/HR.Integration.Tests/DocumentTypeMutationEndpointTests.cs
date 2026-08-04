@@ -52,7 +52,7 @@ public class DocumentTypeMutationEndpointTests
     public async Task UpdateDocumentType_Returns_NotFound_For_Unknown_Id()
     {
         var companyId    = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var unknownId    = Guid.NewGuid();
 
         var response = await client.PutAsJsonAsync(
@@ -65,7 +65,7 @@ public class DocumentTypeMutationEndpointTests
     public async Task UpdateDocumentType_Returns_OK_And_Persists_Changes()
     {
         var companyId    = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var createResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/document-types",
@@ -94,7 +94,7 @@ public class DocumentTypeMutationEndpointTests
     public async Task UpdateDocumentType_Returns_Conflict_When_Name_Already_Taken_In_Company()
     {
         var companyId    = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         // Create two types in the same isolated company
         var resp1 = await client.PostAsJsonAsync(
@@ -145,7 +145,7 @@ public class DocumentTypeMutationEndpointTests
     public async Task DeactivateDocumentType_Returns_NotFound_For_Unknown_Id()
     {
         var companyId    = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/document-types/{Guid.NewGuid()}");
@@ -156,7 +156,7 @@ public class DocumentTypeMutationEndpointTests
     public async Task DeactivateDocumentType_Returns_NoContent_And_Removes_From_List()
     {
         var companyId    = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var createResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/document-types",
@@ -177,11 +177,12 @@ public class DocumentTypeMutationEndpointTests
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

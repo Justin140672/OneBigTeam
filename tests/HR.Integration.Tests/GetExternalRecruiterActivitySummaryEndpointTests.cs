@@ -25,11 +25,12 @@ public class GetExternalRecruiterActivitySummaryEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -58,7 +59,7 @@ public class GetExternalRecruiterActivitySummaryEndpointTests
     public async Task Get_ActivitySummary_Returns_NotFound_When_Recruiter_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/external-recruiters/{Guid.NewGuid()}/activity-summary");
@@ -70,7 +71,7 @@ public class GetExternalRecruiterActivitySummaryEndpointTests
     public async Task Get_ActivitySummary_Returns_Empty_Summary_For_Recruiter_With_No_Activity()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var recruiterId = await SeedRecruiterAsync(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/external-recruiters/{recruiterId}/activity-summary");
@@ -88,7 +89,7 @@ public class GetExternalRecruiterActivitySummaryEndpointTests
     public async Task Get_ActivitySummary_Reflects_Current_Vacancy_Assignment()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var recruiterId = await SeedRecruiterAsync(companyId);
 
         Guid vacancyId;
@@ -117,7 +118,7 @@ public class GetExternalRecruiterActivitySummaryEndpointTests
         // AssignedRecruiterId is repointed away from a recruiter before the vacancy reaches a
         // terminal status, that recruiter no longer appears in either bucket for that vacancy.
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var recruiterId = await SeedRecruiterAsync(companyId);
 
         Guid replacementRecruiterId;

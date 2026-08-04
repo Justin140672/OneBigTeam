@@ -21,11 +21,12 @@ public class ListExternalRecruitersEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -43,7 +44,7 @@ public class ListExternalRecruitersEndpointTests
     public async Task Get_ExternalRecruiters_Returns_Created_Recruiters()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         await client.PostAsJsonAsync($"/api/companies/{companyId}/external-recruiters", new { companyId, agencyName = "Acme Recruiting" });
         await client.PostAsJsonAsync($"/api/companies/{companyId}/external-recruiters", new { companyId, agencyName = "Beta Talent" });
@@ -60,7 +61,7 @@ public class ListExternalRecruitersEndpointTests
     public async Task Get_ExternalRecruiters_Filters_By_Search()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         await client.PostAsJsonAsync($"/api/companies/{companyId}/external-recruiters", new { companyId, agencyName = "Acme Recruiting" });
         await client.PostAsJsonAsync($"/api/companies/{companyId}/external-recruiters", new { companyId, agencyName = "Beta Talent" });
@@ -78,7 +79,7 @@ public class ListExternalRecruitersEndpointTests
     public async Task Get_ExternalRecruiters_Returns_UnprocessableEntity_For_Invalid_PageSize()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/external-recruiters?pageSize=0");
 

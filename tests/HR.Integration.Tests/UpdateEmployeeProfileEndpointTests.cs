@@ -45,6 +45,7 @@ public class UpdateEmployeeProfileEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UpdEmpUser1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UpdEmpUser1, SystemRoles.HrAdministrator, companyId);
 
         var created = await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com");
 
@@ -78,6 +79,7 @@ public class UpdateEmployeeProfileEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UpdEmpUser2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UpdEmpUser2, SystemRoles.HrAdministrator, companyId);
 
         var emp1 = await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com");
         var emp2 = await CreateEmployeeAsync(client, companyId, "Bob", "Jones", $"bob.{Guid.NewGuid():N}@example.com");
@@ -104,6 +106,7 @@ public class UpdateEmployeeProfileEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UpdEmpUser3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UpdEmpUser3, SystemRoles.HrAdministrator, companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/profile",

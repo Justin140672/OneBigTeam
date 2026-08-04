@@ -23,19 +23,21 @@ public class DeactivateOnboardingTemplateEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
-    private HttpClient CompanyAdministratorClient(Guid companyId)
+    private async Task<HttpClient> CompanyAdministratorClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, CompanyAdministratorUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdministratorUserId, SystemRoles.CompanyAdministrator, companyId);
         return client;
     }
 
@@ -65,10 +67,10 @@ public class DeactivateOnboardingTemplateEndpointTests
     public async Task Delete_OnboardingTemplate_Returns_Forbidden_For_User_Without_Employee_Manage_Permission()
     {
         var companyId = Guid.NewGuid();
-        using var adminClient = AdminClient(companyId);
+        using var adminClient = await AdminClient(companyId);
         var template = await CreateTemplateAsync(adminClient, companyId);
 
-        using var client = CompanyAdministratorClient(companyId);
+        using var client = await CompanyAdministratorClient(companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/onboarding-templates/{template.Id}");
@@ -80,7 +82,7 @@ public class DeactivateOnboardingTemplateEndpointTests
     public async Task Delete_OnboardingTemplate_Returns_NotFound_When_Template_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/onboarding-templates/{Guid.NewGuid()}");
@@ -92,7 +94,7 @@ public class DeactivateOnboardingTemplateEndpointTests
     public async Task Delete_OnboardingTemplate_Returns_NoContent_On_Success()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var template = await CreateTemplateAsync(client, companyId);
 
         var response = await client.DeleteAsync(
@@ -105,7 +107,7 @@ public class DeactivateOnboardingTemplateEndpointTests
     public async Task Delete_OnboardingTemplate_Deactivates_The_Template()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var template = await CreateTemplateAsync(client, companyId);
 
         var deleteResponse = await client.DeleteAsync(
@@ -123,7 +125,7 @@ public class DeactivateOnboardingTemplateEndpointTests
     public async Task Delete_OnboardingTemplate_Returns_NotFound_When_Already_Deactivated()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var template = await CreateTemplateAsync(client, companyId);
 
         var firstDelete = await client.DeleteAsync(
@@ -141,11 +143,11 @@ public class DeactivateOnboardingTemplateEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var createClient = AdminClient(companyId);
+        using var createClient = await AdminClient(companyId);
 
         var template = await CreateTemplateAsync(createClient, companyId, "Vehicles Onboarding");
 
-        using var otherClient = AdminClient(otherCompanyId);
+        using var otherClient = await AdminClient(otherCompanyId);
         var response = await otherClient.DeleteAsync(
             $"/api/companies/{otherCompanyId}/onboarding-templates/{template.Id}");
 

@@ -20,11 +20,12 @@ public class GetHrSettingsEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid tenantId)
+    private async Task<HttpClient> AuthenticatedClient(Guid tenantId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, tenantId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.Employee, tenantId);
         return client;
     }
 
@@ -41,7 +42,7 @@ public class GetHrSettingsEndpointTests
     [Fact]
     public async Task Get_Hr_Settings_Returns_OK_For_Employee_Role_Reading_Own_Company()
     {
-        using var client = AuthenticatedClient(UserId);
+        using var client = await AuthenticatedClient(UserId);
 
         var createResponse = await client.PostAsJsonAsync("/api/companies", new
         {
@@ -66,14 +67,14 @@ public class GetHrSettingsEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<GetHrSettingsPayload>();
         Assert.NotNull(payload);
         Assert.Equal(createdCompany.Id, payload!.CompanyId);
-        Assert.Equal("Manual", payload.EmployeeNumberMode);
+        Assert.Equal("Automatic", payload.EmployeeNumberMode);
         Assert.Equal(1, payload.NextEmployeeNumber);
     }
 
     [Fact]
     public async Task Get_Hr_Settings_Returns_NotFound_For_Unknown_Id()
     {
-        using var client = AuthenticatedClient(UserId);
+        using var client = await AuthenticatedClient(UserId);
 
         var response = await client.GetAsync($"/api/companies/{Guid.NewGuid()}/hr-settings");
 

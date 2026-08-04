@@ -6,15 +6,15 @@ namespace HR.Modules.Companies.Tests;
 public class CompanySettingsEmployeeNumberTests
 {
     [Fact]
-    public void CreateDefault_Sets_Manual_Mode_And_Default_Numbering_Values()
+    public void CreateDefault_Sets_Automatic_Mode_And_Default_Numbering_Values()
     {
         var now = DateTimeOffset.UtcNow;
         var settings = CompanySettings.CreateDefault(Guid.NewGuid(), now);
 
-        Assert.Equal(EmployeeNumberMode.Manual, settings.EmployeeNumberMode);
+        Assert.Equal(EmployeeNumberMode.Automatic, settings.EmployeeNumberMode);
         Assert.Null(settings.EmployeeNumberPrefix);
         Assert.Equal(1, settings.NextEmployeeNumber);
-        Assert.Equal(1, settings.EmployeeNumberMinimumLength);
+        Assert.Equal(4, settings.EmployeeNumberMinimumLength);
     }
 
     [Fact]

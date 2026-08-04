@@ -18,11 +18,12 @@ public class UpdateLocationTypeEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -43,7 +44,7 @@ public class UpdateLocationTypeEndpointTests
     public async Task Put_LocationType_Updates_Name_And_Description()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/location-types", new
         {
@@ -75,7 +76,7 @@ public class UpdateLocationTypeEndpointTests
     public async Task Put_LocationType_Returns_NotFound_For_Unknown_Id()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/location-types/{Guid.NewGuid()}", new
@@ -92,7 +93,7 @@ public class UpdateLocationTypeEndpointTests
     public async Task Put_LocationType_Returns_Conflict_For_Duplicate_Name()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var create1 = await client.PostAsJsonAsync($"/api/companies/{companyId}/location-types", new
         {

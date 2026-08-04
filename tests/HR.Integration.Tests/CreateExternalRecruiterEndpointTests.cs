@@ -21,11 +21,12 @@ public class CreateExternalRecruiterEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -46,7 +47,7 @@ public class CreateExternalRecruiterEndpointTests
     public async Task Post_ExternalRecruiters_Creates_Recruiter()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/external-recruiters", new
         {
@@ -70,7 +71,7 @@ public class CreateExternalRecruiterEndpointTests
     public async Task Post_ExternalRecruiters_Returns_UnprocessableEntity_When_AgencyName_Missing()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/external-recruiters", new
         {
@@ -85,7 +86,7 @@ public class CreateExternalRecruiterEndpointTests
     public async Task Post_ExternalRecruiters_Returns_UnprocessableEntity_When_ContactEmail_Is_Invalid()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/external-recruiters", new
         {
@@ -102,7 +103,7 @@ public class CreateExternalRecruiterEndpointTests
     {
         var companyId = Guid.NewGuid();
         var differentCompany = Guid.NewGuid();
-        using var mismatchedClient = AuthenticatedClient(differentCompany);
+        using var mismatchedClient = await AuthenticatedClient(differentCompany);
 
         var response = await mismatchedClient.PostAsJsonAsync($"/api/companies/{companyId}/external-recruiters", new
         {

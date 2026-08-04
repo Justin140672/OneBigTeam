@@ -40,7 +40,7 @@ public class GetEmployeeDocumentEndpointTests
     [Fact]
     public async Task Returns_NotFound_For_Unknown_Document()
     {
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClient();
         var response     = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{SarahEmployeeId}/documents/{Guid.NewGuid()}");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -49,7 +49,7 @@ public class GetEmployeeDocumentEndpointTests
     [Fact]
     public async Task Returns_NotFound_When_EmployeeId_Does_Not_Match()
     {
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClient();
         var response     = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{Guid.NewGuid()}/documents/{SarahContractDocId}");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -58,7 +58,7 @@ public class GetEmployeeDocumentEndpointTests
     [Fact]
     public async Task Returns_OK_With_Document_Details_For_Seeded_Document()
     {
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClient();
         var response     = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{SarahEmployeeId}/documents/{SarahContractDocId}");
 
@@ -74,7 +74,7 @@ public class GetEmployeeDocumentEndpointTests
     [Fact]
     public async Task Upload_Then_Get_Returns_Uploaded_Document_Details()
     {
-        using var client = AdminClient();
+        using var client = await AdminClient();
         var employeeId   = Guid.NewGuid();
 
         // Upload a document
@@ -99,7 +99,7 @@ public class GetEmployeeDocumentEndpointTests
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient()
+    private async Task<HttpClient> AuthenticatedClient()
     {
         var userId = Guid.NewGuid();
         TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
@@ -107,14 +107,16 @@ public class GetEmployeeDocumentEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, AcmeCompanyId);
         return client;
     }
 
-    private HttpClient AdminClient()
+    private async Task<HttpClient> AdminClient()
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, AcmeCompanyId);
         return client;
     }
 

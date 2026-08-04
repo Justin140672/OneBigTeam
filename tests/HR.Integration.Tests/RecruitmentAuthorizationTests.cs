@@ -45,11 +45,12 @@ public class RecruitmentAuthorizationTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientAs(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -99,10 +100,10 @@ public class RecruitmentAuthorizationTests
     public async Task PlainEmployee_Gets_Ok_Listing_Vacancies()
     {
         var companyId = Guid.NewGuid();
-        using var recruiterClient = ClientAs(RecruiterUser, companyId);
+        using var recruiterClient = await ClientAs(RecruiterUser, companyId);
         await SeedApplicationAsync(recruiterClient, companyId);
 
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -112,10 +113,10 @@ public class RecruitmentAuthorizationTests
     public async Task PlainEmployee_Gets_Ok_Getting_A_Vacancy()
     {
         var companyId = Guid.NewGuid();
-        using var recruiterClient = ClientAs(RecruiterUser, companyId);
+        using var recruiterClient = await ClientAs(RecruiterUser, companyId);
         var (vacancyId, _, _) = await SeedApplicationAsync(recruiterClient, companyId);
 
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/{vacancyId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -125,7 +126,7 @@ public class RecruitmentAuthorizationTests
     public async Task Manager_Gets_Ok_Listing_Vacancies()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(ManagerUser, companyId);
+        using var client = await ClientAs(ManagerUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies");
 
@@ -136,7 +137,7 @@ public class RecruitmentAuthorizationTests
     public async Task HrAdministrator_Gets_Ok_Listing_Vacancies()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(HrAdminUser, companyId);
+        using var client = await ClientAs(HrAdminUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies");
 
@@ -159,7 +160,7 @@ public class RecruitmentAuthorizationTests
     public async Task PlainEmployee_Gets_Forbidden_Listing_Candidates()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/candidates");
 
@@ -170,7 +171,7 @@ public class RecruitmentAuthorizationTests
     public async Task PlainEmployee_Gets_Forbidden_Getting_A_Candidate()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/candidates/{Guid.NewGuid()}");
 
@@ -181,7 +182,7 @@ public class RecruitmentAuthorizationTests
     public async Task Manager_Gets_Forbidden_Listing_Candidates()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(ManagerUser, companyId);
+        using var client = await ClientAs(ManagerUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/candidates");
 
@@ -195,7 +196,7 @@ public class RecruitmentAuthorizationTests
     public async Task CompanyAdministrator_Gets_Forbidden_Listing_Candidates()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(CompanyAdministratorUser, companyId);
+        using var client = await ClientAs(CompanyAdministratorUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/candidates");
 
@@ -206,7 +207,7 @@ public class RecruitmentAuthorizationTests
     public async Task CompanyAdministrator_Gets_Forbidden_Getting_A_Candidate()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(CompanyAdministratorUser, companyId);
+        using var client = await ClientAs(CompanyAdministratorUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/candidates/{Guid.NewGuid()}");
 
@@ -217,7 +218,7 @@ public class RecruitmentAuthorizationTests
     public async Task PlainEmployee_Gets_Forbidden_Getting_An_Application()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/vacancies/{Guid.NewGuid()}/applications/{Guid.NewGuid()}");
@@ -229,7 +230,7 @@ public class RecruitmentAuthorizationTests
     public async Task PlainEmployee_Gets_Forbidden_Listing_Applications_For_Vacancy()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/vacancies/{Guid.NewGuid()}/applications");
@@ -241,7 +242,7 @@ public class RecruitmentAuthorizationTests
     public async Task PlainEmployee_Gets_Forbidden_Listing_Interviews_For_Vacancy()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/vacancies/{Guid.NewGuid()}/interviews");
@@ -253,7 +254,7 @@ public class RecruitmentAuthorizationTests
     public async Task PlainEmployee_Gets_Forbidden_Getting_Interviews_Today_Count()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/interviews/today-count");
 
@@ -264,7 +265,7 @@ public class RecruitmentAuthorizationTests
     public async Task PlainEmployee_Gets_Forbidden_Listing_Candidate_Documents()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/candidates/{Guid.NewGuid()}/documents");
@@ -276,7 +277,7 @@ public class RecruitmentAuthorizationTests
     public async Task PlainEmployee_Gets_Forbidden_Downloading_Candidate_Document()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/candidates/{Guid.NewGuid()}/documents/{Guid.NewGuid()}/download");
@@ -293,7 +294,7 @@ public class RecruitmentAuthorizationTests
     public async Task HrAdministrator_Gets_Forbidden_Creating_A_Vacancy()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(HrAdminUser, companyId);
+        using var client = await ClientAs(HrAdminUser, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
         {
@@ -309,7 +310,7 @@ public class RecruitmentAuthorizationTests
     public async Task HrAdministrator_Gets_Forbidden_Creating_A_Candidate()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(HrAdminUser, companyId);
+        using var client = await ClientAs(HrAdminUser, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/candidates", new
         {
@@ -328,7 +329,7 @@ public class RecruitmentAuthorizationTests
     public async Task Recruiter_Gets_Ok_Listing_Candidates()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/candidates");
 
@@ -339,7 +340,7 @@ public class RecruitmentAuthorizationTests
     public async Task HrAdministrator_Gets_Forbidden_Listing_Candidates()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(HrAdminUser, companyId);
+        using var client = await ClientAs(HrAdminUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/candidates");
 
@@ -350,7 +351,7 @@ public class RecruitmentAuthorizationTests
     public async Task Recruiter_Gets_Ok_Getting_A_Candidate()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
         var candidateResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/candidates", new
         {
             companyId,
@@ -370,10 +371,10 @@ public class RecruitmentAuthorizationTests
     public async Task HrAdministrator_Gets_Forbidden_Getting_An_Application()
     {
         var companyId = Guid.NewGuid();
-        using var recruiterClient = ClientAs(RecruiterUser, companyId);
+        using var recruiterClient = await ClientAs(RecruiterUser, companyId);
         var (vacancyId, _, applicationId) = await SeedApplicationAsync(recruiterClient, companyId);
 
-        using var client = ClientAs(HrAdminUser, companyId);
+        using var client = await ClientAs(HrAdminUser, companyId);
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}");
 
@@ -384,10 +385,10 @@ public class RecruitmentAuthorizationTests
     public async Task HrAdministrator_Gets_Forbidden_Listing_Applications_For_Vacancy()
     {
         var companyId = Guid.NewGuid();
-        using var recruiterClient = ClientAs(RecruiterUser, companyId);
+        using var recruiterClient = await ClientAs(RecruiterUser, companyId);
         var (vacancyId, _, _) = await SeedApplicationAsync(recruiterClient, companyId);
 
-        using var client = ClientAs(HrAdminUser, companyId);
+        using var client = await ClientAs(HrAdminUser, companyId);
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/{vacancyId}/applications");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -397,10 +398,10 @@ public class RecruitmentAuthorizationTests
     public async Task HrAdministrator_Gets_Forbidden_Listing_Interviews_For_Vacancy()
     {
         var companyId = Guid.NewGuid();
-        using var recruiterClient = ClientAs(RecruiterUser, companyId);
+        using var recruiterClient = await ClientAs(RecruiterUser, companyId);
         var (vacancyId, _, _) = await SeedApplicationAsync(recruiterClient, companyId);
 
-        using var client = ClientAs(HrAdminUser, companyId);
+        using var client = await ClientAs(HrAdminUser, companyId);
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/{vacancyId}/interviews");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -410,7 +411,7 @@ public class RecruitmentAuthorizationTests
     public async Task HrAdministrator_Gets_Forbidden_Getting_Interviews_Today_Count()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(HrAdminUser, companyId);
+        using var client = await ClientAs(HrAdminUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/interviews/today-count");
 
@@ -421,10 +422,10 @@ public class RecruitmentAuthorizationTests
     public async Task HrAdministrator_Gets_Forbidden_Listing_Candidate_Documents()
     {
         var companyId = Guid.NewGuid();
-        using var recruiterClient = ClientAs(RecruiterUser, companyId);
+        using var recruiterClient = await ClientAs(RecruiterUser, companyId);
         var (_, candidateId, _) = await SeedApplicationAsync(recruiterClient, companyId);
 
-        using var client = ClientAs(HrAdminUser, companyId);
+        using var client = await ClientAs(HrAdminUser, companyId);
         var response = await client.GetAsync($"/api/companies/{companyId}/candidates/{candidateId}/documents");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);

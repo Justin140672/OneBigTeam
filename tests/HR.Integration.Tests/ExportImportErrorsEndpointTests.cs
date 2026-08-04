@@ -27,7 +27,7 @@ public class ExportImportErrorsEndpointTests
     public async Task Returns_Ok_With_Csv_Content_Type_And_Correct_Bytes_After_Validating_A_Session_With_Row_Errors()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         // Row 2 is missing the required "Last Name" value, producing a row error on validate.
         const string csv =
@@ -65,7 +65,7 @@ public class ExportImportErrorsEndpointTests
     public async Task Returns_NotFound_When_Session_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.GetAsync(ExportUrl(companyId, Guid.NewGuid()));
 
@@ -78,21 +78,22 @@ public class ExportImportErrorsEndpointTests
         var ownerCompanyId = Guid.NewGuid();
         var callerCompanyId = Guid.NewGuid();
 
-        using var ownerClient = AdminClient(ownerCompanyId);
+        using var ownerClient = await AdminClient(ownerCompanyId);
         var sessionId = await UploadAsync(ownerClient, ownerCompanyId, ValidCsv());
 
-        using var callerClient = AdminClient(callerCompanyId);
+        using var callerClient = await AdminClient(callerCompanyId);
 
         var response = await callerClient.GetAsync(ExportUrl(callerCompanyId, sessionId));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

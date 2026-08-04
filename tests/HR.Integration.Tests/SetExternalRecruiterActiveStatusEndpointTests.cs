@@ -21,11 +21,12 @@ public class SetExternalRecruiterActiveStatusEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -52,7 +53,7 @@ public class SetExternalRecruiterActiveStatusEndpointTests
     public async Task Post_ActiveStatus_Deactivates_Recruiter()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var recruiterId = await SeedRecruiterAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync(
@@ -69,7 +70,7 @@ public class SetExternalRecruiterActiveStatusEndpointTests
     public async Task Post_ActiveStatus_Returns_NotFound_When_Recruiter_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/external-recruiters/{Guid.NewGuid()}/active-status",
@@ -83,10 +84,10 @@ public class SetExternalRecruiterActiveStatusEndpointTests
     {
         var companyId = Guid.NewGuid();
         var differentCompany = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var recruiterId = await SeedRecruiterAsync(client, companyId);
 
-        using var mismatchedClient = AuthenticatedClient(differentCompany);
+        using var mismatchedClient = await AuthenticatedClient(differentCompany);
         var response = await mismatchedClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/external-recruiters/{recruiterId}/active-status",
             new { companyId, externalRecruiterId = recruiterId, isActive = false });

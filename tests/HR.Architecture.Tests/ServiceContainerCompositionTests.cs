@@ -63,7 +63,7 @@ public class ServiceContainerCompositionTests
         services.AddDataImportModule(connectionString, configuration);
         services.AddDocumentsModule(connectionString, configuration);
         services.AddEmployeesModule(connectionString);
-        services.AddIdentityModule(connectionString);
+        services.AddIdentityModule(connectionString, configuration);
         services.AddLeaveModule(connectionString);
         services.AddNotificationsModule(connectionString);
         services.AddOnboardingModule(connectionString);

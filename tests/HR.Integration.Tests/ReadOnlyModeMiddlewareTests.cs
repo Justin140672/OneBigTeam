@@ -34,11 +34,12 @@ public class ReadOnlyModeMiddlewareTests
         _factory.StripeGateway.Reset();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -66,7 +67,7 @@ public class ReadOnlyModeMiddlewareTests
     public async Task Post_NonAllowListed_Mutation_Returns_403_When_Company_Is_ReadOnly()
     {
         var companyId = await SeedReadOnlyCompanyAsync();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/asset-categories",
@@ -84,7 +85,7 @@ public class ReadOnlyModeMiddlewareTests
     public async Task Get_Request_Succeeds_When_Company_Is_ReadOnly()
     {
         var companyId = await SeedReadOnlyCompanyAsync();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         // subscription-details (policy subscription:manage) rather than subscription-status
         // (policy role:employee) — AdminUserId is only seeded with the HrAdministrator role here,
@@ -98,7 +99,7 @@ public class ReadOnlyModeMiddlewareTests
     public async Task Post_AllowListed_CheckoutSession_Succeeds_Even_When_Company_Is_ReadOnly()
     {
         var companyId = await SeedReadOnlyCompanyAsync();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsync("/api/companies/checkout-session", content: null);
 
@@ -109,7 +110,7 @@ public class ReadOnlyModeMiddlewareTests
     public async Task Post_NonAllowListed_Mutation_Succeeds_When_Company_Is_Not_ReadOnly()
     {
         var companyId = await SeedActiveTrialCompanyAsync();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/asset-categories",

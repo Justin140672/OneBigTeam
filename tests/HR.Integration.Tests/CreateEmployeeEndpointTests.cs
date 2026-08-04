@@ -132,6 +132,7 @@ public class CreateEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
 
         // Department, Location, Position Profile, Employment Type and Employee Number are all
         // mandatory on employee creation — seed the minimum real reference data required for any
@@ -166,6 +167,7 @@ public class CreateEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
         // Base reference data used for the manager (whose own department/position-profile isn't
         // under test here); a distinct department + position profile are created afterwards to
@@ -244,6 +246,7 @@ public class CreateEmployeeEndpointTests
         var email = $"duplicate.{Guid.NewGuid():N}@example.com";
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User3, SystemRoles.HrAdministrator, companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
@@ -266,6 +269,7 @@ public class CreateEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User4.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User4, SystemRoles.HrAdministrator, companyId);
 
         // Location/PositionProfile/EmploymentType are real (seeded) so the NotFound is
         // attributable specifically to the unknown DepartmentId, not some other missing lookup.
@@ -298,6 +302,7 @@ public class CreateEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User6.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User6, SystemRoles.HrAdministrator, companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
         var locationId = await CreateLocationAsync(client, companyId);
@@ -333,6 +338,7 @@ public class CreateEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User7.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User7, SystemRoles.HrAdministrator, companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
@@ -363,6 +369,7 @@ public class CreateEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User5.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User5, SystemRoles.HrAdministrator, companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
@@ -533,6 +540,7 @@ public class CreateEmployeeEndpointTests
         var companyId = await CreateCompanyAsync(client);
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User12, SystemRoles.HrAdministrator, companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
         await SetEmployeeNumberModeAsync(client, companyId, "Automatic", prefix: "EMP-", nextEmployeeNumber: 1, minimumLength: 3);
@@ -655,6 +663,7 @@ public class CreateEmployeeEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
@@ -683,6 +692,7 @@ public class CreateEmployeeEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
 
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyA.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User3, SystemRoles.HrAdministrator, companyA);
         var refDataA = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyA);
         var responseA = await client.PostAsJsonAsync(
             $"/api/companies/{companyA}/employees",

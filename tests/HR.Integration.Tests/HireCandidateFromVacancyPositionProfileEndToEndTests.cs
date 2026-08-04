@@ -29,11 +29,12 @@ public class HireCandidateFromVacancyPositionProfileEndToEndTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -41,7 +42,7 @@ public class HireCandidateFromVacancyPositionProfileEndToEndTests
     public async Task Full_Pipeline_Hires_Candidate_With_Employee_Matching_Vacancys_PositionProfile_And_Department()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
 
         // 1. Create a Vacancy against the seeded Position Profile.

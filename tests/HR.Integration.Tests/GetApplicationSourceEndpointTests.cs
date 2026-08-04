@@ -30,11 +30,12 @@ public class GetApplicationSourceEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -42,7 +43,7 @@ public class GetApplicationSourceEndpointTests
     public async Task Get_Application_Returns_Source_And_Recruiter_AgencyName()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         Guid vacancyId, applicationId;
         using (var scope = _factory.Services.CreateScope())
@@ -77,7 +78,7 @@ public class GetApplicationSourceEndpointTests
     public async Task Get_Application_Returns_Null_Source_Fields_When_Source_Was_Never_Set()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         Guid vacancyId, applicationId;
         using (var scope = _factory.Services.CreateScope())

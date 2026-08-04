@@ -48,6 +48,7 @@ public class CreateProbationReviewEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
 
         var recordResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
         {
@@ -87,6 +88,7 @@ public class CreateProbationReviewEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
         {
@@ -106,6 +108,7 @@ public class CreateProbationReviewEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User3, SystemRoles.HrAdministrator, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
         {
@@ -127,6 +130,7 @@ public class CreateProbationReviewEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, HR.Modules.Identity.Domain.SystemRoles.HrAdministrator);
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, HR.Modules.Identity.Domain.SystemRoles.HrAdministrator, companyId);
 
         var recordResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
         {
@@ -168,6 +172,7 @@ public class CreateProbationReviewEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, HR.Modules.Identity.Domain.SystemRoles.HrAdministrator);
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, HR.Modules.Identity.Domain.SystemRoles.HrAdministrator, companyId);
 
         var recordResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
         {

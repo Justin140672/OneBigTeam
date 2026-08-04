@@ -32,11 +32,12 @@ public class UserAdministrationAuthorizationTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientFor(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientFor(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -46,7 +47,7 @@ public class UserAdministrationAuthorizationTests
     public async Task Employee_Only_Persona_Is_Forbidden_From_ListUsers()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(TomWilliamsEmployeeOnly, companyId);
+        using var client = await ClientFor(TomWilliamsEmployeeOnly, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/users");
 
@@ -57,7 +58,7 @@ public class UserAdministrationAuthorizationTests
     public async Task Employee_Only_Persona_Is_Forbidden_From_GetUserDetails()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(TomWilliamsEmployeeOnly, companyId);
+        using var client = await ClientFor(TomWilliamsEmployeeOnly, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/users/{Guid.NewGuid()}");
 
@@ -68,7 +69,7 @@ public class UserAdministrationAuthorizationTests
     public async Task Employee_Only_Persona_Is_Forbidden_From_InviteEmployeeUser()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(TomWilliamsEmployeeOnly, companyId);
+        using var client = await ClientFor(TomWilliamsEmployeeOnly, companyId);
         var employeeId = Guid.NewGuid();
 
         var response = await client.PostAsJsonAsync(
@@ -82,7 +83,7 @@ public class UserAdministrationAuthorizationTests
     public async Task Employee_Only_Persona_Is_Forbidden_From_UpdateUserRoles()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(TomWilliamsEmployeeOnly, companyId);
+        using var client = await ClientFor(TomWilliamsEmployeeOnly, companyId);
         var userId = Guid.NewGuid();
 
         var response = await client.PutAsJsonAsync(
@@ -96,7 +97,7 @@ public class UserAdministrationAuthorizationTests
     public async Task Employee_Only_Persona_Is_Forbidden_From_DisableUser()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(TomWilliamsEmployeeOnly, companyId);
+        using var client = await ClientFor(TomWilliamsEmployeeOnly, companyId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/users/{Guid.NewGuid()}/disable", EmptyJson());
@@ -108,7 +109,7 @@ public class UserAdministrationAuthorizationTests
     public async Task Employee_Only_Persona_Is_Forbidden_From_EnableUser()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(TomWilliamsEmployeeOnly, companyId);
+        using var client = await ClientFor(TomWilliamsEmployeeOnly, companyId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/users/{Guid.NewGuid()}/enable", EmptyJson());
@@ -120,7 +121,7 @@ public class UserAdministrationAuthorizationTests
     public async Task Employee_Only_Persona_Is_Forbidden_From_ResendInvite()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(TomWilliamsEmployeeOnly, companyId);
+        using var client = await ClientFor(TomWilliamsEmployeeOnly, companyId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/invites/{Guid.NewGuid()}/resend", EmptyJson());
@@ -132,7 +133,7 @@ public class UserAdministrationAuthorizationTests
     public async Task Employee_Only_Persona_Is_Forbidden_From_CancelInvite()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(TomWilliamsEmployeeOnly, companyId);
+        using var client = await ClientFor(TomWilliamsEmployeeOnly, companyId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/invites/{Guid.NewGuid()}/cancel", EmptyJson());
@@ -144,7 +145,7 @@ public class UserAdministrationAuthorizationTests
     public async Task Employee_Only_Persona_Is_Forbidden_From_GetUserAuditHistory()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(TomWilliamsEmployeeOnly, companyId);
+        using var client = await ClientFor(TomWilliamsEmployeeOnly, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/users/{Guid.NewGuid()}/audit-history");
 
@@ -155,7 +156,7 @@ public class UserAdministrationAuthorizationTests
     public async Task HrAdministrator_Persona_Can_Access_ListUsers()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(LauraBennettHrAdmin, companyId);
+        using var client = await ClientFor(LauraBennettHrAdmin, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/users");
 

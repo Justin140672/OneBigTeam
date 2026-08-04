@@ -42,7 +42,7 @@ public class ImportCompensationChangesEndpointTests
         // c.Errors.StatusCode = 422; see also CreateAssetCategoryEndpointTests for the equivalent
         // convention on another endpoint).
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var content = new MultipartFormDataContent
         {
@@ -61,7 +61,7 @@ public class ImportCompensationChangesEndpointTests
     public async Task Post_Import_Returns_UnprocessableEntity_For_Row_Validation_Errors()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var (_, employeeNumber) = await CompensationTestHelpers.CreateEmployeeWithNumberAsync(client, companyId);
 
@@ -81,7 +81,7 @@ public class ImportCompensationChangesEndpointTests
     public async Task Post_Import_Creates_Compensation_Records_For_Valid_Rows()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var (employeeId, employeeNumber) = await CompensationTestHelpers.CreateEmployeeWithNumberAsync(client, companyId);
 
@@ -117,11 +117,12 @@ public class ImportCompensationChangesEndpointTests
         currentResponse.EnsureSuccessStatusCode();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

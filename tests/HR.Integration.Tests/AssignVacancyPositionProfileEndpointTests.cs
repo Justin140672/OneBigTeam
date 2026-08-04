@@ -23,11 +23,12 @@ public class AssignVacancyPositionProfileEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -57,7 +58,7 @@ public class AssignVacancyPositionProfileEndpointTests
     public async Task Put_AssignVacancyPositionProfile_Assigns_And_Persists()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var vacancyId = await SeedVacancyAsync(companyId);
 
@@ -81,7 +82,7 @@ public class AssignVacancyPositionProfileEndpointTests
     public async Task Put_AssignVacancyPositionProfile_Returns_NotFound_When_Vacancy_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var vacancyId = Guid.NewGuid();
 
@@ -96,7 +97,7 @@ public class AssignVacancyPositionProfileEndpointTests
     public async Task Put_AssignVacancyPositionProfile_Returns_NotFound_When_PositionProfile_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var vacancyId = await SeedVacancyAsync(companyId);
 
         var response = await client.PutAsJsonAsync(
@@ -111,7 +112,7 @@ public class AssignVacancyPositionProfileEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         // Position profile exists, but for a different company than the one making the request.
         var otherCompanyReferenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, otherCompanyId);
@@ -128,7 +129,7 @@ public class AssignVacancyPositionProfileEndpointTests
     public async Task Put_AssignVacancyPositionProfile_Returns_UnprocessableEntity_When_PositionProfileId_Is_Empty()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var vacancyId = await SeedVacancyAsync(companyId);
 
         var response = await client.PutAsJsonAsync(
@@ -142,7 +143,7 @@ public class AssignVacancyPositionProfileEndpointTests
     public async Task Put_AssignVacancyPositionProfile_Returns_UnprocessableEntity_When_PositionProfileId_Is_Omitted()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var vacancyId = await SeedVacancyAsync(companyId);
 
         var response = await client.PutAsJsonAsync(
@@ -156,7 +157,7 @@ public class AssignVacancyPositionProfileEndpointTests
     public async Task Put_AssignVacancyPositionProfile_Can_ReAssign_Vacancy_That_Already_Had_A_PositionProfileId()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var originalReferenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var newReferenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var vacancyId = await SeedVacancyAsync(companyId, originalReferenceData.PositionProfileId);

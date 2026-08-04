@@ -139,7 +139,7 @@ public class ProcessDocumentExpiryNotificationsEndpointTests
     private async Task<(Guid CompanyId, Guid DocTypeId, HttpClient Client)> SetupAsync()
     {
         var companyId = Guid.NewGuid();
-        var client    = AdminClient(companyId);
+        var client    = await AdminClient(companyId);
 
         var resp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/document-types",
@@ -150,11 +150,12 @@ public class ProcessDocumentExpiryNotificationsEndpointTests
         return (companyId, docType!.Id, client);
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ExpiryAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ExpiryAdmin, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

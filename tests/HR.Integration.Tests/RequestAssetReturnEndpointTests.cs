@@ -18,11 +18,12 @@ public class RequestAssetReturnEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -78,7 +79,7 @@ public class RequestAssetReturnEndpointTests
     public async Task Post_RequestAssetReturn_Returns_NoContent_For_Active_Assignment()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var (_, assignmentId) = await CreateActiveAssignmentAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync(
@@ -92,7 +93,7 @@ public class RequestAssetReturnEndpointTests
     public async Task Post_RequestAssetReturn_Returns_NotFound_When_Assignment_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/asset-assignments/{Guid.NewGuid()}/request-return",

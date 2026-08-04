@@ -113,6 +113,7 @@ public class AwardToilEndpointTests
         var setupClient = _factory.CreateClient();
         setupClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, HrAdminUserId.ToString());
         setupClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, HrAdminUserId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, HrAdminUserId, SystemRoles.HrAdministrator, HrAdminUserId);
 
         var companyResp = await setupClient.PostAsJsonAsync("/api/companies", new
         {
@@ -154,6 +155,7 @@ public class AwardToilEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
 
         return (client, companyId, employee!.Id);
     }

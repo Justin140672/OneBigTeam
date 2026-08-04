@@ -25,11 +25,12 @@ public class GetVacancyEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -47,7 +48,7 @@ public class GetVacancyEndpointTests
     public async Task Get_Vacancy_Returns_NotFound_When_Vacancy_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/{Guid.NewGuid()}");
 
@@ -58,7 +59,7 @@ public class GetVacancyEndpointTests
     public async Task Get_Vacancy_Returns_PositionProfile_Fields_When_Linked_Profile_Is_Active()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         Guid vacancyId;
         Guid positionProfileId;
@@ -102,7 +103,7 @@ public class GetVacancyEndpointTests
     public async Task Get_Vacancy_Gracefully_Resolves_PositionProfile_Fields_When_Linked_Profile_Is_Deactivated()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         Guid vacancyId;
         Guid positionProfileId;
@@ -143,7 +144,7 @@ public class GetVacancyEndpointTests
         // field, and EffectiveLocation is resolved exclusively from the linked Position Profile's
         // PositionProfileSummary.LocationName.
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
 
         Guid vacancyId;
@@ -175,7 +176,7 @@ public class GetVacancyEndpointTests
     public async Task Get_Vacancy_Returns_ApplicationCount_Zero_And_CanChangePositionProfile_True_For_Draft_Vacancy()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
 
         Guid vacancyId;
@@ -201,7 +202,7 @@ public class GetVacancyEndpointTests
     public async Task Get_Vacancy_Returns_ApplicationCount_And_CanChangePositionProfile_False_When_Vacancy_Has_An_Application()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
 
         Guid vacancyId;

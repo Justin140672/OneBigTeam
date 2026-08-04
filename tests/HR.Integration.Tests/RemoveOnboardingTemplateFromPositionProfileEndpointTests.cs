@@ -23,19 +23,21 @@ public class RemoveOnboardingTemplateFromPositionProfileEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
-    private HttpClient CompanyAdministratorClient(Guid companyId)
+    private async Task<HttpClient> CompanyAdministratorClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, CompanyAdministratorUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdministratorUserId, SystemRoles.CompanyAdministrator, companyId);
         return client;
     }
 
@@ -54,12 +56,12 @@ public class RemoveOnboardingTemplateFromPositionProfileEndpointTests
     public async Task Delete_OnboardingTemplate_Returns_Forbidden_For_User_Without_Employee_Manage_Permission()
     {
         var companyId = Guid.NewGuid();
-        using var adminClient = AdminClient(companyId);
+        using var adminClient = await AdminClient(companyId);
         var profileId = await CreatePositionProfileAsync(adminClient, companyId, "Software Engineer");
         var templateId = await CreateOnboardingTemplateAsync(adminClient, companyId, "Standard Onboarding");
         var assignmentId = await AssignOnboardingTemplateAsync(adminClient, companyId, profileId, templateId);
 
-        using var client = CompanyAdministratorClient(companyId);
+        using var client = await CompanyAdministratorClient(companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/position-profiles/{profileId}/onboarding-templates/{assignmentId}");
@@ -71,7 +73,7 @@ public class RemoveOnboardingTemplateFromPositionProfileEndpointTests
     public async Task Delete_OnboardingTemplate_Returns_NoContent_And_Deactivates_Assignment()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Software Engineer");
         var templateId = await CreateOnboardingTemplateAsync(client, companyId, "Standard Onboarding");
@@ -94,7 +96,7 @@ public class RemoveOnboardingTemplateFromPositionProfileEndpointTests
     public async Task Delete_OnboardingTemplate_Returns_NotFound_When_Already_Removed()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "HR Manager");
         var templateId = await CreateOnboardingTemplateAsync(client, companyId, "Standard Onboarding");
@@ -113,7 +115,7 @@ public class RemoveOnboardingTemplateFromPositionProfileEndpointTests
     public async Task Delete_OnboardingTemplate_Returns_NotFound_For_Unknown_Assignment()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Finance Manager");
 
@@ -128,13 +130,13 @@ public class RemoveOnboardingTemplateFromPositionProfileEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Operations Lead");
         var templateId = await CreateOnboardingTemplateAsync(client, companyId, "Standard Onboarding");
         var assignmentId = await AssignOnboardingTemplateAsync(client, companyId, profileId, templateId);
 
-        using var otherClient = AdminClient(otherCompanyId);
+        using var otherClient = await AdminClient(otherCompanyId);
         var response = await otherClient.DeleteAsync(
             $"/api/companies/{otherCompanyId}/position-profiles/{profileId}/onboarding-templates/{assignmentId}");
 
@@ -145,7 +147,7 @@ public class RemoveOnboardingTemplateFromPositionProfileEndpointTests
     public async Task Delete_OnboardingTemplate_Allows_Same_Template_To_Be_Re_Assigned_After_Removal()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Recruiter");
         var templateId = await CreateOnboardingTemplateAsync(client, companyId, "Standard Onboarding");

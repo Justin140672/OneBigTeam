@@ -18,11 +18,12 @@ public class UpdateSicknessRecordEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -71,7 +72,7 @@ public class UpdateSicknessRecordEndpointTests
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateCategory(client, companyId);
         var newCategoryId = await CreateCategory(client, companyId);
         var recordId = await CreateSicknessRecord(client, companyId, employeeId, categoryId);
@@ -100,7 +101,7 @@ public class UpdateSicknessRecordEndpointTests
     public async Task Put_SicknessRecord_Returns_UnprocessableEntity_When_CategoryId_Is_Empty()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/sickness-records/{Guid.NewGuid()}",
@@ -121,7 +122,7 @@ public class UpdateSicknessRecordEndpointTests
     public async Task Put_SicknessRecord_Returns_NotFound_When_Record_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateCategory(client, companyId);
 
         var response = await client.PutAsJsonAsync(
@@ -144,7 +145,7 @@ public class UpdateSicknessRecordEndpointTests
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateCategory(client, companyId);
         var recordId = await CreateSicknessRecord(client, companyId, employeeId, categoryId);
 

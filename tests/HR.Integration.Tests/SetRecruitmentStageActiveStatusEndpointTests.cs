@@ -27,11 +27,12 @@ public class SetRecruitmentStageActiveStatusEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientAs(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -62,7 +63,7 @@ public class SetRecruitmentStageActiveStatusEndpointTests
     {
         var companyId = Guid.NewGuid();
         var stages = await SeedDefaultStagesAsync(companyId);
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages/{stages["Offer"]}/active-status",
@@ -76,7 +77,7 @@ public class SetRecruitmentStageActiveStatusEndpointTests
     {
         var companyId = Guid.NewGuid();
         var stages = await SeedDefaultStagesAsync(companyId);
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages/{stages["Offer"]}/active-status",
@@ -92,7 +93,7 @@ public class SetRecruitmentStageActiveStatusEndpointTests
     public async Task Post_ActiveStatus_Returns_NotFound_For_Unknown_Stage()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages/{Guid.NewGuid()}/active-status",
@@ -106,7 +107,7 @@ public class SetRecruitmentStageActiveStatusEndpointTests
     {
         var companyId = Guid.NewGuid();
         var stages = await SeedDefaultStagesAsync(companyId);
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages/{stages["Hired"]}/active-status",
@@ -134,7 +135,7 @@ public class SetRecruitmentStageActiveStatusEndpointTests
             await db.SaveChangesAsync();
         }
 
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/recruitment-stages/{stages["Application Received"]}/active-status",

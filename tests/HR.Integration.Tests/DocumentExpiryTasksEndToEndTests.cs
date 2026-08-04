@@ -32,7 +32,7 @@ public class DocumentExpiryTasksEndToEndTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var docTypeId = await CreateDocTypeAsync(client, companyId);
         await UploadDocAsync(client, companyId, docTypeId, employeeId, Today.AddDays(10));
@@ -59,7 +59,7 @@ public class DocumentExpiryTasksEndToEndTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var docTypeId = await CreateDocTypeAsync(client, companyId);
         await UploadDocAsync(client, companyId, docTypeId, employeeId, Today.AddDays(-5));
@@ -83,7 +83,7 @@ public class DocumentExpiryTasksEndToEndTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var docTypeId = await CreateDocTypeAsync(client, companyId);
         await UploadDocAsync(client, companyId, docTypeId, employeeId, Today.AddDays(7));
@@ -103,11 +103,12 @@ public class DocumentExpiryTasksEndToEndTests
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ExpiryE2EAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ExpiryE2EAdmin, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -116,6 +117,7 @@ public class DocumentExpiryTasksEndToEndTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, companyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }

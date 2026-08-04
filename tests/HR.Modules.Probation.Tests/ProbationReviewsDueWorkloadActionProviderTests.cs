@@ -55,7 +55,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
 
         var provider = new ProbationReviewsDueWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
 
@@ -79,7 +79,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
 
         var provider = new ProbationReviewsDueWorkloadActionProvider(
             context, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-probation"));
+            new FakeAuthorizationService("reporting:view-probation"), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
@@ -97,7 +97,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
 
         var provider = new ProbationReviewsDueWorkloadActionProvider(
             context, new FakeDirectReportsReader([]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-probation"));
+            new FakeAuthorizationService("reporting:view-probation"), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
 
@@ -114,7 +114,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
 
         var provider = new ProbationReviewsDueWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService());
+            new FakeAuthorizationService(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
 
@@ -133,7 +133,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
 
         var provider = new ProbationReviewsDueWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
 
@@ -156,7 +156,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
 
         var provider = new OverdueProbationReviewsWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
 
@@ -176,7 +176,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
 
         var provider = new OverdueProbationReviewsWorkloadActionProvider(
             context, new FakeDirectReportsReader([]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-probation"));
+            new FakeAuthorizationService("reporting:view-probation"), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
 
@@ -193,7 +193,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
 
         var provider = new OverdueProbationReviewsWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService());
+            new FakeAuthorizationService(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
 

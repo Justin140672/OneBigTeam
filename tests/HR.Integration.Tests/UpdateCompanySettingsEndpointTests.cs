@@ -21,11 +21,12 @@ public class UpdateCompanySettingsEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid tenantId)
+    private async Task<HttpClient> AuthenticatedClient(Guid tenantId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, tenantId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.CompanyAdministrator, tenantId);
         return client;
     }
 
@@ -46,7 +47,7 @@ public class UpdateCompanySettingsEndpointTests
     [Fact]
     public async Task Put_Company_Settings_Updates_Settings_For_Authenticated_Request()
     {
-        using var client = AuthenticatedClient(UserId);
+        using var client = await AuthenticatedClient(UserId);
 
         var createResponse = await client.PostAsJsonAsync("/api/companies", new
         {
@@ -86,7 +87,7 @@ public class UpdateCompanySettingsEndpointTests
     [Fact]
     public async Task Put_Company_Settings_Returns_UnprocessableEntity_When_TimeZone_Is_Blank()
     {
-        using var client = AuthenticatedClient(UserId);
+        using var client = await AuthenticatedClient(UserId);
 
         var createResponse = await client.PostAsJsonAsync("/api/companies", new
         {
@@ -116,7 +117,7 @@ public class UpdateCompanySettingsEndpointTests
     [Fact]
     public async Task Put_Company_Settings_Returns_NotFound_For_Unknown_Id()
     {
-        using var client = AuthenticatedClient(UserId);
+        using var client = await AuthenticatedClient(UserId);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}/settings", new
         {

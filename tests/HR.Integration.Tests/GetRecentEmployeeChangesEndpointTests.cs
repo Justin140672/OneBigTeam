@@ -23,11 +23,12 @@ public class GetRecentEmployeeChangesEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientAs(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -45,7 +46,7 @@ public class GetRecentEmployeeChangesEndpointTests
     public async Task Get_RecentEmployeeChanges_Returns_Forbidden_For_Plain_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees/recent-changes");
 
@@ -56,7 +57,7 @@ public class GetRecentEmployeeChangesEndpointTests
     public async Task Get_RecentEmployeeChanges_Returns_Empty_List_When_No_Changes_Recorded()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(HrAdminUser, companyId);
+        using var client = await ClientAs(HrAdminUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees/recent-changes");
 
@@ -70,7 +71,7 @@ public class GetRecentEmployeeChangesEndpointTests
     public async Task Get_RecentEmployeeChanges_Returns_Recorded_Employee_Profile_Change()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(HrAdminUser, companyId);
+        using var client = await ClientAs(HrAdminUser, companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
 

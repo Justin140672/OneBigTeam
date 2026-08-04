@@ -51,7 +51,7 @@ public class LeavePolicyCrudEndpointTests
     public async Task ListPolicies_Returns_OK_For_Manager_Role()
     {
         // Manager has leave:approve — should be able to list
-        using var client = ManagerClient();
+        using var client = await ManagerClient();
         var response     = await client.GetAsync($"/api/companies/{SeededCompanyId}/leave-policies");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -142,7 +142,7 @@ public class LeavePolicyCrudEndpointTests
     public async Task UpdatePolicy_Returns_Forbidden_Without_Leave_Manage_Role()
     {
         // Manager has leave:approve but NOT leave:manage
-        using var client = ManagerClient();
+        using var client = await ManagerClient();
         var response     = await client.PutAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/leave-policies/{Guid.NewGuid()}",
             new { name = "Updated" });
@@ -297,11 +297,12 @@ public class LeavePolicyCrudEndpointTests
         return client;
     }
 
-    private HttpClient ManagerClient()
+    private async Task<HttpClient> ManagerClient()
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ManagerUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ManagerUser, SystemRoles.Manager, SeededCompanyId);
         return client;
     }
 

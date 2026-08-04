@@ -43,6 +43,7 @@ public class ListDocumentRequestsEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader,   callerId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, callerId, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests");
@@ -113,6 +114,7 @@ public class ListDocumentRequestsEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader,   AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/document-requests");
@@ -173,6 +175,7 @@ public class ListDocumentRequestsEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader,   employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, companyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }

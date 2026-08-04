@@ -20,11 +20,12 @@ public class ListOnboardingTemplatesEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -59,7 +60,7 @@ public class ListOnboardingTemplatesEndpointTests
     public async Task Get_OnboardingTemplates_Returns_Only_The_Seeded_Default_When_No_Templates_Created()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/onboarding-templates");
 
@@ -75,7 +76,7 @@ public class ListOnboardingTemplatesEndpointTests
     public async Task Get_OnboardingTemplates_Returns_Active_Templates_Ordered_By_Name()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         await CreateTemplateAsync(client, companyId, "Remote Onboarding");
         await CreateTemplateAsync(client, companyId, "Executive Onboarding");
@@ -98,7 +99,7 @@ public class ListOnboardingTemplatesEndpointTests
     public async Task Get_OnboardingTemplates_Excludes_Inactive_Templates_By_Default()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var active = await CreateTemplateAsync(client, companyId, "Active Onboarding");
         var toDeactivate = await CreateTemplateAsync(client, companyId, "Inactive Onboarding");
@@ -119,7 +120,7 @@ public class ListOnboardingTemplatesEndpointTests
     public async Task Get_OnboardingTemplates_Includes_Inactive_Templates_When_Requested()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var active = await CreateTemplateAsync(client, companyId, "Active Onboarding");
         var toDeactivate = await CreateTemplateAsync(client, companyId, "Inactive Onboarding");
@@ -142,8 +143,8 @@ public class ListOnboardingTemplatesEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
-        using var otherClient = AdminClient(otherCompanyId);
+        using var client = await AdminClient(companyId);
+        using var otherClient = await AdminClient(otherCompanyId);
 
         await otherClient.PostAsJsonAsync($"/api/companies/{otherCompanyId}/onboarding-templates", new
         {

@@ -18,11 +18,12 @@ public class ListAssetsEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -63,7 +64,7 @@ public class ListAssetsEndpointTests
     public async Task Get_Assets_Returns_Empty_List_When_No_Assets_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/assets");
 
@@ -77,7 +78,7 @@ public class ListAssetsEndpointTests
     public async Task Get_Assets_Returns_All_Assets_For_Company()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateCategoryAsync(client, companyId);
 
         await CreateAssetAsync(client, companyId, categoryId, "A001", "Laptop");
@@ -96,7 +97,7 @@ public class ListAssetsEndpointTests
     public async Task Get_Assets_Returns_Assets_Ordered_By_AssetNumber()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateCategoryAsync(client, companyId);
 
         await CreateAssetAsync(client, companyId, categoryId, "C003", "Monitor");
@@ -119,8 +120,8 @@ public class ListAssetsEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
-        using var otherClient = AdminClient(otherCompanyId);
+        using var client = await AdminClient(companyId);
+        using var otherClient = await AdminClient(otherCompanyId);
 
         var otherCategoryId = await CreateCategoryAsync(otherClient, otherCompanyId);
         await CreateAssetAsync(otherClient, otherCompanyId, otherCategoryId, "A001", "Laptop");
@@ -137,7 +138,7 @@ public class ListAssetsEndpointTests
     public async Task Get_Assets_Filters_By_Status_When_Status_Query_Parameter_Provided()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateCategoryAsync(client, companyId);
 
         var asset = await CreateAssetAsync(client, companyId, categoryId, "A001", "Laptop");
@@ -164,7 +165,7 @@ public class ListAssetsEndpointTests
     public async Task Get_Assets_Returns_Empty_List_When_No_Assets_Match_Status_Filter()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateCategoryAsync(client, companyId);
 
         await CreateAssetAsync(client, companyId, categoryId, "A001", "Laptop");

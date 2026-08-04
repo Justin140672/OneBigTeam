@@ -18,11 +18,12 @@ public class DeactivateSicknessCategoryEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -41,7 +42,7 @@ public class DeactivateSicknessCategoryEndpointTests
     public async Task Delete_SicknessCategory_Returns_NoContent_On_Success()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var created = await client.PostAsJsonAsync($"/api/companies/{companyId}/sickness-categories", new
         {
@@ -63,7 +64,7 @@ public class DeactivateSicknessCategoryEndpointTests
     public async Task Delete_SicknessCategory_Returns_NotFound_When_Category_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/sickness-categories/{Guid.NewGuid()}");

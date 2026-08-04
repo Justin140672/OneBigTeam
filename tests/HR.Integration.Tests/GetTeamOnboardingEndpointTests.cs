@@ -36,7 +36,7 @@ public class GetTeamOnboardingEndpointTests
     public async Task Get_TeamOnboarding_Returns_Empty_When_Manager_Has_No_Direct_Reports()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var manager = await CreateEmployeeAsync(client, companyId, "Solo", "Manager");
 
@@ -53,7 +53,7 @@ public class GetTeamOnboardingEndpointTests
     public async Task Get_TeamOnboarding_Returns_Active_Onboarding_Plan_For_Direct_Report()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var manager = await CreateEmployeeAsync(client, companyId, "Alice", "Manager");
         var report = await CreateEmployeeAsync(client, companyId, "Bob", "Reporter");
@@ -77,11 +77,12 @@ public class GetTeamOnboardingEndpointTests
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

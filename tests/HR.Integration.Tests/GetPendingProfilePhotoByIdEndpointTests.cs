@@ -74,6 +74,7 @@ public class GetPendingProfilePhotoByIdEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/profile-photo/pending/{pendingPhotoId}");
@@ -85,7 +86,7 @@ public class GetPendingProfilePhotoByIdEndpointTests
     public async Task Get_Returns_NotFound_When_No_Pending_Photo_With_That_Id_Exists()
     {
         var companyId = Guid.NewGuid();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/profile-photo/pending/{Guid.NewGuid()}");
@@ -109,7 +110,7 @@ public class GetPendingProfilePhotoByIdEndpointTests
             Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
         }
 
-        using (var managerClientB = ManagerClient(companyB))
+        using (var managerClientB = await ManagerClient(companyB))
         {
             var lookup = await managerClientB.GetAsync(
                 $"/api/companies/{companyB}/employees/{employeeId}/profile-photo/pending");
@@ -121,7 +122,7 @@ public class GetPendingProfilePhotoByIdEndpointTests
         // An HR caller genuinely belonging to Company A (their own claim matches the route) tries
         // to fetch Company B's pending photo by id via Company A's route — must 404, never leak.
         var companyA = Guid.NewGuid();
-        using var clientA = ManagerClient(companyA);
+        using var clientA = await ManagerClient(companyA);
 
         var response = await clientA.GetAsync(
             $"/api/companies/{companyA}/profile-photo/pending/{pendingPhotoId}");
@@ -143,7 +144,7 @@ public class GetPendingProfilePhotoByIdEndpointTests
             Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
         }
 
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var lookup = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending");
@@ -172,15 +173,17 @@ public class GetPendingProfilePhotoByIdEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, companyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }
 
-    private HttpClient ManagerClient(Guid companyId)
+    private async Task<HttpClient> ManagerClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ManagerUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ManagerUser, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

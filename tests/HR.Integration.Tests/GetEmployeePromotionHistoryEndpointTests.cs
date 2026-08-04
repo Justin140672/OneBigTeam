@@ -27,11 +27,12 @@ public class GetEmployeePromotionHistoryEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid userId, Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -50,7 +51,7 @@ public class GetEmployeePromotionHistoryEndpointTests
     public async Task Get_PromotionHistory_Returns_NotFound_For_Unknown_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser1, companyId);
+        using var client = await AdminClient(AdminUser1, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/promotions");
@@ -62,7 +63,7 @@ public class GetEmployeePromotionHistoryEndpointTests
     public async Task Get_PromotionHistory_Returns_Ok_With_Empty_List_When_No_Promotions()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser2, companyId);
+        using var client = await AdminClient(AdminUser2, companyId);
 
         var (departmentId, locationId, positionProfileId, employmentTypeId, _) =
             await CreateEmployeeReferenceDataAsync(client, companyId);
@@ -82,7 +83,7 @@ public class GetEmployeePromotionHistoryEndpointTests
     public async Task Get_PromotionHistory_Returns_Promotions_Ordered_By_EffectiveDate_Descending()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(AdminUser3, companyId);
+        using var client = await AdminClient(AdminUser3, companyId);
 
         var (departmentId, locationId, positionProfileId, employmentTypeId, defaultLeavePolicyId) =
             await CreateEmployeeReferenceDataAsync(client, companyId);

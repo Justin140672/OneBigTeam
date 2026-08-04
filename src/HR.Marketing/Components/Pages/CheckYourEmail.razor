@@ -1,0 +1,71 @@
+@page "/check-your-email"
+
+<PageTitle>Check your email | One Big Team</PageTitle>
+<HeadContent>
+    <meta name="description" content="Confirm your email address to finish setting up your One Big Team account.">
+</HeadContent>
+
+<SiteHeader />
+
+<main>
+  <section class="contact-hero section-band">
+    <div class="section-inner hero-copy">
+      <p class="eyebrow">Almost there</p>
+      <h1>Check your email to confirm your account.</h1>
+      <p class="hero-text">
+        We've sent a verification link to
+        @if (!string.IsNullOrWhiteSpace(Email))
+        {
+          <strong>@Email</strong>
+        }
+        else
+        {
+          <span>the email address you registered with</span>
+        }.
+        Click the link in that email to activate your account and finish setting up your company.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-inner contact-grid">
+      <div>
+        <p class="eyebrow">Didn't get it?</p>
+        <h2>The email may take a few minutes to arrive.</h2>
+        <p class="estimator-intro">
+          Check your spam or junk folder if you don't see it soon. If you still can't find it,
+          you can request a new verification email below.
+        </p>
+        @if (Resent)
+        {
+          <p class="field-error" style="display:block">We've sent a new verification email.</p>
+        }
+      </div>
+
+      <div class="contact-form">
+        <form method="post" action="/resend-verification">
+          <input type="hidden" name="email" value="@Email">
+          <div class="form-submit-row">
+            <button class="button button-primary button-large" type="submit">Resend verification email</button>
+            <p class="small-note">We'll send another copy of the verification link to the same address.</p>
+          </div>
+        </form>
+
+        <div class="form-submit-row">
+          <a class="button button-secondary button-large" href="/signup">Change email address</a>
+          <p class="small-note">Registered with the wrong email? Sign up again with the correct one.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<SiteFooter />
+
+@code {
+    [SupplyParameterFromQuery(Name = "email")]
+    public string? Email { get; set; }
+
+    [SupplyParameterFromQuery(Name = "resent")]
+    public bool Resent { get; set; }
+}

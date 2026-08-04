@@ -20,11 +20,12 @@ public class GetLocationEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -55,7 +56,7 @@ public class GetLocationEndpointTests
     public async Task Get_Location_Returns_Location_For_Authenticated_Request()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var locationTypeId = await CreateLocationTypeAsync(client, companyId);
 
@@ -87,7 +88,7 @@ public class GetLocationEndpointTests
     public async Task Get_Location_Returns_NotFound_For_Unknown_Id()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/locations/{Guid.NewGuid()}");
 
@@ -100,7 +101,7 @@ public class GetLocationEndpointTests
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        using var client = AdminClient(companyA);
+        using var client = await AdminClient(companyA);
 
         var locationTypeId = await CreateLocationTypeAsync(client, companyA);
 

@@ -39,11 +39,12 @@ public class SicknessAuthorizationTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientFor(Guid companyId, Guid userId)
+    private async Task<HttpClient> ClientFor(Guid companyId, Guid userId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -56,7 +57,7 @@ public class SicknessAuthorizationTests
     public async Task PlainEmployee_Gets_Ok_Listing_Sickness_Categories()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, PlainEmployeeUser);
+        using var client = await ClientFor(companyId, PlainEmployeeUser);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/sickness-categories");
 
@@ -67,7 +68,7 @@ public class SicknessAuthorizationTests
     public async Task PlainEmployee_Gets_Forbidden_Creating_Sickness_Category()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, PlainEmployeeUser);
+        using var client = await ClientFor(companyId, PlainEmployeeUser);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/sickness-categories", new
         {
@@ -83,7 +84,7 @@ public class SicknessAuthorizationTests
     public async Task PlainEmployee_Gets_Forbidden_Listing_Employee_Sickness_Records()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, PlainEmployeeUser);
+        using var client = await ClientFor(companyId, PlainEmployeeUser);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/sickness-records");
@@ -95,7 +96,7 @@ public class SicknessAuthorizationTests
     public async Task PlainEmployee_Gets_Forbidden_Recording_Sickness_On_Behalf_Of_Another_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, PlainEmployeeUser);
+        using var client = await ClientFor(companyId, PlainEmployeeUser);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/sickness-records",
@@ -115,7 +116,7 @@ public class SicknessAuthorizationTests
     public async Task HrAdministrator_Gets_Ok_Listing_Sickness_Categories()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, HrAdminUser);
+        using var client = await ClientFor(companyId, HrAdminUser);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/sickness-categories");
 
@@ -129,7 +130,7 @@ public class SicknessAuthorizationTests
     public async Task CompanyAdministrator_Gets_Forbidden_Creating_Sickness_Category()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, CompanyAdministratorUser);
+        using var client = await ClientFor(companyId, CompanyAdministratorUser);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/sickness-categories", new
         {
@@ -145,7 +146,7 @@ public class SicknessAuthorizationTests
     public async Task CompanyAdministrator_Gets_Forbidden_Listing_Employee_Sickness_Records()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, CompanyAdministratorUser);
+        using var client = await ClientFor(companyId, CompanyAdministratorUser);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/sickness-records");
@@ -159,7 +160,7 @@ public class SicknessAuthorizationTests
     public async Task Manager_Gets_Ok_Viewing_Own_Team_Sickness_Today()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, ManagerUser);
+        using var client = await ClientFor(companyId, ManagerUser);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{ManagerUser}/team-sickness-today");
@@ -171,7 +172,7 @@ public class SicknessAuthorizationTests
     public async Task Manager_Gets_Forbidden_Viewing_Different_Managers_Team_Sickness_Today()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, ManagerUser);
+        using var client = await ClientFor(companyId, ManagerUser);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{OtherManagerUser}/team-sickness-today");
@@ -183,7 +184,7 @@ public class SicknessAuthorizationTests
     public async Task HrAdministrator_Gets_Ok_Viewing_Any_Managers_Team_Sickness_Today()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, HrAdminUser);
+        using var client = await ClientFor(companyId, HrAdminUser);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{ManagerUser}/team-sickness-today");
@@ -195,7 +196,7 @@ public class SicknessAuthorizationTests
     public async Task PlainEmployee_Gets_Forbidden_Viewing_Team_Sickness_Today()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, PlainEmployeeUser);
+        using var client = await ClientFor(companyId, PlainEmployeeUser);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{PlainEmployeeUser}/team-sickness-today");
@@ -207,7 +208,7 @@ public class SicknessAuthorizationTests
     public async Task CompanyAdministrator_Gets_Forbidden_Viewing_Team_Sickness_Today()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, CompanyAdministratorUser);
+        using var client = await ClientFor(companyId, CompanyAdministratorUser);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{CompanyAdministratorUser}/team-sickness-today");
@@ -221,10 +222,10 @@ public class SicknessAuthorizationTests
     public async Task Employee_Can_Record_And_List_Their_Own_Sickness()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, PlainEmployeeUser);
+        using var client = await ClientFor(companyId, PlainEmployeeUser);
 
         // Plain employees cannot create categories directly — use HR admin for setup.
-        using var hrClient = ClientFor(companyId, HrAdminUser);
+        using var hrClient = await ClientFor(companyId, HrAdminUser);
         var setupResponse = await hrClient.PostAsJsonAsync($"/api/companies/{companyId}/sickness-categories", new
         {
             companyId,
@@ -259,7 +260,7 @@ public class SicknessAuthorizationTests
     public async Task Employee_Gets_Forbidden_Listing_Another_Employees_Own_Sickness_Records()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, PlainEmployeeUser);
+        using var client = await ClientFor(companyId, PlainEmployeeUser);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/sickness-records/my");
@@ -274,7 +275,7 @@ public class SicknessAuthorizationTests
     public async Task Manager_Gets_Ok_Getting_Overdue_ReturnToWork_Reviews()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, ManagerUser);
+        using var client = await ClientFor(companyId, ManagerUser);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/return-to-work-reviews/overdue");
 
@@ -285,7 +286,7 @@ public class SicknessAuthorizationTests
     public async Task PlainEmployee_Gets_Forbidden_Getting_Overdue_ReturnToWork_Reviews()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, PlainEmployeeUser);
+        using var client = await ClientFor(companyId, PlainEmployeeUser);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/return-to-work-reviews/overdue");
 
@@ -296,7 +297,7 @@ public class SicknessAuthorizationTests
     public async Task Manager_Gets_Ok_Getting_Missing_Fit_Notes()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, ManagerUser);
+        using var client = await ClientFor(companyId, ManagerUser);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/sickness-evidence-requests/missing");
 
@@ -307,7 +308,7 @@ public class SicknessAuthorizationTests
     public async Task PlainEmployee_Gets_Forbidden_Getting_Missing_Fit_Notes()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, PlainEmployeeUser);
+        using var client = await ClientFor(companyId, PlainEmployeeUser);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/sickness-evidence-requests/missing");
 

@@ -41,6 +41,7 @@ public class EmergencyContactsEndpointTests
         using var adminClient = _factory.CreateClient();
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, adminUserId.ToString());
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, adminUserId, companyId);
 
         var (departmentId, locationId, positionProfileId, employmentTypeId) =
             await CreateEmployeeReferenceDataAsync(adminClient, companyId);
@@ -317,6 +318,7 @@ public class EmergencyContactsEndpointTests
         var client2 = _factory.CreateClient();
         client2.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, EcUser2.ToString());
         client2.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId1.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, EcUser2, SystemRoles.HrAdministrator, companyId1);
 
         var deleteResponse = await client2.DeleteAsync(
             $"/api/companies/{companyId1}/employees/me/emergency-contacts/{added!.Id}");

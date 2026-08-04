@@ -18,11 +18,12 @@ public class StartOffboardingEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -111,7 +112,7 @@ public class StartOffboardingEndpointTests
     public async Task Post_StartOffboarding_Starts_Offboarding_For_Existing_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var employeeId = await CreateEmployeeAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync(
@@ -137,7 +138,7 @@ public class StartOffboardingEndpointTests
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/offboarding/start",
@@ -150,7 +151,7 @@ public class StartOffboardingEndpointTests
     public async Task Post_StartOffboarding_Returns_Conflict_When_Plan_Already_Exists()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var employeeId = await CreateEmployeeAsync(client, companyId);
 
         var firstResponse = await client.PostAsJsonAsync(
@@ -169,7 +170,7 @@ public class StartOffboardingEndpointTests
     public async Task Post_StartOffboarding_Returns_ValidationError_When_LastWorkingDay_Is_Missing()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var employeeId = await CreateEmployeeAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync(

@@ -28,11 +28,12 @@ public class AssetAuthorizationTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientFor(Guid companyId, Guid userId)
+    private async Task<HttpClient> ClientFor(Guid companyId, Guid userId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -42,7 +43,7 @@ public class AssetAuthorizationTests
     public async Task CompanyAdministrator_Gets_Forbidden_Listing_Employee_Assets()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, CompanyAdministratorUser);
+        using var client = await ClientFor(companyId, CompanyAdministratorUser);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/assets");
@@ -56,7 +57,7 @@ public class AssetAuthorizationTests
     public async Task CompanyAdministrator_Gets_Forbidden_Creating_Asset_Category()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, CompanyAdministratorUser);
+        using var client = await ClientFor(companyId, CompanyAdministratorUser);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/asset-categories", new
         {

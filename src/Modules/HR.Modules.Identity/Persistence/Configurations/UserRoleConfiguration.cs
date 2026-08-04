@@ -24,10 +24,13 @@ internal sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
             .HasColumnName("assigned_at")
             .IsRequired();
 
-        builder.HasOne<ApplicationUser>()
-            .WithMany()
-            .HasForeignKey(ur => ur.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
+        // No FK constraint on UserId: this column can reference either ApplicationUser.Id
+        // (local-auth path — AcceptInvite, DevAuthHandler, seeded dev personas) or
+        // UserProfile.Id (real Supabase-backed users, created by self-service SignUp as of
+        // Phase B) — see SignUpHandler.CreateIdentityRecordAsync's remarks on why UserRole.UserId
+        // must equal UserProfile.Id, not the raw Supabase auth user id. A single FK to one table
+        // would incorrectly reject role rows for the other table's users.
+        builder.HasIndex(ur => ur.UserId);
 
         builder.HasOne<Role>()
             .WithMany()

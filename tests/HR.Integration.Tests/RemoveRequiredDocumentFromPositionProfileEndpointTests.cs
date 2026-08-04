@@ -21,11 +21,12 @@ public class RemoveRequiredDocumentFromPositionProfileEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -44,7 +45,7 @@ public class RemoveRequiredDocumentFromPositionProfileEndpointTests
     public async Task Delete_RequiredDocument_Returns_NoContent_And_Deactivates_Document()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Software Engineer");
         var documentTypeId = await CreateDocumentTypeAsync(client, companyId, "Passport");
@@ -66,7 +67,7 @@ public class RemoveRequiredDocumentFromPositionProfileEndpointTests
     public async Task Delete_RequiredDocument_Returns_NotFound_When_Already_Removed()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "HR Manager");
         var documentTypeId = await CreateDocumentTypeAsync(client, companyId, "Driving Licence");
@@ -85,7 +86,7 @@ public class RemoveRequiredDocumentFromPositionProfileEndpointTests
     public async Task Delete_RequiredDocument_Returns_NotFound_For_Unknown_Id()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Finance Manager");
 
@@ -99,7 +100,7 @@ public class RemoveRequiredDocumentFromPositionProfileEndpointTests
     public async Task Delete_RequiredDocument_Allows_Same_DocumentType_To_Be_Re_Added_After_Removal()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Operations Lead");
         var documentTypeId = await CreateDocumentTypeAsync(client, companyId, "Right To Work");

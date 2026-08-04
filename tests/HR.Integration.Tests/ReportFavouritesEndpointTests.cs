@@ -16,11 +16,12 @@ public class ReportFavouritesEndpointTests
         _factory = factory;
     }
 
-    private HttpClient ClientFor(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientFor(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, companyId);
         return client;
     }
 
@@ -42,7 +43,7 @@ public class ReportFavouritesEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/favourites");
 
@@ -65,7 +66,7 @@ public class ReportFavouritesEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, roleId);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/favourites");
 
@@ -78,7 +79,7 @@ public class ReportFavouritesEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/favourites");
 
@@ -106,7 +107,7 @@ public class ReportFavouritesEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.PutAsync(
             $"/api/companies/{companyId}/reporting/favourites/employee-directory", EmptyJsonBody());
@@ -120,7 +121,7 @@ public class ReportFavouritesEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var addResponse = await client.PutAsync(
             $"/api/companies/{companyId}/reporting/favourites/employee-directory", EmptyJsonBody());
@@ -139,7 +140,7 @@ public class ReportFavouritesEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var first = await client.PutAsync(
             $"/api/companies/{companyId}/reporting/favourites/employee-directory", EmptyJsonBody());
@@ -175,7 +176,7 @@ public class ReportFavouritesEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/reporting/favourites/employee-directory");
@@ -189,7 +190,7 @@ public class ReportFavouritesEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/reporting/favourites/never-favourited-report");
@@ -203,7 +204,7 @@ public class ReportFavouritesEndpointTests
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientFor(userId, companyId);
+        using var client = await ClientFor(userId, companyId);
 
         await client.PutAsync($"/api/companies/{companyId}/reporting/favourites/employee-directory", EmptyJsonBody());
 

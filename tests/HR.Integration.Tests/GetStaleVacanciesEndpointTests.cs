@@ -29,11 +29,12 @@ public class GetStaleVacanciesEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientAs(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -51,7 +52,7 @@ public class GetStaleVacanciesEndpointTests
     public async Task Get_StaleVacancies_Returns_Forbidden_For_Plain_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/stale");
 
@@ -66,7 +67,7 @@ public class GetStaleVacanciesEndpointTests
     public async Task Get_StaleVacancies_Returns_Forbidden_For_HrAdministrator_Without_Recruiter_Role()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(HrAdminUser, companyId);
+        using var client = await ClientAs(HrAdminUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/stale");
 
@@ -77,7 +78,7 @@ public class GetStaleVacanciesEndpointTests
     public async Task Get_StaleVacancies_Returns_Empty_List_When_No_Open_Vacancies()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/stale");
 
@@ -91,7 +92,7 @@ public class GetStaleVacanciesEndpointTests
     public async Task Get_StaleVacancies_Returns_Open_Vacancy_With_No_Recent_Activity()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         Guid vacancyId = Guid.Empty;
         using (var scope = _factory.Services.CreateScope())
@@ -119,7 +120,7 @@ public class GetStaleVacanciesEndpointTests
     public async Task Get_StaleVacancies_Excludes_Vacancy_With_Recent_Application_Activity()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         using (var scope = _factory.Services.CreateScope())
         {
@@ -151,7 +152,7 @@ public class GetStaleVacanciesEndpointTests
     public async Task Get_StaleVacancies_Excludes_NonOpen_Vacancy()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         using (var scope = _factory.Services.CreateScope())
         {
@@ -175,7 +176,7 @@ public class GetStaleVacanciesEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         using (var scope = _factory.Services.CreateScope())
         {

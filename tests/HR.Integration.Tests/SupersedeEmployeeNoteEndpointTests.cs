@@ -26,11 +26,12 @@ public class SupersedeEmployeeNoteEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -73,7 +74,7 @@ public class SupersedeEmployeeNoteEndpointTests
     public async Task Post_SupersedeEmployeeNote_Supersedes_Original_Note()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var employeeId = await CompensationTestHelpers.CreateEmployeeAsync(client, companyId);
         var originalNoteId = await CreateNoteAsync(client, companyId, employeeId);
 
@@ -110,7 +111,7 @@ public class SupersedeEmployeeNoteEndpointTests
     public async Task Post_SupersedeEmployeeNote_Returns_NotFound_When_Original_Note_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var employeeId = await CompensationTestHelpers.CreateEmployeeAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync(
@@ -130,7 +131,7 @@ public class SupersedeEmployeeNoteEndpointTests
     public async Task Post_SupersedeEmployeeNote_Returns_Conflict_When_Note_Already_Superseded()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var employeeId = await CompensationTestHelpers.CreateEmployeeAsync(client, companyId);
         var originalNoteId = await CreateNoteAsync(client, companyId, employeeId);
 
@@ -167,6 +168,7 @@ public class SupersedeEmployeeNoteEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ManagerUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ManagerUserId, SystemRoles.Manager, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/notes/{noteId}/supersede", new
@@ -190,6 +192,7 @@ public class SupersedeEmployeeNoteEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, EmployeeUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, EmployeeUserId, SystemRoles.Employee, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/notes/{noteId}/supersede", new

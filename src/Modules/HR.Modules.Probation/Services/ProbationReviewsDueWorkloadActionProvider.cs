@@ -4,6 +4,7 @@ using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using IClock = HR.SharedKernel.IClock;
 
 namespace HR.Modules.Probation.Services;
 
@@ -19,7 +20,8 @@ internal sealed class ProbationReviewsDueWorkloadActionProvider(
     ProbationDbContext dbContext,
     IDirectReportsReader directReportsReader,
     IEmployeeDepartmentReader employeeDepartmentReader,
-    IAuthorizationService authorizationService) : IWorkloadActionProvider
+    IAuthorizationService authorizationService,
+    IClock clock) : IWorkloadActionProvider
 {
     public string ActionCategory => "Probation Reviews Due";
 
@@ -28,7 +30,7 @@ internal sealed class ProbationReviewsDueWorkloadActionProvider(
         ClaimsPrincipal caller,
         CancellationToken cancellationToken)
         => await ProbationReviewWorkloadActions.GetAsync(
-            dbContext, directReportsReader, employeeDepartmentReader, authorizationService,
+            dbContext, directReportsReader, employeeDepartmentReader, authorizationService, clock,
             companyId, caller, ActionCategory, overdueOnly: false, cancellationToken);
 }
 
@@ -40,7 +42,8 @@ internal sealed class OverdueProbationReviewsWorkloadActionProvider(
     ProbationDbContext dbContext,
     IDirectReportsReader directReportsReader,
     IEmployeeDepartmentReader employeeDepartmentReader,
-    IAuthorizationService authorizationService) : IWorkloadActionProvider
+    IAuthorizationService authorizationService,
+    IClock clock) : IWorkloadActionProvider
 {
     public string ActionCategory => "Overdue Probation Reviews";
 
@@ -49,7 +52,7 @@ internal sealed class OverdueProbationReviewsWorkloadActionProvider(
         ClaimsPrincipal caller,
         CancellationToken cancellationToken)
         => await ProbationReviewWorkloadActions.GetAsync(
-            dbContext, directReportsReader, employeeDepartmentReader, authorizationService,
+            dbContext, directReportsReader, employeeDepartmentReader, authorizationService, clock,
             companyId, caller, ActionCategory, overdueOnly: true, cancellationToken);
 }
 
@@ -65,6 +68,7 @@ internal static class ProbationReviewWorkloadActions
         IDirectReportsReader directReportsReader,
         IEmployeeDepartmentReader employeeDepartmentReader,
         IAuthorizationService authorizationService,
+        IClock clock,
         Guid companyId,
         ClaimsPrincipal caller,
         string actionCategory,
@@ -92,7 +96,7 @@ internal static class ProbationReviewWorkloadActions
             employeeIds = directReportIds;
         }
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        var today = DateOnly.FromDateTime(clock.UtcNow.Date);
 
         var recordsQuery = dbContext.ProbationRecords
             .AsNoTracking()

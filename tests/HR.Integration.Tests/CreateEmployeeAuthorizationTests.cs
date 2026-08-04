@@ -23,6 +23,7 @@ public class CreateEmployeeAuthorizationTests
         var userId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {
@@ -47,6 +48,7 @@ public class CreateEmployeeAuthorizationTests
 
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {
@@ -71,6 +73,7 @@ public class CreateEmployeeAuthorizationTests
 
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {
@@ -95,6 +98,7 @@ public class CreateEmployeeAuthorizationTests
 
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, companyId);
 
         var (departmentId, locationId, positionProfileId, employmentTypeId) =
             await CreateEmployeeReferenceDataAsync(client, companyId);
@@ -178,6 +182,7 @@ public class CreateEmployeeAuthorizationTests
 
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {

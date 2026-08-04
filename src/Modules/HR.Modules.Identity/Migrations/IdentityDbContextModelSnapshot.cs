@@ -615,6 +615,10 @@ namespace HR.Modules.Identity.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -647,6 +651,8 @@ namespace HR.Modules.Identity.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CompanyId");
+
                     b.HasIndex("SupabaseAuthUserId")
                         .IsUnique();
 
@@ -670,6 +676,8 @@ namespace HR.Modules.Identity.Migrations
                     b.HasKey("UserId", "RoleId");
 
                     b.HasIndex("RoleId");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("user_roles", "identity");
                 });
@@ -739,12 +747,6 @@ namespace HR.Modules.Identity.Migrations
                     b.HasOne("HR.Modules.Identity.Domain.Role", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("HR.Modules.Identity.Domain.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -18,11 +18,12 @@ public class ListAssetCategoriesEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -38,7 +39,7 @@ public class ListAssetCategoriesEndpointTests
     public async Task Get_AssetCategories_Returns_Empty_List_When_No_Categories_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/asset-categories");
 
@@ -52,7 +53,7 @@ public class ListAssetCategoriesEndpointTests
     public async Task Get_AssetCategories_Returns_Active_Categories_For_Company()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         await client.PostAsJsonAsync($"/api/companies/{companyId}/asset-categories", new
         {
@@ -81,7 +82,7 @@ public class ListAssetCategoriesEndpointTests
     public async Task Get_AssetCategories_Returns_Categories_Ordered_By_Name()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         await client.PostAsJsonAsync($"/api/companies/{companyId}/asset-categories", new { companyId, name = "Vehicles" });
         await client.PostAsJsonAsync($"/api/companies/{companyId}/asset-categories", new { companyId, name = "Computers" });
@@ -103,8 +104,8 @@ public class ListAssetCategoriesEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
-        using var otherClient = AdminClient(otherCompanyId);
+        using var client = await AdminClient(companyId);
+        using var otherClient = await AdminClient(otherCompanyId);
 
         await otherClient.PostAsJsonAsync($"/api/companies/{otherCompanyId}/asset-categories", new
         {

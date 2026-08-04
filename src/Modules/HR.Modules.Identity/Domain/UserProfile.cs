@@ -6,6 +6,7 @@ internal sealed class UserProfile
 
     public Guid Id { get; private set; }
     public Guid SupabaseAuthUserId { get; private set; }
+    public Guid CompanyId { get; private set; }
     public string Email { get; private set; } = string.Empty;
     public string FirstName { get; private set; } = string.Empty;
     public string LastName { get; private set; } = string.Empty;
@@ -15,6 +16,7 @@ internal sealed class UserProfile
     public static UserProfile Create(
         Guid id,
         Guid supabaseAuthUserId,
+        Guid companyId,
         string email,
         string firstName,
         string lastName,
@@ -24,6 +26,7 @@ internal sealed class UserProfile
         {
             Id = id,
             SupabaseAuthUserId = supabaseAuthUserId,
+            CompanyId = companyId,
             Email = email,
             FirstName = firstName,
             LastName = lastName,

@@ -33,7 +33,7 @@ public class GetOrganisationChartEndpointTests
     public async Task Get_OrganisationChart_Is_Company_Scoped_And_Excludes_Inactive_And_Terminated_Employees()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var (departmentId, locationId, positionProfileId, employmentTypeId) = await CreateReferenceDataAsync(client, companyId);
 
@@ -49,7 +49,7 @@ public class GetOrganisationChartEndpointTests
 
         // An employee in a completely different company — should never appear.
         var otherCompanyId = Guid.NewGuid();
-        using var otherClient = AdminClient(otherCompanyId);
+        using var otherClient = await AdminClient(otherCompanyId);
         var (otherDeptId, otherLocId, otherProfileId, otherTypeId) = await CreateReferenceDataAsync(otherClient, otherCompanyId);
         await CreateEmployeeAsync(
             otherClient, otherCompanyId, "Olivia", "Other", otherDeptId, otherLocId, otherProfileId, otherTypeId, "ORG-OTHER");
@@ -80,11 +80,12 @@ public class GetOrganisationChartEndpointTests
         Assert.Equal(managerId, report.ManagerId);
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

@@ -20,11 +20,12 @@ public class GetCompanySettingsEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid tenantId)
+    private async Task<HttpClient> AuthenticatedClient(Guid tenantId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, tenantId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.Employee, tenantId);
         return client;
     }
 
@@ -41,7 +42,7 @@ public class GetCompanySettingsEndpointTests
     [Fact]
     public async Task Get_Company_Settings_Returns_Slimmed_ProfileScoped_Fields_When_Never_Customised()
     {
-        using var client = AuthenticatedClient(UserId);
+        using var client = await AuthenticatedClient(UserId);
 
         var createResponse = await client.PostAsJsonAsync("/api/companies", new
         {
@@ -84,7 +85,7 @@ public class GetCompanySettingsEndpointTests
     [Fact]
     public async Task Get_Company_Settings_Returns_NotFound_For_Unknown_Id()
     {
-        using var client = AuthenticatedClient(UserId);
+        using var client = await AuthenticatedClient(UserId);
 
         var response = await client.GetAsync($"/api/companies/{Guid.NewGuid()}/settings");
 

@@ -376,10 +376,10 @@ public class UpdateHrSettingsHandlerTests
 		var auditEvent = Assert.IsType<HrSettingsUpdatedAuditEvent>(auditEvt);
 
 		Assert.NotNull(auditEvent.PreviousSettings);
-		Assert.Equal(EmployeeNumberMode.Manual, auditEvent.PreviousSettings!.EmployeeNumberMode);
+		Assert.Equal(EmployeeNumberMode.Automatic, auditEvent.PreviousSettings!.EmployeeNumberMode);
 		Assert.Null(auditEvent.PreviousSettings.EmployeeNumberPrefix);
 		Assert.Equal(1, auditEvent.PreviousSettings.NextEmployeeNumber);
-		Assert.Equal(1, auditEvent.PreviousSettings.EmployeeNumberMinimumLength);
+		Assert.Equal(4, auditEvent.PreviousSettings.EmployeeNumberMinimumLength);
 
 		Assert.Equal(EmployeeNumberMode.Automatic, auditEvent.CurrentSettings.EmployeeNumberMode);
 		Assert.Equal("EMP-", auditEvent.CurrentSettings.EmployeeNumberPrefix);

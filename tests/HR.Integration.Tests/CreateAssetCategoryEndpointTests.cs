@@ -18,11 +18,12 @@ public class CreateAssetCategoryEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -38,7 +39,7 @@ public class CreateAssetCategoryEndpointTests
     public async Task Post_AssetCategories_Creates_AssetCategory()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/asset-categories", new
         {
@@ -63,7 +64,7 @@ public class CreateAssetCategoryEndpointTests
     public async Task Post_AssetCategories_Creates_AssetCategory_Without_Description()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/asset-categories", new
         {
@@ -83,7 +84,7 @@ public class CreateAssetCategoryEndpointTests
     public async Task Post_AssetCategories_Returns_BadRequest_When_Name_Is_Missing()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/asset-categories", new
         {

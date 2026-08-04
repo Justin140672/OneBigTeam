@@ -18,11 +18,12 @@ public class UpdatePositionProfileEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -119,7 +120,7 @@ public class UpdatePositionProfileEndpointTests
     public async Task Put_PositionProfile_Updates_Profile()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
 
         var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
@@ -151,7 +152,7 @@ public class UpdatePositionProfileEndpointTests
     public async Task Put_PositionProfile_Returns_NotFound_For_Unknown_Id()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
 
         var response = await client.PutAsJsonAsync(
@@ -172,7 +173,7 @@ public class UpdatePositionProfileEndpointTests
     public async Task Put_PositionProfile_Returns_Conflict_For_Duplicate_Title()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
 
         await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Profile A");
@@ -197,7 +198,7 @@ public class UpdatePositionProfileEndpointTests
     {
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyA);
+        using var client = await AuthenticatedClient(companyA);
         var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyA);
 
         var created = await CreatePositionProfileAsync(client, companyA, departmentId, locationId, leavePolicyId, "Designer");
@@ -221,7 +222,7 @@ public class UpdatePositionProfileEndpointTests
     public async Task Put_PositionProfile_Returns_BadRequest_When_DepartmentId_Is_Empty()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
         var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
 
@@ -243,7 +244,7 @@ public class UpdatePositionProfileEndpointTests
     public async Task Put_PositionProfile_Returns_BadRequest_When_LocationId_Is_Empty()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
         var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
 
@@ -265,7 +266,7 @@ public class UpdatePositionProfileEndpointTests
     public async Task Put_PositionProfile_Returns_BadRequest_When_DefaultLeavePolicyId_Is_Empty()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
         var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
 
@@ -287,7 +288,7 @@ public class UpdatePositionProfileEndpointTests
     public async Task Put_PositionProfile_Updates_NoticePeriodOverride()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
         var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
 
@@ -316,7 +317,7 @@ public class UpdatePositionProfileEndpointTests
     public async Task Put_PositionProfile_Clears_NoticePeriodOverride_Back_To_Null()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
         var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
 
@@ -357,7 +358,7 @@ public class UpdatePositionProfileEndpointTests
     public async Task Put_PositionProfile_Returns_BadRequest_When_Only_NoticePeriodUnitOverride_Is_Set()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
         var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
 
@@ -380,7 +381,7 @@ public class UpdatePositionProfileEndpointTests
     public async Task Put_PositionProfile_Returns_BadRequest_When_Only_NoticePeriodLengthOverride_Is_Set()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
         var created = await CreatePositionProfileAsync(client, companyId, departmentId, locationId, leavePolicyId, "Original Title");
 

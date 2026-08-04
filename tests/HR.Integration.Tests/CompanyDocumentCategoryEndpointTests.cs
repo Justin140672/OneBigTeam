@@ -37,7 +37,7 @@ public class CompanyDocumentCategoryEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/document-categories", new { name = "Policy" });
@@ -51,7 +51,7 @@ public class CompanyDocumentCategoryEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.CompanyAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/document-categories", new { name = "Policy" });
@@ -66,7 +66,7 @@ public class CompanyDocumentCategoryEndpointTests
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.CompanyAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/document-categories", new { name = "Policy" });
@@ -80,7 +80,7 @@ public class CompanyDocumentCategoryEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/document-categories", new { name = "Handbook" });
@@ -97,7 +97,7 @@ public class CompanyDocumentCategoryEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         await client.PostAsJsonAsync($"/api/companies/{companyId}/document-categories", new { name = "Policy" });
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/document-categories", new { name = "Policy" });
@@ -114,12 +114,12 @@ public class CompanyDocumentCategoryEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var createResp = await hrClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/document-categories", new { name = "Procedure" });
         var created = await createResp.Content.ReadFromJsonAsync<CategoryPayload>();
 
-        using var managerClient = ClientAs(companyId, managerId);
+        using var managerClient = await ClientAs(companyId, managerId);
         var response = await managerClient.DeleteAsync(
             $"/api/companies/{companyId}/document-categories/{created!.Id}");
 
@@ -132,14 +132,14 @@ public class CompanyDocumentCategoryEndpointTests
         var companyId = Guid.NewGuid();
         var hrUserId   = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         await hrClient.PostAsJsonAsync($"/api/companies/{companyId}/document-categories", new { name = "Guidance" });
 
         foreach (var roleId in new[] { SystemRoles.Employee, SystemRoles.Manager, SystemRoles.Recruiter, SystemRoles.HrAdministrator })
         {
             var userId = Guid.NewGuid();
             await TestRoleSeeder.AssignRoleAsync(_factory, userId, roleId);
-            using var client = ClientAs(companyId, userId);
+            using var client = await ClientAs(companyId, userId);
 
             var response = await client.GetAsync($"/api/companies/{companyId}/document-categories");
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -152,18 +152,25 @@ public class CompanyDocumentCategoryEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.CompanyAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/document-categories");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    private HttpClient ClientAs(Guid companyId, Guid userId)
+    private async Task<HttpClient> ClientAs(Guid companyId, Guid userId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        // Role-agnostic sync only — every caller of this helper already granted the specific
+        // role(s) it wants to test beforehand via AssignRoleAsync. Hardcoding a role here (this
+        // used to always grant SystemRoles.Manager) additionally granted it to every caller
+        // regardless of intent, which used to be harmless only because tenant resolution didn't
+        // actually key off UserProfile.CompanyId yet — now that it does, an unconditional extra
+        // role grant here changes real authorization outcomes.
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 

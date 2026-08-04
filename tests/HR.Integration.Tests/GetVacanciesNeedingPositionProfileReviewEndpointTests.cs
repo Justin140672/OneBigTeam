@@ -29,11 +29,12 @@ public class GetVacanciesNeedingPositionProfileReviewEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, companyId);
         return client;
     }
 
@@ -51,7 +52,7 @@ public class GetVacanciesNeedingPositionProfileReviewEndpointTests
     public async Task Get_PositionProfileMatchesReview_Returns_Empty_List_When_Nothing_Needs_Review()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/position-profile-matches/review");
 
@@ -65,7 +66,7 @@ public class GetVacanciesNeedingPositionProfileReviewEndpointTests
     public async Task Get_PositionProfileMatchesReview_Always_Returns_Empty_List_Even_When_Vacancies_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
 
         using (var scope = _factory.Services.CreateScope())

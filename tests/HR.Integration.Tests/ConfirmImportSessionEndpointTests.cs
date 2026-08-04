@@ -34,7 +34,7 @@ public class ConfirmImportSessionEndpointTests
     public async Task Returns_Ok_And_Creates_Employees_For_All_Valid_Rows()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         await EnsureDefaultLeavePolicyAsync(client, companyId);
 
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
@@ -86,7 +86,7 @@ public class ConfirmImportSessionEndpointTests
     public async Task Returns_NotFound_For_Unknown_Session()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsync(ConfirmUrl(companyId, Guid.NewGuid()), EmptyJson());
 
@@ -97,7 +97,7 @@ public class ConfirmImportSessionEndpointTests
     public async Task Returns_Forbidden_When_Company_Claim_Mismatches_Route()
     {
         var companyId = Guid.NewGuid();
-        using var uploadClient = AdminClient(companyId);
+        using var uploadClient = await AdminClient(companyId);
         var sessionId = await UploadAsync(uploadClient, companyId, ValidCsv());
 
         using var mismatchedClient = _factory.CreateClient();
@@ -116,13 +116,13 @@ public class ConfirmImportSessionEndpointTests
         var ownerCompanyId = Guid.NewGuid();
         var callerCompanyId = Guid.NewGuid();
 
-        using var ownerClient = AdminClient(ownerCompanyId);
+        using var ownerClient = await AdminClient(ownerCompanyId);
         var sessionId = await UploadAsync(ownerClient, ownerCompanyId, ValidCsv());
         var validateResponse = await ownerClient.PostAsync(
             $"/api/companies/{ownerCompanyId}/data-import/sessions/{sessionId}/validate", EmptyJson());
         validateResponse.EnsureSuccessStatusCode();
 
-        using var callerClient = AdminClient(callerCompanyId);
+        using var callerClient = await AdminClient(callerCompanyId);
 
         // Caller's claim matches the route company (passes the auth check), but the session
         // was created under a different company, so the handler cannot find it for this caller.
@@ -135,7 +135,7 @@ public class ConfirmImportSessionEndpointTests
     public async Task Returns_Conflict_When_Session_Has_Not_Been_Validated_Yet()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         // Uploaded but never validated: session is still Pending, which is not a confirmable state.
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
@@ -149,7 +149,7 @@ public class ConfirmImportSessionEndpointTests
     public async Task Returns_Conflict_When_Session_Has_Already_Been_Confirmed()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         await EnsureDefaultLeavePolicyAsync(client, companyId);
 
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
@@ -311,11 +311,12 @@ public class ConfirmImportSessionEndpointTests
         response.EnsureSuccessStatusCode();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ImportAdmin, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

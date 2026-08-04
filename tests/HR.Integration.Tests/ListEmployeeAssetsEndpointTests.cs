@@ -21,11 +21,12 @@ public class ListEmployeeAssetsEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -84,7 +85,7 @@ public class ListEmployeeAssetsEndpointTests
     public async Task Get_Employee_Assets_Returns_Empty_List_When_No_Assignments_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees/{Guid.NewGuid()}/assets");
 
@@ -99,7 +100,7 @@ public class ListEmployeeAssetsEndpointTests
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var categoryId = await CreateCategoryAsync(client, companyId);
         var assetId = await CreateAssetAsync(client, companyId, categoryId, $"EMP-{Guid.NewGuid():N}");
@@ -121,7 +122,7 @@ public class ListEmployeeAssetsEndpointTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var otherEmployeeId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var categoryId = await CreateCategoryAsync(client, companyId);
         var assetId = await CreateAssetAsync(client, companyId, categoryId, $"OTH-{Guid.NewGuid():N}");
@@ -140,7 +141,7 @@ public class ListEmployeeAssetsEndpointTests
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var categoryId = await CreateCategoryAsync(client, companyId);
         var assetNumber = $"DET-{Guid.NewGuid():N}";
@@ -165,7 +166,7 @@ public class ListEmployeeAssetsEndpointTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var categoryId   = await CreateCategoryAsync(client, companyId);
         var assetId      = await CreateAssetAsync(client, companyId, categoryId, $"RET-{Guid.NewGuid():N}");

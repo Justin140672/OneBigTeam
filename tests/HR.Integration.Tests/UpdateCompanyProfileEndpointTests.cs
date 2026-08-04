@@ -21,11 +21,12 @@ public class UpdateCompanyEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient()
+    private async Task<HttpClient> AuthenticatedClient()
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, UserId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.CompanyAdministrator, UserId);
         return client;
     }
 
@@ -45,7 +46,7 @@ public class UpdateCompanyEndpointTests
     [Fact]
     public async Task Put_Company_Updates_Name_And_Addresses()
     {
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClient();
 
         var createResponse = await client.PostAsJsonAsync("/api/companies", new
         {
@@ -86,7 +87,7 @@ public class UpdateCompanyEndpointTests
     [Fact]
     public async Task Put_Company_Returns_NotFound_For_Unknown_Id()
     {
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClient();
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}", new
         {

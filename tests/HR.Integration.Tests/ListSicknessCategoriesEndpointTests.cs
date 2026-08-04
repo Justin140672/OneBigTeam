@@ -20,11 +20,12 @@ public class ListSicknessCategoriesEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -40,7 +41,7 @@ public class ListSicknessCategoriesEndpointTests
     public async Task Get_SicknessCategories_Returns_Empty_List_For_New_Company()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/sickness-categories");
 
@@ -54,7 +55,7 @@ public class ListSicknessCategoriesEndpointTests
     public async Task Get_SicknessCategories_Returns_Categories_Ordered_By_DisplayOrder()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         await client.PostAsJsonAsync($"/api/companies/{companyId}/sickness-categories", new
         {

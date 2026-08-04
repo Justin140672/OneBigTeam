@@ -43,7 +43,7 @@ public class GetTeamTasksEndpointTests
     [Fact]
     public async Task Get_TeamTasks_Returns_Empty_When_Manager_Has_No_Direct_Reports()
     {
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClient();
 
         var manager = await CreateEmployeeAsync(client, "Solo", "Manager");
 
@@ -58,7 +58,7 @@ public class GetTeamTasksEndpointTests
     [Fact]
     public async Task Get_TeamTasks_Returns_Tasks_Assigned_To_Direct_Reports()
     {
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClient();
 
         var manager = await CreateEmployeeAsync(client, "Alice", "Manager");
         var report1 = await CreateEmployeeAsync(client, "Bob",   "Reporter");
@@ -83,7 +83,7 @@ public class GetTeamTasksEndpointTests
     [Fact]
     public async Task Get_TeamTasks_Does_Not_Return_Tasks_Assigned_To_Other_Employees()
     {
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClient();
 
         var manager   = await CreateEmployeeAsync(client, "Dave",  "Manager");
         var report    = await CreateEmployeeAsync(client, "Eve",   "Reporter");
@@ -105,7 +105,7 @@ public class GetTeamTasksEndpointTests
     [Fact]
     public async Task Get_TeamTasks_Filters_By_Status_When_Provided()
     {
-        using var client = AuthenticatedClient();
+        using var client = await AuthenticatedClient();
 
         var manager = await CreateEmployeeAsync(client, "Grace", "Manager");
         var report  = await CreateEmployeeAsync(client, "Hank",  "Reporter");
@@ -126,11 +126,12 @@ public class GetTeamTasksEndpointTests
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient()
+    private async Task<HttpClient> AuthenticatedClient()
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, SeededCompanyId);
         return client;
     }
 

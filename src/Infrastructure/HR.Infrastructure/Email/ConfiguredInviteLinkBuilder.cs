@@ -10,7 +10,7 @@ namespace HR.Infrastructure.Email;
 /// </summary>
 internal sealed class ConfiguredInviteLinkBuilder(IConfiguration configuration) : IInviteLinkBuilder
 {
-    private const string FallbackBaseUrl = "http://localhost:5270";
+    private const string FallbackBaseUrl = "http://localhost:5157";
 
     public string Build(string token)
     {

@@ -51,6 +51,7 @@ public class BulkApplyCompensationAdjustmentsEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
 
         var (employeeId1, _) = await CompensationTestHelpers.CreateEmployeeWithNumberAsync(client, companyId);
         var (employeeId2, _) = await CompensationTestHelpers.CreateEmployeeWithNumberAsync(client, companyId);
@@ -83,6 +84,7 @@ public class BulkApplyCompensationAdjustmentsEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
         var (employeeId, _) = await CompensationTestHelpers.CreateEmployeeWithNumberAsync(client, companyId);
 
@@ -120,6 +122,7 @@ public class BulkApplyCompensationAdjustmentsEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User3, SystemRoles.HrAdministrator, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/compensation/bulk", new
         {
@@ -140,6 +143,7 @@ public class BulkApplyCompensationAdjustmentsEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User3, SystemRoles.HrAdministrator, companyId);
 
         var (employeeId, _) = await CompensationTestHelpers.CreateEmployeeWithNumberAsync(client, companyId);
 

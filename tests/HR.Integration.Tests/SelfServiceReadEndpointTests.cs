@@ -38,7 +38,7 @@ public class SelfServiceReadEndpointTests
     [Fact]
     public async Task GetMyEmployee_Returns_NotFound_When_No_Employee_Linked_To_User()
     {
-        using var client = SelfClient(Guid.NewGuid()); // user with no employee record
+        using var client = await SelfClient(Guid.NewGuid()); // user with no employee record
         var response     = await client.GetAsync($"/api/companies/{SeededCompanyId}/employees/me");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -46,11 +46,11 @@ public class SelfServiceReadEndpointTests
     [Fact]
     public async Task GetMyEmployee_Returns_Employee_When_User_Matches_Employee_Id()
     {
-        using var adminClient = AdminClient();
+        using var adminClient = await AdminClient();
         var employee          = await CreateEmployeeAsync(adminClient, "Self", "Service");
 
         // employee.Id is the sub claim — GetMyEmployee looks up by e.Id == userId
-        using var selfClient  = SelfClient(employee.Id);
+        using var selfClient  = await SelfClient(employee.Id);
         var response          = await selfClient.GetAsync(
             $"/api/companies/{SeededCompanyId}/employees/me");
 
@@ -75,7 +75,7 @@ public class SelfServiceReadEndpointTests
     [Fact]
     public async Task GetMyPersonalDetails_Returns_NotFound_When_No_Employee_Linked()
     {
-        using var client = SelfClient(Guid.NewGuid());
+        using var client = await SelfClient(Guid.NewGuid());
         var response     = await client.GetAsync(
             $"/api/companies/{SeededCompanyId}/employees/me/personal-details");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -84,11 +84,11 @@ public class SelfServiceReadEndpointTests
     [Fact]
     public async Task GetMyPersonalDetails_Returns_Personal_Data_For_Employee()
     {
-        using var adminClient = AdminClient();
+        using var adminClient = await AdminClient();
         var employee          = await CreateEmployeeAsync(adminClient, "Jane", "Doe",
             dateOfBirth: "1992-03-15", nationality: "French", gender: "Female");
 
-        using var selfClient  = SelfClient(employee.Id);
+        using var selfClient  = await SelfClient(employee.Id);
         var response          = await selfClient.GetAsync(
             $"/api/companies/{SeededCompanyId}/employees/me/personal-details");
 
@@ -116,7 +116,7 @@ public class SelfServiceReadEndpointTests
     [Fact]
     public async Task GetMyContactDetails_Returns_NotFound_When_No_Employee_Linked()
     {
-        using var client = SelfClient(Guid.NewGuid());
+        using var client = await SelfClient(Guid.NewGuid());
         var response     = await client.GetAsync(
             $"/api/companies/{SeededCompanyId}/employees/me/contact-details");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -125,12 +125,12 @@ public class SelfServiceReadEndpointTests
     [Fact]
     public async Task GetMyContactDetails_Returns_Contact_Info_For_Employee()
     {
-        using var adminClient = AdminClient();
+        using var adminClient = await AdminClient();
         var workEmail         = $"contact.test.{Guid.NewGuid():N}@test.com";
         var employee          = await CreateEmployeeAsync(adminClient, "Contact", "Test",
             workEmail: workEmail);
 
-        using var selfClient  = SelfClient(employee.Id);
+        using var selfClient  = await SelfClient(employee.Id);
         var response          = await selfClient.GetAsync(
             $"/api/companies/{SeededCompanyId}/employees/me/contact-details");
 
@@ -141,21 +141,23 @@ public class SelfServiceReadEndpointTests
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
-    private HttpClient AdminClient()
+    private async Task<HttpClient> AdminClient()
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, SeededCompanyId);
         return client;
     }
 
-    private HttpClient SelfClient(Guid userId)
+    private async Task<HttpClient> SelfClient(Guid userId)
     {
         TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
 
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, SeededCompanyId);
         return client;
     }
 

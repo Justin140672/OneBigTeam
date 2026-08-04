@@ -24,7 +24,7 @@ public class ListEmployeeDocumentsEndpointTests(ApiWebApplicationFactory factory
     [Fact]
     public async Task Returns_Two_Seeded_Documents_For_Sarah()
     {
-        using var client = AuthenticatedClient(AcmeCompanyId);
+        using var client = await AuthenticatedClient(AcmeCompanyId);
         var response     = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{SarahEmployeeId}/documents");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -35,7 +35,7 @@ public class ListEmployeeDocumentsEndpointTests(ApiWebApplicationFactory factory
     [Fact]
     public async Task Returns_Empty_For_Employee_With_No_Documents()
     {
-        using var client     = AuthenticatedClient(AcmeCompanyId);
+        using var client     = await AuthenticatedClient(AcmeCompanyId);
         var unknownEmployeeId = Guid.NewGuid();
         var response         = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{unknownEmployeeId}/documents");
@@ -48,7 +48,7 @@ public class ListEmployeeDocumentsEndpointTests(ApiWebApplicationFactory factory
     public async Task Returns_Empty_When_CompanyId_Does_Not_Match()
     {
         var otherCompanyId = Guid.NewGuid();
-        using var client   = AuthenticatedClient(otherCompanyId);
+        using var client   = await AuthenticatedClient(otherCompanyId);
         var response       = await client.GetAsync(
             $"/api/companies/{otherCompanyId}/employees/{SarahEmployeeId}/documents");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -56,7 +56,7 @@ public class ListEmployeeDocumentsEndpointTests(ApiWebApplicationFactory factory
         Assert.Empty(payload!.Items);
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var userId = Guid.NewGuid();
         TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
@@ -64,6 +64,7 @@ public class ListEmployeeDocumentsEndpointTests(ApiWebApplicationFactory factory
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee, companyId);
         return client;
     }
 

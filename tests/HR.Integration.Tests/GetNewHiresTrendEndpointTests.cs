@@ -23,11 +23,12 @@ public class GetNewHiresTrendEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.Employee, companyId);
         return client;
     }
 
@@ -47,6 +48,7 @@ public class GetNewHiresTrendEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.Empty.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.Employee, Guid.Empty);
 
         var response = await client.GetAsync($"/api/companies/{Guid.Empty}/employees/new-hires-trend");
 
@@ -57,7 +59,7 @@ public class GetNewHiresTrendEndpointTests
     public async Task Get_NewHiresTrend_Returns_Six_Zero_Filled_Months_When_No_Hires()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees/new-hires-trend");
 
@@ -72,7 +74,7 @@ public class GetNewHiresTrendEndpointTests
     public async Task Get_NewHiresTrend_Counts_Employees_Hired_In_The_Current_Month()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var currentMonthStart = new DateOnly(today.Year, today.Month, 1);
@@ -101,7 +103,7 @@ public class GetNewHiresTrendEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var currentMonthStart = new DateOnly(today.Year, today.Month, 1);

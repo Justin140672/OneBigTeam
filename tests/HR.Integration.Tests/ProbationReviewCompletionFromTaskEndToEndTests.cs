@@ -39,7 +39,7 @@ public class ProbationReviewCompletionFromTaskEndToEndTests
     public async Task CompleteTask_Marks_ManagerCheckIn_Review_As_Completed()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(User1, companyId);
+        using var client = await AuthenticatedClient(User1, companyId);
 
         var (recordId, reviewId) = await CreateRecordAndReviewAsync(client, companyId, "ManagerCheckIn");
 
@@ -65,7 +65,7 @@ public class ProbationReviewCompletionFromTaskEndToEndTests
     public async Task CompleteTask_With_Pass_Outcome_Transitions_FinalDecision_And_Record_To_Passed()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(User2, companyId);
+        using var client = await AuthenticatedClient(User2, companyId);
 
         var (recordId, reviewId) = await CreateRecordAndReviewAsync(client, companyId, "FinalDecision");
 
@@ -94,7 +94,7 @@ public class ProbationReviewCompletionFromTaskEndToEndTests
     public async Task CompleteTask_With_Fail_Outcome_Transitions_FinalDecision_And_Record_To_Failed()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(User3, companyId);
+        using var client = await AuthenticatedClient(User3, companyId);
 
         var (recordId, reviewId) = await CreateRecordAndReviewAsync(client, companyId, "FinalDecision");
 
@@ -121,11 +121,12 @@ public class ProbationReviewCompletionFromTaskEndToEndTests
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient(Guid userId, Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 

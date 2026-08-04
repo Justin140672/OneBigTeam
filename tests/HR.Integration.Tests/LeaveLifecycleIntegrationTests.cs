@@ -574,6 +574,7 @@ public class LeaveLifecycleIntegrationTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, UserId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, UserId);
 
         var companyResp = await client.PostAsJsonAsync("/api/companies", new
         {

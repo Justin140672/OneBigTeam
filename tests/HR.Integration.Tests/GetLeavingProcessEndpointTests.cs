@@ -80,6 +80,7 @@ public class GetLeavingProcessEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
 
@@ -95,6 +96,7 @@ public class GetLeavingProcessEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
         await StartLeavingProcessAsync(client, companyId, employeeId);
@@ -121,6 +123,7 @@ public class GetLeavingProcessEndpointTests
         var otherCompanyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User3, SystemRoles.HrAdministrator, companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
         await StartLeavingProcessAsync(client, companyId, employeeId);
@@ -145,6 +148,7 @@ public class GetLeavingProcessEndpointTests
         var companyId = Guid.NewGuid();
         hrAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
         hrAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
 
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
         await StartLeavingProcessAsync(hrAdminClient, companyId, employeeId);

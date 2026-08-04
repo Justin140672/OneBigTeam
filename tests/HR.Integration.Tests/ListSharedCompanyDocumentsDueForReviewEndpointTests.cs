@@ -37,7 +37,7 @@ public class ListSharedCompanyDocumentsDueForReviewEndpointTests
         var companyId  = Guid.NewGuid();
         var userId     = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
 
         var (overdue, _)   = await UploadAsync(client, companyId, categoryId, "Overdue Policy", Today.AddDays(-5));
@@ -67,7 +67,7 @@ public class ListSharedCompanyDocumentsDueForReviewEndpointTests
         var companyId  = Guid.NewGuid();
         var userId     = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
 
         var (overdue, _)      = await UploadAsync(client, companyId, categoryId, "Overdue Policy", Today.AddDays(-2));
@@ -91,7 +91,7 @@ public class ListSharedCompanyDocumentsDueForReviewEndpointTests
         var companyId  = Guid.NewGuid();
         var userId     = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
 
         var (withinWindow, _) = await UploadAsync(client, companyId, categoryId, "Exactly Seven Days Policy", Today.AddDays(7));
@@ -117,11 +117,11 @@ public class ListSharedCompanyDocumentsDueForReviewEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         await UploadAsync(clientA, companyA, categoryInA, "Company A Only Overdue Policy", Today.AddDays(-1));
 
-        using var clientB = ClientAs(companyB, hrInB);
+        using var clientB = await ClientAs(companyB, hrInB);
         var response = await clientB.GetAsync(DueForReviewUrl(companyB));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -134,11 +134,12 @@ public class ListSharedCompanyDocumentsDueForReviewEndpointTests
     private static string DueForReviewUrl(Guid companyId) =>
         $"/api/companies/{companyId}/shared-documents/due-for-review";
 
-    private HttpClient ClientAs(Guid companyId, Guid userId)
+    private async Task<HttpClient> ClientAs(Guid companyId, Guid userId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

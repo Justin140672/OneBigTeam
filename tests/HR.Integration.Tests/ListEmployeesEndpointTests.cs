@@ -52,6 +52,7 @@ public class ListEmployeesEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ListEmpUser1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ListEmpUser1, SystemRoles.HrAdministrator, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees");
 
@@ -70,6 +71,7 @@ public class ListEmployeesEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ListEmpUser2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ListEmpUser2, SystemRoles.HrAdministrator, companyId);
 
         await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com");
         await CreateEmployeeAsync(client, companyId, "Bob", "Jones", $"bob.{Guid.NewGuid():N}@example.com");
@@ -93,6 +95,7 @@ public class ListEmployeesEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ListEmpUser3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ListEmpUser3, SystemRoles.HrAdministrator, companyId);
 
         await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com");
         await CreateEmployeeAsync(client, companyId, "Bob", "Jones", $"bob.{Guid.NewGuid():N}@example.com");
@@ -114,6 +117,7 @@ public class ListEmployeesEndpointTests
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ListEmpUser4.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ListEmpUser4, SystemRoles.HrAdministrator, companyId);
 
         for (var i = 0; i < 5; i++)
         {
@@ -142,6 +146,7 @@ public class ListEmployeesEndpointTests
 
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ListEmpUser5.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyA.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ListEmpUser5, SystemRoles.HrAdministrator, companyA);
         await CreateEmployeeAsync(client, companyA, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com");
 
         // Authenticated as companyA but route targets companyB — middleware blocks it.
@@ -160,6 +165,7 @@ public class ListEmployeesEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ListEmpUser1.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ListEmpUser1, SystemRoles.HrAdministrator, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees");
 
@@ -181,6 +187,7 @@ public class ListEmployeesEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ListEmpUser2.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ListEmpUser2, SystemRoles.HrAdministrator, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees");
 
@@ -200,6 +207,7 @@ public class ListEmployeesEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ListEmpUser3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ListEmpUser3, SystemRoles.HrAdministrator, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees");
 

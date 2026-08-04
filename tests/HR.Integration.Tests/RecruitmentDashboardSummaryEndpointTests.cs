@@ -39,11 +39,12 @@ public class RecruitmentDashboardSummaryEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientAs(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -103,7 +104,7 @@ public class RecruitmentDashboardSummaryEndpointTests
     public async Task Get_InterviewsTodayCount_Returns_Zero_When_No_Interviews_Scheduled()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(HrAdminUserId, companyId);
+        using var client = await ClientAs(HrAdminUserId, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/interviews/today-count");
 
@@ -116,7 +117,7 @@ public class RecruitmentDashboardSummaryEndpointTests
     public async Task Get_InterviewsTodayCount_Counts_Interview_Scheduled_For_Today()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(HrAdminUserId, companyId);
+        using var client = await ClientAs(HrAdminUserId, companyId);
         var (vacancyId, _, applicationId) = await SeedApplicationAsync(client, companyId);
 
         var scheduleResponse = await client.PostAsJsonAsync(
@@ -143,8 +144,8 @@ public class RecruitmentDashboardSummaryEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = ClientAs(HrAdminUserId, companyId);
-        using var otherClient = ClientAs(HrAdminUserId, otherCompanyId);
+        using var client = await ClientAs(HrAdminUserId, companyId);
+        using var otherClient = await ClientAs(HrAdminUserId, otherCompanyId);
         var (vacancyId, _, applicationId) = await SeedApplicationAsync(otherClient, otherCompanyId);
 
         var scheduleResponse = await otherClient.PostAsJsonAsync(
@@ -181,7 +182,7 @@ public class RecruitmentDashboardSummaryEndpointTests
     public async Task Get_OutstandingTaskCount_Returns_Forbidden_For_Employee_Role()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(EmployeeUserId, companyId);
+        using var client = await ClientAs(EmployeeUserId, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/tasks/outstanding-count");
 
@@ -192,7 +193,7 @@ public class RecruitmentDashboardSummaryEndpointTests
     public async Task Get_OutstandingTaskCount_Counts_Interview_Feedback_Task_After_Scheduling()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(HrAdminUserId, companyId);
+        using var client = await ClientAs(HrAdminUserId, companyId);
         var (vacancyId, _, applicationId) = await SeedApplicationAsync(client, companyId);
 
         var scheduleResponse = await client.PostAsJsonAsync(
@@ -221,7 +222,7 @@ public class RecruitmentDashboardSummaryEndpointTests
     public async Task Get_OutstandingTaskCount_Returns_Zero_When_No_Matching_Tasks()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(HrAdminUserId, companyId);
+        using var client = await ClientAs(HrAdminUserId, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/tasks/outstanding-count?source=Recruitment&actionType=Complete");

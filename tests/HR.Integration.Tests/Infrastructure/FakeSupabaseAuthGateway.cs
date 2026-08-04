@@ -1,0 +1,58 @@
+using HR.Modules.Identity.Services;
+
+namespace HR.Integration.Tests.Infrastructure;
+
+/// <summary>
+/// Test double for the Identity module's internal ISupabaseAuthGateway, registered against the
+/// shared integration test host (see ApiWebApplicationFactory). Never calls the real Supabase Auth
+/// API. Safe to mutate per-test because the assembly disables test parallelization (see
+/// AssemblyInfo.cs), so tests run strictly sequentially against the shared factory.
+/// </summary>
+internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
+{
+    public List<(string Email, string RedirectTo)> CreatedUsers { get; } = [];
+    public List<(string Email, string RedirectTo)> ResentEmails { get; } = [];
+
+    public Guid? UserIdToReturn { get; set; }
+    public bool ShouldThrowOnCreate { get; set; }
+    public bool ShouldThrowOnExchange { get; set; }
+
+    public Task<Guid> CreateUserAsync(string email, string redirectTo, CancellationToken cancellationToken)
+    {
+        if (ShouldThrowOnCreate)
+        {
+            throw new InvalidOperationException("Simulated Supabase failure.");
+        }
+
+        CreatedUsers.Add((email, redirectTo));
+        return Task.FromResult(UserIdToReturn ?? Guid.NewGuid());
+    }
+
+    public Task ResendVerificationEmailAsync(string email, string redirectTo, CancellationToken cancellationToken)
+    {
+        ResentEmails.Add((email, redirectTo));
+        return Task.CompletedTask;
+    }
+
+    public Task<SupabaseSession> ExchangeCodeForSessionAsync(string code, CancellationToken cancellationToken)
+    {
+        if (ShouldThrowOnExchange)
+        {
+            throw new InvalidOperationException("Simulated invalid/expired Supabase verification code.");
+        }
+
+        // Reuses UserIdToReturn (the same knob SignUp tests set before calling /api/signup) so a
+        // test can drive the full SignUp -> VerifyEmail flow against the same Supabase auth user
+        // id without a separate code->session mapping.
+        return Task.FromResult(new SupabaseSession("access-token", "refresh-token", UserIdToReturn ?? Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(1)));
+    }
+
+    public void Reset()
+    {
+        CreatedUsers.Clear();
+        ResentEmails.Clear();
+        UserIdToReturn = null;
+        ShouldThrowOnCreate = false;
+        ShouldThrowOnExchange = false;
+    }
+}

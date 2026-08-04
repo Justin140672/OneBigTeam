@@ -28,19 +28,21 @@ public class CreateCheckoutSessionEndpointTests
         _factory.StripeGateway.Reset();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId, bool ensureActiveSubscription = true)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId, ensureActiveSubscription);
         return client;
     }
 
-    private HttpClient EmployeeClient(Guid companyId)
+    private async Task<HttpClient> EmployeeClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, EmployeeUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, EmployeeUserId, SystemRoles.Employee, companyId);
         return client;
     }
 
@@ -71,7 +73,7 @@ public class CreateCheckoutSessionEndpointTests
     public async Task Post_CheckoutSession_Returns_Forbidden_For_Role_Without_SubscriptionManage_Policy()
     {
         var companyId = await SeedCompanyWithSubscriptionAsync();
-        using var client = EmployeeClient(companyId);
+        using var client = await EmployeeClient(companyId);
 
         var response = await client.PostAsync("/api/companies/checkout-session", content: null);
 
@@ -83,7 +85,7 @@ public class CreateCheckoutSessionEndpointTests
     {
         var companyId = await SeedCompanyWithSubscriptionAsync();
         _factory.StripeGateway.CheckoutUrlToReturn = "https://checkout.stripe.com/session-happy-path";
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsync("/api/companies/checkout-session", content: null);
         response.EnsureSuccessStatusCode();
@@ -103,7 +105,7 @@ public class CreateCheckoutSessionEndpointTests
         await db.SaveChangesAsync();
         // Deliberately no CustomerSubscription row seeded.
 
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId, ensureActiveSubscription: false);
 
         var response = await client.PostAsync("/api/companies/checkout-session", content: null);
 

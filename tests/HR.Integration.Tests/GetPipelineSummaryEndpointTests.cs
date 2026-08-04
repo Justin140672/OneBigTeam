@@ -29,11 +29,12 @@ public class GetPipelineSummaryEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientAs(Guid userId, Guid companyId)
+    private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -51,7 +52,7 @@ public class GetPipelineSummaryEndpointTests
     public async Task Get_PipelineSummary_Returns_Forbidden_For_Plain_Employee()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(PlainEmployeeUser, companyId);
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/recruitment/pipeline-summary");
 
@@ -64,6 +65,7 @@ public class GetPipelineSummaryEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.Empty.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, RecruiterUser, SystemRoles.Recruiter, Guid.Empty);
 
         var response = await client.GetAsync($"/api/companies/{Guid.Empty}/recruitment/pipeline-summary");
 
@@ -74,7 +76,7 @@ public class GetPipelineSummaryEndpointTests
     public async Task Get_PipelineSummary_Returns_No_Items_When_Company_Has_No_RecruitmentStages()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/recruitment/pipeline-summary");
 
@@ -88,7 +90,7 @@ public class GetPipelineSummaryEndpointTests
     public async Task Get_PipelineSummary_Returns_Default_Stages_Zero_Filled_And_Excludes_Terminal_Stages_And_Withdrawn()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         await SeedAsync(scope =>
         {
@@ -134,7 +136,7 @@ public class GetPipelineSummaryEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = ClientAs(RecruiterUser, companyId);
+        using var client = await ClientAs(RecruiterUser, companyId);
 
         await SeedAsync(scope =>
         {

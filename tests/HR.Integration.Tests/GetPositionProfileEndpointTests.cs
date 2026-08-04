@@ -21,11 +21,12 @@ public class GetPositionProfileEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -102,7 +103,7 @@ public class GetPositionProfileEndpointTests
     public async Task Get_PositionProfile_Returns_PositionProfile_For_Authenticated_Request()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
 
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
@@ -134,7 +135,7 @@ public class GetPositionProfileEndpointTests
     public async Task Get_PositionProfile_Returns_NoticePeriodOverride_When_Set()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
 
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
@@ -166,7 +167,7 @@ public class GetPositionProfileEndpointTests
     public async Task Get_PositionProfile_Returns_NotFound_For_Unknown_Id()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/position-profiles/{Guid.NewGuid()}");
 
@@ -179,7 +180,7 @@ public class GetPositionProfileEndpointTests
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        using var client = AdminClient(companyA);
+        using var client = await AdminClient(companyA);
         var (departmentId, locationId, leavePolicyId) = await SeedReferenceDataAsync(client, companyA);
 
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyA}/position-profiles", new

@@ -37,8 +37,8 @@ public class AssetLifecycleEndToEndTests
         var employeeId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
 
-        using var adminClient    = AuthenticatedClient(AdminUser, companyId);
-        using var employeeClient = AuthenticatedClient(employeeId, companyId);
+        using var adminClient    = await AuthenticatedClient(AdminUser, companyId);
+        using var employeeClient = await AuthenticatedClient(employeeId, companyId);
 
         // ── Step 1: Create asset category and asset ────────────────────────────
         var categoryResp = await adminClient.PostAsJsonAsync(
@@ -125,11 +125,12 @@ public class AssetLifecycleEndToEndTests
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient(Guid userId, Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 

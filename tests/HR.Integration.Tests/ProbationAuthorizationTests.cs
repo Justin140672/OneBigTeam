@@ -32,11 +32,12 @@ public class ProbationAuthorizationTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientFor(Guid companyId, Guid userId)
+    private async Task<HttpClient> ClientFor(Guid companyId, Guid userId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -46,7 +47,7 @@ public class ProbationAuthorizationTests
     public async Task CompanyAdministrator_Gets_Forbidden_Creating_Probation_Record()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, CompanyAdministratorUser);
+        using var client = await ClientFor(companyId, CompanyAdministratorUser);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
         {
@@ -66,7 +67,7 @@ public class ProbationAuthorizationTests
     public async Task CompanyAdministrator_Gets_Forbidden_Getting_Probation_Review()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, CompanyAdministratorUser);
+        using var client = await ClientFor(companyId, CompanyAdministratorUser);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/probation-reviews/{Guid.NewGuid()}");
 
@@ -80,7 +81,7 @@ public class ProbationAuthorizationTests
     public async Task Manager_Gets_Ok_Getting_Upcoming_Probation_Reviews()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, ManagerUser);
+        using var client = await ClientFor(companyId, ManagerUser);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/probation-reviews/upcoming");
 
@@ -91,7 +92,7 @@ public class ProbationAuthorizationTests
     public async Task PlainEmployee_Gets_Forbidden_Getting_Upcoming_Probation_Reviews()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, PlainEmployeeUser);
+        using var client = await ClientFor(companyId, PlainEmployeeUser);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/probation-reviews/upcoming");
 

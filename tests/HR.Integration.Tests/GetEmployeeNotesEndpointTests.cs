@@ -26,11 +26,12 @@ public class GetEmployeeNotesEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -50,7 +51,7 @@ public class GetEmployeeNotesEndpointTests
     public async Task Get_EmployeeNotes_Returns_Created_Notes_For_HrAdministrator()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var employeeId = await CompensationTestHelpers.CreateEmployeeAsync(client, companyId);
 
         var created = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees/{employeeId}/notes", new
@@ -79,6 +80,7 @@ public class GetEmployeeNotesEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ManagerUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ManagerUserId, SystemRoles.Manager, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/notes");
 
@@ -93,6 +95,7 @@ public class GetEmployeeNotesEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, EmployeeUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, EmployeeUserId, SystemRoles.Employee, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/notes");
 

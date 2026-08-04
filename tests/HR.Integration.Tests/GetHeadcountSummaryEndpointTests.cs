@@ -24,11 +24,12 @@ public class GetHeadcountSummaryEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.Employee, companyId);
         return client;
     }
 
@@ -48,6 +49,7 @@ public class GetHeadcountSummaryEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.Empty.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.Employee, Guid.Empty);
 
         var response = await client.GetAsync($"/api/companies/{Guid.Empty}/employees/headcount-summary");
 
@@ -58,7 +60,7 @@ public class GetHeadcountSummaryEndpointTests
     public async Task Get_HeadcountSummary_Returns_Empty_List_When_No_Employees()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees/headcount-summary");
 
@@ -72,7 +74,7 @@ public class GetHeadcountSummaryEndpointTests
     public async Task Get_HeadcountSummary_Groups_By_Department_And_Excludes_Inactive_Employees()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var departmentId = await SeedAsync(companyId, (db, refData) =>
         {
@@ -114,7 +116,7 @@ public class GetHeadcountSummaryEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         await SeedAsync(companyId, (db, refData) =>
         {

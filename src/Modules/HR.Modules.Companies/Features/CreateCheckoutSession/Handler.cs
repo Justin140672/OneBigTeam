@@ -16,7 +16,7 @@ internal sealed class CreateCheckoutSessionHandler(
 {
     // Mirrors the base-URL resolution pattern used by HR.Marketing's SiteHeader.razor for
     // linking into HR.Web from another Aspire-hosted project.
-    private const string FallbackWebAppBaseUrl = "http://localhost:5270";
+    private const string FallbackWebAppBaseUrl = "http://localhost:5157";
 
     public async Task<Result<CreateCheckoutSessionResponse>> HandleAsync(CancellationToken cancellationToken)
     {

@@ -29,19 +29,21 @@ public class RecordSicknessEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
-    private HttpClient ClientFor(Guid companyId, Guid userId)
+    private async Task<HttpClient> ClientFor(Guid companyId, Guid userId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -81,7 +83,7 @@ public class RecordSicknessEndpointTests
     public async Task Post_SicknessRecords_Manager_Can_Record_For_Own_Direct_Report()
     {
         var companyId = Guid.NewGuid();
-        using var adminClient = AdminClient(companyId);
+        using var adminClient = await AdminClient(companyId);
         var categoryId = await CreateCategory(adminClient, companyId);
         var managerEmployeeId = await CreateEmployeeAsync(adminClient, companyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerEmployeeId, SystemRoles.Employee);
@@ -89,7 +91,7 @@ public class RecordSicknessEndpointTests
         var reportId = await CreateEmployeeAsync(adminClient, companyId);
         await AssignManagerAsync(adminClient, companyId, reportId, managerEmployeeId);
 
-        using var managerClient = ClientFor(companyId, managerEmployeeId);
+        using var managerClient = await ClientFor(companyId, managerEmployeeId);
         var response = await managerClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{reportId}/sickness-records",
             new
@@ -108,7 +110,7 @@ public class RecordSicknessEndpointTests
     public async Task Post_SicknessRecords_Manager_Gets_Forbidden_Recording_For_NonReport()
     {
         var companyId = Guid.NewGuid();
-        using var adminClient = AdminClient(companyId);
+        using var adminClient = await AdminClient(companyId);
         var categoryId = await CreateCategory(adminClient, companyId);
         var managerEmployeeId = await CreateEmployeeAsync(adminClient, companyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerEmployeeId, SystemRoles.Employee);
@@ -117,7 +119,7 @@ public class RecordSicknessEndpointTests
         var reportId = await CreateEmployeeAsync(adminClient, companyId);
         await AssignManagerAsync(adminClient, companyId, reportId, otherManagerEmployeeId);
 
-        using var managerClient = ClientFor(companyId, managerEmployeeId);
+        using var managerClient = await ClientFor(companyId, managerEmployeeId);
         var response = await managerClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{reportId}/sickness-records",
             new
@@ -136,11 +138,11 @@ public class RecordSicknessEndpointTests
     public async Task Post_SicknessRecords_PlainEmployee_Gets_Forbidden()
     {
         var companyId = Guid.NewGuid();
-        using var adminClient = AdminClient(companyId);
+        using var adminClient = await AdminClient(companyId);
         var categoryId = await CreateCategory(adminClient, companyId);
         var reportId = await CreateEmployeeAsync(adminClient, companyId);
 
-        using var employeeClient = ClientFor(companyId, PlainEmployeeUserId);
+        using var employeeClient = await ClientFor(companyId, PlainEmployeeUserId);
         var response = await employeeClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{reportId}/sickness-records",
             new
@@ -183,7 +185,7 @@ public class RecordSicknessEndpointTests
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateCategory(client, companyId);
 
         var response = await client.PostAsJsonAsync(
@@ -216,7 +218,7 @@ public class RecordSicknessEndpointTests
     public async Task Post_SicknessRecords_Returns_NotFound_When_Category_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/sickness-records",
@@ -236,7 +238,7 @@ public class RecordSicknessEndpointTests
     public async Task Post_SicknessRecords_Returns_UnprocessableEntity_When_CategoryId_Is_Empty()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/sickness-records",
@@ -256,7 +258,7 @@ public class RecordSicknessEndpointTests
     public async Task Post_SicknessRecords_Returns_UnprocessableEntity_When_StartDate_Is_Missing()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/sickness-records",
@@ -276,7 +278,7 @@ public class RecordSicknessEndpointTests
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateCategory(client, companyId);
 
         // Create the first open record

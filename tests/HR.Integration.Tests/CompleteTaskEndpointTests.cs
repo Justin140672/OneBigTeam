@@ -32,7 +32,7 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task Complete_Task_Returns_NotFound_When_Task_Does_Not_Exist()
     {
-        using var client = AuthenticatedClient(Guid.NewGuid());
+        using var client = await AuthenticatedClient(Guid.NewGuid());
 
         var response = await client.PostAsync(
             $"/api/companies/{SeededCompanyId}/tasks/{Guid.NewGuid()}/complete",
@@ -47,7 +47,7 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
     public async Task Complete_Task_Returns_Conflict_When_Task_Is_Cancelled()
     {
         var userId = Guid.NewGuid();
-        using var client = AuthenticatedClient(userId);
+        using var client = await AuthenticatedClient(userId);
 
         var cancelledTaskId = await SeedCancelledTaskAsync();
 
@@ -64,7 +64,7 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
     public async Task Complete_Task_Returns_Completed_Status()
     {
         var userId = Guid.NewGuid();
-        using var client = AuthenticatedClient(userId);
+        using var client = await AuthenticatedClient(userId);
 
         var taskId = await CreateTaskAsync("Task to complete");
 
@@ -83,7 +83,7 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
     public async Task Complete_Task_Is_Idempotent()
     {
         var userId = Guid.NewGuid();
-        using var client = AuthenticatedClient(userId);
+        using var client = await AuthenticatedClient(userId);
 
         var taskId = await CreateTaskAsync("Task to complete twice");
 
@@ -97,13 +97,14 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient(Guid userId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId)
     {
         TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee).GetAwaiter().GetResult();
 
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(factory, userId, SystemRoles.Employee, SeededCompanyId);
         return client;
     }
 

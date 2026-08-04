@@ -20,11 +20,12 @@ public class ListOnboardingTemplatesForPositionProfileEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -43,7 +44,7 @@ public class ListOnboardingTemplatesForPositionProfileEndpointTests
     public async Task Get_OnboardingTemplates_Returns_NotFound_For_Unknown_PositionProfile()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/position-profiles/{Guid.NewGuid()}/onboarding-templates");
@@ -55,7 +56,7 @@ public class ListOnboardingTemplatesForPositionProfileEndpointTests
     public async Task Get_OnboardingTemplates_Returns_Empty_List_When_None_Assigned()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Operations Lead");
 
@@ -72,7 +73,7 @@ public class ListOnboardingTemplatesForPositionProfileEndpointTests
     public async Task Get_OnboardingTemplates_Returns_Assigned_Templates_With_TaskCount()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Software Engineer");
         var templateId = await CreateOnboardingTemplateAsync(client, companyId, "Standard Onboarding", "Default checklist");
@@ -98,7 +99,7 @@ public class ListOnboardingTemplatesForPositionProfileEndpointTests
     public async Task Get_OnboardingTemplates_Excludes_Removed_Assignments()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "HR Manager");
         var templateAId = await CreateOnboardingTemplateAsync(client, companyId, "Template A", null);
@@ -126,8 +127,8 @@ public class ListOnboardingTemplatesForPositionProfileEndpointTests
     {
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
-        using var clientA = AuthenticatedClient(companyA);
-        using var clientB = AuthenticatedClient(companyB);
+        using var clientA = await AuthenticatedClient(companyA);
+        using var clientB = await AuthenticatedClient(companyB);
 
         var profileAId = await CreatePositionProfileAsync(clientA, companyA, "Developer");
         var profileBId = await CreatePositionProfileAsync(clientB, companyB, "Developer");

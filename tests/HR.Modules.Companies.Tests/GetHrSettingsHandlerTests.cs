@@ -114,10 +114,10 @@ public class GetHrSettingsHandlerTests
         var result = await handler.HandleAsync(new GetHrSettingsRequest { Id = company.Id }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(EmployeeNumberMode.Manual, result.Value!.EmployeeNumberMode);
+        Assert.Equal(EmployeeNumberMode.Automatic, result.Value!.EmployeeNumberMode);
         Assert.Null(result.Value.EmployeeNumberPrefix);
         Assert.Equal(1, result.Value.NextEmployeeNumber);
-        Assert.Equal(1, result.Value.EmployeeNumberMinimumLength);
+        Assert.Equal(4, result.Value.EmployeeNumberMinimumLength);
     }
 
     [Fact]

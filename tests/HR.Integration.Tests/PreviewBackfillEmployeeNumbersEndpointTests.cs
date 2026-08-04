@@ -31,11 +31,12 @@ public class PreviewBackfillEmployeeNumbersEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid userId, Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -126,7 +127,7 @@ public class PreviewBackfillEmployeeNumbersEndpointTests
     [Fact]
     public async Task Returns_Conflict_When_Company_Is_In_Manual_Mode()
     {
-        using var client = AuthenticatedClient(User1, Guid.NewGuid());
+        using var client = await AuthenticatedClient(User1, Guid.NewGuid());
         var companyId = await CreateCompanyAsync(client);
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
@@ -141,7 +142,7 @@ public class PreviewBackfillEmployeeNumbersEndpointTests
     [Fact]
     public async Task Returns_Ok_With_Empty_Candidates_When_No_Employees_Are_Missing_A_Number()
     {
-        using var client = AuthenticatedClient(User2, Guid.NewGuid());
+        using var client = await AuthenticatedClient(User2, Guid.NewGuid());
         var companyId = await CreateCompanyAsync(client);
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
@@ -159,7 +160,7 @@ public class PreviewBackfillEmployeeNumbersEndpointTests
     [Fact]
     public async Task Returns_Ok_With_Predicted_Numbers_For_Employees_Missing_A_Number_Ordered_By_StartDate()
     {
-        using var client = AuthenticatedClient(User3, Guid.NewGuid());
+        using var client = await AuthenticatedClient(User3, Guid.NewGuid());
         var companyId = await CreateCompanyAsync(client);
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
@@ -186,7 +187,7 @@ public class PreviewBackfillEmployeeNumbersEndpointTests
     [Fact]
     public async Task Preview_Does_Not_Advance_The_Real_Counter_Or_Mutate_Any_Employee()
     {
-        using var client = AuthenticatedClient(User4, Guid.NewGuid());
+        using var client = await AuthenticatedClient(User4, Guid.NewGuid());
         var companyId = await CreateCompanyAsync(client);
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());

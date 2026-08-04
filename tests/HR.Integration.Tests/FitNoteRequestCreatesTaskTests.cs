@@ -135,11 +135,12 @@ public class FitNoteRequestCreatesTaskTests
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
-    private HttpClient ClientFor(Guid userId, Guid tenantId)
+    private async Task<HttpClient> ClientFor(Guid userId, Guid tenantId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, tenantId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, tenantId);
         return client;
     }
 
@@ -152,7 +153,7 @@ public class FitNoteRequestCreatesTaskTests
     /// </summary>
     private async Task<(HttpClient CompanyAdminClient, HttpClient HrClient, Guid CompanyId)> CreateAuthenticatedClientWithCompanyAsync()
     {
-        var companyAdminClient = ClientFor(CompanyAdminUser, CompanyAdminUser);
+        var companyAdminClient = await ClientFor(CompanyAdminUser, CompanyAdminUser);
 
         var resp = await companyAdminClient.PostAsJsonAsync("/api/companies", new
         {
@@ -168,7 +169,7 @@ public class FitNoteRequestCreatesTaskTests
         companyAdminClient.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
         companyAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, company!.Id.ToString());
 
-        var hrClient = ClientFor(HrAdminUser, company.Id);
+        var hrClient = await ClientFor(HrAdminUser, company.Id);
 
         return (companyAdminClient, hrClient, company.Id);
     }

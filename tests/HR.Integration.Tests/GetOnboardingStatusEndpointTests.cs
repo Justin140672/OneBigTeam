@@ -37,7 +37,7 @@ public class GetOnboardingStatusEndpointTests
     public async Task Get_OnboardingStatus_Returns_HasPlan_False_When_Employee_Has_No_Plan()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/onboarding-status");
@@ -53,7 +53,7 @@ public class GetOnboardingStatusEndpointTests
     public async Task Get_OnboardingStatus_Returns_NotStarted_After_Employee_Created()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
 
@@ -71,7 +71,7 @@ public class GetOnboardingStatusEndpointTests
     public async Task Get_OnboardingStatus_Returns_InProgress_After_First_Task_Completed()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
         await CompleteUnassignedOnboardingTaskAsync(client, companyId, "Set up workstation");
@@ -90,7 +90,7 @@ public class GetOnboardingStatusEndpointTests
     public async Task Get_OnboardingStatus_Returns_Completed_After_All_Tasks_Completed()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
         await CompleteUnassignedOnboardingTaskAsync(client, companyId, "Set up workstation");
@@ -109,11 +109,12 @@ public class GetOnboardingStatusEndpointTests
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

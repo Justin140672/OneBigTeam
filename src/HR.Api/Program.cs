@@ -20,6 +20,7 @@ using HR.Modules.Recruitment;
 using HR.Modules.Tasks;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
@@ -33,7 +34,7 @@ builder.Services.AddCompanyOnboardingModule(connectionString);
 builder.Services.AddDataImportModule(connectionString, builder.Configuration);
 builder.Services.AddDocumentsModule(connectionString, builder.Configuration);
 builder.Services.AddEmployeesModule(connectionString);
-builder.Services.AddIdentityModule(connectionString);
+builder.Services.AddIdentityModule(connectionString, builder.Configuration);
 builder.Services.AddLeaveModule(connectionString);
 builder.Services.AddNotificationsModule(connectionString);
 builder.Services.AddOnboardingModule(connectionString);
@@ -52,19 +53,58 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher>();
 
+// Supabase-backed JWT Bearer validation, shared between Development (dual-scheme below) and
+// non-Development (sole scheme). This Supabase project uses asymmetric JWT signing (JWKS), not a
+// shared HS256 secret — see SupabaseJwksKeyResolver below.
+void ConfigureSupabaseJwtBearer(JwtBearerOptions options)
+{
+	var supabaseProjectUrl = builder.Configuration["SupabaseAuth:ProjectUrl"] ?? "";
+	var supabaseJwksUrl = builder.Configuration["SupabaseAuth:JwksUrl"] ?? "";
+
+	options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+	{
+		ValidateIssuer = true,
+		ValidIssuer = $"{supabaseProjectUrl}/auth/v1",
+		ValidateAudience = true,
+		// "authenticated" is Supabase's well-known audience claim value for authenticated users on
+		// issued access tokens.
+		ValidAudience = "authenticated",
+		ValidateLifetime = true,
+		IssuerSigningKeyResolver = (_, _, kid, _) =>
+			SupabaseJwksKeyResolver.ResolveSigningKeys(supabaseJwksUrl, kid),
+	};
+}
+
 if (builder.Environment.IsDevelopment())
 {
 	builder.Services.AddSingleton<DevPersonaStore>();
+
+	// Dual-scheme: requests carrying a real Authorization: Bearer header (e.g. HR.Web's
+	// /verify-email flow calling back in with a genuine Supabase access token, or anyone testing
+	// real Supabase Auth end-to-end locally) are validated as real Supabase JWTs; everything else
+	// keeps using the dev-persona auto-login as before. Without this, Development could never
+	// authenticate a real Supabase-issued token at all — DevAuthHandler ignores the header
+	// entirely and always signs the request in as the fixed dev persona.
 	builder.Services
-		.AddAuthentication("DevAuth")
+		.AddAuthentication("DevOrSupabase")
+		.AddPolicyScheme("DevOrSupabase", "DevOrSupabase", options =>
+		{
+			options.ForwardDefaultSelector = context =>
+				context.Request.Headers.ContainsKey("Authorization")
+					? JwtBearerDefaults.AuthenticationScheme
+					: "DevAuth";
+		})
 		.AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, DevAuthHandler>(
-			"DevAuth", _ => { });
+			"DevAuth", _ => { })
+		.AddJwtBearer(ConfigureSupabaseJwtBearer);
 }
 else
 {
+	// Supabase-backed authentication for non-Development environments (Phase B of the "Move Email
+	// Verification into the Main Application" plan).
 	builder.Services
 		.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-		.AddJwtBearer();
+		.AddJwtBearer(ConfigureSupabaseJwtBearer);
 }
 
 builder.Services
@@ -570,3 +610,54 @@ app.Run();
 public partial class Program;
 
 internal sealed record RegisterDevPersonaRequest(Guid UserId, Guid CompanyId, string FirstName, string LastName, string Email);
+
+// Fetches and caches Supabase's JWKS (bare JSON Web Key Set, RFC 7517) document so JWT Bearer
+// validation can resolve the signing key matching a token's "kid" header. AddJwtBearer's built-in
+// options.MetadataAddress auto-discovery expects a full OpenID Connect discovery document (which
+// itself points at a jwks_uri) — Supabase's JwksUrl here is a bare JWKS document, not an OIDC
+// discovery document, so MetadataAddress is not usable and this manual resolver is used instead.
+// IssuerSigningKeyResolver is a synchronous callback, so the JWKS fetch below is synchronous
+// (blocking) with a short in-memory cache to avoid fetching on every request.
+internal static class SupabaseJwksKeyResolver
+{
+	private static readonly HttpClient HttpClient = new();
+	private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(10);
+	private static readonly SemaphoreSlim RefreshLock = new(1, 1);
+
+	private static Microsoft.IdentityModel.Tokens.JsonWebKeySet? _cachedKeySet;
+	private static DateTimeOffset _cachedAt = DateTimeOffset.MinValue;
+
+	public static IEnumerable<Microsoft.IdentityModel.Tokens.SecurityKey> ResolveSigningKeys(string jwksUrl, string? kid)
+	{
+		var keySet = GetKeySet(jwksUrl);
+		var keys = keySet.GetSigningKeys();
+
+		return string.IsNullOrEmpty(kid)
+			? keys
+			: keys.Where(key => key.KeyId == kid);
+	}
+
+	private static Microsoft.IdentityModel.Tokens.JsonWebKeySet GetKeySet(string jwksUrl)
+	{
+		if (_cachedKeySet is not null && DateTimeOffset.UtcNow - _cachedAt < CacheDuration)
+			return _cachedKeySet;
+
+		RefreshLock.Wait();
+		try
+		{
+			if (_cachedKeySet is not null && DateTimeOffset.UtcNow - _cachedAt < CacheDuration)
+				return _cachedKeySet;
+
+			// Blocking call: IssuerSigningKeyResolver is a synchronous delegate in
+			// Microsoft.IdentityModel.Tokens, so there is no async alternative here.
+			var json = HttpClient.GetStringAsync(jwksUrl).GetAwaiter().GetResult();
+			_cachedKeySet = new Microsoft.IdentityModel.Tokens.JsonWebKeySet(json);
+			_cachedAt = DateTimeOffset.UtcNow;
+			return _cachedKeySet;
+		}
+		finally
+		{
+			RefreshLock.Release();
+		}
+	}
+}

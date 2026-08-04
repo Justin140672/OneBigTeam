@@ -18,11 +18,12 @@ public class RetireAssetEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -67,7 +68,7 @@ public class RetireAssetEndpointTests
     public async Task Delete_Asset_Returns_NotFound_When_Asset_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/assets/{Guid.NewGuid()}");
@@ -79,7 +80,7 @@ public class RetireAssetEndpointTests
     public async Task Delete_Asset_Returns_NoContent_On_Success()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateActiveCategoryAsync(client, companyId);
         var assetId = await CreateAssetAsync(client, companyId, categoryId);
 
@@ -94,11 +95,11 @@ public class RetireAssetEndpointTests
     {
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
-        using var createClient = AdminClient(companyId);
+        using var createClient = await AdminClient(companyId);
         var categoryId = await CreateActiveCategoryAsync(createClient, companyId);
         var assetId = await CreateAssetAsync(createClient, companyId, categoryId);
 
-        using var otherClient = AdminClient(otherCompanyId);
+        using var otherClient = await AdminClient(otherCompanyId);
         var response = await otherClient.DeleteAsync(
             $"/api/companies/{otherCompanyId}/assets/{assetId}");
 
@@ -109,7 +110,7 @@ public class RetireAssetEndpointTests
     public async Task Delete_Asset_Returns_Conflict_When_Asset_Is_Assigned()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
         var categoryId = await CreateActiveCategoryAsync(client, companyId);
         var assetId = await CreateAssetAsync(client, companyId, categoryId);
 

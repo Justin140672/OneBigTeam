@@ -62,6 +62,7 @@ public class UploadEmployeeProfilePhotoEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, callerId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, callerId, companyId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo",
@@ -92,7 +93,7 @@ public class UploadEmployeeProfilePhotoEndpointTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo",
@@ -115,7 +116,7 @@ public class UploadEmployeeProfilePhotoEndpointTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo",
@@ -133,7 +134,7 @@ public class UploadEmployeeProfilePhotoEndpointTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var oversized = new byte[6 * 1024 * 1024]; // exceeds the default 5 MB limit
 
@@ -149,7 +150,7 @@ public class UploadEmployeeProfilePhotoEndpointTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo",
@@ -163,7 +164,7 @@ public class UploadEmployeeProfilePhotoEndpointTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         // Extension/content type claim PNG, but the bytes are not a PNG (spoofed/renamed file).
         var spoofed = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
@@ -180,7 +181,7 @@ public class UploadEmployeeProfilePhotoEndpointTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo",
@@ -194,7 +195,7 @@ public class UploadEmployeeProfilePhotoEndpointTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo",
@@ -208,7 +209,7 @@ public class UploadEmployeeProfilePhotoEndpointTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var first = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo",
@@ -242,15 +243,17 @@ public class UploadEmployeeProfilePhotoEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, companyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }
 
-    private HttpClient ManagerClient(Guid companyId)
+    private async Task<HttpClient> ManagerClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ManagerUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ManagerUser, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

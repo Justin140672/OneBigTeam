@@ -10,8 +10,10 @@ using HR.Modules.Identity.Features.GetUserDetails;
 using HR.Modules.Identity.Features.InviteEmployeeUser;
 using HR.Modules.Identity.Features.ListUsers;
 using HR.Modules.Identity.Features.ResendInvite;
+using HR.Modules.Identity.Features.ResendVerification;
 using HR.Modules.Identity.Features.SignUp;
 using HR.Modules.Identity.Features.UpdateUserRoles;
+using HR.Modules.Identity.Features.VerifyEmail;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Identity.Services;
 using HR.Modules.Identity.Services.OnboardingTasks;
@@ -19,6 +21,7 @@ using HR.SharedKernel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Modules.Identity;
@@ -27,12 +30,17 @@ public static class IdentityModule
 {
     public static IServiceCollection AddIdentityModule(
         this IServiceCollection services,
-        string connectionString)
+        string connectionString,
+        IConfiguration configuration)
     {
         services.AddDbContext<IdentityDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "identity")));
         services.AddHttpContextAccessor();
+
+        services.Configure<SupabaseAuthOptions>(configuration.GetSection("SupabaseAuth"));
+        services.AddHttpClient();
+        services.AddScoped<ISupabaseAuthGateway, SupabaseAuthGateway>();
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
         services.AddScoped<ICurrentTenant, HttpContextCurrentTenant>();
         services.AddScoped<HR.SharedKernel.IAuthorizationService, IdentityAuthorizationService>();
@@ -61,6 +69,9 @@ public static class IdentityModule
         services.AddScoped<IValidator<EnableUserRequest>, EnableUserValidator>();
         services.AddScoped<SignUpHandler>();
         services.AddScoped<IValidator<SignUpRequest>, SignUpValidator>();
+        services.AddScoped<ResendVerificationHandler>();
+        services.AddScoped<IValidator<ResendVerificationRequest>, ResendVerificationValidator>();
+        services.AddScoped<VerifyEmailHandler>();
 
         services.AddScoped<
             IIntegrationEventHandler<OffboardingPlanCompletedIntegrationEvent>,

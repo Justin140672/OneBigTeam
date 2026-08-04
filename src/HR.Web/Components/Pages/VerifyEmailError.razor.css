@@ -1,0 +1,79 @@
+.login-card {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    padding: 40px 40px 36px;
+    width: 100%;
+    max-width: 520px;
+}
+
+.login-brand {
+    display: flex;
+    align-items: center;
+    margin-bottom: 28px;
+}
+
+.login-logo-img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+}
+
+.login-heading {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 4px;
+}
+
+.login-subheading {
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin: 0 0 24px;
+}
+
+.login-field {
+    margin-bottom: 18px;
+}
+
+.login-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 6px;
+}
+
+.login-validation {
+    display: block;
+    font-size: 0.8rem;
+    color: #dc2626;
+    margin-top: 4px;
+}
+
+.login-btn {
+    width: 100%;
+    margin-top: 8px;
+}
+
+/* This page is deliberately light-only (the card above is hardcoded to a white background,
+   never adapting to dark mode) — but the SfTextBox input doesn't know that: App.razor's
+   theme-detection script runs on every page including this one and defaults to dark based on
+   the OS/browser's prefers-color-scheme when the visitor has never explicitly toggled a
+   preference, enabling Syncfusion's separate dark-theme stylesheet and Bootstrap's
+   data-bs-theme="dark" globally. Without this override the input renders with a dark
+   background inside the always-white card. !important is needed to beat the dark Syncfusion
+   stylesheet's own specificity; ::deep reaches into SfTextBox's own generated markup, which
+   Blazor's CSS isolation wouldn't otherwise scope to this component. */
+::deep .e-input-group,
+::deep .e-input-group.e-control-wrapper,
+::deep .e-float-input.e-control-wrapper {
+    background: #fff !important;
+    border-color: #d1d5db !important;
+}
+
+::deep .e-input-group input.e-input,
+::deep .e-float-input input {
+    background: #fff !important;
+    color: #111827 !important;
+}

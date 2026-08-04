@@ -58,7 +58,7 @@ public class LeaveSubmittedCreatesTaskTests
         await AssignPolicyAsync(client, report.Id, policyId);
         await SubmitLeaveAsync(client, report.Id);
 
-        using var managerClient = AsEmployee(manager.Id);
+        using var managerClient = await AsEmployee(manager.Id);
         var response = await managerClient.GetAsync(
             $"/api/companies/{SeededCompanyId}/notifications/my");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -71,7 +71,7 @@ public class LeaveSubmittedCreatesTaskTests
     [Fact]
     public async Task Submit_Leave_Without_Manager_Does_Not_Fail()
     {
-        using var client   = AdminClient();
+        using var client   = await AdminClient();
         var policyId       = await CreatePolicyAsync(client);
         var orphan         = await CreateEmployeeAsync(client, "Orphan", "Employee");
         await AssignPolicyAsync(client, orphan.Id, policyId);
@@ -85,7 +85,7 @@ public class LeaveSubmittedCreatesTaskTests
 
     private async Task<(HttpClient Client, Guid PolicyId, EmpPayload Manager, EmpPayload Report)> SetupAsync()
     {
-        var client   = AdminClient();
+        var client   = await AdminClient();
         var policyId = await CreatePolicyAsync(client);
         var manager  = await CreateEmployeeAsync(client, "Leave", "Manager");
         var report   = await CreateEmployeeAsync(client, "Leave", "Report");
@@ -159,21 +159,23 @@ public class LeaveSubmittedCreatesTaskTests
         return resp;
     }
 
-    private HttpClient AdminClient()
+    private async Task<HttpClient> AdminClient()
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUser, SystemRoles.HrAdministrator, SeededCompanyId);
         return client;
     }
 
-    private HttpClient AsEmployee(Guid employeeId)
+    private async Task<HttpClient> AsEmployee(Guid employeeId)
     {
         TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee).GetAwaiter().GetResult();
 
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, SeededCompanyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, SeededCompanyId);
         return client;
     }
 

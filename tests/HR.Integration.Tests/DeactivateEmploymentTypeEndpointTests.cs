@@ -21,11 +21,12 @@ public class DeactivateEmploymentTypeEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -43,7 +44,7 @@ public class DeactivateEmploymentTypeEndpointTests
     public async Task Delete_EmploymentType_Deactivates_It()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/employment-types", new
         {
@@ -69,7 +70,7 @@ public class DeactivateEmploymentTypeEndpointTests
     public async Task Delete_EmploymentType_Returns_NotFound_For_Unknown_Id()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/employment-types/{Guid.NewGuid()}");
@@ -81,7 +82,7 @@ public class DeactivateEmploymentTypeEndpointTests
     public async Task Delete_EmploymentType_Returns_BadRequest_When_Already_Inactive()
     {
         var companyId = Guid.NewGuid();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var createResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/employment-types", new
         {

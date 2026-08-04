@@ -73,6 +73,7 @@ public class GetPendingProfilePhotoEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending");
@@ -85,7 +86,7 @@ public class GetPendingProfilePhotoEndpointTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending");
@@ -111,7 +112,7 @@ public class GetPendingProfilePhotoEndpointTests
         // An HR caller genuinely belonging to Company A (their own claim matches the route) tries
         // to fetch the employeeId that actually belongs to Company B — must 404, never leak.
         var companyA = Guid.NewGuid();
-        using var clientA = ManagerClient(companyA);
+        using var clientA = await ManagerClient(companyA);
 
         var response = await clientA.GetAsync(
             $"/api/companies/{companyA}/employees/{employeeId}/profile-photo/pending");
@@ -133,7 +134,7 @@ public class GetPendingProfilePhotoEndpointTests
             Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
         }
 
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending");
@@ -157,15 +158,17 @@ public class GetPendingProfilePhotoEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, companyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }
 
-    private HttpClient ManagerClient(Guid companyId)
+    private async Task<HttpClient> ManagerClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ManagerUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ManagerUser, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

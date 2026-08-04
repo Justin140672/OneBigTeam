@@ -36,6 +36,7 @@ public class GetCompensationImportTemplateEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, TemplateAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, TemplateAdmin, SystemRoles.HrAdministrator, companyId);
 
         await CompensationTestHelpers.CreateEmployeeWithNumberAsync(client, companyId);
 

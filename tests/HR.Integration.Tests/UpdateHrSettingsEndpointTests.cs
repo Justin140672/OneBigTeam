@@ -24,17 +24,18 @@ public class UpdateHrSettingsEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientFor(Guid userId, Guid tenantId)
+    private async Task<HttpClient> ClientFor(Guid userId, Guid tenantId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, tenantId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, tenantId);
         return client;
     }
 
     private async Task<Guid> CreateCompanyAsync(Guid tenantId)
     {
-        using var client = ClientFor(HrAdminUserId, tenantId);
+        using var client = await ClientFor(HrAdminUserId, tenantId);
 
         var response = await client.PostAsJsonAsync("/api/companies", new
         {
@@ -74,7 +75,7 @@ public class UpdateHrSettingsEndpointTests
     {
         var tenantId = Guid.NewGuid();
         var companyId = await CreateCompanyAsync(tenantId);
-        using var client = ClientFor(HrAdminUserId, tenantId);
+        using var client = await ClientFor(HrAdminUserId, tenantId);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
         {
@@ -101,7 +102,7 @@ public class UpdateHrSettingsEndpointTests
         // must no longer be able to change HR-policy settings.
         var tenantId = Guid.NewGuid();
         var companyId = await CreateCompanyAsync(tenantId);
-        using var client = ClientFor(CompanyAdminOnlyUserId, tenantId);
+        using var client = await ClientFor(CompanyAdminOnlyUserId, tenantId);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", HrSettingsBody());
 
@@ -113,7 +114,7 @@ public class UpdateHrSettingsEndpointTests
     {
         var tenantId = Guid.NewGuid();
         var companyId = await CreateCompanyAsync(tenantId);
-        using var client = ClientFor(HrAdminUserId, tenantId);
+        using var client = await ClientFor(HrAdminUserId, tenantId);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
         {
@@ -134,7 +135,7 @@ public class UpdateHrSettingsEndpointTests
     {
         var tenantId = Guid.NewGuid();
         var companyId = await CreateCompanyAsync(tenantId);
-        using var client = ClientFor(HrAdminUserId, tenantId);
+        using var client = await ClientFor(HrAdminUserId, tenantId);
 
         var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
         {
@@ -151,7 +152,7 @@ public class UpdateHrSettingsEndpointTests
     [Fact]
     public async Task Put_Hr_Settings_Returns_NotFound_For_Unknown_Id()
     {
-        using var client = ClientFor(HrAdminUserId, Guid.NewGuid());
+        using var client = await ClientFor(HrAdminUserId, Guid.NewGuid());
 
         var response = await client.PutAsJsonAsync($"/api/companies/{Guid.NewGuid()}/hr-settings", HrSettingsBody());
 
@@ -163,8 +164,8 @@ public class UpdateHrSettingsEndpointTests
     {
         var tenantId = Guid.NewGuid();
         var companyId = await CreateCompanyAsync(tenantId);
-        using var client = ClientFor(HrAdminUserId, tenantId);
-        using var companyAdminClient = ClientFor(CompanyAdminOnlyUserId, tenantId);
+        using var client = await ClientFor(HrAdminUserId, tenantId);
+        using var companyAdminClient = await ClientFor(CompanyAdminOnlyUserId, tenantId);
 
         // Update company (profile) settings — company:manage is CompanyAdministrator-only.
         var settingsResponse = await companyAdminClient.PutAsJsonAsync($"/api/companies/{companyId}/settings", new

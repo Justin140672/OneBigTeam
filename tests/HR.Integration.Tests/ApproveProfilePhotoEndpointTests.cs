@@ -81,6 +81,7 @@ public class ApproveProfilePhotoEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, companyId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/approve",
@@ -94,7 +95,7 @@ public class ApproveProfilePhotoEndpointTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/approve",
@@ -122,7 +123,7 @@ public class ApproveProfilePhotoEndpointTests
         // to approve the employeeId that actually belongs to Company B — must 404, never leak,
         // and must not touch Company B's pending photo.
         var companyA = Guid.NewGuid();
-        using var clientA = ManagerClient(companyA);
+        using var clientA = await ManagerClient(companyA);
 
         var response = await clientA.PostAsync(
             $"/api/companies/{companyA}/employees/{employeeId}/profile-photo/pending/approve",
@@ -155,7 +156,7 @@ public class ApproveProfilePhotoEndpointTests
             Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
         }
 
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/approve",
@@ -205,7 +206,7 @@ public class ApproveProfilePhotoEndpointTests
             Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
         }
 
-        using var client = ManagerClient(companyId);
+        using var client = await ManagerClient(companyId);
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/approve",
@@ -231,15 +232,17 @@ public class ApproveProfilePhotoEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, companyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         return client;
     }
 
-    private HttpClient ManagerClient(Guid companyId)
+    private async Task<HttpClient> ManagerClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ManagerUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, ManagerUser, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 

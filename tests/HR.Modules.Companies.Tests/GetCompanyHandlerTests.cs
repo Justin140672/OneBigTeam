@@ -39,7 +39,9 @@ public class GetCompanyHandlerTests
         Assert.NotNull(result.Value);
         Assert.Equal(company.Id, result.Value!.Id);
         Assert.Equal("Acme Corporation", result.Value.Name);
-        Assert.True(result.Value.IsActive);
+        // Company.Create now always starts a company in PendingVerification — see
+        // CreateCompanyHandlerTests for the full rationale.
+        Assert.False(result.Value.IsActive);
         Assert.Equal(now, result.Value.CreatedAt);
         Assert.Single(result.Value.Addresses);
         Assert.Equal(CompanyAddressType.RegisteredOffice, result.Value.Addresses.Single().Type);

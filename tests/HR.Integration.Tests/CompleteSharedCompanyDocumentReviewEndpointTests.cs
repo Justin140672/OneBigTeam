@@ -45,7 +45,7 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(
@@ -92,7 +92,7 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(
@@ -137,7 +137,7 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(
@@ -177,7 +177,7 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(
@@ -210,7 +210,7 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(
@@ -246,13 +246,13 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         var differentCompany = Guid.NewGuid();
         var userId           = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var uploadClient = ClientAs(companyId, userId);
+        using var uploadClient = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(uploadClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(uploadClient, companyId, categoryId);
 
         // Same user, but the tenant header on this client claims a different company than the
         // one in the route — must be rejected before the document lookup even runs.
-        using var mismatchedClient = ClientAs(differentCompany, userId);
+        using var mismatchedClient = await ClientAs(differentCompany, userId);
         var response = await mismatchedClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/complete-review",
             new { ReviewNotes = "Reviewed." });
@@ -269,13 +269,13 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
 
-        using var hrClient = ClientAs(companyId, hrUserId);
+        using var hrClient = await ClientAs(companyId, hrUserId);
         var categoryId = await CreateCategoryAsync(hrClient, companyId, "Policy");
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId);
 
         // Manager holds no company-wide role that satisfies shared-document:manage, so the
         // policy itself should reject the call before the tenant-claim check even matters.
-        using var managerClient = ClientAs(companyId, managerId);
+        using var managerClient = await ClientAs(companyId, managerId);
         var response = await managerClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/complete-review",
             new { ReviewNotes = "Reviewed." });
@@ -289,7 +289,7 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{Guid.NewGuid()}/complete-review",
@@ -308,11 +308,11 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInA, SystemRoles.HrAdministrator);
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
-        using var clientA = ClientAs(companyA, hrInA);
+        using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
         var (doc, _) = await UploadAsync(clientA, companyA, categoryInA);
 
-        using var clientB = ClientAs(companyB, hrInB);
+        using var clientB = await ClientAs(companyB, hrInB);
         var response = await clientB.PostAsJsonAsync(
             $"/api/companies/{companyB}/shared-documents/{doc!.Id}/complete-review",
             new { ReviewNotes = "Reviewed." });
@@ -326,7 +326,7 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
 
@@ -343,7 +343,7 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(client, companyId, categoryId);
 
@@ -367,7 +367,7 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(
@@ -419,7 +419,7 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
-        using var client = ClientAs(companyId, userId);
+        using var client = await ClientAs(companyId, userId);
 
         var categoryId = await CreateCategoryAsync(client, companyId, "Policy");
         var (doc, _) = await UploadAsync(
@@ -546,11 +546,18 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         return bytes;
     }
 
-    private HttpClient ClientAs(Guid companyId, Guid userId)
+    private async Task<HttpClient> ClientAs(Guid companyId, Guid userId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        // Role-agnostic sync only — every caller of this helper already granted the specific
+        // role(s) it wants to test beforehand via AssignRoleAsync. Hardcoding a role here (this
+        // used to always grant SystemRoles.HrAdministrator) additionally granted it to every
+        // caller regardless of intent, which used to be harmless only because tenant resolution
+        // didn't actually key off UserProfile.CompanyId yet — now that it does, an unconditional
+        // extra role grant here changes real authorization outcomes.
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 

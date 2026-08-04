@@ -23,11 +23,12 @@ public class ResumeSubscriptionEndpointTests
         _factory.StripeGateway.Reset();
     }
 
-    private HttpClient AdminClient(Guid companyId)
+    private async Task<HttpClient> AdminClient(Guid companyId, bool ensureActiveSubscription = true)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId, ensureActiveSubscription);
         return client;
     }
 
@@ -69,7 +70,7 @@ public class ResumeSubscriptionEndpointTests
     public async Task Post_ResumeSubscription_Returns_NotFound_When_No_Subscription_Row_Exists()
     {
         var companyId = await SeedCompanyAsync();
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId, ensureActiveSubscription: false);
 
         var response = await client.PostAsync("/api/companies/subscription/resume", content: null);
 
@@ -88,7 +89,7 @@ public class ResumeSubscriptionEndpointTests
             await db.SaveChangesAsync();
         }
 
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsync("/api/companies/subscription/resume", content: null);
 
@@ -101,7 +102,7 @@ public class ResumeSubscriptionEndpointTests
         var companyId = await SeedCompanyAsync();
         await SeedCancellingSubscriptionAsync(companyId, "sub_resume_me");
 
-        using var client = AdminClient(companyId);
+        using var client = await AdminClient(companyId);
 
         var response = await client.PostAsync("/api/companies/subscription/resume", content: null);
         response.EnsureSuccessStatusCode();

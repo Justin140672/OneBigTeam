@@ -2,6 +2,7 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Persistence;
 using HR.SharedKernel;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Services;
@@ -34,5 +35,42 @@ internal sealed class CompanyProvisioner(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return company.Id;
+    }
+
+    public async Task DeactivateCompanyAsync(Guid companyId, CancellationToken cancellationToken)
+    {
+        var company = await dbContext.Companies
+            .SingleOrDefaultAsync(c => c.Id == companyId, cancellationToken);
+
+        if (company is null)
+        {
+            return;
+        }
+
+        company.Deactivate(clock.UtcNowOffset());
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<bool> IsCompanyActiveAsync(Guid companyId, CancellationToken cancellationToken)
+    {
+        return await dbContext.Companies
+            .AsNoTracking()
+            .Where(c => c.Id == companyId)
+            .Select(c => c.Status == CompanyStatus.Active)
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task ActivateCompanyAsync(Guid companyId, CancellationToken cancellationToken)
+    {
+        var company = await dbContext.Companies
+            .SingleOrDefaultAsync(c => c.Id == companyId, cancellationToken);
+
+        if (company is null)
+        {
+            return;
+        }
+
+        company.Activate(clock.UtcNowOffset());
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

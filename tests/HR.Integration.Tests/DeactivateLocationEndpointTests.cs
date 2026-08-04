@@ -21,11 +21,12 @@ public class DeactivateLocationEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient AuthenticatedClient(Guid companyId)
+    private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, companyId);
         return client;
     }
 
@@ -72,7 +73,7 @@ public class DeactivateLocationEndpointTests
     public async Task Delete_Location_Returns_NotFound_When_Location_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/locations/{Guid.NewGuid()}");
@@ -84,7 +85,7 @@ public class DeactivateLocationEndpointTests
     public async Task Delete_Location_Deactivates_Active_Location()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var locationTypeId = await CreateLocationTypeAsync(client, companyId);
         var location = await CreateLocationAsync(client, companyId, locationTypeId);
@@ -104,7 +105,7 @@ public class DeactivateLocationEndpointTests
     public async Task Delete_Location_Returns_NotFound_When_Already_Inactive()
     {
         var companyId = Guid.NewGuid();
-        using var client = AuthenticatedClient(companyId);
+        using var client = await AuthenticatedClient(companyId);
 
         var locationTypeId = await CreateLocationTypeAsync(client, companyId);
         var location = await CreateLocationAsync(client, companyId, locationTypeId);

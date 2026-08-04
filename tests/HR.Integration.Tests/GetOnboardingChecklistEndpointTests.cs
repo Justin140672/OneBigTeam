@@ -9,9 +9,16 @@ namespace HR.Integration.Tests;
 public class GetOnboardingChecklistEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
-    private static readonly Guid HrAdminUserId = new("cc000001-0000-0000-0000-000000000001");
-    private static readonly Guid CompanyAdminUserId = new("cc000001-0000-0000-0000-000000000002");
-    private static readonly Guid EmployeeUserId = new("cc000001-0000-0000-0000-000000000003");
+
+    // Guid.NewGuid() rather than hardcoded literals — under the shared-database "Integration"
+    // collection, a fixed literal here previously collided with the same literal used (and
+    // assigned a different role) in CompanyAuthorizationTests.cs, silently granting this
+    // "Employee" user CompanyAdministrator too since roles are additive and never reset between
+    // test classes sharing the same Testcontainer database. See that file's NoRoleUser comment
+    // for the same precedent.
+    private static readonly Guid HrAdminUserId = Guid.NewGuid();
+    private static readonly Guid CompanyAdminUserId = Guid.NewGuid();
+    private static readonly Guid EmployeeUserId = Guid.NewGuid();
 
     public GetOnboardingChecklistEndpointTests(ApiWebApplicationFactory factory)
     {
@@ -24,11 +31,12 @@ public class GetOnboardingChecklistEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    private HttpClient ClientFor(Guid companyId, Guid userId)
+    private async Task<HttpClient> ClientFor(Guid companyId, Guid userId)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
@@ -46,7 +54,7 @@ public class GetOnboardingChecklistEndpointTests
     public async Task Get_Checklist_Returns_Forbidden_For_Employee_Role()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, EmployeeUserId);
+        using var client = await ClientFor(companyId, EmployeeUserId);
 
         var response = await client.GetAsync("/api/company-onboarding/checklist");
 
@@ -57,7 +65,7 @@ public class GetOnboardingChecklistEndpointTests
     public async Task Get_Checklist_Returns_Ok_For_HrAdministrator()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, HrAdminUserId);
+        using var client = await ClientFor(companyId, HrAdminUserId);
 
         var response = await client.GetAsync("/api/company-onboarding/checklist");
 
@@ -73,7 +81,7 @@ public class GetOnboardingChecklistEndpointTests
     public async Task Get_Checklist_Returns_Ok_For_CompanyAdministrator()
     {
         var companyId = Guid.NewGuid();
-        using var client = ClientFor(companyId, CompanyAdminUserId);
+        using var client = await ClientFor(companyId, CompanyAdminUserId);
 
         var response = await client.GetAsync("/api/company-onboarding/checklist");
 
