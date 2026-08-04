@@ -43,7 +43,30 @@ public static class DropDownSelector
         if (Regex.IsMatch(currentValue ?? "", Regex.Escape(text)))
             return;
 
-        await combobox.ClickAsync();
+        // A combobox that has only just mounted (e.g. the first field rendered right as a dialog's
+        // _loading flips off) can have its DOM element visible before Syncfusion's JS interop has
+        // actually attached the click listener that opens the popup — a real race, not a flake in
+        // the test itself. A single click in that gap is silently swallowed with no popup and no
+        // error, so retry the click when NOTHING happened at all. Retrying blindly on any timeout
+        // is dangerous though: a popup backed by a large item list (e.g. a 500-employee picker) can
+        // start opening but take a while to become visible — clicking again in that window toggles
+        // it back closed and corrupts the selection that follows. So only treat it as "never
+        // opened" (and click again) when the popup element hasn't even attached to the DOM yet;
+        // once it's attached, keep waiting for it to become visible instead of re-clicking.
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await combobox.ClickAsync();
+            try
+            {
+                await page.Locator(".e-popup.e-ddl").WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = attempt < 3 ? 2_000 : 10_000 });
+                break;
+            }
+            catch (TimeoutException) when (attempt < 3)
+            {
+                // Popup never even attached — listener likely wasn't bound yet. Try again.
+            }
+        }
+
         await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
 
         // The popup container can become visible a tick before its item list is actually populated

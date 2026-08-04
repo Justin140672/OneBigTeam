@@ -112,6 +112,11 @@
             return;
         }
 
+        // See EmployeeDirectoryReportPage's OnGridActionBeginAsync — externally/server-paged grid,
+        // must cancel the grid's own built-in paging/sorting so it doesn't also process the small
+        // returned page locally and clobber header/pager UI state after the reload.
+        args.Cancel = true;
+
         await LoadAsync();
     }
 

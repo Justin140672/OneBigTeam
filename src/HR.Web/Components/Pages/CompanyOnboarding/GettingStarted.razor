@@ -1,0 +1,73 @@
+@page "/getting-started"
+@rendermode InteractiveServer
+@inject CompanyOnboardingService CompanyOnboardingService
+@inject NavigationManager Navigation
+@inject AppSession Session
+
+<PageTitle>Getting Started</PageTitle>
+
+<div class="container-fluid py-4">
+    @if (_isLoading)
+    {
+        <HrLoadingIndicator Label="Loading checklist…" />
+    }
+    else if (_checklist is null)
+    {
+        <div class="alert alert-danger">Failed to load the getting started checklist.</div>
+    }
+    else
+    {
+        <div class="d-flex align-items-start justify-content-between mb-1">
+            <div>
+                <h1 class="mb-1">Getting Started</h1>
+                <p class="text-muted mb-3">Complete these steps to finish setting up your company.</p>
+            </div>
+            <SfButton CssClass="e-outline" OnClick="SkipForNowAsync" Disabled="_dismissing">Skip for now</SfButton>
+        </div>
+
+        <div class="onboarding-progress mb-4">
+            <div class="onboarding-progress-track">
+                <div class="onboarding-progress-fill" style="width: @(_checklist.CompletionPercentage)%"></div>
+            </div>
+            <span class="onboarding-progress-label">@_checklist.CompletionPercentage% complete</span>
+        </div>
+
+        <div class="row g-3">
+            @foreach (var task in _checklist.Tasks.OrderBy(t => t.Order))
+            {
+                <div class="col-md-4">
+                    <OnboardingTaskCard Task="task" CompanyId="Session.CompanyId" />
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private GetCompanyOnboardingChecklistResponse? _checklist;
+    private bool _isLoading = true;
+    private bool _dismissing;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!(Session.IsHrAdministrator || Session.CanManageCompany))
+        {
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            return;
+        }
+
+        _checklist = await CompanyOnboardingService.GetChecklistAsync();
+        _isLoading = false;
+    }
+
+    private async Task SkipForNowAsync()
+    {
+        _dismissing = true;
+        await CompanyOnboardingService.DismissChecklistAsync();
+        _dismissing = false;
+
+        Navigation.NavigateTo(Session.IsHrAdministrator
+            ? "/dashboard/hr"
+            : $"/companies/{Session.CompanyId}/edit");
+    }
+}

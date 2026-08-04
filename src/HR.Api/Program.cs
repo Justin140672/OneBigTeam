@@ -3,6 +3,7 @@ using HR.Api.Authentication;
 using HR.Infrastructure;
 using HR.Infrastructure.Logging;
 using HR.Modules.Companies;
+using HR.Modules.CompanyOnboarding;
 using HR.Modules.DataImport;
 using HR.Modules.Documents;
 using HR.Modules.Employees;
@@ -27,7 +28,8 @@ builder.Host.UseSerilogWithDefaults();
 var connectionString = builder.Configuration.GetConnectionString("hr")
 	?? throw new InvalidOperationException("Connection string 'hr' was not found.");
 
-builder.Services.AddCompaniesModule(connectionString);
+builder.Services.AddCompaniesModule(connectionString, builder.Configuration);
+builder.Services.AddCompanyOnboardingModule(connectionString);
 builder.Services.AddDataImportModule(connectionString, builder.Configuration);
 builder.Services.AddDocumentsModule(connectionString, builder.Configuration);
 builder.Services.AddEmployeesModule(connectionString);
@@ -74,6 +76,9 @@ var app = builder.Build();
 var companiesMigrationStatus = "unknown";
 string? companiesMigrationError = null;
 DateTimeOffset? companiesMigrationCheckedAt = null;
+var companyOnboardingMigrationStatus = "unknown";
+string? companyOnboardingMigrationError = null;
+DateTimeOffset? companyOnboardingMigrationCheckedAt = null;
 var dataImportMigrationStatus = "unknown";
 string? dataImportMigrationError = null;
 DateTimeOffset? dataImportMigrationCheckedAt = null;
@@ -132,6 +137,20 @@ catch (Exception exception)
 	companiesMigrationStatus = "failed";
 	companiesMigrationError = exception.Message;
 	companiesMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+
+try
+{
+	await app.Services.MigrateCompanyOnboardingAsync();
+	await app.Services.SeedCompanyOnboardingAsync();
+	companyOnboardingMigrationStatus = "succeeded";
+	companyOnboardingMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+catch (Exception exception)
+{
+	companyOnboardingMigrationStatus = "failed";
+	companyOnboardingMigrationError = exception.Message;
+	companyOnboardingMigrationCheckedAt = DateTimeOffset.UtcNow;
 }
 
 try
@@ -356,6 +375,12 @@ app.MapGet("/health/startup-migrations", () =>
 			checkedAt = companiesMigrationCheckedAt,
 			error = companiesMigrationError
 		},
+		companyOnboarding = new
+		{
+			status = companyOnboardingMigrationStatus,
+			checkedAt = companyOnboardingMigrationCheckedAt,
+			error = companyOnboardingMigrationError
+		},
 		dataImport = new
 		{
 			status = dataImportMigrationStatus,
@@ -442,7 +467,7 @@ app.MapGet("/health/startup-migrations", () =>
 		}
 	};
 
-	return auditMigrationStatus == "failed" || companiesMigrationStatus == "failed" || dataImportMigrationStatus == "failed" || documentsMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed" || notificationsMigrationStatus == "failed" || tasksMigrationStatus == "failed" || onboardingMigrationStatus == "failed" || offboardingMigrationStatus == "failed" || probationMigrationStatus == "failed" || reportingMigrationStatus == "failed" || assetsMigrationStatus == "failed" || sicknessMigrationStatus == "failed" || recruitmentMigrationStatus == "failed"
+	return auditMigrationStatus == "failed" || companiesMigrationStatus == "failed" || companyOnboardingMigrationStatus == "failed" || dataImportMigrationStatus == "failed" || documentsMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed" || notificationsMigrationStatus == "failed" || tasksMigrationStatus == "failed" || onboardingMigrationStatus == "failed" || offboardingMigrationStatus == "failed" || probationMigrationStatus == "failed" || reportingMigrationStatus == "failed" || assetsMigrationStatus == "failed" || sicknessMigrationStatus == "failed" || recruitmentMigrationStatus == "failed"
 		? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
 		: Results.Ok(response);
 });
@@ -462,6 +487,22 @@ if (app.Environment.IsDevelopment())
 			return Results.StatusCode(StatusCodes.Status403Forbidden);
 
 		store.Switch(userId);
+		return Results.NoContent();
+	}).AllowAnonymous();
+
+	// Establishes a dev-stub session for a brand-new self-service signup admin (HR.Modules.Identity's
+	// SignUp feature returns exactly these fields). Identity cannot reference DevPersonaStore itself
+	// (it lives in HR.Api, the host) — the client (marketing StartTrial page / HR.Web) calls this
+	// immediately after a successful signup, achieving the "auto-login" UX via the same dev-stub
+	// mechanism used everywhere else in this codebase today.
+	app.MapPost("/api/dev/persona/register", (RegisterDevPersonaRequest request, DevPersonaStore store) =>
+	{
+		store.Register(new DevPersona(
+			request.UserId.ToString(),
+			request.CompanyId.ToString(),
+			$"{request.FirstName} {request.LastName}".Trim(),
+			"Company Administrator",
+			request.Email));
 		return Results.NoContent();
 	}).AllowAnonymous();
 
@@ -516,6 +557,7 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseIdentityModule();
 app.UseAuthorization();
+app.UseCompaniesModule();
 app.UseFastEndpoints(c =>
 {
 	c.Serializer.Options.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
@@ -526,3 +568,5 @@ app.MapDefaultEndpoints();
 app.Run();
 
 public partial class Program;
+
+internal sealed record RegisterDevPersonaRequest(Guid UserId, Guid CompanyId, string FirstName, string LastName, string Email);

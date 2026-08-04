@@ -106,6 +106,14 @@
             return;
         }
 
+        // The grid is externally/server-paged (TotalItemCount is supplied separately from the
+        // small per-page DataSource — the manual equivalent of Syncfusion's remote-data adaptor
+        // pattern). Without cancelling here, the grid's own built-in engine also tries to
+        // paginate/sort the already-small returned page locally, which conflicts with the
+        // externally-reloaded DataSource assigned below and corrupts header/pager UI state
+        // (e.g. aria-sort getting reset after the reload).
+        args.Cancel = true;
+
         await LoadAsync();
     }
 

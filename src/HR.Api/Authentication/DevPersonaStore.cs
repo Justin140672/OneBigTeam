@@ -23,11 +23,31 @@ public sealed class DevPersonaStore
         new("30000000-0000-0000-0000-000000000012", BetaCorp, "Bob Taylor",    "Software Developer",  "bob.taylor@betacorp.example"),
     ];
 
-    public DevPersona Current => Personas.First(p => p.UserId == _currentUserId);
+    // Personas created via the self-service SignUp flow (HR.Modules.Identity's SignUp feature) —
+    // registered here at runtime so the dev-stub auth mechanism can "sign in" a brand-new
+    // company/admin without a real Supabase Auth flow. In-memory only (matches the rest of this
+    // dev-only stub); lost on API restart.
+    private readonly List<DevPersona> _registeredPersonas = [];
+
+    private IEnumerable<DevPersona> AllPersonas => Personas.Concat(_registeredPersonas);
+
+    public DevPersona Current => AllPersonas.First(p => p.UserId == _currentUserId);
 
     public void Switch(string userId)
     {
-        if (Personas.Any(p => p.UserId == userId))
+        if (AllPersonas.Any(p => p.UserId == userId))
             _currentUserId = userId;
+    }
+
+    /// <summary>
+    /// Registers a brand-new persona (e.g. a self-service signup admin) and immediately switches
+    /// to it, establishing a session the same way the existing persona switcher does.
+    /// </summary>
+    public void Register(DevPersona persona)
+    {
+        if (!AllPersonas.Any(p => p.UserId == persona.UserId))
+            _registeredPersonas.Add(persona);
+
+        _currentUserId = persona.UserId;
     }
 }

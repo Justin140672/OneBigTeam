@@ -1,0 +1,87 @@
+@page "/signup"
+@using Microsoft.AspNetCore.WebUtilities
+
+<PageTitle>Start your free trial | One Big Team</PageTitle>
+<HeadContent>
+    <meta name="description" content="Start your free 14-day trial of One Big Team — no credit card required.">
+</HeadContent>
+
+<SiteHeader CurrentPage="signup" />
+
+<main>
+  <section class="pricing-hero section-band">
+    <div class="section-inner hero-copy">
+      <p class="eyebrow">Start free trial</p>
+      <h1>Set up your company in a couple of minutes.</h1>
+      <p class="hero-text">
+        Create your company and admin account to start your free 14-day trial.
+        No credit card required — you'll land straight in the app to get set up.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-inner contact-grid">
+      <div>
+        <p class="eyebrow">Create your account</p>
+        <h2>Tell us about your company.</h2>
+        <p class="estimator-intro">
+          Required fields are marked so you can get started quickly.
+        </p>
+        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+          <p class="field-error" style="display:block">@ErrorMessage</p>
+        }
+      </div>
+
+      <form method="post" action="/signup-submit" class="contact-form">
+        <div class="form-field form-field-full">
+          <label for="companyName">Company name</label>
+          <input id="companyName" name="companyName" type="text" autocomplete="organization" autofocus required>
+          <p class="field-error" data-error-for="companyName">Enter your company name.</p>
+        </div>
+
+        <div class="form-field">
+          <label for="firstName">First name</label>
+          <input id="firstName" name="firstName" type="text" autocomplete="given-name" required>
+          <p class="field-error" data-error-for="firstName">Enter your first name.</p>
+        </div>
+
+        <div class="form-field">
+          <label for="lastName">Last name</label>
+          <input id="lastName" name="lastName" type="text" autocomplete="family-name" required>
+          <p class="field-error" data-error-for="lastName">Enter your last name.</p>
+        </div>
+
+        <div class="form-field form-field-full">
+          <label for="email">Work email</label>
+          <input id="email" name="email" type="email" autocomplete="email"
+                 pattern="[^\s@@]+@@[^\s@@]+\.[^\s@@]+" title="Enter a valid email address, e.g. name@@company.com" required>
+          <p class="field-error" data-error-for="email">Enter a valid work email.</p>
+        </div>
+
+        <div class="form-field form-field-full">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+          <p class="field-error" data-error-for="password">Password must be at least 8 characters.</p>
+        </div>
+
+        <div class="form-submit-row">
+          <button class="button button-primary button-large" type="submit">Start free trial</button>
+          <p class="small-note">
+            We'll send a confirmation link to your email — you'll need to confirm your
+            account before you can start using One Big Team.
+          </p>
+          <p class="small-note">By continuing you agree to our Terms of Service and Privacy Policy.</p>
+        </div>
+      </form>
+    </div>
+  </section>
+</main>
+
+<SiteFooter />
+
+@code {
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? ErrorMessage { get; set; }
+}

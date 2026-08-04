@@ -88,7 +88,7 @@
             <div class="ms-auto d-flex gap-2">
                 @if (!IsViewMode)
                 {
-                    <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                    <SfButton IsPrimary="true" Disabled="@(Saving || Session.IsReadOnly)" OnClick="SaveAsync">
                         @(Saving ? "Saving…" : "Save")
                     </SfButton>
                 }

@@ -100,6 +100,7 @@ using HR.Modules.Employees.Features.BackfillEmployeeTimeline;
 using HR.Modules.Employees.Jobs;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
+using HR.Modules.Employees.Services.OnboardingTasks;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Builder;
@@ -389,6 +390,9 @@ public static class EmployeesModule
         services.AddScoped<IEmployeeImportWriter, EmployeeImportWriter>();
         services.AddScoped<IWorkloadActionProvider, UpcomingEmployeeStartDatesWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, UpcomingEmployeeLeavingDatesWorkloadActionProvider>();
+
+        // Getting Started checklist task definition (HR.Modules.CompanyOnboarding epic, Phase A).
+        services.AddScoped<IOnboardingTaskDefinition, ImportEmployeesTask>();
     }
 
     public static async Task MigrateEmployeesAsync(this IServiceProvider services)

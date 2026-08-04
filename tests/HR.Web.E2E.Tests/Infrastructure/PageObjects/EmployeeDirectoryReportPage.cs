@@ -19,6 +19,14 @@ public sealed class EmployeeDirectoryReportPage(IPage page, string baseUrl)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/reporting/employee-directory");
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 20_000 });
+
+        // The grid only mounts once the page's initial load finishes (_isLoading flips false),
+        // and Syncfusion's JS binds its native click-to-sort/pager handlers a tick after that DOM
+        // appears. A header/pager click that lands in that gap is silently swallowed — no error,
+        // just no effect — so give interop a moment to finish binding before any caller interacts
+        // with sort or paging (same race as DropDownSelector.SelectAsync's retry, but here there's
+        // no popup to detect and retry against, so a short settle wait is the pragmatic fix).
+        await page.WaitForTimeoutAsync(300);
     }
 
     public async Task<IReadOnlyList<string>> GetColumnHeadersAsync()

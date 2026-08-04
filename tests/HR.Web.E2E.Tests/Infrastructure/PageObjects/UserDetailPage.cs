@@ -60,7 +60,16 @@ public sealed class UserDetailPage(IPage page, string baseUrl)
     public async Task<string?> GetSuccessMessageAsync()
     {
         var alert = page.Locator(".alert-success");
-        return await alert.IsVisibleAsync() ? await alert.InnerTextAsync() : null;
+        try
+        {
+            await alert.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
+
+        return await alert.InnerTextAsync();
     }
 
     public async Task OpenManageRolesDialogAsync()
@@ -72,30 +81,19 @@ public sealed class UserDetailPage(IPage page, string baseUrl)
     private ILocator ManageRolesDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Manage Roles" });
 
     /// <summary>
-    /// Toggles the given roles (by name) in the checkbox-mode SfMultiSelect and saves. Toggling a
-    /// role that's already selected deselects it, and vice versa — callers should pass only the
+    /// Toggles the given roles (by name) via the dialog's plain checkbox table and saves. Toggling
+    /// a role that's already selected deselects it, and vice versa — callers should pass only the
     /// roles they want to flip relative to the dialog's pre-populated <c>CurrentRoleIds</c>.
     /// </summary>
     public async Task ToggleRolesAndSaveAsync(IReadOnlyList<string> roleNamesToToggle)
     {
-        await ManageRolesDialog.Locator("input[placeholder='Select one or more roles']").ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup:visible", new() { Timeout = 10_000 });
-
         foreach (var roleName in roleNamesToToggle)
         {
-            await page.Locator(".e-popup .e-list-item")
-                .Filter(new() { HasText = roleName })
+            await ManageRolesDialog.Locator("tr", new() { HasText = roleName })
+                .Locator("input[type='checkbox']")
                 .First
                 .ClickAsync();
         }
-
-        // Checkbox-mode multiselect popups stay open to allow further selections, and being an
-        // overlay it can sit visually on top of (and intercept clicks intended for) whatever sits
-        // beneath it, including the dialog's own footer Save button — clicking a "neutral" element
-        // underneath it is not reliable. Escape is the standard, unambiguous way to close a
-        // Syncfusion dropdown/multiselect popup without depending on its rendered size/position.
-        await page.Keyboard.PressAsync("Escape");
-        await page.WaitForSelectorAsync(".e-popup:visible", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
 
         await ManageRolesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await ManageRolesDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });

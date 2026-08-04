@@ -1,3 +1,4 @@
+using HR.Modules.Companies.Services;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
@@ -17,6 +18,8 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, I
         .Build();
 
     public FakeEmailSender EmailSender { get; } = new FakeEmailSender();
+
+    internal FakeStripeGateway StripeGateway { get; } = new FakeStripeGateway();
 
     async Task IAsyncLifetime.InitializeAsync()
     {
@@ -50,6 +53,9 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>, I
             // Replace real email sender and link builder with test doubles
             services.AddSingleton<IEmailSender>(EmailSender);
             services.AddSingleton<IInviteLinkBuilder, FakeInviteLinkBuilder>();
+
+            // Replace the real Stripe gateway so no test ever calls out to Stripe's network API.
+            services.AddScoped<IStripeGateway>(_ => StripeGateway);
         });
     }
 }

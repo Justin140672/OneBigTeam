@@ -29,12 +29,17 @@ web
 	.WithReference(api)
 	.WaitFor(api);
 
-// Public marketing site — static content only, no database/API dependency.
-// References web only to resolve its URL for the "Log in" link, not for data access.
+// Public marketing site — static content, plus a server-side "Start free trial" signup proxy
+// (Phase B of the Getting Started + Subscription/Billing epic) that calls HR.Api's public /api/signup
+// endpoint directly, avoiding any need for browser-side CORS. References web to resolve its URL for
+// the "Log in" link and the post-signup redirect into "/getting-started".
 var marketing = isE2ETesting
 	? builder.AddProject<Projects.HR_Marketing>("marketing", launchProfileName: "http")
 	: builder.AddProject<Projects.HR_Marketing>("marketing");
 
-marketing.WithReference(web);
+marketing
+	.WithReference(web)
+	.WithReference(api)
+	.WaitFor(api);
 
 builder.Build().Run();

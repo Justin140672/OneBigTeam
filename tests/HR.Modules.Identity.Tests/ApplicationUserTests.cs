@@ -43,4 +43,34 @@ public class ApplicationUserTests
         Assert.False(user.IsActive);
         Assert.Equal(later, user.UpdatedAt);
     }
+
+    [Fact]
+    public void Create_Defaults_IsEmailConfirmed_True_When_Not_Specified()
+    {
+        var user = ApplicationUser.Create(Guid.NewGuid(), "user@test.com", "hash", "Test", "User", Now);
+
+        Assert.True(user.IsEmailConfirmed);
+    }
+
+    [Fact]
+    public void Create_Allows_Creating_An_Unconfirmed_User()
+    {
+        var user = ApplicationUser.Create(
+            Guid.NewGuid(), "user@test.com", "hash", "Test", "User", Now, isEmailConfirmed: false);
+
+        Assert.False(user.IsEmailConfirmed);
+    }
+
+    [Fact]
+    public void ConfirmEmail_Sets_IsEmailConfirmed_True_And_Updates_UpdatedAt()
+    {
+        var user = ApplicationUser.Create(
+            Guid.NewGuid(), "user@test.com", "hash", "Test", "User", Now, isEmailConfirmed: false);
+
+        var later = Now.AddDays(1);
+        user.ConfirmEmail(later);
+
+        Assert.True(user.IsEmailConfirmed);
+        Assert.Equal(later, user.UpdatedAt);
+    }
 }

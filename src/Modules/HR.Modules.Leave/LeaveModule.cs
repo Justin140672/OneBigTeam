@@ -25,6 +25,7 @@ using HR.Modules.Leave.Features.UpdateLeaveType;
 using HR.Modules.Leave.Features.DeactivateLeaveType;
 using HR.Modules.Leave.Persistence;
 using HR.Modules.Leave.Services;
+using HR.Modules.Leave.Services.OnboardingTasks;
 using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -98,6 +99,9 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         services.AddScoped<IEmployeeLeaveStatusReader, EmployeeLeaveStatusReader>();
         services.AddScoped<ILeaveSummaryReader, LeaveSummaryReader>();
         services.AddScoped<ILeaveCalendarReader, LeaveCalendarReader>();
+
+        // Getting Started checklist task definition (HR.Modules.CompanyOnboarding epic, Phase A).
+        services.AddScoped<IOnboardingTaskDefinition, ReviewDefaultLeavePolicyTask>();
     }
 
     public static async Task MigrateLeaveAsync(this IServiceProvider services)

@@ -18,7 +18,7 @@ namespace HR.Modules.Companies.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("companies")
-                .HasAnnotation("ProductVersion", "10.0.9")
+                .HasAnnotation("ProductVersion", "10.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -320,6 +320,62 @@ namespace HR.Modules.Companies.Migrations
                         });
                 });
 
+            modelBuilder.Entity("HR.Modules.Companies.Domain.CustomerSubscription", b =>
+                {
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<bool>("CancelAtPeriodEnd")
+                        .HasColumnType("boolean")
+                        .HasColumnName("cancel_at_period_end");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("CurrentPeriodEnd")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("current_period_end");
+
+                    b.Property<string>("PriceId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("price_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StripeCustomerId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("stripe_customer_id");
+
+                    b.Property<string>("StripeSubscriptionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("stripe_subscription_id");
+
+                    b.Property<DateTimeOffset>("TrialExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("trial_expires_at");
+
+                    b.Property<DateTimeOffset>("TrialStartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("trial_started_at");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("CompanyId");
+
+                    b.ToTable("customer_subscriptions", "companies");
+                });
+
             modelBuilder.Entity("HR.Modules.Companies.Domain.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -425,6 +481,15 @@ namespace HR.Modules.Companies.Migrations
                     b.HasOne("HR.Modules.Companies.Domain.Company", null)
                         .WithOne("Settings")
                         .HasForeignKey("HR.Modules.Companies.Domain.CompanySettings", "CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HR.Modules.Companies.Domain.CustomerSubscription", b =>
+                {
+                    b.HasOne("HR.Modules.Companies.Domain.Company", null)
+                        .WithOne()
+                        .HasForeignKey("HR.Modules.Companies.Domain.CustomerSubscription", "CompanyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

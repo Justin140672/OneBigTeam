@@ -1,0 +1,26 @@
+.trial-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: 0.875rem;
+}
+
+.trial-banner-action {
+    margin-left: auto;
+    font-weight: 600;
+    text-decoration: underline;
+    white-space: nowrap;
+}
+
+.trial-banner--ending-soon {
+    background: #fff8e1;
+    color: #6b5300;
+    border-bottom: 1px solid #f0d98c;
+}
+
+.trial-banner--expired {
+    background: #fdecea;
+    color: #7a2118;
+    border-bottom: 1px solid #f3b7ae;
+}

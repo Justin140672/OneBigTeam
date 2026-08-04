@@ -117,16 +117,29 @@ public sealed class UserAdministrationManagementTests(AppFixture fixture) : E2ET
         await login.LoginAsync(HrAdminEmail);
 
         await list.GoToAsync(AcmeId);
-        await list.OpenUserDetailAsync("Laura Bennett");
+        // David Park is a seeded active account not otherwise edited by this test class — Marcus
+        // Diallo is mutated by ManageRoles_UpdatesUsersRoles below, and reusing him here would make
+        // the "starts with no audit history" assertion order-dependent on that other test.
+        await list.OpenUserDetailAsync("David Park");
 
         var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);
 
         Assert.Equal("Active", await detail.GetAccountStatusAsync());
 
-        // Laura's account is a seeded dev persona, so it should have at least one audit entry
-        // (account creation) rather than the empty-state message.
+        // Seeded dev personas carry no audit trail of their own (seeding bypasses the normal
+        // audit-event flow), so the empty-history state is expected here — an actual edit is
+        // what should produce the first entry.
+        Assert.True(await detail.HasAuditHistoryEmptyMessageAsync(),
+            "Expected a freshly seeded account to start with no audit history");
+
+        await detail.OpenManageRolesDialogAsync();
+        await detail.ToggleRolesAndSaveAsync(["Manager"]);
+        Assert.Equal("Roles updated.", await detail.GetSuccessMessageAsync());
+
         Assert.False(await detail.HasAuditHistoryEmptyMessageAsync(),
-            "Expected Laura Bennett's account to have at least one audit history entry");
+            "Expected the account to have at least one audit history entry after a roles edit");
+        Assert.True(await detail.GetAuditHistoryCountAsync() > 0,
+            "Expected the roles edit to produce a visible audit history entry");
     }
 
     [Fact]

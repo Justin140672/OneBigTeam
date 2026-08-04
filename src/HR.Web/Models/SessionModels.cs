@@ -11,7 +11,8 @@ public sealed record MeResponse(
     bool CanManageCompany,
     bool IsHrAdministrator,
     bool IsManager,
-    bool IsRecruiter);
+    bool IsRecruiter,
+    bool IsEmailConfirmed);
 
 public sealed record MyEmployeeResponse(
     Guid EmployeeId,

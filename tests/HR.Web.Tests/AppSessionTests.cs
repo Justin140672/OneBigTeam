@@ -21,14 +21,15 @@ public class AppSessionTests
     }
 
     private static AppSession BuildSession(IHttpClientFactory factory) =>
-        new(factory, new EmployeeService(factory), new SicknessCategoryService(factory));
+        new(factory, new EmployeeService(factory), new SicknessCategoryService(factory), new CompanyOnboardingService(factory), new SubscriptionService(factory));
 
     private static RoutingHandler BuildHappyPathHandler(
         Guid userId, Guid companyId, Guid employeeId,
-        bool isHrAdministrator = false, bool isManager = false, bool isRecruiter = false)
+        bool isHrAdministrator = false, bool isManager = false, bool isRecruiter = false,
+        bool isEmailConfirmed = true)
     {
         var me = new MeResponse(userId, companyId, "alice@example.com", [ManageEmployeesPermission], true,
-            isHrAdministrator, isManager, isRecruiter);
+            isHrAdministrator, isManager, isRecruiter, isEmailConfirmed);
         var company = new GetCompanyResponse(companyId, "Acme Corporation", true, DateTime.UtcNow, [],
             new GetCompanyBrandingResponse("logo.png", "small-logo.png", null));
         var settings = new GetCompanySettingsResponse(
@@ -151,6 +152,46 @@ public class AppSessionTests
         var session = BuildSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
 
         Assert.Equal("?", session.Initials);
+    }
+
+    [Fact]
+    public async Task InitialiseAsync_Sets_IsEmailConfirmed_True_By_Default()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var factory = BuildFactory(BuildHappyPathHandler(userId, companyId, employeeId));
+        var session = BuildSession(factory);
+
+        await session.InitialiseAsync();
+
+        Assert.True(session.IsEmailConfirmed);
+    }
+
+    [Fact]
+    public async Task InitialiseAsync_Sets_IsEmailConfirmed_False_For_Unconfirmed_Account()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var factory = BuildFactory(BuildHappyPathHandler(userId, companyId, employeeId, isEmailConfirmed: false));
+        var session = BuildSession(factory);
+
+        await session.InitialiseAsync();
+
+        Assert.False(session.IsEmailConfirmed);
+    }
+
+    [Fact]
+    public void SetEmailConfirmed_Flips_IsEmailConfirmed_To_True()
+    {
+        var session = BuildSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
+
+        session.SetEmailConfirmed();
+
+        Assert.True(session.IsEmailConfirmed);
     }
 
     [Fact]

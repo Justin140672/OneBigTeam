@@ -59,7 +59,7 @@ public class ServiceContainerCompositionTests
         // registered here too or container validation fails even though the real app starts fine.
         services.AddAuthorizationCore();
 
-        services.AddCompaniesModule(connectionString);
+        services.AddCompaniesModule(connectionString, configuration);
         services.AddDataImportModule(connectionString, configuration);
         services.AddDocumentsModule(connectionString, configuration);
         services.AddEmployeesModule(connectionString);

@@ -55,15 +55,25 @@
                             <span class="badge bg-secondary-subtle text-secondary-emphasis">Employee</span>
                             <span class="text-muted small ms-1">— every user always has this role</span>
                         </div>
-                        <SfMultiSelect TValue="List<Guid>"
-                                       TItem="RoleOption"
-                                       DataSource="@_additionalRoleOptions"
-                                       @bind-Value="_selectedAdditionalRoleIds"
-                                       Placeholder="Select additional roles (optional)"
-                                       Mode="VisualMode.CheckBox"
-                                       AllowFiltering="true">
-                            <MultiSelectFieldSettings Value="Id" Text="Name" />
-                        </SfMultiSelect>
+                        <table class="table table-sm table-borderless mb-0">
+                            <tbody>
+                                @foreach (var role in _additionalRoleOptions)
+                                {
+                                    <tr>
+                                        <td class="ps-0" style="width: 2.5rem;">
+                                            <input type="checkbox"
+                                                   class="form-check-input"
+                                                   id="@($"additional-role-{role.Id}")"
+                                                   checked="@_selectedAdditionalRoleIds.Contains(role.Id)"
+                                                   @onchange="@(e => OnAdditionalRoleCheckedChanged(role.Id, e.Value is bool b && b))" />
+                                        </td>
+                                        <td class="align-middle">
+                                            <label class="form-check-label mb-0" for="@($"additional-role-{role.Id}")">@role.Name</label>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
                     </div>
                 }
                 else if (_step == 3)
@@ -215,6 +225,19 @@
         // The invite endpoint itself still guards against a race with a 409 Conflict — this is
         // just the happy-path filter.
         _loading = false;
+    }
+
+    private void OnAdditionalRoleCheckedChanged(Guid roleId, bool isChecked)
+    {
+        if (isChecked)
+        {
+            if (!_selectedAdditionalRoleIds.Contains(roleId))
+                _selectedAdditionalRoleIds.Add(roleId);
+        }
+        else
+        {
+            _selectedAdditionalRoleIds.Remove(roleId);
+        }
     }
 
     private void OnEmployeeChanged(ChangeEventArgs<Guid?, InviteEmployeeOption> args)

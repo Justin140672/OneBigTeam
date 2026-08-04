@@ -10,9 +10,11 @@ using HR.Modules.Identity.Features.GetUserDetails;
 using HR.Modules.Identity.Features.InviteEmployeeUser;
 using HR.Modules.Identity.Features.ListUsers;
 using HR.Modules.Identity.Features.ResendInvite;
+using HR.Modules.Identity.Features.SignUp;
 using HR.Modules.Identity.Features.UpdateUserRoles;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Identity.Services;
+using HR.Modules.Identity.Services.OnboardingTasks;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -57,6 +59,8 @@ public static class IdentityModule
         services.AddScoped<IValidator<DisableUserRequest>, DisableUserValidator>();
         services.AddScoped<EnableUserHandler>();
         services.AddScoped<IValidator<EnableUserRequest>, EnableUserValidator>();
+        services.AddScoped<SignUpHandler>();
+        services.AddScoped<IValidator<SignUpRequest>, SignUpValidator>();
 
         services.AddScoped<
             IIntegrationEventHandler<OffboardingPlanCompletedIntegrationEvent>,
@@ -64,6 +68,9 @@ public static class IdentityModule
 
         services.AddScoped<IWorkloadActionProvider, EmployeeAccountsAwaitingInvitationWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, EmployeeAccountsAwaitingDisablementWorkloadActionProvider>();
+
+        // Getting Started checklist task definition (HR.Modules.CompanyOnboarding epic, Phase A).
+        services.AddScoped<IOnboardingTaskDefinition, InviteAdditionalUsersTask>();
 
         return services;
     }
@@ -141,6 +148,22 @@ public static class IdentityModule
             SystemRoles.CompanyAdministrator));
 
         builder.AddPolicy("users:manage", RolePolicy(
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
+        // Getting Started checklist domain policies (CompanyOnboarding epic, Phase A) — same
+        // HR/Company Admin OR-of-roles shape as users:view/users:manage above.
+        builder.AddPolicy("onboarding:view", RolePolicy(
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
+        builder.AddPolicy("onboarding:manage", RolePolicy(
+            SystemRoles.HrAdministrator,
+            SystemRoles.CompanyAdministrator));
+
+        // Subscription domain policy (Phase C — Stripe checkout) — same HR/Company Admin
+        // OR-of-roles shape as onboarding:manage/users:manage above.
+        builder.AddPolicy("subscription:manage", RolePolicy(
             SystemRoles.HrAdministrator,
             SystemRoles.CompanyAdministrator));
 

@@ -1,0 +1,17 @@
+@inject AppSession Session
+
+@if (Session.SubscriptionStatus == SubscriptionStatus.Trial && Session.TrialDaysRemaining <= 3)
+{
+    <div class="trial-banner trial-banner--ending-soon">
+        <i class="fa-solid fa-clock me-2"></i>
+        <span>
+            @(Session.TrialDaysRemaining == 0
+                ? "Your free trial ends today."
+                : $"Your free trial ends in {Session.TrialDaysRemaining} day{(Session.TrialDaysRemaining == 1 ? "" : "s")}.")
+        </span>
+        <a class="trial-banner-action" href="/subscription">Start subscription</a>
+    </div>
+}
+
+@code {
+}

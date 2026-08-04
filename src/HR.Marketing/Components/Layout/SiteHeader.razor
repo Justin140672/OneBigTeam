@@ -32,10 +32,10 @@
     [Parameter] public string? CurrentPage { get; set; }
 
     /// <summary>
-    /// The Home/Features pages link "Start free trial" to the Contact page's form; the Contact
-    /// page itself links straight to its own in-page anchor (mirrors the original static site).
+    /// "Start free trial" links to the real self-service signup page; the SignUp page itself
+    /// still exposes its own in-page form (no anchor jump needed since it *is* the destination).
     /// </summary>
-    private string TrialHref => CurrentPage == "contact" ? "#contact-form" : "/contact#contact-form";
+    private string TrialHref => CurrentPage == "signup" ? "#" : "/signup";
 
     private const string FallbackWebAppBaseUrl = "http://localhost:5270";
 

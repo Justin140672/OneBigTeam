@@ -1,0 +1,13 @@
+@inject AppSession Session
+
+@if (Session.SubscriptionStatus == SubscriptionStatus.TrialExpired)
+{
+    <div class="trial-banner trial-banner--expired">
+        <i class="fa-solid fa-lock me-2"></i>
+        <span>Your account is read-only until a subscription starts. Data cannot be added or edited.</span>
+        <a class="trial-banner-action" href="/subscription">Start subscription</a>
+    </div>
+}
+
+@code {
+}

@@ -1,0 +1,33 @@
+<div class="card h-100">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h6 class="mb-0">@Task.Name</h6>
+        @if (Task.IsCompleted)
+        {
+            <i class="fa-solid fa-circle-check text-success" title="Completed"></i>
+        }
+    </div>
+    <div class="card-body d-flex flex-column">
+        <p class="text-muted small mb-3">@Task.Description</p>
+        @if (Task.IsCompleted)
+        {
+            <span class="badge bg-success align-self-start mt-auto">
+                <i class="fa-solid fa-check me-1"></i>Completed
+            </span>
+        }
+        else
+        {
+            <a href="@ResolvedLinkUrl" class="btn btn-primary btn-sm align-self-start mt-auto">
+                Go to task
+            </a>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public CompanyOnboardingTaskItem Task { get; set; } = default!;
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+
+    // Task.LinkUrl contains a "{companyId}" placeholder since HR.Web's routes are company-scoped
+    // (e.g. "/companies/{CompanyId:guid}/employees") — substitute the current company id here.
+    private string ResolvedLinkUrl => Task.LinkUrl.Replace("{companyId}", CompanyId.ToString());
+}

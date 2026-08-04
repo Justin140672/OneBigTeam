@@ -274,6 +274,8 @@
 
     protected override string LoadErrorMessage => "Failed to load employees.";
 
+    protected override bool IsAddDisabled => Session.IsReadOnly;
+
     protected override string? GetAddUrl() =>
         _canCreateEmployee ? $"/companies/{CompanyId}/employees/new" : null;
 

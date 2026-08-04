@@ -117,6 +117,8 @@
 
     protected override string LoadErrorMessage => "Failed to load departments.";
 
+    protected override bool IsAddDisabled => Session.IsReadOnly;
+
     protected override string? GetAddUrl()  => $"/companies/{CompanyId}/departments/new";
     protected override string? GetEditUrl(DepartmentListItemModel item) => $"/companies/{CompanyId}/departments/{item.Id}";
     protected override string? GetViewUrl(DepartmentListItemModel item) => $"/companies/{CompanyId}/departments/{item.Id}/view";

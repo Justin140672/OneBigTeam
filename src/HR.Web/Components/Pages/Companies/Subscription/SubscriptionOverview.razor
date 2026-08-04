@@ -1,0 +1,191 @@
+@page "/subscription"
+@rendermode InteractiveServer
+@inject SubscriptionService SubscriptionService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Subscription</PageTitle>
+
+<div class="container-fluid py-4">
+    <h1 class="mb-1">Subscription</h1>
+
+    @if (_isLoading)
+    {
+        <HrLoadingIndicator Label="Loading subscription…" />
+    }
+    else
+    {
+        @if (_errorMessage is not null)
+        {
+            <div class="alert alert-danger">@_errorMessage</div>
+        }
+
+        @if (_infoMessage is not null)
+        {
+            <div class="alert alert-success">@_infoMessage</div>
+        }
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Subscription Details</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Plan</label>
+                        <p class="mb-0">@(_details?.PlanName ?? "—")</p>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Status</label>
+                        <p class="mb-0">@(_status?.Status.ToString() ?? "Unknown")</p>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Active Employees</label>
+                        <p class="mb-0">@(_details?.ActiveEmployeeCount ?? 0)</p>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Next Billing Date</label>
+                        <p class="mb-0">@NextBillingDateDisplay</p>
+                    </div>
+
+                    @if (_status?.Status == SubscriptionStatus.Trial)
+                    {
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Trial Days Remaining</label>
+                            <p class="mb-0">@_status.TrialDaysRemaining</p>
+                        </div>
+                    }
+
+                    @if (_details?.CancelAtPeriodEnd == true)
+                    {
+                        <div class="col-12">
+                            <div class="alert alert-warning mb-0">
+                                Your subscription will end on @NextBillingDateDisplay.
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+            @if (_status?.Status is SubscriptionStatus.Trial or SubscriptionStatus.TrialExpired)
+            {
+                <SfButton IsPrimary="true" Disabled="@_isBusy" OnClick="StartCheckoutAsync">
+                    Start subscription
+                </SfButton>
+            }
+
+            @if (_details?.Status == SubscriptionStatus.Active && _details.CancelAtPeriodEnd == false)
+            {
+                <SfButton Disabled="@_isBusy" OnClick="CancelAsync">Cancel subscription</SfButton>
+            }
+
+            @if (_details?.CancelAtPeriodEnd == true)
+            {
+                <SfButton IsPrimary="true" Disabled="@_isBusy" OnClick="ResumeAsync">Resume subscription</SfButton>
+            }
+
+            @if (_details is not null && _details.Status != SubscriptionStatus.Trial)
+            {
+                <SfButton Disabled="@_isBusy" OnClick="ManageBillingAsync">Manage billing</SfButton>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private GetSubscriptionStatusResponse? _status;
+    private GetSubscriptionDetailsResponse? _details;
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private string? _errorMessage;
+    private string? _infoMessage;
+
+    private string NextBillingDateDisplay =>
+        _details?.NextBillingDate is { } date ? date.ToLocalTime().ToString("d") : "Not yet billed";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var statusTask = SubscriptionService.GetStatusAsync();
+        var detailsTask = SubscriptionService.GetDetailsAsync();
+
+        await Task.WhenAll(statusTask, detailsTask);
+
+        _status = await statusTask;
+        _details = await detailsTask;
+        _isLoading = false;
+    }
+
+    private async Task StartCheckoutAsync()
+    {
+        _errorMessage = null;
+        _infoMessage = null;
+        _isBusy = true;
+
+        var response = await SubscriptionService.CreateCheckoutSessionAsync();
+
+        if (response is null)
+        {
+            _errorMessage = "Unable to start checkout. Please try again.";
+            _isBusy = false;
+            return;
+        }
+
+        NavigationManager.NavigateTo(response.CheckoutUrl, forceLoad: true);
+    }
+
+    private async Task CancelAsync()
+    {
+        _errorMessage = null;
+        _infoMessage = null;
+        _isBusy = true;
+
+        var response = await SubscriptionService.CancelAsync();
+        if (response is null)
+        {
+            _errorMessage = "Unable to cancel your subscription. Please try again.";
+            _isBusy = false;
+            return;
+        }
+
+        _details = _details is null ? null : _details with { CancelAtPeriodEnd = response.CancelAtPeriodEnd };
+        _infoMessage = "Your subscription is scheduled to be cancelled.";
+        _isBusy = false;
+    }
+
+    private async Task ResumeAsync()
+    {
+        _errorMessage = null;
+        _infoMessage = null;
+        _isBusy = true;
+
+        var response = await SubscriptionService.ResumeAsync();
+        if (response is null)
+        {
+            _errorMessage = "Unable to resume your subscription. Please try again.";
+            _isBusy = false;
+            return;
+        }
+
+        _details = _details is null ? null : _details with { CancelAtPeriodEnd = response.CancelAtPeriodEnd };
+        _infoMessage = "Your subscription has been resumed.";
+        _isBusy = false;
+    }
+
+    private async Task ManageBillingAsync()
+    {
+        _errorMessage = null;
+        _infoMessage = null;
+        _isBusy = true;
+
+        var response = await SubscriptionService.GetBillingPortalAsync();
+        if (response is null)
+        {
+            _errorMessage = "Unable to open the billing portal. Please try again.";
+            _isBusy = false;
+            return;
+        }
+
+        NavigationManager.NavigateTo(response.PortalUrl, forceLoad: true);
+    }
+}

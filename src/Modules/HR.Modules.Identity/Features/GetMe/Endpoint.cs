@@ -1,13 +1,16 @@
 using FastEndpoints;
 using HR.Modules.Identity.Domain;
+using HR.Modules.Identity.Persistence;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.GetMe;
 
 internal sealed class Endpoint(
     ICurrentUser currentUser,
-    IAuthorizationService authorizationService) : EndpointWithoutRequest<GetMeResponse>
+    IAuthorizationService authorizationService,
+    IdentityDbContext dbContext) : EndpointWithoutRequest<GetMeResponse>
 {
     public override void Configure()
     {
@@ -43,6 +46,12 @@ internal sealed class Endpoint(
         var isManager = roles.Contains(SystemRoles.Manager);
         var isRecruiter = roles.Contains(SystemRoles.Recruiter);
 
+        var isEmailConfirmed = await dbContext.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId.Value)
+            .Select(u => u.IsEmailConfirmed)
+            .SingleOrDefaultAsync(ct);
+
         await Send.ResultAsync(TypedResults.Ok(new GetMeResponse(
             userId.Value,
             companyId,
@@ -51,7 +60,8 @@ internal sealed class Endpoint(
             canManageCompany,
             isHrAdministrator,
             isManager,
-            isRecruiter)));
+            isRecruiter,
+            isEmailConfirmed)));
     }
 }
 
@@ -63,4 +73,5 @@ internal sealed record GetMeResponse(
     bool CanManageCompany,
     bool IsHrAdministrator,
     bool IsManager,
-    bool IsRecruiter);
+    bool IsRecruiter,
+    bool IsEmailConfirmed);

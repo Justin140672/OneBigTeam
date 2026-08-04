@@ -116,10 +116,24 @@ public class GetMeEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Get_Me_Returns_IsEmailConfirmed_True_For_A_Normally_Seeded_User()
+    {
+        using var client = ClientFor(EmployeeUser);
+
+        var response = await client.GetAsync("/api/me");
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<MePayload>();
+        Assert.NotNull(payload);
+        Assert.True(payload!.IsEmailConfirmed);
+    }
+
     private sealed record MePayload(
         Guid UserId,
         Guid CompanyId,
         string? Email,
         List<Guid> PermissionIds,
-        bool CanManageCompany);
+        bool CanManageCompany,
+        bool IsEmailConfirmed);
 }

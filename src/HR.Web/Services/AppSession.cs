@@ -4,7 +4,7 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeService employeeService, SicknessCategoryService sicknessCategoryService)
+public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeService employeeService, SicknessCategoryService sicknessCategoryService, CompanyOnboardingService companyOnboardingService, SubscriptionService subscriptionService)
 {
     private HttpClient Http => httpClientFactory.CreateClient("hrapi");
 
@@ -25,6 +25,26 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
     public bool IsManager { get; private set; }
     public bool IsRecruiter { get; private set; }
 
+    // Interim stub for the real Supabase-Auth email-confirmation flow (out of scope for now — see
+    // ApplicationUser.IsEmailConfirmed remarks). Only self-service SignUp accounts start
+    // unconfirmed; every other creation path defaults to already-confirmed. False blocks the
+    // entire app behind EmailConfirmationRequired.razor (see MainLayout.razor).
+    public bool IsEmailConfirmed { get; private set; } = true;
+
+    // True when the "Getting Started" onboarding checklist should be shown/landed-on for this
+    // user — set from the company-onboarding checklist endpoint below. Only ever true for an HR
+    // Administrator or Company Administrator (the only roles granted onboarding:view/manage);
+    // defaults false on any fetch failure so a broken/absent endpoint never blocks sign-in.
+    public bool ShowGettingStarted { get; private set; }
+
+    // Trial/subscription status (Getting Started + Subscription/Billing epic, Phase B) — drives
+    // TrialBanner visibility and (in a later phase) read-only UI gating. Defaults to a
+    // non-blocking "Active" status on any fetch failure, same fail-open convention as
+    // ShowGettingStarted above, so a broken/absent endpoint never blocks sign-in.
+    public SubscriptionStatus SubscriptionStatus { get; private set; } = SubscriptionStatus.Active;
+    public int TrialDaysRemaining { get; private set; }
+    public bool IsReadOnly { get; private set; }
+
     // Where a plain employee (no manage permissions) should land when they're denied access to
     // an admin-only page, instead of the manager/HR-oriented dashboard. Falls back to the
     // dashboard for the rare case of a signed-in user with no linked employee record.
@@ -36,6 +56,7 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
     // Manager > Company Administrator (no HR role) > plain Employee's own profile. Consumed by
     // Home.razor as the fallback when there's no (or no longer valid) localStorage selection.
     public string LandingUrl =>
+        ShowGettingStarted && (IsHrAdministrator || CanManageCompany) ? "/getting-started" :
         IsHrAdministrator ? "/dashboard/hr" :
         IsRecruiter ? "/dashboard/recruitment" :
         IsManager ? "/dashboard/manager" :
@@ -116,20 +137,39 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
         PermissionIds = me.PermissionIds;
         CanManageCompany = me.CanManageCompany;
         IsHrAdministrator = me.IsHrAdministrator;
+        IsEmailConfirmed = me.IsEmailConfirmed;
         IsManager = me.IsManager;
         IsRecruiter = me.IsRecruiter;
 
-        var companyTask    = Http.GetFromJsonAsync<GetCompanyResponse>($"api/companies/{me.CompanyId}", HrApiJsonOptions.Default);
-        var settingsTask   = Http.GetFromJsonAsync<GetCompanySettingsResponse>($"api/companies/{me.CompanyId}/settings", HrApiJsonOptions.Default);
-        var hrSettingsTask = Http.GetFromJsonAsync<GetHrSettingsResponse>($"api/companies/{me.CompanyId}/hr-settings", HrApiJsonOptions.Default);
+        var companyTask    = GetCompanyOrNullAsync(me.CompanyId);
+        var settingsTask   = GetCompanySettingsOrNullAsync(me.CompanyId);
+        var hrSettingsTask = GetHrSettingsOrNullAsync(me.CompanyId);
         var employeeTask   = GetEmployeeOrNullAsync(me.CompanyId);
 
-        await Task.WhenAll(companyTask, settingsTask, hrSettingsTask, employeeTask);
+        // Only HR Administrators / Company Administrators are granted the onboarding:view policy;
+        // everyone else gets a 403, so skip the call entirely rather than let it noisily fail.
+        var onboardingTask = me.IsHrAdministrator || me.CanManageCompany
+            ? GetOnboardingChecklistOrNullAsync()
+            : Task.FromResult<GetCompanyOnboardingChecklistResponse?>(null);
+        var subscriptionTask = GetSubscriptionStatusOrNullAsync();
 
-        var company    = await companyTask;
-        var settings   = await settingsTask;
-        var hrSettings = await hrSettingsTask;
-        var employee   = await employeeTask;
+        await Task.WhenAll(companyTask, settingsTask, hrSettingsTask, employeeTask, onboardingTask, subscriptionTask);
+
+        var company      = await companyTask;
+        var settings     = await settingsTask;
+        var hrSettings   = await hrSettingsTask;
+        var employee     = await employeeTask;
+        var onboarding   = await onboardingTask;
+        var subscription = await subscriptionTask;
+
+        ShowGettingStarted = onboarding is not null && !onboarding.IsHidden && !onboarding.IsDismissedEarly;
+
+        if (subscription is not null)
+        {
+            SubscriptionStatus = subscription.Status;
+            TrialDaysRemaining = subscription.TrialDaysRemaining;
+            IsReadOnly = subscription.IsReadOnly;
+        }
 
         if (company is not null)
         {
@@ -191,6 +231,79 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
         }
     }
 
+    // Mirrors GetEmployeeOrNullAsync's guard above — a permission gap (e.g. a role missing the
+    // "role:employee" floor) or any other transient failure must not take down session
+    // initialisation and crash the Blazor Server circuit; the relevant session fields simply keep
+    // their fail-open defaults in that case.
+    private async Task<GetCompanyResponse?> GetCompanyOrNullAsync(Guid companyId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetCompanyResponse>(
+                $"api/companies/{companyId}", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<GetCompanySettingsResponse?> GetCompanySettingsOrNullAsync(Guid companyId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetCompanySettingsResponse>(
+                $"api/companies/{companyId}/settings", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<GetHrSettingsResponse?> GetHrSettingsOrNullAsync(Guid companyId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetHrSettingsResponse>(
+                $"api/companies/{companyId}/hr-settings", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    // Mirrors GetEmployeeOrNullAsync's guard above: a 403 (permission not granted after all) or
+    // any other transient failure must not take down session initialisation — ShowGettingStarted
+    // simply defaults to false in that case.
+    private async Task<GetCompanyOnboardingChecklistResponse?> GetOnboardingChecklistOrNullAsync()
+    {
+        try
+        {
+            return await companyOnboardingService.GetChecklistAsync();
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    // Mirrors GetOnboardingChecklistOrNullAsync's guard above — a transient failure must not take
+    // down session initialisation; SubscriptionStatus/TrialDaysRemaining/IsReadOnly simply keep
+    // their fail-open defaults in that case.
+    private async Task<GetSubscriptionStatusResponse?> GetSubscriptionStatusOrNullAsync()
+    {
+        try
+        {
+            return await subscriptionService.GetStatusAsync();
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
     // Several dashboard widgets each need an employee id -> display name lookup (and a couple
     // need sickness category names). Cached per-circuit here so they share one fetch instead of
     // each independently re-requesting the full employee/category list.
@@ -208,6 +321,10 @@ public sealed class AppSession(IHttpClientFactory httpClientFactory, EmployeeSer
 
     public Task<IReadOnlyDictionary<Guid, string>> GetSicknessCategoryNamesAsync() =>
         _sicknessCategoryNamesTask ??= LoadSicknessCategoryNamesAsync();
+
+    // Optimistic local update after EmailConfirmationRequired's dev-only confirm call succeeds —
+    // avoids a full session reload just to flip one flag.
+    public void SetEmailConfirmed() => IsEmailConfirmed = true;
 
     private async Task<IReadOnlyDictionary<Guid, string>> LoadSicknessCategoryNamesAsync()
     {

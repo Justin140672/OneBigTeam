@@ -56,7 +56,7 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
         {
             var items = new List<object>
             {
-                new ItemModel { Id = "hr-add",  Text = "Add",  PrefixIcon = "fa-solid fa-plus", TooltipText = "Add" },
+                new ItemModel { Id = "hr-add",  Text = "Add",  PrefixIcon = "fa-solid fa-plus", TooltipText = "Add", Disabled = IsAddDisabled },
                 new ItemModel { Id = "hr-edit", Text = "Edit", PrefixIcon = "fa-solid fa-pen",  TooltipText = "Edit selected", Disabled = !_hasSelection },
                 new ItemModel { Id = "hr-view", Text = "View", PrefixIcon = "fa-solid fa-eye",  TooltipText = "View selected", Disabled = !_hasSelection },
             };
@@ -119,6 +119,11 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
         }
     }
 
+    // Override (e.g. => Session.IsReadOnly) on pages where the "Add" action should be hidden
+    // while the company's subscription is read-only. Defense-in-depth only — the real
+    // enforcement is server-side; not every list page opts into this yet.
+    protected virtual bool IsAddDisabled => false;
+
     protected virtual string? GetAddUrl() => null;
     protected virtual string? GetEditUrl(TItem item) => null;
     protected virtual string? GetViewUrl(TItem item) => null;
@@ -167,6 +172,7 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
         switch (args.Item.Id)
         {
             case "hr-add":
+                if (IsAddDisabled) break;
                 var addUrl = GetAddUrl();
                 if (addUrl is not null) Navigation.NavigateTo(addUrl);
                 break;

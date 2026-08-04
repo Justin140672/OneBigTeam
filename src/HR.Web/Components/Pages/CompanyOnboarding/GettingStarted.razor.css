@@ -1,0 +1,25 @@
+.onboarding-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.onboarding-progress-track {
+    flex: 1;
+    height: 0.75rem;
+    border-radius: 0.5rem;
+    background-color: var(--bs-secondary-bg, #e9ecef);
+    overflow: hidden;
+}
+
+.onboarding-progress-fill {
+    height: 100%;
+    background-color: var(--bs-primary, #0d6efd);
+    transition: width 0.3s ease;
+}
+
+.onboarding-progress-label {
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--bs-secondary-color, #6c757d);
+}

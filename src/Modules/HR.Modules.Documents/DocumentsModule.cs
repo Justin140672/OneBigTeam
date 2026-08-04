@@ -54,6 +54,7 @@ using HR.Modules.Documents.Features.GetPendingProfilePhotoById;
 using HR.Modules.Documents.Features.ApproveProfilePhoto;
 using HR.Modules.Documents.Features.RejectProfilePhoto;
 using HR.Modules.Documents.Services;
+using HR.Modules.Documents.Services.OnboardingTasks;
 using HR.Modules.Documents.Features.ListDocumentTypes;
 using HR.Modules.Documents.Features.UpdateDocumentType;
 using HR.Modules.Documents.Persistence;
@@ -248,6 +249,9 @@ public static class DocumentsModule
         services.AddScoped<IWorkloadActionProvider, MissingRequiredEmployeeDocumentsWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, EmployeeDocumentsExpiringSoonWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, CompanyDocumentAcknowledgementsOutstandingWorkloadActionProvider>();
+
+        // Getting Started checklist task definition (HR.Modules.CompanyOnboarding epic, Phase A).
+        services.AddScoped<IOnboardingTaskDefinition, ReviewCompanyDocumentsTask>();
     }
 
     public static WebApplication UseDocumentsRecurringJobs(this WebApplication app)

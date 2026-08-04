@@ -48,6 +48,10 @@ internal sealed class ApplicationUserConfiguration : IEntityTypeConfiguration<Ap
             .HasColumnName("is_active")
             .IsRequired();
 
+        builder.Property(u => u.IsEmailConfirmed)
+            .HasColumnName("is_email_confirmed")
+            .IsRequired();
+
         builder.Property(u => u.LastLoginAt)
             .HasColumnName("last_login_at");
 

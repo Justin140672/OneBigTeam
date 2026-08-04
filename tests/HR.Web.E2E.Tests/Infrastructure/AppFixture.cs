@@ -11,6 +11,7 @@ public sealed class AppFixture : IAsyncLifetime
     private IBrowser?               _browser;
 
     public string    WebBaseUrl { get; private set; } = "";
+    public string    MarketingBaseUrl { get; private set; } = "";
     public IBrowser  Browser    => _browser!;
 
     public async Task InitializeAsync()
@@ -31,6 +32,7 @@ public sealed class AppFixture : IAsyncLifetime
 
         // Strip trailing slash so page objects can safely append paths.
         WebBaseUrl = _app.GetEndpoint("web", "http").ToString().TrimEnd('/');
+        MarketingBaseUrl = _app.GetEndpoint("marketing", "http").ToString().TrimEnd('/');
 
         // Probe until the web app is actually serving requests.
         // StartAsync returns as soon as Aspire begins orchestrating — Postgres migrations

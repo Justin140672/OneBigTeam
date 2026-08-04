@@ -17,6 +17,10 @@
         </div>
     </div>
 }
+else if (!Session.IsEmailConfirmed)
+{
+    <EmailConfirmationRequired />
+}
 else
 {
 
@@ -120,6 +124,8 @@ else
         }
 
         <main class="main-content">
+            <ReadOnlyBanner />
+            <TrialBanner />
             <div class="top-bar">
                 @if (ShowSidebar && !SidebarOpen)
                 {
@@ -139,6 +145,25 @@ else
                             <i class="fa-solid fa-moon"></i>
                         }
                     </button>
+                    @if (Session.IsHrAdministrator || Session.CanManageCompany)
+                    {
+                        <div class="help-menu @(_helpOpen ? "help-open" : "")">
+                            <button class="help-btn" @onclick="ToggleHelp" title="Help">
+                                <i class="fa-solid fa-circle-question"></i>
+                            </button>
+                            @if (_helpOpen)
+                            {
+                                <div class="help-dropdown">
+                                    <a class="help-item" href="/getting-started" @onclick="CloseHelp">
+                                        <i class="fa-solid fa-list-check me-2"></i>Getting Started
+                                    </a>
+                                    <a class="help-item" href="/explore" @onclick="CloseHelp">
+                                        <i class="fa-solid fa-compass me-2"></i>Explore One Big Team
+                                    </a>
+                                </div>
+                            }
+                        </div>
+                    }
                     @if (Session.IsLoaded && Session.EmployeeId.HasValue)
                     {
                         <div class="notif-bell @(_notifOpen ? "notif-open" : "")">
@@ -285,6 +310,7 @@ else
     private int _unreadCount;
     private List<NotificationDto> _notifications = [];
     private bool _notifOpen;
+    private bool _helpOpen;
 
     private Guid? _notifiedTaskId;
     private bool _taskDialogOpen;
@@ -388,6 +414,10 @@ else
         if (_notifOpen)
             await LoadNotificationsAsync();
     }
+
+    private void ToggleHelp() => _helpOpen = !_helpOpen;
+
+    private void CloseHelp() => _helpOpen = false;
 
     private async Task OnNotificationClick(NotificationDto notification)
     {

@@ -32,6 +32,26 @@ internal static class TestRoleSeeder
                 now: DateTimeOffset.UtcNow));
         }
 
+        // Also ensure a matching UserProfile exists, keyed by SupabaseAuthUserId == userId
+        // (TestAuthHandler puts the test user id in the "sub" claim). Without this,
+        // SupabaseCurrentUserResolutionMiddleware can't resolve ICurrentUser.Email for any
+        // handler that needs it (e.g. CreateCheckoutSessionHandler).
+        var profileExists = await db.UserProfiles.AnyAsync(p => p.SupabaseAuthUserId == userId);
+        if (!profileExists)
+        {
+            // Id must equal userId (not a fresh Guid): RoleAuthorizationHandler resolves
+            // role membership via ICurrentUser.UserId, which SupabaseCurrentUserResolutionMiddleware
+            // sets to UserProfile.Id once a profile is found — it must match the id UserRoles
+            // rows below are keyed by, or every role check for this user will fail.
+            db.UserProfiles.Add(UserProfile.Create(
+                userId,
+                supabaseAuthUserId: userId,
+                email: $"testuser-{userId:N}@test.internal",
+                firstName: "Test",
+                lastName: "User",
+                now: DateTimeOffset.UtcNow));
+        }
+
         var roleExists = await db.UserRoles.AnyAsync(ur => ur.UserId == userId && ur.RoleId == roleId);
         if (!roleExists)
             db.UserRoles.Add(UserRole.Create(userId, roleId, DateTimeOffset.UtcNow));

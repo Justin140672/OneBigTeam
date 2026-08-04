@@ -1,12 +1,19 @@
 using FluentValidation;
 
 using HR.Modules.Companies.Domain;
+using HR.Modules.Companies.Features.CancelSubscription;
+using HR.Modules.Companies.Features.CreateBillingPortalSession;
+using HR.Modules.Companies.Features.CreateCheckoutSession;
 using HR.Modules.Companies.Features.CreateCompany;
 using HR.Modules.Companies.Features.CreatePublicHoliday;
 using HR.Modules.Companies.Features.GetCompany;
 using HR.Modules.Companies.Features.GetCompanySettings;
 using HR.Modules.Companies.Features.GetHrSettings;
+using HR.Modules.Companies.Features.GetSubscriptionDetails;
+using HR.Modules.Companies.Features.GetSubscriptionStatus;
 using HR.Modules.Companies.Features.ListPublicHolidays;
+using HR.Modules.Companies.Features.ResumeSubscription;
+using HR.Modules.Companies.Features.StripeWebhook;
 using HR.Modules.Companies.Features.UpdateCompany;
 using HR.Modules.Companies.Features.UpdateCompanySettings;
 using HR.Modules.Companies.Features.UpdateHrSettings;
@@ -14,22 +21,38 @@ using HR.Modules.Companies.Features.UpdatePublicHoliday;
 using HR.Modules.Companies.Features.UploadCompanyLogo;
 using HR.Modules.Companies.Persistence;
 using HR.Modules.Companies.Services;
+using HR.Modules.Companies.Services.OnboardingTasks;
 using HR.Modules.Companies.Storage;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Modules.Companies;
 
 public static class CompaniesModule
 {
+    /// <summary>
+    /// Registers Phase D's ReadOnlyModeMiddleware. Must be called after UseIdentityModule (and
+    /// UseAuthentication) so the current tenant is already resolvable via ICurrentTenant.
+    /// </summary>
+    public static IApplicationBuilder UseCompaniesModule(this IApplicationBuilder app)
+    {
+        app.UseMiddleware<ReadOnlyModeMiddleware>();
+        return app;
+    }
+
     public static IServiceCollection AddCompaniesModule(
         this IServiceCollection services,
-        string connectionString)
+        string connectionString,
+        IConfiguration configuration)
     {
         AddFeatureServices(services);
+
+        services.Configure<StripeOptions>(configuration.GetSection("Stripe"));
 
         services.AddDbContext<CompaniesDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
@@ -81,6 +104,26 @@ public static class CompaniesModule
 
         await db.SaveChangesAsync();
 
+        // Seeded dev companies get an already-active subscription (rather than a trial) so dev
+        // personas are never read-only-gated — real trials only start via the self-service SignUp
+        // flow (Identity's SignUp feature, via ICompanyProvisioner).
+        foreach (var seededCompanyId in new[] { acmeId, betaCorpId })
+        {
+            if (!await db.CustomerSubscriptions.AnyAsync(s => s.CompanyId == seededCompanyId))
+            {
+                var subscription = CustomerSubscription.StartTrial(seededCompanyId, now, trialLengthDays: 14);
+                subscription.ActivateSubscription(
+                    stripeCustomerId: "dev-stub-customer",
+                    stripeSubscriptionId: "dev-stub-subscription",
+                    priceId: "dev-stub-price",
+                    currentPeriodEnd: now.AddYears(1),
+                    now);
+                db.CustomerSubscriptions.Add(subscription);
+            }
+        }
+
+        await db.SaveChangesAsync();
+
         if (!await db.PublicHolidays.AnyAsync())
         {
             db.PublicHolidays.AddRange(
@@ -114,6 +157,7 @@ public static class CompaniesModule
         services.AddScoped<GetCompanyHandler>();
         services.AddScoped<GetCompanySettingsHandler>();
         services.AddScoped<GetHrSettingsHandler>();
+        services.AddScoped<GetSubscriptionStatusHandler>();
         services.AddScoped<UpdateCompanyHandler>();
         services.AddScoped<UpdateCompanySettingsHandler>();
         services.AddScoped<UpdateHrSettingsHandler>();
@@ -130,6 +174,8 @@ public static class CompaniesModule
         services.AddScoped<ICompanyEmployeeNumberSettingsReader, CompanyEmployeeNumberSettingsReader>();
         services.AddScoped<IEmployeeNumberGenerator, EmployeeNumberGenerator>();
         services.AddScoped<IPublicHolidayReader, PublicHolidayReader>();
+        services.AddScoped<ISubscriptionStatusReader, SubscriptionStatusReader>();
+        services.AddScoped<ICompanyProvisioner, CompanyProvisioner>();
         services.AddScoped<CreatePublicHolidayHandler>();
         services.AddScoped<IValidator<CreatePublicHolidayRequest>, CreatePublicHolidayValidator>();
         services.AddScoped<ListPublicHolidaysHandler>();
@@ -140,5 +186,27 @@ public static class CompaniesModule
         services.AddScoped<IValidator<UpdateCompanySettingsRequest>, UpdateCompanySettingsValidator>();
         services.AddScoped<IValidator<UpdateHrSettingsRequest>, UpdateHrSettingsValidator>();
         services.AddScoped<IValidator<UploadCompanyLogoRequest>, UploadCompanyLogoValidator>();
+
+        // Getting Started checklist task definitions (HR.Modules.CompanyOnboarding epic, Phase A) —
+        // multi-registered against the shared IOnboardingTaskDefinition contract so
+        // CompanyOnboarding's OnboardingTaskRegistry can aggregate them without referencing
+        // HR.Modules.Companies directly.
+        services.AddScoped<IOnboardingTaskDefinition, CompleteCompanyDetailsTask>();
+        services.AddScoped<IOnboardingTaskDefinition, ConfigureHrSettingsTask>();
+
+        // Phase B (trial/subscription tracking) — optional checklist item, excluded from the
+        // mandatory completion percentage.
+        services.AddScoped<IOnboardingTaskDefinition, StartSubscriptionTask>();
+
+        // Phase C — Stripe checkout + webhook.
+        services.AddScoped<IStripeGateway, StripeGateway>();
+        services.AddScoped<CreateCheckoutSessionHandler>();
+        services.AddScoped<StripeWebhookHandler>();
+
+        // Phase D — subscription management (details, cancel/resume, billing portal).
+        services.AddScoped<GetSubscriptionDetailsHandler>();
+        services.AddScoped<CancelSubscriptionHandler>();
+        services.AddScoped<ResumeSubscriptionHandler>();
+        services.AddScoped<CreateBillingPortalSessionHandler>();
     }
 }

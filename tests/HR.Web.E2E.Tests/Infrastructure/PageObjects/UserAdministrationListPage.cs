@@ -89,15 +89,14 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
     /// <summary>
     /// Runs the full 3-step invite wizard from this entry point (no pre-selected employee, so
     /// step 1 — "Employee" — is shown): selects the employee by name (Step 1) — this auto-derives
-    /// the email from the employee's own work email — then selects any additional (non-Employee)
-    /// role(s) via the optional multiselect (Step 2; the mandatory "Employee" role itself is shown
-    /// as a fixed, non-removable badge above the multiselect and cannot be selected/deselected —
+    /// the email from the employee's own work email — then checks any additional (non-Employee)
+    /// role(s) in the plain checkbox table (Step 2; the mandatory "Employee" role itself is shown
+    /// as a fixed, non-removable badge above the table and cannot be selected/deselected —
     /// see <see cref="IsEmployeeRoleBadgeVisibleAsync"/>), then confirms (Step 3, which shows no
     /// separate Email row — see <see cref="HasConfirmEmailRowAsync"/>). The employee combobox is a
     /// Syncfusion SfDropDownList (single-select popup, click item to choose and auto-close); the
-    /// roles field is an SfMultiSelect in checkbox mode (popup stays open after each click, so it's
-    /// closed explicitly before advancing) — same interaction patterns as SharedDocumentAudienceTests
-    /// / CompanyDocumentsTabTests use for the equivalent Syncfusion widgets elsewhere in this suite.
+    /// roles field is a plain HTML checkbox table (no popup), same pattern as
+    /// UserDetailPage.ToggleRolesAndSaveAsync uses for ManageUserRolesDialog.
     /// </summary>
     public async Task InviteEmployeeAsync(string employeeName, IReadOnlyList<string> additionalRoleNames)
     {
@@ -112,27 +111,29 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
 
         await InviteDialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
 
-        // Step 2: additional roles only — "Employee" is a fixed badge, never a multiselect item
-        // (see InviteUserDialog.razor's _additionalRoleOptions, which excludes it entirely).
-        if (additionalRoleNames.Count > 0)
+        // DropDownSelector only proves the combobox's own displayed text updated client-side —
+        // not that the SignalR round trip invoking InviteUserDialog's OnEmployeeChanged (which
+        // populates _email) has landed server-side yet (see DropDownSelector's own doc comment).
+        // If "Next" above raced ahead of that commit, the dialog surfaces a spurious "no work
+        // email on file" step error even for an employee who genuinely has one. Self-heal: step
+        // back and retry — by then the round trip will have committed.
+        var noEmailError = InviteDialog.GetByText("This employee has no work email on file", new() { Exact = false });
+        if (await noEmailError.IsVisibleAsync())
         {
-            await InviteDialog.Locator("input[placeholder='Select additional roles (optional)']").ClickAsync();
-            await page.WaitForSelectorAsync(".e-popup:visible", new() { Timeout = 10_000 });
-            foreach (var roleName in additionalRoleNames)
-            {
-                await page.Locator(".e-popup .e-list-item")
-                    .Filter(new() { HasText = roleName })
-                    .First
-                    .ClickAsync();
-            }
-            // Checkbox-mode multiselect popups stay open to allow further selections, and being an
-            // overlay it can sit visually on top of (and intercept clicks intended for) whatever sits
-            // beneath it, including the dialog's own "Next" button — clicking a "neutral" element
-            // underneath it is not reliable. Escape is the standard, unambiguous way to close a
-            // Syncfusion dropdown/multiselect popup without depending on its rendered size/position —
-            // same reasoning as UserDetailPage.ToggleRolesAndSaveAsync for the equivalent widget.
-            await page.Keyboard.PressAsync("Escape");
-            await page.WaitForSelectorAsync(".e-popup:visible", new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+            await InviteDialog.GetByRole(AriaRole.Button, new() { Name = "Back" }).ClickAsync();
+            await page.WaitForTimeoutAsync(500);
+            await InviteDialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
+        }
+
+        // Step 2: additional roles only — "Employee" is a fixed badge, never a selectable item
+        // (see InviteUserDialog.razor's _additionalRoleOptions, which excludes it entirely). Plain
+        // checkbox table, same pattern as UserDetailPage.ToggleRolesAndSaveAsync for ManageRolesDialog.
+        foreach (var roleName in additionalRoleNames)
+        {
+            await InviteDialog.Locator("tr", new() { HasText = roleName })
+                .Locator("input[type='checkbox']")
+                .First
+                .ClickAsync();
         }
 
         await InviteDialog.GetByRole(AriaRole.Button, new() { Name = "Next" }).ClickAsync();
