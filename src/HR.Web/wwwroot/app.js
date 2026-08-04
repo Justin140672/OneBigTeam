@@ -91,6 +91,47 @@ function getScrollPosition(key) {
     } catch { return null; }
 }
 
+// Used by the Help & Feedback page to attach basic client diagnostics to a support submission
+// when the user opts in.
+function getBrowserInfo() {
+    try { return navigator.userAgent; } catch { return ''; }
+}
+
+// Rolling buffer of recent client-side errors, surfaced on the Help & Feedback "include
+// diagnostics" submission so support staff don't have to ask the customer to reproduce and
+// describe a JS error themselves. Capped so a noisy page can't grow this unbounded.
+const CLIENT_ERROR_BUFFER_LIMIT = 20;
+window.__clientErrorBuffer = window.__clientErrorBuffer || [];
+
+function pushClientError(message) {
+    try {
+        const entry = `${new Date().toISOString()} ${message}`;
+        window.__clientErrorBuffer.push(entry);
+        if (window.__clientErrorBuffer.length > CLIENT_ERROR_BUFFER_LIMIT) {
+            window.__clientErrorBuffer.shift();
+        }
+    } catch { }
+}
+
+window.addEventListener('error', (event) => {
+    pushClientError(event?.message ?? 'Unknown script error');
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    const reason = event?.reason;
+    pushClientError(`Unhandled promise rejection: ${reason?.message ?? reason ?? 'unknown reason'}`);
+});
+
+// Called from HelpFeedback.razor when "include diagnostics" is checked at submit time. Returns
+// the most recent errors first (Blazor circuit errors pushed via pushClientError from
+// MainLayout's ErrorBoundary end up here too).
+function getRecentClientErrors(max) {
+    try {
+        const buffer = window.__clientErrorBuffer || [];
+        return buffer.slice(-1 * (max || CLIENT_ERROR_BUFFER_LIMIT)).reverse();
+    } catch { return []; }
+}
+
 function downloadFileFromBase64(fileName, contentType, base64Content) {
     const link = document.createElement('a');
     link.href = `data:${contentType};base64,${base64Content}`;

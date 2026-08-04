@@ -26,6 +26,7 @@
     <Project Path="src/Modules/HR.Modules.Reporting/HR.Modules.Reporting.csproj" />
     <Project Path="src/Modules/HR.Modules.Assets/HR.Modules.Assets.csproj" />
     <Project Path="src/Modules/HR.Modules.Sickness/HR.Modules.Sickness.csproj" />
+    <Project Path="src/Modules/HR.Modules.Support/HR.Modules.Support.csproj" />
     <Project Path="src/Modules/HR.Modules.Tasks/HR.Modules.Tasks.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">
@@ -50,6 +51,7 @@
     <Project Path="tests/HR.Modules.Recruitment.Tests/HR.Modules.Recruitment.Tests.csproj" />
     <Project Path="tests/HR.Modules.Assets.Tests/HR.Modules.Assets.Tests.csproj" />
     <Project Path="tests/HR.Modules.Reporting.Tests/HR.Modules.Reporting.Tests.csproj" />
+    <Project Path="tests/HR.Modules.Support.Tests/HR.Modules.Support.Tests.csproj" />
     <Project Path="tests/HR.Modules.Tasks.Tests/HR.Modules.Tasks.Tests.csproj" />
     <Project Path="tests/HR.Web.Tests/HR.Web.Tests.csproj" />
   </Folder>

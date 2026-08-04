@@ -26,7 +26,7 @@ public static class InfrastructureModule
         string connectionString,
         IConfiguration configuration)
     {
-        services.AddSingleton<IEmailSender, LoggingEmailSender>();
+        AddEmailSender(services, configuration);
         services.AddSingleton<IInviteLinkBuilder, ConfiguredInviteLinkBuilder>();
         services.AddScoped<IAuditEventPublisher, DbAuditEventPublisher>();
         services.AddScoped<IAuditHistoryReader, AuditHistoryReader>();
@@ -39,6 +39,7 @@ public static class InfrastructureModule
 
         services.AddHttpContextAccessor();
         AddProfilePhotoStorageService(services, configuration);
+        AddSupportAttachmentStorageService(services, configuration);
 
         QuestPDF.Settings.License = LicenseType.Community;
         services.AddScoped<IReportExporter, ReportExporter>();
@@ -58,6 +59,36 @@ public static class InfrastructureModule
         else
         {
             services.AddScoped<IProfilePhotoStorageService, LocalProfilePhotoStorageService>();
+        }
+    }
+
+    private static void AddSupportAttachmentStorageService(IServiceCollection services, IConfiguration configuration)
+    {
+        var supabaseSection = configuration.GetSection("Infrastructure:Supabase:SupportAttachments");
+
+        if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
+        {
+            services.Configure<SupabaseSupportAttachmentStorageOptions>(supabaseSection);
+            services.AddHttpClient<ISupportAttachmentStorageService, SupabaseSupportAttachmentStorageService>();
+        }
+        else
+        {
+            services.AddScoped<ISupportAttachmentStorageService, LocalSupportAttachmentStorageService>();
+        }
+    }
+
+    private static void AddEmailSender(IServiceCollection services, IConfiguration configuration)
+    {
+        var postmarkSection = configuration.GetSection("Infrastructure:Postmark");
+
+        if (postmarkSection.Exists() && !string.IsNullOrWhiteSpace(postmarkSection["ServerToken"]))
+        {
+            services.Configure<PostmarkOptions>(postmarkSection);
+            services.AddHttpClient<IEmailSender, PostmarkEmailSender>();
+        }
+        else
+        {
+            services.AddSingleton<IEmailSender, LoggingEmailSender>();
         }
     }
 

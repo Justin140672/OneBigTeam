@@ -17,6 +17,7 @@ using HR.Modules.Sickness;
 using HR.Modules.Probation;
 using HR.Modules.Reporting;
 using HR.Modules.Recruitment;
+using HR.Modules.Support;
 using HR.Modules.Tasks;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -44,6 +45,7 @@ builder.Services.AddProbationModule(connectionString);
 builder.Services.AddRecruitmentModule(connectionString, builder.Configuration);
 builder.Services.AddAssetsModule(connectionString);
 builder.Services.AddSicknessModule(connectionString);
+builder.Services.AddSupportModule(connectionString);
 builder.Services.AddReportingModule(connectionString);
 builder.Services.AddInfrastructure(connectionString, builder.Configuration);
 builder.Services.AddHangfireBackgroundJobs(connectionString);
@@ -158,6 +160,10 @@ DateTimeOffset? reportingMigrationCheckedAt = null;
 var assetsMigrationStatus = "unknown";
 string? assetsMigrationError = null;
 DateTimeOffset? assetsMigrationCheckedAt = null;
+
+var supportMigrationStatus = "unknown";
+string? supportMigrationError = null;
+DateTimeOffset? supportMigrationCheckedAt = null;
 var sicknessMigrationStatus = "unknown";
 string? sicknessMigrationError = null;
 DateTimeOffset? sicknessMigrationCheckedAt = null;
@@ -387,6 +393,20 @@ catch (Exception exception)
 
 try
 {
+	await app.Services.MigrateSupportAsync();
+	await app.Services.SeedSupportAsync();
+	supportMigrationStatus = "succeeded";
+	supportMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+catch (Exception exception)
+{
+	supportMigrationStatus = "failed";
+	supportMigrationError = exception.Message;
+	supportMigrationCheckedAt = DateTimeOffset.UtcNow;
+}
+
+try
+{
 	await app.Services.MigrateRecruitmentAsync();
 	await app.Services.SeedRecruitmentAsync();
 	recruitmentMigrationStatus = "succeeded";
@@ -504,10 +524,16 @@ app.MapGet("/health/startup-migrations", () =>
 			status = recruitmentMigrationStatus,
 			checkedAt = recruitmentMigrationCheckedAt,
 			error = recruitmentMigrationError
+		},
+		support = new
+		{
+			status = supportMigrationStatus,
+			checkedAt = supportMigrationCheckedAt,
+			error = supportMigrationError
 		}
 	};
 
-	return auditMigrationStatus == "failed" || companiesMigrationStatus == "failed" || companyOnboardingMigrationStatus == "failed" || dataImportMigrationStatus == "failed" || documentsMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed" || notificationsMigrationStatus == "failed" || tasksMigrationStatus == "failed" || onboardingMigrationStatus == "failed" || offboardingMigrationStatus == "failed" || probationMigrationStatus == "failed" || reportingMigrationStatus == "failed" || assetsMigrationStatus == "failed" || sicknessMigrationStatus == "failed" || recruitmentMigrationStatus == "failed"
+	return auditMigrationStatus == "failed" || companiesMigrationStatus == "failed" || companyOnboardingMigrationStatus == "failed" || dataImportMigrationStatus == "failed" || documentsMigrationStatus == "failed" || employeesMigrationStatus == "failed" || identityMigrationStatus == "failed" || leaveMigrationStatus == "failed" || notificationsMigrationStatus == "failed" || tasksMigrationStatus == "failed" || onboardingMigrationStatus == "failed" || offboardingMigrationStatus == "failed" || probationMigrationStatus == "failed" || reportingMigrationStatus == "failed" || assetsMigrationStatus == "failed" || sicknessMigrationStatus == "failed" || recruitmentMigrationStatus == "failed" || supportMigrationStatus == "failed"
 		? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
 		: Results.Ok(response);
 });
@@ -556,6 +582,7 @@ if (app.Environment.IsDevelopment())
 		["profile-photos"]      = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "onebigteam", "profile-photos")),
 		["documents"]            = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "onebigteam", "documents")),
 		["candidate-documents"] = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "onebigteam", "recruitment", "candidate-documents")),
+		["support-attachments"] = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "onebigteam", "support-attachments")),
 	};
 	var contentTypeProvider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
 
@@ -588,6 +615,7 @@ app.UseEmployeesRecurringJobs();
 app.UseProbationRecurringJobs();
 app.UseAssetsRecurringJobs();
 app.UseSicknessRecurringJobs();
+app.UseSupportRecurringJobs();
 app.UseRecruitmentRecurringJobs();
 app.UseOnboardingRecurringJobs();
 app.UseOffboardingRecurringJobs();

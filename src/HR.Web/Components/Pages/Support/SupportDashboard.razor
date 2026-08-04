@@ -1,0 +1,150 @@
+@page "/companies/{CompanyId:guid}/support/admin/dashboard"
+@rendermode InteractiveServer
+@inject SupportService SupportService
+@inject AppSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Product Feedback Dashboard</PageTitle>
+
+<div class="container-fluid py-4">
+    <h1 class="mb-1">Product Feedback Dashboard</h1>
+    <p class="text-muted mb-4">Aggregated support and feedback metrics across all companies.</p>
+
+    @if (_loading)
+    {
+        <HrLoadingIndicator Label="Loading dashboard…" />
+    }
+    else if (_loadError is not null)
+    {
+        <div class="alert alert-danger">@_loadError</div>
+    }
+    else if (_dashboard is not null)
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-md-6 col-xl-3">
+                <div class="card support-metric-card">
+                    <div class="card-body">
+                        <div class="text-muted">Open Requests</div>
+                        <div class="support-metric-value">@_dashboard.OpenRequestsCount</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="card support-metric-card">
+                    <div class="card-body">
+                        <div class="text-muted">Avg. Staff Response Time</div>
+                        <div class="support-metric-value">
+                            @(_dashboard.AverageStaffResponseTimeHours.HasValue
+                                ? $"{_dashboard.AverageStaffResponseTimeHours.Value:0.#}h"
+                                : "—")
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="card mb-4">
+                    <div class="card-header"><h5 class="mb-0">Top Requested Features</h5></div>
+                    <div class="card-body p-0">
+                        @if (_dashboard.TopRequestedFeatures.Count == 0)
+                        {
+                            <p class="text-muted p-3 mb-0">No feature requests yet.</p>
+                        }
+                        else
+                        {
+                            <table class="table mb-0">
+                                <thead>
+                                    <tr><th>Title</th><th class="text-end">Count</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var row in _dashboard.TopRequestedFeatures)
+                                    {
+                                        <tr><td>@row.Title</td><td class="text-end">@row.Count</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Top Reported Problems</h5></div>
+                    <div class="card-body p-0">
+                        @if (_dashboard.TopReportedProblems.Count == 0)
+                        {
+                            <p class="text-muted p-3 mb-0">No reported problems yet.</p>
+                        }
+                        else
+                        {
+                            <table class="table mb-0">
+                                <thead>
+                                    <tr><th>Title</th><th class="text-end">Count</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var row in _dashboard.TopReportedProblems)
+                                    {
+                                        <tr><td>@row.Title</td><td class="text-end">@row.Count</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Requests by Type</h5></div>
+                    <div class="card-body p-0">
+                        @if (_dashboard.RequestsByType.Count == 0)
+                        {
+                            <p class="text-muted p-3 mb-0">No requests yet.</p>
+                        }
+                        else
+                        {
+                            <table class="table mb-0">
+                                <thead>
+                                    <tr><th>Type</th><th class="text-end">Count</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var row in _dashboard.RequestsByType)
+                                    {
+                                        <tr><td>@SupportRequestOptions.TypeLabel(row.Type)</td><td class="text-end">@row.Count</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private bool _loading = true;
+    private string? _loadError;
+    private SupportDashboardModel? _dashboard;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Session.IsHrAdministrator && !Session.CanManageCompany)
+        {
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            return;
+        }
+
+        _loading = true;
+        _loadError = null;
+
+        _dashboard = await SupportService.GetDashboardAsync();
+        if (_dashboard is null)
+            _loadError = "Failed to load the dashboard.";
+
+        _loading = false;
+    }
+}

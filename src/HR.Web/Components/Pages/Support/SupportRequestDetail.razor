@@ -1,0 +1,261 @@
+@page "/companies/{CompanyId:guid}/support/{Id:guid}"
+@rendermode InteractiveServer
+@inject SupportService SupportService
+@inject NavigationManager Navigation
+@inject AppSession Session
+
+<PageTitle>@(_detail?.ReferenceNumber ?? "Support Request")</PageTitle>
+
+<div class="container py-4">
+    <SfBreadcrumb Class="mb-3">
+        <BreadcrumbItems>
+            <BreadcrumbItem Text="Help & Feedback" Url="@($"/companies/{CompanyId}/support")" />
+            <BreadcrumbItem Text="@(_detail?.ReferenceNumber ?? "Request")" />
+        </BreadcrumbItems>
+    </SfBreadcrumb>
+
+    @if (_loading)
+    {
+        <HrLoadingIndicator />
+    }
+    else if (_loadError is not null)
+    {
+        <div class="alert alert-danger">@_loadError</div>
+    }
+    else if (_detail is not null)
+    {
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <div>
+                <h1 class="mb-1">@_detail.Title</h1>
+                <div class="text-muted">@_detail.ReferenceNumber</div>
+            </div>
+            <span class="badge fs-6 @StatusBadgeClass(_detail.Status)">@_detail.Status</span>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-header"><h5 class="mb-0">Details</h5></div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3">Type</dt>
+                            <dd class="col-sm-9">@SupportRequestOptions.TypeLabel(_detail.Type)</dd>
+
+                            <dt class="col-sm-3">Priority</dt>
+                            <dd class="col-sm-9">@_detail.Priority</dd>
+
+                            <dt class="col-sm-3">Description</dt>
+                            <dd class="col-sm-9 support-description-text">@_detail.Description</dd>
+
+                            <dt class="col-sm-3">Submitted</dt>
+                            <dd class="col-sm-9">@_detail.CreatedAt.ToLocalTime().ToString("g")</dd>
+
+                            <dt class="col-sm-3">Last Updated</dt>
+                            <dd class="col-sm-9">@_detail.UpdatedAt.ToLocalTime().ToString("g")</dd>
+                        </dl>
+
+                        @if (_detail.Attachments.Count > 0)
+                        {
+                            <hr />
+                            <h6>Attachments</h6>
+                            <ul class="list-unstyled mb-0">
+                                @foreach (var attachment in _detail.Attachments)
+                                {
+                                    <li><i class="fa-solid fa-paperclip me-2"></i>@attachment.FileName <span class="text-muted">(@FormatSize(attachment.SizeBytes))</span></li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </div>
+
+                @if (_detail.IncludeDiagnostics)
+                {
+                    <div class="card mb-4">
+                        <div class="card-header"><h5 class="mb-0">Diagnostics</h5></div>
+                        <div class="card-body">
+                            <dl class="row mb-0">
+                                <dt class="col-sm-3">Page URL</dt>
+                                <dd class="col-sm-9">@(_detail.PageUrl ?? "—")</dd>
+
+                                <dt class="col-sm-3">Browser</dt>
+                                <dd class="col-sm-9">@(_detail.Browser ?? "—")</dd>
+
+                                <dt class="col-sm-3">App Version</dt>
+                                <dd class="col-sm-9">@(_detail.AppVersion ?? "—")</dd>
+
+                                <dt class="col-sm-3">Correlation Id</dt>
+                                <dd class="col-sm-9">@(_detail.CorrelationId ?? "—")</dd>
+
+                                @if (!string.IsNullOrWhiteSpace(_detail.DiagnosticsJson))
+                                {
+                                    <dt class="col-sm-3">Additional Data</dt>
+                                    <dd class="col-sm-9"><pre class="mb-0 support-diagnostics-json">@_detail.DiagnosticsJson</pre></dd>
+                                }
+                            </dl>
+                        </div>
+                    </div>
+                }
+
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">Conversation</h5></div>
+                    <div class="card-body">
+                        @if (_detail.Responses.Count == 0)
+                        {
+                            <p class="text-muted">No responses yet.</p>
+                        }
+                        else
+                        {
+                            <div class="support-thread">
+                                @foreach (var response in _detail.Responses)
+                                {
+                                    <div class="support-thread-item @(response.IsStaffResponse ? "support-thread-item--staff" : "")">
+                                        <div class="d-flex justify-content-between">
+                                            <span class="fw-semibold">@(response.IsStaffResponse ? "Support Team" : "You")</span>
+                                            <span class="text-muted small">@response.CreatedAt.ToLocalTime().ToString("g")</span>
+                                        </div>
+                                        <div class="support-thread-body">@((MarkupString)response.BodyHtml)</div>
+                                        @if (response.Attachments.Count > 0)
+                                        {
+                                            <ul class="list-unstyled mb-0 mt-2">
+                                                @foreach (var attachment in response.Attachments)
+                                                {
+                                                    <li><i class="fa-solid fa-paperclip me-2"></i>@attachment.FileName</li>
+                                                }
+                                            </ul>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        <hr />
+
+                        @if (!string.IsNullOrEmpty(_replyError))
+                        {
+                            <div class="alert alert-danger">@_replyError</div>
+                        }
+
+                        <EditForm EditContext="_replyEditContext" OnValidSubmit="SubmitReplyAsync">
+                            <DataAnnotationsValidator />
+                            <div class="mb-3">
+                                <label class="form-label">Reply</label>
+                                <HrTextBox @bind-Value="_replyModel.BodyHtml" Multiline="true" CssClass="support-reply-box"
+                                           Placeholder="Write a reply…" />
+                                <ValidationMessage For="@(() => _replyModel.BodyHtml)" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Attachments (optional)</label>
+                                <InputFile OnChange="OnReplyFilesSelected" multiple class="form-control" />
+                            </div>
+                            <div class="d-flex justify-content-end">
+                                <SfButton IsPrimary="true" Disabled="@_replying" type="submit">
+                                    @if (_replying)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                    }
+                                    Send Reply
+                                </SfButton>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _loading = true;
+    private string? _loadError;
+    private SupportRequestDetailModel? _detail;
+
+    private readonly AddSupportResponseFormModel _replyModel = new();
+    private EditContext _replyEditContext = default!;
+    private readonly List<IBrowserFile> _replyFiles = [];
+    private bool _replying;
+    private string? _replyError;
+
+    protected override void OnInitialized()
+    {
+        _replyEditContext = new EditContext(_replyModel);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Session.IsHrAdministrator && !Session.CanManageCompany)
+        {
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loadError = null;
+        StateHasChanged();
+
+        _detail = await SupportService.GetSupportRequestAsync(CompanyId, Id);
+        if (_detail is null)
+            _loadError = "Failed to load this support request.";
+
+        _loading = false;
+    }
+
+    private void OnReplyFilesSelected(InputFileChangeEventArgs e)
+    {
+        _replyFiles.Clear();
+        foreach (var file in e.GetMultipleFiles(20))
+            _replyFiles.Add(file);
+    }
+
+    private async Task SubmitReplyAsync()
+    {
+        _replyError = null;
+
+        if (!_replyEditContext.Validate())
+        {
+            _replyError = "Please enter a reply.";
+            return;
+        }
+
+        _replying = true;
+        StateHasChanged();
+
+        var (result, error) = await SupportService.AddResponseAsync(
+            CompanyId, Id, _replyModel.BodyHtml.Trim(), _replyFiles);
+
+        _replying = false;
+
+        if (result is null)
+        {
+            _replyError = error ?? "Failed to post reply.";
+            return;
+        }
+
+        _replyModel.BodyHtml = string.Empty;
+        _replyFiles.Clear();
+        await LoadAsync();
+    }
+
+    private static string FormatSize(long bytes) =>
+        bytes < 1024 ? $"{bytes} B" :
+        bytes < 1024 * 1024 ? $"{bytes / 1024.0:0.#} KB" :
+        $"{bytes / (1024.0 * 1024.0):0.#} MB";
+
+    private static string StatusBadgeClass(string status) => status switch
+    {
+        "Submitted" => "bg-secondary",
+        "UnderReview" => "bg-info text-dark",
+        "Planned" => "bg-primary",
+        "WaitingForCustomer" => "bg-warning text-dark",
+        "Resolved" => "bg-success",
+        "Closed" => "bg-dark",
+        _ => "bg-secondary",
+    };
+}

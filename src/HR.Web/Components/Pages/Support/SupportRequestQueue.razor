@@ -1,0 +1,150 @@
+@page "/companies/{CompanyId:guid}/support/admin/queue"
+@rendermode InteractiveServer
+@inject SupportService SupportService
+@inject AppSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Support Requests</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="d-flex align-items-center justify-content-between mb-1">
+        <h1 class="mb-0">Support Requests</h1>
+    </div>
+    <p class="text-muted mb-3">
+        Staff queue for reviewing and updating the status of support requests submitted by employees of this company.
+    </p>
+
+    <div class="mb-3 support-status-filter">
+        <label class="form-label">Filter by status</label>
+        <SfDropDownList TValue="string" TItem="string"
+                        DataSource="@_statusFilterOptions"
+                        Value="@_statusFilter"
+                        ValueChanged="OnStatusFilterChangedAsync">
+        </SfDropDownList>
+    </div>
+
+    @if (_loading)
+    {
+        <HrLoadingIndicator Label="Loading support requests…" />
+    }
+    else if (_loadError is not null)
+    {
+        <div class="alert alert-danger">@_loadError</div>
+    }
+    else
+    {
+        @if (_actionError is not null)
+        {
+            <div class="alert alert-danger alert-dismissible">
+                @_actionError
+                <button type="button" class="btn-close" @onclick="@(() => _actionError = null)"></button>
+            </div>
+        }
+
+        <HrGrid TValue="SupportRequestListItem"
+                DataSource="@_items"
+                AllowPaging="true"
+                AllowSorting="true">
+            <GridPageSettings PageSize="20" />
+            <GridColumns>
+                <GridColumn Field="@nameof(SupportRequestListItem.ReferenceNumber)" HeaderText="Reference" Width="140">
+                    <Template>
+                        @{
+                            var row = (context as SupportRequestListItem)!;
+                            <a href="/companies/@CompanyId/support/@row.Id">@row.ReferenceNumber</a>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(SupportRequestListItem.Title)" HeaderText="Title" Width="220" />
+                <GridColumn Field="@nameof(SupportRequestListItem.Type)" HeaderText="Type" Width="160">
+                    <Template>
+                        @{
+                            var row = (context as SupportRequestListItem)!;
+                            @SupportRequestOptions.TypeLabel(row.Type)
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(SupportRequestListItem.Priority)" HeaderText="Priority" Width="110" />
+                <GridColumn Field="@nameof(SupportRequestListItem.CreatedAt)" HeaderText="Submitted" Width="150" Format="g" />
+                <GridColumn HeaderText="Status" Width="220">
+                    <Template>
+                        @{
+                            var row = (context as SupportRequestListItem)!;
+                        }
+                        <SfDropDownList TValue="string" TItem="string"
+                                        DataSource="@SupportRequestOptions.Statuses"
+                                        Value="@row.Status"
+                                        ValueChanged="@(async (string value) => await ChangeStatusAsync(row, value))">
+                        </SfDropDownList>
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </HrGrid>
+
+        <p class="text-muted mt-3">@_items.Count support request(s)</p>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private const string AllStatusesOption = "All statuses";
+    private readonly List<string> _statusFilterOptions = [AllStatusesOption, .. SupportRequestOptions.Statuses];
+    private string _statusFilter = AllStatusesOption;
+
+    private bool _loading = true;
+    private string? _loadError;
+    private string? _actionError;
+    private List<SupportRequestListItem> _items = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Session.IsHrAdministrator && !Session.CanManageCompany)
+        {
+            Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loadError = null;
+        StateHasChanged();
+
+        var status = _statusFilter == AllStatusesOption ? null : _statusFilter;
+        var result = await SupportService.ListSupportRequestsAsync(CompanyId, status);
+
+        if (result is null)
+            _loadError = "Failed to load support requests.";
+        else
+            _items = result;
+
+        _loading = false;
+    }
+
+    private async Task OnStatusFilterChangedAsync(string value)
+    {
+        _statusFilter = value;
+        await LoadAsync();
+    }
+
+    private async Task ChangeStatusAsync(SupportRequestListItem row, string newStatus)
+    {
+        if (newStatus == row.Status) return;
+
+        _actionError = null;
+        var (result, error) = await SupportService.UpdateStatusAsync(CompanyId, row.Id, newStatus);
+
+        if (result is null)
+        {
+            _actionError = error ?? "Failed to update status.";
+            StateHasChanged();
+            return;
+        }
+
+        await LoadAsync();
+    }
+}

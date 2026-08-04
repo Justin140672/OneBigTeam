@@ -48,6 +48,7 @@ public static class IdentityModule
         services.AddSingleton<IClock, SystemClock>();
 
         services.AddScoped<IEmployeeUserAccountStatusReader, EmployeeUserAccountStatusReader>();
+        services.AddScoped<IUserEmailReader, UserEmailReader>();
 
         services.AddScoped<ListUsersHandler>();
         services.AddScoped<IValidator<ListUsersRequest>, ListUsersValidator>();
@@ -140,6 +141,15 @@ public static class IdentityModule
         // HR Administrator is a distinct role scoped to employee/leave/sickness data and
         // must not be able to change company-level configuration.
         builder.AddPolicy("company:manage", RolePolicy(
+            SystemRoles.CompanyAdministrator));
+
+        // Support & Feedback domain policy — status management and the reporting dashboard are
+        // internal-staff territory. No dedicated "platform staff" role exists yet in SystemRoles,
+        // so this is scoped to HR/Company Administrator (same OR-of-roles shape as users:view
+        // above) as the closest existing approximation. Revisit if a genuine internal-staff role
+        // is introduced later.
+        builder.AddPolicy("support:manage", RolePolicy(
+            SystemRoles.HrAdministrator,
             SystemRoles.CompanyAdministrator));
 
         // HR Settings domain policy — the HR-policy fields split out of Company Settings

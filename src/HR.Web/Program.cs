@@ -76,6 +76,7 @@ builder.Services.AddScoped<DataImportService>();
 builder.Services.AddScoped<ReportingService>();
 builder.Services.AddScoped<CompanyOnboardingService>();
 builder.Services.AddScoped<SubscriptionService>();
+builder.Services.AddScoped<SupportService>();
 builder.Services.AddScoped<AppSession>();
 builder.Services.AddScoped<AuthenticationStateProvider, AppSessionAuthStateProvider>();
 builder.Services.AddAuthentication("NoOp")

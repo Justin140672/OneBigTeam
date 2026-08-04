@@ -22,6 +22,7 @@ public class ModuleDependencyBoundariesTests
             typeof(HR.Modules.Sickness.SicknessModule).Assembly,
             typeof(HR.Modules.Onboarding.OnboardingModule).Assembly,
             typeof(HR.Modules.Offboarding.OffboardingModule).Assembly,
+            typeof(HR.Modules.Support.SupportModule).Assembly,
         ];
 
     [Theory]
